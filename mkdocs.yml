@@ -71,18 +71,33 @@ nav:
       - 概要: strategy/index.md
   - 要件:
       - 概要: requirements/index.md
+      - beer-game:
+          - 概要: requirements/beer-game/index.md
+          - 要件定義: requirements/beer-game/requirements_definition.md
   - 設計:
       - 概要: design/index.md
+      - beer-game:
+          - 概要: design/beer-game/index.md
   - 開発:
       - 概要: development/index.md
+      - beer-game:
+          - 概要: development/beer-game/index.md
   - 運用:
       - 概要: operation/index.md
+      - beer-game:
+          - 概要: operation/beer-game/index.md
   - レビュー:
       - 概要: review/index.md
+      - beer-game:
+          - 概要: review/beer-game/index.md
   - ADR:
       - 概要: adr/index.md
+      - beer-game:
+          - 概要: adr/beer-game/index.md
   - ジャーナル:
       - 概要: journal/index.md
+      - beer-game:
+          - 概要: journal/beer-game/index.md
   - 記事:
       - 概要: article/index.md
   - リファレンス:

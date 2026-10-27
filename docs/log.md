@@ -1,5 +1,8 @@
 # Docs Update Log
 
+## 2026-10-27
+* **Creation**: JSD 改訂版ビールゲームキットを根拠に、システム価値・外部環境・境界・内部構造を定義
+
 ## 2026-10-03
 * **Update**: プロジェクト別 7 カテゴリ（requirements/design/development/operation/adr/journal/review）のカテゴリ索引を「プロジェクト一覧」表の形式に変更し、ドキュメント一覧は `apply-docs-structure` のテンプレートから作る `<category>/<project>/index.md` に移動。[ジャーナル](/journal/index.md) の索引を新規作成し、[ドキュメント構成ガイド](/reference/ドキュメント構成ガイド.md) の追加手順を更新（claude-code/claude-opus-5-5）
 * **Update**: MkDocs のナビゲーションをプロジェクト単位で折りたためるように変更（`navigation.sections` を外し、add-project が nav にプロジェクトのグループを追加）。[ドキュメント構成ガイド](/reference/ドキュメント構成ガイド.md) に nav の規約を追記（claude-code/claude-opus-5-5）
