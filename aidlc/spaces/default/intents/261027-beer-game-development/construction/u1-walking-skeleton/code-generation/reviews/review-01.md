@@ -1,0 +1,27 @@
+## Review
+
+**Verdict:** NOT-READY
+**Reviewer:** aidlc-architecture-reviewer-agent
+**Date:** 2026-10-28T06:53:15Z
+**Iteration:** 1
+**Verdict Dictated:** no
+
+### Findings
+
+| ID | Severity | Location | Finding | Required action | Status |
+|---|---|---|---|---|---|
+| R-01 | Critical | apps/beer-game/src/api/app.ts > `encodeActor` / `decodeActor` / `setSession` and apps/beer-game/src/application/game-service.ts > authorization methods | `bg_session` is only base64url-encoded JSON and has no signature or opaque server-side lookup. A client can forge `kind: FACILITATOR`, any `gameId`, and any `role`; the stored facilitator and participant credential digests are never checked by a request path. In addition, the events endpoint accepts any authenticated actor and does not compare the path `gameId` with the actor's game, so a legitimate participant can read another game's event stream. This contradicts BR3.1 and the Security Design's opaque-session and per-object authorization boundary. | Replace the actor cookie with an opaque credential or cryptographically authenticated session identifier resolved against server-side credential state on every request. Validate path game/session/week resources against that resolved membership and role, including the events route, and add forgery and cross-game authorization tests. | New |
+| R-02 | Critical | apps/beer-game/src/application/game-service.ts > `GameService` state and `commitWeek`; apps/beer-game/migrations/001_u1_walking_skeleton.sql | All authoritative state, idempotency records, results, and events live in process-local `Map` / arrays. The migration is not connected to any repository, and `commitWeek` never writes PostgreSQL or the outbox. A restart loses accepted games and weeks, and BR6.1's atomic state/result/idempotency/outbox transaction is not implemented despite `traceability.json` marking BR6.1 `OK`. | Implement PostgreSQL repositories and execute game creation, join, decision, and week commit through explicit database transactions that persist aggregate state, idempotency result, week result, and outbox row atomically. Add container-backed rollback, restart-recovery, and concurrency integration tests; change traceability to `Deferred` or `GAP` until they pass. | New |
+| R-03 | Major | apps/beer-game/src/infrastructure/outbox-dispatcher.ts > `dispatchBatch` | The dispatcher issues `SELECT ... FOR UPDATE SKIP LOCKED` without starting a transaction, so under normal PostgreSQL autocommit the row locks end when the select statement completes. Concurrent workers can publish the same rows before either update is visible. The implementation also has no persisted retry schedule/backoff or terminal isolation even though the delivery contract requires retry backoff. | Wrap claim, publish-state transition, attempt accounting, and notification in a deliberate concurrency protocol, such as a short claim transaction with lease/status followed by publish and idempotent completion. Persist next-attempt timing/backoff and add concurrent-worker, publish-failure, and recovery tests against PostgreSQL. | New |
+| R-04 | Major | apps/beer-game/tests/e2e/u1.spec.ts > U1 walking skeleton scenarios; aidlc/spaces/default/intents/261027-beer-game-development/construction/u1-walking-skeleton/code-generation/unit-test-instructions.md > Test Scope | The Playwright suite contains only game creation and cross-origin rejection. It does not execute the promised browser flow of join, four role assignments, start, four decisions, one week commit, duplicate commit, or role-private non-disclosure. The passing `verify:u1` therefore does not demonstrate the U1 end-to-end walking skeleton claimed by the plan and test instructions. | Add an executable browser/API E2E scenario covering the complete one-game/four-role/one-week flow, duplicate commit, and cross-role disclosure checks, and ensure `verify:u1` runs it. | New |
+| R-05 | Major | apps/beer-game/infra/main.tf and .github/workflows/beer-game-u1.yml > deployment resources/jobs | Terraform creates only a VPC, ECS cluster, log group, and RDS instance; private/public subnets, routing/egress, security groups, ECS task/service/worker, ALB, S3/CloudFront/WAF, ECR, secret injection, alarms, and remote state are absent. The staging and production jobs only echo deployment text. This does not implement the Infrastructure Specification's topology or executable rolling/blue-green gates. | Implement the declared network, compute, frontend, security, observability, and state resources, plus real OIDC-authenticated staging and production deployment steps with blue-green health/bake/rollback conditions; validate them in CI. | New |
+
+### Validation Tool Results
+
+| Tool | Result | Interpretation |
+|---|---|---|
+| `npm --prefix apps/beer-game run verify:u1` | PASS: formatter、lint、type-check、52/52 Vitest、2/2 Playwright、lines 96.89%、branches 83.5%、functions 100% | Coverage floor and the tests currently selected by the script pass, but the selected suites do not exercise PostgreSQL persistence or the complete walking-skeleton flow described above. |
+
+### Summary
+
+Local verification is green, but authentication can be forged and the authoritative workflow is still in-memory rather than transactionally persisted. The absent database integration, incomplete outbox concurrency, partial E2E flow, and placeholder deployment topology leave the U1 walking skeleton unsafe to approve as complete.

@@ -1,0 +1,23 @@
+{
+  "stage": "code-generation",
+  "unit": "u1-walking-skeleton",
+  "version": 1,
+  "writes": [
+    { "path": "apps/beer-game/.prettierignore" },
+    { "path": "apps/beer-game/.prettierrc.json" },
+    { "path": "apps/beer-game/Dockerfile" },
+    { "path": "apps/beer-game/README.md" },
+    { "path": "apps/beer-game/compose.yaml" },
+    { "path": "apps/beer-game/eslint.config.js" },
+    { "path": "apps/beer-game/infra/" },
+    { "path": "apps/beer-game/migrations/" },
+    { "path": "apps/beer-game/package-lock.json" },
+    { "path": "apps/beer-game/package.json" },
+    { "path": "apps/beer-game/playwright.config.ts" },
+    { "path": "apps/beer-game/src/" },
+    { "path": "apps/beer-game/tests/" },
+    { "path": "apps/beer-game/tsconfig.json" },
+    { "path": "apps/beer-game/vitest.config.ts" },
+    { "path": ".github/workflows/beer-game-u1.yml" }
+  ]
+}
