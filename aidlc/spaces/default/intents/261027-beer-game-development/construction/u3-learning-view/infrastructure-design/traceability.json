@@ -1,0 +1,11 @@
+{
+  "stage":"infrastructure-design",
+  "unit":"u3-learning-view",
+  "upstream_ids":["NFR1.1","NFR1.2","NFR1.3","NFR1.4","NFR1.5","NFR1.6","NFR2.1","NFR2.2","NFR2.3","NFR2.4","NFR2.5","NFR3.1","NFR3.2","NFR3.3","NFR3.4","NFR3.5","NFR4.1","NFR4.2","NFR5.1","NFR6.1","NFR7.1","NFR7.2","NFR7.3","NFR7.4","NFR8.1","NFR9.1"],
+  "coverage":[
+    {"id":"NFR1.1","status":"OK","target":"ALB/ECS/RDS sizing"},{"id":"NFR1.2","status":"OK","target":"SQS consumer autoscaling"},{"id":"NFR1.3","status":"OK","target":"SQS/S3 export pipeline"},{"id":"NFR1.4","status":"OK","target":"ECS autoscaling"},{"id":"NFR1.5","status":"OK","target":"queue consumer partitioning"},{"id":"NFR1.6","status":"OK","target":"RDS/S3 capacity and lifecycle"},
+    {"id":"NFR2.1","status":"OK","target":"Multi-AZ and SLO alarms"},{"id":"NFR2.2","status":"OK","target":"PostgreSQL transaction boundary"},{"id":"NFR2.3","status":"OK","target":"DLQ and rebuild monitoring"},{"id":"NFR2.4","status":"OK","target":"PITR and replay exercise"},{"id":"NFR2.5","status":"OK","target":"private staged S3 publication"},
+    {"id":"NFR3.1","status":"OK","target":"task boundary and authorization tests"},{"id":"NFR3.2","status":"OK","target":"private network and telemetry controls"},{"id":"NFR3.3","status":"OK","target":"privacy test gate"},{"id":"NFR3.4","status":"OK","target":"scoped private S3 access"},{"id":"NFR3.5","status":"OK","target":"ALB TLS and headers"},{"id":"NFR4.1","status":"OK","target":"encrypted minimal stores"},{"id":"NFR4.2","status":"OK","target":"S3/database deletion lifecycle"},
+    {"id":"NFR5.1","status":"OK","target":"Playwright accessibility gate"},{"id":"NFR6.1","status":"OK","target":"browser matrix gate"},{"id":"NFR7.1","status":"OK","target":"CloudWatch structured logs"},{"id":"NFR7.2","status":"OK","target":"CloudWatch/OpenTelemetry metrics"},{"id":"NFR7.3","status":"OK","target":"OpenTelemetry Collector"},{"id":"NFR7.4","status":"OK","target":"alarm rules and runbooks"},{"id":"NFR8.1","status":"OK","target":"BDD test and coverage pipeline"},{"id":"NFR9.1","status":"OK","target":"develop/main staging and production gates"}
+  ],"reverse":[]
+}

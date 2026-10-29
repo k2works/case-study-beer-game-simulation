@@ -1,0 +1,10 @@
+manifest	1728ad1e8eb2f8c344d6ad0b25c108eb4db3fda11c0fab21c4fa3f95decb01e7	-
+	apps/beer-game/migrations/002_u2_session_continuity.sql	100644	865cc64315ec8ce3a23559bacd3a9215fc5e7786d36e8ca2cab4e03616e03c2b
+	apps/beer-game/package.json	100644	9cd34ef63637552477dc54fb7e18459d5a2b3c67cbde04928a98c72f18da7c20
+	apps/beer-game/src/api/app.ts	100644	f47c32ad152046e50d242b12f1c364dc37b8bcbfde037817366430d720785cd0
+	apps/beer-game/src/application/game-service.ts	100644	decad8c80e6855b3ad3d7d3216f54c14eb150dd638371427cfb65957b38cbd69
+	apps/beer-game/src/domain/types.ts	100644	229b9b88fff32652e42140bc7770587dad17fa7a1aeed0766ccf3c46bd549cc7
+	apps/beer-game/src/security/credentials.ts	100644	7273312ec97d8ffcbf6cc17e9efc5c52c2fb8aaa0838ae9c75b9603b11f95b2d
+	apps/beer-game/tests/u1/credentials.test.ts	100644	cd712cabe9588047c74863a2be5984bbb1b71a88c369577a096d59e6171ed5be
+	apps/beer-game/tests/u2/session-continuity.test.ts	100644	ead9bbcd039be07ca52d025661bc407517bb55f876b0afa25b8279dff66f09d6
+	apps/beer-game/vitest.config.ts	100644	33a84a37733d79acc3a45bb92c669f515ca2bf1b8284dafede5f14b4300ee676
