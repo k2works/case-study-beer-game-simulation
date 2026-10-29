@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test:u1": "vitest run tests/u1",
-    "test:coverage": "vitest run tests/u1 --coverage",
+    "test:u2": "vitest run tests/u2",
+    "test:coverage": "vitest run tests/u1 tests/u2 --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src tests --max-warnings=0",
     "format:check": "prettier --check .",

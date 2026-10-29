@@ -7,7 +7,7 @@ import {
 
 describe('Given recovery credentials', () => {
   it('issues at least 128 bits of entropy', () =>
-    expect(Buffer.from(issueCredential().raw, 'base64url')).toHaveLength(16));
+    expect(Buffer.from(issueCredential().raw, 'base64url').length).toBeGreaterThanOrEqual(16));
   it('stores only a non-reversible digest', () => {
     const value = issueCredential();
     expect(value.digest).not.toContain(value.raw);

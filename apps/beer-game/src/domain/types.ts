@@ -1,6 +1,6 @@
 export const ROLES = ['FACTORY', 'DISTRIBUTOR', 'WHOLESALER', 'RETAILER'] as const;
 export type Role = (typeof ROLES)[number];
-export type SessionStatus = 'LOBBY' | 'ACTIVE' | 'ENDED';
+export type SessionStatus = 'LOBBY' | 'ACTIVE' | 'PAUSED' | 'ENDED';
 
 export interface RoleState {
   role: Role;

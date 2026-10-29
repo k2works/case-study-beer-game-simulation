@@ -6,6 +6,7 @@ import {
 } from '../domain/simulation-engine.js';
 import { ROLES, type Role, type SessionSnapshot, type WeekResult } from '../domain/types.js';
 import { issueCredential } from '../security/credentials.js';
+import { credentialMatches } from '../security/credentials.js';
 
 export interface Actor {
   id: string;
@@ -26,6 +27,8 @@ interface Participant {
   name: string;
   role?: Role;
   credentialDigest: string;
+  credentialExpiresAt: number;
+  credentialRevoked: boolean;
 }
 interface Game {
   id: string;
@@ -150,6 +153,8 @@ export class GameService {
         id: randomUUID(),
         name,
         credentialDigest: credential.digest,
+        credentialExpiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
+        credentialRevoked: false,
       };
       game.participants.set(participant.id, participant);
       this.emit(game, 'ParticipantJoined', { participantId: participant.id });
@@ -178,6 +183,94 @@ export class GameService {
       throw new Problem(409, 'ROLES_MISSING', `Missing roles: ${missing.join(', ')}`);
     game.session = { ...game.session, status: 'ACTIVE', version: game.session.version + 1 };
     return { version: game.session.version };
+  }
+
+  pauseSession(actor: Actor, expectedVersion: number, key: string) {
+    return this.transitionSession(
+      actor,
+      expectedVersion,
+      key,
+      'PAUSED',
+      ['ACTIVE'],
+      'SessionPaused',
+    );
+  }
+
+  resumeSession(actor: Actor, expectedVersion: number, key: string) {
+    return this.transitionSession(
+      actor,
+      expectedVersion,
+      key,
+      'ACTIVE',
+      ['PAUSED'],
+      'SessionResumed',
+    );
+  }
+
+  endSession(actor: Actor, expectedVersion: number, key: string) {
+    return this.transitionSession(
+      actor,
+      expectedVersion,
+      key,
+      'ENDED',
+      ['ACTIVE', 'PAUSED'],
+      'SessionEnded',
+    );
+  }
+
+  submitProxyDecision(
+    actor: Actor,
+    role: Role,
+    quantity: number,
+    expectedVersion: number,
+    key: string,
+  ) {
+    const game = this.authorizeFacilitator(actor);
+    if (game.session.status !== 'ACTIVE')
+      throw new Problem(409, 'SESSION_NOT_ACTIVE', 'Session is not active');
+    if (!Number.isSafeInteger(quantity) || quantity < 0 || quantity > 1000)
+      throw new Problem(400, 'INVALID_QUANTITY', 'Quantity must be a bounded integer');
+    return this.idempotent(
+      game,
+      `proxy:${role}:${key}`,
+      { role, quantity, expectedVersion },
+      () => {
+        const current = game.decisions.get(role);
+        const version = current?.version ?? 0;
+        if (version !== expectedVersion)
+          throw new Problem(409, 'STALE_STATE', 'Decision version is stale', { version });
+        game.decisions.set(role, { quantity, version: version + 1 });
+        this.emit(game, 'ProxyDecisionSubmitted', { role, actorId: actor.id });
+        return { role, quantity, version: version + 1, proxied: true as const };
+      },
+    );
+  }
+
+  recoverParticipation(rawToken: string) {
+    for (const game of this.games.values()) {
+      for (const participant of game.participants.values()) {
+        if (
+          !participant.credentialRevoked &&
+          participant.credentialExpiresAt > Date.now() &&
+          credentialMatches(rawToken, participant.credentialDigest)
+        ) {
+          if (!participant.role)
+            throw new Problem(401, 'RECOVERY_NOT_AVAILABLE', 'Recovery is not available');
+          const rotated = issueCredential();
+          participant.credentialDigest = rotated.digest;
+          participant.credentialExpiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
+          const actor: Actor = {
+            id: participant.id,
+            kind: 'PARTICIPANT',
+            gameId: game.id,
+            role: participant.role,
+          };
+          this.emit(game, 'ParticipationRecovered', { participantId: participant.id });
+          return { actor, recoveryToken: rotated.raw, state: this.roleSafeState(actor) };
+        }
+      }
+    }
+    throw new Problem(401, 'RECOVERY_NOT_AVAILABLE', 'Recovery is not available');
   }
 
   submitDecision(actor: Actor, quantity: number, expectedVersion: number, key: string) {
@@ -284,6 +377,31 @@ export class GameService {
     const value = action();
     game.idempotency.set(key, { requestDigest, value });
     return value;
+  }
+  private transitionSession(
+    actor: Actor,
+    expectedVersion: number,
+    key: string,
+    nextStatus: SessionSnapshot['status'],
+    allowed: SessionSnapshot['status'][],
+    eventType: string,
+  ) {
+    const game = this.authorizeFacilitator(actor);
+    return this.idempotent(game, `lifecycle:${key}`, { expectedVersion, nextStatus }, () => {
+      if (game.session.version !== expectedVersion)
+        throw new Problem(409, 'STALE_STATE', 'Session version is stale', {
+          version: game.session.version,
+        });
+      if (!allowed.includes(game.session.status))
+        throw new Problem(409, 'INVALID_TRANSITION', 'Session transition is not allowed');
+      game.session = {
+        ...game.session,
+        status: nextStatus,
+        version: game.session.version + 1,
+      };
+      this.emit(game, eventType, {});
+      return { status: game.session.status, version: game.session.version };
+    });
   }
   private emit(game: Game, eventType: string, data: Record<string, unknown>) {
     game.events.push({

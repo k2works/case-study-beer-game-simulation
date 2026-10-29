@@ -115,6 +115,46 @@ export async function buildApp(service = new GameService()) {
   app.post('/api/v1/sessions/:sessionId/start', async (request) =>
     service.startSession(actor(request)),
   );
+  app.post('/api/v1/sessions/:sessionId/pause', async (request) =>
+    service.pauseSession(
+      actor(request),
+      Number(request.headers['if-match'] ?? -1),
+      String(request.headers['idempotency-key'] ?? ''),
+    ),
+  );
+  app.post('/api/v1/sessions/:sessionId/resume', async (request) =>
+    service.resumeSession(
+      actor(request),
+      Number(request.headers['if-match'] ?? -1),
+      String(request.headers['idempotency-key'] ?? ''),
+    ),
+  );
+  app.post('/api/v1/sessions/:sessionId/end', async (request) =>
+    service.endSession(
+      actor(request),
+      Number(request.headers['if-match'] ?? -1),
+      String(request.headers['idempotency-key'] ?? ''),
+    ),
+  );
+  app.put('/api/v1/sessions/:sessionId/proxy-decisions/:role', async (request) => {
+    const { role } = z.object({ role: z.enum(ROLES) }).parse(request.params);
+    const { quantity, expectedVersion } = z
+      .object({ quantity: z.number().int(), expectedVersion: z.number().int().min(0) })
+      .parse(request.body);
+    return service.submitProxyDecision(
+      actor(request),
+      role,
+      quantity,
+      expectedVersion,
+      String(request.headers['idempotency-key'] ?? ''),
+    );
+  });
+  app.post('/api/v1/participations/recover', async (request, reply) => {
+    const { recoveryToken } = z.object({ recoveryToken: z.string().min(1) }).parse(request.body);
+    const result = service.recoverParticipation(recoveryToken);
+    const csrfToken = setSession(reply, result.actor);
+    return { recoveryToken: result.recoveryToken, state: result.state, csrfToken };
+  });
   app.get('/api/v1/sessions/:sessionId/state', async (request) =>
     service.roleSafeState(actor(request)),
   );
