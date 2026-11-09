@@ -88,6 +88,7 @@ nav:
           - インフラストラクチャ: design/beer-game/architecture-infrastructure.md
           - 技術スタック: design/beer-game/tech-stack.md
           - UI 設計: design/beer-game/ui-design.md
+          - テスト戦略: design/beer-game/test-strategy.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
