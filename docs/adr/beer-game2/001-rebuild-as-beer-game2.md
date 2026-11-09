@@ -4,7 +4,7 @@ title: "ADR-001: beer-game2 として要件と設計を改訂し、作り直す"
 description: "beer-game の分析と実装から得た知見をもとに、beer-game2（v2）として、要件・設計・実装を新しく作る。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:26:15Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:00:57Z }
 ---
 
 # ADR-001: beer-game2 として要件と設計を改訂し、作り直す
@@ -39,7 +39,7 @@ beer-game（v1）は、ウォーキングスケルトン（U1）から U5 まで
   - カスタム条件（初期在庫、遅延、費用単価、公開範囲の変更と、「カスタム」の記録）
   - 観察者の独立した立場
   - 週の自動確定（進行役の確定操作は残す）
-- 技術スタックは、beer-game を踏襲し、版だけ更新する（TypeScript、Fastify、React、Vite、PostgreSQL、AWS、Terraform。Node は 24 LTS）。
+- 技術スタックは、beer-game を踏襲し、版だけ更新する（TypeScript、Fastify、React、Vite、PostgreSQL、AWS、Terraform）。版は [技術スタック](../../design/beer-game2/tech-stack.md) に従う（確認の結果、Node は、決定時に想定した 24 ではなく、最新の LTS である 26 を採用した。[ADR-013](./013-tech-stack-versions.md)）。
 - beer-game は、未コミットだった U3〜U5 の作業をコミットして保全し（`1af35d2`、`9615c9e`）、参照用に残す。beer-game2 の完成後に、廃止を判断する。
 - beer-game の ADR（`docs/adr/beer-game/001`〜`008`）は、履歴として残す。v2 で引き継ぐ判断は、v2 の ADR として改めて記録する。
 

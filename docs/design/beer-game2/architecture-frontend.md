@@ -4,7 +4,7 @@ title: "フロントエンドアーキテクチャ - ビールゲームシミュ
 description: "v2 のフロントエンドアーキテクチャ。URL ルーティング、機能単位の構成、共同入力、リアルタイム更新、v1 からの変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:51:56Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:22Z }
 ---
 
 # フロントエンドアーキテクチャ - ビールゲームシミュレーション（v2）
@@ -202,7 +202,7 @@ Review --> [*]
 | 7 | 観察者の入口が無い | `/observe` と観察用の招待 |
 | 8 | SSE の再生に頼る実装 | 版の通知のみ。再接続時にスナップショットを取得 |
 
-## 設計判断（ADR の対象）
+## 設計判断（[ADR-010](../../adr/beer-game2/010-url-router-and-features.md)、[ADR-006](../../adr/beer-game2/006-sse-version-only.md)）
 
 - URL ルーターを導入し、ゲームを URL で表す（資格は Cookie）。
 - 機能単位（`features/`）の構成にする。

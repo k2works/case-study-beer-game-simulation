@@ -142,6 +142,18 @@ nav:
       - beer-game2:
           - 概要: adr/beer-game2/index.md
           - ADR-001 beer-game2 として作り直す: adr/beer-game2/001-rebuild-as-beer-game2.md
+          - ADR-002 v1 の ADR の引き継ぎ: adr/beer-game2/002-adopt-v1-adrs.md
+          - ADR-003 ポートとアダプター: adr/beer-game2/003-ports-and-adapters-with-lint.md
+          - ADR-004 Game と Session の集約: adr/beer-game2/004-separate-game-and-session-aggregates.md
+          - ADR-005 役割別の週結果: adr/beer-game2/005-role-results-and-sql-read-models.md
+          - ADR-006 SSE は版の通知のみ: adr/beer-game2/006-sse-version-only.md
+          - ADR-007 カスケード削除: adr/beer-game2/007-cascade-deletion-without-queues.md
+          - ADR-008 自動確定と監査: adr/beer-game2/008-auto-commit-and-event-audit.md
+          - ADR-009 資格の鍵の版: adr/beer-game2/009-credential-key-versions.md
+          - ADR-010 URL ルーター: adr/beer-game2/010-url-router-and-features.md
+          - ADR-011 ドメイン・TLS・ヘッダー: adr/beer-game2/011-cloudfront-domain-tls-headers.md
+          - ADR-012 デリバリーと Terraform: adr/beer-game2/012-delivery-pipeline-and-terraform.md
+          - ADR-013 技術スタックの版: adr/beer-game2/013-tech-stack-versions.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:

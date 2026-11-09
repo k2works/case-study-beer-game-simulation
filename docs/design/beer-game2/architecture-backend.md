@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "v2 のバックエンドアーキテクチャ。ポートとアダプター、集約の読み書き、自動確定、観測性、セキュリティ、v1 からの変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:51:56Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:21Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（v2）
@@ -247,7 +247,7 @@ R --> P : 200（版）
 
 ## 設計判断（ADR の対象）
 
-次の判断を、v2 の ADR として記録します（作成は次の工程）。
+次の判断を、v2 の ADR として記録しました（[ADR-003](../../adr/beer-game2/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game2/006-sse-version-only.md)、[007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game2/009-credential-key-versions.md)）。v1 の判断の扱いは [ADR-002](../../adr/beer-game2/002-adopt-v1-adrs.md) にまとめました。
 
 - ドメインモデル + ポートとアダプター。層の依存を lint で守る。
 - `Game`（準備）と `Session`（進行）の集約を分ける。開始だけが同一トランザクション。

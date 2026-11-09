@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "v2 のインフラアーキテクチャ。ECR、リモートの Terraform、観測、CI/CD、ブルー/グリーン、キューの廃止、v1 からの変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:51:56Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:22Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（v2）
@@ -170,7 +170,7 @@ stop
 | 8 | マイグレーションは手動 | デプロイ時に、1 回限りのタスクで適用 |
 | 9 | PostgreSQL の版が環境で異なる（CI は 16） | すべて 17 に揃える |
 
-## 設計判断（ADR の対象）
+## 設計判断（[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)）
 
 - CloudFront の単一オリジンと、独自ドメイン・TLS 1.2 以上・セキュリティヘッダー。
 - API はステートレスで、Fargate で水平に増減する。
