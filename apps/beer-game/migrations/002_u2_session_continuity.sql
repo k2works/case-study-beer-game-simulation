@@ -1,4 +1,4 @@
-ALTER TABLE game_sessions
+ALTER TABLE sessions
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'ACTIVE',
   ADD COLUMN IF NOT EXISTS aggregate_version bigint NOT NULL DEFAULT 1;
 

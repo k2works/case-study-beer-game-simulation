@@ -1,74 +1,118 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { BrowserApi } from './browser-api.js';
+import { CreateGameForm, JoinAndRecovery, Lobby } from './CreateJoinLobby.js';
+import { PlayPage } from './PlayPage.js';
+import { FacilitatorConsole } from './FacilitatorConsole.js';
+import { ObservationPage, ReviewPage } from './LearningPages.js';
+import { RetentionPage } from './RetentionPage.js';
 
-type SafeState = {
-  week: number;
-  version: number;
-  status: string;
-  own: { role: string; inventory: number; backlog: number };
-};
+type Page =
+  'welcome' | 'create' | 'join' | 'lobby' | 'play' | 'observation' | 'review' | 'retention';
 
-export function App() {
-  const [state, setState] = useState<SafeState>();
-  const [quantity, setQuantity] = useState('4');
-  const [error, setError] = useState('');
-  useEffect(() => {
-    const refresh = () =>
-      fetch('/api/v1/sessions/current/state', { credentials: 'include' })
-        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('状態を取得できません'))))
-        .then(setState)
-        .catch((e) => setError(e.message));
-    refresh();
-    const timer = window.setInterval(refresh, 4000);
-    return () => window.clearInterval(timer);
-  }, []);
-  async function submit() {
-    setError('');
-    const response = await fetch('/api/v1/sessions/current/decisions', {
-      method: 'PUT',
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/json',
-        'if-match': '0',
-        'idempotency-key': crypto.randomUUID(),
-        'x-csrf-token': document.cookie.match(/bg_csrf=([^;]+)/)?.[1] ?? '',
-      },
-      body: JSON.stringify({ quantity: Number(quantity) }),
-    });
-    if (!response.ok) setError('発注量を保存できません');
+export function App({ api }: { api?: BrowserApi }) {
+  const browserApi = useMemo(() => api ?? new BrowserApi(), [api]);
+  const [page, setPage] = useState<Page>('welcome');
+  const [gameId, setGameId] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [facilitator, setFacilitator] = useState(false);
+
+  function enterLobby(id: string, asFacilitator: boolean) {
+    setGameId(id);
+    setFacilitator(asFacilitator);
+    setPage('lobby');
   }
   return (
-    <main>
-      <h1>Beer Game</h1>
-      <div role="status" aria-live="polite">
-        {error}
-      </div>
-      {state ? (
-        <section>
-          <h2>
-            {state.own.role} — Week {state.week}
-          </h2>
-          <dl>
-            <dt>在庫</dt>
-            <dd>{state.own.inventory}</dd>
-            <dt>受注残</dt>
-            <dd>{state.own.backlog}</dd>
-          </dl>
-          <label>
-            発注量
-            <input
-              data-testid="decision-quantity"
-              inputMode="numeric"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
+    <>
+      <a className="skip-link" href="#main">
+        本文へスキップ
+      </a>
+      <header>
+        <h1>ビールゲーム</h1>
+      </header>
+      <main id="main" tabIndex={-1}>
+        {gameId && page !== 'welcome' && page !== 'create' && page !== 'join' && (
+          <nav aria-label="ゲーム画面">
+            {page !== 'observation' && (
+              <button type="button" onClick={() => setPage('observation')}>
+                観察を見る
+              </button>
+            )}
+            {page === 'observation' && (
+              <button type="button" onClick={() => setPage(sessionId ? 'play' : 'lobby')}>
+                ゲームへ戻る
+              </button>
+            )}
+            {facilitator && page !== 'retention' && (
+              <button type="button" onClick={() => setPage('retention')}>
+                保持状態を見る
+              </button>
+            )}
+            {page === 'retention' && (
+              <button type="button" onClick={() => setPage(sessionId ? 'play' : 'lobby')}>
+                ゲームへ戻る
+              </button>
+            )}
+          </nav>
+        )}
+        {page === 'welcome' && (
+          <section aria-labelledby="welcome-title">
+            <h2 id="welcome-title">はじめる</h2>
+            <button type="button" onClick={() => setPage('create')}>
+              ゲームを作る
+            </button>
+            <button type="button" onClick={() => setPage('join')}>
+              ゲームに参加・復帰
+            </button>
+          </section>
+        )}
+        {page === 'create' && (
+          <CreateGameForm api={browserApi} onLobby={(id) => enterLobby(id, true)} />
+        )}
+        {page === 'join' && (
+          <JoinAndRecovery
+            api={browserApi}
+            onJoined={(id) => enterLobby(id, false)}
+            onRecovered={(id, restoredSessionId) => {
+              setGameId(id);
+              setFacilitator(false);
+              setSessionId(restoredSessionId);
+              setPage('play');
+            }}
+          />
+        )}
+        {page === 'lobby' && (
+          <Lobby
+            api={browserApi}
+            gameId={gameId}
+            facilitator={facilitator}
+            onStarted={(id) => {
+              setSessionId(id);
+              setPage('play');
+            }}
+          />
+        )}
+        {page === 'play' &&
+          (facilitator ? (
+            <FacilitatorConsole
+              api={browserApi}
+              gameId={gameId}
+              sessionId={sessionId}
+              onEnded={() => setPage('review')}
             />
-          </label>
-          <button data-testid="submit-decision" onClick={submit}>
-            保存
-          </button>
-        </section>
-      ) : (
-        <p>読み込み中…</p>
-      )}
-    </main>
+          ) : (
+            <PlayPage
+              api={browserApi}
+              gameId={gameId}
+              sessionId={sessionId}
+              onReview={() => setPage('review')}
+            />
+          ))}
+        {page === 'observation' && <ObservationPage api={browserApi} gameId={gameId} />}
+        {page === 'review' && (
+          <ReviewPage api={browserApi} gameId={gameId} facilitator={facilitator} />
+        )}
+        {page === 'retention' && <RetentionPage api={browserApi} gameId={gameId} />}
+      </main>
+    </>
   );
 }

@@ -5,8 +5,7 @@ import {
   type SimulationSettings,
 } from '../domain/simulation-engine.js';
 import { ROLES, type Role, type SessionSnapshot, type WeekResult } from '../domain/types.js';
-import { issueCredential } from '../security/credentials.js';
-import { credentialMatches } from '../security/credentials.js';
+import { credentialMatches, digestCredential, issueCredential } from '../security/credentials.js';
 
 export interface Actor {
   id: string;
@@ -20,6 +19,7 @@ export interface SafeState {
   status: string;
   version: number;
   decisionComplete: boolean;
+  decisionVersion: number;
   own: { role: Role; inventory: number; backlog: number; arrivals: number; order: number };
 }
 interface Participant {
@@ -34,10 +34,23 @@ interface Game {
   id: string;
   joinCode: string;
   facilitatorDigest: string;
+  retentionDays: number;
   session: SessionSnapshot;
   participants: Map<string, Participant>;
   decisions: Map<Role, { quantity: number; version: number }>;
   idempotency: Map<string, { requestDigest: string; value: unknown }>;
+  results: WeekResult[];
+  events: DomainEvent[];
+}
+export interface PersistedGame {
+  id: string;
+  joinCode: string;
+  facilitatorDigest: string;
+  retentionDays: number;
+  session: SessionSnapshot;
+  participants: Participant[];
+  decisions: [Role, { quantity: number; version: number }][];
+  idempotency: [string, { requestDigest: string; value: unknown }][];
   results: WeekResult[];
   events: DomainEvent[];
 }
@@ -80,22 +93,86 @@ const DEFAULT_SETTINGS: SimulationSettings = {
 
 export class GameService {
   private readonly games = new Map<string, Game>();
+  private readonly eventListeners = new Map<string, Set<(event: DomainEvent) => void>>();
+  private readonly domainListeners = new Set<(event: DomainEvent) => void>();
+  private readonly browserSessions = new Map<string, { actor: Actor; expiresAt: number }>();
   private readonly creationKeys = new Map<
     string,
     { requestDigest: string; value: CreateGameResult }
   >();
 
-  createGame(input: { finalWeek: number; demand: number[] }, key: string): CreateGameResult {
+  exportGame(gameId: string): PersistedGame {
+    const game = this.game(gameId);
+    return structuredClone({
+      id: game.id,
+      joinCode: game.joinCode,
+      facilitatorDigest: game.facilitatorDigest,
+      retentionDays: game.retentionDays,
+      session: game.session,
+      participants: [...game.participants.values()],
+      decisions: [...game.decisions.entries()],
+      idempotency: [...game.idempotency.entries()],
+      results: game.results,
+      events: game.events,
+    });
+  }
+
+  importGame(record: PersistedGame): void {
+    const copy = structuredClone(record);
+    this.games.set(record.id, {
+      ...copy,
+      participants: new Map(copy.participants.map((participant) => [participant.id, participant])),
+      decisions: new Map(copy.decisions),
+      idempotency: new Map(copy.idempotency),
+    });
+  }
+
+  issueBrowserSession(actor: Actor): string {
+    const session = issueCredential();
+    this.browserSessions.set(session.digest, {
+      actor,
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+    });
+    return session.raw;
+  }
+
+  resolveBrowserSession(raw: string | undefined): Actor | undefined {
+    if (!raw) return undefined;
+    const digest = digestCredential(raw);
+    const session = this.browserSessions.get(digest);
+    if (!session) return undefined;
+    if (session.expiresAt <= Date.now()) {
+      this.browserSessions.delete(digest);
+      return undefined;
+    }
+    const actor = session.actor;
+    const game = this.games.get(actor.gameId);
+    if (!game) return undefined;
+    if (actor.kind === 'FACILITATOR') return actor;
+    const participant = game.participants.get(actor.id);
+    if (!participant || participant.credentialRevoked) return undefined;
+    return { ...actor, role: participant.role };
+  }
+
+  createGame(
+    input: { finalWeek: number; demand: number[]; retentionDays?: number },
+    key: string,
+  ): CreateGameResult {
     if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     if (
       !Number.isInteger(input.finalWeek) ||
       input.finalWeek < 1 ||
       input.demand.length < input.finalWeek ||
-      input.demand.some((v) => !Number.isSafeInteger(v) || v < 0 || v > 1000)
+      input.demand.some((v) => !Number.isSafeInteger(v) || v < 0 || v > 1000) ||
+      (input.retentionDays !== undefined &&
+        (!Number.isSafeInteger(input.retentionDays) ||
+          input.retentionDays < 1 ||
+          input.retentionDays > 3650))
     )
       throw new Problem(400, 'INVALID_GAME', 'finalWeek and demand must be bounded integers');
     const requestDigest = digest(input);
-    const existing = this.creationKeys.get(key);
+    const keyDigest = digest(key);
+    const existing = this.creationKeys.get(keyDigest);
     if (existing) {
       if (existing.requestDigest !== requestDigest)
         throw new Problem(409, 'IDEMPOTENCY_CONFLICT', 'Key was used with a different request');
@@ -111,6 +188,7 @@ export class GameService {
       id,
       joinCode: randomBytesCode(),
       facilitatorDigest: credential.digest,
+      retentionDays: input.retentionDays ?? 90,
       participants: new Map(),
       decisions: new Map(),
       idempotency: new Map(),
@@ -136,11 +214,12 @@ export class GameService {
       facilitatorCredential: credential.raw,
       version: 1,
     };
-    this.creationKeys.set(key, { requestDigest, value });
+    this.creationKeys.set(keyDigest, { requestDigest, value });
     return value;
   }
 
   joinGame(gameId: string, displayName: string, key: string) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const game = this.game(gameId);
     if (game.session.status !== 'LOBBY')
       throw new Problem(409, 'JOIN_CLOSED', 'Game is not accepting participants');
@@ -162,6 +241,52 @@ export class GameService {
     });
   }
 
+  joinByCode(joinCode: string, displayName: string, key: string) {
+    const game = [...this.games.values()].find(
+      (candidate) => candidate.joinCode === joinCode.trim().toUpperCase(),
+    );
+    if (!game) throw new Problem(404, 'JOIN_CODE_NOT_FOUND', 'Invitation code was not found');
+    return {
+      gameId: game.id,
+      sessionId: game.session.sessionId,
+      ...this.joinGame(game.id, displayName, key),
+    };
+  }
+
+  lobbyState(actor: Actor) {
+    const game = this.game(actor.gameId);
+    if (actor.kind === 'PARTICIPANT' && !game.participants.has(actor.id))
+      throw new Problem(403, 'FORBIDDEN', 'Participant access required');
+    return {
+      gameId: game.id,
+      sessionId: game.session.sessionId,
+      week: game.session.week,
+      status: game.session.status,
+      version: game.session.version,
+      ...(actor.kind === 'FACILITATOR' ? { joinCode: game.joinCode } : {}),
+      ...(actor.kind === 'FACILITATOR'
+        ? {
+            decisions: Object.fromEntries(
+              ROLES.map((role) => [
+                role,
+                {
+                  complete: game.decisions.has(role),
+                  version: game.decisions.get(role)?.version ?? 0,
+                },
+              ]),
+            ) as Record<Role, { complete: boolean; version: number }>,
+          }
+        : {}),
+      participants: [...game.participants.values()].map((participant) => ({
+        participantId: participant.id,
+        displayName: participant.name,
+        ...(actor.kind === 'FACILITATOR' || actor.id === participant.id
+          ? { role: participant.role }
+          : {}),
+      })),
+    };
+  }
+
   assignRole(actor: Actor, participantId: string, role: Role) {
     const game = this.authorizeFacilitator(actor);
     const participant = game.participants.get(participantId);
@@ -175,6 +300,24 @@ export class GameService {
     return { participantId, role };
   }
 
+  assignRoleBrowser(
+    actor: Actor,
+    participantId: string,
+    role: Role,
+    expectedVersion: number,
+    key: string,
+  ) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
+    const game = this.authorizeFacilitator(actor);
+    return this.idempotent(game, `assign:${key}`, { participantId, role, expectedVersion }, () => {
+      if (game.session.version !== expectedVersion)
+        throw new Problem(412, 'VERSION_CONFLICT', 'Lobby version is stale', {
+          version: game.session.version,
+        });
+      return { ...this.assignRole(actor, participantId, role), version: game.session.version };
+    });
+  }
+
   startSession(actor: Actor) {
     const game = this.authorizeFacilitator(actor);
     const assigned = new Set([...game.participants.values()].map((p) => p.role));
@@ -182,7 +325,20 @@ export class GameService {
     if (missing.length)
       throw new Problem(409, 'ROLES_MISSING', `Missing roles: ${missing.join(', ')}`);
     game.session = { ...game.session, status: 'ACTIVE', version: game.session.version + 1 };
-    return { version: game.session.version };
+    this.emit(game, 'SessionStarted', {});
+    return { status: game.session.status, version: game.session.version };
+  }
+
+  startSessionBrowser(actor: Actor, expectedVersion: number, key: string) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
+    const game = this.authorizeFacilitator(actor);
+    return this.idempotent(game, `start:${key}`, { expectedVersion }, () => {
+      if (game.session.version !== expectedVersion)
+        throw new Problem(412, 'VERSION_CONFLICT', 'Session version is stale', {
+          version: game.session.version,
+        });
+      return this.startSession(actor);
+    });
   }
 
   pauseSession(actor: Actor, expectedVersion: number, key: string) {
@@ -225,6 +381,7 @@ export class GameService {
     expectedVersion: number,
     key: string,
   ) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const game = this.authorizeFacilitator(actor);
     if (game.session.status !== 'ACTIVE')
       throw new Problem(409, 'SESSION_NOT_ACTIVE', 'Session is not active');
@@ -274,6 +431,7 @@ export class GameService {
   }
 
   submitDecision(actor: Actor, quantity: number, expectedVersion: number, key: string) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const game = this.authorizeParticipant(actor);
     if (!actor.role) throw new Problem(403, 'ROLE_REQUIRED', 'A role is required');
     if (game.session.status !== 'ACTIVE')
@@ -300,9 +458,12 @@ export class GameService {
     );
   }
 
-  commitWeek(actor: Actor, expectedVersion: number, key: string) {
+  commitWeek(actor: Actor, expectedVersion: number, key: string, requestedWeek?: number) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const game = this.authorizeFacilitator(actor);
-    return this.idempotent(game, `commit:${key}`, { expectedVersion }, () => {
+    return this.idempotent(game, `commit:${key}`, { expectedVersion, requestedWeek }, () => {
+      if (requestedWeek !== undefined && game.session.week !== requestedWeek)
+        throw new Problem(409, 'WEEK_MISMATCH', 'Requested week is not current');
       if (game.session.version !== expectedVersion)
         throw new Problem(412, 'VERSION_CONFLICT', 'Session version is stale');
       const missing = ROLES.filter((role) => !game.decisions.has(role));
@@ -315,7 +476,28 @@ export class GameService {
       game.session = transition.snapshot;
       game.results.push(transition.result);
       game.decisions.clear();
-      this.emit(game, 'WeekCommitted', { week: transition.result.week });
+      this.emit(game, 'WeekCommitted', {
+        week: transition.result.week,
+        teamTotals: {
+          inventory: ROLES.reduce(
+            (sum, role) => sum + transition.result.roles[role].endingInventory,
+            0,
+          ),
+          backlog: ROLES.reduce(
+            (sum, role) => sum + transition.result.roles[role].endingBacklog,
+            0,
+          ),
+          orders: ROLES.reduce((sum, role) => sum + decisions[role], 0),
+          demand: ROLES.reduce((sum, role) => sum + transition.result.roles[role].demand, 0),
+          shipments: ROLES.reduce((sum, role) => sum + transition.result.roles[role].shipped, 0),
+          costMinor: ROLES.reduce(
+            (sum, role) => sum + transition.result.roles[role].weeklyCostMinor,
+            0,
+          ),
+        },
+        contributorCount: ROLES.length,
+      });
+      if (game.session.status === 'ENDED') this.emit(game, 'SessionEnded', {});
       return { result: transition.result, version: game.session.version };
     });
   }
@@ -330,6 +512,7 @@ export class GameService {
       status: game.session.status,
       version: game.session.version,
       decisionComplete: game.decisions.has(role),
+      decisionVersion: game.decisions.get(role)?.version ?? 0,
       own: {
         role,
         inventory: state.inventory,
@@ -345,8 +528,39 @@ export class GameService {
     if (!participant?.role) throw new Problem(403, 'ROLE_REQUIRED', 'Participant has no role');
     return { id: participant.id, kind: 'PARTICIPANT', gameId, role: participant.role };
   }
+  sessionIdForGame(gameId: string): string {
+    return this.game(gameId).session.sessionId;
+  }
+  retentionDays(gameId: string): number {
+    return this.game(gameId).retentionDays;
+  }
+  verifyFacilitatorCredential(gameId: string, rawCredential: string): boolean {
+    const game = this.game(gameId);
+    return Boolean(rawCredential) && credentialMatches(rawCredential, game.facilitatorDigest);
+  }
   events(gameId: string) {
     return this.game(gameId).events.map((event) => ({ ...event }));
+  }
+  eventsSince(actor: Actor, cursor?: string): DomainEvent[] {
+    const events = this.game(actor.gameId).events;
+    if (!cursor) return events.map((event) => ({ ...event }));
+    const index = events.findIndex((event) => event.eventId === cursor);
+    if (index < 0) throw new Problem(400, 'INVALID_EVENT_CURSOR', 'Event cursor is unknown');
+    return events.slice(index + 1).map((event) => ({ ...event }));
+  }
+  subscribeEvents(actor: Actor, listener: (event: DomainEvent) => void): () => void {
+    this.game(actor.gameId);
+    const listeners = this.eventListeners.get(actor.gameId) ?? new Set();
+    listeners.add(listener);
+    this.eventListeners.set(actor.gameId, listeners);
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) this.eventListeners.delete(actor.gameId);
+    };
+  }
+  onDomainEvent(listener: (event: DomainEvent) => void): () => void {
+    this.domainListeners.add(listener);
+    return () => this.domainListeners.delete(listener);
   }
   private game(id: string) {
     const game = this.games.get(id);
@@ -368,14 +582,15 @@ export class GameService {
   private idempotent<T>(game: Game, key: string, request: unknown, action: () => T): T {
     if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const requestDigest = digest(request);
-    const existing = game.idempotency.get(key);
+    const keyDigest = digest(key);
+    const existing = game.idempotency.get(keyDigest);
     if (existing) {
       if (existing.requestDigest !== requestDigest)
         throw new Problem(409, 'IDEMPOTENCY_CONFLICT', 'Key was used with a different request');
       return existing.value as T;
     }
     const value = action();
-    game.idempotency.set(key, { requestDigest, value });
+    game.idempotency.set(keyDigest, { requestDigest, value });
     return value;
   }
   private transitionSession(
@@ -386,6 +601,7 @@ export class GameService {
     allowed: SessionSnapshot['status'][],
     eventType: string,
   ) {
+    if (!key) throw new Problem(400, 'IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required');
     const game = this.authorizeFacilitator(actor);
     return this.idempotent(game, `lifecycle:${key}`, { expectedVersion, nextStatus }, () => {
       if (game.session.version !== expectedVersion)
@@ -404,17 +620,23 @@ export class GameService {
     });
   }
   private emit(game: Game, eventType: string, data: Record<string, unknown>) {
-    game.events.push({
+    const event: DomainEvent = {
       eventId: randomUUID(),
       eventType,
       gameId: game.id,
       sessionId: game.session.sessionId,
-      aggregateVersion: game.session.version,
+      aggregateVersion: game.events.length + 1,
       schemaVersion: 1,
       correlationId: randomUUID(),
       occurredAt: new Date().toISOString(),
-      data,
-    });
+      data: {
+        ...data,
+        completionStatus: Object.fromEntries(ROLES.map((role) => [role, game.decisions.has(role)])),
+      },
+    };
+    game.events.push(event);
+    for (const listener of this.eventListeners.get(game.id) ?? []) listener({ ...event });
+    for (const listener of this.domainListeners) listener({ ...event });
   }
 }
 

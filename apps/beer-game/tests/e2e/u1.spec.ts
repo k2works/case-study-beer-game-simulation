@@ -5,7 +5,7 @@ test.describe('U1 walking skeleton boundary', () => {
     request,
   }) => {
     const response = await request.post('/api/v1/games', {
-      headers: { 'idempotency-key': 'e2e-create' },
+      headers: { origin: 'http://127.0.0.1:3100', 'idempotency-key': 'e2e-create' },
       data: { finalWeek: 1, demand: [4] },
     });
     expect(response.status()).toBe(201);
