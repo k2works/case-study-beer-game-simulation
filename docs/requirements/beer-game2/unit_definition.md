@@ -3,8 +3,10 @@ type: Requirement
 title: "Unit 定義 - ビールゲームシミュレーション（v2）"
 description: "v2 の Unit 定義。Unit 6 つの境界、依存 DAG、ストーリーとの対応、実装エントロピーの評価、未決事項を整理した正本。"
 tags: [requirement]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:39:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-09T09:43:49Z }
 ---
 
 # Unit 定義 - ビールゲームシミュレーション（v2）

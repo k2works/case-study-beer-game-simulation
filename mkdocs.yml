@@ -117,6 +117,7 @@ nav:
       - beer-game2:
           - 概要: development/beer-game2/index.md
           - リリース計画: development/beer-game2/release_plan.md
+          - Bolt 1 計画: development/beer-game2/bolt_1_plan.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
