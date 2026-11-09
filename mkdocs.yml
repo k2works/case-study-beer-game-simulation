@@ -77,6 +77,12 @@ nav:
           - ビジネスユースケース: requirements/beer-game/business_usecase.md
           - システムユースケース: requirements/beer-game/system_usecase.md
           - ユーザーストーリー: requirements/beer-game/user_story.md
+      - beer-game2:
+          - 概要: requirements/beer-game2/index.md
+          - 要件定義: requirements/beer-game2/requirements_definition.md
+          - ビジネスユースケース: requirements/beer-game2/business_usecase.md
+          - システムユースケース: requirements/beer-game2/system_usecase.md
+          - ユーザーストーリー: requirements/beer-game2/user_story.md
   - 設計:
       - 概要: design/index.md
       - beer-game:
@@ -91,18 +97,36 @@ nav:
           - テスト戦略: design/beer-game/test-strategy.md
           - 非機能要件: design/beer-game/non-functional.md
           - 運用要件: design/beer-game/operation.md
+      - beer-game2:
+          - 概要: design/beer-game2/index.md
+          - ドメインモデル: design/beer-game2/domain-model.md
+          - データモデル: design/beer-game2/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game2/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game2/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game2/architecture-infrastructure.md
+          - 技術スタック: design/beer-game2/tech-stack.md
+          - UI 設計: design/beer-game2/ui-design.md
+          - テスト戦略: design/beer-game2/test-strategy.md
+          - 非機能要件: design/beer-game2/non-functional.md
+          - 運用要件: design/beer-game2/operation.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
           - 概要: development/beer-game/index.md
+      - beer-game2:
+          - 概要: development/beer-game2/index.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
           - 概要: operation/beer-game/index.md
+      - beer-game2:
+          - 概要: operation/beer-game2/index.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:
           - 概要: review/beer-game/index.md
+      - beer-game2:
+          - 概要: review/beer-game2/index.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
@@ -115,10 +139,15 @@ nav:
           - ADR-006 SPA の構成: adr/beer-game/006-spa-without-router-or-store.md
           - ADR-007 CloudFront の単一オリジン: adr/beer-game/007-cloudfront-single-origin.md
           - ADR-008 保持削除の Saga: adr/beer-game/008-retention-saga.md
+      - beer-game2:
+          - 概要: adr/beer-game2/index.md
+          - ADR-001 beer-game2 として作り直す: adr/beer-game2/001-rebuild-as-beer-game2.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:
           - 概要: journal/beer-game/index.md
+      - beer-game2:
+          - 概要: journal/beer-game2/index.md
   - 記事:
       - 概要: article/index.md
   - リファレンス:
