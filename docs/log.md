@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Creation**: [user_story](/requirements/beer-game2/user_story.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [business_usecase](/requirements/beer-game2/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
 * **Creation**: [001-rebuild-as-beer-game2](/adr/beer-game2/001-rebuild-as-beer-game2.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [operation](/design/beer-game2/operation.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [non-functional](/design/beer-game2/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
