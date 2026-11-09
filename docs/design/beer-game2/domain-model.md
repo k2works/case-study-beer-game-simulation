@@ -1,32 +1,33 @@
 ---
 type: Design
 title: "ドメインモデル設計 - ビールゲームシミュレーション（v2）"
-description: "ビールゲームのドメインモデル。ユビキタス言語、値オブジェクト・エンティティ・集約・ドメインサービス、設計と実装の差分を整理した正本。"
+description: "v2 のドメインモデル。Game・Session・RetentionSaga の集約、共同担当・観察者・自動確定・カスタム条件、v1 からの変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:26:13Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:46:02Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（v2）
 
-> **beer-game2（v2）の出発点**: 本書は beer-game（v1）の文書を複製したものです。v2 で改訂します。表中の「実装状況」「現状」は **v1 の状態**を表し、不足は v2 で解消する対象です。詳細は [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md) を参照してください。
-
 ## 概要
 
-本書は、ビールゲームシミュレーションのドメインモデルを DDD の戦術的設計パターン（エンティティ・値オブジェクト・集約・ドメインサービス）で定義します。**`docs/` を設計の正本**とし、`aidlc/` 配下の Inception 成果物（`domain-design/components.md`、`decisions.md`）と実装（`apps/beer-game/src`）を突き合わせて、次の 3 点を 1 か所にまとめます。
+本書は、beer-game2（v2）のドメインモデルを、DDD の戦術的設計パターン（エンティティ・値オブジェクト・集約・ドメインサービス）で定義します。**`docs/` を設計の正本**とします。
 
-- 業務の専門家と開発者が共有するユビキタス言語
-- 実装済みのモデル（コードで確認できる事実）
-- 設計意図と実装の差分（今後の判断が必要な点）
+beer-game（v1）の [ドメインモデル](../beer-game/domain-model.md) を出発点に、次の 2 点を反映して**改訂**しました。
 
-入力は [要件定義](../../requirements/beer-game2/requirements_definition.md) の BR-01〜BR-14、情報モデル、状態モデルです。
+- v2 の範囲: 同一役割の共同担当（FR-16）、カスタム条件（FR-01）、観察者の独立した立場（FR-17）、週の自動確定（FR-18）
+- v1 の設計上の差分: ルールがサービスに集中し、集約が振る舞いを持たなかったこと。週の確定結果に役割別の値が無かったこと。削除対象に漏れがあったこと
 
-### 設計の前提
+入力は [要件定義](../../requirements/beer-game2/requirements_definition.md)（BR-01〜BR-17）、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md) です。
+
+### 設計の前提と原則
 
 - 学習用シミュレーションであり、勝敗の判定ではなく「構造が振る舞いを生む」ことの体験が目的です。
-- 参加者はアカウントを作らず、参加コードと表示名で参加します。
+- 参加者はアカウントを作らず、参加コードと表示名で参加します。観察者は観察用の招待で参加します。
 - 週次の計算は決定論的で、同じ入力から同じ結果を返します。
 - プレイ中は役割ごとに見える情報を制限し、終了後に全役割の時系列を開示します。
+- **ルールは集約が持ちます。** アプリケーションサービスは、集約の読み込み、呼び出し、保存だけを行い、業務ルールを持ちません（v1 の `GameService` への集中を解消します）。
+- 集約は、トランザクション整合性が必要な最小の範囲にします。他の集約へは、識別子で参照します。
 
 ## 戦略的設計
 
@@ -42,114 +43,148 @@ quadrantChart
     quadrant-3 "一般または補完"
     quadrant-4 "補完"
     "シミュレーション計算": [0.85, 0.80]
-    "ゲーム進行": [0.70, 0.72]
+    "進行（プレイ）": [0.72, 0.78]
+    "準備（設定と参加）": [0.55, 0.55]
     "学習ビュー": [0.62, 0.55]
-    "参加と権限": [0.30, 0.45]
     "保持と削除": [0.20, 0.50]
 ```
 
-| コンテキスト | 分類 | 理由 |
-| :--- | :--- | :--- |
-| シミュレーション計算 | 中核 | JSD 改訂版キットの 12 ステップと 2 週遅延を忠実に再現することが教材価値そのもの |
-| ゲーム進行 | 中核 | 4 役割の意思決定を揃えて週を一度だけ確定する整合性が体験の信頼性を決める |
-| 学習ビュー | 補完 | 開示範囲の制御（逆算で個別値が漏れない集計）に固有のルールがある |
-| 参加と権限 | 一般 | アカウントなしの参加と復帰は一般的な仕組み |
-| 保持と削除 | 一般 | 期限後の一括削除と再試行は一般的な仕組み |
+| コンテキスト | 分類 | 理由 | 集約・主な要素 |
+| :--- | :--- | :--- | :--- |
+| シミュレーション計算 | 中核 | JSD 改訂版キットの 12 ステップと遅延を忠実に再現することが教材価値そのもの | 純粋なドメインサービス（`simulateWeek`） |
+| 進行（プレイ） | 中核 | 4 役割の意思決定を揃えて週を一度だけ確定する整合性。共同入力と自動確定がここにある | `Session` 集約 |
+| 準備（設定と参加） | 補完 | カスタム条件、参加者・共同担当・観察者の管理。規則は多いが、更新頻度は低い | `Game` 集約 |
+| 学習ビュー | 補完 | 開示範囲（逆算で個別値が漏れない集計）に固有のルールがある。役割別の時系列を持つ | 読み取りモデル（投影） |
+| 保持と削除 | 一般 | 期限後の一括削除と再試行は一般的な仕組み | `RetentionSaga` 集約 |
+
+v1 は、準備と進行を 1 つの `Game` 集約に入れていました。v2 では、**更新の頻度と整合性の範囲が異なる**ため、`Game`（準備）と `Session`（進行）に分けます。
 
 ### コンテキストマップ
 
 ```plantuml
 @startuml
-title コンテキストマップ
+title コンテキストマップ（v2）
 
-package "設計上の境界" {
-  component "ゲーム設定" as GC
-  component "参加と権限" as PA
-  component "ゲーム進行" as GS
-  component "シミュレーション計算" as SE
-  component "学習ビュー" as LV
-  component "保持と削除" as RT
+package "準備" {
+  component "Game 集約\n設定・参加者・役割・観察用の招待" as GAME
+}
+package "進行" {
+  component "Session 集約\n週・役割の状態・意思決定・結果" as SESS
+}
+package "計算" {
+  component "simulateWeek\n（純粋関数）" as SIM
+}
+package "学習ビュー" {
+  component "投影\n観察・振り返り・出力" as LV
+}
+package "保持と削除" {
+  component "RetentionSaga" as RT
 }
 
-PA --> GC : 参加可否の確認
-GS --> GC : 設定・需要系列の取得
-GS --> PA : 操作者と役割の権限確認
-GS --> SE : 週次計算（純粋関数）
-LV ..> GS : 確定済みイベントの購読
-RT ..> GS : 削除要求（所有者単位）
-RT ..> LV : 削除要求（所有者単位）
+GAME --> SESS : 開始時に Session を作る\n（設定の写しを渡す）
+SESS --> SIM : 週確定で呼ぶ
+SESS ..> GAME : 操作者の役割を確認する\n（参照のみ）
+LV ..> SESS : 確定済みイベントを購読
+RT ..> GAME : 削除要求
+RT ..> SESS : 削除要求
+RT ..> LV : 削除要求
 @enduml
 ```
 
-関係の種類は次のとおりです。
-
-- 実線は同期の呼び出しです。
-- 点線はイベントまたは削除要求による非同期の連携です。
+- 実線は、同期の呼び出しです。点線は、イベントまたは参照です。
+- `Session` は、開始時に設定の**写し**を持ち、以後は `Game` に依存せずに週を確定できます（設定は開始後に変更しません）。
+- 操作者が持つ役割は、`Game` の割り当てを参照して確認します（読み取りのみ。開始後は、割り当てを変更しません）。
 
 ## ユビキタス言語
 
+v1 の用語に、v2 で加わったものを太字で示します。
+
 | 用語 | 英語（コード上の名称） | 定義 |
 | :--- | :--- | :--- |
-| ゲーム | Game | 1 回のシミュレーション実施単位。参加コードで参加者を受け付ける |
+| ゲーム | Game | 1 回のシミュレーション実施単位。設定、参加者、役割の割り当てを持つ |
 | 進行役 | Facilitator | ゲームを作成し、役割割当て・開始・週確定・停止・終了を行う人 |
 | 参加者 | Participant | 表示名で参加する人。役割を 1 つ割り当てられる |
-| 役割 | Role | サプライチェーン上の位置。工場・一次卸・二次卸・小売店（FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER） |
+| **共同担当** | Co-assignment | 同じ役割に割り当てられた複数の参加者。1 つの意思決定値を共有して入力する |
+| 役割 | Role | サプライチェーン上の位置。工場・一次卸・二次卸・小売店 |
+| **観察者** | Observer | 役割を持たず、読み取り専用で観察する人。観察用の招待で参加する |
+| **観察用の招待** | Observer Invitation | 観察者が参加するための、参加コードと別の招待。有効期間と失効を持つ |
+| ゲーム設定 | Game Settings | 終了週、需要系列、初期条件、費用、公開範囲、確定の方式 |
+| **カスタム条件** | Customization | キット準拠値から変更した設定。「カスタム」としてゲームに記録する |
+| **公開範囲** | Disclosure Policy | プレイ中に観察者へ見せる情報の範囲 |
+| セッション | Session | ゲームの進行状態（週・状態・版・役割の状態・意思決定）を持つ実行単位 |
 | 顧客需要 | Demand | 小売店にだけ届く外生の週次需要。系列として事前に決まる |
-| セッション | Session | ゲームの進行状態（週・状態・版）を持つ実行単位 |
 | 週 | Week | 1 から始まる進行単位。4 役割の意思決定が揃って初めて確定する |
-| 意思決定 | Decision | 当週の発注数、または工場の生産要請数。役割ごとに 1 件 |
-| 代理入力 | Proxy Decision | 進行役が参加者に代わって入力する意思決定 |
+| 意思決定 | Decision | 当週の発注数、または工場の生産要請数。**役割ごとに 1 件**（共同担当で共有） |
+| 代理入力 | Proxy Decision | 進行役が参加者に代わって入力する意思決定。入力値を履歴に残す |
 | 週確定 | Commit Week | 4 役割の意思決定から次週の状態を計算して確定する操作。一度だけ成立する |
+| **自動確定** | Auto Commit | 進行役が有効にした場合、4 役割の入力がそろった時点でシステムが週確定を行う方式 |
+| **週結果** | Week Result | 週確定の結果。**役割別の**需要・出荷・発注・週末在庫・週末受注残・週次費用を持つ |
 | 在庫 | Inventory | 週末時点で手元にある数量 |
 | 受注残 | Backlog | 出荷できず次週以降に持ち越す未充足の受注 |
-| 注文遅延 | Order Delay | 注文が上流へ届くまでの 2 週の遅れ |
-| 配送遅延 | Shipment Delay | 出荷が下流へ届くまでの 2 週の遅れ |
-| 生産遅延 | Production Delay | 工場の生産要請が在庫に入るまでの遅れ |
-| 週次費用 | Weekly Cost | 週末在庫 × 0.50 + 週末受注残 × 1.00（金額は最小単位で保持） |
-| 参加コード | Join Code | 参加者がゲームに参加するための 8 桁のコード（大文字の英数字） |
-| 復帰資格 | Recovery Credential | ブラウザを閉じた参加者が同じ役割へ戻るための推測困難な資格 |
+| 注文遅延・配送遅延・生産遅延 | Order / Shipment / Production Delay | 注文・出荷・生産要請が届くまでの遅れ（週単位。カスタム条件で変更できる） |
+| 週次費用 | Weekly Cost | 週末在庫 × 在庫単価 + 週末受注残 × 受注残単価（最小単位で保持） |
+| 参加コード | Join Code | 参加者がゲームに参加するための 8 桁のコード |
+| 復帰資格 | Recovery Credential | ブラウザを閉じた参加者・進行役が戻るための、推測困難な資格。有効期限と失効を持つ |
 | 保持期間 | Retention | ゲームの記録を保持する日数。期限後に削除する |
 | 観察 | Observation | プレイ中に観察者へ見せる、逆算できないチーム合計 |
 | 振り返り | Review | 終了後に開示する全役割の時系列 |
 
 ## 戦術的設計
 
-### 実装の全体像
+### 全体像
 
 ```plantuml
 @startuml
-title 実装済みモデルの全体像
+title 集約と主な要素（v2）
 
-package "domain/ (純粋)" {
-  class "simulateWeek()" as SW <<ドメインサービス>>
-  class SessionSnapshot <<値オブジェクト>>
-  class RoleState <<値オブジェクト>>
-  class WeekResult <<値オブジェクト>>
-}
-
-package "application/ GameService" {
-  class Game <<集約ルート>>
+package "Game 集約（準備）" {
+  class Game <<集約ルート>> {
+    gameId
+    status
+    version
+    assign(participant, role)
+    unassign(participant)
+    inviteObserver()
+    revokeInvitation(id)
+    start()
+  }
+  class GameSettings <<値オブジェクト>>
   class Participant <<エンティティ>>
+  class RoleAssignment <<値オブジェクト>>
+  class ObserverInvitation <<エンティティ>>
+  Game *-- GameSettings
+  Game *-- "0..*" Participant
+  Game *-- "0..*" RoleAssignment
+  Game *-- "0..*" ObserverInvitation
 }
 
-package "learning/" {
-  class Projection <<read model>>
-  class ExportPackage <<値オブジェクト>>
+package "Session 集約（進行）" {
+  class Session <<集約ルート>> {
+    sessionId
+    week / status / version
+    submitDecision(role, quantity, editor, version)
+    proxyDecision(role, quantity, facilitator)
+    commitWeek(requestedWeek, version)
+    pause() / resume() / end()
+    setAutoCommit(enabled)
+  }
+  class RoleState <<値オブジェクト>>
+  class RoleDecision <<エンティティ>>
+  class WeekResult <<値オブジェクト>>
+  Session *-- "4" RoleState
+  Session *-- "0..4" RoleDecision
+  Session *-- "0..*" WeekResult
 }
 
-package "retention/" {
-  class RetentionPolicy <<値オブジェクト>>
-  class Saga <<集約ルート>>
+package "RetentionSaga 集約" {
+  class RetentionSaga <<集約ルート>>
 }
 
-Game *-- SessionSnapshot
-Game *-- "0..4+" Participant
-Game *-- "0..*" WeekResult
-SessionSnapshot *-- "4" RoleState
-SW ..> SessionSnapshot : 入力・出力
-Game ..> SW : 週確定時に呼ぶ
-Projection ..> Game : イベント購読
-Saga ..> RetentionPolicy
+class "simulateWeek" as SW <<ドメインサービス>>
+
+Game ..> Session : start() で作成
+Session ..> SW : commitWeek で呼ぶ
+RetentionSaga ..> Game : gameId で参照
 @enduml
 ```
 
@@ -157,182 +192,186 @@ Saga ..> RetentionPolicy
 
 不変で、属性値が同じなら同じものとして扱います。生成時に検証し、不正な値が存在できないようにします。
 
-| 値オブジェクト | 属性・制約 | 実装の位置 |
-| :--- | :--- | :--- |
-| 役割（Role） | FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER の 4 値。上流から下流の順序を持つ | `domain/types.ts` の `ROLES` |
-| 数量（Quantity） | 0 以上 1000 以下の整数。発注数・生産要請数に使う | `assertQuantity`、`submitDecision` の検証 |
-| 需要系列（Demand Series） | 各週の顧客需要。0〜1000 の整数で、長さは最終週以上 | `createGame` の検証 |
-| 役割状態（RoleState） | 在庫、受注残、注文遅延キュー、配送遅延キュー、生産遅延キュー、累積費用 | `domain/types.ts` |
-| セッション断面（SessionSnapshot） | 週、最終週、状態、版、需要系列、4 役割の役割状態 | `domain/types.ts` |
-| 週結果（WeekResult） | 役割ごとの需要・出荷・週末在庫・週末受注残・週次費用・累積費用 | `domain/types.ts` |
-| 費用単価（SimulationSettings） | 在庫 50、受注残 100（最小単位）、数量上限 1000 | `simulation-engine.ts`、`game-service.ts` の `DEFAULT_SETTINGS` |
-| 表示名（Display Name） | 前後の空白を除いて 1〜80 文字 | `joinGame` の検証 |
-| 参加コード（Join Code） | 8 桁（UUID 由来の大文字 16 進）。参加者が入力するコード | `randomBytesCode` |
-| 資格ダイジェスト（Credential Digest） | 生の資格を保存せず、鍵付き HMAC のダイジェストだけを保持する | `security/credentials.ts` |
-| 保持方針（Retention Policy） | 保持日数 1〜3650、保持開始時刻、削除期限、方針の版 | `retention-service.ts` |
-| 冪等キー（Idempotency Key） | 操作の重複実行を防ぐキー。同じキーで内容が違えば競合として拒否する | `GameService.idempotent` |
-| エクスポート（Export Package） | スキーマ版 `1.0.0`、CSV、JSON、チェックサム、元の版 | `learning/learning-view.ts` |
+| 値オブジェクト | 属性・制約 |
+| :--- | :--- |
+| 役割（Role） | FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER。上流から下流の順序を持つ |
+| 数量（Quantity） | 0 以上の整数、上限あり（既定 1000）。発注数・生産要請数 |
+| 週（Week） | 1 から最終週まで（1〜50） |
+| 金額（Money） | 最小単位（整数）。在庫単価・受注残単価・週次費用 |
+| 需要系列（DemandSeries） | 各週の顧客需要。0 以上の整数で、長さは最終週以上 |
+| 遅延（Delay） | 週数（0 以上の整数）。注文、配送、生産ごと。キットの既定は 2（生産は 2 段階） |
+| 初期条件（InitialConditions） | 各役割の初期在庫、初期の注文・配送・生産の待ち行列。既定はキット準拠（在庫 12、各段 4） |
+| 費用方針（CostPolicy） | 在庫単価、受注残単価。既定は 0.50 と 1.00 |
+| 公開範囲（DisclosurePolicy） | プレイ中に観察者へ見せる範囲。既定はチーム合計（寄与者が 2 未満なら非表示） |
+| 確定方式（CommitMode） | MANUAL（既定）または AUTO |
+| ゲーム設定（GameSettings） | 上記の組。**キット準拠か、カスタムか**を導出して保持する（`kind` と、変更された項目の一覧） |
+| 役割の割り当て（RoleAssignment） | 参加者 ID と役割の組。1 人の参加者は、高々 1 つ |
+| 役割状態（RoleState） | 在庫、受注残、注文・配送・生産の待ち行列、累積費用 |
+| 役割別の週結果（RoleWeekResult） | 役割ごとの需要（受注）、出荷、**発注（その週の意思決定）**、週末在庫、週末受注残、週次費用、累積費用 |
+| 週結果（WeekResult） | 週と、4 つの役割別の週結果 |
+| 表示名（DisplayName） | 前後の空白を除いて 1〜80 文字 |
+| 参加コード・観察用の招待コード（JoinCode、InvitationCode） | 推測困難な乱数から作る（8 桁以上）。**2 つは別の値** |
+| 資格ダイジェスト（CredentialDigest） | 生の資格を保存せず、鍵付き HMAC のダイジェストと**鍵の版**だけを保持する |
+| 資格の有効性（CredentialValidity） | 発行時刻、有効期限、失効時刻。有効か、失効か、期限切れかを返す |
+| 保持方針（RetentionPolicy） | 保持日数 1〜3650（既定 90）、保持開始、削除期限、方針の版 |
+| 版（Version） | 楽観的排他のための、単調に増える整数 |
+| 冪等キー（IdempotencyKey） | 重複実行の防止。同じキーで内容が違えば競合 |
 
 ### エンティティ
 
-| エンティティ | 識別子 | 主な属性 | ライフサイクル |
+| エンティティ | 識別子 | 属するもの | 主な属性・ライフサイクル |
 | :--- | :--- | :--- | :--- |
-| ゲーム（Game） | gameId（UUID） | 参加コード、進行役資格のダイジェスト、保持日数、セッション、参加者、意思決定、結果、イベント、冪等記録 | 作成 → 削除（保持期間後） |
-| 参加者（Participant） | participantId（UUID） | 表示名、役割（未割当も可）、復帰資格のダイジェスト・有効期限・失効 | 参加 → 役割割当て → 復帰（資格を更新） |
-| セッション（Session） | sessionId（UUID） | 週、状態、版、断面 | 準備中 → 進行中 ⇄ 一時停止 → 終了 |
-| 意思決定（Decision） | 役割（週ごと） | 数量、版 | 入力・変更 → 週確定でクリア |
-| ドメインイベント（DomainEvent） | eventId | 種別、集約の版、相関 ID、発生時刻、スキーマ版 | 発行のみ（不変） |
-| 保持削除（Saga） | deletionId | ゲーム、状態、試行回数、所有者ごとの状態 | 進行中 → 完了または失敗 |
+| ゲーム（Game） | gameId | Game 集約のルート | 設定、状態（準備中 → 開始済み → 終了）、版、保持日数。作成 → 削除 |
+| 参加者（Participant） | participantId | Game 集約 | 表示名、復帰資格（ダイジェスト、有効性）。参加 → 役割の割り当て → 復帰（資格を更新） |
+| 観察用の招待（ObserverInvitation） | invitationId | Game 集約 | 招待コード（ダイジェスト）、有効性、状態（有効 → 失効）。発行 → 失効 |
+| セッション（Session） | sessionId | Session 集約のルート | 週、状態（進行中・一時停止・終了）、版、設定の写し、確定方式。開始 → 終了 |
+| 意思決定（RoleDecision） | （sessionId、週、役割） | Session 集約 | 数量、版、**最後に保存した参加者**。入力・変更 → 週確定でクリア |
+| 保持削除（RetentionSaga） | deletionId | RetentionSaga 集約のルート | ゲーム、状態、試行回数、所有者ごとの状態 |
+
+進行役の資格は、`Game` が持ちます（ゲームの作成時に発行し、有効期限と失効・再発行を持つ）。
 
 ### 集約
 
-```plantuml
-@startuml
-title 集約の境界
+#### Game 集約（準備）
 
-rectangle "ゲーム集約（ルート: Game）" {
-  class Game {
-    gameId
-    joinCode
-    retentionDays
-  }
-  class Session {
-    sessionId
-    week / finalWeek
-    status
-    version
-  }
-  class Participant {
-    participantId
-    displayName
-    role
-  }
-  class Decision {
-    role
-    quantity
-    version
-  }
-  class WeekResult
-  Game *-- Session
-  Game *-- Participant
-  Game *-- Decision
-  Game *-- WeekResult
-}
-
-rectangle "保持削除集約（ルート: Saga）" {
-  class Saga {
-    deletionId
-    status
-    attempt
-  }
-  class OwnerStatus
-  Saga *-- OwnerStatus
-}
-
-rectangle "学習ビュー（read model）" {
-  class Projection {
-    sourceVersion
-    stale
-  }
-}
-
-Saga ..> Game : gameId で参照
-Projection ..> Game : gameId で参照
-@enduml
-```
-
-#### ゲーム集約
-
-集約ルートは `Game` で、外部からは必ずここを経由します。トランザクション境界は 1 回の操作（作成・参加・役割割当て・開始・意思決定・週確定・停止・再開・終了）です。
+集約ルートは `Game` で、設定、参加者、役割の割り当て、観察用の招待を所有します。トランザクション境界は 1 回の操作（作成、参加、割り当て、招待、開始）です。
 
 | 不変条件 | 内容 | 根拠 |
 | :--- | :--- | :--- |
-| 参加の受付 | 準備中の間だけ参加できる | BR（状態モデル） |
-| 役割の一意性 | 1 つの役割に参加者は 1 人。1 人の参加者は 1 つの役割だけを持つ | UC-03 |
-| 開始条件 | 4 役割がすべて割り当てられている | UC-04 |
-| 意思決定の条件 | 進行中で、役割を持つ参加者だけが 0〜1000 の整数を入力できる | BR-10 |
+| 設定の妥当性 | 最終週 1〜50、需要系列の長さは最終週以上、各値と単価は範囲内。準拠値から変えたら「カスタム」として記録する | BR-13、BR-14 |
+| 参加の受付 | 準備中の間だけ、参加と割り当てを受け付ける | 状態モデル |
+| 役割の割り当て | 1 人の参加者は高々 1 つの役割。**1 つの役割に複数の参加者を割り当てられる** | FR-16、BR-15 |
+| 開始条件 | 4 役割のそれぞれに、1 人以上が割り当てられている | UC-04 |
+| 観察用の招待 | 参加コードと別の値。失効したら、新しい参加に使えない。観察者は、役割を持てない | FR-17、BR-17 |
+| 設定の固定 | 開始後は、設定と役割の割り当てを変更しない | — |
+| 権限 | 割り当て、招待、開始は進行役だけ | — |
+
+**開始**は、`Game` の状態を「開始済み」にし、同じトランザクションで `Session` を作成します（`Game` の設定の写しを渡す）。これは、2 つの集約をまたぐ、**例外的な同一トランザクション**です（開始の一回性を保つため）。
+
+#### Session 集約（進行）
+
+集約ルートは `Session` で、週、4 つの役割状態、意思決定、週結果の履歴を所有します。**ルールは `Session` が持ち**、サービスは持ちません。
+
+| 不変条件 | 内容 | 根拠 |
+| :--- | :--- | :--- |
+| 意思決定の条件 | 進行中のときだけ、0〜上限の整数を、役割ごとに 1 件保存できる | BR-10 |
+| 共同入力 | 同じ役割の意思決定は、1 つの値と 1 つの版を、共同担当で共有する。**版が古い更新は拒否し、最新値と最後の保存者を返す**（変更を黙って失わない） | FR-16、BR-15 |
+| 代理入力 | 進行役だけが、任意の役割へ入力できる。**入力値、操作者、時刻を、イベントに残す** | FR-15 |
 | 週確定の条件 | 4 役割の意思決定が揃うまで確定できない | BR-12 |
-| 週確定の一回性 | 同じ冪等キーでは同じ結果を返し、週と版が現在と一致する場合だけ確定する | BR-12 |
-| 終了 | 最終週を確定すると自動で終了し、以後の入力は拒否する | 状態モデル |
-| 権限 | 進行・確定・代理入力・割当ては進行役だけ。意思決定と状態参照は参加者本人の役割だけ | 役割別開示 |
+| 週確定の一回性 | 要求された週と版が現在と一致する場合だけ確定し、同じ冪等キーでは同じ結果を返す | FR-09 |
+| 週確定の結果 | **役割別の週結果**（需要、出荷、発注、在庫、受注残、費用）を、履歴に追加する | FR-13、FR-14 |
+| 自動確定 | 確定方式が AUTO で、進行中のときだけ、**最後の意思決定を保存した同じトランザクション内で**、週確定を行う。一時停止中は確定しない。再開時に、揃っていれば確定する | FR-18、BR-16 |
+| 終了 | 最終週を確定すると、自動で終了する。終了後は、入力と確定を拒否する | 状態モデル |
+| 権限 | 意思決定は、その役割の参加者だけ。確定、停止、再開、終了、確定方式の変更は進行役だけ | — |
 
-#### 保持削除集約
+自動確定を、最後の意思決定の保存と**同じトランザクション内**で行うため、「入力がそろったあと、確定の前に、別の人が変更する」という隙間は生じません（手動の確定は、進行役が揃った入力を確認して行う）。手動の確定と、自動確定が同時に起きても、`Session` の版により、確定は一度だけです。
 
-保持方針に従い、期限到達後にゲーム単位の削除要求を所有者（`u1-walking-skeleton`、`u2-session-continuity`、`u3-learning-view`）ごとに発行します。全所有者が完了した場合だけ完了とし、失敗は再試行します。他コンテキストのデータを直接消さず、各所有者が冪等に自分のデータを削除します。
+#### RetentionSaga 集約（保持と削除）
+
+v1 を引き継ぎます（[ADR-008](../../adr/beer-game/008-retention-saga.md)）。期限に達したゲームごとに、所有者単位の削除要求を発行し、全所有者が完了した場合だけ完了とします。**v2 では、所有者に、`Game`、`Session`、イベントと冪等記録、学習ビューのすべてを含め、削除後にゲームの ID を含むデータが残らないことを不変条件**とします（v1 の削除対象の漏れの解消）。
 
 ### ドメインサービス
 
 | サービス | 責務 | 入力 → 出力 | 特徴 |
 | :--- | :--- | :--- | :--- |
-| 週次計算（`simulateWeek`） | 12 ステップと 2 週遅延に従い、在庫・受注残・出荷・遅延・費用を計算する | 前週の断面、4 役割の意思決定、設定 → 次週の断面、週結果 | 純粋関数。永続化・時刻・通信・認可に依存しない |
-| 開示判定（学習ビューの `consume`） | 確定済みイベントから、逆算で個別値が漏れない集計だけを公開する | ドメインイベント → 観察・振り返りの投影 | 寄与者が 2 未満の週は抑止し、版の欠落は stale として扱う |
-
-週次計算の規則は次のとおりです（BR-05〜BR-09）。
-
-- 利用可能量は「前週末在庫 + 当週入荷」です。
-- 充足対象は「前週末受注残 + 当週受注」です。
-- 出荷数は両者の小さい方です。
-- 週末在庫と週末受注残は差の正の部分です。
-- 週次費用は「週末在庫 × 在庫単価 + 週末受注残 × 受注残単価」です。
+| 週次計算（`simulateWeek`） | 12 ステップと遅延に従い、在庫・受注残・出荷・遅延・費用を計算する。**役割別の週結果を返す** | 前週の断面、4 役割の意思決定、設定 → 次週の断面、週結果 | 純粋関数。永続化・時刻・通信・認可に依存しない。遅延の週数は設定から受ける |
+| 開示判定（`DisclosurePolicy`） | 確定済みの記録から、公開範囲に応じて、逆算できない集計だけを公開する | 週結果、公開範囲 → 観察用の投影 | 寄与者が 2 未満の週は抑止する。役割別の値は、終了後だけ開示する |
+| キット準拠の判定（`KitPreset`） | 設定がキット準拠か、カスタムかを判定し、変更項目を列挙する | ゲーム設定 → 種別、変更項目 | 純粋関数 |
 
 ### 状態
 
 ```plantuml
 @startuml
-title セッション状態
+title ゲームとセッションの状態（v2）
 
-[*] --> LOBBY : ゲーム作成
-LOBBY --> ACTIVE : 開始 [4 役割が割当て済み]
-ACTIVE --> PAUSED : 一時停止
-PAUSED --> ACTIVE : 再開
-ACTIVE --> ENDED : 終了 / 最終週の確定
-PAUSED --> ENDED : 終了
-ENDED --> [*]
+state "Game: 準備中" as G1
+state "Game: 開始済み" as G2
+state "Game: 終了" as G3
+state "Session: 進行中" as S1
+state "Session: 一時停止" as S2
+state "Session: 終了" as S3
+
+[*] --> G1 : ゲーム作成
+G1 --> G2 : 開始 [各役割に 1 人以上]\n（Session を作成）
+G2 --> G3 : Session の終了
+G3 --> [*]
+
+[*] --> S1 : 開始
+S1 --> S2 : 一時停止
+S2 --> S1 : 再開
+S1 --> S3 : 最終週の確定 / 終了
+S2 --> S3 : 終了
+S3 --> [*]
+@enduml
+```
+
+```plantuml
+@startuml
+title 観察用の招待の状態
+
+state "有効" as A
+state "失効" as R
+
+[*] --> A : 発行
+A --> R : 進行役が失効 / 有効期限
+R --> [*]
 @enduml
 ```
 
 ### ドメインイベント
 
-| イベント | 発行契機 |
-| :--- | :--- |
-| GameCreated | ゲーム作成 |
-| ParticipantJoined | 参加 |
-| RoleAssigned | 役割割当て |
-| SessionStarted、SessionPaused、SessionResumed、SessionEnded | 進行状態の遷移 |
-| DecisionSubmitted、ProxyDecisionSubmitted | 意思決定の入力、代理入力 |
-| WeekCommitted | 週確定（チーム合計と寄与者数を含む） |
-| ParticipationRecovered | 復帰 |
+すべてのイベントは、集約の版、相関 ID、スキーマ版を持ちます。**監査の記録は、イベントそのものとして残し**（専用の別テーブルは作らない）、操作者と入力値を含めます。
 
-すべてのイベントは集約の版、相関 ID、スキーマ版を持ち、学習ビューが版の連続性で欠落を検知します。
+| イベント | 集約 | 発行契機・主なデータ |
+| :--- | :--- | :--- |
+| GameCreated | Game | ゲーム作成（設定の種別: キット準拠 / カスタム、確定方式） |
+| ParticipantJoined | Game | 参加 |
+| RoleAssigned、RoleUnassigned | Game | 役割の割り当て・解除（参加者、役割） |
+| ObserverInvited、ObserverInvitationRevoked | Game | 観察用の招待の発行・失効 |
+| CredentialRevoked、CredentialReissued | Game | 資格の失効・再発行（進行役、参加者） |
+| GameStarted | Game | 開始 |
+| SessionStarted、SessionPaused、SessionResumed、SessionEnded | Session | 進行状態の遷移 |
+| DecisionSaved | Session | 意思決定の保存（役割、数量、保存者、版） |
+| ProxyDecisionSubmitted | Session | 代理入力（役割、数量、進行役） |
+| AutoCommitChanged | Session | 確定方式の変更（進行役） |
+| WeekCommitted | Session | 週確定（**役割別の週結果**、確定の方式: 手動 / 自動、寄与者数） |
+| ParticipationRecovered | Game | 復帰 |
 
-## 設計と実装の差分
+## v1 からの変更
 
-`aidlc/` の設計は 5 つの論理コンポーネント（GameConfiguration、Participation、SimulationEngine、GameSession、LearningView）に分けていましたが、実装は次のとおりです。**どちらに合わせるかは未決定で、判断が必要です。**
-
-| # | 設計（aidlc） | 実装 | 影響・扱い |
+| # | v1 の設計・実装 | v2 の設計 | 関連 |
 | :--- | :--- | :--- | :--- |
-| 1 | ゲーム設定・参加・進行を別コンポーネントに分ける | `Game` 集約 1 つに設定・参加者・セッション・意思決定・結果を含む | 現規模では整合性の確保が単純。分割は規模拡大時に再判断 |
-| 2 | 同一役割に複数の共同参加者を認める | 役割は 1 人だけ（二人目は `ROLE_OCCUPIED` で拒否） | 要件に共同参加が残るなら実装が不足。要件の再確認が必要 |
-| 3 | 初期在庫・遅延・費用・公開範囲を設定でき、変更時は「カスタム」と区別する（BR-14） | 作成時に指定できるのは最終週・需要系列・保持日数だけ。初期値と費用単価は固定 | BR-14 は未実装。カスタム識別は今後の対象 |
-| 4 | 意思決定は参加者ごとに記録（RoleDecision に participantId） | 意思決定は役割をキーに保持し、操作者の識別は持たない | 代理入力を含め、操作者の追跡は監査イベントで代替 |
-| 5 | 操作監査（OperationAudit）を保持する | 操作者付きのドメインイベントで代替（`actorId` は代理入力のみ） | 監査要件の確認が必要 |
-| 6 | 保持と削除を GameConfiguration が所有する | 別モジュール（`retention/`）の Saga が所有 | 設計意図（完了判定の一元化）と整合。所有者単位の削除は実装済み |
+| 1 | `Game` 集約に、設定・参加者・セッション・意思決定・結果を全て含む | `Game`（準備）と `Session`（進行）に分ける。進行の更新が、準備のロックを取らない | 更新頻度と整合性の範囲 |
+| 2 | ルールが `GameService` に集中し、集約は振る舞いを持たない | ルールは集約（`Game`、`Session`）が持つ。サービスは、読み込み・呼び出し・保存だけ | 貧血なドメインモデルの解消 |
+| 3 | 1 役割 1 人。二人目は拒否 | 1 役割に複数の参加者。意思決定は、役割ごとに 1 件を共有し、版で競合を検出する | FR-16、BR-15 |
+| 4 | 週確定のイベントが、全役割の合計だけを持つ | 役割別の週結果（需要、出荷、発注、在庫、受注残、費用）を持つ | FR-13、FR-14（最優先） |
+| 5 | 設定は、最終週・需要系列・保持日数だけ。「カスタム」は画面の区別だけ | 初期条件、費用、遅延、公開範囲、確定方式を持つ設定。準拠か、カスタムかを、導出して記録する | FR-01、BR-14 |
+| 6 | 観察者の立場が無い | 観察用の招待（`ObserverInvitation`）と、観察者の権限（読み取り専用） | FR-17、BR-17 |
+| 7 | 進行役の確定操作だけ | 確定方式（MANUAL / AUTO）。自動確定は、最後の意思決定と同じトランザクションで行う | FR-18、BR-16 |
+| 8 | 代理入力の履歴に値が残らず、監査テーブルは使われない | イベントに入力値を含め、イベントを監査の記録とする | FR-15、NFR-09 |
+| 9 | 資格に有効性の概念が散在（進行役は期限なし） | 資格の有効性（期限、失効）を値オブジェクトにし、進行役の資格も失効・再発行できる | NFR-06 |
+| 10 | 削除対象に `outbox_events`、`idempotency_records` が無い | 削除後にゲームの ID を含むデータが残らないことを、不変条件とする | NFR-07 |
 
-## 設計判断
+## 設計判断と未決事項
 
-- 週次計算は純粋関数に分離し、既知系列の golden test で規則を保護します。
-- 参加者の資格は生の値を保存せず、鍵付き HMAC のダイジェストだけを保持します。復帰時に資格を更新し、ブラウザセッションは 24 時間、復帰資格は 30 日で失効します。
-- 学習用の表示は書き込みモデルを直接公開せず、イベントから作る用途別の投影を経由します。
-- 設計判断の背景は [ADR](../../adr/beer-game/index.md) に記録しています（週次計算の分離は ADR-001、資格は ADR-005、保持削除は ADR-008）。
+### 設計判断
+
+- 準備と進行を、別の集約に分ける。開始だけが、2 つの集約をまたぐ（同一トランザクション）。
+- 共同入力は、**版による楽観的排他**とし、投票や自動の統合はしない（ASM-04）。後から更新した人は、拒否され、最新値と保存者を見て再入力する。
+- 自動確定は、最後の意思決定の保存と同じトランザクションで行う。猶予の時間は設けない。
+- 監査は、専用のテーブルではなく、イベントに残す。
+- 設定の種別（キット準拠 / カスタム）は、設定から導出し、変更項目と一緒に記録する。
+
+### 未決事項
+
+- 開始後に、共同担当の参加者を**追加**できるか（v1 は、開始後の参加を拒否）。当面は、準備中だけとする。
+- 観察用の招待の有効期間の既定値と、観察者の人数の上限。
+- 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。
+- 自動確定に、猶予（例: 数秒）を設けるか。設けると、入力の訂正の余地が生まれるが、確定が遅れる。
 
 ## 出典
 
-- [要件定義](../../requirements/beer-game2/requirements_definition.md)（BR-01〜BR-14、情報モデル、状態モデル）
-- `aidlc/spaces/default/intents/261027-beer-game-development/inception/domain-design/components.md`
-- `aidlc/spaces/default/intents/261027-beer-game-development/inception/domain-design/decisions.md`
-- `apps/beer-game/src/domain/`、`application/game-service.ts`、`learning/learning-view.ts`、`retention/retention-service.ts`
-
-## 未確定事項
-
-- 差分 #2（共同参加者）と #3（カスタム条件）は、要件として残すか判断が必要です。
-- ゲーム集約の分割要否は、規模と変更理由が増えた段階で再判断します。
+- [要件定義](../../requirements/beer-game2/requirements_definition.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
+- v1 の [ドメインモデル](../beer-game/domain-model.md)、[データモデル](../beer-game/data-model.md)、[ADR](../../adr/beer-game/index.md)
+- `aidlc/spaces/default/intents/261027-beer-game-development/inception/domain-design/`
+- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
