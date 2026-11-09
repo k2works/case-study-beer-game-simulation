@@ -78,6 +78,11 @@ nav:
       - 概要: design/index.md
       - beer-game:
           - 概要: design/beer-game/index.md
+          - ドメインモデル: design/beer-game/domain-model.md
+          - データモデル: design/beer-game/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game/architecture-infrastructure.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
@@ -94,6 +99,14 @@ nav:
       - 概要: adr/index.md
       - beer-game:
           - 概要: adr/beer-game/index.md
+          - ADR-001 週次計算の分離: adr/beer-game/001-pure-weekly-simulation.md
+          - ADR-002 状態を持たない API: adr/beer-game/002-stateless-api-row-lock.md
+          - ADR-003 アウトボックスと投影: adr/beer-game/003-outbox-projection-over-event-sourcing.md
+          - ADR-004 SSE による版の通知: adr/beer-game/004-sse-version-notification.md
+          - ADR-005 資格のダイジェスト保存: adr/beer-game/005-credential-digest-only.md
+          - ADR-006 SPA の構成: adr/beer-game/006-spa-without-router-or-store.md
+          - ADR-007 CloudFront の単一オリジン: adr/beer-game/007-cloudfront-single-origin.md
+          - ADR-008 保持削除の Saga: adr/beer-game/008-retention-saga.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:

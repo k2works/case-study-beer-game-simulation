@@ -1,5 +1,23 @@
 # Docs Update Log
 
+## 2026-11-09
+* **Creation**: [008-retention-saga](/adr/beer-game/008-retention-saga.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [007-cloudfront-single-origin](/adr/beer-game/007-cloudfront-single-origin.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [006-spa-without-router-or-store](/adr/beer-game/006-spa-without-router-or-store.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [005-credential-digest-only](/adr/beer-game/005-credential-digest-only.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [004-sse-version-notification](/adr/beer-game/004-sse-version-notification.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [003-outbox-projection-over-event-sourcing](/adr/beer-game/003-outbox-projection-over-event-sourcing.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [002-stateless-api-row-lock](/adr/beer-game/002-stateless-api-row-lock.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [001-pure-weekly-simulation](/adr/beer-game/001-pure-weekly-simulation.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-infrastructure](/design/beer-game/architecture-infrastructure.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-frontend](/design/beer-game/architecture-frontend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-backend](/design/beer-game/architecture-backend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [data-model](/design/beer-game/data-model.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [domain-model](/design/beer-game/domain-model.md) を作成（claude-code/claude-sonnet-5-5）
+
 ## 2026-10-27
 * **Creation**: JSD 改訂版ビールゲームキットを根拠に、システム価値・外部環境・境界・内部構造を定義
 
