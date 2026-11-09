@@ -8,6 +8,8 @@ Node.js 22 と Docker が必要です。`npm install` 後、`docker compose up -
 
 `npm run dev` で API（`http://localhost:3000`、DB なしの in-memory）と Vite dev server（`http://localhost:5173`、HMR）を並行起動し、ブラウザを自動で開きます。`/api` は Vite が API にプロキシし、`ALLOWED_ORIGIN` は `http://localhost:5173` に設定されます。
 
+ゲームの開始には 4 人の参加者が必要で、参加者のセッションはブラウザの Cookie ごとに分かれます。そのため dev 中は、画面でゲームを作成すると Vite のプロキシがそれを検知し、ボット 4 人を自動で参加させます（`scripts/dev-bots.ts`）。主催者はロビーで役割を割り当てて「開始する」を押すだけで、以降は 1 秒ごとにボットが「受けた注文と同数」を発注し、主催者の権限で週を確定してゲーム終了まで自動で進みます。参加だけを手動で行う場合は `npm run dev:bots -- <参加コード>` を使います。
+
 ## Verification
 
 - `npm run test:u1`: U1 unit / HTTP integration test。

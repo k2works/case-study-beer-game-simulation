@@ -20,7 +20,7 @@
     "e2e:u5:matrix": "U5_BROWSER_MATRIX=1 playwright test tests/e2e/u5.spec.ts",
     "build:ui": "vite build",
     "dev": "concurrently -k -n server,client \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:server": "PORT=3000 ALLOWED_ORIGIN=http://localhost:5173 RETENTION_HMAC_KEY=local-development-only-key tsx watch src/server.ts",
+    "dev:server": "PORT=3000 ALLOWED_ORIGIN=http://localhost:5173 RETENTION_HMAC_KEY=local-development-only-key API_RATE_LIMIT_PER_MINUTE=100000 tsx watch src/server.ts",
     "dev:bots": "tsx scripts/dev-bots.ts",
     "dev:client": "wait-on tcp:3000 && vite",
     "load:u5": "tsx performance/u5-load.ts",
