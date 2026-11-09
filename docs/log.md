@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Creation**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-frontend](/design/beer-game2/architecture-frontend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-backend](/design/beer-game2/architecture-backend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [data-model](/design/beer-game2/data-model.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [domain-model](/design/beer-game2/domain-model.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [user_story](/requirements/beer-game2/user_story.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）

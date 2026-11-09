@@ -1,108 +1,178 @@
 ---
 type: Design
 title: "データモデル設計 - ビールゲームシミュレーション（v2）"
-description: "ビールゲームのデータモデル。概念・論理モデル、ER 図、テーブル定義、ドメインモデルとの対応、設計と実装の差分を整理した正本。"
+description: "v2 のデータモデル。Game・Session の 2 集約に合わせたテーブル、役割別の週結果、カスケード削除、v1 からの変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:26:13Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:51:56Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（v2）
 
-> **beer-game2（v2）の出発点**: 本書は beer-game（v1）の文書を複製したものです。v2 で改訂します。表中の「実装状況」「現状」は **v1 の状態**を表し、不足は v2 で解消する対象です。詳細は [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md) を参照してください。
-
 ## 概要
 
-本書は、ビールゲームシミュレーションのデータモデルを、概念データモデルから論理データモデルへ段階的に定義します。**`docs/` を設計の正本**とし、実装済みのスキーマ（`apps/beer-game/migrations/001`〜`005`）と永続化の実装（`infrastructure/postgres-game-repository.ts`、`retention/`）を突き合わせて記述します。
+本書は、beer-game2（v2）のデータモデルを、概念データモデルから論理データモデルへ段階的に定義します。**`docs/` を設計の正本**とします。
 
-- ドメインモデルは [ドメインモデル設計](./domain-model.md) を参照してください。用語はそこで定義したユビキタス言語に従います。
-- データベースは PostgreSQL です。スキーマは SQL マイグレーションで管理しており、ORM は使っていません。
-- 本書の「実装の状態」列は、コードでの読み書きを確認した結果です。
+beer-game（v1）の [データモデル](../beer-game/data-model.md) を出発点に、[ドメインモデル（v2）](./domain-model.md) に合わせて**改訂**しました。データベースは PostgreSQL で、スキーマは SQL マイグレーションで管理します。
 
-### 設計の方針
+### v1 からの設計方針の変更
 
-- ゲーム 1 件の整合性は 1 トランザクションで保つ。API プロセスは状態を持たず、リクエストごとに集約を読み込んで保存する。
-- 週ごとの確定結果と意思決定は行として残し、イベントは追記専用の outbox に残す。
-- 資格（進行役・復帰・ブラウザセッション）は生の値を保存せず、ダイジェストだけを保存する。
-- 冪等性の記録に残す応答は暗号化して保存する（AES-256-GCM）。
-- 保持期間を過ぎたゲームは、所有者単位の削除（Saga）で消す。
+| # | v1 | v2 | 理由 |
+| :--- | :--- | :--- | :--- |
+| 1 | 週結果を JSONB（`week_results.result`）で保存し、投影はイベントから再構築する | **週結果を役割別の行（`week_role_results`）として保存**する。観察と振り返りは、SQL の問い合わせで返す | 役割別の振り返りと出力（FR-13、FR-14）を、単純で速い問い合わせにする。イベントからの再構築を無くす |
+| 2 | `games` が設定・進行・参加者の全体を表す | `games`（準備）と `sessions`（進行）に分ける | 集約の分離（更新頻度と整合性の範囲） |
+| 3 | `participants.role` は `(game_id, role)` で一意 | **一意制約を外す**。1 人の参加者は高々 1 つの役割 | 共同担当（FR-16） |
+| 4 | 設定は最終週・需要・保持日数だけ | 初期条件、費用、遅延、公開範囲、確定方式を列で持つ。準拠かカスタムかを記録 | FR-01、BR-14 |
+| 5 | 観察者の表が無い | `observers`、`observer_invitations` を追加 | FR-17 |
+| 6 | 監査は、イベントと、未使用の `operation_audit` | **イベントを監査の記録とする**。`operation_audit` は作らない | 二重管理の排除 |
+| 7 | 投影テーブルが 4 つ定義され、未使用 | 作らない。冪等・出力以外の読み取り専用の表は持たない | 未使用の定義の排除 |
+| 8 | 削除対象に `outbox_events`、`idempotency_records` が漏れていた | **すべての表が `games` へ外部キー（`ON DELETE CASCADE`）を持ち、1 回の削除で漏れなく消える** | NFR-07、削除の網羅 |
+| 9 | 保持削除の所有者別の表と、所有者別のキュー | 1 つのデータベースなので、削除は 1 トランザクション。Saga の表は簡素化 | 単純化（[アーキテクチャ](./architecture-backend.md)） |
+| 10 | 冪等記録の保持が 30 日 | 24 時間（設計の要件 NFR2.6） | 保存と削除の範囲を小さく |
 
 ## 概念データモデル
 
-業務の言葉でエンティティと関係を表します。物理的な実装は考慮しません。
-
 ```plantuml
 @startuml
-title 概念データモデル
+title 概念データモデル（v2）
 hide circle
 left to right direction
 
 entity ゲーム
-entity 需要系列
-entity 保持方針
-entity セッション
 entity 参加者
-entity 復帰資格
-entity ブラウザセッション
+entity 観察用の招待
+entity 観察者
+entity セッション
 entity 意思決定
 entity 週結果
-entity ドメインイベント
+entity 役割別の週結果
+entity イベント
 entity 冪等記録
-entity 操作監査
-entity 観察投影
-entity 振り返り投影
-entity エクスポート
+entity 出力
+entity 保持方針
 entity 保持削除
-entity 所有者別削除状況
 
-ゲーム ||--|| 需要系列
-ゲーム ||--|| 保持方針
-ゲーム ||--|| セッション
 ゲーム ||--o{ 参加者
-ゲーム ||--o{ ブラウザセッション
-参加者 ||--o{ 復帰資格
+ゲーム ||--o{ 観察用の招待
+観察用の招待 ||--o{ 観察者
+ゲーム ||--o| セッション
 セッション ||--o{ 意思決定
 セッション ||--o{ 週結果
-セッション ||--o{ 操作監査
-ゲーム ||--o{ ドメインイベント
+週結果 ||--|{ 役割別の週結果
+ゲーム ||--o{ イベント
 ゲーム ||--o{ 冪等記録
-ゲーム ||--o| 観察投影
-ゲーム ||--o| 振り返り投影
-ゲーム ||--o{ エクスポート
-ゲーム ||--o| 保持削除
-保持削除 ||--o{ 所有者別削除状況
+ゲーム ||--o{ 出力
+ゲーム ||--|| 保持方針
+保持方針 ||--o| 保持削除
 @enduml
 ```
 
 | 概念エンティティ | 対応するドメイン概念 | 説明 |
 | :--- | :--- | :--- |
-| ゲーム、需要系列、保持方針 | ゲーム（集約ルート）、需要系列、保持方針 | 1 回の実施単位。需要系列はゲームに属する |
-| セッション | セッション | 進行状態（週・状態・版）と、4 役割の状態断面 |
-| 参加者、復帰資格、ブラウザセッション | 参加者、復帰資格 | アカウントなしの参加と復帰 |
-| 意思決定、週結果 | 意思決定、週結果 | 週ごとの入力と、確定した結果 |
-| ドメインイベント、冪等記録、操作監査 | ドメインイベント、冪等キー | 変更の履歴と重複排除 |
-| 観察投影、振り返り投影、エクスポート | 学習ビュー | 開示規則を適用した読み取り用データ |
-| 保持削除、所有者別削除状況 | 保持削除（Saga） | 期限後の一括削除の進行 |
+| ゲーム、参加者、観察用の招待、観察者 | `Game` 集約 | 設定、参加者（役割の割り当てを含む）、観察用の招待、観察者 |
+| セッション、意思決定、週結果、役割別の週結果 | `Session` 集約 | 進行状態、役割ごとの現在の意思決定、確定した週の結果（役割別） |
+| イベント、冪等記録 | 横断 | 変更の履歴（監査）と、重複排除 |
+| 出力 | 学習ビュー | CSV・JSON の成果物 |
+| 保持方針、保持削除 | `RetentionSaga` | 期限と、削除の進行 |
 
 ## 論理データモデル
 
-### ER 図（ゲームの書き込み側）
+### ER 図（Game 集約）
 
 ```plantuml
 @startuml
-title 論理 ER 図 - ゲーム（書き込み側）
+title 論理 ER 図 - Game 集約（準備）
 hide circle
 skinparam linetype ortho
 
 entity "games" as games {
   * game_id : uuid <<PK>>
   --
+  status : text
+  version : bigint
   join_code : text <<UK>>
-  facilitator_digest : text
   final_week : integer
   demand : jsonb
+  initial_conditions : jsonb
+  holding_cost_minor : integer
+  backlog_cost_minor : integer
+  order_delay_weeks : integer
+  shipment_delay_weeks : integer
+  production_delay_weeks : integer
+  disclosure_policy : text
+  commit_mode : text
+  settings_kind : text
+  settings_changes : jsonb
   retention_days : integer
+  facilitator_digest : text
+  facilitator_key_version : integer
+  facilitator_expires_at : timestamptz
+  facilitator_revoked_at : timestamptz
   created_at : timestamptz
+  started_at : timestamptz
+}
+
+entity "participants" as participants {
+  * participant_id : uuid <<PK>>
+  --
+  game_id : uuid <<FK>>
+  display_name : text
+  role : text
+  recovery_digest : text <<UK>>
+  key_version : integer
+  expires_at : timestamptz
+  revoked_at : timestamptz
+  joined_at : timestamptz
+}
+
+entity "observer_invitations" as invitations {
+  * invitation_id : uuid <<PK>>
+  --
+  game_id : uuid <<FK>>
+  code_digest : text <<UK>>
+  key_version : integer
+  expires_at : timestamptz
+  revoked_at : timestamptz
+  created_at : timestamptz
+}
+
+entity "observers" as observers {
+  * observer_id : uuid <<PK>>
+  --
+  game_id : uuid <<FK>>
+  invitation_id : uuid <<FK>>
+  display_name : text
+  joined_at : timestamptz
+}
+
+entity "browser_sessions" as browser_sessions {
+  * credential_digest : text <<PK>>
+  --
+  game_id : uuid <<FK>>
+  actor_kind : text
+  actor_id : uuid
+  key_version : integer
+  expires_at : timestamptz
+}
+
+games ||--o{ participants
+games ||--o{ invitations
+invitations ||--o{ observers
+games ||--o{ observers
+games ||--o{ browser_sessions
+@enduml
+```
+
+### ER 図（Session 集約）
+
+```plantuml
+@startuml
+title 論理 ER 図 - Session 集約（進行）
+hide circle
+skinparam linetype ortho
+
+entity "games" as games {
+  * game_id : uuid <<PK>>
 }
 
 entity "sessions" as sessions {
@@ -112,68 +182,85 @@ entity "sessions" as sessions {
   status : text
   week : integer
   version : bigint
-  aggregate_version : bigint
-  state : jsonb
+  commit_mode : text
+  settings : jsonb
+  role_states : jsonb
+  started_at : timestamptz
+  ended_at : timestamptz
 }
 
-entity "participants" as participants {
-  * participant_id : uuid <<PK>>
-  --
-  game_id : uuid <<FK>>
-  display_name : text
-  role : text
-  credential_digest : text <<UK>>
-  credential_expires_at : timestamptz
-  credential_revoked : boolean
-}
-
-entity "decisions" as decisions {
+entity "role_decisions" as decisions {
   * session_id : uuid <<PK, FK>>
   * week : integer <<PK>>
   * role : text <<PK>>
   --
-  participant_id : uuid <<FK, null>>
   quantity : integer
   version : bigint
-  committed : boolean
+  editor_kind : text
+  editor_id : uuid
+  updated_at : timestamptz
 }
 
 entity "week_results" as week_results {
   * session_id : uuid <<PK, FK>>
   * week : integer <<PK>>
   --
-  result : jsonb
-  aggregate_version : bigint
+  commit_kind : text
+  session_version : bigint
   committed_at : timestamptz
 }
 
-entity "browser_sessions" as browser_sessions {
-  * credential_digest : text <<PK>>
+entity "week_role_results" as role_results {
+  * session_id : uuid <<PK, FK>>
+  * week : integer <<PK, FK>>
+  * role : text <<PK>>
   --
-  game_id : uuid <<FK, cascade>>
-  actor_id : uuid
-  actor_kind : text
-  expires_at : timestamptz
+  demand : integer
+  shipped : integer
+  ordered : integer
+  ending_inventory : integer
+  ending_backlog : integer
+  weekly_cost_minor : integer
+  cumulative_cost_minor : bigint
 }
 
-entity "outbox_events" as outbox_events {
+games ||--o| sessions
+sessions ||--o{ decisions
+sessions ||--o{ week_results
+week_results ||--|{ role_results
+@enduml
+```
+
+### ER 図（横断・出力・保持）
+
+```plantuml
+@startuml
+title 論理 ER 図 - 横断・出力・保持
+hide circle
+skinparam linetype ortho
+
+entity "games" as games {
+  * game_id : uuid <<PK>>
+}
+
+entity "events" as events {
   * event_id : uuid <<PK>>
   --
-  aggregate_id : uuid
+  game_id : uuid <<FK>>
+  aggregate_type : text
   aggregate_version : bigint
   event_type : text
   payload : jsonb
+  actor_kind : text
+  actor_id : uuid
   correlation_id : uuid
   occurred_at : timestamptz
   published_at : timestamptz
-  attempts : integer
-  next_attempt_at : timestamptz
 }
 
-entity "idempotency_records" as idempotency_records {
-  * actor_id : text <<PK>>
-  * operation : text <<PK>>
-  * resource_id : text <<PK>>
+entity "idempotency_records" as idem {
+  * game_id : uuid <<PK, FK>>
+  * scope : text <<PK>>
   * key_digest : text <<PK>>
   --
   request_digest : text
@@ -182,26 +269,19 @@ entity "idempotency_records" as idempotency_records {
   expires_at : timestamptz
 }
 
-games ||--|| sessions
-games ||--o{ participants
-games ||--o{ browser_sessions
-sessions ||--o{ decisions
-sessions ||--o{ week_results
-participants |o--o{ decisions
-@enduml
-```
+entity "export_packages" as exports {
+  * export_id : uuid <<PK>>
+  --
+  game_id : uuid <<FK>>
+  schema_version : text
+  status : text
+  checksum : text
+  csv : text
+  json : jsonb
+  created_at : timestamptz
+}
 
-`outbox_events.aggregate_id` はゲーム ID を指し、`idempotency_records.resource_id` はゲーム ID（またはグローバル）を文字列で持ちます。どちらも外部キー制約は張っていません。
-
-### ER 図（保持と削除）
-
-```plantuml
-@startuml
-title 論理 ER 図 - 保持と削除
-hide circle
-skinparam linetype ortho
-
-entity "retention_policies" as retention_policies {
+entity "retention_policies" as policies {
   * game_id : uuid <<PK>>
   --
   retention_days : integer
@@ -210,58 +290,27 @@ entity "retention_policies" as retention_policies {
   policy_version : integer
 }
 
-entity "deletion_sagas" as deletion_sagas {
+entity "deletion_runs" as runs {
   * deletion_id : uuid <<PK>>
   --
   game_id : uuid <<UK>>
   status : text
   attempt : integer
-  automatic_retries : integer
   requested_at : timestamptz
   next_attempt_at : timestamptz
   last_failure_code : text
   completed_at : timestamptz
 }
 
-entity "owner_deletion_progress" as owner_deletion_progress {
-  * deletion_id : uuid <<PK, FK>>
-  * owner_unit : text <<PK>>
-  --
-  status : text
-  completed_at : timestamptz
-  failure_code : text
-}
-
-entity "deletion_attempts" as deletion_attempts {
+entity "deletion_attempts" as attempts {
   * deletion_id : uuid <<PK, FK>>
   * attempt : integer <<PK>>
   --
   started_at : timestamptz
-  next_attempt_at : timestamptz
   failure_code : text
 }
 
-entity "deletion_outbox" as deletion_outbox {
-  * event_id : uuid <<PK>>
-  --
-  deletion_id : uuid <<FK>>
-  owner_unit : text
-  attempt : integer
-  channel : text
-  payload : jsonb
-  published_at : timestamptz
-}
-
-entity "deletion_inbox" as deletion_inbox {
-  * event_id : uuid <<PK>>
-  --
-  deletion_id : uuid
-  owner_unit : text
-  attempt : integer
-  payload_digest : text
-}
-
-entity "deletion_receipts" as deletion_receipts {
+entity "deletion_receipts" as receipts {
   * deletion_id : uuid <<PK>>
   --
   game_reference_digest : text
@@ -270,180 +319,138 @@ entity "deletion_receipts" as deletion_receipts {
   expires_at : timestamptz
 }
 
-entity "retention_retry_idempotency" as retention_retry_idempotency {
-  * game_id : uuid <<PK>>
-  * key_digest : text <<PK>>
-  --
-  expected_attempt : integer
-  response : jsonb
-}
-
-entity "retention_restore_gate" as retention_restore_gate {
-  * gate_id : boolean <<PK>>
-  --
-  reads_open : boolean
-  sweep_completed_at : timestamptz
-}
-
-retention_policies ||..o| deletion_sagas : game_id（論理参照）
-deletion_sagas ||--o{ owner_deletion_progress
-deletion_sagas ||--o{ deletion_attempts
-deletion_sagas ||--o{ deletion_outbox
+games ||--o{ events
+games ||--o{ idem
+games ||--o{ exports
+policies ||..o| runs : game_id（論理参照）
+runs ||--o{ attempts
+runs ||--o| receipts
 @enduml
 ```
 
-保持と削除のテーブルは `games` への外部キーを持ちません。ゲームが削除された後も、削除の証跡（受領記録）を一定期間残すためです。
-
-### ER 図（学習ビュー）
-
-```plantuml
-@startuml
-title 論理 ER 図 - 学習ビュー
-hide circle
-skinparam linetype ortho
-
-entity "observation_projections" as observation_projections {
-  * game_id : uuid <<PK>>
-  --
-  session_id : uuid
-  source_version : bigint
-  projection : jsonb
-  stale : boolean
-}
-
-entity "review_projections" as review_projections {
-  * game_id : uuid <<PK>>
-  --
-  source_version : bigint
-  status : text
-  projection : jsonb
-}
-
-entity "export_packages" as export_packages {
-  * export_id : uuid <<PK>>
-  --
-  game_id : uuid
-  source_version : bigint
-  schema_version : text
-  status : text
-  artifact_refs : jsonb
-}
-
-entity "learning_processed_events" as learning_processed_events {
-  * event_id : uuid <<PK>>
-  --
-  game_id : uuid
-  aggregate_version : bigint
-}
-
-entity "learning_consumer_cursors" as learning_consumer_cursors {
-  * game_id : uuid <<PK>>
-  --
-  aggregate_version : bigint
-}
-@enduml
-```
+`retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` は、`games` へ外部キーを持ちません。ゲームを削除した後も、削除の証跡（受領記録）を一定期間残すためです。
 
 ### テーブル定義
 
-#### ゲームの書き込み側
-
-| テーブル | 主キー | 主な制約 | 役割 | 実装の状態 |
-| :--- | :--- | :--- | :--- | :--- |
-| `games` | `game_id` | `join_code` 一意、`final_week > 0`、`demand` は JSON 配列 | ゲームの定義。需要系列は列（JSONB）で持つ | 読み書き |
-| `sessions` | `session_id` | `game_id` 一意（1 ゲーム 1 セッション）、`status` は 4 値、`week > 0`、`version > 0` | 進行状態。`state` に 4 役割の断面を JSONB で保存 | 読み書き |
-| `participants` | `participant_id` | `(game_id, role)` 一意、`credential_digest` 一意、`role` は 4 値または NULL | 参加者。資格のダイジェスト・有効期限・失効もここ | 読み書き |
-| `decisions` | `(session_id, week, role)` | `quantity >= 0`、`participant_id` は NULL 可 | 週ごとの意思決定。`committed` で確定済みを区別 | 読み書き |
-| `week_results` | `(session_id, week)` | `result` は JSONB | 週ごとに確定した結果 | 書き込みと読み込み |
-| `browser_sessions` | `credential_digest` | `game_id` 参照は `ON DELETE CASCADE`、`actor_kind` は 2 値 | ブラウザセッション（24 時間） | 読み書き |
-| `outbox_events` | `event_id` | `(aggregate_id, aggregate_version, event_type)` 一意 | ドメインイベントの追記専用の記録。配信状況も持つ | 読み書き |
-| `idempotency_records` | `(actor_id, operation, resource_id, key_digest)` | 応答は暗号化、`expires_at` で 30 日 | 冪等キーと応答の保存 | 読み書き |
-| `recovery_credentials` | `recovery_credential_id` | `credential_digest` 一意 | 復帰資格を別テーブルで持つ設計 | **定義のみ（アプリは書かない）** |
-| `operation_audit` | `audit_id` | なし | 操作監査 | **定義のみ（アプリは書かない）** |
-
-#### 学習ビュー
-
-| テーブル | 主キー | 主な制約 | 実装の状態 |
-| :--- | :--- | :--- | :--- |
-| `export_packages` | `export_id` | `status` は 4 値 | 読み書き（成果物は `artifact_refs` の JSONB に格納） |
-| `observation_projections` | `game_id` | なし | **定義のみ（アプリは書かない）** |
-| `review_projections` | `game_id` | `status` は `BUILDING`、`READY`、`FAILED` | **定義のみ（アプリは書かない）** |
-| `learning_processed_events` | `event_id` | なし | **定義のみ（アプリは書かない）** |
-| `learning_consumer_cursors` | `game_id` | なし | **定義のみ（アプリは書かない）** |
-
-学習ビューの観察・振り返りは、データベース利用時はリクエストのたびに `outbox_events` から投影を再構築して返します（メモリ利用時はイベント購読で更新）。投影テーブルへの永続化は未着手です。
-
-#### 保持と削除
+#### Game 集約
 
 | テーブル | 主キー | 主な制約 | 役割 |
 | :--- | :--- | :--- | :--- |
+| `games` | `game_id` | `status` は `PREPARING`・`STARTED`・`ENDED`。`join_code` 一意。`final_week` は 1〜50。`commit_mode` は `MANUAL`・`AUTO`。`settings_kind` は `KIT`・`CUSTOM`。遅延と単価は 0 以上。`disclosure_policy` は列挙 | ゲームの設定と状態。`settings_changes` に、準拠値から変えた項目を記録する。進行役の資格も、ここに持つ |
+| `participants` | `participant_id` | `game_id` は外部キー（`CASCADE`）。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**。`recovery_digest` 一意 | 参加者。役割の割り当ては `role` 列。1 人の参加者は高々 1 つの役割 |
+| `observer_invitations` | `invitation_id` | `game_id` は外部キー（`CASCADE`）。`code_digest` 一意 | 観察用の招待。失効は `revoked_at` |
+| `observers` | `observer_id` | `game_id`、`invitation_id` は外部キー（`CASCADE`） | 観察者。役割を持たない |
+| `browser_sessions` | `credential_digest` | `game_id` は外部キー（`CASCADE`）。`actor_kind` は `FACILITATOR`・`PARTICIPANT`・`OBSERVER` | ブラウザセッション（24 時間） |
+
+開始後は、`games` の設定の列と、`participants.role` を変更しません（アプリで保証し、更新のトリガーまたは検査で守る）。
+
+#### Session 集約
+
+| テーブル | 主キー | 主な制約 | 役割 |
+| :--- | :--- | :--- | :--- |
+| `sessions` | `session_id` | `game_id` は外部キー（`CASCADE`）で一意（1 ゲーム 1 セッション）。`status` は `ACTIVE`・`PAUSED`・`ENDED`。`week > 0`、`version > 0` | 進行状態。`settings` に**設定の写し**、`role_states` に 4 役割の状態（在庫、受注残、待ち行列、累積費用）を JSONB で持つ |
+| `role_decisions` | `(session_id, week, role)` | `session_id` は外部キー（`CASCADE`）。`quantity >= 0` と上限（検査）。`version > 0` | 現在の週の、役割ごとの意思決定。共同担当で共有し、`editor_*` に最後に保存した人を持つ。週確定でクリア（またはコミット済みとして履歴に残す） |
+| `week_results` | `(session_id, week)` | `session_id` は外部キー（`CASCADE`）。`commit_kind` は `MANUAL`・`AUTO` | 確定した週。**一度だけ確定**されることを、主キーで守る |
+| `week_role_results` | `(session_id, week, role)` | `(session_id, week)` は `week_results` への外部キー（`CASCADE`） | **役割別の週結果**。需要、出荷、発注、週末在庫、週末受注残、週次費用、累積費用 |
+
+#### 横断・出力・保持
+
+| テーブル | 主キー | 主な制約 | 役割 |
+| :--- | :--- | :--- | :--- |
+| `events` | `event_id` | `game_id` は外部キー（`CASCADE`）。`(aggregate_type, game_id, aggregate_version)` 一意 | ドメインイベントの追記専用の記録。**監査の記録を兼ねる**（操作者、入力値を含む）。通知・外部配信の状態も持つ |
+| `idempotency_records` | `(game_id, scope, key_digest)` | `game_id` は外部キー（`CASCADE`）。応答は暗号化。`expires_at` は 24 時間後 | 冪等キーと応答の保存。ゲームの作成など、ゲームが無い操作は、作成後の `game_id` で保存する |
+| `export_packages` | `export_id` | `game_id` は外部キー（`CASCADE`）。`status` は `PENDING`・`COMPLETE`・`FAILED` | CSV と JSON の成果物 |
 | `retention_policies` | `game_id` | `retention_days` は 1〜3650、`delete_after > retention_starts_at` | 保持方針。期限で索引を持つ |
-| `deletion_sagas` | `deletion_id` | `game_id` 一意、`status` は 4 値、`automatic_retries` は 0〜5 | ゲーム単位の削除の進行 |
-| `owner_deletion_progress` | `(deletion_id, owner_unit)` | `owner_unit` は 3 値、`status` は 4 値 | 所有者ごとの完了状況 |
-| `deletion_attempts` | `(deletion_id, attempt)` | `attempt > 0` | 試行履歴 |
-| `deletion_outbox` | `event_id` | `(deletion_id, owner_unit, attempt)` 一意 | 所有者への削除要求の送信待ち |
-| `deletion_inbox` | `event_id` | なし | 所有者からの完了通知の重複排除 |
-| `deletion_receipts` | `deletion_id` | `game_reference_digest` は 64 文字、`expires_at > recorded_at` | 削除の証跡（ゲーム ID はダイジェストだけを保持）。期限後に消す |
-| `retention_retry_idempotency` | `(game_id, key_digest)` | なし | 手動再試行の冪等性 |
-| `retention_restore_gate` | `gate_id`（常に true の 1 行） | なし | リストア後の読み取り再開ゲート |
+| `deletion_runs` | `deletion_id` | `game_id` 一意。`status` は `PENDING`・`IN_PROGRESS`・`FAILED`・`COMPLETED` | 削除の進行（簡素化。所有者別の進捗表は無い） |
+| `deletion_attempts` | `(deletion_id, attempt)` | — | 試行履歴 |
+| `deletion_receipts` | `deletion_id` | `game_reference_digest` は 64 文字。`expires_at > recorded_at` | 削除の証跡（ゲーム ID のダイジェストだけ）。1 年後に削除 |
+
+ゲーム作成の冪等は、作成の要求（`scope='create'`）を、**ゲームの挿入と同じトランザクションで**、新しい `game_id` で保存します。同じ冪等キーの再送は、`(scope, key_digest)` の部分一意索引（`WHERE scope = 'create'`）で検索し、保存した応答（暗号化済み）を返します。これにより、`game_id` の外部キーを満たしたまま、作成前の重複を排除できます。
 
 ### 設計判断
 
-#### JSONB の使いどころ
+#### 週結果を役割別の行にする
 
-次の値は、行を分けずに JSONB で持っています。
+`week_role_results` を行で持つことで、次が単純になります。
 
-- `games.demand`: 週ごとの需要の配列。週数は最大でも少なく、需要だけを検索する要件がない。
-- `sessions.state`: 4 役割の在庫・受注残・遅延キュー・累積費用を含む断面。純粋関数 `simulateWeek` の入出力をそのまま保存できる。
-- `week_results.result`: 役割ごとの週結果。
-- `outbox_events.payload`: イベント本文（スキーマ版つき）。
+- 振り返り: `SELECT … FROM week_role_results WHERE session_id=$1 ORDER BY week, role`（週 × 役割）
+- 出力: 同じ問い合わせから、CSV と JSON を作る
+- 観察: 確定済みの週の合計を `SUM` し、公開範囲と寄与者数で抑止する
 
-役割ごとの列に分けると、遅延キューの長さ（可変）と、計算の入出力との変換が増えます。計算の正本はコード側にあり、データベース側で在庫などを集計する要件がないため、JSONB を採用しています。
+v1 は、イベントの JSONB から投影を再構築しており、役割別の値が失われていました。v2 は、確定の瞬間に**役割別の行を同じトランザクションで保存**します（`sessions`、`week_results`、`week_role_results`、`events` を一括で）。
 
-#### 非正規化
+#### JSONB を使う範囲
 
-`sessions` は `status`、`week`、`version` を列で持ちつつ、同じ値を `state`（JSONB）にも含みます。列は検索・制約・楽観的排他のため、`state` は計算入力のためです。更新は同じ文で行うので、ずれることはありません。
+- `games.demand`: 週ごとの需要の配列（検索しない）。
+- `games.initial_conditions`: 役割ごとの初期在庫と待ち行列の初期値。
+- `sessions.role_states`: 4 役割の状態（待ち行列は可変長）。計算の入出力をそのまま保存できる。
+- `events.payload`: イベント本文（スキーマ版つき）。
+
+#### 設定の写し
+
+`sessions.settings` に、開始時の設定の写しを持ちます。`Session` は、開始後に `games` を参照せずに、週を確定できます（[ドメインモデル](./domain-model.md)）。
 
 #### 版と冪等性
 
-- `sessions.version` は週確定・状態遷移ごとに増える楽観的排他の版です。`aggregate_version` は発行済みイベント数で、イベントの連続性の確認に使います。
-- 冪等記録は、キーのダイジェスト、リクエストのダイジェスト、暗号化した応答を保存し、同じキーで内容が違うリクエストは競合として拒否します。
+- `games.version`、`sessions.version` は、楽観的排他の版です。更新は `WHERE version = $expected` で行い、行数 0 を競合とします。
+- `role_decisions.version` は、共同担当の競合の検出に使います（古い版の更新は、行数 0 で拒否し、最新値と最後の保存者を返す）。
+- 週確定は、`week_results` の主キーにより、同じ週の二重の確定を、データベースでも防ぎます。
+- 冪等記録は、リクエストのダイジェストと暗号化した応答を保存し、24 時間で期限切れにします。
 
-#### 履歴の持ち方
+#### 削除の網羅
 
-意思決定は週ごとに行を残し、確定時に `committed` を立てます。未確定の行だけ、保存のたびに入れ替えます。確定した週の記録は削除せず、振り返りと学習ビューの元になります。
+すべての表が `games(game_id)` への外部キー（`ON DELETE CASCADE`）を持つため、**`DELETE FROM games WHERE game_id = $1` の 1 回で、関連するデータがすべて消えます**（`sessions` 経由の `role_decisions`、`week_results`、`week_role_results` も連鎖）。削除の網羅は、次のテストで確認します。
+
+> 削除の完了後に、`game_id` 列を持つ**すべての表**に、そのゲームの行が残らない（表の一覧は、`information_schema` から取得して検査する）。
+
+保持と削除の表（`retention_policies`、`deletion_*`）は、証跡のために `games` を参照しない設計です。`game_id` の生の値は、受領記録に残さず、ダイジェストだけを持ちます。
+
+### インデックス（主なもの）
+
+| 表 | 索引 | 目的 |
+| :--- | :--- | :--- |
+| `games` | `join_code`（一意） | 参加コードでの検索 |
+| `participants` | `(game_id)`、`recovery_digest`（一意） | ロビーの一覧、復帰 |
+| `observer_invitations` | `code_digest`（一意） | 招待での参加 |
+| `browser_sessions` | `(game_id, expires_at)` | 期限切れの掃除 |
+| `events` | `(game_id, aggregate_type, aggregate_version)`、`published_at IS NULL` の部分索引 | 配信、通知の再送 |
+| `idempotency_records` | `(expires_at)` | 期限切れの掃除 |
+| `retention_policies` | `(delete_after, game_id)` | 期限到来の検出 |
+| `deletion_runs` | 再試行の予定の部分索引 | 再試行 |
 
 ## ドメインモデルとの対応
 
 | ドメイン | テーブル | 備考 |
 | :--- | :--- | :--- |
-| ゲーム集約（ルート `Game`） | `games`、`sessions`、`participants`、`decisions`、`week_results`、`outbox_events`、`idempotency_records` | 1 ゲーム 1 トランザクションで保存する |
-| 参加者の役割の一意性 | `participants` の `(game_id, role)` 一意制約 | ドメインの不変条件をデータベースでも守る |
-| 数量の範囲 | `decisions.quantity >= 0` | 上限（1000）はアプリで検証し、データベースは下限だけ |
-| セッション状態 | `sessions.status` の CHECK（4 値） | `PAUSED` は 005 で追加 |
-| 保持削除集約（Saga） | `deletion_sagas` ほか 7 テーブル | 所有者単位で削除し、証跡は別に残す |
-| 学習ビュー | `export_packages`（使用中）、投影テーブル群（未使用） | 差分 #3 を参照 |
+| `Game` 集約 | `games`、`participants`、`observer_invitations`、`observers`、`browser_sessions` | 準備中の操作 1 回 = 1 トランザクション |
+| `Session` 集約 | `sessions`、`role_decisions`、`week_results`、`week_role_results` | 進行の操作 1 回 = 1 トランザクション |
+| ドメインイベント | `events` | 監査の記録を兼ねる |
+| 共同担当の不変条件 | `participants.role`（一意制約なし）、`role_decisions` の主キー | 役割ごとに意思決定は 1 件 |
+| 週確定の一回性 | `week_results` の主キー | データベースでも守る |
+| `RetentionSaga` | `retention_policies`、`deletion_*` | 削除は 1 トランザクション（カスケード） |
+| 出力 | `export_packages` | 学習ビューの成果物 |
 
-## 設計と実装の差分・要確認事項
+## v1 からの変更の要約
 
-| # | 内容 | 影響 | 扱い |
-| :--- | :--- | :--- | :--- |
-| 1 | `recovery_credentials` と `operation_audit` は定義されているが、アプリは書き込まない。復帰資格は `participants` の列で持つ | 設計（別テーブルで復帰資格と監査を持つ）と実装が一致しない | どちらを正とするか決める。監査要件が残るなら実装が不足 |
-| 2 | 学習ビューの投影テーブル 4 件は定義のみで、書き込まない | 観察・振り返りは永続化されず、リクエストのたびにイベント全件から再構築する（ゲームが長いほど読み込みが増える） | 永続化するか、テーブルを廃止するか決める |
-| 3 | **保持期間後の削除で `outbox_events` と `idempotency_records` が消えない**（`owner-deletion.ts` の削除対象に含まれず、他に該当の `DELETE` が無いことを確認。`retention_policies` も削除対象外だが、削除の証跡として残す意図かは未確認） | イベント本文（参加者 ID・役割・チーム合計）と、暗号化済みの冪等応答が期限後も残る。保持方針の「期限後に削除する」と矛盾する可能性がある | **要確認**。削除対象に含めるか、残す範囲を保持方針として明文化する |
-| 4 | `u2-session-continuity` の削除は `participants` を参照するサブクエリを使うが、`u1-walking-skeleton` の削除が先に `participants` を消すと、`recovery_credentials` が残る | #1 のとおり当該テーブルは現状書かれないため実害はないが、使い始めると削除漏れになる | #1 の判断とあわせて、削除順を設計する |
-| 5 | `002` の最初の `ALTER TABLE sessions ADD COLUMN IF NOT EXISTS status` は、列が既にあるため何もしない | なし（読み手が混乱する程度） | 記録のみ |
-| 6 | 数量の上限（1000）は DB の CHECK にない | アプリ経由なら問題ないが、直接の書き込みは防げない | 必要なら CHECK を追加（スキーマ変更なので要承認） |
+v1 の差分（[データモデル（v1）](../beer-game/data-model.md) の差分表）への対応です。
+
+| v1 の差分 | v2 での対応 |
+| :--- | :--- |
+| #1 `recovery_credentials`、`operation_audit` が未使用 | 作らない。復帰資格は `participants`、監査は `events` |
+| #2 投影テーブルが未使用で、取得のたびにイベント全件から再構築 | 投影テーブルを作らず、`week_role_results` への SQL で返す |
+| #3 削除で `outbox_events`、`idempotency_records` が漏れる | すべての表に `ON DELETE CASCADE` の外部キーを持たせ、網羅をテストする |
+| #4 削除の順序の依存 | 1 トランザクションで消すため、順序の問題は無い |
+| #6 数量の上限が DB の `CHECK` に無い | `CHECK` を持たせる（上限は設定の値と整合させる） |
+
+## 未決事項
+
+- マイグレーションの管理ツールと、適用の自動化（[技術スタック](./tech-stack.md) で決める）。履歴テーブルで管理し、拡張 → 互換 → 縮小の順に適用する。
+- 数量の上限を、`CHECK`（固定値）にするか、設定の値と照合する検査にするか。
+- `role_decisions` を、確定後に削除するか、履歴として残すか（`week_role_results.ordered` が確定値を持つため、削除でよい見込み）。
+- `events` の保持と、ゲームの削除前の長期の分析の要否。
 
 ## 出典
 
-- [ドメインモデル設計](./domain-model.md)
-- [要件定義](../../requirements/beer-game2/requirements_definition.md)（情報モデル）
-- `apps/beer-game/migrations/001_u1_walking_skeleton.sql` 〜 `005_u5_shared_game_store.sql`
-- `apps/beer-game/src/infrastructure/postgres-game-repository.ts`
-- `apps/beer-game/src/retention/postgres-retention.ts`、`owner-deletion.ts`
-
-## 未確定事項
-
-- 差分 #3（削除対象の漏れ）は、保持方針の実効性に関わるため、優先して判断が必要です。
-- 差分 #1、#2 は、設計と実装のどちらに合わせるかを決める必要があります。
+- [ドメインモデル設計（v2）](./domain-model.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)
+- v1 の [データモデル設計](../beer-game/data-model.md)、`apps/beer-game/migrations/001`〜`005`
+- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)

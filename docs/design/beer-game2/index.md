@@ -8,15 +8,15 @@ beer-game2（v2）プロジェクトの設計ドキュメントです。
 
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |
-| [バックエンドアーキテクチャ](./architecture-backend.md) | パターン選択の根拠、層構造、API 方針、設計と実装の差分を整理 | Draft（v1 の複製。改訂中） |
-| [フロントエンドアーキテクチャ](./architecture-frontend.md) | UI 構成、状態管理、画面遷移、リアルタイム更新を整理 | Draft（v1 の複製。改訂中） |
-| [インフラストラクチャ](./architecture-infrastructure.md) | 実行環境、配信構成、CI/CD、設計と実装の差分を整理 | Draft（v1 の複製。改訂中） |
+| [バックエンドアーキテクチャ](./architecture-backend.md) | パターン選択、層構造、自動確定の流れ、API、観測性、セキュリティ、v1 からの変更を整理 | Draft（v2 改訂済み） |
+| [フロントエンドアーキテクチャ](./architecture-frontend.md) | URL ルーティング、機能単位の構成、共同入力、リアルタイム更新、v1 からの変更を整理 | Draft（v2 改訂済み） |
+| [インフラストラクチャ](./architecture-infrastructure.md) | 実行環境、配信構成、CI/CD、観測、v1 からの変更を整理 | Draft（v2 改訂済み） |
 
 ### モデル設計
 
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |
-| [データモデル設計](./data-model.md) | 概念・論理データモデル、テーブル定義、ER 図、設計と実装の差分を整理 | Draft（v1 の複製。改訂中） |
+| [データモデル設計](./data-model.md) | 概念・論理データモデル、テーブル定義、ER 図、役割別の週結果、v1 からの変更を整理 | Draft（v2 改訂済み） |
 | [ドメインモデル設計](./domain-model.md) | コンテキスト、集約（Game・Session・RetentionSaga）、値オブジェクト、ドメインサービス、v1 からの変更を整理 | Draft（v2 改訂済み） |
 
 ### UI/UX設計
