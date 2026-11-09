@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Update**: [operation](/design/beer-game2/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game2/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [test-strategy](/design/beer-game2/test-strategy.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [ui-design](/design/beer-game2/ui-design.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [tech-stack](/design/beer-game2/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend](/design/beer-game2/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
