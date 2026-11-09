@@ -4,12 +4,12 @@ title: "システムユースケース - ビールゲームシミュレーショ
 description: "システムユースケース 15 件の完全形式の記述と実装状況。要件定義に UC-13〜UC-15 を追加した正本。"
 tags: [requirement]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:42:17Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:53Z }
 ---
 
 # システムユースケース - ビールゲームシミュレーション（v2）
 
-> **beer-game2（v2）の出発点**: 本書は beer-game（v1）の文書を複製したものです。v2 で改訂します。表中の「実装状況」「現状」は **v1 の状態**を表し、不足は v2 で解消する対象です。詳細は [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md) を参照してください。
+> **beer-game2（v2）**: 本書は beer-game（v1）の文書を出発点に、v2 で改訂しました。表中に「v1 の状態」と記した項目は、v1 の実装の状況で、不足は v2 で解消する対象です。経緯は [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md) を参照してください。
 
 ## 概要
 
