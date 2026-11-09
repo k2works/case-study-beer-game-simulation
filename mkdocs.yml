@@ -83,6 +83,7 @@ nav:
           - ビジネスユースケース: requirements/beer-game2/business_usecase.md
           - システムユースケース: requirements/beer-game2/system_usecase.md
           - ユーザーストーリー: requirements/beer-game2/user_story.md
+          - Unit 定義: requirements/beer-game2/unit_definition.md
   - 設計:
       - 概要: design/index.md
       - beer-game:
@@ -115,6 +116,7 @@ nav:
           - 概要: development/beer-game/index.md
       - beer-game2:
           - 概要: development/beer-game2/index.md
+          - リリース計画: development/beer-game2/release_plan.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:

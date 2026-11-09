@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Creation**: [release_plan](/development/beer-game2/release_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [unit_definition](/requirements/beer-game2/unit_definition.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [business_usecase](/requirements/beer-game2/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [requirements_definition](/requirements/beer-game2/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
