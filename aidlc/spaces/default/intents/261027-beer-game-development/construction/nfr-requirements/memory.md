@@ -21,3 +21,4 @@
 <!-- example: 2026-05-29T10:14:32Z — confirm the retention window with compliance before the next stage hardens the schema -->
 - 2026-10-28 [unit u1-walking-skeleton] — architecture review は multi-instance SSE、RPO 0 guarantee、browser credential boundary、accessibility / browser compatibility、NFR4 traceability に Major finding を残した。
 - 2026-10-29 [unit u3-learning-view] — C3 discriminated payload schema と snapshot/replay API は implementation 前に contract 補完が必要である。
+- 2026-11-07T02:09:11Z [unit u5-accessible-experience] — browser 認証、SSE / polling、保持状態・export の共有契約と入力確定の latency budget にレビュー上の懸念が残った。次の設計と実装計画で provider / consumer 間の仕様を確定する。

@@ -9,7 +9,7 @@
     { "path": "apps/beer-game/README.md" },
     { "path": "apps/beer-game/compose.yaml" },
     { "path": "apps/beer-game/eslint.config.js" },
-    { "path": "apps/beer-game/infra/" },
+    { "path": "apps/beer-game/infra/main.tf" },
     { "path": "apps/beer-game/migrations/" },
     { "path": "apps/beer-game/package-lock.json" },
     { "path": "apps/beer-game/package.json" },

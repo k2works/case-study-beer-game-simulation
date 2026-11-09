@@ -72,15 +72,15 @@
 ```
 ## Steps
 
-- [ ] Step 1 — 既存 runner と `npm --prefix apps/beer-game test -- --run tests/u3` を確認する。
-- [ ] Step 2 — US4.1〜US4.3 の Given/When/Then を `tests/u3/learning-view.test.ts`、contract/fault scenarios を `tests/u3/learning-view.integration.test.ts` に先行追加する。
-- [ ] Step 3 — PostgreSQL projection、processed-event、cursor、export metadata migration と repository port/adapter を実装する。
-- [ ] Step 4 — C3 validator、session ordering/idempotency、gap/rebuild coordinator、privacy disclosure policy を実装する。
-- [ ] Step 5 — C6 observation/review/export create/status/download routes と fresh authorization を実装する。
-- [ ] Step 6 — canonical dataset から streaming CSV/JSON、schema/checksum/equality validation、partial cleanup を実装する。
-- [ ] Step 7 — scenarios を green にし、既存 U1/U2 suite と 80% coverage を維持して refactor する。
-- [ ] Step 8 — telemetry、queue/export configuration、migration/IaC assertions、API contract fixture を追加する。
-- [ ] Step 9 — `code-summary.md`、`traceability.json`、`source-manifest.json` を作成する。
+- [x] Step 1 — 既存 runner と `npm --prefix apps/beer-game test -- --run tests/u3` を確認する。
+- [x] Step 2 — US4.1〜US4.3 の Given/When/Then を `tests/u3/learning-view.test.ts`、contract/fault scenarios を `tests/u3/learning-view.integration.test.ts` に先行追加する。
+- [x] Step 3 — PostgreSQL projection、processed-event、cursor、export metadata migration と repository port/adapter を実装する。
+- [x] Step 4 — C3 validator、session ordering/idempotency、gap/rebuild coordinator、privacy disclosure policy を実装する。
+- [x] Step 5 — C6 observation/review/export create/status/download routes と fresh authorization を実装する。
+- [x] Step 6 — canonical dataset から streaming CSV/JSON、schema/checksum/equality validation、partial cleanup を実装する。
+- [x] Step 7 — scenarios を green にし、既存 U1/U2 suite と 80% coverage を維持して refactor する。
+- [x] Step 8 — telemetry、queue/export configuration、migration/IaC assertions、API contract fixture を追加する。
+- [x] Step 9 — `code-summary.md`、`traceability.json`、`source-manifest.json` を作成する。
 
 ## Story traceability
 

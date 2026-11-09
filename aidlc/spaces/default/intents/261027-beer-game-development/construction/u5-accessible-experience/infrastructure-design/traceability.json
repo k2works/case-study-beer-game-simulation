@@ -1,0 +1,27 @@
+{
+  "stage": "infrastructure-design",
+  "unit": "u5-accessible-experience",
+  "upstream_ids": ["NFR1.10", "NFR1.11", "NFR1.12", "NFR1.13", "NFR1.14", "NFR3.12", "NFR3.13", "NFR3.14", "NFR3.15", "NFR3.16", "NFR4.10", "NFR4.11", "NFR7.10", "NFR5.1", "NFR5.2", "NFR5.3", "NFR6.2", "NFR6.3", "NFR8.1", "NFR9.1"],
+  "coverage": [
+    {"id": "NFR1.10", "status": "OK", "target": "monitoring-design.md > Input end-to-end p95; infrastructure-specification.md > Resource sizing"},
+    {"id": "NFR1.11", "status": "OK", "target": "infrastructure-specification.md > SSE transport; monitoring-design.md > Commit-to-render p95"},
+    {"id": "NFR1.12", "status": "OK", "target": "infrastructure-specification.md > Resource sizing; monitoring-design.md > Fallback reflection max"},
+    {"id": "NFR1.13", "status": "N/A", "target": "自動更新の停止と手動更新は browser application の設計であり、インフラ設定は不要"},
+    {"id": "NFR1.14", "status": "N/A", "target": "version 比較と draft 保持は browser application の設計であり、インフラ設定は不要"},
+    {"id": "NFR3.12", "status": "OK", "target": "infrastructure-specification.md > Networking topology; cicd-pipeline.md > Secrets and contract gate"},
+    {"id": "NFR3.13", "status": "OK", "target": "infrastructure-specification.md > Networking topology; cicd-pipeline.md > BDD and integration"},
+    {"id": "NFR3.14", "status": "N/A", "target": "role-safe DTO と DOM 保護は application 契約と UI 実装であり、インフラ設定は不要"},
+    {"id": "NFR3.15", "status": "N/A", "target": "version と idempotency は application 契約と UI 実装であり、インフラ設定は不要"},
+    {"id": "NFR3.16", "status": "OK", "target": "infrastructure-specification.md > Networking topology; cicd-pipeline.md > BDD and integration"},
+    {"id": "NFR4.10", "status": "N/A", "target": "表示名と保持状態の表示は application 契約と UI 実装であり、インフラ設定は不要"},
+    {"id": "NFR4.11", "status": "N/A", "target": "削除状態の表示は application 契約と UI 実装であり、インフラ設定は不要"},
+    {"id": "NFR7.10", "status": "OK", "target": "monitoring-design.md > Logs & Tracing"},
+    {"id": "NFR5.1", "status": "OK", "target": "infrastructure-specification.md > Compute model; cicd-pipeline.md > Build"},
+    {"id": "NFR5.2", "status": "OK", "target": "cicd-pipeline.md > Accessibility automation and manual"},
+    {"id": "NFR5.3", "status": "N/A", "target": "live region と chart / table は UI 実装であり、インフラ設定は不要"},
+    {"id": "NFR6.2", "status": "OK", "target": "cicd-pipeline.md > Accessibility automation and manual"},
+    {"id": "NFR6.3", "status": "OK", "target": "cicd-pipeline.md > Accessibility automation"},
+    {"id": "NFR8.1", "status": "OK", "target": "cicd-pipeline.md > BDD and integration"},
+    {"id": "NFR9.1", "status": "OK", "target": "cicd-pipeline.md > Promotion and rollback"}
+  ]
+}

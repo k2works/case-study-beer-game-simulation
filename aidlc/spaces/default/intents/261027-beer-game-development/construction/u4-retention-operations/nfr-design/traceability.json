@@ -1,0 +1,28 @@
+{
+  "stage": "nfr-design",
+  "unit": "u4-retention-operations",
+  "upstream_ids": ["NFR1.1", "NFR1.2", "NFR1.3", "NFR1.4", "NFR1.5", "NFR2.1", "NFR2.2", "NFR2.3", "NFR2.4", "NFR2.5", "NFR3.1", "NFR3.2", "NFR3.3", "NFR3.4", "NFR4.1", "NFR7.1", "NFR7.2", "NFR7.3", "NFR7.4", "NFR8.1"],
+  "coverage": [
+    {"id": "NFR1.1", "status": "OK", "target": "performance-design.md status query budget and indexed projection"},
+    {"id": "NFR1.2", "status": "OK", "target": "reliability-design.md rolling 30-day deletion SLO"},
+    {"id": "NFR1.3", "status": "OK", "target": "performance-design.md paged scheduler cycle"},
+    {"id": "NFR1.4", "status": "OK", "target": "scalability-design.md capacity baseline and headroom"},
+    {"id": "NFR1.5", "status": "OK", "target": "scalability-design.md owner queue autoscaling"},
+    {"id": "NFR2.1", "status": "OK", "target": "reliability-design.md inbox deduplication and conditional update"},
+    {"id": "NFR2.2", "status": "OK", "target": "reliability-design.md five-attempt exponential backoff with full jitter"},
+    {"id": "NFR2.3", "status": "OK", "target": "reliability-design.md permanent and exhausted transition to FAILED"},
+    {"id": "NFR2.4", "status": "OK", "target": "reliability-design.md atomic owner completion and receipt condition"},
+    {"id": "NFR2.5", "status": "OK", "target": "reliability-design.md durable schedule recovery"},
+    {"id": "NFR3.1", "status": "OK", "target": "security-design.md per-request operator authorization"},
+    {"id": "NFR3.2", "status": "OK", "target": "security-design.md schema validation and stale-attempt isolation"},
+    {"id": "NFR3.3", "status": "OK", "target": "security-design.md data minimization and telemetry allowlist"},
+    {"id": "NFR3.4", "status": "OK", "target": "security-design.md HMAC reference and KMS encryption"},
+    {"id": "NFR4.1", "status": "OK", "target": "security-design.md U4-owned one-year receipt lifecycle"},
+    {"id": "NFR7.1", "status": "OK", "target": "observability-design.md end-to-end correlation and event coverage"},
+    {"id": "NFR7.2", "status": "OK", "target": "observability-design.md five-minute accepted-delivery alert SLI"},
+    {"id": "NFR7.3", "status": "OK", "target": "observability-design.md current and 30-day dashboard"},
+    {"id": "NFR7.4", "status": "OK", "target": "observability-design.md field allowlist and redaction scan"},
+    {"id": "NFR8.1", "status": "OK", "target": "scalability-design.md game-scoped isolation and owner bulkheads"}
+  ],
+  "reverse": []
+}

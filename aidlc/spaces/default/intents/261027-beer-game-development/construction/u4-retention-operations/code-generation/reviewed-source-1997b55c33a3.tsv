@@ -1,0 +1,17 @@
+manifest	6bc1dc5295bd171a1138da0ed065e8c4e2f06e5252eb53f4fb4dd55e504c0150	-
+	apps/beer-game/infra/main.tf	100644	356f28ff88e39ad775dedd4b39da2e85de456b4e38cbfe0384856e8e38302654
+	apps/beer-game/migrations/002_u2_session_continuity.sql	100644	c407539e28b96bd7c8db968d2e3553049bb02daa9a4babdecb8a560e953a5dbf
+	apps/beer-game/migrations/004_u4_retention.sql	100644	e8ed29352d3394baebffc23e711355fc9343b2c18b7e8362a21f1bce3fdd946e
+	apps/beer-game/package-lock.json	100644	d7d89ef2664fcff8b72dd14b53ab92ea682096a3cddf4cf8462474f0157e3fca
+	apps/beer-game/package.json	100644	7241a33942de2103c327d8b3c72037a9a55973993dc8b51bece7b59d00689ab6
+	apps/beer-game/src/api/app.ts	100644	d1673c306da2d10c9f9cd12173ff1346bb1a6a38df634e1d6f1ab73b9c89bee2
+	apps/beer-game/src/application/game-service.ts	100644	8bcbd36ab796a43ab2b76e40f3608d63968c1e2f8377b4edee65e3157f754517
+	apps/beer-game/src/retention/owner-deletion.ts	100644	0b7e03f3f3016f0721c69020369ee3adf6ea8a6e3163b0d19dc120f22319fb7f
+	apps/beer-game/src/retention/postgres-retention.ts	100644	694fa2d68453de9c2221122c518066d7d2f481500548eaf00eece9516c2de081
+	apps/beer-game/src/retention/retention-service.ts	100644	d87a767d72ff7f3e7e073aa4fcdff891ca7ab0a3014c8abfd569348f9a39a241
+	apps/beer-game/src/retention/sqs-worker.ts	100644	c854f31a43dfe6dc1ffb9ba3d815c9b614c80fca9cc1807448cc5da7375606be
+	apps/beer-game/src/retention/worker-main.ts	100644	d843a2d8d88e929c8c6709b2aaff850b8b56db4f966dd9c30276b4b831f267be
+	apps/beer-game/tests/u4/retention-api.integration.test.ts	100644	f1c7168c8c2fee10a73ba9661b324a2a75ddf69fcdff227ca1175d9b1ab11e14
+	apps/beer-game/tests/u4/retention-pg.integration.test.ts	100644	5036043d49ad117f826bf847bbca225fa180887875646416ab87c0dfc81b9530
+	apps/beer-game/tests/u4/retention.test.ts	100644	6df2346080e0eaecae79b95960be47ca903075625ae47388c1b6f1f7d1f0a94d
+	apps/beer-game/vitest.config.ts	100644	a7506053605464357d85916897a4ff7c02d38aa47a447f5c7bcaf23e30da8f59
