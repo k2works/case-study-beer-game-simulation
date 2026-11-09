@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Creation**: [operation](/design/beer-game/operation.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [non-functional](/design/beer-game/non-functional.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [test-strategy](/design/beer-game/test-strategy.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [ui-design](/design/beer-game/ui-design.md) を作成（claude-code/claude-sonnet-5-5）
