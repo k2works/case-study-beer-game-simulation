@@ -74,6 +74,9 @@ nav:
       - beer-game:
           - 概要: requirements/beer-game/index.md
           - 要件定義: requirements/beer-game/requirements_definition.md
+          - ビジネスユースケース: requirements/beer-game/business_usecase.md
+          - システムユースケース: requirements/beer-game/system_usecase.md
+          - ユーザーストーリー: requirements/beer-game/user_story.md
   - 設計:
       - 概要: design/index.md
       - beer-game:
@@ -83,6 +86,7 @@ nav:
           - バックエンドアーキテクチャ: design/beer-game/architecture-backend.md
           - フロントエンドアーキテクチャ: design/beer-game/architecture-frontend.md
           - インフラストラクチャ: design/beer-game/architecture-infrastructure.md
+          - 技術スタック: design/beer-game/tech-stack.md
   - 開発:
       - 概要: development/index.md
       - beer-game:

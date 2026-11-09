@@ -1,6 +1,12 @@
 # Docs Update Log
 
 ## 2026-11-09
+* **Update**: [tech-stack](/design/beer-game/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [tech-stack](/design/beer-game/tech-stack.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [requirements_definition](/requirements/beer-game/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [user_story](/requirements/beer-game/user_story.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [system_usecase](/requirements/beer-game/system_usecase.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [business_usecase](/requirements/beer-game/business_usecase.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [008-retention-saga](/adr/beer-game/008-retention-saga.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [007-cloudfront-single-origin](/adr/beer-game/007-cloudfront-single-origin.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [006-spa-without-router-or-store](/adr/beer-game/006-spa-without-router-or-store.md) を作成（claude-code/claude-sonnet-5-5）
