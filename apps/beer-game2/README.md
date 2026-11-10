@@ -26,13 +26,13 @@ tests/           unit / component / integration / e2e
 
 ## よく使うコマンド
 
-| コマンド                           | 内容                                                                 |
-| :--------------------------------- | :------------------------------------------------------------------- |
-| `npm run db:up`                    | PostgreSQL 18 を起動（ポート 5433）                                  |
-| `npm run migrate`                  | マイグレーションを適用（`DATABASE_URL` が必要）                      |
-| `npm start` / `npm run dev:client` | API（3000）/ UI（5173）                                              |
-| `npm run dev`                      | DB 起動 → マイグレーション → API（3000）と UI（5173）を同時に起動    |
+| コマンド                           | 内容                                                                                                       |
+| :--------------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| `npm run db:up`                    | PostgreSQL 18 を起動（ポート 5433）                                                                        |
+| `npm run migrate`                  | マイグレーションを適用（`DATABASE_URL` が必要）                                                            |
+| `npm start` / `npm run dev:client` | API（3000）/ UI（5173）                                                                                    |
+| `npm run dev`                      | DB 起動 → マイグレーション → API（3000）と UI（5173）を同時に起動                                          |
 | `npm run dev:bots -- <参加コード>` | 1 人で遊ぶための開発用ボット（3 体）。`BOT_STRATEGY=reactive` で注文が増幅する発注方式。手順は手順書を参照 |
-| `npm run smoke`                    | 起動中の API に、作成から確定までを通して動作を確認                  |
-| `npm run verify`                   | format、lint、typecheck、カバレッジ付きテスト、受入条件の対応表、E2E |
-| `npm run acceptance`               | 受入条件とテストの対応表を出力（未対応があれば失敗）                 |
+| `npm run smoke`                    | 起動中の API に、作成から確定までを通して動作を確認                                                        |
+| `npm run verify`                   | format、lint、typecheck、カバレッジ付きテスト、受入条件の対応表、E2E                                       |
+| `npm run acceptance`               | 受入条件とテストの対応表を出力（未対応があれば失敗）                                                       |
