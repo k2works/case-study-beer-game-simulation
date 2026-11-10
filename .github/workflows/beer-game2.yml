@@ -2,9 +2,19 @@ name: beer-game2
 
 on:
   push:
-    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2.yml']
+    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2*.yml']
   pull_request:
-    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2.yml']
+    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2*.yml']
+
+concurrency:
+  group: beer-game2-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DATABASE_URL: postgres://beer_game2:local-only@localhost:5433/beer_game2
 
 jobs:
   verify:
@@ -24,8 +34,8 @@ jobs:
           --health-cmd "pg_isready -U beer_game2"
           --health-interval 2s --health-timeout 2s --health-retries 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version-file: apps/beer-game2/.nvmrc
           cache: npm
@@ -35,5 +45,73 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:coverage
+      - run: npm run acceptance > /dev/null
+      # 本番に入る依存の脆弱性（開発依存は対象外）
+      - run: npm audit --omit=dev --audit-level=high
+
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game2
+    services:
+      postgres:
+        image: postgres:18-alpine
         env:
-          DATABASE_URL: postgres://beer_game2:local-only@localhost:5433/beer_game2
+          POSTGRES_DB: beer_game2
+          POSTGRES_USER: beer_game2
+          POSTGRES_PASSWORD: local-only
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U beer_game2"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: apps/beer-game2/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/beer-game2/package-lock.json
+      - run: npm ci
+      - run: npm run migrate
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v5
+        if: failure()
+        with:
+          name: playwright-traces
+          path: apps/beer-game2/test-results
+          retention-days: 7
+
+  container:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game2
+    steps:
+      - uses: actions/checkout@v5
+      # 本番用イメージ: 非 root、開発依存なし、マイグレーション、/ready、DB 停止で 503
+      - run: npm run container:check
+
+  infra:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game2/infra
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+      # 認証情報なしで行える検査（plan / apply は人が行う）
+      - run: terraform fmt -recursive -check
+      - run: terraform init -backend=false -input=false
+        working-directory: apps/beer-game2/infra/envs/staging
+      - run: terraform validate
+        working-directory: apps/beer-game2/infra/envs/staging
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: shellcheck -x -S warning apps/beer-game2/scripts/*.sh apps/beer-game2/scripts/deploy/*.sh
