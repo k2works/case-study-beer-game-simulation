@@ -20,7 +20,6 @@ export interface TourMeta {
 }
 
 const COMMENT = /\/\*\*([\s\S]*?)\*\//g;
-const TAG = /^@guidedTour\s+(\S+)\s+(\S+)\s*(.*)$/;
 const DECLARATION: RegExp[] = [
   /^export\s+(?:default\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)/,
   /^(?:async\s+)?function\s+([A-Za-z0-9_]+)/,
@@ -42,19 +41,42 @@ function declarationAfter(source: string, index: number): string | null {
   return null;
 }
 
-/** ソースから、`@guidedTour` の付いた宣言を取り出す（出現順） */
-export function extractSteps(source: string, file: string): TourStep[] {
-  const steps: TourStep[] = [];
+interface Tagged {
+  /** タグの行（`@guidedTour` や `@landmark` を除いた残り） */
+  head: string;
+  /** 次の `@` タグまでの続きの行 */
+  rest: string[];
+  /** 直後の宣言の名前 */
+  symbol: string | null;
+}
+
+/** JSDoc から、指定したタグ（例: `@guidedTour`）の付いたものを集める（出現順） */
+function findTagged(source: string, tag: string): Tagged[] {
+  const out: Tagged[] = [];
   for (const match of source.matchAll(COMMENT)) {
     const lines = match[1]!
       .split('\n')
       .map((l) => l.replace(/^\s*\*?\s?/, '').trim());
-    const at = lines.findIndex((l) => l.startsWith('@guidedTour'));
+    const at = lines.findIndex((l) => l === tag || l.startsWith(`${tag} `));
     if (at < 0) continue;
+    out.push({
+      head: lines[at]!.slice(tag.length).trim(),
+      rest: takeContinuation(lines.slice(at + 1)),
+      symbol: declarationAfter(source, match.index! + match[0].length),
+    });
+  }
+  return out;
+}
 
-    const tag = TAG.exec(lines[at]!);
+const joinDescription = (head: string, rest: string[]) =>
+  [head, ...rest].filter((l) => l.length > 0).join(' ');
+
+/** ソースから、`@guidedTour` の付いた宣言を取り出す（出現順） */
+export function extractSteps(source: string, file: string): TourStep[] {
+  return findTagged(source, '@guidedTour').map((t) => {
+    const tag = /^(\S+)\s+(\S+)\s*(.*)$/.exec(t.head);
     if (!tag)
-      throw new Error(`${file}: @guidedTour の書式が不正です: ${lines[at]}`);
+      throw new Error(`${file}: @guidedTour の書式が不正です: ${t.head}`);
     const [, tour, rankText, first] = tag as unknown as [
       string,
       string,
@@ -64,19 +86,19 @@ export function extractSteps(source: string, file: string): TourStep[] {
     if (!/^\d+$/.test(rankText)) {
       throw new Error(`${file}: @guidedTour の順序は数値です（${rankText}）`);
     }
-    const description = [first, ...takeContinuation(lines.slice(at + 1))]
-      .filter((l) => l.length > 0)
-      .join(' ');
-
-    const symbol = declarationAfter(source, match.index! + match[0].length);
-    if (!symbol) {
+    if (!t.symbol) {
       throw new Error(
         `${file}: @guidedTour（${tour} ${rankText}）の直後に宣言が見つかりません`,
       );
     }
-    steps.push({ tour, rank: Number(rankText), symbol, description, file });
-  }
-  return steps;
+    return {
+      tour,
+      rank: Number(rankText),
+      symbol: t.symbol,
+      description: joinDescription(first, t.rest),
+      file,
+    };
+  });
 }
 
 function takeContinuation(lines: string[]): string[] {
@@ -121,6 +143,58 @@ export function renderTour(
     out.push(`[\`${s.file}\`](${repoBase}/${s.file})`, '');
     out.push(s.description, '');
   });
+  return out.join('\n');
+}
+
+export interface Landmark {
+  symbol: string;
+  description: string;
+  file: string;
+}
+
+/** 見どころは少数に絞る（5〜7 個が目安。多くても 10 個） */
+export const MAX_LANDMARKS = 10;
+
+/** ソースから、`@landmark <説明>` の付いた宣言を取り出す（出現順）。ツアーのタグとは独立 */
+export function extractLandmarks(source: string, file: string): Landmark[] {
+  return findTagged(source, '@landmark').map((t) => {
+    if (!t.symbol)
+      throw new Error(`${file}: @landmark の直後に宣言が見つかりません`);
+    return {
+      symbol: t.symbol,
+      description: joinDescription(t.head, t.rest),
+      file,
+    };
+  });
+}
+
+export function validateLandmarks(landmarks: Landmark[]): void {
+  if (landmarks.length < 1) {
+    throw new Error('見どころが 1 個もありません（5〜7 個に絞って選ぶ）');
+  }
+  if (landmarks.length > MAX_LANDMARKS) {
+    throw new Error(
+      `見どころが多すぎます（${landmarks.length} 個）。${MAX_LANDMARKS} 個以下、できれば 5〜7 個に絞ってください`,
+    );
+  }
+}
+
+const escapeCell = (text: string) => text.replace(/\|/g, '\\|');
+
+/** 見どころの一覧（順序なし）を、表の Markdown にする。リンクは行番号を含めない */
+export function renderMap(
+  landmarks: Landmark[],
+  meta: TourMeta,
+  repoBase: string,
+): string {
+  const out: string[] = [`# ${meta.title}`, '', meta.intro, ''];
+  out.push('| 見どころ | 場所 | 理由 |', '| :--- | :--- | :--- |');
+  for (const m of landmarks) {
+    out.push(
+      `| \`${m.symbol}\` | [\`${m.file}\`](${repoBase}/${m.file}) | ${escapeCell(m.description)} |`,
+    );
+  }
+  out.push('');
   return out.join('\n');
 }
 

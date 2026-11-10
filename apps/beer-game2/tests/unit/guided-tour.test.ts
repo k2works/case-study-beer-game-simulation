@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extractLandmarks,
   extractSteps,
   groupTours,
   isUpToDate,
+  renderMap,
   renderTour,
+  validateLandmarks,
+  type Landmark,
   type TourStep,
 } from '../../scripts/lib/guided-tour.js';
 
@@ -176,5 +180,97 @@ describe('isUpToDate', () => {
     const b =
       '---\ngenerated: { by: script, at: 2026-11-10T00:00:00Z }\n---\n本文 B\n';
     expect(isUpToDate(a, b)).toBe(false);
+  });
+});
+
+describe('サイトシーイング・マップ（@landmark）', () => {
+  const source = `
+/**
+ * 通常の説明。
+ * @landmark 週次の計算。ここを理解すれば、ゲームのルールが分かる。
+ *   時刻・DB に依存しない。
+ */
+export function simulateWeek() {}
+
+/** タグの無い宣言 */
+export function other() {}
+
+/**
+ * @guidedTour demo 10 ツアーのステップ（見どころではない）
+ */
+export class OnlyTour {}
+
+/**
+ * @guidedTour demo 20 ツアーと見どころの両方
+ * @landmark 見どころでもある。
+ */
+export interface Session {}
+`;
+
+  it('[ガイドツアー] @landmark の付いた宣言だけを、説明つきで取り出す（ツアーのタグとは独立）', () => {
+    const marks = extractLandmarks(source, 'src/x.ts');
+    expect(marks.map((m) => m.symbol)).toEqual(['simulateWeek', 'Session']);
+    expect(marks[0]?.description).toBe(
+      '週次の計算。ここを理解すれば、ゲームのルールが分かる。 時刻・DB に依存しない。',
+    );
+    expect(marks[1]?.description).toBe('見どころでもある。');
+  });
+
+  it('[ガイドツアー] 1 つの宣言に、ツアーと見どころの両方を付けても、互いの説明に混ざらない', () => {
+    const steps = extractSteps(source, 'src/x.ts');
+    expect(steps.map((s) => s.symbol)).toEqual(['OnlyTour', 'Session']);
+    expect(steps[1]?.description).toBe('ツアーと見どころの両方');
+  });
+
+  it('[ガイドツアー] 宣言が見つからない @landmark は、エラーにする', () => {
+    expect(() => extractLandmarks('/** @landmark 説明 */\n\n', 'f.ts')).toThrow(
+      /f\.ts/,
+    );
+  });
+
+  const mark = (n: number): Landmark => ({
+    symbol: `S${n}`,
+    description: `説明 ${n}`,
+    file: `src/s${n}.ts`,
+  });
+
+  it('[ガイドツアー] 見どころは 1〜10 個。多すぎるとエラー（5〜7 個に絞る）', () => {
+    expect(() => validateLandmarks([])).toThrow(/1/);
+    expect(() =>
+      validateLandmarks(Array.from({ length: 10 }, (_, i) => mark(i))),
+    ).not.toThrow();
+    expect(() =>
+      validateLandmarks(Array.from({ length: 11 }, (_, i) => mark(i))),
+    ).toThrow(/10/);
+  });
+
+  it('[ガイドツアー] 表で出力し、場所へのリンクを張る（行番号なし）。同じ入力なら同じ出力', () => {
+    const md = renderMap(
+      [mark(1), mark(2)],
+      { title: '地図', intro: '導入。' },
+      'https://e.test/b',
+    );
+    expect(md).toContain('# 地図');
+    expect(md).toContain('| 見どころ | 場所 | 理由 |');
+    expect(md).toContain(
+      '| `S1` | [`src/s1.ts`](https://e.test/b/src/s1.ts) | 説明 1 |',
+    );
+    expect(md).not.toMatch(/#L\d+/);
+    expect(
+      renderMap(
+        [mark(1), mark(2)],
+        { title: '地図', intro: '導入。' },
+        'https://e.test/b',
+      ),
+    ).toBe(md);
+  });
+
+  it('[ガイドツアー] 説明の中の「|」は、表を壊さないようにエスケープする', () => {
+    const md = renderMap(
+      [{ symbol: 'A', description: 'a | b', file: 'src/a.ts' }],
+      { title: 't', intro: 'i' },
+      'https://e.test/b',
+    );
+    expect(md).toContain('a \\| b');
   });
 });

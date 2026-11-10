@@ -1,10 +1,12 @@
 /**
- * ガイドツアーを、コードの `@guidedTour` から生成する（Living Documentation）。
+ * ガイドツアーと、サイトシーイング・マップを、コードのタグから生成する（Living Documentation）。
+ * - ガイドツアー: `@guidedTour <ツアー名> <順序> <説明>`（順序のある、処理の流れの案内）
+ * - サイトシーイング・マップ: `@landmark <説明>`（順序のない、見どころの一覧。5〜7 個に絞る）
  *
  *   npm run docs:tour         生成する（docs/ の該当ファイルを更新）
  *   npm run docs:tour:check   生成物がコードと一致しているか検査する（不一致なら失敗。CI で使う）
  *
- * タグの書き方: 宣言の JSDoc に `@guidedTour <ツアー名> <順序> <説明>`（順序は 10 刻み）。
+ * タグは、宣言の JSDoc に付ける。ツアーの順序は 10 刻みにする（途中に足せるように）。
  */
 import {
   existsSync,
@@ -15,12 +17,15 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
+  extractLandmarks,
   extractSteps,
   groupTours,
   isUpToDate,
+  renderMap,
   renderTour,
+  validateLandmarks,
+  type Landmark,
   type TourMeta,
-  type TourStep,
 } from './lib/guided-tour.js';
 
 const REPO_BASE =
@@ -60,67 +65,99 @@ function walk(dir: string): string[] {
   });
 }
 
-function collect(): TourStep[] {
+function sources(): { file: string; text: string }[] {
   return SCAN_DIRS.flatMap(walk)
     .filter((f) => /\.(ts|tsx)$/.test(f))
     .sort()
-    .flatMap((file) => extractSteps(readFileSync(file, 'utf8'), file));
+    .map((file) => ({ file, text: readFileSync(file, 'utf8') }));
 }
 
-function document(
-  name: string,
-  config: TourConfig,
-  steps: TourStep[],
-  at: string,
-): string {
-  const front = [
+const MAP: TourConfig = {
+  title: 'サイトシーイング・マップ（見どころ）',
+  description:
+    'コードベースの見どころ（ここを理解すれば全体が分かる場所）の一覧。順序はない。コードのタグから自動生成する。',
+  output: '../../docs/design/beer-game2/sightseeing-map.md',
+  intro: [
+    '> **自動生成**: このファイルは `npm run docs:tour` で、コードの `@landmark` から生成しています。直接編集せず、コードのタグを直してください（CI が、コードとの一致を検査します）。',
+    '',
+    '初めてコードを読むときの地図です。**ここを理解すれば全体が分かる**場所だけを、少数に絞っています。',
+    '処理の流れを順にたどりたいときは、[ガイドツアー](./guided-tour-walking-skeleton.md) を使ってください。',
+  ].join('\n'),
+};
+
+function frontMatter(config: TourConfig, by: string, at: string): string {
+  return [
     '---',
     'type: Design',
     `title: "${config.title}"`,
     `description: "${config.description}"`,
     'tags: [design, living-documentation]',
     'status: draft',
-    `generated: { by: "script:apps/beer-game2/scripts/guided-tour.ts (${name})", at: ${at} }`,
+    `generated: { by: "${by}", at: ${at} }`,
     '---',
     '',
   ].join('\n');
-  return `${front}${renderTour(steps, config, REPO_BASE)}`;
 }
 
 const check = process.argv.includes('--check');
-const tours = groupTours(collect());
+const all = sources();
+const tours = groupTours(all.flatMap((f) => extractSteps(f.text, f.file)));
+const landmarks: Landmark[] = all.flatMap((f) =>
+  extractLandmarks(f.text, f.file),
+);
 let stale = false;
 
-for (const [name, config] of Object.entries(TOURS)) {
-  const steps = tours.get(name);
-  if (!steps || steps.length === 0)
-    throw new Error(`ツアー ${name} に、タグの付いた宣言がありません`);
+/** 生成物を書く。または（--check）コードと一致しているかを検査する */
+function emit(
+  label: string,
+  config: TourConfig,
+  by: string,
+  body: string,
+  count: number,
+) {
   const existing = existsSync(config.output)
     ? readFileSync(config.output, 'utf8')
     : '';
   const existingAt =
     /at:\s*([^\s,}]+)/.exec(existing)?.[1] ?? new Date().toISOString();
-  const generated = document(name, config, steps, existingAt);
-
+  const generated = `${frontMatter(config, by, existingAt)}${body}`;
   if (existing && isUpToDate(existing, generated)) {
-    console.log(`✓ ${name}: 最新（${steps.length} ステップ）`);
-    continue;
+    console.log(`✓ ${label}: 最新（${count} 件）`);
+    return;
   }
   if (check) {
     console.error(
-      `✗ ${name}: 生成物がコードと一致しません。npm run docs:tour で再生成してください`,
+      `✗ ${label}: 生成物がコードと一致しません。npm run docs:tour で再生成してください`,
     );
     stale = true;
-    continue;
+    return;
   }
-  writeFileSync(
-    config.output,
-    document(name, config, steps, new Date().toISOString()),
-  );
-  console.log(
-    `✓ ${name}: 生成しました（${steps.length} ステップ）→ ${config.output}`,
+  const at = new Date().toISOString();
+  writeFileSync(config.output, `${frontMatter(config, by, at)}${body}`);
+  console.log(`✓ ${label}: 生成しました（${count} 件）→ ${config.output}`);
+}
+
+for (const [name, config] of Object.entries(TOURS)) {
+  const steps = tours.get(name);
+  if (!steps || steps.length === 0)
+    throw new Error(`ツアー ${name} に、タグの付いた宣言がありません`);
+  emit(
+    `ガイドツアー ${name}`,
+    config,
+    `script:apps/beer-game2/scripts/guided-tour.ts (${name})`,
+    renderTour(steps, config, REPO_BASE),
+    steps.length,
   );
 }
+
+validateLandmarks(landmarks);
+emit(
+  'サイトシーイング・マップ',
+  MAP,
+  'script:apps/beer-game2/scripts/guided-tour.ts (sightseeing-map)',
+  renderMap(landmarks, MAP, REPO_BASE),
+  landmarks.length,
+);
 
 const unknown = [...tours.keys()].filter((t) => !(t in TOURS));
 if (unknown.length > 0) {
