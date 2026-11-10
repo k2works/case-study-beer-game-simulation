@@ -8,7 +8,7 @@
 
 ## コードの案内
 
-初めて読むときは、[ガイドツアー: ウォーキングスケルトン](../../docs/design/beer-game2/guided-tour-walking-skeleton.md) から。発注の保存から 1 週が確定するまでを、7 ステップでたどれます。ツアーは、コードの JSDoc `@guidedTour <ツアー名> <順序> <説明>` から生成します（`npm run docs:tour`。コードとの一致は CI が検査します）。
+初めて読むときは、まず [サイトシーイング・マップ](../../docs/design/beer-game2/sightseeing-map.md)（見どころ 7 か所）で全体をつかみ、次に [ガイドツアー: ウォーキングスケルトン](../../docs/design/beer-game2/guided-tour-walking-skeleton.md) から。発注の保存から 1 週が確定するまでを、7 ステップでたどれます。地図は JSDoc の `@landmark <説明>`、ツアーは `@guidedTour <ツアー名> <順序> <説明>` から生成します（`npm run docs:tour`。コードとの一致は CI が検査します）。
 
 ## 構成
 
