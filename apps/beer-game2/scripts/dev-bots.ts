@@ -8,6 +8,9 @@
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 const ORIGIN = process.env.ORIGIN ?? 'http://localhost:5173';
 const ORDER = Number(process.env.BOT_ORDER ?? 4);
+// steady: 毎週 ORDER を発注する。reactive: 直近の受注 + 受注残 + (目標在庫 12 − 在庫) を発注する（基点在庫方式。
+// 上流ほど注文が大きく揺れる「ブルウィップ効果」が現れる。振り返りの確認に使う）
+const STRATEGY = process.env.BOT_STRATEGY ?? 'steady';
 
 const [joinCode, countArg] = process.argv.slice(2);
 if (!joinCode) {
@@ -15,6 +18,17 @@ if (!joinCode) {
   process.exit(1);
 }
 const count = Number(countArg ?? 3);
+
+/** 自分の画面（/me）の情報だけで、今週の発注を決める */
+function quantityFor(v: {
+  inventory: number;
+  backlog: number;
+  history: { demand: number }[];
+}): number {
+  if (STRATEGY !== 'reactive') return ORDER;
+  const lastDemand = v.history.at(-1)?.demand ?? ORDER;
+  return Math.max(0, lastDemand + v.backlog + (12 - v.inventory));
+}
 
 class Bot {
   private cookie = '';
@@ -65,12 +79,12 @@ class Bot {
     const r = await this.call(
       'PUT',
       `/api/games/${this.gameId}/decision`,
-      { role: v.role, quantity: ORDER },
+      { role: v.role, quantity: quantityFor(v) },
       { 'if-match': '"0"' },
     );
     if (r.status === 200)
       console.log(
-        `  ${this.name}（${v.role}）が ${v.week} 週目に ${ORDER} を発注`,
+        `  ${this.name}（${v.role}）が ${v.week} 週目に ${quantityFor(v)} を発注`,
       );
   }
 }
