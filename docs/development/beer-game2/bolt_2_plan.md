@@ -1,10 +1,12 @@
 ---
 type: Plan
 title: "Bolt 2 計画 - CI/CD とステージング"
-description: "Bolt 2（CI/CD とステージング）のステップ計画。ゴール、仮説、対象の受入条件、承認の項目、ステップとゲート、完了条件。承認待ち。"
+description: "Bolt 2（CI/CD とステージング）のステップ計画。ゴール、仮説、対象の受入条件、承認の項目、ステップとゲート、完了条件。承認済み（2026-11-10）。"
 tags: [plan]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-10T05:00:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-10T04:50:00Z }
 ---
 
 # Bolt 2 計画 - CI/CD とステージング
@@ -19,7 +21,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-10T05:00:00Z }
 | ゲート密度 | **密**（ステップごとに、人が検証する） |
 | テスト戦略 | Standard。インフラは `terraform validate` / `plan` と、デプロイ後のスモークテストを「テスト」とする |
 | 前提 | [Bolt 1](./bolt_1_plan.md) の承認と、マイグレーション 001・002 の承認（[終了報告](./bolt_1_report.md)） |
-| 状態 | **計画（承認待ち）** |
+| 状態 | **計画は承認済み（2026-11-10）。Step 1 の判断項目 1・2・3・5・7 は回答待ち（ゲート 1）** |
 
 ### ゴール
 
@@ -56,7 +58,7 @@ AWS への操作は、**外部連携・本番環境・費用に関わる**ため
 | :--- | :--- | :--- | :--- |
 | 1 | **前提の承認** | Bolt 1 のゲート承認、マイグレーション 001・002 の承認 | 先に完了させる。未承認のままスキーマを AWS に適用しない |
 | 2 | **AWS アカウントと権限** | ステージング用のアカウント（または厳格に分離した領域）、リージョン `ap-northeast-1`、Terraform を適用する人（権限）と、GitHub から引き受ける OIDC のロール | **人が用意し、AI は認証情報を扱わない**。Terraform の `apply` は、人が `plan` を確認して実行（または承認）する |
-| 3 | **費用** | ステージングの常時費用（RDS、NAT、ALB、Fargate、CloudFront） | 設計は Multi-AZ・2 タスクだが、**ステージングは Single-AZ・1 タスク・NAT なし（VPC エンドポイント）** を提案。本番の構成は B12 で設計どおり。概算は Step 1 で作成して提示する |
+| 3 | **費用** | ステージングの常時費用（RDS、ALB、Fargate、CloudFront、ネットワーク） | 設計は Multi-AZ・2 タスクだが、**ステージングは Single-AZ・1 タスク**を提案。ネットワークは、NAT ゲートウェイや VPC エンドポイントが月数十ドルかかるため、**タスクを公開サブネットに置き（セキュリティグループで ALB からのみ許可）、RDS はプライベートのまま**を提案。本番の構成は B12 で設計どおり。概算は [手順書の骨子](../../operation/beer-game2/aws_staging_setup.md)（未確認の概算）|
 | 4 | **PostgreSQL の版** | [インフラ設計](../../design/beer-game2/architecture-infrastructure.md)は RDS / CI を 17 と記載。[技術スタック](../../design/beer-game2/tech-stack.md)と B1 の実装は **18** | **18 に統一**し、インフラ設計の記載を直す（RDS が 18 を提供していることを Step 1 で確認） |
 | 5 | **GitHub の設定** | Environments（`staging`、`production`）、`AWS_ROLE_ARN` などの変数、`main` への反映方法（現在の作業ブランチは `develop`） | `develop` → `main` はプルリクエストで反映。`staging` は承認なし、`production` は必須レビュアーあり（B12 で使用） |
 | 6 | **AC6.1.3 の扱い** | B1 計画は「B2」としたが、[リリース計画](./release_plan.md)は B11（観測の完成）に置いている | **B11 に置く**（B2 が重いため）。B1 計画の記述を直す |
@@ -76,9 +78,9 @@ AWS への操作は、**外部連携・本番環境・費用に関わる**ため
 ### Step 1: 前提の確認と見積もり（🔵）
 
 - [ ] 1.1 判断項目 1〜10 を確認し、承認を得る
-- [ ] 1.2 RDS for PostgreSQL 18 の提供、ECS Fargate / ALB / CloudFront の構成で、**費用の概算**を作成（ステージング・本番）
-- [ ] 1.3 インフラ設計の PostgreSQL の記載（17 → 18）を直す。ADR-012 を承認済みにする
-- [ ] 1.4 `docs/operation/beer-game2/` に、AWS ステージング環境セットアップ手順書の骨子を作る
+- [x] 1.2 **費用の概算**を作成（ステージング。[手順書の骨子](../../operation/beer-game2/aws_staging_setup.md)。公式料金での確認と、RDS for PostgreSQL 18 の提供の確認は、人のアカウントで行う）
+- [ ] 1.3 インフラ設計の PostgreSQL の記載（17 → 18）を直した。**ADR-012 の承認は回答待ち**
+- [x] 1.4 `docs/operation/beer-game2/` に、AWS ステージング環境セットアップ手順書の骨子を作る
 
 **ゲート 1**: 費用、アカウント、権限、版を、人が承認する。
 
@@ -175,3 +177,4 @@ AWS への操作は、**外部連携・本番環境・費用に関わる**ため
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
 | 2026-11-10 | 初版作成（AI が提案。人の承認待ち） | claude-code |
+| 2026-11-10 | 計画を承認（human:kakimomokuri）。Step 1 の資料（費用の概算、手順書の骨子、設計の版の修正）を作成。項目 3 のネットワーク案を修正（エンドポイントは NAT と費用が同程度のため） | claude-code |

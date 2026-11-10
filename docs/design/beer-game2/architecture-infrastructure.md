@@ -24,7 +24,7 @@ beer-game（v1）の [インフラストラクチャアーキテクチャ](../be
 | クラウド | AWS（`ap-northeast-1`） | 変更なし |
 | デプロイ形態 | コンテナ（ECS Fargate） | 変更なし |
 | 配信 | CloudFront の単一オリジン（静的ファイルは S3、`/api/*` は ALB）。**独自ドメインと ACM の証明書、TLS 1.2 以上** | v1 は既定の証明書で、TLS の最低版を指定できなかった |
-| データベース | RDS for PostgreSQL 17（Multi-AZ、暗号化、PITR、バックアップ 7 日） | 変更なし |
+| データベース | RDS for PostgreSQL 18（Multi-AZ、暗号化、PITR、バックアップ 7 日） | 変更なし |
 | **非同期・キュー** | **使わない（SQS、所有者別ワーカーを廃止）** | 保持削除を 1 トランザクションのカスケード削除にしたため（[データモデル](./data-model.md)）。必要になった時点で追加する |
 | 定期処理 | EventBridge による ECS タスク（保持の期限検出・削除） | 1 種類のタスクに簡素化 |
 | イメージ | **ECR（不変のタグ、スキャン）** | v1 は、ECR の定義が無く、イメージは GHCR だった |
@@ -50,7 +50,7 @@ package "プライベートサブネット" {
   node "ECS Fargate\nAPI（2〜4 タスク）" as API
   node "ECS Fargate（定期）\n保持の期限検出・削除" as Ret
   node "ECS Fargate（デプロイ時）\nマイグレーションの適用" as Mig
-  database "RDS PostgreSQL 17\nMulti-AZ / PITR" as DB
+  database "RDS PostgreSQL 18\nMulti-AZ / PITR" as DB
 }
 
 storage "S3（Web 資産・非公開・版つき）" as S3Web
@@ -88,7 +88,7 @@ Mon --> SNS
 | API サービス | Fargate、常時 2 タスク、CPU 60% で 2〜4 に自動増減。ステートレス。**本番はブルー/グリーン（CodeDeploy）、ステージングはローリング** |
 | 保持の定期タスク | EventBridge で 5 分ごとに起動し、期限に達したゲームを検出して削除する |
 | マイグレーション | デプロイの一部として、**1 回限りの ECS タスク**で適用する（アプリの起動前）。履歴テーブルで管理し、拡張 → 互換 → 縮小の順 |
-| RDS | PostgreSQL 17、Multi-AZ、暗号化、PITR、バックアップ 7 日、本番は削除保護。接続はプライベートのみ |
+| RDS | PostgreSQL 18、Multi-AZ、暗号化、PITR、バックアップ 7 日、本番は削除保護。接続はプライベートのみ |
 | ECR | 不変のタグ（コミット SHA）、プッシュ時のスキャン、ライフサイクル |
 | 秘密情報 | DB 接続、資格の鍵（**複数の版**）、暗号鍵を Secrets Manager から注入。実行ロールにだけ参照権限 |
 | 観測 | JSON ログを暗号化した CloudWatch Logs へ。メトリクスは EMF。合成監視で、作成・参加・SSE を 1 分ごとに確認。アラームを SNS へ。ダッシュボードを 1 枚 |
@@ -99,7 +99,7 @@ Mon --> SNS
 | 環境 | 用途 | デプロイ | Terraform の状態 |
 | :--- | :--- | :--- | :--- |
 | ローカル | 開発・確認 | `npm run dev`（API と Vite。DB は Docker の PostgreSQL） | — |
-| CI | 検証 | GitHub Actions（PostgreSQL 17 のサービスコンテナ） | — |
+| CI | 検証 | GitHub Actions（PostgreSQL 18 のサービスコンテナ） | — |
 | ステージング | 本番前の確認 | main へのマージで自動（ローリング） | 専用 |
 | 本番 | 運用 | 手動の承認後（ブルー/グリーン） | 専用 |
 
@@ -115,7 +115,7 @@ start
 :プルリクエスト / main へのプッシュ;
 partition "検証" {
   :format、lint（層の依存を含む）、typecheck;
-  :ユニット・コンポーネント・統合テスト（PostgreSQL 17）;
+  :ユニット・コンポーネント・統合テスト（PostgreSQL 18）;
   :Playwright e2e;
   :依存関係・秘密情報・コンテナ・IaC の検査;
   :Terraform fmt / validate / plan;
@@ -168,7 +168,7 @@ stop
 | 6 | アラームが ALB の接続数 1 件。ダッシュボードが無い | 構造化ログ、メトリクス、合成監視、アラーム、ダッシュボード |
 | 7 | ALB のヘルスチェックが `/health`（DB を確認しない） | `/ready`（DB 接続を確認） |
 | 8 | マイグレーションは手動 | デプロイ時に、1 回限りのタスクで適用 |
-| 9 | PostgreSQL の版が環境で異なる（CI は 16） | すべて 17 に揃える |
+| 9 | PostgreSQL の版が環境で異なる（CI は 16） | すべて 18 に揃える（RDS、Docker、CI） |
 
 ## 設計判断（[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)）
 
