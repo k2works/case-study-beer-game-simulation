@@ -59,13 +59,18 @@ test('[US4.2/AC4.2.1] 終了後に役割別の振り返りを見られ、終了�
       });
       await page.getByLabel('発注数').fill('4');
       await page.getByRole('button', { name: '保存する' }).click();
-      await expect(
-        page
-          .getByText(/次の週に進みます|ゲームが終了|週目に進みました/)
-          .first(),
-      ).toBeVisible({
-        timeout: 20_000,
-      });
+      // 一瞬だけ出る案内ではなく、最終の状態を待つ: 次の週の表示、または最終週なら終了
+      if (week < 3) {
+        await expect(
+          page.getByText(`${week + 1} 週目`, { exact: true }),
+        ).toBeVisible({ timeout: 20_000 });
+      } else {
+        await expect(
+          page.getByText('ゲームは終了しました。').first(),
+        ).toBeVisible({
+          timeout: 20_000,
+        });
+      }
     }
     await expect(page.getByText('ゲームは終了しました。')).toBeVisible({
       timeout: 20_000,

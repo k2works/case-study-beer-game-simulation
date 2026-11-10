@@ -61,7 +61,10 @@ test('[US1.2] 1 人・1 ブラウザ + ボット 3 体で、最終週まで 1 �
       });
       await page.getByLabel('発注数').fill('4');
       await page.getByRole('button', { name: '保存する' }).click();
-      await expect(page.getByText(done)).toBeVisible({ timeout: 20_000 });
+      // 自分が最後の保存だと、「…週目に進みました」の通知と「N 週目」の表示が両方出る。どちらでもよい
+      await expect(page.getByText(done).first()).toBeVisible({
+        timeout: 20_000,
+      });
     }
   } finally {
     bots.kill();
