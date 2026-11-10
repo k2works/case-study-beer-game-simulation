@@ -24,7 +24,10 @@
     "migrate:local": "DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2 npm run migrate",
     "dev": "npm run db:up && npm run migrate:local && concurrently -k -n api,ui \"npm start\" \"wait-on tcp:3000 && vite\"",
     "smoke": "tsx scripts/smoke.ts",
-    "dev:bots": "tsx scripts/dev-bots.ts"
+    "dev:bots": "tsx scripts/dev-bots.ts",
+    "container:check": "bash scripts/container-check.sh",
+    "build": "tsc -p tsconfig.build.json",
+    "start:prod": "node dist/main.js"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -42,7 +45,6 @@
     "eslint": "10.14.0",
     "fast-check": "4.10.2",
     "jsdom": "31.0.0",
-    "node-pg-migrate": "9.0.0",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
@@ -54,6 +56,7 @@
   "dependencies": {
     "@fastify/cookie": "11.1.5",
     "fastify": "5.12.8",
+    "node-pg-migrate": "9.0.0",
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",

@@ -15,6 +15,7 @@
     "src",
     "tests",
     "ui",
+    "scripts",
     "vitest.config.ts",
     "vite.config.ts",
     "eslint.config.js"
