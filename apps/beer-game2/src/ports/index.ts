@@ -57,7 +57,10 @@ export interface Repositories {
   events: EventLog;
 }
 
-/** 1 回の操作のトランザクション境界。失敗したら、何も残さない */
+/** 1 回の操作のトランザクション境界。失敗したら、何も残さない
+ *
+ * @landmark トランザクション境界の契約。成功したら全部、失敗したら何も残らない。メモリ版と PostgreSQL 版の 2 つの実装が、同じ契約でテストされている。
+ */
 export interface UnitOfWork {
   run<T>(work: (repos: Repositories) => Promise<T>): Promise<T>;
 }

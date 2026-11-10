@@ -46,6 +46,8 @@ const FIELD: Record<Metric, (r: ReviewRow) => number> = {
 /**
  * 開示の判定。振り返りは、ゲームが終了してから開示する（プレイ中は、他の役割の値と将来の需要を隠すため）。
  * 判定はここ 1 か所に集める。
+ *
+ * @landmark 情報の制約の要。振り返りを開示してよいかの判定が、この 1 か所に集まっている（終了後だけ）。他の経路から漏れないよう、判定を散らさない。
  */
 export function canDisclose(sessionStatus: 'ACTIVE' | 'ENDED' | null): boolean {
   return sessionStatus === 'ENDED';

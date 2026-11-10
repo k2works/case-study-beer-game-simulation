@@ -33,7 +33,10 @@ export interface Participant {
 
 export type GameStatus = 'PREPARING' | 'STARTED' | 'ENDED';
 
-/** Game 集約（準備）。不変。操作は新しい Game とイベントを返す。 */
+/** Game 集約（準備）。不変。操作は新しい Game とイベントを返す。
+ *
+ * @landmark 準備の集約。設定・参加者・役割の割り当てと、開始の条件（4 役割がそろう）を持つ。不変で、操作は新しい Game とイベントを返す。
+ */
 export interface Game {
   id: string;
   /** 参加コード。推測困難な乱数（生成は外側の層） */

@@ -34,7 +34,10 @@ export interface WeekRecord {
   roles: Readonly<Record<Role, RoleWeekRecord>>;
 }
 
-/** Session 集約（進行）。不変。操作は新しい Session とイベントを返す。 */
+/** Session 集約（進行）。不変。操作は新しい Session とイベントを返す。
+ *
+ * @landmark 進行の集約。週・役割別の状態・発注・履歴を持ち、確定と自動確定の不変条件を守る。Game とは別の集約にして、更新の競合を小さくしている。
+ */
 export interface Session {
   id: string;
   gameId: string;
