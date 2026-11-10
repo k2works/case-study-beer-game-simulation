@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-10
+* **Creation**: [bolt_2_plan](/development/beer-game2/bolt_2_plan.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [journal/beer-game2/20261110](/journal/beer-game2/20261110.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_1_report](/development/beer-game2/bolt_1_report.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を作成（claude-code/claude-sonnet-5-5）
