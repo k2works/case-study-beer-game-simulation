@@ -1,0 +1,5 @@
+# コピーして terraform.tfvars にし、値を入れる（terraform.tfvars はコミットしない）。
+image           = "<ECR の URL>@sha256:<ダイジェスト>"
+web_bucket_name = "beer-game2-staging-web-<アカウント ID>"
+# アカウントに GitHub の OIDC プロバイダーが既にあれば false
+create_oidc_provider = true
