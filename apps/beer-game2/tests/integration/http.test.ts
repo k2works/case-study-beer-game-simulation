@@ -6,6 +6,7 @@ import { buildServer } from '../../src/adapters/http/server.js';
 import { ROLES } from '../../src/domain/role.js';
 import {
   fakeCredentials,
+  memoryReviewReader,
   memoryUnitOfWork,
   sequentialIds,
 } from '../support/memory.js';
@@ -25,6 +26,7 @@ beforeEach(async () => {
     clock: { now: () => new Date() },
     ids: sequentialIds(),
     credentials: fakeCredentials(),
+    reviews: memoryReviewReader(mem),
   });
   server = buildServer({
     app,
@@ -210,6 +212,80 @@ describe('同じブラウザでの進行役と参加者', () => {
     const lobby = await get(`/api/games/${next.json().gameId}/lobby`, cookies);
     expect(lobby.statusCode).toBe(200);
     expect(lobby.json().viewer.kind).toBe('PARTICIPANT');
+  });
+});
+
+describe('振り返り（終了後だけ開示）', () => {
+  async function autoGame() {
+    const created = await post('/api/games', { weeks: 2, commitMode: 'AUTO' });
+    const fac = cookieOf(created);
+    const { gameId, joinCode } = created.json();
+    const players: string[] = [];
+    for (const role of ROLES) {
+      const j = await post('/api/join', { joinCode, displayName: role });
+      players.push(cookieOf(j));
+      await post(
+        `/api/games/${gameId}/assignments`,
+        { participantId: j.json().participantId, role },
+        fac,
+      );
+    }
+    await post(`/api/games/${gameId}/start`, {}, fac);
+    const playWeek = async () => {
+      for (const [i, role] of ROLES.entries()) {
+        await server.inject({
+          method: 'PUT',
+          url: `/api/games/${gameId}/decision`,
+          payload: { role, quantity: 6 },
+          headers: { origin: ORIGIN, cookie: players[i]!, 'if-match': '"0"' },
+        });
+      }
+    };
+    return { gameId, fac, players, playWeek };
+  }
+
+  it('[US4.2/AC4.2.2] 進行中は 403（Problem JSON）で、役割別の値も需要も含まない', async () => {
+    const { gameId, fac, players, playWeek } = await autoGame();
+    await playWeek(); // 1 週目だけ確定した状態
+    for (const cookie of [fac, players[0]!, players[3]!]) {
+      const res = await get(`/api/games/${gameId}/review`, cookie);
+      expect(res.statusCode).toBe(403);
+      expect(res.headers['content-type']).toMatch(/application\/problem\+json/);
+      const body = res.json();
+      expect(body).not.toHaveProperty('series');
+      expect(body).not.toHaveProperty('demand');
+      expect(JSON.stringify(body)).not.toMatch(/"order"|RETAILER|FACTORY/);
+    }
+  });
+
+  it('[US4.2/AC4.2.1] 終了後は 200 で、週・需要・指標ごとの役割別の系列を返す', async () => {
+    const { gameId, fac, players, playWeek } = await autoGame();
+    await playWeek();
+    await playWeek();
+    for (const cookie of [fac, players[1]!]) {
+      const res = await get(`/api/games/${gameId}/review`, cookie);
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.weeks).toEqual([1, 2]);
+      expect(body.demand).toEqual([4, 4]);
+      expect(Object.keys(body.series).sort()).toEqual([
+        'backlog',
+        'cost',
+        'inventory',
+        'order',
+        'shipped',
+      ]);
+      expect(body.series.order.RETAILER).toEqual([6, 6]);
+    }
+  });
+
+  it('[US4.2/AC4.2.2] 資格が無ければ 401、他のゲームの資格は 403', async () => {
+    const a = await autoGame();
+    const b = await autoGame();
+    expect((await get(`/api/games/${a.gameId}/review`)).statusCode).toBe(401);
+    expect((await get(`/api/games/${a.gameId}/review`, b.fac)).statusCode).toBe(
+      403,
+    );
   });
 });
 

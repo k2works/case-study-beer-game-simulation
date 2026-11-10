@@ -1,4 +1,5 @@
 import type { Game } from '../domain/game.js';
+import type { ReviewRow } from '../domain/review.js';
 import type { Session } from '../domain/session.js';
 
 /** 版が古い、または既に存在する。呼び出し側は競合として扱う */
@@ -79,4 +80,19 @@ export interface CredentialPolicy {
 /** 状態の変化の通知（内容は含めず、変化があったことだけを伝える） */
 export interface ChangeNotifier {
   subscribe(gameId: string, listener: () => void): () => void;
+}
+
+/** 振り返りの元データ。ゲームの状態と、確定した週の役割別の行 */
+export interface ReviewSource {
+  /** セッションが無い（未開始）なら null */
+  sessionStatus: 'ACTIVE' | 'ENDED' | null;
+  rows: ReviewRow[];
+}
+
+/**
+ * 読み取り専用の経路（集約を経由せず、ロックを取らない）。
+ * 開示してよいかの判定はここでは行わない（ドメインの `canDisclose`）。
+ */
+export interface ReviewReader {
+  read(gameId: string): Promise<ReviewSource>;
 }

@@ -4,6 +4,7 @@ import {
   createApplication,
   type Application,
 } from '../../src/application/index.js';
+import { PgReviewReader } from '../../src/adapters/persistence/pg-review-reader.js';
 import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js';
 import { FACILITATOR } from '../../src/domain/actor.js';
 import { ROLES } from '../../src/domain/role.js';
@@ -179,6 +180,80 @@ describe('冪等記録', () => {
   });
 });
 
+describe('PgReviewReader（読み取り専用）', () => {
+  it('[US4.2/AC4.2.1] 役割別の週結果の行を、週・役割の順で返し、状態も返す', async () => {
+    const app = createApplication({
+      uow,
+      clock: { now: () => new Date() },
+      ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
+      credentials: fakeCredentials(),
+      reviews: new PgReviewReader(pool),
+    });
+    const reader = new PgReviewReader(pool);
+    const c = await app.createGame({ weeks: 2, commitMode: 'AUTO' });
+    expect(await reader.read(c.gameId)).toEqual({
+      sessionStatus: null,
+      rows: [],
+    });
+
+    const tokens: string[] = [];
+    for (const role of ROLES) {
+      const j = await app.joinGame({ joinCode: c.joinCode, displayName: role });
+      await app.assignRole({
+        token: c.facilitatorToken,
+        gameId: c.gameId,
+        participantId: j.participantId,
+        role,
+      });
+      tokens.push(j.token);
+    }
+    await app.startGame({ token: c.facilitatorToken, gameId: c.gameId });
+    const playWeek = async () => {
+      for (const [i, role] of ROLES.entries()) {
+        await app.saveDecision({
+          token: tokens[i]!,
+          gameId: c.gameId,
+          role,
+          quantity: 6,
+          expectedVersion: 0,
+        });
+      }
+    };
+    await playWeek();
+    const mid = await reader.read(c.gameId);
+    expect(mid.sessionStatus).toBe('ACTIVE');
+    expect(mid.rows).toHaveLength(4);
+    await playWeek();
+    const end = await reader.read(c.gameId);
+    expect(end.sessionStatus).toBe('ENDED');
+    expect(end.rows.map((r) => `${r.week}:${r.role}`)).toEqual([
+      '1:DISTRIBUTOR',
+      '1:FACTORY',
+      '1:RETAILER',
+      '1:WHOLESALER',
+      '2:DISTRIBUTOR',
+      '2:FACTORY',
+      '2:RETAILER',
+      '2:WHOLESALER',
+    ]);
+    expect(
+      end.rows.find((r) => r.week === 1 && r.role === 'RETAILER'),
+    ).toMatchObject({
+      demand: 4,
+      order: 6,
+      shipped: 4,
+      endingInventory: 12,
+    });
+    // ユースケース越しでも、終了後は同じ内容が開示される
+    const review = await app.review({
+      token: c.facilitatorToken,
+      gameId: c.gameId,
+    });
+    expect(review.weeks).toEqual([1, 2]);
+    expect(review.series.order.RETAILER).toEqual([6, 6]);
+  });
+});
+
 describe('ユースケースを実 PostgreSQL で通す', () => {
   let app: Application;
   beforeEach(() => {
@@ -187,6 +262,7 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
       clock: { now: () => new Date() },
       ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
       credentials: fakeCredentials(),
+      reviews: new PgReviewReader(pool),
     });
   });
 
@@ -308,6 +384,7 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
       clock: { now: () => new Date() },
       ids: { uuid: () => randomUUID(), joinCode: () => 'x' },
       credentials: fakeCredentials(),
+      reviews: new PgReviewReader(pool),
     });
     await expect(
       broken.commitWeek({

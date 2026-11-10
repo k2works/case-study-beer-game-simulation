@@ -274,6 +274,14 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     }),
   );
 
+  // 振り返り（役割別の時系列）。ゲームが終了してから、進行役・参加者に開示する
+  server.get('/api/games/:id/review', async (request) =>
+    app.review({
+      token: await tokenOf(request, 'facilitator', 'participant'),
+      gameId: gameParam(request),
+    }),
+  );
+
   server.get('/api/games/:id/console', async (request) =>
     app.console({
       token: await tokenOf(request, 'facilitator', 'participant'),

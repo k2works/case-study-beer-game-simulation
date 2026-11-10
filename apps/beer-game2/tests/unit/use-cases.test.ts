@@ -17,6 +17,7 @@ import {
 import { ConflictError } from '../../src/ports/index.js';
 import {
   fakeCredentials,
+  memoryReviewReader,
   memoryUnitOfWork,
   sequentialIds,
 } from '../support/memory.js';
@@ -31,6 +32,7 @@ beforeEach(() => {
     clock: { now: () => new Date('2026-11-10T00:00:00Z') },
     ids: sequentialIds(),
     credentials: fakeCredentials(),
+    reviews: memoryReviewReader(mem),
   });
 });
 
@@ -472,5 +474,84 @@ describe('意思決定と週の確定', () => {
     }
     const c = await app.console({ token: t.facilitator, gameId: t.gameId });
     expect(c.status).toBe('ENDED');
+  });
+});
+
+describe('振り返り（終了後だけ開示）', () => {
+  async function playWeek(t: Table, week: number, key: string) {
+    for (const role of ROLES) {
+      await app.saveDecision({
+        token: t.players[role].token,
+        gameId: t.gameId,
+        role,
+        quantity: 4 + week,
+        expectedVersion: 0,
+      });
+    }
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    await app.commitWeek({
+      token: t.facilitator,
+      gameId: t.gameId,
+      week,
+      version: c.sessionVersion,
+      idempotencyKey: key,
+    });
+  }
+
+  it('[US4.2/AC4.2.2] 進行中は、役割別の値を開示しない（権限エラー）', async () => {
+    const t = await setUpTable(2);
+    await playWeek(t, 1, 'k1');
+    for (const token of [t.facilitator, t.players.RETAILER.token]) {
+      const attempt = app.review({ token, gameId: t.gameId });
+      await expect(attempt).rejects.toBeInstanceOf(PermissionError);
+      await expect(attempt).rejects.toThrow(/終了/);
+    }
+  });
+
+  it('[US4.2/AC4.2.2] 開始前も開示しない', async () => {
+    const t = await setUpTable(2, false);
+    await expect(
+      app.review({ token: t.facilitator, gameId: t.gameId }),
+    ).rejects.toBeInstanceOf(PermissionError);
+  });
+
+  it('[US4.2/AC4.2.1] 終了後は、進行役にも参加者にも、役割別の時系列を返す', async () => {
+    const t = await setUpTable(2);
+    await playWeek(t, 1, 'k1');
+    await playWeek(t, 2, 'k2');
+    for (const token of [t.facilitator, t.players.WHOLESALER.token]) {
+      const review = await app.review({ token, gameId: t.gameId });
+      expect(review.weeks).toEqual([1, 2]);
+      expect(review.demand).toEqual([4, 4]);
+      expect(review.series.order.RETAILER).toEqual([5, 6]);
+      expect(Object.keys(review.series.order)).toEqual([...ROLES]);
+    }
+  });
+
+  it('[US4.2/AC4.2.2] 資格が無ければ 401 相当、他のゲームの資格は 403 相当', async () => {
+    const a = await setUpTable(1);
+    const b = await setUpTable(1);
+    await expect(
+      app.review({ token: 'x', gameId: a.gameId }),
+    ).rejects.toBeInstanceOf(UnauthorizedError);
+    await expect(
+      app.review({ token: b.facilitator, gameId: a.gameId }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('[US4.2/AC4.2.3] 終了済みで 0 件なら、空の振り返りを返す（エラーではない）', async () => {
+    const t = await setUpTable(1);
+    const emptyApp = createApplication({
+      uow: mem.uow,
+      clock: { now: () => new Date() },
+      ids: sequentialIds(),
+      credentials: fakeCredentials(),
+      reviews: { read: async () => ({ sessionStatus: 'ENDED', rows: [] }) },
+    });
+    const review = await emptyApp.review({
+      token: t.facilitator,
+      gameId: t.gameId,
+    });
+    expect(review.weeks).toEqual([]);
   });
 });

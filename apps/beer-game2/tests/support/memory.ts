@@ -1,4 +1,6 @@
 import type { Game } from '../../src/domain/game.js';
+import { ROLES } from '../../src/domain/role.js';
+import type { ReviewRow } from '../../src/domain/review.js';
 import type { Session } from '../../src/domain/session.js';
 import {
   ConflictError,
@@ -7,6 +9,7 @@ import {
   type IdempotencyRecord,
   type Principal,
   type Repositories,
+  type ReviewReader,
   type UnitOfWork,
 } from '../../src/ports/index.js';
 
@@ -110,5 +113,35 @@ export function fakeCredentials(): CredentialPolicy {
       return { token, digest: `digest(${token})` };
     },
     digestOf: (token) => `digest(${token})`,
+  };
+}
+
+/** メモリ上の読み取り専用の経路（振り返り）。UnitOfWork の保存内容をそのまま読む */
+export function memoryReviewReader(mem: {
+  snapshot: () => Store;
+}): ReviewReader {
+  return {
+    read: async (gameId) => {
+      const session = mem.snapshot().sessions.get(gameId);
+      if (!session) return { sessionStatus: null, rows: [] };
+      const rows: ReviewRow[] = session.history.flatMap((record) =>
+        ROLES.map((role) => {
+          const r = record.roles[role];
+          return {
+            week: record.week,
+            role,
+            demand: r.demand,
+            received: r.received,
+            shipped: r.shipped,
+            order: r.order,
+            endingInventory: r.endingInventory,
+            endingBacklog: r.endingBacklog,
+            weeklyCostMinor: r.weeklyCostMinor,
+            cumulativeCostMinor: r.cumulativeCostMinor,
+          };
+        }),
+      );
+      return { sessionStatus: session.status, rows };
+    },
   };
 }

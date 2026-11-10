@@ -9,6 +9,8 @@ import {
   startGame as startGameRule,
 } from '../domain/game.js';
 import { ROLES, type Role } from '../domain/role.js';
+import { buildReview, canDisclose } from '../domain/review.js';
+import { PermissionError } from '../domain/values.js';
 import {
   commitWeek as commitWeekRule,
   saveDecision as saveDecisionRule,
@@ -18,6 +20,7 @@ import {
 import {
   ConflictError,
   type Clock,
+  type ReviewReader,
   type CredentialPolicy,
   type IdGenerator,
   type Principal,
@@ -31,6 +34,8 @@ export interface Dependencies {
   clock: Clock;
   ids: IdGenerator;
   credentials: CredentialPolicy;
+  /** 読み取り専用の経路（振り返り） */
+  reviews: ReviewReader;
 }
 
 export interface CommitResult {
@@ -44,7 +49,7 @@ export interface CommitResult {
  * 1 回の操作は 1 つのトランザクション（UnitOfWork）で行う。
  */
 export function createApplication(deps: Dependencies) {
-  const { uow, ids, credentials } = deps;
+  const { uow, ids, credentials, reviews } = deps;
 
   async function authenticate(
     repos: Repositories,
@@ -344,6 +349,19 @@ export function createApplication(deps: Dependencies) {
           }),
         };
       });
+    },
+
+    /**
+     * 振り返り（役割別の時系列）。ゲームが終了してから、そのゲームの進行役・参加者に開示する。
+     * 開示の判定はドメインの `canDisclose` に集め、終了前は値を一切返さない。
+     */
+    async review(input: { token: string; gameId: string }) {
+      await uow.run((repos) => authenticate(repos, input.token, input.gameId));
+      const source = await reviews.read(input.gameId);
+      if (!canDisclose(source.sessionStatus)) {
+        throw new PermissionError('振り返りは、ゲームが終了してから見られます');
+      }
+      return buildReview(source.rows);
     },
 
     /** 進行役のコンソール。入力の有無だけを見せる */

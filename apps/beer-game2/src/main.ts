@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { HmacCredentialPolicy } from './adapters/http/credentials.js';
 import { buildServer } from './adapters/http/server.js';
+import { PgReviewReader } from './adapters/persistence/pg-review-reader.js';
 import { PgNotifier } from './adapters/persistence/pg-notifier.js';
 import { PgUnitOfWork } from './adapters/persistence/pg-unit-of-work.js';
 import { createApplication } from './application/index.js';
@@ -29,6 +30,7 @@ const app = createApplication({
   uow: new PgUnitOfWork(pool, { idempotencyKey: config.idempotencyKey }),
   clock: { now: () => new Date() },
   ids: { uuid: randomUUID, joinCode },
+  reviews: new PgReviewReader(pool),
   credentials: new HmacCredentialPolicy(
     config.credentialHmacKey,
     config.credentialKeyVersion,
