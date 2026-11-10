@@ -1,9 +1,9 @@
 ---
 type: Plan
 title: "Bolt 1 計画 - 基盤と縦の最小（ウォーキングスケルトン）"
-description: "Bolt 1（基盤と縦の最小）のステップ計画。ゴール、仮説、対象の受入条件、承認の項目、TDD のステップとゲート、完了条件。承認待ち。"
+description: "Bolt 1（基盤と縦の最小）のステップ計画。ゴール、仮説、対象の受入条件、承認の項目、TDD のステップとゲート、完了条件。承認済み（2026-11-10）。"
 tags: [plan]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:44:50Z }
 ---
 
@@ -18,7 +18,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:44:50Z }
 | 所要（計画） | 2 稼働日 |
 | ゲート密度 | **密**（ステップごとに、人が検証する） |
 | テスト戦略 | Comprehensive（`simulateWeek`、集約、永続化）、Standard（その他） |
-| 状態 | **計画（承認待ち）** |
+| 状態 | **承認済み（2026-11-10）。実装完了。人のゲート承認（全 10 ゲート）は未実施。[終了報告](./bolt_1_report.md)** |
 
 ### ゴール
 
@@ -67,92 +67,92 @@ CI/CD とステージング（B2）、役割別の振り返りの画面（B3）�
 
 ### Step 1: リポジトリの土台（🔵）
 
-- [ ] 1.1 `.nvmrc`（26）、`package.json`（`engines`、スクリプト、依存関係は固定の版）、`tsconfig.json`（TypeScript 6.0、strict）
-- [ ] 1.2 `eslint.config.js`: **層の依存の検査**（`no-restricted-imports`: `domain` は他の層を import しない、`application` は `adapters` を import しない など）、警告 0
-- [ ] 1.3 `vitest.config.ts`: カバレッジのゲート（行・関数・文 85%、分岐 75%）、`adapters/http` を計測対象に含める
-- [ ] 1.4 `compose.yaml`（`postgres:18`）、`prettier` 設定、`.gitignore`
-- [ ] 1.5 ディレクトリ構成（`src/{domain,ports,application,adapters/{http,persistence},config}`、`tests/{unit,component,integration,e2e}`、`ui/`、`migrations/`）
-- [ ] 1.6 `.github/workflows/beer-game2.yml`（format、lint、typecheck、テスト、カバレッジ。PostgreSQL 18 のサービス）
-- [ ] 1.7 層の lint が、**違反を実際に検出する**ことの確認（意図的な違反で失敗し、戻して成功）
+- [x] 1.1 `.nvmrc`（26）、`package.json`（`engines`、スクリプト、依存関係は固定の版）、`tsconfig.json`（TypeScript 6.0、strict）
+- [x] 1.2 `eslint.config.js`: **層の依存の検査**（`no-restricted-imports`: `domain` は他の層を import しない、`application` は `adapters` を import しない など）、警告 0
+- [x] 1.3 `vitest.config.ts`: カバレッジのゲート（行・関数・文 85%、分岐 75%）、`adapters/http` を計測対象に含める
+- [x] 1.4 `compose.yaml`（`postgres:18`）、`prettier` 設定、`.gitignore`
+- [x] 1.5 ディレクトリ構成（`src/{domain,ports,application,adapters/{http,persistence},config}`、`tests/{unit,component,integration,e2e}`、`ui/`、`migrations/`）
+- [x] 1.6 `.github/workflows/beer-game2.yml`（format、lint、typecheck、テスト、カバレッジ。PostgreSQL 18 のサービス）
+- [x] 1.7 層の lint が、**違反を実際に検出する**ことの確認（意図的な違反で失敗し、戻して成功）
 
 **ゲート 1**: 構成と lint のルールを、人が確認する。`npm run lint`、`typecheck`、`test` が空の状態で通る。
 
 ### Step 2: ドメイン — 値オブジェクトと週次計算（🔴🟢🟡）
 
-- [ ] 2.1 🔴 値オブジェクトのテスト: `Role`、`Quantity`（0〜1000）、`Week`（1〜50）、`Money`、`DemandSeries`、`DisplayName`、`Version`
-- [ ] 2.2 🟢 値オブジェクトの実装（生成時の検証）
-- [ ] 2.3 🔴 `simulateWeek` の **golden テスト**（既知の系列の期待値。JSD 改訂版キットの 12 ステップと 2 週遅延）と、**fast-check の性質**（決定論、非負、保存、費用、遅延、役割別の合計 = チームの合計）
-- [ ] 2.4 🟢 `simulateWeek` の実装。**役割別の週結果**（需要、出荷、発注、週末在庫、週末受注残、週次費用、累積費用）を返す
-- [ ] 2.5 🟡 Refactor（命名、重複の除去。ユビキタス言語に合わせる）
+- [x] 2.1 🔴 値オブジェクトのテスト: `Role`、`Quantity`（0〜1000）、`Week`（1〜50）、`Money`、`DemandSeries`、`DisplayName`、`Version`
+- [x] 2.2 🟢 値オブジェクトの実装（生成時の検証）
+- [x] 2.3 🔴 `simulateWeek` の **golden テスト**（既知の系列の期待値。JSD 改訂版キットの 12 ステップと 2 週遅延）と、**fast-check の性質**（決定論、非負、保存、費用、遅延、役割別の合計 = チームの合計）
+- [x] 2.4 🟢 `simulateWeek` の実装。**役割別の週結果**（需要、出荷、発注、週末在庫、週末受注残、週次費用、累積費用）を返す
+- [x] 2.5 🟡 Refactor（命名、重複の除去。ユビキタス言語に合わせる）
 
 **ゲート 2**: golden の期待値が、教材（要件定義の BR-02〜BR-09）と一致することを、人が確認する。性質のテストの網羅を確認する。
 
 ### Step 3: ドメイン — Game 集約（🔴🟢🟡）
 
-- [ ] 3.1 🔴 `Game` のテスト: キット準拠の作成（`KitPreset`）、設定の検証（無効な需要系列は**対象週と修正内容**を返す）、参加（準備中のみ）、役割の割り当て（1 人 1 役割。**この Bolt では 1 役割 1 人**）、開始の条件（4 役割が割り当て済み）、不足している役割の通知
-- [ ] 3.2 🟢 `Game` の実装（**ルールは集約が持つ**）。ドメインイベントを返す
-- [ ] 3.3 🟡 Refactor
+- [x] 3.1 🔴 `Game` のテスト: キット準拠の作成（`KitPreset`）、設定の検証（無効な需要系列は**対象週と修正内容**を返す）、参加（準備中のみ）、役割の割り当て（1 人 1 役割。**この Bolt では 1 役割 1 人**）、開始の条件（4 役割が割り当て済み）、不足している役割の通知
+- [x] 3.2 🟢 `Game` の実装（**ルールは集約が持つ**）。ドメインイベントを返す
+- [x] 3.3 🟡 Refactor
 
 **ゲート 3**: ルールが集約に集まり、サービスに漏れていないことを確認する。
 
 ### Step 4: ドメイン — Session 集約（🔴🟢🟡）
 
-- [ ] 4.1 🔴 `Session` のテスト: 開始（設定の写し、初期状態）、意思決定の保存（進行中のみ、0〜上限、版）、週確定（4 役割が揃う、**要求された週と版が一致**、**役割別の週結果**、最終週で終了）、一回性（同じ冪等キーは同じ結果）、版の競合
-- [ ] 4.2 🟢 `Session` の実装（`simulateWeek` を呼ぶ）
-- [ ] 4.3 🟡 Refactor
+- [x] 4.1 🔴 `Session` のテスト: 開始（設定の写し、初期状態）、意思決定の保存（進行中のみ、0〜上限、版）、週確定（4 役割が揃う、**要求された週と版が一致**、**役割別の週結果**、最終週で終了）、一回性（同じ冪等キーは同じ結果）、版の競合
+- [x] 4.2 🟢 `Session` の実装（`simulateWeek` を呼ぶ）
+- [x] 4.3 🟡 Refactor
 
 **ゲート 4**: 週確定の不変条件（FR-09、BR-12）を、人が確認する。
 
 ### Step 5: ポートとユースケース（🔴🟢🟡）
 
-- [ ] 5.1 🔵 ポートの定義（`GameRepository`、`SessionRepository`、`Clock`、`IdGenerator`、`CredentialPolicy`）
-- [ ] 5.2 🔴 ユースケースのテスト（**メモリ上のポート**）: `CreateGame`、`JoinGame`、`AssignRole`、`StartGame`、`SaveDecision`、`CommitWeek`、問い合わせ（`Lobby`、`RoleState`）。冪等性、権限（進行役・参加者）
-- [ ] 5.3 🟢 ユースケースの実装（読み込み → 集約の呼び出し → 保存。**ルールを持たない**）
-- [ ] 5.4 🟡 Refactor
+- [x] 5.1 🔵 ポートの定義（`GameRepository`、`SessionRepository`、`Clock`、`IdGenerator`、`CredentialPolicy`）
+- [x] 5.2 🔴 ユースケースのテスト（**メモリ上のポート**）: `CreateGame`、`JoinGame`、`AssignRole`、`StartGame`、`SaveDecision`、`CommitWeek`、問い合わせ（`Lobby`、`RoleState`）。冪等性、権限（進行役・参加者）
+- [x] 5.3 🟢 ユースケースの実装（読み込み → 集約の呼び出し → 保存。**ルールを持たない**）
+- [x] 5.4 🟡 Refactor
 
 **ゲート 5**: アプリケーション層にルールが無いことを確認する（lint とレビュー）。
 
 ### Step 6: 永続化（PostgreSQL）（🔴🟢🟡）
 
-- [ ] 6.1 🔵 マイグレーション 001（`games`、`participants`、`browser_sessions`、`sessions`、`role_decisions`、`week_results`、`week_role_results`、`events`、`idempotency_records`。全表に `games` への `ON DELETE CASCADE` の外部キー）。`node-pg-migrate`
-- [ ] 6.2 🔴 DB 統合テスト（実 PostgreSQL 18。専用 DB 名の検査）: 版つきの更新（競合は行数 0）、冪等記録（暗号化した応答）、**確定の原子性（保存の途中の失敗を注入して、部分更新が残らない）**、`week_results` の主キーによる二重確定の防止、役割別の週結果の行
-- [ ] 6.3 🟢 リポジトリの実装（`SELECT … FOR UPDATE`、`WHERE version = $expected`、`pg_notify`）
-- [ ] 6.4 🟡 Refactor
+- [x] 6.1 🔵 マイグレーション 001（`games`、`participants`、`browser_sessions`、`sessions`、`role_decisions`、`week_results`、`week_role_results`、`events`、`idempotency_records`。全表に `games` への `ON DELETE CASCADE` の外部キー）。`node-pg-migrate`
+- [x] 6.2 🔴 DB 統合テスト（実 PostgreSQL 18。専用 DB 名の検査）: 版つきの更新（競合は行数 0）、冪等記録（暗号化した応答）、**確定の原子性（保存の途中の失敗を注入して、部分更新が残らない）**、`week_results` の主キーによる二重確定の防止、役割別の週結果の行
+- [x] 6.3 🟢 リポジトリの実装（`SELECT … FOR UPDATE`、`WHERE version = $expected`、`pg_notify`）
+- [x] 6.4 🟡 Refactor
 
 **ゲート 6**: スキーマと、永続化の整合性（版、原子性）を、人が確認する。マイグレーションの内容は、**スキーマ変更のため、人が承認**する。
 
 ### Step 7: HTTP と観測性（🔴🟢🟡）
 
-- [ ] 7.1 🔴 API 統合テスト: ルート（games、participation、session、health）、Cookie（`HttpOnly`、`Secure`、`SameSite=Strict`）、Origin 検査、Problem JSON、`Idempotency-Key`、`If-Match`、相関 ID、**ログに資格・表示名・非公開値が含まれない**、**予期しないエラーが、相関 ID つきで記録される**、`/health` と **`/ready`（DB が使えないと失敗）**、他役割・他ゲームの拒否
-- [ ] 7.2 🟢 Fastify の実装（機能別のルート、zod 検証、Pino の構造化ログと `redact`、エラーハンドラー）
-- [ ] 7.3 🔴🟢 資格: 発行（256 ビット）、ダイジェスト + **鍵の版**、検証（定数時間）、**本番で鍵が未設定なら起動に失敗する**
-- [ ] 7.4 🔴🟢 SSE: 版の通知（`LISTEN/NOTIFY`）、再生なし。通知に状態の内容が無い
-- [ ] 7.5 🟡 Refactor
+- [x] 7.1 🔴 API 統合テスト: ルート（games、participation、session、health）、Cookie（`HttpOnly`、`Secure`、`SameSite=Strict`）、Origin 検査、Problem JSON、`Idempotency-Key`、`If-Match`、相関 ID、**ログに資格・表示名・非公開値が含まれない**、**予期しないエラーが、相関 ID つきで記録される**、`/health` と **`/ready`（DB が使えないと失敗）**、他役割・他ゲームの拒否
+- [x] 7.2 🟢 Fastify の実装（機能別のルート、zod 検証、Pino の構造化ログと `redact`、エラーハンドラー）
+- [x] 7.3 🔴🟢 資格: 発行（256 ビット）、ダイジェスト + **鍵の版**、検証（定数時間）、**本番で鍵が未設定なら起動に失敗する**
+- [x] 7.4 🔴🟢 SSE: 版の通知（`LISTEN/NOTIFY`）、再生なし。通知に状態の内容が無い
+- [x] 7.5 🟡 Refactor
 
 **ゲート 7**: ログの内容（秘匿）、エラーの記録、`/ready`、資格の検証を、人が確認する（セキュリティのため、密に検証する）。
 
 ### Step 8: UI（アウトサイドイン）（🔴🟢🟡）
 
-- [ ] 8.1 🔴 コンポーネントテスト（`ApiClient` を差し替え）: ルーティング（`/`、`/new`、`/join`、`/games/:id/lobby`、`/play`、`/console`）、権限が無ければ参加・復帰へ誘導、日本語の表示名の辞書、作成フォームの検証エラー（入力を保持）、ロビー、プレイ（役割別の状況、工場は「生産要請数」）、コンソール（入力状況、確定ダイアログ）
-- [ ] 8.2 🟢 UI の実装（Vite + React + react-router。機能単位 `features/`。`useLiveSnapshot`）。**最小の機能で動かす**（見た目の作り込みは後続）
-- [ ] 8.3 🟡 Refactor
+- [x] 8.1 🔴 コンポーネントテスト（`ApiClient` を差し替え）: ルーティング（`/`、`/new`、`/join`、`/games/:id/lobby`、`/play`、`/console`）、権限が無ければ参加・復帰へ誘導、日本語の表示名の辞書、作成フォームの検証エラー（入力を保持）、ロビー、プレイ（役割別の状況、工場は「生産要請数」）、コンソール（入力状況、確定ダイアログ）
+- [x] 8.2 🟢 UI の実装（Vite + React + react-router。機能単位 `features/`。`useLiveSnapshot`）。**最小の機能で動かす**（見た目の作り込みは後続）
+- [x] 8.3 🟡 Refactor
 
 **ゲート 8**: 画面の構造と、日本語の表示、フォーカス・題名の扱いを、人が確認する。
 
 ### Step 9: E2E（🔴🟢）
 
-- [ ] 9.1 🔴 Playwright: 進行役がゲームを作成 → 4 人が参加 → 役割を割り当て → 開始 → 4 役割が入力 → 進行役が確定 → 状態が更新される（`[US2.3/AC2.3.1]` ほか）
-- [ ] 9.2 🟢 通るまで、不足を埋める
-- [ ] 9.3 SSE を遮断しても、ポーリングで追いつくこと（`[US2.1]`）
+- [x] 9.1 🔴 Playwright: 進行役がゲームを作成 → 4 人が参加 → 役割を割り当て → 開始 → 4 役割が入力 → 進行役が確定 → 状態が更新される（`[US2.3/AC2.3.1]` ほか）
+- [x] 9.2 🟢 通るまで、不足を埋める
+- [x] 9.3 SSE を遮断しても、ポーリングで追いつくこと（`[US2.1]`）
 
 **ゲート 9**: ローカルで、縦に通ることを、人が実際に操作して確認する。
 
 ### Step 10: 検証と終了（✅）
 
-- [ ] 10.1 `format:check`、`lint`、`typecheck`、全テスト、**カバレッジのゲート（85/85/85/75）**、すべて合格
-- [ ] 10.2 受入条件の対応表の生成（テスト名のストーリー ID から）
-- [ ] 10.3 `docs/` の更新（`apps/beer-game2` の README、運用手順書「アプリケーション開発環境セットアップ」の初版、`log.md`）
-- [ ] 10.4 **Bolt 終了報告**と、**判断と学び**（ジャーナル）。ゲート密度の見直し、以降の Bolt の所要の再調整
+- [x] 10.1 `format:check`、`lint`、`typecheck`、全テスト、**カバレッジのゲート（85/85/85/75）**、すべて合格
+- [x] 10.2 受入条件の対応表の生成（テスト名のストーリー ID から）
+- [x] 10.3 `docs/` の更新（`apps/beer-game2` の README、運用手順書「アプリケーション開発環境セットアップ」の初版、`log.md`）
+- [x] 10.4 **Bolt 終了報告**と、**判断と学び**（ジャーナル）。ゲート密度の見直し、以降の Bolt の所要の再調整
 - [ ] 10.5 コミット（Step ごとに、意味のある単位で）
 
 **ゲート 10（Bolt の承認）**: 人が、完了条件を確認し、Bolt を承認する。
@@ -161,13 +161,13 @@ CI/CD とステージング（B2）、役割別の振り返りの画面（B3）�
 
 ## 完了条件（Definition of Done）
 
-- [ ] 対象の受入条件（上記）が、テストでパスしている（テスト名にストーリー ID を含む）
-- [ ] ローカルで、作成から確定までの E2E が通る
-- [ ] カバレッジのゲート（行・関数・文 85%、分岐 75%）を満たし、`adapters/http` が計測対象に含まれる
-- [ ] `lint`（層の依存を含む）、`typecheck`、`format:check` が警告 0 で通る
-- [ ] DB 統合テストが、CI で**必ず実行される**（スキップされない）
-- [ ] ログに、資格・表示名・非公開値が含まれない（テストで確認）。予期しないエラーが記録される
-- [ ] 本番相当の設定で、鍵が無ければ起動に失敗する（テストで確認）
+- [x] 対象の受入条件（上記）が、テストでパスしている（テスト名にストーリー ID を含む）
+- [x] ローカルで、作成から確定までの E2E が通る
+- [x] カバレッジのゲート（行・関数・文 85%、分岐 75%）を満たし、`adapters/http` が計測対象に含まれる
+- [x] `lint`（層の依存を含む）、`typecheck`、`format:check` が警告 0 で通る
+- [x] DB 統合テストが、CI で**必ず実行される**（スキップされない）
+- [x] ログに、資格・表示名・非公開値が含まれない（テストで確認）。予期しないエラーが記録される
+- [x] 本番相当の設定で、鍵が無ければ起動に失敗する（テストで確認）
 - [ ] コードを、人が全行理解して承認した
 
 ### デモ項目
@@ -198,3 +198,4 @@ CI/CD とステージング（B2）、役割別の振り返りの画面（B3）�
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
 | 2026-11-09 | 初版作成（AI が提案。人の承認待ち） | claude-code |
+| 2026-11-10 | 承認（着手前の 5 項目）。実装の完了に合わせてチェックを更新 | claude-code |
