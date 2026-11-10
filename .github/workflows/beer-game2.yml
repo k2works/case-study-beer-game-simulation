@@ -1,0 +1,39 @@
+name: beer-game2
+
+on:
+  push:
+    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2.yml']
+  pull_request:
+    paths: ['apps/beer-game2/**', '.github/workflows/beer-game2.yml']
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game2
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: beer_game2
+          POSTGRES_USER: beer_game2
+          POSTGRES_PASSWORD: local-only
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U beer_game2"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/beer-game2/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/beer-game2/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+        env:
+          DATABASE_URL: postgres://beer_game2:local-only@localhost:5433/beer_game2

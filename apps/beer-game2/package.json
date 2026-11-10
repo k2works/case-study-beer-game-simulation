@@ -1,0 +1,63 @@
+{
+  "name": "@beer-game2/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d --wait",
+    "migrate": "node-pg-migrate -m migrations --migrations-table pgmigrations up",
+    "dev:server": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "dev:client": "vite",
+    "build:ui": "vite build",
+    "acceptance": "tsx scripts/acceptance-matrix.ts",
+    "e2e": "playwright test",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run acceptance > /dev/null && npm run e2e",
+    "migrate:local": "DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2 npm run migrate",
+    "dev": "npm run db:up && npm run migrate:local && concurrently -k -n api,ui \"npm start\" \"wait-on tcp:3000 && vite\"",
+    "smoke": "tsx scripts/smoke.ts",
+    "dev:bots": "tsx scripts/dev-bots.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "concurrently": "10.0.7",
+    "eslint": "10.14.0",
+    "fast-check": "4.10.2",
+    "jsdom": "31.0.0",
+    "node-pg-migrate": "9.0.0",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.6",
+    "vitest": "5.1.0",
+    "wait-on": "9.5.1"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "fastify": "5.12.8",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.5.1",
+    "zod": "4.6.7"
+  }
+}
