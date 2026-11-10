@@ -60,6 +60,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     lobby: vi.fn().mockResolvedValue(lobbyBase),
     assign: vi.fn().mockResolvedValue(undefined),
     unassign: vi.fn().mockResolvedValue(undefined),
+    review: vi.fn(),
     start: vi.fn().mockResolvedValue(undefined),
     me: vi.fn().mockResolvedValue(roleView('RETAILER', { customerDemand: 4 })),
     console: vi.fn().mockResolvedValue({
@@ -474,6 +475,42 @@ describe('プレイ', () => {
     await waitFor(() =>
       expect(vi.mocked(api.me).mock.calls.length).toBeGreaterThan(calls),
     );
+  });
+});
+
+describe('終了後の導線', () => {
+  it('[US4.2] 終了後の自分の画面と進行役コンソールに「振り返りを見る」がある', async () => {
+    const api = fakeApi({
+      me: vi.fn().mockResolvedValue(roleView('RETAILER', { status: 'ENDED' })),
+      console: vi.fn().mockResolvedValue({
+        status: 'ENDED',
+        week: 3,
+        sessionVersion: 9,
+        submitted: {
+          FACTORY: false,
+          DISTRIBUTOR: false,
+          WHOLESALER: false,
+          RETAILER: false,
+        },
+      }),
+    });
+    const play = renderAt('/games/g1/play', api);
+    expect(
+      await screen.findByRole('link', { name: '振り返りを見る' }),
+    ).toHaveAttribute('href', '/games/g1/review');
+    play.unmount();
+    renderAt('/games/g1/console', api);
+    expect(
+      await screen.findByRole('link', { name: '振り返りを見る' }),
+    ).toHaveAttribute('href', '/games/g1/review');
+  });
+
+  it('[US4.2] 進行中は「振り返りを見る」を出さない', async () => {
+    renderAt('/games/g1/play', fakeApi());
+    await screen.findByLabelText('発注数');
+    expect(
+      screen.queryByRole('link', { name: '振り返りを見る' }),
+    ).not.toBeInTheDocument();
   });
 });
 

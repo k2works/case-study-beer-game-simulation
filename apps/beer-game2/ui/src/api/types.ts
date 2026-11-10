@@ -70,6 +70,15 @@ export interface ConsoleView {
   submitted: Record<Role, boolean>;
 }
 
+export type Metric = 'order' | 'inventory' | 'backlog' | 'shipped' | 'cost';
+
+/** 振り返り（役割別の時系列）。費用は最小単位（セント） */
+export interface ReviewView {
+  weeks: number[];
+  demand: number[];
+  series: Record<Metric, Record<Role, number[]>>;
+}
+
 export interface CommitResult {
   committedWeek: number;
   nextWeek: number;
@@ -103,6 +112,7 @@ export interface ApiClient {
     version: number,
     idempotencyKey: string,
   ): Promise<CommitResult>;
+  review(gameId: string): Promise<ReviewView>;
   /** 変化の通知を購読する。戻り値で解除 */
   subscribe(gameId: string, onChange: () => void): () => void;
 }

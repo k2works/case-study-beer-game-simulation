@@ -5,6 +5,7 @@ import { ConsoleScreen } from './features/console.js';
 import { Home, Join, NewGame } from './features/home.js';
 import { LobbyScreen } from './features/lobby.js';
 import { PlayScreen } from './features/play.js';
+import { ReviewScreen } from './features/review.js';
 import { Menu } from './menu.js';
 
 /** ルーティング。API クライアントは差し替えられる（テストでは偽物を渡す） */
@@ -26,6 +27,7 @@ export function App({
           <Route path="/games/:id/lobby" element={<LobbyScreen />} />
           <Route path="/games/:id/play" element={<PlayScreen />} />
           <Route path="/games/:id/console" element={<ConsoleScreen />} />
+          <Route path="/games/:id/review" element={<ReviewScreen />} />
         </Routes>
       </PollContext.Provider>
     </ApiContext.Provider>

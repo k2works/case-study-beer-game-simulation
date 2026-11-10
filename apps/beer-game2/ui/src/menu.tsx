@@ -38,6 +38,9 @@ export function Menu() {
                 進行役コンソール
               </NavLink>
             </li>
+            <li>
+              <NavLink to={`/games/${gameId}/review`}>振り返り</NavLink>
+            </li>
           </>
         )}
       </ul>

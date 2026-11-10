@@ -82,3 +82,37 @@ td {
 .menu-sep {
   color: #8a9099;
 }
+:root {
+  /* グラフの色（白地で 3:1 以上）。色だけに頼らず、線の種類と直接のラベルでも区別する */
+  --s1: #1f5fbf;
+  --s2: #b3261e;
+  --s3: #1b6e3a;
+  --s4: #7a3fb8;
+  --s5: #5b5f66;
+}
+fieldset {
+  border: 1px solid #c8ccd2;
+  margin: 0.75rem 0;
+}
+label.inline {
+  display: inline-block;
+  margin: 0.25rem 1rem 0.25rem 0;
+}
+label.inline input {
+  margin-right: 0.35rem;
+  margin-left: 0;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  max-width: 44rem;
+  color: var(--fg);
+  font-size: 12px;
+}
+.chart .grid {
+  stroke: #d5d8dd;
+  stroke-width: 1;
+}
+.chart .series-label {
+  font-weight: bold;
+}

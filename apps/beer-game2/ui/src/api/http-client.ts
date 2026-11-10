@@ -40,6 +40,7 @@ export function createHttpClient(): ApiClient {
         `${g(id)}/assignments/${encodeURIComponent(participantId)}`,
       ),
     start: (id) => call('POST', `${g(id)}/start`, {}),
+    review: (id) => call('GET', `${g(id)}/review`),
     me: (id) => call('GET', `${g(id)}/me`),
     console: (id) => call('GET', `${g(id)}/console`),
     saveDecision: (id, role, quantity, version) =>

@@ -49,7 +49,10 @@ export function ConsoleScreen() {
   return (
     <Page title="進行役コンソール">
       {ended ? (
-        <p>ゲームは終了しました。</p>
+        <p>
+          ゲームは終了しました。
+          <Link to={`/games/${id}/review`}>振り返りを見る</Link>
+        </p>
       ) : (
         <p>{view.week} 週目の入力状況</p>
       )}

@@ -56,7 +56,14 @@ export function PlayScreen() {
 
   return (
     <Page title={`${ROLE_LABEL[view.role]}の画面`}>
-      {ended ? <p>ゲームは終了しました。</p> : <p>{view.week} 週目</p>}
+      {ended ? (
+        <p>
+          ゲームは終了しました。
+          <Link to={`/games/${id}/review`}>振り返りを見る</Link>
+        </p>
+      ) : (
+        <p>{view.week} 週目</p>
+      )}
       <dl>
         <dt>在庫</dt>
         <dd>{view.inventory}</dd>

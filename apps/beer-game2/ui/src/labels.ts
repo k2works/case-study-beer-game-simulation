@@ -18,4 +18,23 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const DECISION_LABEL = (role: Role) =>
   role === 'FACTORY' ? '生産要請数' : '発注数';
 
+export const METRIC_ORDER = [
+  'order',
+  'inventory',
+  'backlog',
+  'shipped',
+  'cost',
+] as const;
+
+export const METRIC_LABEL: Record<(typeof METRIC_ORDER)[number], string> = {
+  order: '注文',
+  inventory: '在庫',
+  backlog: '受注残',
+  shipped: '出荷',
+  cost: '費用',
+};
+
+/** 需要は、数量の指標（注文・出荷）とだけ比べられる */
+export const DEMAND_METRICS = new Set(['order', 'shipped']);
+
 export const formatMoney = (minor: number) => `$${(minor / 100).toFixed(2)}`;
