@@ -127,7 +127,7 @@ nav:
       - beer-game2:
           - 概要: operation/beer-game2/index.md
           - アプリケーション開発環境セットアップ: operation/beer-game2/application_dev_setup.md
-          - AWS ステージング環境セットアップ（骨子）: operation/beer-game2/aws_staging_setup.md
+          - AWS ステージング環境セットアップ: operation/beer-game2/aws_staging_setup.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:
