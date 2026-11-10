@@ -107,6 +107,7 @@ nav:
           - インフラストラクチャ: design/beer-game2/architecture-infrastructure.md
           - 技術スタック: design/beer-game2/tech-stack.md
           - UI 設計: design/beer-game2/ui-design.md
+          - ガイドツアー（ウォーキングスケルトン）: design/beer-game2/guided-tour-walking-skeleton.md
           - テスト戦略: design/beer-game2/test-strategy.md
           - 非機能要件: design/beer-game2/non-functional.md
           - 運用要件: design/beer-game2/operation.md

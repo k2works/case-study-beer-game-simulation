@@ -6,6 +6,10 @@
 - 設計: [設計ドキュメント](../../docs/design/beer-game2/index.md)
 - 環境構築: [アプリケーション開発環境セットアップ手順書](../../docs/operation/beer-game2/application_dev_setup.md)
 
+## コードの案内
+
+初めて読むときは、[ガイドツアー: ウォーキングスケルトン](../../docs/design/beer-game2/guided-tour-walking-skeleton.md) から。発注の保存から 1 週が確定するまでを、7 ステップでたどれます。ツアーは、コードの JSDoc `@guidedTour <ツアー名> <順序> <説明>` から生成します（`npm run docs:tour`。コードとの一致は CI が検査します）。
+
 ## 構成
 
 ```text

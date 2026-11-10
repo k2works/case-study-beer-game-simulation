@@ -46,6 +46,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run acceptance > /dev/null
+      # ガイドツアーが、コードのタグと一致している（Living Documentation）
+      - run: npm run docs:tour:check
       # 本番に入る依存の脆弱性（開発依存は対象外）
       - run: npm audit --omit=dev --audit-level=high
 
