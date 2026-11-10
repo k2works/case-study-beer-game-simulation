@@ -100,6 +100,9 @@ function requireActive(session: Session): void {
     throw new DomainError('このゲームは終了しています');
 }
 
+/**
+ * @guidedTour walking-skeleton 50 ルールの本体その 1。担当の役割だけが、進行中に、範囲内の数量を、版が一致するときだけ保存できる。自動確定のゲームでは、最後の保存で、同じ操作の中で週を確定する。
+ */
 export function saveDecision(
   session: Session,
   actor: Actor,
@@ -157,6 +160,9 @@ export function saveDecision(
 const allDecided = (session: Session) =>
   ROLES.every((r) => session.decisions[r] !== undefined);
 
+/**
+ * @guidedTour walking-skeleton 60 ルールの本体その 2。進行役だけが、4 役割の発注がそろい、週と版が一致するときだけ確定できる（確認した後に入力が変わったら拒否）。計算は `simulateWeek` に任せ、役割別の週結果を履歴に積む。
+ */
 export function commitWeek(
   session: Session,
   actor: Actor,

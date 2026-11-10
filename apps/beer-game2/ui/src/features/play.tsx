@@ -5,6 +5,9 @@ import { ErrorMessage, Page } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { DECISION_LABEL, ROLE_LABEL, formatMoney } from '../labels.js';
 
+/**
+ * @guidedTour walking-skeleton 10 入口。参加者が発注を保存する画面。`api.saveDecision` を、画面が持つ「版」とともに呼ぶ（他の操作で更新されていたら、黙って上書きしないため）。画面は HTTP を知らず、`ApiClient`（実装は `ui/src/api/http-client.ts`、テストでは偽物）だけに依存する。次は、サーバー側の入口。
+ */
 export function PlayScreen() {
   const { id = '' } = useParams();
   const api = useApi();

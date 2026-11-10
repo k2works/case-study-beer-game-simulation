@@ -47,6 +47,8 @@ export interface CommitResult {
 /**
  * ユースケース。読み込み → 集約の呼び出し → 保存だけを行い、ルールは持たない。
  * 1 回の操作は 1 つのトランザクション（UnitOfWork）で行う。
+ *
+ * @guidedTour walking-skeleton 40 ユースケース。1 回の操作を `UnitOfWork`（1 つのトランザクション）の中で行い、資格を確認し、集約を呼び、保存する。**ルールはここに書かない**（層の依存は lint で守られる）。次は、集約のルール。
  */
 export function createApplication(deps: Dependencies) {
   const { uow, ids, credentials, reviews } = deps;

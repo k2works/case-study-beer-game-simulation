@@ -98,6 +98,9 @@ function problem(
     });
 }
 
+/**
+ * @guidedTour walking-skeleton 30 HTTP の入口。Origin の検査、Cookie から資格の選択、zod による入力の検証、エラーの Problem JSON への変換を行う。**ルールは持たず**、ユースケースを呼ぶだけ。次は、ユースケース。
+ */
 export function buildServer(deps: ServerDependencies): FastifyInstance {
   const { app, config } = deps;
   const server = Fastify({

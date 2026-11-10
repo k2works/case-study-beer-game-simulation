@@ -51,6 +51,8 @@ export function initialRoleStates(): RoleStates {
 /**
  * 1 週の計算（純粋関数）。改訂版キットの順序:
  * 入荷 → 受注 → 出荷 → 在庫・受注残の更新 → 発注 → 遅延の前進 → 費用。
+ *
+ * @guidedTour walking-skeleton 70 週次の計算（純粋関数）。入荷 → 受注 → 出荷 → 在庫・受注残 → 発注 → 遅延の前進 → 費用の順。時刻・DB・認可に依存しない。golden とプロパティテストで守られている。次は、結果の保存。
  */
 export function simulateWeek(
   prior: RoleStates,
