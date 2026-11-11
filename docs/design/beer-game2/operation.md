@@ -79,6 +79,20 @@ beer-game（v1）の [運用要件](../beer-game/operation.md)（11 件の差分
 | セキュリティ | Origin 拒否、認証失敗の急増                   | 平常の 3 倍（提案）      | 平常の 10 倍（提案）    | アプリ             |            ✗             |
 | コスト       | 月次の予算                                    | 実績 80%                 | 予測 100%               | AWS Budgets        | ✓（この 2 つを設定済み） |
 
+### 実装済みのアラーム（Bolt 11。Terraform で定義、AWS には未適用）
+
+上の表のうち、Critical の次の項目を、`infra/modules/observability` に定義しました（[Bolt 11 計画](../../development/beer-game2/bolt_11_plan.md)）。メトリクスはアプリが EMF で出します（名前空間 `BeerGame2`、次元 `Environment`）。通知は SNS のトピック（`<name>-alerts`）で、メールの購読は変数 `alert_email` で作ります。
+
+| 監視項目                 | アラーム                              | メトリクス                                                                      | 条件                                         |
+| :----------------------- | :------------------------------------ | :------------------------------------------------------------------------------ | :------------------------------------------- |
+| 研修中の主要な操作の成功 | `<name>-ready-canary`                 | `CloudWatchSynthetics` の `SuccessPercent`（合成監視、1 分ごとに `/api/ready`） | 1 回（1 分）でも 100% 未満。データ無しも発報 |
+| 5xx                      | `<name>-server-errors`                | `ServerErrors`                                                                  | 5 分で 5 件以上                              |
+| API の応答（p95）        | `<name>-api-latency-p95`              | `Latency`                                                                       | p95 が 1 秒超（5 分）                        |
+| 不変条件の違反           | `<name>-invariant-violations`         | `InvariantViolations`（500、または DB の一意制約の違反）                        | 1 件で発報                                   |
+| 削除の恒久的な失敗       | `<name>-retention-permanent-failures` | `RetentionPermanentFailures`                                                    | 1 件で発報                                   |
+
+合成監視は `/ready` ではなく `/api/ready` を叩きます（CloudFront は `/api/*` だけを API へ中継するため）。Warning の通知と、DB・容量・セキュリティの項目は、まだ定義していません。
+
 ### ヘルスチェック
 
 | 種類              | 内容                                                                          |                 v1 の状態                 |
