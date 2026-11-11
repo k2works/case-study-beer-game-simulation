@@ -4,7 +4,7 @@ title: "Bolt 8 終了報告 - 観察者"
 description: "Bolt 8 の結果。完了条件の達成状況、仮説の検証結果、承認ゲートの扱い、人の承認が必要な項目、学び。"
 tags: [report, plan]
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T04:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T03:30:00Z }
 ---
 
 # Bolt 8 終了報告
