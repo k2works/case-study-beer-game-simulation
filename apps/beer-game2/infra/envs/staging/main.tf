@@ -93,6 +93,13 @@ module "ecs" {
   assign_public_ip = true
 }
 
+module "observability" {
+  source      = "../../modules/observability"
+  name        = local.name
+  ready_url   = "https://${module.web.domain_name}/api/ready"
+  alert_email = var.alert_email
+}
+
 module "github_oidc" {
   source             = "../../modules/github_oidc"
   name               = local.name

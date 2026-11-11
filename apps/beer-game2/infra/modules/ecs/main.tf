@@ -86,6 +86,8 @@ resource "aws_ecs_task_definition" "api" {
     portMappings = [{ containerPort = var.container_port, protocol = "tcp" }]
     environment = [
       { name = "NODE_ENV", value = "production" },
+      # メトリクスの次元 Environment（観測のアラームと同じ値）
+      { name = "APP_ENV", value = var.name },
       { name = "PORT", value = tostring(var.container_port) },
       { name = "ALLOWED_ORIGIN", value = var.allowed_origin },
     ]

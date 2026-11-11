@@ -4,6 +4,7 @@ import { HmacCredentialPolicy } from './adapters/http/credentials.js';
 import { PgExportReader } from './adapters/persistence/pg-export-reader.js';
 import { PgReviewReader } from './adapters/persistence/pg-review-reader.js';
 import { PgUnitOfWork } from './adapters/persistence/pg-unit-of-work.js';
+import { EmfMetrics } from './adapters/observability/emf.js';
 import { createApplication } from './application/index.js';
 import type { Config } from './config/index.js';
 
@@ -25,10 +26,21 @@ export function createPool(config: Config): pg.Pool {
   return pool;
 }
 
+/** メトリクス: CloudWatch の EMF を標準出力に書く（ECS の awslogs が CloudWatch Logs へ送る） */
+export function createMetrics(config: Config) {
+  return new EmfMetrics({
+    write: (line) => process.stdout.write(`${line}\n`),
+    namespace: 'BeerGame2',
+    environment: config.metricsEnvironment,
+    now: () => Date.now(),
+  });
+}
+
 /** 本番のアプリケーションの組み立て（API と定期のタスクで共通） */
 export function composeApplication(config: Config, pool: pg.Pool) {
   const reviews = new PgReviewReader(pool);
   return createApplication({
+    metrics: createMetrics(config),
     uow: new PgUnitOfWork(pool, { idempotencyKey: config.idempotencyKey }),
     clock: { now: () => new Date() },
     ids: { uuid: randomUUID, joinCode },

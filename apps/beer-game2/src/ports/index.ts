@@ -12,6 +12,14 @@ export class ConflictError extends Error {
   }
 }
 
+/** 一意制約の違反（週の二重の確定など）。競合として扱うが、不変条件の違反の候補として数える */
+export class DuplicateError extends ConflictError {
+  constructor() {
+    super();
+    this.name = 'DuplicateError';
+  }
+}
+
 export interface GameRepository {
   find(id: string): Promise<Game | null>;
   findByJoinCode(joinCode: string): Promise<Game | null>;
@@ -193,4 +201,14 @@ export interface ExportReader {
 export interface RateLimiter {
   /** `bucket` の、時刻 `at` を含む窓の回数を 1 増やし、上限以内なら true */
   hit(bucket: string, at: Date): Promise<boolean>;
+}
+
+/** メトリクス（CloudWatch の EMF など）。次元にゲームや参加者の ID を入れない */
+export interface Metric {
+  name: string;
+  value: number;
+  unit: 'Milliseconds' | 'Count' | 'None';
+}
+export interface Metrics {
+  emit(metrics: readonly Metric[], dimensions?: Record<string, string>): void;
 }

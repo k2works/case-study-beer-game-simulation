@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createApplication } from '../../src/application/index.js';
 import { buildServer } from '../../src/adapters/http/server.js';
 import { ROLES } from '../../src/domain/role.js';
-import type { RateLimiter } from '../../src/ports/index.js';
+import type { Metric, RateLimiter } from '../../src/ports/index.js';
 import {
   fakeCredentials,
   memoryExportReader,
@@ -20,11 +20,16 @@ let server: FastifyInstance;
 let logs: string[];
 let dbUp: boolean;
 let mem: ReturnType<typeof memoryUnitOfWork>;
+let emitted: {
+  metrics: readonly Metric[];
+  dimensions: Record<string, string>;
+}[];
 
 async function boot(
   rateLimiter: RateLimiter = memoryRateLimiter(1000, 60_000),
 ) {
   logs = [];
+  emitted = [];
   dbUp = true;
   mem = memoryUnitOfWork();
   const app = createApplication({
@@ -40,6 +45,9 @@ async function boot(
     ready: async () => dbUp,
     notifier: { subscribe: () => () => {} },
     rateLimiter,
+    metrics: {
+      emit: (metrics, dimensions = {}) => emitted.push({ metrics, dimensions }),
+    },
     config: { allowedOrigin: ORIGIN, logLevel: 'info' },
     logStream: new Writable({
       write(chunk, _enc, cb) {
@@ -930,5 +938,107 @@ describe('保持期間（HTTP）', () => {
     expect(
       (await post('/api/games', { weeks: 3, retentionDays: 4000 })).statusCode,
     ).toBe(422);
+  });
+});
+
+describe('メトリクス（EMF）', () => {
+  const named = (name: string) =>
+    emitted.filter((e) => e.metrics.some((m) => m.name === name));
+
+  it('[US6.1/AC6.1.3] 要求のたびに、応答時間と件数を、ID を含まないルートと状態の区分で出す', async () => {
+    const { gameId, fac } = await table();
+    emitted = [];
+    await get(`/api/games/${gameId}/console`, fac);
+    const [e] = named('Latency');
+    expect(e!.dimensions).toEqual({
+      Route: '/api/games/:id/console',
+      Method: 'GET',
+      StatusClass: '2xx',
+    });
+    expect(e!.metrics).toEqual(
+      expect.arrayContaining([
+        { name: 'Latency', value: expect.any(Number), unit: 'Milliseconds' },
+        { name: 'Requests', value: 1, unit: 'Count' },
+      ]),
+    );
+    expect(JSON.stringify(emitted)).not.toContain(gameId);
+  });
+
+  it('[US6.1/AC6.1.3] 確定の競合（409）を数える', async () => {
+    const { gameId, players } = await table();
+    await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 1 },
+      players.RETAILER!,
+      0,
+    );
+    emitted = [];
+    await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 2 },
+      players.RETAILER!,
+      0,
+    );
+    expect(named('Conflicts')[0]!.dimensions.Route).toBe(
+      '/api/games/:id/decision',
+    );
+  });
+
+  it('[US6.1/AC6.1.3] 週の確定を、確定の方式（手動・自動）ごとに数える', async () => {
+    const { gameId, fac, players } = await table();
+    for (const role of ROLES)
+      await put(
+        `/api/games/${gameId}/decision`,
+        { role, quantity: 4 },
+        players[role]!,
+        0,
+      );
+    const c = await get(`/api/games/${gameId}/console`, fac);
+    await post(`/api/games/${gameId}/commit`, { week: 1 }, fac, {
+      'if-match': `"${c.json().sessionVersion}"`,
+      'idempotency-key': 'm1',
+    });
+    expect(named('WeekCommitted').map((e) => e.dimensions.CommitKind)).toEqual([
+      'MANUAL',
+    ]);
+    const auto = await post('/api/games', { weeks: 2, commitMode: 'AUTO' });
+    const afac = cookieOf(auto);
+    const { gameId: g2, joinCode } = auto.json();
+    const ps: string[] = [];
+    for (const role of ROLES) {
+      const j = await post('/api/join', { joinCode, displayName: role });
+      ps.push(cookieOf(j));
+      await post(
+        `/api/games/${g2}/assignments`,
+        { participantId: j.json().participantId, role },
+        afac,
+      );
+    }
+    await post(`/api/games/${g2}/start`, {}, afac);
+    for (const [i, role] of ROLES.entries())
+      await put(`/api/games/${g2}/decision`, { role, quantity: 4 }, ps[i]!, 0);
+    expect(named('WeekCommitted').map((e) => e.dimensions.CommitKind)).toEqual([
+      'MANUAL',
+      'AUTO',
+    ]);
+  });
+
+  it('[US6.1/AC6.1.6] 予期しないエラー（500）を、不変条件の違反の候補として数える', async () => {
+    const { gameId, fac } = await table();
+    mem.failEventAppend(true);
+    emitted = [];
+    const res = await post(`/api/games/${gameId}/pause`, {}, fac);
+    expect(res.statusCode).toBe(500);
+    mem.failEventAppend(false);
+    expect(named('ServerErrors')).toHaveLength(1);
+    expect(named('InvariantViolations')).toHaveLength(1);
+  });
+});
+
+describe('合成監視の入口', () => {
+  it('[US6.1/AC6.1.5] CloudFront 経由で呼べる /api/ready が、/ready と同じく DB が使えないと 503', async () => {
+    expect((await get('/api/ready')).statusCode).toBe(200);
+    dbUp = false;
+    expect((await get('/api/ready')).statusCode).toBe(503);
   });
 });

@@ -1556,3 +1556,26 @@ describe('保持方針（コンソール）', () => {
     expect(c.retention).toMatchObject({ days: 90, backupDays: 7 });
   });
 });
+
+describe('保持の削除のメトリクス', () => {
+  it('[US6.1/AC6.1.3] 削除の件数・失敗・恒久的な失敗をメトリクスに出す', async () => {
+    const emitted: { name: string; value: number }[] = [];
+    const withMetrics = createApplication({
+      uow: mem.uow,
+      clock: { now: () => now },
+      ids: sequentialIds(),
+      credentials: fakeCredentials(),
+      reviews: memoryReviewReader(mem),
+      exports: memoryExportReader(mem),
+      metrics: { emit: (ms) => emitted.push(...ms) },
+    });
+    await withMetrics.createGame({ weeks: 3, retentionDays: 1 });
+    advance(24 * 60 * 60 * 1000);
+    await withMetrics.runRetention();
+    expect(emitted).toEqual([
+      { name: 'RetentionDeleted', value: 1, unit: 'Count' },
+      { name: 'RetentionFailed', value: 0, unit: 'Count' },
+      { name: 'RetentionPermanentFailures', value: 0, unit: 'Count' },
+    ]);
+  });
+});

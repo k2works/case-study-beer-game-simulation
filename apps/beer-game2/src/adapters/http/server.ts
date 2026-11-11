@@ -24,9 +24,12 @@ import {
 } from '../../domain/values.js';
 import {
   ConflictError,
+  DuplicateError,
   type ChangeNotifier,
+  type Metrics,
   type RateLimiter,
 } from '../../ports/index.js';
+import { NO_METRICS } from '../observability/emf.js';
 
 export interface HttpConfig {
   allowedOrigin: string;
@@ -39,6 +42,8 @@ export interface ServerDependencies {
   notifier: ChangeNotifier;
   /** 参加・復帰の専用のレート制限（総当たりの対策） */
   rateLimiter: RateLimiter;
+  /** メトリクス（省略時は出さない） */
+  metrics?: Metrics;
   config: HttpConfig;
   /** ログの出力先（テスト用。省略時は標準出力） */
   logStream?: Writable;
@@ -169,6 +174,43 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     reply.header('x-correlation-id', request.id);
   });
 
+  // メトリクス: 要求ごとの応答時間と件数。次元のルートは、ID を含まない定義の形
+  const metrics = deps.metrics ?? NO_METRICS;
+  const invariantViolations = new WeakSet<FastifyRequest>();
+  server.addHook('onResponse', async (request, reply) => {
+    const status = reply.statusCode;
+    metrics.emit(
+      [
+        { name: 'Latency', value: reply.elapsedTime, unit: 'Milliseconds' },
+        { name: 'Requests', value: 1, unit: 'Count' },
+        ...(status >= 500
+          ? [{ name: 'ServerErrors', value: 1, unit: 'Count' as const }]
+          : []),
+        ...(status === 409
+          ? [{ name: 'Conflicts', value: 1, unit: 'Count' as const }]
+          : []),
+        ...(status >= 500 || invariantViolations.has(request)
+          ? [{ name: 'InvariantViolations', value: 1, unit: 'Count' as const }]
+          : []),
+      ],
+      {
+        Route: request.routeOptions.url ?? 'unknown',
+        Method: request.method,
+        StatusClass: `${Math.floor(status / 100)}xx`,
+      },
+    );
+  });
+  // SSE の接続数（このタスクの現在の値。タスクの合計はダッシュボードで足し合わせる）
+  let sseConnections = 0;
+  const emitConnections = () =>
+    metrics.emit([
+      { name: 'SseConnections', value: sseConnections, unit: 'Count' },
+    ]);
+  const committed = (kind: 'MANUAL' | 'AUTO') =>
+    metrics.emit([{ name: 'WeekCommitted', value: 1, unit: 'Count' }], {
+      CommitKind: kind,
+    });
+
   server.addHook('onRequest', async (request, reply) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
       if (request.headers.origin !== config.allowedOrigin) {
@@ -210,6 +252,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
         latest: error.latest,
       });
     }
+    if (error instanceof DuplicateError) invariantViolations.add(request);
     if (error instanceof ConflictError || error instanceof StaleError) {
       return problem(reply, 409, 'Conflict', error.message);
     }
@@ -273,17 +316,19 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   };
 
   server.get('/health', async () => ({ status: 'ok' }));
-  server.get('/ready', async (_request, reply) => {
-    let ok: boolean;
-    try {
-      ok = await deps.ready();
-    } catch {
-      ok = false;
-    }
-    return reply
-      .code(ok ? 200 : 503)
-      .send({ status: ok ? 'ready' : 'unavailable' });
-  });
+  // /ready は ALB のヘルスチェック、/api/ready は CloudFront 経由の合成監視（/api/* だけが API へ届く）
+  for (const path of ['/ready', '/api/ready'])
+    server.get(path, async (_request, reply) => {
+      let ok: boolean;
+      try {
+        ok = await deps.ready();
+      } catch {
+        ok = false;
+      }
+      return reply
+        .code(ok ? 200 : 503)
+        .send({ status: ok ? 'ready' : 'unavailable' });
+    });
 
   server.post('/api/games', async (request, reply) => {
     const body = createBody.parse(request.body);
@@ -470,6 +515,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       quantity: body.quantity,
       expectedVersion: ifMatch(request),
     });
+    if (saved.committed) committed('AUTO');
     return saved;
   });
 
@@ -513,13 +559,15 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     if (typeof key !== 'string' || key.length === 0) {
       throw new HttpError(400, 'Idempotency-Key ヘッダーが必要です');
     }
-    return app.commitWeek({
+    const result = await app.commitWeek({
       token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       week: body.week,
       version: ifMatch(request),
       idempotencyKey: key,
     });
+    committed('MANUAL');
+    return result;
   });
 
   // 状態の変化の通知（SSE）。内容は含めず、変化があったことだけを伝える
@@ -538,13 +586,18 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       'x-correlation-id': request.id,
     });
     res.write(': connected\n\n');
+    sseConnections += 1;
+    emitConnections();
     const unsubscribe = deps.notifier.subscribe(gameId, () => {
       res.write('event: changed\ndata: {}\n\n');
+      metrics.emit([{ name: 'SseNotifications', value: 1, unit: 'Count' }]);
     });
     const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15_000);
     request.raw.on('close', () => {
       clearInterval(heartbeat);
       unsubscribe();
+      sseConnections -= 1;
+      emitConnections();
     });
   });
 

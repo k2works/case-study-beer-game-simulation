@@ -63,7 +63,10 @@ export const TARGET = [
   'AC5.1.5',
   'AC6.1.1',
   'AC6.1.2',
+  'AC6.1.3',
   'AC6.1.4',
+  'AC6.1.5',
+  'AC6.1.6',
 ];
 
 function walk(dir: string): string[] {

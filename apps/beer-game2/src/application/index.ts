@@ -41,6 +41,7 @@ import {
   type CredentialPolicy,
   type CredentialPurpose,
   type ExportReader,
+  type Metrics,
   type IdGenerator,
   type Principal,
   type Repositories,
@@ -62,6 +63,8 @@ export interface Dependencies {
   reviews: ReviewReader;
   /** 読み取り専用の経路（出力） */
   exports: ExportReader;
+  /** メトリクス（省略時は出さない） */
+  metrics?: Metrics;
   /** 資格の有効期間（省略時は仮の既定値） */
   ttl?: { sessionMs: number; recoveryMs: number; observerInvitationMs: number };
 }
@@ -669,6 +672,15 @@ export function createApplication(deps: Dependencies) {
           if (attempts >= RETENTION.maxAttempts) result.permanentFailures += 1;
         }
       }
+      deps.metrics?.emit([
+        { name: 'RetentionDeleted', value: result.deleted, unit: 'Count' },
+        { name: 'RetentionFailed', value: result.failed, unit: 'Count' },
+        {
+          name: 'RetentionPermanentFailures',
+          value: result.permanentFailures,
+          unit: 'Count',
+        },
+      ]);
       return result;
     },
 

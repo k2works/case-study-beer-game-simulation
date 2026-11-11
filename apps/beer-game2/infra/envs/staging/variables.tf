@@ -23,6 +23,12 @@ variable "web_bucket_name" {
   description = "静的ファイルのバケット名（全世界で一意）"
 }
 
+variable "alert_email" {
+  type        = string
+  description = "アラームの通知先（空なら購読を作らない）"
+  default     = ""
+}
+
 variable "create_oidc_provider" {
   type    = bool
   default = true

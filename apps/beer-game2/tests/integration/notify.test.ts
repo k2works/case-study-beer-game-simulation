@@ -96,8 +96,9 @@ describe('PgNotifier の再接続', () => {
 });
 
 describe('SSE', () => {
-  it('[US2.1] 通知は「変化があった」ことだけを伝え、状態の内容を含まない。認証が要る', async () => {
+  it('[US2.1] 通知は「変化があった」ことだけを伝え、状態の内容を含まない。認証が要る。[US6.1/AC6.1.3] 接続数と通知の数をメトリクスに出す', async () => {
     let fire: () => void = () => {};
+    const emitted: { name: string; value: number }[] = [];
     const app = createApplication({
       uow: new PgUnitOfWork(pool, { idempotencyKey: Buffer.alloc(32, 1) }),
       clock: { now: () => new Date() },
@@ -116,6 +117,7 @@ describe('SSE', () => {
         },
       },
       rateLimiter: memoryRateLimiter(1000, 60_000),
+      metrics: { emit: (ms) => emitted.push(...ms) },
       config: { allowedOrigin: 'https://x.test', logLevel: 'silent' },
     });
     await server.listen({ port: 0, host: '127.0.0.1' });
@@ -139,6 +141,14 @@ describe('SSE', () => {
       fire();
       text += decoder.decode((await reader.read()).value);
       expect(text).toContain('event: changed\ndata: {}');
+      expect(emitted).toContainEqual({
+        name: 'SseConnections',
+        value: 1,
+        unit: 'Count',
+      });
+      expect(emitted.filter((m) => m.name === 'SseNotifications')).toHaveLength(
+        1,
+      );
       ctrl.abort();
     } finally {
       await server.close();

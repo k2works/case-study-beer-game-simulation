@@ -17,6 +17,7 @@ import type {
 } from '../../domain/session.js';
 import {
   ConflictError,
+  DuplicateError,
   type CredentialPurpose,
   type CredentialRepository,
   type EventLog,
@@ -38,7 +39,7 @@ async function guarded<T>(work: () => Promise<T>): Promise<T> {
     return await work();
   } catch (e) {
     if ((e as { code?: string }).code === UNIQUE_VIOLATION)
-      throw new ConflictError();
+      throw new DuplicateError();
     throw e;
   }
 }

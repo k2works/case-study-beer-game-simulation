@@ -1,7 +1,7 @@
 import { buildServer } from './adapters/http/server.js';
 import { PgNotifier } from './adapters/persistence/pg-notifier.js';
 import { PgRateLimiter } from './adapters/persistence/pg-rate-limiter.js';
-import { composeApplication, createPool } from './compose.js';
+import { composeApplication, createMetrics, createPool } from './compose.js';
 import { loadConfig } from './config/index.js';
 
 const config = loadConfig(process.env);
@@ -18,6 +18,7 @@ const server = buildServer({
     return true;
   },
   notifier,
+  metrics: createMetrics(config),
   rateLimiter: new PgRateLimiter(pool, {
     limit: config.authRateLimitPerMinute,
     windowMs: 60_000,

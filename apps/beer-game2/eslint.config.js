@@ -37,4 +37,18 @@ export default tseslint.config(
       'no-restricted-imports': ['error', forbid('adapters', 'config')],
     },
   },
+  {
+    // 合成監視のスクリプト: CloudWatch Synthetics の Node.js の実行環境が読む CommonJS
+    files: ['infra/**/canary/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        exports: 'writable',
+        process: 'readonly',
+        fetch: 'readonly',
+      },
+    },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
 );

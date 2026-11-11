@@ -7,6 +7,8 @@ export interface Config {
   /** 資格の鍵（古い順。最後が発行用） */
   credentialKeys: { version: string; key: Buffer }[];
   idempotencyKey: Buffer;
+  /** メトリクスの次元の環境名（staging、production など） */
+  metricsEnvironment: string;
   /** 参加・復帰の専用のレート制限（送信元ごと、1 分あたりの回数）。研修会場は送信元の IP を共有しやすいため、余裕を持たせる */
   authRateLimitPerMinute: number;
 }
@@ -112,5 +114,6 @@ export function loadConfig(env: Env): Config {
     credentialKeys: credentialKeys(env, production),
     idempotencyKey: key(env, 'IDEMPOTENCY_KEY', production, '22'.repeat(32)),
     authRateLimitPerMinute: positiveInt(env, 'AUTH_RATE_LIMIT_PER_MINUTE', 60),
+    metricsEnvironment: env.APP_ENV || environment,
   };
 }

@@ -74,6 +74,13 @@ describe('loadConfig', () => {
     ).toThrow(/AUTH_RATE_LIMIT_PER_MINUTE/);
   });
 
+  it('[US6.1/AC6.1.3] メトリクスの環境名は APP_ENV、無ければ実行環境の名前', () => {
+    expect(loadConfig(prod).metricsEnvironment).toBe('production');
+    expect(loadConfig({ ...prod, APP_ENV: 'staging' }).metricsEnvironment).toBe(
+      'staging',
+    );
+  });
+
   it('開発では、鍵が無くても既定値で起動する', () => {
     expect(loadConfig({ NODE_ENV: 'development' })).toMatchObject({
       environment: 'development',
