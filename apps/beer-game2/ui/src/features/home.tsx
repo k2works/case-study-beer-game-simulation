@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import type { Recovered } from '../api/types.js';
+import type { DisclosurePolicy, Recovered } from '../api/types.js';
+import { DISCLOSURE_LABEL } from '../labels.js';
 import { useApi } from '../hooks.js';
 import { ErrorMessage, Page } from '../components.js';
 
@@ -22,6 +23,30 @@ export function NewGame() {
   const [auto, setAuto] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  // 条件（キット準拠の値で始める）。費用はドルで入力し、送るときに最小単位（セント）へ直す
+  const [form, setForm] = useState({
+    initialInventory: '12',
+    orderDelayWeeks: '2',
+    shipmentDelayWeeks: '2',
+    productionDelayWeeks: '2',
+    holdingCost: '0.50',
+    backlogCost: '1.00',
+  });
+  const [disclosure, setDisclosure] = useState<DisclosurePolicy>('TEAM_TOTAL');
+  const field = (name: keyof typeof form, label: string, step = '1') => (
+    <label>
+      {label}
+      <input
+        type="number"
+        step={step}
+        value={form[name]}
+        onChange={(e) => setForm({ ...form, [name]: e.target.value })}
+      />
+    </label>
+  );
+  // 0.29 × 100 が 28.999… になる誤差を丸める（整数でない値は、そのまま送り、サーバーで拒否される）
+  const toMinor = (dollars: string) =>
+    Number((Number(dollars) * 100).toFixed(6));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -31,6 +56,15 @@ export function NewGame() {
       const created = await api.createGame({
         weeks: Number(weeks),
         commitMode: auto ? 'AUTO' : 'MANUAL',
+        conditions: {
+          initialInventory: Number(form.initialInventory),
+          orderDelayWeeks: Number(form.orderDelayWeeks),
+          shipmentDelayWeeks: Number(form.shipmentDelayWeeks),
+          productionDelayWeeks: Number(form.productionDelayWeeks),
+          holdingCostMinor: toMinor(form.holdingCost),
+          backlogCostMinor: toMinor(form.backlogCost),
+          disclosure,
+        },
       });
       // 復帰コードはロビーで一度だけ示す（履歴の state で渡し、表示後に消す）
       navigate(`/games/${created.gameId}/lobby`, {
@@ -64,9 +98,34 @@ export function NewGame() {
           />
           全員が保存したら自動で次の週に進む
         </label>
-        <p>
-          外すと、進行役が「週を確定する」を押すまで進みません。需要・費用・遅延は、改訂版キットの標準です。
-        </p>
+        <p>外すと、進行役が「週を確定する」を押すまで進みません。</p>
+        <fieldset>
+          <legend>条件（キット準拠から変えられます）</legend>
+          <p>
+            既定は改訂版キットの標準です。変えると「カスタム」として記録し、ロビーに変更した項目を示します。
+          </p>
+          {field('initialInventory', '初期在庫')}
+          {field('orderDelayWeeks', '注文の遅延（週）')}
+          {field('shipmentDelayWeeks', '配送の遅延（週）')}
+          {field('productionDelayWeeks', '生産の遅延（週）')}
+          {field('holdingCost', '在庫の費用（1 個・1 週、ドル）', '0.01')}
+          {field('backlogCost', '受注残の費用（1 個・1 週、ドル）', '0.01')}
+          <label>
+            公開範囲（観察者）
+            <select
+              value={disclosure}
+              onChange={(e) =>
+                setDisclosure(e.target.value as DisclosurePolicy)
+              }
+            >
+              {(['TEAM_TOTAL', 'PROGRESS_ONLY'] as const).map((d) => (
+                <option key={d} value={d}>
+                  {DISCLOSURE_LABEL[d]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </fieldset>
         <button type="submit" disabled={busy}>
           作成する
         </button>

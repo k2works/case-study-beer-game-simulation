@@ -78,6 +78,27 @@ describe('startSession', () => {
   });
 });
 
+describe('startSession（条件）', () => {
+  it('[US1.1/AC1.1.4] 条件の初期在庫と遅延で、開始時の状態を作る', () => {
+    let g = createGame({
+      id: 'g1',
+      joinCode: 'J',
+      weeks: 3,
+      conditions: { initialInventory: 30, shipmentDelayWeeks: 1 },
+    }).game;
+    ROLES.forEach((role, i) => {
+      g = joinGame(g, { participantId: `p${i}`, displayName: `P${i}` }).game;
+      g = assignRole(g, FACILITATOR, `p${i}`, role).game;
+    });
+    const { session } = startSession(startGame(g, FACILITATOR).game, 's1');
+    expect(session.states.RETAILER).toMatchObject({
+      inventory: 30,
+      incomingGoods: [4],
+    });
+    expect(session.settings.kind).toBe('CUSTOM');
+  });
+});
+
 describe('saveDecision', () => {
   it('[US2.2/AC2.2.1] 担当の参加者が、自分の役割の数量を保存できる', () => {
     const { session, events } = saveDecision(

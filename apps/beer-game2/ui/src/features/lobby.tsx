@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import type { Role } from '../api/types.js';
-import { ErrorMessage, Page, RecoveryCodeNote } from '../components.js';
+import {
+  ErrorMessage,
+  Page,
+  RecoveryCodeNote,
+  SettingsSummary,
+} from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { ROLE_LABEL, ROLE_ORDER } from '../labels.js';
 
@@ -80,6 +85,7 @@ export function LobbyScreen() {
         </p>
       )}
       <p>{lobby.finalWeek} 週のゲームです。</p>
+      <SettingsSummary settings={lobby.settings} detailed />
       <h2>参加者</h2>
       <ul>
         {lobby.participants.map((p) => (

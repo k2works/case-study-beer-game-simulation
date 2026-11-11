@@ -969,3 +969,76 @@ describe('共同担当と共同入力', () => {
     ).rejects.toMatchObject({ latest: { savedBy: '進行役' } });
   });
 });
+
+describe('カスタム条件', () => {
+  it('[US1.1/AC1.1.3] カスタム条件で作ると、ロビーと進行役のコンソールに「カスタム」と変更項目、条件の値が出る', async () => {
+    const created = await app.createGame({
+      weeks: 3,
+      conditions: { initialInventory: 20, holdingCostMinor: 25 },
+    });
+    const lobby = await app.lobby({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+    });
+    expect(lobby.settings).toEqual({
+      kind: 'CUSTOM',
+      changes: ['initialInventory', 'holdingCostMinor'],
+      initialInventory: 20,
+      orderDelayWeeks: 2,
+      shipmentDelayWeeks: 2,
+      productionDelayWeeks: 2,
+      holdingCostMinor: 25,
+      backlogCostMinor: 100,
+      disclosure: 'TEAM_TOTAL',
+    });
+  });
+
+  it('[US1.1/AC1.1.3] 参加者のロビーにも、準拠かカスタムかが出る', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
+    const lobby = await app.lobby({ token: j.token, gameId: c.gameId });
+    expect(lobby.settings).toMatchObject({ kind: 'KIT', changes: [] });
+  });
+
+  it('[US1.1/AC1.1.4] 範囲外の条件では、作成せず、何も残らない', async () => {
+    await expect(
+      app.createGame({ weeks: 3, conditions: { orderDelayWeeks: 0 } }),
+    ).rejects.toThrow(DomainError);
+    expect(mem.snapshot().games.size).toBe(0);
+  });
+
+  it('[US1.1/AC1.1.4] 条件の初期在庫で始まり、進行役のコンソールにも種別が出る', async () => {
+    const created = await app.createGame({
+      weeks: 3,
+      conditions: { initialInventory: 40 },
+    });
+    const ids: string[] = [];
+    for (const role of ROLES) {
+      const j = await app.joinGame({
+        joinCode: created.joinCode,
+        displayName: role,
+      });
+      ids.push(j.token);
+      await app.assignRole({
+        token: created.facilitatorToken,
+        gameId: created.gameId,
+        participantId: j.participantId,
+        role,
+      });
+    }
+    await app.startGame({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+    });
+    const me = await app.roleState({ token: ids[3]!, gameId: created.gameId });
+    expect(me.inventory).toBe(40);
+    const c = await app.console({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+    });
+    expect(c.settings).toMatchObject({
+      kind: 'CUSTOM',
+      changes: ['initialInventory'],
+    });
+  });
+});

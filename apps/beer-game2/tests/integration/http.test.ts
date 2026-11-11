@@ -665,3 +665,38 @@ describe('共同入力の競合（HTTP）', () => {
     expect(res.json().latest).toBeUndefined();
   });
 });
+
+describe('カスタム条件（HTTP）', () => {
+  it('[US1.1/AC1.1.4] 条件を渡して作成でき、ロビーに種別と条件が出る', async () => {
+    const res = await post('/api/games', {
+      weeks: 3,
+      conditions: { initialInventory: 20, disclosure: 'PROGRESS_ONLY' },
+    });
+    expect(res.statusCode).toBe(201);
+    const lobby = await get(
+      `/api/games/${res.json().gameId}/lobby`,
+      cookieOf(res),
+    );
+    expect(lobby.json().settings).toMatchObject({
+      kind: 'CUSTOM',
+      changes: ['initialInventory', 'disclosure'],
+    });
+  });
+
+  it('[US1.1/AC1.1.4] 範囲外の条件は 422 で、項目ごとに修正内容を返す', async () => {
+    const res = await post('/api/games', {
+      weeks: 3,
+      conditions: { shipmentDelayWeeks: 7, backlogCostMinor: 5000 },
+    });
+    expect(res.statusCode).toBe(422);
+    expect(res.json().issues).toHaveLength(2);
+  });
+
+  it('未知の条件の項目は 400', async () => {
+    const res = await post('/api/games', {
+      weeks: 3,
+      conditions: { unknown: 1 },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});

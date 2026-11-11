@@ -1,4 +1,11 @@
 import type { Actor } from './actor.js';
+import {
+  KIT_CONDITIONS,
+  conditionsOf,
+  kitPreset,
+  type ConditionItem,
+  type Conditions,
+} from './conditions.js';
 import { ROLES, type Role } from './role.js';
 import {
   DemandSeries,
@@ -14,13 +21,14 @@ import {
 
 export type CommitMode = 'MANUAL' | 'AUTO';
 
-export interface GameSettings {
-  /** キット準拠か、カスタムか（カスタムは Bolt 6） */
-  kind: 'KIT';
+/** ゲームの設定。条件（初期在庫・遅延・費用単価・公開範囲）を含む */
+export interface GameSettings extends Conditions {
+  /** キット準拠か、カスタムか（条件と需要系列から導出する） */
+  kind: 'KIT' | 'CUSTOM';
+  /** キット準拠値から変更した項目 */
+  changes: readonly ConditionItem[];
   finalWeek: number;
   demand: DemandSeries;
-  holdingCostMinor: number;
-  backlogCostMinor: number;
   quantityMax: number;
   /** 週の確定方式。AUTO は、全役割の発注がそろった保存で、同じ操作の中で確定する */
   commitMode: CommitMode;
@@ -50,7 +58,12 @@ export interface Game {
 }
 
 export type GameEvent =
-  | { type: 'GameCreated'; gameId: string; kind: GameSettings['kind'] }
+  | {
+      type: 'GameCreated';
+      gameId: string;
+      kind: GameSettings['kind'];
+      changes: readonly ConditionItem[];
+    }
   | { type: 'ParticipantJoined'; gameId: string; participantId: string }
   | { type: 'RoleAssigned'; gameId: string; participantId: string; role: Role }
   | { type: 'RoleUnassigned'; gameId: string; participantId: string }
@@ -61,8 +74,8 @@ export interface Outcome {
   events: GameEvent[];
 }
 
-export const KIT_HOLDING_COST_MINOR = 50;
-export const KIT_BACKLOG_COST_MINOR = 100;
+export const KIT_HOLDING_COST_MINOR = KIT_CONDITIONS.holdingCostMinor;
+export const KIT_BACKLOG_COST_MINOR = KIT_CONDITIONS.backlogCostMinor;
 
 /** キットの既定の需要: 4 週は 4、5 週目から 8。 */
 export function kitDemand(weeks: number): DemandSeries {
@@ -78,22 +91,32 @@ export function createGame(input: {
   weeks: number;
   demand?: readonly number[];
   commitMode?: CommitMode;
+  /** キット準拠値から変える条件（指定の無い項目はキットの値） */
+  conditions?: Partial<Conditions>;
 }): Outcome {
   const finalWeek = Week.of(input.weeks);
+  const kit = kitDemand(finalWeek);
   const demand = input.demand
     ? DemandSeries.create(input.demand, finalWeek)
-    : kitDemand(finalWeek);
+    : kit;
+  const conditions = conditionsOf(input.conditions ?? {});
+  const { kind, changes } = kitPreset(
+    conditions,
+    demand.some((v, i) => v !== kit[i]),
+  );
   const game: Game = {
     id: input.id,
     joinCode: input.joinCode,
     status: 'PREPARING',
     version: 0,
     settings: {
-      kind: 'KIT',
+      ...conditions,
+      kind,
+      changes,
       finalWeek,
       demand,
-      holdingCostMinor: Money.ofMinor(KIT_HOLDING_COST_MINOR),
-      backlogCostMinor: Money.ofMinor(KIT_BACKLOG_COST_MINOR),
+      holdingCostMinor: Money.ofMinor(conditions.holdingCostMinor),
+      backlogCostMinor: Money.ofMinor(conditions.backlogCostMinor),
       quantityMax: Quantity.of(QUANTITY_MAX),
       commitMode: input.commitMode ?? 'MANUAL',
     },
@@ -102,7 +125,7 @@ export function createGame(input: {
   };
   return {
     game,
-    events: [{ type: 'GameCreated', gameId: game.id, kind: 'KIT' }],
+    events: [{ type: 'GameCreated', gameId: game.id, kind, changes }],
   };
 }
 

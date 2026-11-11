@@ -105,7 +105,7 @@ export function startSession(game: Game, sessionId: string): SessionOutcome {
     week: 1,
     settings: game.settings,
     holders,
-    states: initialRoleStates(),
+    states: initialRoleStates(game.settings),
     decisions: {},
     history: [],
   };

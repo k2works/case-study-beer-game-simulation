@@ -15,6 +15,7 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../application/errors.js';
+import { DISCLOSURE_POLICIES } from '../../domain/conditions.js';
 import { ROLES } from '../../domain/role.js';
 import {
   DomainError,
@@ -65,6 +66,19 @@ const createBody = z.object({
   weeks: z.number().int(),
   demand: z.array(z.number()).optional(),
   commitMode: z.enum(['MANUAL', 'AUTO']).optional(),
+  // 範囲の検査はドメイン（項目ごとの修正内容を返す）。ここでは形と、未知の項目だけを拒否する
+  conditions: z
+    .strictObject({
+      initialInventory: z.number(),
+      orderDelayWeeks: z.number(),
+      shipmentDelayWeeks: z.number(),
+      productionDelayWeeks: z.number(),
+      holdingCostMinor: z.number(),
+      backlogCostMinor: z.number(),
+      disclosure: z.enum(DISCLOSURE_POLICIES),
+    })
+    .partial()
+    .optional(),
 });
 const joinBody = z.object({
   joinCode: z.string().min(1),

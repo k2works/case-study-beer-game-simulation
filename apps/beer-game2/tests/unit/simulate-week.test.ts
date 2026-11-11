@@ -1,5 +1,9 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
+import {
+  KIT_CONDITIONS,
+  type Conditions,
+} from '../../src/domain/conditions.js';
 import { ROLES, downstreamOf, type Role } from '../../src/domain/role.js';
 import {
   initialRoleStates,
@@ -222,6 +226,148 @@ describe('simulateWeek: 性質（fast-check）', () => {
           0,
         );
         expect(team).toBe(byWeek);
+      }),
+    );
+  });
+});
+
+describe('initialRoleStates: 条件（初期在庫・遅延）', () => {
+  it('[US1.1/AC1.1.4] 既定はキット: 初期在庫 12、待ち行列は 2 段で各 4', () => {
+    expect(initialRoleStates()).toEqual(initialRoleStates(KIT_CONDITIONS));
+    expect(initialRoleStates().RETAILER).toMatchObject({
+      inventory: 12,
+      incomingGoods: [4, 4],
+      outgoingOrders: [4, 4],
+    });
+  });
+
+  it('[US1.1/AC1.1.4] 遅延の週数だけの段を作る。工場の入荷の段は生産の遅延', () => {
+    const s = initialRoleStates({
+      ...KIT_CONDITIONS,
+      initialInventory: 20,
+      orderDelayWeeks: 1,
+      shipmentDelayWeeks: 3,
+      productionDelayWeeks: 4,
+    });
+    expect(s.RETAILER).toMatchObject({
+      inventory: 20,
+      incomingGoods: [4, 4, 4],
+      outgoingOrders: [4],
+    });
+    expect(s.FACTORY).toMatchObject({
+      inventory: 20,
+      incomingGoods: [4, 4, 4, 4],
+      outgoingOrders: [],
+    });
+  });
+});
+
+describe('simulateWeek: 可変の遅延の性質（fast-check）', () => {
+  const qty = fc.integer({ min: 0, max: 1000 });
+  const delay = fc.integer({ min: 1, max: 4 });
+  const conditions = fc.record({
+    initialInventory: fc.integer({ min: 0, max: 100 }),
+    orderDelayWeeks: delay,
+    shipmentDelayWeeks: delay,
+    productionDelayWeeks: delay,
+    holdingCostMinor: fc.integer({ min: 0, max: 1000 }),
+    backlogCostMinor: fc.integer({ min: 0, max: 1000 }),
+    disclosure: fc.constant('TEAM_TOTAL' as const),
+  });
+  const decisions = fc.record({
+    FACTORY: qty,
+    DISTRIBUTOR: qty,
+    WHOLESALER: qty,
+    RETAILER: qty,
+  });
+  const scenario = fc.array(fc.tuple(qty, decisions), {
+    minLength: 1,
+    maxLength: 20,
+  });
+
+  function play(c: Conditions, sc: [number, Record<Role, number>][]) {
+    let states: RoleStates = initialRoleStates(c);
+    const steps = [];
+    for (const [demand, d] of sc) {
+      const before = states;
+      const out = simulateWeek(states, demand, d, c);
+      steps.push({ before, d, ...out });
+      states = out.states;
+    }
+    return steps;
+  }
+
+  it('[US1.1/AC1.1.4] 出荷は配送の遅延の週数の後に、下流の入荷になる（BR-02）', () => {
+    fc.assert(
+      fc.property(conditions, scenario, (c, sc) => {
+        const steps = play(c, sc);
+        for (const [i, s] of steps.entries()) {
+          const later = steps[i + c.shipmentDelayWeeks];
+          if (!later) continue;
+          for (const r of ROLES) {
+            const down = downstreamOf(r);
+            if (down)
+              expect(later.results[down].received).toBe(s.results[r].shipped);
+          }
+        }
+      }),
+    );
+  });
+
+  it('[US1.1/AC1.1.4] 発注は注文の遅延の後に上流の受注に、生産要請は生産の遅延の後に工場の入荷になる（BR-03・BR-04）', () => {
+    fc.assert(
+      fc.property(conditions, scenario, (c, sc) => {
+        const steps = play(c, sc);
+        for (const [i, s] of steps.entries()) {
+          const ordered = steps[i + c.orderDelayWeeks];
+          if (ordered) {
+            expect(ordered.results.WHOLESALER.demand).toBe(s.d.RETAILER);
+            expect(ordered.results.FACTORY.demand).toBe(s.d.DISTRIBUTOR);
+          }
+          const produced = steps[i + c.productionDelayWeeks];
+          if (produced)
+            expect(produced.results.FACTORY.received).toBe(s.d.FACTORY);
+        }
+      }),
+    );
+  });
+
+  it('[US1.1/AC1.1.4] 遅延と初期在庫を変えても、保存則・非負・費用の式が保たれる（BR-05〜BR-09）', () => {
+    fc.assert(
+      fc.property(conditions, scenario, (c, sc) => {
+        for (const s of play(c, sc)) {
+          for (const r of ROLES) {
+            const before = s.before[r];
+            const x = s.results[r];
+            expect(x.endingInventory - before.inventory).toBe(
+              x.received - x.shipped,
+            );
+            expect(x.endingBacklog - before.backlog).toBe(x.demand - x.shipped);
+            expect(Math.min(x.endingInventory, x.endingBacklog)).toBe(0);
+            expect(x.weeklyCostMinor).toBe(
+              x.endingInventory * c.holdingCostMinor +
+                x.endingBacklog * c.backlogCostMinor,
+            );
+          }
+        }
+      }),
+    );
+  });
+
+  it('待ち行列の段の数は、週を進めても遅延の週数のまま', () => {
+    fc.assert(
+      fc.property(conditions, scenario, (c, sc) => {
+        for (const s of play(c, sc)) {
+          for (const r of ROLES) {
+            const st = s.states[r];
+            expect(st.incomingGoods).toHaveLength(
+              r === 'FACTORY' ? c.productionDelayWeeks : c.shipmentDelayWeeks,
+            );
+            expect(st.outgoingOrders).toHaveLength(
+              r === 'FACTORY' ? 0 : c.orderDelayWeeks,
+            );
+          }
+        }
       }),
     );
   });

@@ -1,4 +1,5 @@
 import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
+import type { Conditions } from '../domain/conditions.js';
 import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
 import {
   assignRole as assignRoleRule,
@@ -7,6 +8,7 @@ import {
   joinGame as joinGameRule,
   missingRoles,
   type CommitMode,
+  type GameSettings,
   startGame as startGameRule,
 } from '../domain/game.js';
 import { ROLES, type Role } from '../domain/role.js';
@@ -130,6 +132,19 @@ export function createApplication(deps: Dependencies) {
     return game;
   }
 
+  /** 画面に出す設定（準拠かカスタムか、変更項目、条件の値） */
+  const settingsView = (s: GameSettings) => ({
+    kind: s.kind,
+    changes: s.changes,
+    initialInventory: s.initialInventory,
+    orderDelayWeeks: s.orderDelayWeeks,
+    shipmentDelayWeeks: s.shipmentDelayWeeks,
+    productionDelayWeeks: s.productionDelayWeeks,
+    holdingCostMinor: s.holdingCostMinor,
+    backlogCostMinor: s.backlogCostMinor,
+    disclosure: s.disclosure,
+  });
+
   /** 保存者の表示名。代理入力は「進行役」 */
   const nameOf = (names: Record<string, string>, savedBy: string) =>
     savedBy === PROXY_OPERATOR ? '進行役' : (names[savedBy] ?? '');
@@ -171,6 +186,7 @@ export function createApplication(deps: Dependencies) {
       weeks: number;
       demand?: readonly number[];
       commitMode?: CommitMode;
+      conditions?: Partial<Conditions>;
     }) {
       return uow.run(async (repos) => {
         const gameId = ids.uuid();
@@ -480,6 +496,7 @@ export function createApplication(deps: Dependencies) {
           status: game.status,
           finalWeek: game.settings.finalWeek,
           commitMode: game.settings.commitMode,
+          settings: settingsView(game.settings),
           ...(principal.kind === 'FACILITATOR'
             ? { joinCode: game.joinCode }
             : {}),
@@ -570,6 +587,7 @@ export function createApplication(deps: Dependencies) {
           status: session.status,
           week: session.week,
           sessionVersion: session.version,
+          settings: settingsView(session.settings),
           submitted: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r] !== undefined]),
           ) as Record<Role, boolean>,

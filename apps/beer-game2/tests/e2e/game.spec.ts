@@ -37,7 +37,16 @@ const startTable = (browser: Browser, weeks = 2) =>
 /** `coRetailer` なら、小売店に 2 人目（共同担当）を加える */
 async function startTableWith(
   browser: Browser,
-  { weeks = 2, coRetailer = false }: { weeks?: number; coRetailer?: boolean },
+  {
+    weeks = 2,
+    coRetailer = false,
+    conditions,
+  }: {
+    weeks?: number;
+    coRetailer?: boolean;
+    /** 作成の画面で、条件の欄を入力する */
+    conditions?: Record<string, string>;
+  },
 ) {
   const facContext = await browser.newContext();
   const fac = await facContext.newPage();
@@ -45,6 +54,8 @@ async function startTableWith(
   await fac.getByLabel('週数').fill(String(weeks));
   // 進行役が確定する流れを検証するため、自動確定をオフにする
   await fac.getByLabel('全員が保存したら自動で次の週に進む').uncheck();
+  for (const [label, value] of Object.entries(conditions ?? {}))
+    await fac.getByLabel(label).fill(value);
   await fac.getByRole('button', { name: '作成する' }).click();
   await expect(fac.getByRole('heading', { name: 'ロビー' })).toBeVisible();
   const facRecoveryCode = await recoveryCodeOn(fac);
@@ -358,6 +369,27 @@ test('[US2.2/AC2.2.3] 共同担当: 一方の保存が他方に反映され、�
   await expect(
     hanako!.page.getByText(`現在の入力: 10（${taro!.name}さんが保存、版 3）`),
   ).toBeVisible({ timeout: 15_000 });
+
+  await facContext.close();
+  for (const p of players) await p.context.close();
+});
+
+test('[US1.1/AC1.1.3] カスタム条件で作ると、ロビーに「カスタム」と変更項目が出て、その条件で始まる', async ({
+  browser,
+}) => {
+  const { fac, facContext, players } = await startTableWith(browser, {
+    conditions: { 初期在庫: '20', '注文の遅延（週）': '1' },
+  });
+  await expect(
+    fac.getByText('条件: カスタム（変更: 初期在庫、注文の遅延）'),
+  ).toBeVisible();
+  const retailer = players[3]!.page;
+  await expect(
+    retailer.getByRole('heading', { name: '小売店の画面' }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(
+    retailer.getByRole('definition').filter({ hasText: /^20$/ }).first(),
+  ).toBeVisible();
 
   await facContext.close();
   for (const p of players) await p.context.close();

@@ -14,7 +14,20 @@ import { ApiError, type ApiClient } from '../../ui/src/api/types.js';
 
 afterEach(cleanup);
 
+const kitSettings = {
+  kind: 'KIT' as const,
+  changes: [],
+  initialInventory: 12,
+  orderDelayWeeks: 2,
+  shipmentDelayWeeks: 2,
+  productionDelayWeeks: 2,
+  holdingCostMinor: 50,
+  backlogCostMinor: 100,
+  disclosure: 'TEAM_TOTAL' as const,
+};
+
 const lobbyBase = {
+  settings: kitSettings,
   gameId: 'g1',
   status: 'PREPARING' as const,
   finalWeek: 10,
@@ -91,6 +104,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
         RETAILER: true,
       },
       versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
+      settings: kitSettings,
     }),
     saveDecision: vi.fn().mockResolvedValue({ version: 1 }),
     commit: vi
@@ -186,10 +200,9 @@ describe('作成', () => {
     await userEvent.clear(weeks);
     await userEvent.type(weeks, '10');
     await userEvent.click(screen.getByRole('button', { name: '作成する' }));
-    expect(api.createGame).toHaveBeenCalledWith({
-      weeks: 10,
-      commitMode: 'AUTO',
-    });
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ weeks: 10, commitMode: 'AUTO' }),
+    );
     expect(await screen.findByText('ABCD2345')).toBeInTheDocument();
   });
 
@@ -222,10 +235,9 @@ describe('確定方式の選択', () => {
     expect(box).toBeChecked();
     await userEvent.click(box);
     await userEvent.click(screen.getByRole('button', { name: '作成する' }));
-    expect(api.createGame).toHaveBeenCalledWith({
-      weeks: 20,
-      commitMode: 'MANUAL',
-    });
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ weeks: 20, commitMode: 'MANUAL' }),
+    );
   });
 });
 
@@ -520,17 +532,18 @@ describe('終了後の導線', () => {
   it('[US4.2] 終了後の自分の画面と進行役コンソールに「振り返りを見る」がある', async () => {
     const api = fakeApi({
       me: vi.fn().mockResolvedValue(roleView('RETAILER', { status: 'ENDED' })),
-      console: vi.fn().mockResolvedValue({
-        status: 'ENDED',
-        week: 3,
-        sessionVersion: 9,
-        submitted: {
-          FACTORY: false,
-          DISTRIBUTOR: false,
-          WHOLESALER: false,
-          RETAILER: false,
-        },
-      }),
+      console: vi.fn().mockResolvedValue(
+        consoleView({
+          status: 'ENDED',
+          sessionVersion: 9,
+          submitted: {
+            FACTORY: false,
+            DISTRIBUTOR: false,
+            WHOLESALER: false,
+            RETAILER: false,
+          },
+        }),
+      ),
     });
     const play = renderAt('/games/g1/play', api);
     expect(
@@ -584,6 +597,7 @@ describe('コンソール', () => {
           RETAILER: true,
         },
         versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 1, RETAILER: 1 },
+        settings: kitSettings,
       }),
     });
     renderAt('/games/g1/console', api);
@@ -615,6 +629,7 @@ const consoleView = (extra: object = {}) => ({
     RETAILER: true,
   },
   versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
+  settings: kitSettings,
   ...extra,
 });
 
@@ -987,3 +1002,135 @@ describe('共同入力（プレイ）', () => {
     expect(screen.getByLabelText('発注数')).toHaveValue(8);
   });
 });
+
+describe('カスタム条件（作成）', () => {
+  it('[US1.1/AC1.1.4] 条件を変えずに作ると、キットの条件を送る', async () => {
+    const api = fakeApi();
+    renderAt('/new', api);
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ conditions: kitConditions }),
+    );
+  });
+
+  it('[US1.1/AC1.1.4] 初期在庫・遅延・費用単価（ドル）・公開範囲を変えて作れる。費用は最小単位に直して送る', async () => {
+    const api = fakeApi();
+    renderAt('/new', api);
+    const form = screen.getByRole('group', {
+      name: '条件（キット準拠から変えられます）',
+    });
+    const set = async (label: string, value: string) => {
+      const input = within(form).getByLabelText(label);
+      await userEvent.clear(input);
+      await userEvent.type(input, value);
+    };
+    await set('初期在庫', '20');
+    await set('注文の遅延（週）', '1');
+    await set('配送の遅延（週）', '3');
+    await set('生産の遅延（週）', '4');
+    await set('在庫の費用（1 個・1 週、ドル）', '0.25');
+    await set('受注残の費用（1 個・1 週、ドル）', '2');
+    await userEvent.selectOptions(
+      within(form).getByLabelText('公開範囲（観察者）'),
+      'PROGRESS_ONLY',
+    );
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conditions: {
+          initialInventory: 20,
+          orderDelayWeeks: 1,
+          shipmentDelayWeeks: 3,
+          productionDelayWeeks: 4,
+          holdingCostMinor: 25,
+          backlogCostMinor: 200,
+          disclosure: 'PROGRESS_ONLY',
+        },
+      }),
+    );
+  });
+
+  it('[US1.1/AC1.1.4] 範囲外は、作成せず、項目ごとの修正内容を示し、入力を保持する', async () => {
+    const api = fakeApi({
+      createGame: vi.fn().mockRejectedValue(
+        new ApiError(422, '条件が無効です', [
+          {
+            problem: '配送の遅延は 1〜4 週の整数です',
+            fix: '配送の遅延を 1〜4 にしてください',
+          },
+        ]),
+      ),
+    });
+    renderAt('/new', api);
+    const input = screen.getByLabelText('配送の遅延（週）');
+    await userEvent.clear(input);
+    await userEvent.type(input, '9');
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '配送の遅延を 1〜4 にしてください',
+    );
+    expect(screen.getByLabelText('配送の遅延（週）')).toHaveValue(9);
+  });
+});
+
+describe('カスタム条件（表示）', () => {
+  it('[US1.1/AC1.1.3] ロビーに「キット準拠」と示す', async () => {
+    renderAt('/games/g1/lobby', fakeApi());
+    expect(await screen.findByText('条件: キット準拠')).toBeInTheDocument();
+  });
+
+  it('[US1.1/AC1.1.3] カスタムなら、ロビーに「カスタム」と変更した項目と値を示す', async () => {
+    const api = fakeApi({
+      lobby: vi.fn().mockResolvedValue({
+        ...lobbyBase,
+        settings: {
+          ...kitSettings,
+          kind: 'CUSTOM',
+          changes: ['initialInventory', 'holdingCostMinor', 'demand'],
+          initialInventory: 20,
+          holdingCostMinor: 25,
+        },
+      }),
+    });
+    renderAt('/games/g1/lobby', api);
+    expect(
+      await screen.findByText(
+        '条件: カスタム（変更: 初期在庫、在庫の費用、需要）',
+      ),
+    ).toBeInTheDocument();
+    const list = screen.getByRole('list', { name: '条件の値' });
+    expect(list).toHaveTextContent('初期在庫: 20');
+    expect(list).toHaveTextContent('在庫の費用: $0.25');
+  });
+
+  it('[US1.1/AC1.1.3] 進行役のコンソールにも、準拠かカスタムかを示す', async () => {
+    renderAt(
+      '/games/g1/console',
+      fakeApi({
+        console: vi.fn().mockResolvedValue(
+          consoleView({
+            settings: {
+              ...kitSettings,
+              kind: 'CUSTOM',
+              changes: ['orderDelayWeeks'],
+              orderDelayWeeks: 1,
+            },
+          }),
+        ),
+      }),
+    );
+    expect(
+      await screen.findByText('条件: カスタム（変更: 注文の遅延）'),
+    ).toBeInTheDocument();
+  });
+});
+
+const kitConditions = {
+  initialInventory: 12,
+  orderDelayWeeks: 2,
+  shipmentDelayWeeks: 2,
+  productionDelayWeeks: 2,
+  holdingCostMinor: 50,
+  backlogCostMinor: 100,
+  disclosure: 'TEAM_TOTAL',
+};

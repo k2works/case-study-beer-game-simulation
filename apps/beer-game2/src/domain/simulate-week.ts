@@ -1,10 +1,12 @@
+import { KIT_CONDITIONS, type Conditions } from './conditions.js';
 import { ROLES, downstreamOf, upstreamOf, type Role } from './role.js';
 
 /**
  * 1 役割の状態。
  * - incomingGoods: これから届く品物。[0] が当週に届く（工場では生産中の分）
  * - outgoingOrders: 上流へ送った発注。[0] が当週に上流へ届く（工場は使わない）
- * 遅延は 2 週（BR-02〜BR-04）。
+ * 遅延の週数は、待ち行列の段の数で表す（キットは 2 週。BR-02〜BR-04）。計算は先頭を取り出して末尾に足すだけなので、
+ * 遅延を変えるには、初期状態の段の数を変えればよい（`initialRoleStates`）。
  */
 export interface RoleState {
   inventory: number;
@@ -33,16 +35,25 @@ export interface RoleWeekResult {
 }
 export type WeekResults = Readonly<Record<Role, RoleWeekResult>>;
 
-export const INITIAL_INVENTORY = 12;
+/** 待ち行列の各段の初期値（キットと同じ。遅延を変えても、段の数が変わるだけ） */
 export const INITIAL_PIPELINE = 4;
 
-export function initialRoleStates(): RoleStates {
+/** 条件（初期在庫・遅延）から、開始時の 4 役割の状態を作る。工場の入荷の段は、生産の遅延 */
+export function initialRoleStates(
+  conditions: Conditions = KIT_CONDITIONS,
+): RoleStates {
+  const pipeline = (weeks: number) =>
+    Array.from({ length: weeks }, () => INITIAL_PIPELINE);
   const make = (role: Role): RoleState => ({
-    inventory: INITIAL_INVENTORY,
+    inventory: conditions.initialInventory,
     backlog: 0,
-    incomingGoods: [INITIAL_PIPELINE, INITIAL_PIPELINE],
+    incomingGoods: pipeline(
+      role === 'FACTORY'
+        ? conditions.productionDelayWeeks
+        : conditions.shipmentDelayWeeks,
+    ),
     outgoingOrders:
-      role === 'FACTORY' ? [] : [INITIAL_PIPELINE, INITIAL_PIPELINE],
+      role === 'FACTORY' ? [] : pipeline(conditions.orderDelayWeeks),
     cumulativeCostMinor: 0,
   });
   return Object.fromEntries(ROLES.map((r) => [r, make(r)])) as RoleStates;

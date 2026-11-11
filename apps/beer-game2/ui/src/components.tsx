@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ApiError, type Issue } from './api/types.js';
+import { ApiError, type Issue, type SettingsView } from './api/types.js';
+import { CONDITION_LABEL, DISCLOSURE_LABEL, formatMoney } from './labels.js';
 
 /** 画面の見出し。題名を設定し、画面の切り替わりで見出しにフォーカスを移す */
 export function Page({
@@ -90,5 +91,37 @@ export function RecoveryCodeNote({
         この画面でだけ表示します。控えてください（他の人に見せないでください）。
       </p>
     </aside>
+  );
+}
+
+/** 条件の要約: キット準拠か、カスタム（変更した項目）か。`detailed` なら値の一覧も示す */
+export function SettingsSummary({
+  settings,
+  detailed = false,
+}: {
+  settings: SettingsView;
+  detailed?: boolean;
+}) {
+  return (
+    <>
+      <p>
+        {settings.kind === 'KIT'
+          ? '条件: キット準拠'
+          : `条件: カスタム（変更: ${settings.changes.map((c) => CONDITION_LABEL[c]).join('、')}）`}
+      </p>
+      {detailed && (
+        <ul aria-label="条件の値">
+          <li>初期在庫: {settings.initialInventory}</li>
+          <li>
+            遅延: 注文 {settings.orderDelayWeeks} 週・配送{' '}
+            {settings.shipmentDelayWeeks} 週・生産{' '}
+            {settings.productionDelayWeeks} 週
+          </li>
+          <li>在庫の費用: {formatMoney(settings.holdingCostMinor)}</li>
+          <li>受注残の費用: {formatMoney(settings.backlogCostMinor)}</li>
+          <li>公開範囲: {DISCLOSURE_LABEL[settings.disclosure]}</li>
+        </ul>
+      )}
+    </>
   );
 }

@@ -5,6 +5,9 @@ import { join } from 'node:path';
 export const TARGET = [
   'AC1.1.1',
   'AC1.1.2',
+  'AC1.1.3',
+  'AC1.1.4',
+  'AC1.1.5',
   'AC1.2.1',
   'AC1.2.2',
   'AC1.2.3',

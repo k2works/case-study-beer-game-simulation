@@ -48,8 +48,62 @@ describe('createGame', () => {
     expect(game.settings.demand).toEqual(kitDemand(10));
     expect(kitDemand(6)).toEqual([4, 4, 4, 4, 8, 8]);
     expect(events).toEqual([
-      { type: 'GameCreated', gameId: 'g1', kind: 'KIT' },
+      { type: 'GameCreated', gameId: 'g1', kind: 'KIT', changes: [] },
     ]);
+  });
+
+  it('[US1.1/AC1.1.3] 条件を変えると「カスタム」として、変更した項目とともに記録する', () => {
+    const { game, events } = createGame({
+      id: 'g1',
+      joinCode: 'J',
+      weeks: 10,
+      conditions: { initialInventory: 20, orderDelayWeeks: 1 },
+    });
+    expect(game.settings).toMatchObject({
+      kind: 'CUSTOM',
+      changes: ['initialInventory', 'orderDelayWeeks'],
+      initialInventory: 20,
+      orderDelayWeeks: 1,
+      shipmentDelayWeeks: 2,
+    });
+    expect(events[0]).toMatchObject({
+      kind: 'CUSTOM',
+      changes: ['initialInventory', 'orderDelayWeeks'],
+    });
+  });
+
+  it('[US1.1/AC1.1.3] 需要系列をキットから変えると「カスタム」。キットと同じ系列を渡せば準拠のまま', () => {
+    const custom = createGame({
+      id: 'g1',
+      joinCode: 'J',
+      weeks: 3,
+      demand: [5, 5, 5],
+    });
+    expect(custom.game.settings).toMatchObject({
+      kind: 'CUSTOM',
+      changes: ['demand'],
+    });
+    const same = createGame({
+      id: 'g1',
+      joinCode: 'J',
+      weeks: 6,
+      demand: [...kitDemand(6)],
+    });
+    expect(same.game.settings.kind).toBe('KIT');
+  });
+
+  it('[US1.1/AC1.1.4] 範囲外の条件では、作成せず、項目ごとに修正内容を示す', () => {
+    try {
+      createGame({
+        id: 'g1',
+        joinCode: 'J',
+        weeks: 3,
+        conditions: { shipmentDelayWeeks: 9 },
+      });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as DomainError).issues[0]!.fix).toMatch(/配送の遅延を 1〜4/);
+    }
   });
 
   it('[US2.4] 確定方式は既定で手動。自動を指定できる', () => {
@@ -66,10 +120,16 @@ describe('createGame', () => {
     expect(auto.game.settings.commitMode).toBe('AUTO');
   });
 
-  it.each([0, 51])('[US1.1/AC1.1.2] 週数 %i は拒否する', (weeks) => {
+  it.each([0, 51, 2.5])('[US1.1/AC1.1.5] 最終週 %s は拒否する', (weeks) => {
     expect(() =>
       createGame({ id: 'g1', joinCode: 'JOIN-0001', weeks }),
     ).toThrow(DomainError);
+  });
+
+  it.each([1, 50])('[US1.1/AC1.1.5] 最終週 %i（境界）は受け付ける', (weeks) => {
+    expect(
+      createGame({ id: 'g1', joinCode: 'J', weeks }).game.settings.finalWeek,
+    ).toBe(weeks);
   });
 
   it('[US1.1/AC1.1.2] 無効な需要系列は、対象週と修正内容を示す', () => {

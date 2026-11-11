@@ -32,8 +32,30 @@ export class ApiError extends Error {
 
 export type CommitMode = 'MANUAL' | 'AUTO';
 
+export type DisclosurePolicy = 'TEAM_TOTAL' | 'PROGRESS_ONLY';
+
+/** ゲームの条件（キット準拠値から変えられる項目）。費用は最小単位（セント） */
+export interface Conditions {
+  initialInventory: number;
+  orderDelayWeeks: number;
+  shipmentDelayWeeks: number;
+  productionDelayWeeks: number;
+  holdingCostMinor: number;
+  backlogCostMinor: number;
+  disclosure: DisclosurePolicy;
+}
+
+export type ConditionItem = keyof Conditions | 'demand';
+
+/** 画面に出す設定。キット準拠か、カスタムか、変更した項目 */
+export interface SettingsView extends Conditions {
+  kind: 'KIT' | 'CUSTOM';
+  changes: ConditionItem[];
+}
+
 export interface Lobby {
   commitMode: CommitMode;
+  settings: SettingsView;
   gameId: string;
   status: GameStatus;
   finalWeek: number;
@@ -77,6 +99,7 @@ export interface RoleView {
 }
 
 export interface ConsoleView {
+  settings: SettingsView;
   status: SessionStatus;
   week: number;
   sessionVersion: number;
@@ -115,6 +138,7 @@ export interface ApiClient {
   createGame(input: {
     weeks: number;
     commitMode: CommitMode;
+    conditions: Conditions;
   }): Promise<{ gameId: string; joinCode: string; recoveryCode: string }>;
   join(input: {
     joinCode: string;

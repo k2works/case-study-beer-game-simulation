@@ -6,6 +6,7 @@ import {
   ErrorMessage,
   Page,
   RecoveryCodeNote,
+  SettingsSummary,
 } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { ROLE_LABEL, ROLE_ORDER } from '../labels.js';
@@ -143,6 +144,7 @@ export function ConsoleScreen() {
           {paused && '（停止中。参加者は入力できません）'}
         </p>
       )}
+      <SettingsSummary settings={view.settings} />
       <table aria-label="入力状況">
         <tbody>
           {ROLE_ORDER.map((r) => (

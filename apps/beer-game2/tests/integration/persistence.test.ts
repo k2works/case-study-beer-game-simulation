@@ -64,6 +64,29 @@ describe('Game の永続化', () => {
     );
   });
 
+  it('[US1.1/AC1.1.3] カスタム条件（種別・変更項目・初期在庫・遅延・費用・公開範囲）を保存し、読み戻せる', async () => {
+    const id = uid();
+    const g = createGame({
+      id,
+      joinCode: `J-${id.slice(0, 8)}`,
+      weeks: 3,
+      demand: [5, 5, 5],
+      conditions: {
+        initialInventory: 30,
+        orderDelayWeeks: 1,
+        shipmentDelayWeeks: 3,
+        productionDelayWeeks: 4,
+        holdingCostMinor: 10,
+        backlogCostMinor: 20,
+        disclosure: 'PROGRESS_ONLY',
+      },
+    }).game;
+    await uow.run((r) => r.games.save(g, null));
+    const loaded = await uow.run((r) => r.games.find(id));
+    expect(loaded?.settings).toEqual(g.settings);
+    expect(loaded?.settings.kind).toBe('CUSTOM');
+  });
+
   it('[US2.3/AC2.3.2] 版が古い更新は競合になり、何も変わらない', async () => {
     const { game } = readyGame();
     await uow.run((r) => r.games.save(game, null));
