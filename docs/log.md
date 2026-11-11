@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Creation**: [bolt_9_report](/development/beer-game2/bolt_9_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_9_plan](/development/beer-game2/bolt_9_plan.md) を作成（claude-code/claude-opus-5-5）
 * **Creation**: [bolt_8_report](/development/beer-game2/bolt_8_report.md) を作成（claude-code/claude-opus-5-5）
 * **Update**: [sightseeing-map](/design/beer-game2/sightseeing-map.md) を生成（観察の開示の判定を追加。script:apps/beer-game2/scripts/guided-tour.ts）
 * **Creation**: [bolt_8_plan](/development/beer-game2/bolt_8_plan.md) を作成（claude-code/claude-opus-5-5）
