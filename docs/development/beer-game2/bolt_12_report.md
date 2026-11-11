@@ -4,7 +4,7 @@ title: "Bolt 12 終了報告 - 本番"
 description: "Bolt 12 の結果。完了条件の達成状況、仮説の検証結果、承認ゲートの扱い、人の承認が必要な項目、U5 の完了の判定。AWS には適用していない。"
 tags: [report, plan]
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:40:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:10:00Z }
 ---
 
 # Bolt 12 終了報告

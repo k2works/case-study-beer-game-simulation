@@ -4,7 +4,7 @@ title: "AWS プロダクション環境セットアップ・運用手順書 - be
 description: "本番環境の構成、人が行う準備と手順、同じダイジェストでの昇格、ロールバック、鍵のローテーション、復元の訓練。コードと定義は用意したが、AWS では未実行・未検証。"
 tags: [operation, setup]
 status: draft
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:08:00Z }
 ---
 
 # AWS プロダクション環境セットアップ・運用手順書（beer-game2）
