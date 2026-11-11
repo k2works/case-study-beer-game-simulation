@@ -5,6 +5,8 @@ description: "Bolt 12（本番）のステップ計画。ゴール、仮説、�
 tags: [plan]
 status: draft
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:05:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-11T06:12:49Z }
 ---
 
 # Bolt 12 計画 - 本番
@@ -19,7 +21,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:05:00Z }
 | ゲート密度   | **密**（本番）                                                                                                        |
 | テスト戦略   | Standard。ヘッダーはテスト、インフラは `terraform validate`、手順はスクリプトの静的検査（shellcheck）                 |
 | 前提         | B10・B11。**方針: コードと定義まで。AWS には適用しない**（2026-11-11 の人の回答）。独自ドメインは未取得（未決事項 5） |
-| 状態         | **承認待ち**。目標（`/goal U5`）に従い、AI が提案どおりに実装した（[終了報告](./bolt_12_report.md)）。AWS には未適用  |
+| 状態         | **承認済み（2026-11-11、「すべて承認」）**。コードと定義まで完了（[終了報告](./bolt_12_report.md)）。AWS には未適用   |
 
 ### ゴール
 
