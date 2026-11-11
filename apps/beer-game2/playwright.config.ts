@@ -19,6 +19,8 @@ export default defineConfig({
         PORT: String(API_PORT),
         ALLOWED_ORIGIN: `http://localhost:${UI_PORT}`,
         LOG_LEVEL: 'warn',
+        // E2E はすべて同じ送信元から参加するため、参加・復帰の上限を緩める
+        AUTH_RATE_LIMIT_PER_MINUTE: '10000',
       },
     },
     {

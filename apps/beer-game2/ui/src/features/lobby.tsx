@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import type { Role } from '../api/types.js';
-import { ErrorMessage, Page } from '../components.js';
+import { ErrorMessage, Page, RecoveryCodeNote } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { ROLE_LABEL, ROLE_ORDER } from '../labels.js';
 
@@ -15,6 +15,15 @@ export function LobbyScreen() {
     reload,
   } = useLiveSnapshot(id, () => api.lobby(id));
   const [actionError, setActionError] = useState<unknown>(null);
+  // 作成・参加の直後だけ、復帰コードを示す。履歴の state は消し、再読み込みでは再表示しない
+  const location = useLocation();
+  const [recoveryCode] = useState(
+    (location.state as { recoveryCode?: string } | null)?.recoveryCode,
+  );
+  useEffect(() => {
+    if (recoveryCode)
+      navigate(location.pathname, { replace: true, state: null });
+  }, [recoveryCode, location.pathname, navigate]);
 
   const facilitator = lobby?.viewer.kind === 'FACILITATOR';
   useEffect(() => {
@@ -59,6 +68,9 @@ export function LobbyScreen() {
 
   return (
     <Page title="ロビー">
+      {recoveryCode && (
+        <RecoveryCodeNote label="復帰コード" code={recoveryCode} />
+      )}
       <ErrorMessage error={actionError} />
       {lobby.joinCode && (
         <p>

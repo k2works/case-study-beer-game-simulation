@@ -30,6 +30,7 @@ export function PlayScreen() {
   }
 
   const ended = view.status === 'ENDED';
+  const paused = view.status === 'PAUSED';
   const value = draft ?? (view.decision ? String(view.decision.quantity) : '');
 
   async function save(e: FormEvent) {
@@ -67,6 +68,9 @@ export function PlayScreen() {
       ) : (
         <p>{view.week} 週目</p>
       )}
+      {paused && (
+        <p role="status">停止中です。進行役の再開を待ってください。</p>
+      )}
       <dl>
         <dt>在庫</dt>
         <dd>{view.inventory}</dd>
@@ -89,13 +93,16 @@ export function PlayScreen() {
               type="number"
               min={0}
               value={value}
+              disabled={paused}
               onChange={(e) => {
                 setDraft(e.target.value);
                 setSavedWeek(null);
               }}
             />
           </label>
-          <button type="submit">保存する</button>
+          <button type="submit" disabled={paused}>
+            保存する
+          </button>
           {savedWeek === view.week && <p role="status">保存しました</p>}
         </form>
       )}

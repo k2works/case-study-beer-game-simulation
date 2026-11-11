@@ -31,6 +31,24 @@ export function createHttpClient(): ApiClient {
   return {
     createGame: (input) => call('POST', '/api/games', input),
     join: (input) => call('POST', '/api/join', input),
+    recover: (code) => call('POST', '/api/recover', { code }),
+    pause: (id) => call('POST', `${g(id)}/pause`, {}),
+    resume: (id) => call('POST', `${g(id)}/resume`, {}),
+    proxyDecision: (id, role, quantity, version) =>
+      call(
+        'PUT',
+        `${g(id)}/proxy-decision`,
+        { role, quantity },
+        { 'if-match': `"${version}"` },
+      ),
+    reissue: (id, target) =>
+      call(
+        'POST',
+        `${g(id)}/credentials/reissue`,
+        target.kind === 'FACILITATOR'
+          ? { target: 'FACILITATOR' }
+          : { target: 'PARTICIPANT', participantId: target.participantId },
+      ),
     lobby: (id) => call('GET', `${g(id)}/lobby`),
     assign: (id, participantId, role) =>
       call('POST', `${g(id)}/assignments`, { participantId, role }),

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** Bolt 1 の対象の受入条件（docs/development/beer-game2/bolt_1_plan.md） */
+/** 対象の受入条件（docs/development/beer-game2/bolt_*_plan.md） */
 export const TARGET = [
   'AC1.1.1',
   'AC1.1.2',
@@ -19,6 +19,14 @@ export const TARGET = [
   'AC2.3.3',
   'AC2.3.4',
   'AC2.3.5',
+  'AC3.1.1',
+  'AC3.1.2',
+  'AC3.1.3',
+  'AC3.2.1',
+  'AC3.2.2',
+  'AC3.2.3',
+  'AC3.2.4',
+  'AC3.2.5',
   'AC4.2.1',
   'AC4.2.2',
   'AC4.2.3',

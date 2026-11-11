@@ -14,7 +14,13 @@ test('[US4.2/AC4.2.1] 終了後に役割別の振り返りを見られ、終了�
   await page.getByLabel('週数').fill('3');
   await page.getByRole('button', { name: '作成する' }).click();
   await expect(page.getByRole('heading', { name: 'ロビー' })).toBeVisible();
-  const joinCode = (await page.locator('strong').innerText()).trim();
+  // 参加コード（復帰コードと区別するため、文言で探す）
+  const joinCode = (
+    await page
+      .getByText(/^参加コード:/)
+      .locator('strong')
+      .innerText()
+  ).trim();
 
   await menu.getByRole('link', { name: 'ゲームに参加' }).click();
   await page.getByLabel('参加コード').fill(joinCode);

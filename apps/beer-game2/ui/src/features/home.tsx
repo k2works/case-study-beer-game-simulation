@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import type { Recovered } from '../api/types.js';
 import { useApi } from '../hooks.js';
 import { ErrorMessage, Page } from '../components.js';
 
@@ -31,7 +32,10 @@ export function NewGame() {
         weeks: Number(weeks),
         commitMode: auto ? 'AUTO' : 'MANUAL',
       });
-      navigate(`/games/${created.gameId}/lobby`);
+      // 復帰コードはロビーで一度だけ示す（履歴の state で渡し、表示後に消す）
+      navigate(`/games/${created.gameId}/lobby`, {
+        state: { recoveryCode: created.recoveryCode },
+      });
     } catch (err) {
       setError(err);
     } finally {
@@ -88,7 +92,9 @@ export function Join() {
     setError(null);
     try {
       const joined = await api.join({ joinCode, displayName });
-      navigate(`/games/${joined.gameId}/lobby`);
+      navigate(`/games/${joined.gameId}/lobby`, {
+        state: { recoveryCode: joined.recoveryCode },
+      });
     } catch (err) {
       setError(err);
     }
@@ -115,6 +121,54 @@ export function Join() {
         <button type="submit">参加する</button>
       </form>
       <ErrorMessage error={error} />
+      <Recover />
     </Page>
+  );
+}
+
+/** 復帰先: 準備中はロビー、開始後は進行役ならコンソール、参加者なら自分の画面 */
+const destinationOf = (back: Recovered) =>
+  back.gameStatus === 'PREPARING'
+    ? `/games/${back.gameId}/lobby`
+    : back.kind === 'FACILITATOR'
+      ? `/games/${back.gameId}/console`
+      : `/games/${back.gameId}/play`;
+
+/** 復帰コードで戻る（Cookie を失ったとき） */
+function Recover() {
+  const api = useApi();
+  const navigate = useNavigate();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<unknown>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    try {
+      navigate(destinationOf(await api.recover(code.trim())));
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <section aria-labelledby="recover-heading">
+      <h2 id="recover-heading">復帰する</h2>
+      <p>
+        ブラウザを閉じた後などは、参加・作成のときに表示された復帰コードで、同じゲームの画面に戻れます。
+      </p>
+      <form onSubmit={submit}>
+        <label>
+          復帰コード
+          <input
+            value={code}
+            autoComplete="off"
+            onChange={(e) => setCode(e.target.value)}
+          />
+        </label>
+        <button type="submit">復帰する</button>
+      </form>
+      <ErrorMessage error={error} />
+    </section>
   );
 }

@@ -53,10 +53,26 @@ const roleView = (role: string, extra: object = {}) => ({
 
 function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
   return {
-    createGame: vi
-      .fn()
-      .mockResolvedValue({ gameId: 'g1', joinCode: 'ABCD2345' }),
-    join: vi.fn().mockResolvedValue({ gameId: 'g1', participantId: 'p1' }),
+    createGame: vi.fn().mockResolvedValue({
+      gameId: 'g1',
+      joinCode: 'ABCD2345',
+      recoveryCode: 'RECOVER-FAC',
+    }),
+    join: vi.fn().mockResolvedValue({
+      gameId: 'g1',
+      participantId: 'p1',
+      recoveryCode: 'RECOVER-P1',
+    }),
+    recover: vi.fn().mockResolvedValue({
+      gameId: 'g1',
+      kind: 'PARTICIPANT',
+      participantId: 'p1',
+      gameStatus: 'STARTED',
+    }),
+    pause: vi.fn().mockResolvedValue(undefined),
+    resume: vi.fn().mockResolvedValue(undefined),
+    proxyDecision: vi.fn().mockResolvedValue({ version: 1 }),
+    reissue: vi.fn().mockResolvedValue({ recoveryCode: 'NEW-CODE' }),
     lobby: vi.fn().mockResolvedValue(lobbyBase),
     assign: vi.fn().mockResolvedValue(undefined),
     unassign: vi.fn().mockResolvedValue(undefined),
@@ -73,6 +89,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
         WHOLESALER: false,
         RETAILER: true,
       },
+      versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
     }),
     saveDecision: vi.fn().mockResolvedValue({ version: 1 }),
     commit: vi
@@ -520,7 +537,8 @@ describe('コンソール', () => {
     expect(
       await screen.findByRole('heading', { name: /コンソール/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText('二次卸')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: '入力状況' });
+    expect(within(table).getByText('二次卸')).toBeInTheDocument();
     expect(screen.getAllByText('入力済み')).toHaveLength(3);
     expect(screen.getAllByText('未入力')).toHaveLength(1);
     expect(screen.getByRole('button', { name: '週を確定する' })).toBeDisabled();
@@ -544,6 +562,7 @@ describe('コンソール', () => {
           WHOLESALER: true,
           RETAILER: true,
         },
+        versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 1, RETAILER: 1 },
       }),
     });
     renderAt('/games/g1/console', api);
@@ -561,5 +580,276 @@ describe('コンソール', () => {
       7,
       expect.stringMatching(/.+/),
     );
+  });
+});
+
+const consoleView = (extra: object = {}) => ({
+  status: 'ACTIVE' as const,
+  week: 3,
+  sessionVersion: 7,
+  submitted: {
+    FACTORY: true,
+    DISTRIBUTOR: true,
+    WHOLESALER: false,
+    RETAILER: true,
+  },
+  versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
+  ...extra,
+});
+
+describe('復帰コード', () => {
+  it('[US3.2/AC3.2.1] 作成の直後に、ロビーで進行役の復帰コードを一度だけ示す', async () => {
+    const api = fakeApi();
+    renderAt('/new', api);
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    const note = await screen.findByRole('note', { name: '復帰コード' });
+    expect(note).toHaveTextContent('RECOVER-FAC');
+    expect(note).toHaveTextContent('この画面でだけ表示');
+  });
+
+  it('[US3.2/AC3.2.1] 参加の直後に、ロビーで自分の復帰コードを示す', async () => {
+    const api = fakeApi({
+      lobby: vi.fn().mockResolvedValue({
+        ...lobbyBase,
+        viewer: { kind: 'PARTICIPANT', participantId: 'p1' },
+        joinCode: undefined,
+      }),
+    });
+    renderAt('/join', api);
+    await userEvent.type(screen.getByLabelText('参加コード'), 'ABCD2345');
+    await userEvent.type(screen.getByLabelText('表示名'), '花子');
+    await userEvent.click(screen.getByRole('button', { name: '参加する' }));
+    expect(
+      await screen.findByRole('note', { name: '復帰コード' }),
+    ).toHaveTextContent('RECOVER-P1');
+  });
+
+  it('ロビーを直接開いたときは、復帰コードを示さない', async () => {
+    renderAt('/games/g1/lobby', fakeApi());
+    await screen.findByText('ABCD2345');
+    expect(screen.queryByRole('note', { name: '復帰コード' })).toBeNull();
+  });
+
+  it('[US3.2/AC3.2.1] 参加者は復帰コードで戻り、進行中なら自分の画面へ進む', async () => {
+    const api = fakeApi();
+    renderAt('/join', api);
+    await userEvent.type(screen.getByLabelText('復帰コード'), ' RECOVER-P1 ');
+    await userEvent.click(screen.getByRole('button', { name: '復帰する' }));
+    expect(api.recover).toHaveBeenCalledWith('RECOVER-P1');
+    expect(
+      await screen.findByRole('heading', { name: '小売店の画面' }),
+    ).toBeInTheDocument();
+  });
+
+  it('[US3.2/AC3.2.4] 進行役は復帰コードで戻り、進行中なら進行役コンソールへ進む', async () => {
+    const api = fakeApi({
+      recover: vi.fn().mockResolvedValue({
+        gameId: 'g1',
+        kind: 'FACILITATOR',
+        gameStatus: 'STARTED',
+      }),
+    });
+    renderAt('/join', api);
+    await userEvent.type(screen.getByLabelText('復帰コード'), 'RECOVER-FAC');
+    await userEvent.click(screen.getByRole('button', { name: '復帰する' }));
+    expect(
+      await screen.findByRole('heading', { name: '進行役コンソール' }),
+    ).toBeInTheDocument();
+  });
+
+  it('[US3.2/AC3.2.2] 無効な復帰コードは、進行役への確認方法を示し、入力を保持する', async () => {
+    const api = fakeApi({
+      recover: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError(401, '復帰コードが無効です。進行役に確認してください'),
+        ),
+    });
+    renderAt('/join', api);
+    await userEvent.type(screen.getByLabelText('復帰コード'), 'WRONG');
+    await userEvent.click(screen.getByRole('button', { name: '復帰する' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('進行役');
+    expect(screen.getByLabelText('復帰コード')).toHaveValue('WRONG');
+  });
+});
+
+describe('停止・再開（コンソール）', () => {
+  it('[US3.1/AC3.1.1] 進行中は、確認を経て停止できる', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '停止する' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: '停止の確認' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: '停止する' }),
+    );
+    expect(api.pause).toHaveBeenCalledWith('g1');
+  });
+
+  it('[US3.1/AC3.1.3] 停止中は「停止中」と示し、確定できず、確認を経て再開できる', async () => {
+    const api = fakeApi({
+      console: vi.fn().mockResolvedValue(consoleView({ status: 'PAUSED' })),
+    });
+    renderAt('/games/g1/console', api);
+    expect(
+      await screen.findByText(/停止中。参加者は入力できません/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '週を確定する' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '停止する' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '再開する' }));
+    const dialog = screen.getByRole('dialog', { name: '再開の確認' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: '再開する' }),
+    );
+    expect(api.resume).toHaveBeenCalledWith('g1');
+  });
+});
+
+describe('代理入力（コンソール）', () => {
+  it('[US3.1/AC3.1.2] 役割と数量を選び、確認を経て、その役割の版つきで代理入力する', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    const form = await screen.findByRole('form', { name: '代理入力' });
+    await userEvent.selectOptions(
+      within(form).getByLabelText('役割'),
+      'WHOLESALER',
+    );
+    await userEvent.type(within(form).getByLabelText('数量'), '6');
+    await userEvent.click(
+      within(form).getByRole('button', { name: '代理入力を確認' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: '代理入力の確認' });
+    expect(dialog).toHaveTextContent('二次卸');
+    expect(dialog).toHaveTextContent('6');
+    expect(dialog).toHaveTextContent('記録');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: '代理入力する' }),
+    );
+    expect(api.proxyDecision).toHaveBeenCalledWith('g1', 'WHOLESALER', 6, 0);
+  });
+
+  it('数量が整数でなければ、確認に進まず修正方法を示す', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    const form = await screen.findByRole('form', { name: '代理入力' });
+    await userEvent.type(within(form).getByLabelText('数量'), '1.5');
+    await userEvent.click(
+      within(form).getByRole('button', { name: '代理入力を確認' }),
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('0 以上の整数');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('資格の再発行（コンソール）', () => {
+  it('[US3.2/AC3.2.5] 参加者を選び、確認を経て再発行すると、新しい復帰コードを示す', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    const form = await screen.findByRole('form', { name: '資格の再発行' });
+    await userEvent.selectOptions(within(form).getByLabelText('対象'), 'p1');
+    await userEvent.click(
+      within(form).getByRole('button', { name: '失効して再発行' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: '再発行の確認' });
+    expect(dialog).toHaveTextContent('花子');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: '失効して再発行' }),
+    );
+    expect(api.reissue).toHaveBeenCalledWith('g1', {
+      kind: 'PARTICIPANT',
+      participantId: 'p1',
+    });
+    expect(
+      await screen.findByRole('note', { name: '新しい復帰コード' }),
+    ).toHaveTextContent('NEW-CODE');
+  });
+
+  it('[US3.2/AC3.2.5] 進行役自身の資格も再発行できる', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    const form = await screen.findByRole('form', { name: '資格の再発行' });
+    await userEvent.selectOptions(
+      within(form).getByLabelText('対象'),
+      'FACILITATOR',
+    );
+    await userEvent.click(
+      within(form).getByRole('button', { name: '失効して再発行' }),
+    );
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: '失効して再発行',
+      }),
+    );
+    expect(api.reissue).toHaveBeenCalledWith('g1', { kind: 'FACILITATOR' });
+  });
+});
+
+describe('停止中のプレイ', () => {
+  it('[US3.1/AC3.1.1] 停止中は「停止中」と示し、保存できない', async () => {
+    const api = fakeApi({
+      me: vi.fn().mockResolvedValue(
+        roleView('RETAILER', {
+          status: 'PAUSED',
+          decision: { quantity: 6, version: 1 },
+        }),
+      ),
+    });
+    renderAt('/games/g1/play', api);
+    expect(
+      await screen.findByText('停止中です。進行役の再開を待ってください。'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+    expect(screen.getByLabelText('発注数')).toBeDisabled();
+    expect(screen.getByLabelText('発注数')).toHaveValue(6);
+  });
+});
+
+describe('複数のタブ', () => {
+  it('[US3.2/AC3.2.3] 再取得が重なったとき、遅れて届いた古い応答を適用せず、最新の状態を表示する', async () => {
+    let notify: () => void = () => {};
+    let resolveOld: (v: unknown) => void = () => {};
+    const me = vi
+      .fn()
+      // 1 回目（古い）: 遅れて届く
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          }),
+      )
+      // 2 回目（新しい）: 他のタブで週が確定した後の状態
+      .mockResolvedValueOnce(roleView('RETAILER', { week: 4 }));
+    const api = fakeApi({
+      me,
+      subscribe: vi.fn().mockImplementation((_id, onChange) => {
+        notify = onChange;
+        return () => {};
+      }),
+    });
+    renderAt('/games/g1/play', api);
+    notify();
+    expect(await screen.findByText('4 週目')).toBeInTheDocument();
+    resolveOld(roleView('RETAILER', { week: 3 }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText('4 週目')).toBeInTheDocument();
+    expect(screen.queryByText('3 週目')).toBeNull();
+  });
+
+  it('[US3.2/AC3.2.3] 他のタブで更新された後の保存は、古い版として拒否され、黙って上書きしない', async () => {
+    const api = fakeApi({
+      saveDecision: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError(409, '他の操作で更新されています。最新の発注は 8 です'),
+        ),
+    });
+    renderAt('/games/g1/play', api);
+    await userEvent.type(await screen.findByLabelText('発注数'), '5');
+    await userEvent.click(screen.getByRole('button', { name: '保存する' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '最新の発注は 8',
+    );
+    expect(screen.getByLabelText('発注数')).toHaveValue(5);
   });
 });

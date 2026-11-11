@@ -20,6 +20,7 @@ export function useApi(): ApiClient {
 
 /**
  * 画面の状態を取得し、変化の通知（SSE）と一定間隔のポーリングで追いつく。
+ * 再取得が重なっても、最後に出した要求の応答だけを適用する（遅れて届いた古い応答で、新しい状態を上書きしない）。
  * 資格が無い（401）場合は、参加の画面へ誘導する。
  */
 export function useLiveSnapshot<T>(
@@ -33,12 +34,17 @@ export function useLiveSnapshot<T>(
   const [error, setError] = useState<string | null>(null);
   const loadRef = useRef(load);
   loadRef.current = load;
+  const latest = useRef(0);
 
   const reload = useCallback(async () => {
+    const seq = ++latest.current;
     try {
-      setData(await loadRef.current());
+      const next = await loadRef.current();
+      if (seq !== latest.current) return; // より新しい要求がある
+      setData(next);
       setError(null);
     } catch (e) {
+      if (seq !== latest.current) return;
       if (e instanceof ApiError && e.status === 401) {
         navigate('/join', { state: { message: e.message } });
         return;

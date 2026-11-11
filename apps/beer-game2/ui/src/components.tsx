@@ -44,3 +44,51 @@ export function ErrorMessage({ error }: { error: unknown }) {
     </div>
   );
 }
+
+/** 取り返しがつかない操作の前の確認。対象と影響を示す */
+export function ConfirmDialog({
+  label,
+  confirm,
+  onConfirm,
+  onCancel,
+  children,
+}: {
+  label: string;
+  confirm: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div role="dialog" aria-modal="true" aria-label={label}>
+      {children}
+      <button type="button" onClick={onConfirm}>
+        {confirm}
+      </button>
+      <button type="button" onClick={onCancel}>
+        キャンセル
+      </button>
+    </div>
+  );
+}
+
+/** 復帰コード。Cookie を失ったときに戻るための値で、表示はこの場限り */
+export function RecoveryCodeNote({
+  label,
+  code,
+}: {
+  label: string;
+  code: string;
+}) {
+  return (
+    <aside role="note" aria-label={label} className="recovery">
+      <p>
+        {label}: <strong>{code}</strong>
+      </p>
+      <p>
+        ブラウザを閉じたり、別の端末に移ったりしたときに、「参加・復帰」の画面で使います。
+        この画面でだけ表示します。控えてください（他の人に見せないでください）。
+      </p>
+    </aside>
+  );
+}

@@ -1,6 +1,6 @@
 export type Role = 'FACTORY' | 'DISTRIBUTOR' | 'WHOLESALER' | 'RETAILER';
 export type GameStatus = 'PREPARING' | 'STARTED' | 'ENDED';
-export type SessionStatus = 'ACTIVE' | 'ENDED';
+export type SessionStatus = 'ACTIVE' | 'PAUSED' | 'ENDED';
 
 export interface Issue {
   week?: number;
@@ -68,6 +68,19 @@ export interface ConsoleView {
   week: number;
   sessionVersion: number;
   submitted: Record<Role, boolean>;
+  /** 役割ごとの入力の版（代理入力に使う） */
+  versions: Record<Role, number>;
+}
+
+/** 資格の再発行の対象 */
+export type CredentialTarget =
+  { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };
+
+export interface Recovered {
+  gameId: string;
+  kind: 'FACILITATOR' | 'PARTICIPANT';
+  participantId?: string;
+  gameStatus: GameStatus;
 }
 
 export type Metric = 'order' | 'inventory' | 'backlog' | 'shipped' | 'cost';
@@ -89,11 +102,26 @@ export interface ApiClient {
   createGame(input: {
     weeks: number;
     commitMode: CommitMode;
-  }): Promise<{ gameId: string; joinCode: string }>;
+  }): Promise<{ gameId: string; joinCode: string; recoveryCode: string }>;
   join(input: {
     joinCode: string;
     displayName: string;
-  }): Promise<{ gameId: string; participantId: string }>;
+  }): Promise<{ gameId: string; participantId: string; recoveryCode: string }>;
+  /** 復帰コードで戻る（新しい Cookie が設定される） */
+  recover(code: string): Promise<Recovered>;
+  pause(gameId: string): Promise<void>;
+  resume(gameId: string): Promise<void>;
+  proxyDecision(
+    gameId: string,
+    role: Role,
+    quantity: number,
+    version: number,
+  ): Promise<{ version: number }>;
+  /** 漏れた資格を失効させ、新しい復帰コードを受け取る */
+  reissue(
+    gameId: string,
+    target: CredentialTarget,
+  ): Promise<{ recoveryCode: string }>;
   lobby(gameId: string): Promise<Lobby>;
   assign(gameId: string, participantId: string, role: Role): Promise<void>;
   unassign(gameId: string, participantId: string): Promise<void>;

@@ -14,7 +14,13 @@ test('[US1.2] 1 人・1 ブラウザ + ボット 3 体で、最終週まで 1 �
   await page.getByLabel('週数').fill('2');
   await page.getByRole('button', { name: '作成する' }).click();
   await expect(page.getByRole('heading', { name: 'ロビー' })).toBeVisible();
-  const joinCode = (await page.locator('strong').innerText()).trim();
+  // 参加コード（復帰コードと区別するため、文言で探す）
+  const joinCode = (
+    await page
+      .getByText(/^参加コード:/)
+      .locator('strong')
+      .innerText()
+  ).trim();
 
   // 同じブラウザで、参加者としても参加する（進行役の資格を失わない）
   await menu.getByRole('link', { name: 'ゲームに参加' }).click();
