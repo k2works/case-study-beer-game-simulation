@@ -5,6 +5,7 @@ import {
   randomBytes,
 } from 'node:crypto';
 import type pg from 'pg';
+import type { CredentialValidity } from '../../domain/credential.js';
 import type { Game, GameSettings } from '../../domain/game.js';
 import { ROLES, type Role } from '../../domain/role.js';
 import type { RoleStates } from '../../domain/simulate-week.js';
@@ -16,6 +17,7 @@ import type {
 } from '../../domain/session.js';
 import {
   ConflictError,
+  type CredentialPurpose,
   type CredentialRepository,
   type EventLog,
   type GameRepository,
@@ -301,24 +303,72 @@ class PgSessions implements SessionRepository {
 
 class PgCredentials implements CredentialRepository {
   constructor(private readonly db: Db) {}
-  async save(digest: string, principal: Principal) {
-    await this.db.query(
-      `INSERT INTO browser_sessions (credential_digest, game_id, actor_kind, participant_id)
-       VALUES ($1,$2,$3,$4)`,
-      [
-        digest,
-        principal.gameId,
-        principal.kind,
-        principal.participantId ?? null,
-      ],
-    );
+
+  async save(
+    digest: string,
+    principal: Principal,
+    purpose: CredentialPurpose,
+    validity: CredentialValidity,
+  ) {
+    if (purpose === 'SESSION') {
+      await this.db.query(
+        `INSERT INTO browser_sessions (credential_digest, game_id, actor_kind, participant_id, expires_at)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [
+          digest,
+          principal.gameId,
+          principal.kind,
+          principal.participantId ?? null,
+          validity.expiresAt,
+        ],
+      );
+      return;
+    }
+    // 復帰コードは主体ごとに 1 つ。上書きで、前の復帰コードは使えなくなる
+    const { rowCount } =
+      principal.kind === 'FACILITATOR'
+        ? await this.db.query(
+            `UPDATE games SET facilitator_digest = $2, facilitator_expires_at = $3,
+               facilitator_revoked_at = NULL
+             WHERE game_id = $1`,
+            [principal.gameId, digest, validity.expiresAt],
+          )
+        : await this.db.query(
+            `UPDATE participants SET recovery_digest = $3, recovery_expires_at = $4,
+               recovery_revoked_at = NULL
+             WHERE game_id = $1 AND participant_id = $2`,
+            [
+              principal.gameId,
+              principal.participantId,
+              digest,
+              validity.expiresAt,
+            ],
+          );
+    if (rowCount === 0) throw new Error('復帰コードの保存先の主体がありません');
   }
-  async find(digest: string): Promise<Principal | null> {
-    const { rows } = await this.db.query(
-      `SELECT game_id, actor_kind, participant_id FROM browser_sessions
-       WHERE credential_digest = $1 AND expires_at > now()`,
-      [digest],
-    );
+
+  async find(
+    digests: readonly string[],
+    purpose: CredentialPurpose,
+    at: Date,
+  ): Promise<Principal | null> {
+    const { rows } =
+      purpose === 'SESSION'
+        ? await this.db.query(
+            `SELECT game_id, actor_kind, participant_id FROM browser_sessions
+             WHERE credential_digest = ANY($1) AND revoked_at IS NULL AND expires_at > $2
+             LIMIT 1`,
+            [digests, at],
+          )
+        : await this.db.query(
+            `SELECT game_id, 'PARTICIPANT' AS actor_kind, participant_id FROM participants
+             WHERE recovery_digest = ANY($1) AND recovery_revoked_at IS NULL AND recovery_expires_at > $2
+             UNION ALL
+             SELECT game_id, 'FACILITATOR', NULL FROM games
+             WHERE facilitator_digest = ANY($1) AND facilitator_revoked_at IS NULL AND facilitator_expires_at > $2
+             LIMIT 1`,
+            [digests, at],
+          );
     const r = rows[0];
     if (!r) return null;
     return {
@@ -326,6 +376,28 @@ class PgCredentials implements CredentialRepository {
       kind: r.actor_kind,
       ...(r.participant_id ? { participantId: r.participant_id } : {}),
     };
+  }
+
+  async revokeAll(principal: Principal, at: Date) {
+    const participantId = principal.participantId ?? null;
+    await this.db.query(
+      `UPDATE browser_sessions SET revoked_at = COALESCE(revoked_at, $4)
+       WHERE game_id = $1 AND actor_kind = $2 AND participant_id IS NOT DISTINCT FROM $3`,
+      [principal.gameId, principal.kind, participantId, at],
+    );
+    if (principal.kind === 'FACILITATOR') {
+      await this.db.query(
+        `UPDATE games SET facilitator_revoked_at = COALESCE(facilitator_revoked_at, $2)
+         WHERE game_id = $1`,
+        [principal.gameId, at],
+      );
+    } else {
+      await this.db.query(
+        `UPDATE participants SET recovery_revoked_at = COALESCE(recovery_revoked_at, $3)
+         WHERE game_id = $1 AND participant_id = $2`,
+        [principal.gameId, participantId, at],
+      );
+    }
   }
 }
 

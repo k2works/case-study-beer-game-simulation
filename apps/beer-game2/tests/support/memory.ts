@@ -1,3 +1,7 @@
+import {
+  CredentialValidity,
+  type CredentialValidity as Validity,
+} from '../../src/domain/credential.js';
 import type { Game } from '../../src/domain/game.js';
 import { ROLES } from '../../src/domain/role.js';
 import type { ReviewRow } from '../../src/domain/review.js';
@@ -5,18 +9,31 @@ import type { Session } from '../../src/domain/session.js';
 import {
   ConflictError,
   type CredentialPolicy,
+  type CredentialPurpose,
   type IdGenerator,
   type IdempotencyRecord,
   type Principal,
+  type RateLimiter,
   type Repositories,
   type ReviewReader,
   type UnitOfWork,
 } from '../../src/ports/index.js';
 
+interface StoredCredential {
+  principal: Principal;
+  purpose: CredentialPurpose;
+  validity: Validity;
+}
+
+const samePrincipal = (a: Principal, b: Principal) =>
+  a.gameId === b.gameId &&
+  a.kind === b.kind &&
+  (a.participantId ?? null) === (b.participantId ?? null);
+
 interface Store {
   games: Map<string, Game>;
   sessions: Map<string, Session>;
-  credentials: Map<string, Principal>;
+  credentials: Map<string, StoredCredential>;
   idempotency: Map<string, IdempotencyRecord>;
   events: { gameId: string; event: object }[];
 }
@@ -58,9 +75,39 @@ function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
       },
     },
     credentials: {
-      save: async (digest, principal) =>
-        void store.credentials.set(digest, principal),
-      find: async (digest) => store.credentials.get(digest) ?? null,
+      save: async (digest, principal, purpose, validity) => {
+        if (purpose === 'RECOVERY') {
+          for (const [d, c] of store.credentials)
+            if (
+              c.purpose === 'RECOVERY' &&
+              samePrincipal(c.principal, principal)
+            )
+              store.credentials.delete(d);
+        }
+        store.credentials.set(digest, { principal, purpose, validity });
+      },
+      find: async (digests, purpose, at) => {
+        for (const d of digests) {
+          const c = store.credentials.get(d);
+          // 削除済みのゲームの資格は、カスケード削除と同じく使えない
+          if (
+            c?.purpose === purpose &&
+            store.games.has(c.principal.gameId) &&
+            CredentialValidity.isValid(c.validity, at)
+          )
+            return c.principal;
+        }
+        return null;
+      },
+      revokeAll: async (principal, at) => {
+        for (const [d, c] of store.credentials) {
+          if (!samePrincipal(c.principal, principal)) continue;
+          store.credentials.set(d, {
+            ...c,
+            validity: CredentialValidity.revoke(c.validity, at),
+          });
+        }
+      },
     },
     idempotency: {
       find: async (gameId, key) =>
@@ -112,7 +159,23 @@ export function fakeCredentials(): CredentialPolicy {
       const token = `token-${++n}`;
       return { token, digest: `digest(${token})` };
     },
-    digestOf: (token) => `digest(${token})`,
+    digestsOf: (token) => [`digest(${token})`],
+  };
+}
+
+/** メモリ上の固定窓のレート制限 */
+export function memoryRateLimiter(
+  limit: number,
+  windowMs: number,
+): RateLimiter {
+  const counts = new Map<string, number>();
+  return {
+    hit: async (bucket, at) => {
+      const key = `${bucket}:${Math.floor(at.getTime() / windowMs)}`;
+      const n = (counts.get(key) ?? 0) + 1;
+      counts.set(key, n);
+      return n <= limit;
+    },
   };
 }
 

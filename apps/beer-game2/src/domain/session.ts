@@ -14,12 +14,16 @@ import {
   StaleError,
 } from './values.js';
 
-export type SessionStatus = 'ACTIVE' | 'ENDED';
+export type SessionStatus = 'ACTIVE' | 'PAUSED' | 'ENDED';
+
+/** 代理入力の保存者 */
+export const PROXY_OPERATOR = 'FACILITATOR';
 
 export interface Decision {
   quantity: number;
   /** 役割ごとの版。古い版の更新を拒否し、変更を黙って失わない */
   version: number;
+  /** 保存した参加者 ID。代理入力なら `PROXY_OPERATOR` */
   savedBy: string;
 }
 
@@ -63,7 +67,19 @@ export type SessionEvent =
       savedBy: string;
       version: number;
     }
+  | {
+      type: 'ProxyDecisionSubmitted';
+      sessionId: string;
+      role: Role;
+      quantity: number;
+      version: number;
+      operator: typeof PROXY_OPERATOR;
+      /** 操作の時刻（ISO 8601）。監査の記録 */
+      at: string;
+    }
   | { type: 'WeekCommitted'; sessionId: string; record: WeekRecord }
+  | { type: 'SessionPaused'; sessionId: string }
+  | { type: 'SessionResumed'; sessionId: string }
   | { type: 'SessionEnded'; sessionId: string };
 
 export interface SessionOutcome {
@@ -98,9 +114,44 @@ export function startSession(game: Game, sessionId: string): SessionOutcome {
   };
 }
 
-function requireActive(session: Session): void {
-  if (session.status !== 'ACTIVE')
+function requireNotEnded(session: Session): void {
+  if (session.status === 'ENDED')
     throw new DomainError('このゲームは終了しています');
+}
+
+function requireActive(session: Session): void {
+  requireNotEnded(session);
+  if (session.status === 'PAUSED')
+    throw new DomainError(
+      '停止中です。進行役の再開を待ってください（保存済みの入力は残っています）',
+    );
+}
+
+function requireFacilitator(actor: Actor, operation: string): void {
+  if (actor.kind !== 'FACILITATOR')
+    throw new PermissionError(`${operation}は進行役だけができます`);
+}
+
+/** 進行役が停止する。停止中は、参加者の保存と週の確定を拒否する */
+export function pauseSession(session: Session, actor: Actor): SessionOutcome {
+  requireFacilitator(actor, '停止');
+  requireActive(session);
+  return {
+    session: { ...session, status: 'PAUSED', version: session.version + 1 },
+    events: [{ type: 'SessionPaused', sessionId: session.id }],
+  };
+}
+
+/** 進行役が再開する。最後の確定済みの週の次から、入力を続けられる */
+export function resumeSession(session: Session, actor: Actor): SessionOutcome {
+  requireFacilitator(actor, '再開');
+  requireNotEnded(session);
+  if (session.status !== 'PAUSED')
+    throw new DomainError('停止中ではないため、再開できません');
+  return {
+    session: { ...session, status: 'ACTIVE', version: session.version + 1 },
+    events: [{ type: 'SessionResumed', sessionId: session.id }],
+  };
 }
 
 /**
@@ -115,13 +166,75 @@ export function saveDecision(
 ): SessionOutcome {
   requireActive(session);
   if (actor.kind !== 'PARTICIPANT') {
-    throw new PermissionError('進行役の代理入力は、この版では使えません');
+    throw new PermissionError(
+      '進行役は、参加者の保存ではなく代理入力を使ってください',
+    );
   }
   if (session.holders[role] !== actor.participantId) {
     throw new PermissionError(
       `${role} の担当ではないため、発注を保存できません`,
     );
   }
+  const { saved, decision } = storeDecision(
+    session,
+    role,
+    quantity,
+    expectedVersion,
+    actor.participantId,
+  );
+  return withAutoCommit(saved, [
+    {
+      type: 'DecisionSaved',
+      sessionId: session.id,
+      role,
+      quantity: decision.quantity,
+      savedBy: actor.participantId,
+      version: decision.version,
+    },
+  ]);
+}
+
+/**
+ * 進行役の代理入力。進行中・停止中のどちらでもでき、操作者・役割・時刻・値をイベント（監査の記録）に残す。
+ */
+export function proxyDecision(
+  session: Session,
+  actor: Actor,
+  role: Role,
+  quantity: number,
+  expectedVersion: number,
+  at: Date,
+): SessionOutcome {
+  requireFacilitator(actor, '代理入力');
+  requireNotEnded(session);
+  const { saved, decision } = storeDecision(
+    session,
+    role,
+    quantity,
+    expectedVersion,
+    PROXY_OPERATOR,
+  );
+  return withAutoCommit(saved, [
+    {
+      type: 'ProxyDecisionSubmitted',
+      sessionId: session.id,
+      role,
+      quantity: decision.quantity,
+      version: decision.version,
+      operator: PROXY_OPERATOR,
+      at: at.toISOString(),
+    },
+  ]);
+}
+
+/** 範囲と版を検査して、役割の意思決定を保存する（参加者・代理で共通） */
+function storeDecision(
+  session: Session,
+  role: Role,
+  quantity: number,
+  expectedVersion: number,
+  savedBy: string,
+): { saved: Session; decision: Decision } {
   const value = Quantity.of(quantity, session.settings.quantityMax);
   const current = session.decisions[role];
   if ((current?.version ?? 0) !== expectedVersion) {
@@ -132,25 +245,28 @@ export function saveDecision(
   const decision: Decision = {
     quantity: value,
     version: expectedVersion + 1,
-    savedBy: actor.participantId,
+    savedBy,
   };
-  const saved: Session = {
-    ...session,
-    version: session.version + 1,
-    decisions: { ...session.decisions, [role]: decision },
-  };
-  const events: SessionEvent[] = [
-    {
-      type: 'DecisionSaved',
-      sessionId: session.id,
-      role,
-      quantity: value,
-      savedBy: actor.participantId,
-      version: decision.version,
+  return {
+    decision,
+    saved: {
+      ...session,
+      version: session.version + 1,
+      decisions: { ...session.decisions, [role]: decision },
     },
-  ];
-  // 自動確定: 最後の発注を保存した同じ操作の中で確定する（保存と確定の間に隙間を作らない）
-  if (session.settings.commitMode === 'AUTO' && allDecided(saved)) {
+  };
+}
+
+/** 自動確定: 最後の入力を保存した同じ操作の中で確定する（保存と確定の間に隙間を作らない）。停止中は確定しない */
+function withAutoCommit(
+  saved: Session,
+  events: SessionEvent[],
+): SessionOutcome {
+  if (
+    saved.status === 'ACTIVE' &&
+    saved.settings.commitMode === 'AUTO' &&
+    allDecided(saved)
+  ) {
     const committed = applyCommit(saved, 'AUTO');
     return {
       session: committed.session,
@@ -171,8 +287,7 @@ export function commitWeek(
   actor: Actor,
   request: { week: number; version: number },
 ): SessionOutcome {
-  if (actor.kind !== 'FACILITATOR')
-    throw new PermissionError('週の確定は進行役だけができます');
+  requireFacilitator(actor, '週の確定');
   requireActive(session);
   if (request.week !== session.week) {
     throw new StaleError(

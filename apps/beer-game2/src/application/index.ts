@@ -1,4 +1,5 @@
 import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
+import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
 import {
   assignRole as assignRoleRule,
   unassignRole as unassignRoleRule,
@@ -13,15 +14,20 @@ import { buildReview, canDisclose } from '../domain/review.js';
 import { PermissionError } from '../domain/values.js';
 import {
   commitWeek as commitWeekRule,
+  pauseSession as pauseSessionRule,
+  proxyDecision as proxyDecisionRule,
+  resumeSession as resumeSessionRule,
   saveDecision as saveDecisionRule,
   startSession,
   type Session,
+  type SessionOutcome,
 } from '../domain/session.js';
 import {
   ConflictError,
   type Clock,
   type ReviewReader,
   type CredentialPolicy,
+  type CredentialPurpose,
   type IdGenerator,
   type Principal,
   type Repositories,
@@ -36,7 +42,17 @@ export interface Dependencies {
   credentials: CredentialPolicy;
   /** 読み取り専用の経路（振り返り） */
   reviews: ReviewReader;
+  /** 資格の有効期間（省略時は仮の既定値） */
+  ttl?: { sessionMs: number; recoveryMs: number };
 }
+
+/** 再発行の対象。進行役自身か、このゲームの参加者 1 人 */
+export type CredentialTarget =
+  { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };
+
+/** 無効な復帰コード。復帰せず、進行役への確認方法を示す */
+const INVALID_RECOVERY =
+  '復帰コードが無効です（失効・期限切れ、またはゲームが削除済み）。進行役に、新しい復帰コードの発行を依頼してください';
 
 export interface CommitResult {
   committedWeek: number;
@@ -53,16 +69,47 @@ export interface CommitResult {
  * @landmark ユースケース層の入口。1 回の操作は 1 つのトランザクション。ルールを持たず、認証 → 集約の呼び出し → 保存の順に進めるだけ。
  */
 export function createApplication(deps: Dependencies) {
-  const { uow, ids, credentials, reviews } = deps;
+  const { uow, ids, credentials, reviews, clock } = deps;
+  const ttl = deps.ttl ?? CREDENTIAL_TTL;
+
+  /** 資格を発行して保存し、生の値を返す（生の値は保存しない） */
+  async function issue(
+    repos: Repositories,
+    principal: Principal,
+    purpose: CredentialPurpose,
+  ): Promise<string> {
+    const cred = credentials.issue();
+    await repos.credentials.save(
+      cred.digest,
+      principal,
+      purpose,
+      CredentialValidity.issue(
+        clock.now(),
+        purpose === 'SESSION' ? ttl.sessionMs : ttl.recoveryMs,
+      ),
+    );
+    return cred.token;
+  }
+
+  const findPrincipal = (
+    repos: Repositories,
+    token: string,
+    purpose: CredentialPurpose,
+  ) =>
+    token
+      ? repos.credentials.find(
+          credentials.digestsOf(token),
+          purpose,
+          clock.now(),
+        )
+      : Promise.resolve(null);
 
   async function authenticate(
     repos: Repositories,
     token: string,
     gameId: string,
   ): Promise<Principal> {
-    const principal = token
-      ? await repos.credentials.find(credentials.digestOf(token))
-      : null;
+    const principal = await findPrincipal(repos, token, 'SESSION');
     if (!principal) throw new UnauthorizedError();
     if (principal.gameId !== gameId) throw new ForbiddenError();
     return principal;
@@ -83,14 +130,27 @@ export function createApplication(deps: Dependencies) {
     return session;
   }
 
+  /** 認証 → セッションの読み込み → 集約の操作 → 保存（停止・再開・代理入力で共通） */
+  function changeSession(
+    input: { token: string; gameId: string },
+    operate: (session: Session, actor: Actor) => SessionOutcome,
+  ): Promise<Session> {
+    return uow.run(async (repos) => {
+      const principal = await authenticate(repos, input.token, input.gameId);
+      const session = await loadSession(repos, input.gameId);
+      const { session: next, events } = operate(session, actorOf(principal));
+      await repos.sessions.save(next, session.version);
+      await repos.events.append(input.gameId, events);
+      return next;
+    });
+  }
+
   return {
     /** 候補の資格のうち、このゲームのものを返す。無ければ先頭（認可の失敗として扱われる） */
     identify(input: { tokens: string[]; gameId: string }): Promise<string> {
       return uow.run(async (repos) => {
         for (const token of input.tokens) {
-          const principal = await repos.credentials.find(
-            credentials.digestOf(token),
-          );
+          const principal = await findPrincipal(repos, token, 'SESSION');
           if (principal?.gameId === input.gameId) return token;
         }
         return input.tokens[0] ?? '';
@@ -111,13 +171,11 @@ export function createApplication(deps: Dependencies) {
           ...input,
         });
         await repos.games.save(game, null);
-        const cred = credentials.issue();
-        await repos.credentials.save(cred.digest, {
-          gameId,
-          kind: 'FACILITATOR',
-        });
+        const principal: Principal = { gameId, kind: 'FACILITATOR' };
+        const facilitatorToken = await issue(repos, principal, 'SESSION');
+        const recoveryCode = await issue(repos, principal, 'RECOVERY');
         await repos.events.append(gameId, events);
-        return { gameId, joinCode, facilitatorToken: cred.token };
+        return { gameId, joinCode, facilitatorToken, recoveryCode };
       });
     },
 
@@ -131,14 +189,78 @@ export function createApplication(deps: Dependencies) {
           displayName: input.displayName,
         });
         await repos.games.save(next, game.version);
-        const cred = credentials.issue();
-        await repos.credentials.save(cred.digest, {
+        const principal: Principal = {
           gameId: game.id,
           kind: 'PARTICIPANT',
           participantId,
-        });
+        };
+        const token = await issue(repos, principal, 'SESSION');
+        const recoveryCode = await issue(repos, principal, 'RECOVERY');
         await repos.events.append(game.id, events);
-        return { gameId: game.id, participantId, token: cred.token };
+        return { gameId: game.id, participantId, token, recoveryCode };
+      });
+    },
+
+    /**
+     * 復帰コードで戻る。新しいブラウザセッションを発行する（復帰コード自体は、期限まで再利用できる）。
+     * 無効なら、復帰せず、進行役への確認方法を示す。
+     */
+    recover(input: { code: string }) {
+      return uow.run(async (repos) => {
+        const principal = await findPrincipal(repos, input.code, 'RECOVERY');
+        const game = principal
+          ? await repos.games.find(principal.gameId)
+          : null;
+        if (!principal || !game) throw new UnauthorizedError(INVALID_RECOVERY);
+        const token = await issue(repos, principal, 'SESSION');
+        await repos.events.append(game.id, [
+          { type: 'ParticipationRecovered', ...principal },
+        ]);
+        return { ...principal, token, gameStatus: game.status };
+      });
+    },
+
+    /**
+     * 進行役が、漏れた資格を失効させて再発行する。対象のブラウザセッションと復帰コードをすべて失効させ、
+     * 新しい復帰コードを返す。進行役自身が対象なら、新しいブラウザセッションも返す。
+     */
+    reissueCredential(input: {
+      token: string;
+      gameId: string;
+      target: CredentialTarget;
+    }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind !== 'FACILITATOR')
+          throw new PermissionError('資格の再発行は進行役だけができます');
+        const game = await loadGame(repos, input.gameId);
+        const target: Principal =
+          input.target.kind === 'FACILITATOR'
+            ? { gameId: game.id, kind: 'FACILITATOR' }
+            : {
+                gameId: game.id,
+                kind: 'PARTICIPANT',
+                participantId: input.target.participantId,
+              };
+        if (
+          target.kind === 'PARTICIPANT' &&
+          !game.participants.some((p) => p.id === target.participantId)
+        )
+          throw new NotFoundError('このゲームの参加者ではありません');
+        await repos.credentials.revokeAll(target, clock.now());
+        const recoveryCode = await issue(repos, target, 'RECOVERY');
+        const facilitatorToken =
+          target.kind === 'FACILITATOR'
+            ? await issue(repos, target, 'SESSION')
+            : undefined;
+        await repos.events.append(game.id, [
+          { type: 'CredentialRevoked', ...target },
+          { type: 'CredentialReissued', ...target },
+        ]);
+        return {
+          recoveryCode,
+          ...(facilitatorToken ? { facilitatorToken } : {}),
+        };
       });
     },
 
@@ -280,6 +402,42 @@ export function createApplication(deps: Dependencies) {
       });
     },
 
+    pauseSession(input: { token: string; gameId: string }) {
+      return changeSession(input, (session, actor) =>
+        pauseSessionRule(session, actor),
+      );
+    },
+
+    resumeSession(input: { token: string; gameId: string }) {
+      return changeSession(input, (session, actor) =>
+        resumeSessionRule(session, actor),
+      );
+    },
+
+    /** 進行役の代理入力。時刻は注入された時計から取り、イベントに残す */
+    async proxyDecision(input: {
+      token: string;
+      gameId: string;
+      role: Role;
+      quantity: number;
+      expectedVersion: number;
+    }) {
+      const next = await changeSession(input, (session, actor) =>
+        proxyDecisionRule(
+          session,
+          actor,
+          input.role,
+          input.quantity,
+          input.expectedVersion,
+          clock.now(),
+        ),
+      );
+      return {
+        version: next.decisions[input.role]?.version ?? 0,
+        sessionVersion: next.version,
+      };
+    },
+
     lobby(input: { token: string; gameId: string }) {
       return uow.run(async (repos) => {
         const principal = await authenticate(repos, input.token, input.gameId);
@@ -382,6 +540,10 @@ export function createApplication(deps: Dependencies) {
           submitted: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r] !== undefined]),
           ) as Record<Role, boolean>,
+          /** 役割ごとの入力の版（代理入力の楽観的排他に使う。値は含めない） */
+          versions: Object.fromEntries(
+            ROLES.map((r) => [r, session.decisions[r]?.version ?? 0]),
+          ) as Record<Role, number>,
         };
       });
     },

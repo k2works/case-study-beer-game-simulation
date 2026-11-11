@@ -47,5 +47,5 @@ export async function assertTestDatabase(pool: pg.Pool): Promise<void> {
 
 export async function resetData(pool: pg.Pool): Promise<void> {
   await assertTestDatabase(pool);
-  await pool.query('TRUNCATE games CASCADE');
+  await pool.query('TRUNCATE games, rate_limits CASCADE');
 }

@@ -16,7 +16,11 @@ import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js'
 import { buildServer } from '../../src/adapters/http/server.js';
 import { createApplication } from '../../src/application/index.js';
 import { ROLES } from '../../src/domain/role.js';
-import { fakeCredentials, sequentialIds } from '../support/memory.js';
+import {
+  fakeCredentials,
+  memoryRateLimiter,
+  sequentialIds,
+} from '../support/memory.js';
 import { prepareTestDatabase, resetData, TEST_URL } from '../support/db.js';
 
 let pool: pg.Pool;
@@ -108,6 +112,7 @@ describe('SSE', () => {
           return () => {};
         },
       },
+      rateLimiter: memoryRateLimiter(1000, 60_000),
       config: { allowedOrigin: 'https://x.test', logLevel: 'silent' },
     });
     await server.listen({ port: 0, host: '127.0.0.1' });

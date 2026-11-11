@@ -83,6 +83,7 @@ describe('canDisclose（開示の判定）', () => {
   it('[US4.2/AC4.2.2] 終了したときだけ開示する', () => {
     expect(canDisclose('ENDED')).toBe(true);
     expect(canDisclose('ACTIVE')).toBe(false);
+    expect(canDisclose('PAUSED')).toBe(false); // 停止中も進行中と同じ
     expect(canDisclose(null)).toBe(false); // 未開始
   });
 });

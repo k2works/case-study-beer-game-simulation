@@ -10,11 +10,18 @@ import {
 import { ROLES } from '../../src/domain/role.js';
 import {
   commitWeek,
+  pauseSession,
+  proxyDecision,
+  resumeSession,
   saveDecision,
   startSession,
   type Session,
 } from '../../src/domain/session.js';
-import { DomainError, PermissionError } from '../../src/domain/values.js';
+import {
+  DomainError,
+  PermissionError,
+  StaleError,
+} from '../../src/domain/values.js';
 
 function startedGame(weeks = 3): Game {
   let g = createGame({ id: 'g1', joinCode: 'JOIN-0001', weeks }).game;
@@ -133,10 +140,190 @@ describe('saveDecision', () => {
     );
   });
 
-  it('進行役の代理入力はこの Bolt の範囲外', () => {
+  it('進行役は、参加者の保存ではなく代理入力を使う', () => {
     expect(() =>
       saveDecision(newSession(), FACILITATOR, 'RETAILER', 1, 0),
+    ).toThrow(PermissionError);
+  });
+});
+
+describe('停止・再開（pauseSession / resumeSession）', () => {
+  it('進行役が停止すると PAUSED になり、再開すると ACTIVE に戻る。版が進む', () => {
+    const paused = pauseSession(newSession(), FACILITATOR);
+    expect(paused.session.status).toBe('PAUSED');
+    expect(paused.session.version).toBe(1);
+    expect(paused.events).toEqual([{ type: 'SessionPaused', sessionId: 's1' }]);
+    const resumed = resumeSession(paused.session, FACILITATOR);
+    expect(resumed.session.status).toBe('ACTIVE');
+    expect(resumed.session.version).toBe(2);
+    expect(resumed.events).toEqual([
+      { type: 'SessionResumed', sessionId: 's1' },
+    ]);
+  });
+
+  it('進行役以外は、停止・再開できない', () => {
+    expect(() => pauseSession(newSession(), holder('RETAILER'))).toThrow(
+      PermissionError,
+    );
+    const paused = pauseSession(newSession(), FACILITATOR).session;
+    expect(() => resumeSession(paused, holder('RETAILER'))).toThrow(
+      PermissionError,
+    );
+  });
+
+  it('停止中でなければ再開できず、進行中でなければ停止できない', () => {
+    expect(() => resumeSession(newSession(), FACILITATOR)).toThrow(DomainError);
+    const paused = pauseSession(newSession(), FACILITATOR).session;
+    expect(() => pauseSession(paused, FACILITATOR)).toThrow(DomainError);
+    let ended = fillAll(newSession(1));
+    ended = commitWeek(ended, FACILITATOR, {
+      week: 1,
+      version: ended.version,
+    }).session;
+    expect(() => pauseSession(ended, FACILITATOR)).toThrow(/終了/);
+  });
+
+  it('[US3.1/AC3.1.1] 停止中に参加者が保存すると拒否し、保存済みの入力を失わない', () => {
+    let s = saveDecision(
+      newSession(),
+      holder('RETAILER'),
+      'RETAILER',
+      6,
+      0,
+    ).session;
+    s = pauseSession(s, FACILITATOR).session;
+    expect(() => saveDecision(s, holder('RETAILER'), 'RETAILER', 9, 1)).toThrow(
+      /停止中/,
+    );
+    expect(s.decisions.RETAILER).toMatchObject({ quantity: 6, version: 1 });
+  });
+
+  it('[US3.1/AC3.1.1] 停止中は、そろっていても週を確定できない', () => {
+    let s = fillAll(newSession());
+    s = pauseSession(s, FACILITATOR).session;
+    expect(() =>
+      commitWeek(s, FACILITATOR, { week: 1, version: s.version }),
+    ).toThrow(/停止中/);
+  });
+
+  it('[US3.1/AC3.1.3] 再開すると、最後の確定済みの週の次から入力できる', () => {
+    let s = fillAll(newSession());
+    s = commitWeek(s, FACILITATOR, { week: 1, version: s.version }).session;
+    s = pauseSession(s, FACILITATOR).session;
+    s = resumeSession(s, FACILITATOR).session;
+    expect(s.week).toBe(2);
+    expect(s.history).toHaveLength(1);
+    const saved = saveDecision(s, holder('FACTORY'), 'FACTORY', 3, 0).session;
+    expect(saved.decisions.FACTORY?.quantity).toBe(3);
+  });
+});
+
+describe('代理入力（proxyDecision）', () => {
+  const at = new Date('2026-11-11T01:00:00.000Z');
+
+  it('[US3.1/AC3.1.2] 進行役が代理入力すると、操作者・役割・時刻・値をイベントに残す', () => {
+    const { session, events } = proxyDecision(
+      newSession(),
+      FACILITATOR,
+      'WHOLESALER',
+      7,
+      0,
+      at,
+    );
+    expect(session.decisions.WHOLESALER).toEqual({
+      quantity: 7,
+      version: 1,
+      savedBy: 'FACILITATOR',
+    });
+    expect(events).toEqual([
+      {
+        type: 'ProxyDecisionSubmitted',
+        sessionId: 's1',
+        role: 'WHOLESALER',
+        quantity: 7,
+        version: 1,
+        operator: 'FACILITATOR',
+        at: '2026-11-11T01:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('[US3.1/AC3.1.2] 停止中に代理入力し、再開してから確定できる', () => {
+    let s = newSession();
+    for (const role of ROLES.filter((r) => r !== 'WHOLESALER')) {
+      s = saveDecision(s, holder(role), role, 4, 0).session;
+    }
+    s = pauseSession(s, FACILITATOR).session;
+    s = proxyDecision(s, FACILITATOR, 'WHOLESALER', 5, 0, at).session;
+    s = resumeSession(s, FACILITATOR).session;
+    const committed = commitWeek(s, FACILITATOR, {
+      week: 1,
+      version: s.version,
+    }).session;
+    expect(committed.history[0]?.roles.WHOLESALER.order).toBe(5);
+  });
+
+  it('参加者は代理入力できない', () => {
+    expect(() =>
+      proxyDecision(newSession(), holder('RETAILER'), 'FACTORY', 1, 0, at),
+    ).toThrow(PermissionError);
+  });
+
+  it('古い版の代理入力は、最新値を示して拒否する', () => {
+    const s = saveDecision(
+      newSession(),
+      holder('RETAILER'),
+      'RETAILER',
+      6,
+      0,
+    ).session;
+    expect(() => proxyDecision(s, FACILITATOR, 'RETAILER', 2, 0, at)).toThrow(
+      StaleError,
+    );
+  });
+
+  it('範囲外の数量と、終了後の代理入力は拒否する', () => {
+    expect(() =>
+      proxyDecision(newSession(), FACILITATOR, 'RETAILER', -1, 0, at),
     ).toThrow(DomainError);
+    let ended = fillAll(newSession(1));
+    ended = commitWeek(ended, FACILITATOR, {
+      week: 1,
+      version: ended.version,
+    }).session;
+    expect(() =>
+      proxyDecision(ended, FACILITATOR, 'RETAILER', 1, 0, at),
+    ).toThrow(/終了/);
+  });
+
+  it('自動確定のゲームでは、代理入力が最後の入力なら同じ操作で確定する', () => {
+    let g = createGame({
+      id: 'g1',
+      joinCode: 'JOIN-0001',
+      weeks: 3,
+      commitMode: 'AUTO',
+    }).game;
+    ROLES.forEach((role, i) => {
+      g = joinGame(g, { participantId: `p${i}`, displayName: `P${i}` }).game;
+      g = assignRole(g, FACILITATOR, `p${i}`, role).game;
+    });
+    let s = startSession(startGame(g, FACILITATOR).game, 's1').session;
+    for (const role of ROLES.filter((r) => r !== 'FACTORY')) {
+      s = saveDecision(s, holder(role), role, 4, 0).session;
+    }
+    const { session, events } = proxyDecision(
+      s,
+      FACILITATOR,
+      'FACTORY',
+      4,
+      0,
+      at,
+    );
+    expect(session.week).toBe(2);
+    expect(events.map((e) => e.type)).toEqual([
+      'ProxyDecisionSubmitted',
+      'WeekCommitted',
+    ]);
   });
 });
 

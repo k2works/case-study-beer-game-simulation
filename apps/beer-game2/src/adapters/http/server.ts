@@ -20,7 +20,11 @@ import {
   PermissionError,
   StaleError,
 } from '../../domain/values.js';
-import { ConflictError, type ChangeNotifier } from '../../ports/index.js';
+import {
+  ConflictError,
+  type ChangeNotifier,
+  type RateLimiter,
+} from '../../ports/index.js';
 
 export interface HttpConfig {
   allowedOrigin: string;
@@ -31,6 +35,8 @@ export interface ServerDependencies {
   app: Application;
   ready: () => Promise<boolean>;
   notifier: ChangeNotifier;
+  /** 参加・復帰の専用のレート制限（総当たりの対策） */
+  rateLimiter: RateLimiter;
   config: HttpConfig;
   /** ログの出力先（テスト用。省略時は標準出力） */
   logStream?: Writable;
@@ -47,6 +53,7 @@ class HttpError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly title = 'Bad Request',
   ) {
     super(message);
   }
@@ -67,6 +74,14 @@ const assignBody = z.object({
   role: roleSchema,
 });
 const decisionBody = z.object({ role: roleSchema, quantity: z.number() });
+const recoverBody = z.object({ code: z.string().max(200) });
+const reissueBody = z.discriminatedUnion('target', [
+  z.object({ target: z.literal('FACILITATOR') }),
+  z.object({
+    target: z.literal('PARTICIPANT'),
+    participantId: z.string().min(1),
+  }),
+]);
 const commitBody = z.object({ week: z.number().int() });
 
 function ifMatch(request: FastifyRequest): number {
@@ -150,9 +165,13 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       );
     }
     if (error instanceof HttpError)
-      return problem(reply, error.status, 'Bad Request', error.message);
-    if (error instanceof UnauthorizedError)
+      return problem(reply, error.status, error.title, error.message);
+    if (error instanceof UnauthorizedError) {
+      // 復帰の失敗は、総当たりの検知のために記録する（コードは記録しない）
+      if (request.routeOptions.url === '/api/recover')
+        request.log.warn({ ip: request.ip }, '復帰に失敗しました');
       return problem(reply, 401, 'Unauthorized', error.message);
+    }
     if (error instanceof ForbiddenError)
       return problem(reply, 403, 'Forbidden', error.message);
     if (error instanceof NotFoundError)
@@ -203,6 +222,22 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   const gameParam = (request: FastifyRequest) =>
     (request.params as { id: string }).id;
 
+  /** 参加・復帰の専用のレート制限。送信元ごと、エンドポイントごとに数える */
+  const limit = async (request: FastifyRequest, name: string) => {
+    const ok = await deps.rateLimiter.hit(`${name}:${request.ip}`, new Date());
+    if (!ok) {
+      request.log.warn(
+        { ip: request.ip, bucket: name },
+        'レート制限を超えました',
+      );
+      throw new HttpError(
+        429,
+        '試行が多すぎます。時間をおいてから、もう一度試してください',
+        'Too Many Requests',
+      );
+    }
+  };
+
   server.get('/health', async () => ({ status: 'ok' }));
   server.get('/ready', async (_request, reply) => {
     let ok: boolean;
@@ -220,18 +255,58 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     const body = createBody.parse(request.body);
     const created = await app.createGame(body);
     setSession(reply, 'facilitator', created.facilitatorToken);
-    return reply
-      .code(201)
-      .send({ gameId: created.gameId, joinCode: created.joinCode });
+    // 復帰コードは、この応答で一度だけ返す（保存はダイジェストだけ）
+    return reply.code(201).send({
+      gameId: created.gameId,
+      joinCode: created.joinCode,
+      recoveryCode: created.recoveryCode,
+    });
   });
 
   server.post('/api/join', async (request, reply) => {
+    await limit(request, 'join');
     const body = joinBody.parse(request.body);
     const joined = await app.joinGame(body);
     setSession(reply, 'participant', joined.token);
-    return reply
-      .code(201)
-      .send({ gameId: joined.gameId, participantId: joined.participantId });
+    return reply.code(201).send({
+      gameId: joined.gameId,
+      participantId: joined.participantId,
+      recoveryCode: joined.recoveryCode,
+    });
+  });
+
+  // 復帰コードで戻る。新しいブラウザセッションの Cookie を設定する
+  server.post('/api/recover', async (request, reply) => {
+    await limit(request, 'recover');
+    const body = recoverBody.parse(request.body);
+    const back = await app.recover(body);
+    setSession(
+      reply,
+      back.kind === 'FACILITATOR' ? 'facilitator' : 'participant',
+      back.token,
+    );
+    return {
+      gameId: back.gameId,
+      kind: back.kind,
+      gameStatus: back.gameStatus,
+      ...(back.participantId ? { participantId: back.participantId } : {}),
+    };
+  });
+
+  // 漏れた資格の失効と再発行（進行役）。進行役自身なら、新しい Cookie も設定する
+  server.post('/api/games/:id/credentials/reissue', async (request, reply) => {
+    const body = reissueBody.parse(request.body);
+    const reissued = await app.reissueCredential({
+      token: await tokenOf(request, 'facilitator', 'participant'),
+      gameId: gameParam(request),
+      target:
+        body.target === 'FACILITATOR'
+          ? { kind: 'FACILITATOR' }
+          : { kind: 'PARTICIPANT', participantId: body.participantId },
+    });
+    if (reissued.facilitatorToken)
+      setSession(reply, 'facilitator', reissued.facilitatorToken);
+    return { recoveryCode: reissued.recoveryCode };
   });
 
   server.get('/api/games/:id/lobby', async (request) =>
@@ -304,6 +379,30 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       expectedVersion: ifMatch(request),
     });
     return saved;
+  });
+
+  for (const action of ['pause', 'resume'] as const) {
+    server.post(`/api/games/:id/${action}`, async (request, reply) => {
+      const input = {
+        token: await tokenOf(request, 'facilitator', 'participant'),
+        gameId: gameParam(request),
+      };
+      await (action === 'pause'
+        ? app.pauseSession(input)
+        : app.resumeSession(input));
+      return reply.code(204).send();
+    });
+  }
+
+  server.put('/api/games/:id/proxy-decision', async (request) => {
+    const body = decisionBody.parse(request.body);
+    return app.proxyDecision({
+      token: await tokenOf(request, 'facilitator', 'participant'),
+      gameId: gameParam(request),
+      role: body.role,
+      quantity: body.quantity,
+      expectedVersion: ifMatch(request),
+    });
   });
 
   server.post('/api/games/:id/commit', async (request) => {

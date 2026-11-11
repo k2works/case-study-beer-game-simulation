@@ -24,12 +24,19 @@ import {
 
 let mem: ReturnType<typeof memoryUnitOfWork>;
 let app: Application;
+const START = new Date('2026-11-10T00:00:00Z');
+let now: Date;
+/** 時計を進める（資格の期限の境界のテスト） */
+const advance = (ms: number) => {
+  now = new Date(now.getTime() + ms);
+};
 
 beforeEach(() => {
   mem = memoryUnitOfWork();
+  now = START;
   app = createApplication({
     uow: mem.uow,
-    clock: { now: () => new Date('2026-11-10T00:00:00Z') },
+    clock: { now: () => now },
     ids: sequentialIds(),
     credentials: fakeCredentials(),
     reviews: memoryReviewReader(mem),
@@ -48,6 +55,7 @@ async function setUpTable(
   commitMode?: 'AUTO' | 'MANUAL',
 ): Promise<Table> {
   const created = await app.createGame({ weeks, commitMode });
+  facilitatorCodes.set(created.gameId, created.recoveryCode);
   const players = {} as Table['players'];
   for (const role of ROLES) {
     const joined = await app.joinGame({
@@ -76,6 +84,10 @@ async function setUpTable(
     players,
   };
 }
+
+const DAY = 24 * 60 * 60 * 1000;
+/** ゲームごとの進行役の復帰コード（作成の応答から記録する） */
+const facilitatorCodes = new Map<string, string>();
 
 async function fillAll(t: Table, quantity = 4) {
   for (const role of ROLES) {
@@ -131,8 +143,11 @@ describe('作成・参加・割り当て・開始', () => {
     const c = await app.createGame({ weeks: 3 });
     const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
     expect(j.gameId).toBe(c.gameId);
-    expect(mem.snapshot().credentials.size).toBe(2); // 進行役 + 参加者
-    expect([...mem.snapshot().credentials.keys()]).not.toContain(j.token);
+    // 進行役・参加者のそれぞれに、ブラウザセッションと復帰コード
+    expect(mem.snapshot().credentials.size).toBe(4);
+    const stored = [...mem.snapshot().credentials.keys()];
+    expect(stored).not.toContain(j.token);
+    expect(stored).not.toContain(j.recoveryCode);
   });
 
   it('[US1.2/AC1.2.2] 存在しないコードでは参加できない', async () => {
@@ -543,7 +558,7 @@ describe('振り返り（終了後だけ開示）', () => {
     const t = await setUpTable(1);
     const emptyApp = createApplication({
       uow: mem.uow,
-      clock: { now: () => new Date() },
+      clock: { now: () => now },
       ids: sequentialIds(),
       credentials: fakeCredentials(),
       reviews: { read: async () => ({ sessionStatus: 'ENDED', rows: [] }) },
@@ -553,5 +568,270 @@ describe('振り返り（終了後だけ開示）', () => {
       gameId: t.gameId,
     });
     expect(review.weeks).toEqual([]);
+  });
+});
+
+describe('停止・再開・代理入力', () => {
+  it('[US3.1/AC3.1.1] 停止中は参加者の保存を拒否し、保存済みの入力は残る', async () => {
+    const t = await setUpTable();
+    await app.saveDecision({
+      token: t.players.RETAILER.token,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 6,
+      expectedVersion: 0,
+    });
+    await app.pauseSession({ token: t.facilitator, gameId: t.gameId });
+    await expect(
+      app.saveDecision({
+        token: t.players.RETAILER.token,
+        gameId: t.gameId,
+        role: 'RETAILER',
+        quantity: 9,
+        expectedVersion: 1,
+      }),
+    ).rejects.toThrow(/停止中/);
+    const me = await app.roleState({
+      token: t.players.RETAILER.token,
+      gameId: t.gameId,
+    });
+    expect(me.status).toBe('PAUSED');
+    expect(me.decision).toMatchObject({ quantity: 6, version: 1 });
+  });
+
+  it('[US3.1/AC3.1.2] 代理入力すると、操作者・役割・時刻・値がイベント（監査の記録）に残る', async () => {
+    const t = await setUpTable();
+    await app.pauseSession({ token: t.facilitator, gameId: t.gameId });
+    const saved = await app.proxyDecision({
+      token: t.facilitator,
+      gameId: t.gameId,
+      role: 'WHOLESALER',
+      quantity: 7,
+      expectedVersion: 0,
+    });
+    expect(saved.version).toBe(1);
+    const proxy = mem
+      .snapshot()
+      .events.map((e) => e.event)
+      .find((e) => (e as { type: string }).type === 'ProxyDecisionSubmitted');
+    expect(proxy).toMatchObject({
+      role: 'WHOLESALER',
+      quantity: 7,
+      operator: 'FACILITATOR',
+      at: START.toISOString(),
+    });
+  });
+
+  it('[US3.1/AC3.1.3] 停止 → 代理入力 → 再開で、最後の確定済みの週から続けて確定できる', async () => {
+    const t = await setUpTable();
+    for (const role of ROLES.filter((r) => r !== 'FACTORY')) {
+      await app.saveDecision({
+        token: t.players[role].token,
+        gameId: t.gameId,
+        role,
+        quantity: 4,
+        expectedVersion: 0,
+      });
+    }
+    await app.pauseSession({ token: t.facilitator, gameId: t.gameId });
+    await app.proxyDecision({
+      token: t.facilitator,
+      gameId: t.gameId,
+      role: 'FACTORY',
+      quantity: 5,
+      expectedVersion: 0,
+    });
+    await app.resumeSession({ token: t.facilitator, gameId: t.gameId });
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    expect(c.status).toBe('ACTIVE');
+    expect(c.versions.FACTORY).toBe(1);
+    const result = await app.commitWeek({
+      token: t.facilitator,
+      gameId: t.gameId,
+      week: 1,
+      version: c.sessionVersion,
+      idempotencyKey: 'k1',
+    });
+    expect(result).toMatchObject({ committedWeek: 1, nextWeek: 2 });
+  });
+
+  it('参加者は、停止・再開・代理入力ができない', async () => {
+    const t = await setUpTable();
+    const player = { token: t.players.RETAILER.token, gameId: t.gameId };
+    await expect(app.pauseSession(player)).rejects.toThrow(PermissionError);
+    await expect(app.resumeSession(player)).rejects.toThrow(PermissionError);
+    await expect(
+      app.proxyDecision({
+        ...player,
+        role: 'FACTORY',
+        quantity: 1,
+        expectedVersion: 0,
+      }),
+    ).rejects.toThrow(PermissionError);
+  });
+});
+
+describe('復帰（復帰コード）', () => {
+  it('[US3.2/AC3.2.1] 参加者が復帰コードで戻ると、新しい資格で同じゲームと役割の最新の状態を見られる', async () => {
+    const created = await app.createGame({ weeks: 3 });
+    const codes = {} as Record<Role, string>;
+    for (const role of ROLES) {
+      const j = await app.joinGame({
+        joinCode: created.joinCode,
+        displayName: role,
+      });
+      codes[role] = j.recoveryCode;
+      await app.assignRole({
+        token: created.facilitatorToken,
+        gameId: created.gameId,
+        participantId: j.participantId,
+        role,
+      });
+    }
+    await app.startGame({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+    });
+    const back = await app.recover({ code: codes.WHOLESALER });
+    expect(back).toMatchObject({
+      gameId: created.gameId,
+      kind: 'PARTICIPANT',
+      gameStatus: 'STARTED',
+    });
+    const me = await app.roleState({ token: back.token, gameId: back.gameId });
+    expect(me.role).toBe('WHOLESALER');
+    expect(
+      mem
+        .snapshot()
+        .events.some(
+          (e) =>
+            (e.event as { type: string }).type === 'ParticipationRecovered',
+        ),
+    ).toBe(true);
+  });
+
+  it('[US3.2/AC3.2.4] 進行役が復帰コードで戻ると、同じゲームの進行コンソールを開ける', async () => {
+    const t = await setUpTable();
+    const code = facilitatorCodes.get(t.gameId)!;
+    const back = await app.recover({ code });
+    expect(back).toMatchObject({ gameId: t.gameId, kind: 'FACILITATOR' });
+    const c = await app.console({ token: back.token, gameId: t.gameId });
+    expect(c.week).toBe(1);
+  });
+
+  it('[US3.2/AC3.2.2] 無効な復帰コードでは復帰せず、進行役への確認を促す', async () => {
+    await expect(app.recover({ code: 'no-such-code' })).rejects.toThrow(
+      UnauthorizedError,
+    );
+    await expect(app.recover({ code: '' })).rejects.toThrow(/進行役/);
+  });
+
+  it('[US3.2/AC3.2.2] 削除済み（ゲームが無い）の復帰コードでは復帰しない', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
+    mem.snapshot().games.delete(c.gameId);
+    await expect(app.recover({ code: j.recoveryCode })).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it('[US3.2/AC3.2.5] 復帰コードは 30 日で期限切れになる（境界）', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
+    advance(30 * DAY - 1);
+    await expect(app.recover({ code: j.recoveryCode })).resolves.toMatchObject({
+      kind: 'PARTICIPANT',
+    });
+    advance(1);
+    await expect(app.recover({ code: j.recoveryCode })).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it('[US3.2/AC3.2.5] ブラウザセッションは 24 時間で期限切れになる（境界）', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const lobby = { token: c.facilitatorToken, gameId: c.gameId };
+    advance(DAY - 1);
+    await expect(app.lobby(lobby)).resolves.toBeDefined();
+    advance(1);
+    await expect(app.lobby(lobby)).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe('資格の失効と再発行', () => {
+  it('[US3.2/AC3.2.5] 進行役が参加者の資格を再発行すると、古いブラウザセッションと古い復帰コードは使えない', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
+    const reissued = await app.reissueCredential({
+      token: c.facilitatorToken,
+      gameId: c.gameId,
+      target: { kind: 'PARTICIPANT', participantId: j.participantId },
+    });
+    await expect(
+      app.lobby({ token: j.token, gameId: c.gameId }),
+    ).rejects.toThrow(UnauthorizedError);
+    await expect(app.recover({ code: j.recoveryCode })).rejects.toThrow(
+      UnauthorizedError,
+    );
+    const back = await app.recover({ code: reissued.recoveryCode });
+    expect(back).toMatchObject({
+      kind: 'PARTICIPANT',
+      participantId: j.participantId,
+    });
+    // 進行役自身の資格は影響を受けない
+    await expect(
+      app.lobby({ token: c.facilitatorToken, gameId: c.gameId }),
+    ).resolves.toBeDefined();
+    const types = mem
+      .snapshot()
+      .events.map((e) => (e.event as { type: string }).type);
+    expect(types).toEqual(
+      expect.arrayContaining(['CredentialRevoked', 'CredentialReissued']),
+    );
+  });
+
+  it('[US3.2/AC3.2.5] 進行役が自分の資格を再発行すると、古い資格は使えず、新しい資格と復帰コードが返る', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const old = c.recoveryCode;
+    const reissued = await app.reissueCredential({
+      token: c.facilitatorToken,
+      gameId: c.gameId,
+      target: { kind: 'FACILITATOR' },
+    });
+    expect(reissued.facilitatorToken).toBeDefined();
+    await expect(
+      app.lobby({ token: c.facilitatorToken, gameId: c.gameId }),
+    ).rejects.toThrow(UnauthorizedError);
+    await expect(app.recover({ code: old })).rejects.toThrow(UnauthorizedError);
+    await expect(
+      app.lobby({ token: reissued.facilitatorToken!, gameId: c.gameId }),
+    ).resolves.toMatchObject({ viewer: { kind: 'FACILITATOR' } });
+    await expect(
+      app.recover({ code: reissued.recoveryCode }),
+    ).resolves.toMatchObject({ kind: 'FACILITATOR' });
+  });
+
+  it('参加者は再発行できない。他のゲームの参加者は対象にできない', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
+    await expect(
+      app.reissueCredential({
+        token: j.token,
+        gameId: c.gameId,
+        target: { kind: 'FACILITATOR' },
+      }),
+    ).rejects.toThrow(PermissionError);
+    const other = await app.createGame({ weeks: 3 });
+    const stranger = await app.joinGame({
+      joinCode: other.joinCode,
+      displayName: '太郎',
+    });
+    await expect(
+      app.reissueCredential({
+        token: c.facilitatorToken,
+        gameId: c.gameId,
+        target: { kind: 'PARTICIPANT', participantId: stranger.participantId },
+      }),
+    ).rejects.toThrow(NotFoundError);
   });
 });
