@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Verification**: [bolt_10_plan](/development/beer-game2/bolt_10_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 006 を含む）
 * **Creation**: [bolt_10_report](/development/beer-game2/bolt_10_report.md) を作成（claude-code/claude-opus-5-5）
 * **Update**: [operation](/design/beer-game2/operation.md) を更新（出力の成果物を保存しないこと、保持の定期タスク。claude-code/claude-opus-5-5）
 * **Update**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を更新（保持の削除の実行。claude-code/claude-opus-5-5）
