@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Creation**: [bolt_5_report](/development/beer-game2/bolt_5_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_5_plan](/development/beer-game2/bolt_5_plan.md) を作成（claude-code/claude-opus-5-5）
 * **Creation**: [bolt_4_report](/development/beer-game2/bolt_4_report.md) を作成（claude-code/claude-opus-5-5）
 * **Update**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を更新（鍵の版とレート制限の設定。claude-code/claude-opus-5-5）
 * **Creation**: [bolt_4_plan](/development/beer-game2/bolt_4_plan.md) を作成（claude-code/claude-opus-5-5）
