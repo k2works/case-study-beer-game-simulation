@@ -1,5 +1,12 @@
 # Docs Update Log
 
+## 2026-11-11
+* **Creation**: [bolt_4_report](/development/beer-game2/bolt_4_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を更新（鍵の版とレート制限の設定。claude-code/claude-opus-5-5）
+* **Creation**: [bolt_4_plan](/development/beer-game2/bolt_4_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_1_plan](/development/beer-game2/bolt_1_plan.md) を human:kakimomokuri が検証（「B1 とマイグレーション 001・002 の承認です」）
+* **Update**: [release_plan](/development/beer-game2/release_plan.md) を更新（進捗。claude-code/claude-opus-5-5）
+
 ## 2026-11-10
 * **Creation**: [sightseeing-map](/design/beer-game2/sightseeing-map.md) を生成（script:apps/beer-game2/scripts/guided-tour.ts）
 * **Creation**: [guided-tour-walking-skeleton](/design/beer-game2/guided-tour-walking-skeleton.md) を生成（script:apps/beer-game2/scripts/guided-tour.ts）
