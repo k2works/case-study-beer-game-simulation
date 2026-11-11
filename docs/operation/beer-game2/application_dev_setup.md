@@ -56,6 +56,8 @@ npm run dev      # DB 起動 → マイグレーション → API と UI を起�
 npm run smoke    # 別の端末で。作成 → 参加 → 割り当て → 開始 → 入力 → 確定 を API で通す
 ```
 
+保持期限に達したゲームの削除（本番では EventBridge Scheduler から 5 分ごとに起動する定期タスク）は、`npm run retention` で手元でも実行できます。
+
 `smoke` は、`/health`・`/ready`、顧客需要が小売店だけに開示されること、確定後に 2 週目へ進み役割別の結果が残ることを確認します。接続先は `API_URL`、`ORIGIN` で変えられます。
 
 ## 1 人で 1 ゲーム遊ぶ（ローカル）
