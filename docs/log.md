@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Verification**: [bolt_9_plan](/development/beer-game2/bolt_9_plan.md) を human:kakimomokuri が検証（「すべて承認」。U4 完了）
+* **Verification**: [bolt_8_plan](/development/beer-game2/bolt_8_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 005 を含む）
 * **Creation**: [bolt_9_report](/development/beer-game2/bolt_9_report.md) を作成（claude-code/claude-opus-5-5）
 * **Creation**: [bolt_9_plan](/development/beer-game2/bolt_9_plan.md) を作成（claude-code/claude-opus-5-5）
 * **Creation**: [bolt_8_report](/development/beer-game2/bolt_8_report.md) を作成（claude-code/claude-opus-5-5）
