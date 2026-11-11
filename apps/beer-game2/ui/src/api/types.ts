@@ -8,12 +8,22 @@ export interface Issue {
   fix: string;
 }
 
+/** 共同入力の競合で返る、その役割の最新の入力 */
+export interface LatestDecision {
+  quantity: number;
+  version: number;
+  /** 保存者の表示名（代理入力なら「進行役」） */
+  savedBy: string;
+}
+
 /** API のエラー（Problem JSON） */
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
     readonly issues: Issue[] = [],
+    /** 共同入力の競合（409）のときの最新の入力。未入力なら null */
+    readonly latest?: LatestDecision | null,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -32,7 +42,8 @@ export interface Lobby {
   viewer:
     { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };
   participants: { id: string; displayName: string }[];
-  assignments: Partial<Record<Role, string>>;
+  /** 役割 → 担当の参加者 ID の一覧（共同担当を含む） */
+  assignments: Partial<Record<Role, string[]>>;
   missingRoles: Role[];
 }
 
@@ -59,7 +70,9 @@ export interface RoleView {
   incomingGoods: number[];
   /** 小売店だけ */
   customerDemand?: number;
-  decision: { quantity: number; version: number } | null;
+  /** 同じ役割の担当（共同担当を含む）の表示名 */
+  coHolders: string[];
+  decision: LatestDecision | null;
   history: WeekRow[];
 }
 

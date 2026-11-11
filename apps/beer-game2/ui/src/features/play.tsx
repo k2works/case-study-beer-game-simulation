@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import type { CommitResult } from '../api/types.js';
+import {
+  ApiError,
+  type CommitResult,
+  type LatestDecision,
+} from '../api/types.js';
 import { ErrorMessage, Page } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { DECISION_LABEL, ROLE_LABEL, formatMoney } from '../labels.js';
@@ -16,6 +20,11 @@ export function PlayScreen() {
   const [savedWeek, setSavedWeek] = useState<number | null>(null);
   const [committed, setCommitted] = useState<CommitResult | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
+  /** 共同入力の競合。最新の入力と、保持している自分の値 */
+  const [conflict, setConflict] = useState<{
+    latest: LatestDecision | null;
+    mine: string;
+  } | null>(null);
 
   if (!view) {
     return (
@@ -33,11 +42,17 @@ export function PlayScreen() {
   const paused = view.status === 'PAUSED';
   const value = draft ?? (view.decision ? String(view.decision.quantity) : '');
 
-  async function save(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
+    await save(view!.decision?.version ?? 0);
+  }
+
+  /** 版を指定して保存する。競合したら、最新の入力と自分の値を並べて示し、自分の値を保持する */
+  async function save(version: number) {
     setSaveError(null);
     setSavedWeek(null);
     setCommitted(null);
+    setConflict(null);
     if (!/^\d+$/.test(value.trim())) {
       setSaveError(new Error('0 以上の整数を入力してください'));
       return;
@@ -47,15 +62,26 @@ export function PlayScreen() {
         id,
         view!.role,
         Number(value),
-        view!.decision?.version ?? 0,
+        version,
       );
       setSavedWeek(view!.week);
       setCommitted(result.committed ?? null);
       setDraft(null);
       await reload();
     } catch (err) {
+      if (err instanceof ApiError && err.latest !== undefined) {
+        setDraft(value);
+        setConflict({ latest: err.latest, mine: value });
+        await reload();
+        return;
+      }
       setSaveError(err);
     }
+  }
+
+  function useLatest() {
+    setConflict(null);
+    setDraft(null);
   }
 
   return (
@@ -67,6 +93,9 @@ export function PlayScreen() {
         </p>
       ) : (
         <p>{view.week} 週目</p>
+      )}
+      {view.coHolders.length > 1 && (
+        <p>共同担当: {view.coHolders.join('、')}</p>
       )}
       {paused && (
         <p role="status">停止中です。進行役の再開を待ってください。</p>
@@ -86,7 +115,7 @@ export function PlayScreen() {
         )}
       </dl>
       {!ended && (
-        <form onSubmit={save}>
+        <form onSubmit={submit}>
           <label>
             {DECISION_LABEL(view.role)}
             <input
@@ -127,6 +156,32 @@ export function PlayScreen() {
             </>
           )}
         </p>
+      )}
+      {!ended && view.decision && (
+        <p>
+          現在の入力: {view.decision.quantity}（{view.decision.savedBy}
+          さんが保存、版 {view.decision.version}）
+        </p>
+      )}
+      {conflict && (
+        <div role="alert" aria-label="入力の競合" className="error">
+          <p>他の人が先に保存しました。</p>
+          <p>
+            {conflict.latest
+              ? `最新の入力: ${conflict.latest.quantity}（${conflict.latest.savedBy}さん、版 ${conflict.latest.version}）`
+              : '最新の入力: 未入力'}
+          </p>
+          <p>あなたの入力: {conflict.mine}（未保存）</p>
+          <button type="button" onClick={useLatest}>
+            最新の値を使う
+          </button>
+          <button
+            type="button"
+            onClick={() => void save(conflict.latest?.version ?? 0)}
+          >
+            この値で保存し直す
+          </button>
+        </div>
       )}
       <ErrorMessage error={saveError} />
       <table aria-label="週ごとの結果">

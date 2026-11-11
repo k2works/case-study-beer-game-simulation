@@ -4,6 +4,7 @@ import {
   type Application,
 } from '../../src/application/index.js';
 import {
+  DecisionConflict,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
@@ -211,7 +212,7 @@ describe('作成・参加・割り当て・開始', () => {
       token: c.facilitatorToken,
       gameId: c.gameId,
     });
-    expect(lobby.assignments).toEqual({ FACTORY: j.participantId });
+    expect(lobby.assignments).toEqual({ FACTORY: [j.participantId] });
     expect(lobby.missingRoles).toEqual([
       'DISTRIBUTOR',
       'WHOLESALER',
@@ -258,6 +259,7 @@ describe('役割別の状況（情報の制約）', () => {
     expect(Object.keys(view).sort()).toEqual(
       [
         'backlog',
+        'coHolders',
         'commitMode',
         'customerDemand',
         'decision',
@@ -349,7 +351,11 @@ describe('意思決定と週の確定', () => {
       token: t.players.RETAILER.token,
       gameId: t.gameId,
     });
-    expect(v.decision).toEqual({ quantity: 6, version: 1 });
+    expect(v.decision).toEqual({
+      quantity: 6,
+      version: 1,
+      savedBy: 'P-RETAILER',
+    });
   });
 
   it('[US2.1/AC2.1.2] 他の役割には、保存できない（権限エラー）', async () => {
@@ -833,5 +839,133 @@ describe('資格の失効と再発行', () => {
         target: { kind: 'PARTICIPANT', participantId: stranger.participantId },
       }),
     ).rejects.toThrow(NotFoundError);
+  });
+});
+
+describe('共同担当と共同入力', () => {
+  /** 小売店に 2 人（花子・太郎）を割り当てて開始する */
+  async function coTable() {
+    const created = await app.createGame({ weeks: 3 });
+    const tokens: Record<string, string> = {};
+    for (const role of ROLES) {
+      const j = await app.joinGame({
+        joinCode: created.joinCode,
+        displayName: `P-${role}`,
+      });
+      await app.assignRole({
+        token: created.facilitatorToken,
+        gameId: created.gameId,
+        participantId: j.participantId,
+        role,
+      });
+      tokens[role] = j.token;
+    }
+    const taro = await app.joinGame({
+      joinCode: created.joinCode,
+      displayName: '太郎',
+    });
+    await app.assignRole({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+      participantId: taro.participantId,
+      role: 'RETAILER',
+    });
+    await app.startGame({
+      token: created.facilitatorToken,
+      gameId: created.gameId,
+    });
+    return {
+      gameId: created.gameId,
+      facilitator: created.facilitatorToken,
+      hanako: tokens.RETAILER!,
+      taro: taro.token,
+    };
+  }
+
+  it('[US1.2/AC1.2.4] ロビーは、役割ごとに担当の一覧を示す', async () => {
+    const t = await coTable();
+    const lobby = await app.lobby({ token: t.facilitator, gameId: t.gameId });
+    expect(lobby.assignments.RETAILER).toHaveLength(2);
+    expect(lobby.missingRoles).toEqual([]);
+  });
+
+  it('[US2.1/AC2.1.4] 共同担当は、同じ状況と、入力値・版・保存者・担当の一覧を見る', async () => {
+    const t = await coTable();
+    await app.saveDecision({
+      token: t.taro,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 8,
+      expectedVersion: 0,
+    });
+    const a = await app.roleState({ token: t.hanako, gameId: t.gameId });
+    const b = await app.roleState({ token: t.taro, gameId: t.gameId });
+    expect(a).toEqual(b);
+    expect(a.role).toBe('RETAILER');
+    expect(a.decision).toEqual({ quantity: 8, version: 1, savedBy: '太郎' });
+    expect(a.coHolders).toEqual(['P-RETAILER', '太郎']);
+  });
+
+  it('[US2.2/AC2.2.4] 一人が保存すると、もう一人は同じ版から上書きでき、版が進む', async () => {
+    const t = await coTable();
+    await app.saveDecision({
+      token: t.hanako,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 6,
+      expectedVersion: 0,
+    });
+    const saved = await app.saveDecision({
+      token: t.taro,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 7,
+      expectedVersion: 1,
+    });
+    expect(saved.version).toBe(2);
+  });
+
+  it('[US2.2/AC2.2.3] 同じ版から後で保存すると、最新の値・版・保存者の表示名を持つ競合になり、先の保存は残る', async () => {
+    const t = await coTable();
+    await app.saveDecision({
+      token: t.hanako,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 6,
+      expectedVersion: 0,
+    });
+    const late = app.saveDecision({
+      token: t.taro,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 10,
+      expectedVersion: 0,
+    });
+    await expect(late).rejects.toBeInstanceOf(DecisionConflict);
+    await expect(late).rejects.toMatchObject({
+      latest: { quantity: 6, version: 1, savedBy: 'P-RETAILER' },
+    });
+    const state = await app.roleState({ token: t.taro, gameId: t.gameId });
+    expect(state.decision?.quantity).toBe(6);
+  });
+
+  it('[US2.2/AC2.2.3] 代理入力の後の競合では、保存者を「進行役」と示す', async () => {
+    const t = await coTable();
+    await app.proxyDecision({
+      token: t.facilitator,
+      gameId: t.gameId,
+      role: 'RETAILER',
+      quantity: 3,
+      expectedVersion: 0,
+    });
+    await expect(
+      app.saveDecision({
+        token: t.hanako,
+        gameId: t.gameId,
+        role: 'RETAILER',
+        quantity: 1,
+        expectedVersion: 0,
+      }),
+    ).rejects.toMatchObject({ latest: { savedBy: '進行役' } });
   });
 });

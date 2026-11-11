@@ -8,6 +8,7 @@ import {
   type RoleWeekResult,
 } from './simulate-week.js';
 import {
+  DecisionConflictError,
   DomainError,
   PermissionError,
   Quantity,
@@ -50,8 +51,8 @@ export interface Session {
   version: number;
   week: number;
   settings: GameSettings;
-  /** 役割 → 担当の参加者 ID（開始時点の写し） */
-  holders: Readonly<Record<Role, string>>;
+  /** 役割 → 担当の参加者 ID の一覧（開始時点の写し。共同担当を含む） */
+  holders: Readonly<Record<Role, readonly string[]>>;
   states: RoleStates;
   decisions: Readonly<Partial<Record<Role, Decision>>>;
   history: readonly WeekRecord[];
@@ -90,11 +91,11 @@ export interface SessionOutcome {
 export function startSession(game: Game, sessionId: string): SessionOutcome {
   if (game.status !== 'STARTED')
     throw new DomainError('開始済みのゲームからだけ、進行を始められます');
-  const holders = {} as Record<Role, string>;
+  const holders = {} as Record<Role, readonly string[]>;
   for (const role of ROLES) {
-    const id = game.assignments[role];
-    if (id === undefined) throw new DomainError(`${role} に参加者がいません`);
-    holders[role] = id;
+    const ids = game.assignments[role] ?? [];
+    if (ids.length === 0) throw new DomainError(`${role} に参加者がいません`);
+    holders[role] = ids;
   }
   const session: Session = {
     id: sessionId,
@@ -170,7 +171,7 @@ export function saveDecision(
       '進行役は、参加者の保存ではなく代理入力を使ってください',
     );
   }
-  if (session.holders[role] !== actor.participantId) {
+  if (!session.holders[role].includes(actor.participantId)) {
     throw new PermissionError(
       `${role} の担当ではないため、発注を保存できません`,
     );
@@ -238,8 +239,9 @@ function storeDecision(
   const value = Quantity.of(quantity, session.settings.quantityMax);
   const current = session.decisions[role];
   if ((current?.version ?? 0) !== expectedVersion) {
-    throw new StaleError(
+    throw new DecisionConflictError(
       `他の操作で更新されています。最新の発注は ${current?.quantity ?? '未入力'} です`,
+      current ? { ...current } : null,
     );
   }
   const decision: Decision = {

@@ -16,6 +16,8 @@ export interface GameRepository {
   findByJoinCode(joinCode: string): Promise<Game | null>;
   /** expectedVersion が null なら新規。版が合わなければ ConflictError */
   save(game: Game, expectedVersion: number | null): Promise<void>;
+  /** 参加者 ID → 表示名。読み取り専用で、ロックを取らない（状況の表示に使う） */
+  participantNames(gameId: string): Promise<Record<string, string>>;
 }
 
 export interface SessionRepository {

@@ -622,3 +622,46 @@ describe('参加・復帰のレート制限', () => {
     expect([a.statusCode, b.statusCode]).toEqual([201, 201]);
   });
 });
+
+describe('共同入力の競合（HTTP）', () => {
+  it('[US2.2/AC2.2.3] 古い版の保存は 409 で、最新の値・版・保存者の表示名を同じ応答で返す', async () => {
+    const { gameId, players } = await table();
+    await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 6 },
+      players.RETAILER!,
+      0,
+    );
+    const res = await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 9 },
+      players.RETAILER!,
+      0,
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({
+      status: 409,
+      latest: { quantity: 6, version: 1, savedBy: '秘密の名前-RETAILER' },
+    });
+    // 表示名は応答にだけ含め、ログには残さない
+    expect(logs.join('')).not.toContain('秘密の名前');
+  });
+
+  it('[US2.2/AC2.2.3] 他の役割の担当には、競合ではなく権限エラーを返し、値を含めない', async () => {
+    const { gameId, players } = await table();
+    await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 6 },
+      players.RETAILER!,
+      0,
+    );
+    const res = await put(
+      `/api/games/${gameId}/decision`,
+      { role: 'RETAILER', quantity: 1 },
+      players.FACTORY!,
+      0,
+    );
+    expect(res.statusCode).toBe(403);
+    expect(res.json().latest).toBeUndefined();
+  });
+});

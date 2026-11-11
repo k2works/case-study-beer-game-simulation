@@ -31,7 +31,14 @@ const recoveryCodeOn = async (page: Page) =>
   ).trim();
 
 /** 進行役が作成し、4 人が参加し、役割を割り当てて開始するまで */
-async function startTable(browser: Browser, weeks = 2) {
+const startTable = (browser: Browser, weeks = 2) =>
+  startTableWith(browser, { weeks });
+
+/** `coRetailer` なら、小売店に 2 人目（共同担当）を加える */
+async function startTableWith(
+  browser: Browser,
+  { weeks = 2, coRetailer = false }: { weeks?: number; coRetailer?: boolean },
+) {
   const facContext = await browser.newContext();
   const fac = await facContext.newPage();
   await fac.goto('/new');
@@ -50,26 +57,26 @@ async function startTable(browser: Browser, weeks = 2) {
   ).trim();
 
   const players: Player[] = [];
-  for (const role of ROLES) {
+  const seats = coRetailer ? [...ROLES, ROLES[3]] : [...ROLES];
+  for (const [n, role] of seats.entries()) {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto('/join');
     await page.getByLabel('参加コード').fill(joinCode);
-    await page.getByLabel('表示名').fill(`${role.label}担当`);
+    const name = n < ROLES.length ? `${role.label}担当` : `${role.label}担当2`;
+    await page.getByLabel('表示名').fill(name);
     await page.getByRole('button', { name: '参加する' }).click();
     await expect(page.getByText('開始を待っています')).toBeVisible();
     players.push({
       context,
       page,
-      name: `${role.label}担当`,
+      name,
       role,
       recoveryCode: await recoveryCodeOn(page),
     });
   }
-  for (const [i, role] of ROLES.entries()) {
-    await fac
-      .getByLabel(`${players[i]!.name} の役割`)
-      .selectOption({ label: role.label });
+  for (const p of players) {
+    await fac.getByLabel(`${p.name} の役割`).selectOption(p.role.key); // 共同担当の表示名が付くため、値で選ぶ
   }
   await expect(fac.getByRole('button', { name: '開始する' })).toBeEnabled();
   await fac.getByRole('button', { name: '開始する' }).click();
@@ -288,6 +295,70 @@ test('[US3.2/AC3.2.4] 進行役は別のブラウザでも、復帰コードで�
   ).toBeVisible();
 
   await other.close();
+  await facContext.close();
+  for (const p of players) await p.context.close();
+});
+
+test('[US2.2/AC2.2.3] 共同担当: 一方の保存が他方に反映され、同じ版からの保存は競合として示される', async ({
+  browser,
+}) => {
+  const { facContext, players } = await startTableWith(browser, {
+    coRetailer: true,
+  });
+  const [hanako, taro] = players.filter((p) => p.role.key === 'RETAILER');
+  for (const p of [hanako!, taro!]) {
+    await expect(
+      p.page.getByRole('heading', { name: '小売店の画面' }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      p.page.getByText(`共同担当: ${hanako!.name}、${taro!.name}`),
+    ).toBeVisible();
+  }
+
+  // AC2.2.4: 花子の保存が、太郎の画面に同じ値・版・保存者で出る
+  await hanako!.page.getByLabel('発注数').fill('6');
+  await hanako!.page.getByRole('button', { name: '保存する' }).click();
+  const shown = `現在の入力: 6（${hanako!.name}さんが保存、版 1）`;
+  await expect(taro!.page.getByText(shown)).toBeVisible({ timeout: 15_000 });
+
+  // 太郎の画面を版 1 のまま止める（通知と再取得に、古い状況を返す）
+  const stale = await (
+    await taro!.page.request.get(
+      taro!.page
+        .url()
+        .replace('/play', '/me')
+        .replace('/games/', '/api/games/'),
+    )
+  ).text();
+  await taro!.page.route('**/stream', (route) => route.abort());
+  await taro!.page.route('**/api/games/*/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: stale,
+    }),
+  );
+
+  await hanako!.page.getByLabel('発注数').fill('7');
+  await hanako!.page.getByRole('button', { name: '保存する' }).click();
+  await expect(hanako!.page.getByText('保存しました')).toBeVisible();
+
+  await taro!.page.getByLabel('発注数').fill('10');
+  await taro!.page.getByRole('button', { name: '保存する' }).click();
+  const conflict = taro!.page.getByRole('alert', { name: '入力の競合' });
+  await expect(conflict).toContainText('他の人が先に保存しました');
+  await expect(conflict).toContainText(
+    `最新の入力: 7（${hanako!.name}さん、版 2）`,
+  );
+  await expect(conflict).toContainText('あなたの入力: 10（未保存）');
+
+  await taro!.page.unroute('**/api/games/*/me');
+  await conflict.getByRole('button', { name: 'この値で保存し直す' }).click();
+  await expect(taro!.page.getByText('保存しました')).toBeVisible();
+  await expect(
+    hanako!.page.getByText(`現在の入力: 10（${taro!.name}さんが保存、版 3）`),
+  ).toBeVisible({ timeout: 15_000 });
+
   await facContext.close();
   for (const p of players) await p.context.close();
 });

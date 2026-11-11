@@ -45,8 +45,8 @@ export interface Game {
   version: number;
   settings: GameSettings;
   participants: readonly Participant[];
-  /** 役割 → 参加者 ID（この Bolt では 1 役割 1 人） */
-  assignments: Readonly<Partial<Record<Role, string>>>;
+  /** 役割 → 担当の参加者 ID の一覧。同じ役割に複数人（共同担当）。1 人は高々 1 つの役割 */
+  assignments: Readonly<Partial<Record<Role, readonly string[]>>>;
 }
 
 export type GameEvent =
@@ -162,7 +162,7 @@ export function assignRole(
   if (!game.participants.some((p) => p.id === participantId)) {
     throw new DomainError('参加していない人は、役割を割り当てられません');
   }
-  const current = ROLES.find((r) => game.assignments[r] === participantId);
+  const current = roleOf(game, participantId);
   if (current !== undefined) {
     throw new DomainError(
       `この参加者はすでに ${current} です。1 人に複数の役割は割り当てられません`,
@@ -174,13 +174,12 @@ export function assignRole(
       ],
     );
   }
-  const holder = game.assignments[role];
-  if (holder !== undefined && holder !== participantId) {
-    throw new DomainError(`${role} はすでに割り当て済みです`);
-  }
   return {
     game: bump(game, {
-      assignments: { ...game.assignments, [role]: participantId },
+      assignments: {
+        ...game.assignments,
+        [role]: [...(game.assignments[role] ?? []), participantId],
+      },
     }),
     events: [{ type: 'RoleAssigned', gameId: game.id, participantId, role }],
   };
@@ -193,17 +192,25 @@ export function unassignRole(
 ): Outcome {
   requireFacilitator(actor);
   requirePreparing(game);
-  const kept = Object.entries(game.assignments).filter(
-    ([, id]) => id !== participantId,
-  );
+  const kept = Object.entries(game.assignments)
+    .map(
+      ([role, ids]) =>
+        [role, (ids ?? []).filter((id) => id !== participantId)] as const,
+    )
+    .filter(([, ids]) => ids.length > 0);
   return {
     game: bump(game, { assignments: Object.fromEntries(kept) }),
     events: [{ type: 'RoleUnassigned', gameId: game.id, participantId }],
   };
 }
 
+/** 参加者の役割（未割り当てなら undefined） */
+export function roleOf(game: Game, participantId: string): Role | undefined {
+  return ROLES.find((r) => game.assignments[r]?.includes(participantId));
+}
+
 export function missingRoles(game: Game): Role[] {
-  return ROLES.filter((r) => game.assignments[r] === undefined);
+  return ROLES.filter((r) => (game.assignments[r]?.length ?? 0) === 0);
 }
 
 export function startGame(game: Game, actor: Actor): Outcome {

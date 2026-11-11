@@ -6,7 +6,7 @@ import {
 } from 'node:crypto';
 import type pg from 'pg';
 import type { CredentialValidity } from '../../domain/credential.js';
-import type { Game, GameSettings } from '../../domain/game.js';
+import { roleOf, type Game, type GameSettings } from '../../domain/game.js';
 import { ROLES, type Role } from '../../domain/role.js';
 import type { RoleStates } from '../../domain/simulate-week.js';
 import type {
@@ -49,9 +49,10 @@ class PgGames implements GameRepository {
       'SELECT participant_id, display_name, role FROM participants WHERE game_id = $1 ORDER BY seq',
       [row.game_id],
     );
-    const assignments: Partial<Record<Role, string>> = {};
+    // 参加の順（seq）に、役割ごとの担当の一覧を作る（共同担当）
+    const assignments: Partial<Record<Role, string[]>> = {};
     for (const p of rows)
-      if (p.role) assignments[p.role as Role] = p.participant_id;
+      if (p.role) (assignments[p.role as Role] ??= []).push(p.participant_id);
     const settings: GameSettings = {
       kind: row.settings_kind as GameSettings['kind'],
       finalWeek: row.final_week as number,
@@ -81,6 +82,17 @@ class PgGames implements GameRepository {
       [id],
     );
     return rows[0] ? this.hydrate(rows[0]) : null;
+  }
+
+  /** ロックを取らない読み取り（状況の表示のための表示名） */
+  async participantNames(gameId: string) {
+    const { rows } = await this.db.query(
+      'SELECT participant_id, display_name FROM participants WHERE game_id = $1',
+      [gameId],
+    );
+    return Object.fromEntries(
+      rows.map((p) => [p.participant_id as string, p.display_name as string]),
+    );
   }
 
   async findByJoinCode(joinCode: string) {
@@ -121,7 +133,7 @@ class PgGames implements GameRepository {
         if (rowCount === 0) throw new ConflictError();
       }
       for (const p of game.participants) {
-        const role = ROLES.find((r) => game.assignments[r] === p.id) ?? null;
+        const role = roleOf(game, p.id) ?? null;
         await this.db.query(
           `INSERT INTO participants (participant_id, game_id, display_name, role)
            VALUES ($1,$2,$3,$4)
@@ -131,6 +143,18 @@ class PgGames implements GameRepository {
       }
     });
   }
+}
+
+/**
+ * 担当の一覧。B4 までの形式（役割 → 参加者 ID の文字列）も一覧として読む。次の保存で新形式に書き戻る。
+ */
+function holdersOf(raw: Record<string, unknown>): Session['holders'] {
+  const holders = {} as Record<Role, readonly string[]>;
+  for (const r of ROLES) {
+    const v = raw[r];
+    holders[r] = Array.isArray(v) ? (v as string[]) : [v as string];
+  }
+  return holders;
 }
 
 class PgSessions implements SessionRepository {
@@ -201,7 +225,7 @@ class PgSessions implements SessionRepository {
       version: row.version,
       week: row.week,
       settings: row.settings,
-      holders: row.holders,
+      holders: holdersOf(row.holders),
       states: row.role_states as RoleStates,
       decisions,
       history,

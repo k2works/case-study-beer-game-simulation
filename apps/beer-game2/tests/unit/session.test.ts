@@ -18,6 +18,7 @@ import {
   type Session,
 } from '../../src/domain/session.js';
 import {
+  DecisionConflictError,
   DomainError,
   PermissionError,
   StaleError,
@@ -483,5 +484,81 @@ describe('commitWeek', () => {
     expect(() =>
       commitWeek(s, FACILITATOR, { week: 1, version: s.version }),
     ).toThrow(/終了/);
+  });
+});
+
+describe('共同担当と共同入力', () => {
+  /** 小売店に p3 と p9（共同担当）がいるセッション */
+  function coSession(): Session {
+    let g = createGame({ id: 'g1', joinCode: 'JOIN-0001', weeks: 3 }).game;
+    ROLES.forEach((role, i) => {
+      g = joinGame(g, { participantId: `p${i}`, displayName: `P${i}` }).game;
+      g = assignRole(g, FACILITATOR, `p${i}`, role).game;
+    });
+    g = joinGame(g, { participantId: 'p9', displayName: 'P9' }).game;
+    g = assignRole(g, FACILITATOR, 'p9', 'RETAILER').game;
+    return startSession(startGame(g, FACILITATOR).game, 's1').session;
+  }
+
+  it('[US1.2/AC1.2.4] 開始時に、役割ごとの担当の一覧を写す', () => {
+    expect(coSession().holders.RETAILER).toEqual(['p3', 'p9']);
+    expect(coSession().holders.FACTORY).toEqual(['p0']);
+  });
+
+  it('[US2.2/AC2.2.4] 共同担当の誰でも保存でき、1 つの値と版を共有する。保存者が残る', () => {
+    let s = coSession();
+    s = saveDecision(s, participant('p3'), 'RETAILER', 6, 0).session;
+    const { session, events } = saveDecision(
+      s,
+      participant('p9'),
+      'RETAILER',
+      8,
+      1,
+    );
+    expect(session.decisions.RETAILER).toEqual({
+      quantity: 8,
+      version: 2,
+      savedBy: 'p9',
+    });
+    expect(events[0]).toMatchObject({ savedBy: 'p9', version: 2 });
+  });
+
+  it('[US2.2/AC2.2.3] 同じ版から後で保存すると、最新の値・版・保存者を持つ競合として拒否し、勝った更新を失わない', () => {
+    const base = coSession();
+    const first = saveDecision(
+      base,
+      participant('p3'),
+      'RETAILER',
+      6,
+      0,
+    ).session;
+    try {
+      saveDecision(first, participant('p9'), 'RETAILER', 10, 0);
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(DecisionConflictError);
+      expect(e).toBeInstanceOf(StaleError);
+      expect((e as DecisionConflictError).latest).toEqual({
+        quantity: 6,
+        version: 1,
+        savedBy: 'p3',
+      });
+    }
+    expect(first.decisions.RETAILER?.quantity).toBe(6);
+  });
+
+  it('未入力の役割に、古い版で保存したときの競合は、最新の値を持たない', () => {
+    try {
+      saveDecision(coSession(), participant('p3'), 'RETAILER', 1, 5);
+      expect.unreachable();
+    } catch (e) {
+      expect((e as DecisionConflictError).latest).toBeNull();
+    }
+  });
+
+  it('共同担当でない参加者は、その役割に保存できない', () => {
+    expect(() =>
+      saveDecision(coSession(), participant('p0'), 'RETAILER', 1, 0),
+    ).toThrow(PermissionError);
   });
 });

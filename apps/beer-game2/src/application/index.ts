@@ -11,8 +11,9 @@ import {
 } from '../domain/game.js';
 import { ROLES, type Role } from '../domain/role.js';
 import { buildReview, canDisclose } from '../domain/review.js';
-import { PermissionError } from '../domain/values.js';
+import { DecisionConflictError, PermissionError } from '../domain/values.js';
 import {
+  PROXY_OPERATOR,
   commitWeek as commitWeekRule,
   pauseSession as pauseSessionRule,
   proxyDecision as proxyDecisionRule,
@@ -33,7 +34,12 @@ import {
   type Repositories,
   type UnitOfWork,
 } from '../ports/index.js';
-import { ForbiddenError, NotFoundError, UnauthorizedError } from './errors.js';
+import {
+  DecisionConflict,
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from './errors.js';
 
 export interface Dependencies {
   uow: UnitOfWork;
@@ -123,6 +129,10 @@ export function createApplication(deps: Dependencies) {
     if (!game) throw new NotFoundError('ゲームが見つかりません');
     return game;
   }
+
+  /** 保存者の表示名。代理入力は「進行役」 */
+  const nameOf = (names: Record<string, string>, savedBy: string) =>
+    savedBy === PROXY_OPERATOR ? '進行役' : (names[savedBy] ?? '');
 
   async function loadSession(repos: Repositories, gameId: string) {
     const session = await repos.sessions.findByGame(gameId);
@@ -330,13 +340,29 @@ export function createApplication(deps: Dependencies) {
       return uow.run(async (repos) => {
         const principal = await authenticate(repos, input.token, input.gameId);
         const session = await loadSession(repos, input.gameId);
-        const { session: next, events } = saveDecisionRule(
-          session,
-          actorOf(principal),
-          input.role,
-          input.quantity,
-          input.expectedVersion,
-        );
+        let outcome;
+        try {
+          outcome = saveDecisionRule(
+            session,
+            actorOf(principal),
+            input.role,
+            input.quantity,
+            input.expectedVersion,
+          );
+        } catch (e) {
+          // 共同入力の競合: 最新の値と保存者の表示名を、同じ応答で返す
+          if (!(e instanceof DecisionConflictError)) throw e;
+          const names = await repos.games.participantNames(input.gameId);
+          throw new DecisionConflict(
+            e.message,
+            e.latest && {
+              quantity: e.latest.quantity,
+              version: e.latest.version,
+              savedBy: nameOf(names, e.latest.savedBy),
+            },
+          );
+        }
+        const { session: next, events } = outcome;
         await repos.sessions.save(next, session.version);
         await repos.events.append(input.gameId, events);
         // 自動確定された場合は、その結果も返す
@@ -474,10 +500,11 @@ export function createApplication(deps: Dependencies) {
         if (principal.kind !== 'PARTICIPANT')
           throw new ForbiddenError('参加者の画面です');
         const session = await loadSession(repos, input.gameId);
-        const role = ROLES.find(
-          (r) => session.holders[r] === principal.participantId,
+        const role = ROLES.find((r) =>
+          session.holders[r].includes(principal.participantId ?? ''),
         );
         if (!role) throw new ForbiddenError('役割が割り当てられていません');
+        const names = await repos.games.participantNames(input.gameId);
         const state = session.states[role];
         const decision = session.decisions[role];
         return {
@@ -492,8 +519,14 @@ export function createApplication(deps: Dependencies) {
           ...(role === 'RETAILER' && session.status === 'ACTIVE'
             ? { customerDemand: session.settings.demand[session.week - 1] }
             : {}),
+          /** 同じ役割の担当（共同担当を含む）の表示名 */
+          coHolders: session.holders[role].map((id) => names[id] ?? ''),
           decision: decision
-            ? { quantity: decision.quantity, version: decision.version }
+            ? {
+                quantity: decision.quantity,
+                version: decision.version,
+                savedBy: nameOf(names, decision.savedBy),
+              }
             : null,
           history: session.history.map((h) => {
             const r = h.roles[role];

@@ -31,6 +31,27 @@ export class StaleError extends DomainError {
   }
 }
 
+/** 競合したときの、その役割の最新の意思決定（保存者は参加者 ID、または代理入力の操作者） */
+export interface LatestDecision {
+  quantity: number;
+  version: number;
+  savedBy: string;
+}
+
+/**
+ * 意思決定の版の競合（共同入力）。拒否した側へ、最新の値・版・保存者を返す（変更を黙って失わない）。
+ * 未入力なら `latest` は null。
+ */
+export class DecisionConflictError extends StaleError {
+  constructor(
+    message: string,
+    readonly latest: LatestDecision | null,
+  ) {
+    super(message);
+    this.name = 'DecisionConflictError';
+  }
+}
+
 export const QUANTITY_MAX = 1000;
 export const WEEK_MAX = 50;
 export const DISPLAY_NAME_MAX = 20;

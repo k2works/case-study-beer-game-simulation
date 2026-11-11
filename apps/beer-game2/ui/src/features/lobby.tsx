@@ -58,13 +58,15 @@ export function LobbyScreen() {
   }
 
   const roleOf = (participantId: string): Role | '' =>
-    ROLE_ORDER.find((r) => lobby.assignments[r] === participantId) ?? '';
+    ROLE_ORDER.find((r) => lobby.assignments[r]?.includes(participantId)) ?? '';
 
-  const nameOf = (participantId?: string) =>
+  const nameOf = (participantId: string) =>
     lobby.participants.find((p) => p.id === participantId)?.displayName ?? '';
-  const heldByOther = (role: Role, participantId: string) =>
-    lobby.assignments[role] !== undefined &&
-    lobby.assignments[role] !== participantId;
+  /** 同じ役割の、自分以外の担当の表示名（共同担当） */
+  const othersIn = (role: Role, participantId: string) =>
+    (lobby.assignments[role] ?? [])
+      .filter((id) => id !== participantId)
+      .map(nameOf);
 
   return (
     <Page title="ロビー">
@@ -91,20 +93,23 @@ export function LobbyScreen() {
                     const role = e.target.value as Role;
                     const current = roleOf(p.id);
                     void act(async () => {
-                      // 1 人に複数の役割は持てないため、付け替えは「解除してから割り当て」
+                      // 1 人に複数の役割は持てないため、付け替えは「解除してから割り当て」。同じ役割に複数人は持てる（共同担当）
                       if (current) await api.unassign(id, p.id);
                       if (role) await api.assign(id, p.id, role);
                     });
                   }}
                 >
                   <option value="">未割り当て</option>
-                  {ROLE_ORDER.map((r) => (
-                    <option key={r} value={r} disabled={heldByOther(r, p.id)}>
-                      {ROLE_LABEL[r]}
-                      {heldByOther(r, p.id) &&
-                        `（${nameOf(lobby.assignments[r])}）`}
-                    </option>
-                  ))}
+                  {ROLE_ORDER.map((r) => {
+                    const others = othersIn(r, p.id);
+                    return (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                        {others.length > 0 &&
+                          `（共同担当: ${others.join('、')}）`}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
             ) : (

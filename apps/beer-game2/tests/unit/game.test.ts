@@ -130,7 +130,7 @@ describe('assignRole', () => {
 
   it('[US1.2/AC1.2.2] 進行役が役割を割り当てる', () => {
     const { game, events } = assignRole(withP(), FACILITATOR, 'p1', 'RETAILER');
-    expect(game.assignments).toEqual({ RETAILER: 'p1' });
+    expect(game.assignments).toEqual({ RETAILER: ['p1'] });
     expect(events).toEqual([
       {
         type: 'RoleAssigned',
@@ -152,7 +152,7 @@ describe('assignRole', () => {
     expect(() => assignRole(g, FACILITATOR, 'p1', 'FACTORY')).toThrow(
       /RETAILER/,
     );
-    expect(g.assignments).toEqual({ RETAILER: 'p1' });
+    expect(g.assignments).toEqual({ RETAILER: ['p1'] });
   });
 
   it('[US1.2] 割り当てを解除すると、別の役割に割り当て直せる', () => {
@@ -163,17 +163,35 @@ describe('assignRole', () => {
       { type: 'RoleUnassigned', gameId: 'g1', participantId: 'p1' },
     ]);
     const g = assignRole(out.game, FACILITATOR, 'p1', 'FACTORY').game;
-    expect(g.assignments).toEqual({ FACTORY: 'p1' });
+    expect(g.assignments).toEqual({ FACTORY: ['p1'] });
     expect(() => unassignRole(withP(), participant('p1'), 'p1')).toThrow(
       PermissionError,
     );
   });
 
-  it('[US1.2] この Bolt では 1 役割 1 人。埋まっている役割は拒否する', () => {
+  it('[US1.2/AC1.2.4] 同じ役割に複数の参加者を割り当てられる（共同担当）', () => {
     let g = joinGame(withP(), { participantId: 'p2', displayName: 'b' }).game;
     g = assignRole(g, FACILITATOR, 'p1', 'RETAILER').game;
-    expect(() => assignRole(g, FACILITATOR, 'p2', 'RETAILER')).toThrow(
-      /割り当て済み/,
+    g = assignRole(g, FACILITATOR, 'p2', 'RETAILER').game;
+    expect(g.assignments).toEqual({ RETAILER: ['p1', 'p2'] });
+    expect(missingRoles(g)).not.toContain('RETAILER');
+  });
+
+  it('[US1.2/AC1.2.4] 共同担当の一人を解除しても、残りの担当は残る。最後の一人を外すと未割り当て', () => {
+    let g = joinGame(withP(), { participantId: 'p2', displayName: 'b' }).game;
+    g = assignRole(g, FACILITATOR, 'p1', 'RETAILER').game;
+    g = assignRole(g, FACILITATOR, 'p2', 'RETAILER').game;
+    g = unassignRole(g, FACILITATOR, 'p1').game;
+    expect(g.assignments).toEqual({ RETAILER: ['p2'] });
+    g = unassignRole(g, FACILITATOR, 'p2').game;
+    expect(g.assignments).toEqual({});
+    expect(missingRoles(g)).toContain('RETAILER');
+  });
+
+  it('[US1.2/AC1.2.5] 同じ役割に二重には割り当てない', () => {
+    const g = assignRole(withP(), FACILITATOR, 'p1', 'RETAILER').game;
+    expect(() => assignRole(g, FACILITATOR, 'p1', 'RETAILER')).toThrow(
+      /RETAILER/,
     );
   });
 
@@ -209,6 +227,15 @@ describe('startGame', () => {
         'RETAILER に参加者がいません',
       ]);
     }
+  });
+
+  it('[US1.2/AC1.2.4] 共同担当を含めて、各役割に 1 人以上いれば開始できる', () => {
+    let g = readyGame();
+    g = joinGame(g, { participantId: 'extra', displayName: 'x' }).game;
+    g = assignRole(g, FACILITATOR, 'extra', 'RETAILER').game;
+    const { game } = startGame(g, FACILITATOR);
+    expect(game.status).toBe('STARTED');
+    expect(game.assignments.RETAILER).toHaveLength(2);
   });
 
   it('進行役以外は開始できない（権限エラー）', () => {

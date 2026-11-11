@@ -34,6 +34,7 @@ const roleView = (role: string, extra: object = {}) => ({
   inventory: 12,
   backlog: 0,
   incomingGoods: [4, 4],
+  coHolders: ['花子'],
   decision: null,
   history: [
     {
@@ -278,7 +279,7 @@ describe('ロビー', () => {
     expect(screen.getByRole('button', { name: '開始する' })).toBeDisabled();
   });
 
-  it('[US1.2] 役割を付け替えると、解除してから割り当てる。他の人の役割は選べない', async () => {
+  it('[US1.2/AC1.2.4] 役割を付け替えると、解除してから割り当てる。他の人の役割にも、共同担当として加えられる', async () => {
     const order: string[] = [];
     const api = fakeApi({
       lobby: vi.fn().mockResolvedValue({
@@ -287,7 +288,7 @@ describe('ロビー', () => {
           { id: 'p1', displayName: '花子' },
           { id: 'p2', displayName: '太郎' },
         ],
-        assignments: { RETAILER: 'p1', FACTORY: 'p2' },
+        assignments: { RETAILER: ['p1'], FACTORY: ['p2'] },
         missingRoles: ['DISTRIBUTOR', 'WHOLESALER'],
       }),
       assign: vi.fn().mockImplementation(async () => void order.push('assign')),
@@ -298,11 +299,31 @@ describe('ロビー', () => {
     renderAt('/games/g1/lobby', api);
     const select = await screen.findByLabelText('花子 の役割');
     expect(
-      within(select).getByRole('option', { name: /工場.*太郎/ }),
-    ).toBeDisabled();
+      within(select).getByRole('option', { name: /工場.*共同担当.*太郎/ }),
+    ).toBeEnabled();
     await userEvent.selectOptions(select, 'WHOLESALER');
     expect(order).toEqual(['unassign', 'assign']);
     expect(api.assign).toHaveBeenCalledWith('g1', 'p1', 'WHOLESALER');
+    await userEvent.selectOptions(select, 'FACTORY');
+    expect(api.assign).toHaveBeenLastCalledWith('g1', 'p1', 'FACTORY');
+  });
+
+  it('[US1.2/AC1.2.4] 参加者のロビーは、役割ごとの担当（共同担当を含む）を示す', async () => {
+    const api = fakeApi({
+      lobby: vi.fn().mockResolvedValue({
+        ...lobbyBase,
+        viewer: { kind: 'PARTICIPANT', participantId: 'p1' },
+        joinCode: undefined,
+        participants: [
+          { id: 'p1', displayName: '花子' },
+          { id: 'p2', displayName: '太郎' },
+        ],
+        assignments: { RETAILER: ['p1', 'p2'] },
+      }),
+    });
+    renderAt('/games/g1/lobby', api);
+    expect(await screen.findByText(/花子（小売店）/)).toBeInTheDocument();
+    expect(screen.getByText(/太郎（小売店）/)).toBeInTheDocument();
   });
 
   it('[US1.2/AC1.2.3] 4 役割がそろえば開始でき、コンソールへ進む', async () => {
@@ -378,11 +399,11 @@ describe('プレイ', () => {
 
   it('[US2.3/AC2.3.1] 保存済みなら、次の週に進む条件（ほかの役割と進行役の確定）を示す', async () => {
     const api = fakeApi({
-      me: vi
-        .fn()
-        .mockResolvedValue(
-          roleView('RETAILER', { decision: { quantity: 6, version: 1 } }),
-        ),
+      me: vi.fn().mockResolvedValue(
+        roleView('RETAILER', {
+          decision: { quantity: 6, version: 1, savedBy: '花子' },
+        }),
+      ),
     });
     renderAt('/games/g1/play', api);
     const note = await screen.findByTestId('waiting');
@@ -398,7 +419,7 @@ describe('プレイ', () => {
       me: vi.fn().mockResolvedValue(
         roleView('RETAILER', {
           commitMode: 'AUTO',
-          decision: { quantity: 6, version: 1 },
+          decision: { quantity: 6, version: 1, savedBy: '花子' },
         }),
       ),
     });
@@ -791,7 +812,7 @@ describe('停止中のプレイ', () => {
       me: vi.fn().mockResolvedValue(
         roleView('RETAILER', {
           status: 'PAUSED',
-          decision: { quantity: 6, version: 1 },
+          decision: { quantity: 6, version: 1, savedBy: '花子' },
         }),
       ),
     });
@@ -851,5 +872,118 @@ describe('複数のタブ', () => {
       '最新の発注は 8',
     );
     expect(screen.getByLabelText('発注数')).toHaveValue(5);
+  });
+});
+
+describe('共同入力（プレイ）', () => {
+  const coView = (extra: object = {}) =>
+    roleView('RETAILER', {
+      coHolders: ['花子', '太郎'],
+      decision: { quantity: 8, version: 2, savedBy: '太郎' },
+      ...extra,
+    });
+
+  it('[US2.1/AC2.1.4] 共同担当の一覧と、現在の入力値・保存者・版を示す', async () => {
+    renderAt(
+      '/games/g1/play',
+      fakeApi({ me: vi.fn().mockResolvedValue(coView()) }),
+    );
+    expect(await screen.findByText('共同担当: 花子、太郎')).toBeInTheDocument();
+    expect(
+      screen.getByText('現在の入力: 8（太郎さんが保存、版 2）'),
+    ).toBeInTheDocument();
+  });
+
+  it('担当が 1 人なら、共同担当を表示しない', async () => {
+    renderAt(
+      '/games/g1/play',
+      fakeApi({
+        me: vi.fn().mockResolvedValue(coView({ coHolders: ['花子'] })),
+      }),
+    );
+    await screen.findByText(/現在の入力/);
+    expect(screen.queryByText(/共同担当/)).toBeNull();
+  });
+
+  it('[US2.2/AC2.2.4] 他の担当の保存が通知されると、同じ値と版に更新される', async () => {
+    let notify: () => void = () => {};
+    const me = vi
+      .fn()
+      .mockResolvedValueOnce(coView())
+      .mockResolvedValue(
+        coView({ decision: { quantity: 11, version: 3, savedBy: '花子' } }),
+      );
+    renderAt(
+      '/games/g1/play',
+      fakeApi({
+        me,
+        subscribe: vi.fn().mockImplementation((_id, onChange) => {
+          notify = onChange;
+          return () => {};
+        }),
+      }),
+    );
+    await screen.findByText(/現在の入力: 8/);
+    notify();
+    expect(
+      await screen.findByText('現在の入力: 11（花子さんが保存、版 3）'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('発注数')).toHaveValue(11);
+  });
+
+  it('[US2.2/AC2.2.3] 競合すると、最新の入力と自分の未保存の値を並べ、自分の値を保持する', async () => {
+    const saveDecision = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ApiError(409, '他の操作で更新されています', [], {
+          quantity: 9,
+          version: 3,
+          savedBy: '太郎',
+        }),
+      )
+      .mockResolvedValue({ version: 4 });
+    const api = fakeApi({
+      me: vi.fn().mockResolvedValue(coView()),
+      saveDecision,
+    });
+    renderAt('/games/g1/play', api);
+    const input = await screen.findByLabelText('発注数');
+    await userEvent.clear(input);
+    await userEvent.type(input, '10');
+    await userEvent.click(screen.getByRole('button', { name: '保存する' }));
+    const conflict = await screen.findByRole('alert', { name: '入力の競合' });
+    expect(conflict).toHaveTextContent('他の人が先に保存しました');
+    expect(conflict).toHaveTextContent('最新の入力: 9（太郎さん、版 3）');
+    expect(conflict).toHaveTextContent('あなたの入力: 10（未保存）');
+    expect(screen.getByLabelText('発注数')).toHaveValue(10);
+    // この値で保存し直すと、最新の版で保存する
+    await userEvent.click(
+      within(conflict).getByRole('button', { name: 'この値で保存し直す' }),
+    );
+    expect(saveDecision).toHaveBeenLastCalledWith('g1', 'RETAILER', 10, 3);
+  });
+
+  it('[US2.2/AC2.2.3] 「最新の値を使う」を選ぶと、自分の値を捨てて最新の値を表示する', async () => {
+    const api = fakeApi({
+      me: vi.fn().mockResolvedValue(coView()),
+      saveDecision: vi.fn().mockRejectedValue(
+        new ApiError(409, '他の操作で更新されています', [], {
+          quantity: 8,
+          version: 2,
+          savedBy: '太郎',
+        }),
+      ),
+    });
+    renderAt('/games/g1/play', api);
+    const input = await screen.findByLabelText('発注数');
+    await userEvent.clear(input);
+    await userEvent.type(input, '10');
+    await userEvent.click(screen.getByRole('button', { name: '保存する' }));
+    const conflict = await screen.findByRole('alert', { name: '入力の競合' });
+    await userEvent.click(
+      within(conflict).getByRole('button', { name: '最新の値を使う' }),
+    );
+    expect(screen.queryByRole('alert', { name: '入力の競合' })).toBeNull();
+    expect(screen.getByLabelText('発注数')).toHaveValue(8);
   });
 });

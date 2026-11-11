@@ -66,6 +66,13 @@ function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
         checkVersion(store.games.get(game.id), expected);
         store.games.set(game.id, game);
       },
+      participantNames: async (gameId) =>
+        Object.fromEntries(
+          (store.games.get(gameId)?.participants ?? []).map((p) => [
+            p.id,
+            p.displayName,
+          ]),
+        ),
     },
     sessions: {
       findByGame: async (gameId) => store.sessions.get(gameId) ?? null,

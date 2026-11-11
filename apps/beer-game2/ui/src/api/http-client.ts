@@ -22,6 +22,7 @@ async function call<T>(
       res.status,
       data.detail ?? '要求を処理できませんでした',
       data.issues ?? [],
+      data.latest,
     );
   return data as T;
 }

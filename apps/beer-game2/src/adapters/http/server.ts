@@ -10,6 +10,7 @@ import Fastify, {
 import { z, ZodError } from 'zod';
 import type { Application } from '../../application/index.js';
 import {
+  DecisionConflict,
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
@@ -99,6 +100,7 @@ function problem(
   title: string,
   detail: string,
   issues?: unknown,
+  extensions: Record<string, unknown> = {},
 ) {
   return reply
     .code(status)
@@ -109,6 +111,7 @@ function problem(
       status,
       detail,
       ...(issues ? { issues } : {}),
+      ...extensions,
       correlationId: reply.request.id,
     });
 }
@@ -176,6 +179,12 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       return problem(reply, 403, 'Forbidden', error.message);
     if (error instanceof NotFoundError)
       return problem(reply, 404, 'Not Found', error.message);
+    // 共同入力の競合: 最新の値・版・保存者を同じ応答で返す（同じ役割の担当にだけ起きる）
+    if (error instanceof DecisionConflict) {
+      return problem(reply, 409, 'Conflict', error.message, undefined, {
+        latest: error.latest,
+      });
+    }
     if (error instanceof ConflictError || error instanceof StaleError) {
       return problem(reply, 409, 'Conflict', error.message);
     }
