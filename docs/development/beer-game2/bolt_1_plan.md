@@ -5,6 +5,8 @@ description: "Bolt 1（基盤と縦の最小）のステップ計画。ゴール
 tags: [plan]
 status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:44:50Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-11T01:09:15Z }
 ---
 
 # Bolt 1 計画 - 基盤と縦の最小（ウォーキングスケルトン）
