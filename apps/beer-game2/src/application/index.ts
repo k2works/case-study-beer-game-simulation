@@ -3,6 +3,7 @@ import type { Conditions } from '../domain/conditions.js';
 import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
 import { OBSERVER_LIMIT, observe } from '../domain/observation.js';
 import { buildExport } from '../domain/export.js';
+import { RETENTION, retentionPolicyOf } from '../domain/retention.js';
 import {
   assignRole as assignRoleRule,
   unassignRole as unassignRoleRule,
@@ -165,6 +166,18 @@ export function createApplication(deps: Dependencies) {
     disclosure: s.disclosure,
   });
 
+  /** 保持方針（進行役に示す）。削除予定日と、削除後もバックアップに残る日数 */
+  async function retentionView(repos: Repositories, gameId: string) {
+    const policy = await repos.retention.policyOf(gameId);
+    return policy
+      ? {
+          days: policy.days,
+          deleteAfter: policy.deleteAfter.toISOString(),
+          backupDays: RETENTION.backupDays,
+        }
+      : null;
+  }
+
   /** 保存者の表示名。代理入力は「進行役」 */
   const nameOf = (names: Record<string, string>, savedBy: string) =>
     savedBy === PROXY_OPERATOR ? '進行役' : (names[savedBy] ?? '');
@@ -207,16 +220,23 @@ export function createApplication(deps: Dependencies) {
       demand?: readonly number[];
       commitMode?: CommitMode;
       conditions?: Partial<Conditions>;
+      /** 保持期間（日）。省略時は 90 日 */
+      retentionDays?: number;
     }) {
       return uow.run(async (repos) => {
         const gameId = ids.uuid();
+        const retention = retentionPolicyOf(clock.now(), input.retentionDays);
         const joinCode = ids.joinCode();
         const { game, events } = createGameRule({
           id: gameId,
           joinCode,
-          ...input,
+          weeks: input.weeks,
+          ...(input.demand ? { demand: input.demand } : {}),
+          ...(input.commitMode ? { commitMode: input.commitMode } : {}),
+          ...(input.conditions ? { conditions: input.conditions } : {}),
         });
         await repos.games.save(game, null);
+        await repos.retention.schedule(gameId, retention);
         const principal: Principal = { gameId, kind: 'FACILITATOR' };
         const facilitatorToken = await issue(repos, principal, 'SESSION');
         const recoveryCode = await issue(repos, principal, 'RECOVERY');
@@ -617,6 +637,41 @@ export function createApplication(deps: Dependencies) {
       });
     },
 
+    /**
+     * 保持期限に達したゲームを削除する（定期のタスクから呼ぶ）。1 ゲームずつ、削除と受領記録を 1 つのトランザクションで行う。
+     * 失敗したら何も消えず、試行回数を記録して次の実行で再試行する。上限に達したら、恒久的な失敗として数える。
+     */
+    async runRetention(limit = 100) {
+      const at = clock.now();
+      const due = await uow.run((repos) =>
+        repos.retention.due(at, RETENTION.maxAttempts, limit),
+      );
+      const result = { deleted: 0, failed: 0, permanentFailures: 0 };
+      for (const { gameId } of due) {
+        try {
+          const deleted = await uow.run(async (repos) => {
+            // 別のタスクが先に削除していれば、受領記録を書かない（一度だけ）
+            if (!(await repos.retention.deleteGame(gameId))) return false;
+            await repos.retention.saveReceipt({
+              reference: credentials.digestsOf(gameId)[0]!,
+              outcome: 'DELETED',
+              recordedAt: at,
+              expiresAt: new Date(at.getTime() + RETENTION.receiptMs),
+            });
+            return true;
+          });
+          if (deleted) result.deleted += 1;
+        } catch {
+          result.failed += 1;
+          const attempts = await uow.run((repos) =>
+            repos.retention.recordFailure(gameId, at),
+          );
+          if (attempts >= RETENTION.maxAttempts) result.permanentFailures += 1;
+        }
+      }
+      return result;
+    },
+
     /** 変化の通知（SSE）の購読の認可。このゲームの進行役・参加者・観察者に通す */
     async authorizeStream(input: { token: string; gameId: string }) {
       await uow.run((repos) => authenticate(repos, input.token, input.gameId));
@@ -644,6 +699,7 @@ export function createApplication(deps: Dependencies) {
           ...(principal.kind === 'FACILITATOR'
             ? {
                 joinCode: game.joinCode,
+                retention: await retentionView(repos, game.id),
                 observerInvitations: (
                   await repos.observers.activeInvitations(game.id, clock.now())
                 ).map((i) => ({
@@ -777,6 +833,7 @@ export function createApplication(deps: Dependencies) {
           sessionVersion: session.version,
           commitMode: session.settings.commitMode,
           settings: settingsView(session.settings),
+          retention: await retentionView(repos, input.gameId),
           submitted: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r] !== undefined]),
           ) as Record<Role, boolean>,

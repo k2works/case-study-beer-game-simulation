@@ -6,6 +6,7 @@ import {
   ErrorMessage,
   Page,
   RecoveryCodeNote,
+  RetentionNote,
   SettingsSummary,
 } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
@@ -89,6 +90,7 @@ export function LobbyScreen() {
       )}
       <p>{lobby.finalWeek} 週のゲームです。</p>
       <SettingsSummary settings={lobby.settings} detailed />
+      {lobby.retention && <RetentionNote retention={lobby.retention} />}
       <h2>参加者</h2>
       <ul>
         {lobby.participants.map((p) => (

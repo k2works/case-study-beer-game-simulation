@@ -162,3 +162,101 @@ resource "aws_ecs_service" "api" {
     ignore_changes = [task_definition]
   }
 }
+
+# 保持の定期タスク: 期限に達したゲームを削除する（docs/development/beer-game2/bolt_10_plan.md）。
+# 同じイメージで、コマンドだけ変える。EventBridge Scheduler が 5 分ごとに起動する
+resource "aws_cloudwatch_log_group" "retention" {
+  name              = "/ecs/${var.name}/retention"
+  retention_in_days = var.log_retention_days
+}
+
+resource "aws_ecs_task_definition" "retention" {
+  family                   = "${var.name}-retention"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([{
+    name      = "retention"
+    image     = var.image
+    essential = true
+    command   = ["node", "dist/retention.js"]
+    secrets   = local.common_secrets
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.retention.name
+        awslogs-region        = data.aws_region.current.name
+        awslogs-stream-prefix = "retention"
+      }
+    }
+  }])
+}
+
+data "aws_iam_policy_document" "scheduler_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+# スケジューラーの実行ロール: 保持のタスクの起動と、タスクのロールの受け渡しだけ
+resource "aws_iam_role" "scheduler" {
+  name               = "${var.name}-retention-scheduler"
+  assume_role_policy = data.aws_iam_policy_document.scheduler_assume.json
+}
+
+resource "aws_iam_role_policy" "scheduler" {
+  name = "run-retention-task"
+  role = aws_iam_role.scheduler.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecs:RunTask"]
+        Resource = [aws_ecs_task_definition.retention.arn_without_revision, "${aws_ecs_task_definition.retention.arn_without_revision}:*"]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["iam:PassRole"]
+        Resource = [aws_iam_role.execution.arn, aws_iam_role.task.arn]
+      },
+    ]
+  })
+}
+
+resource "aws_scheduler_schedule" "retention" {
+  name                = "${var.name}-retention"
+  schedule_expression = var.retention_schedule
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.this.arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    ecs_parameters {
+      task_definition_arn = aws_ecs_task_definition.retention.arn_without_revision
+      launch_type         = "FARGATE"
+
+      network_configuration {
+        subnets          = var.subnet_ids
+        security_groups  = [var.task_security_group_id]
+        assign_public_ip = var.assign_public_ip
+      }
+    }
+
+    retry_policy {
+      maximum_retry_attempts = 0 # 再試行は、次の起動で行う（アプリが試行回数を数える）
+    }
+  }
+}

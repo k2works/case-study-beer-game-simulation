@@ -1392,3 +1392,62 @@ describe('観察（S07）', () => {
     ).toHaveAttribute('href', '/games/g1/observation');
   });
 });
+
+describe('保持期間', () => {
+  it('[US5.1/AC5.1.1] 作成の画面の保持期間は既定で 90 日で、変えて作れる', async () => {
+    const api = fakeApi();
+    renderAt('/new', api);
+    const days = screen.getByLabelText('保持期間（日）');
+    expect(days).toHaveValue(90);
+    await userEvent.clear(days);
+    await userEvent.type(days, '30');
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ retentionDays: 30 }),
+    );
+  });
+
+  it('[US5.1/AC5.1.5] 進行役のロビーに、削除予定日と、削除後もバックアップに残る期間を示す', async () => {
+    renderAt(
+      '/games/g1/lobby',
+      fakeApi({
+        lobby: vi.fn().mockResolvedValue({
+          ...lobbyBase,
+          retention: {
+            days: 90,
+            deleteAfter: '2027-02-09T00:00:00.000Z',
+            backupDays: 7,
+          },
+        }),
+      }),
+    );
+    const note = await screen.findByRole('note', { name: '保持方針' });
+    expect(note).toHaveTextContent('保持期間 90 日');
+    expect(note).toHaveTextContent('2027');
+    expect(note).toHaveTextContent(
+      /バックアップには、削除後も最大\s*7\s*日残ります/,
+    );
+  });
+});
+
+describe('保持方針（コンソール）', () => {
+  it('[US5.1/AC5.1.5] 進行役のコンソールにも、保持期間と、バックアップに残る期間を示す', async () => {
+    renderAt(
+      '/games/g1/console',
+      fakeApi({
+        console: vi.fn().mockResolvedValue(
+          consoleView({
+            retention: {
+              days: 30,
+              deleteAfter: '2026-12-11T00:00:00.000Z',
+              backupDays: 7,
+            },
+          }),
+        ),
+      }),
+    );
+    const note = await screen.findByRole('note', { name: '保持方針' });
+    expect(note).toHaveTextContent('保持期間 30 日');
+    expect(note).toHaveTextContent(/最大\s*7\s*日/);
+  });
+});

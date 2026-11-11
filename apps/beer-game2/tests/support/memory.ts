@@ -52,6 +52,13 @@ interface Store {
     string,
     { gameId: string; invitationId: string; displayName: string }
   >;
+  retention: Map<string, { days: number; deleteAfter: Date; attempts: number }>;
+  receipts: {
+    reference: string;
+    outcome: string;
+    recordedAt: Date;
+    expiresAt: Date;
+  }[];
   idempotency: Map<string, IdempotencyRecord>;
   events: { gameId: string; event: object }[];
 }
@@ -62,11 +69,17 @@ const emptyStore = (): Store => ({
   credentials: new Map(),
   invitations: new Map(),
   observers: new Map(),
+  retention: new Map(),
+  receipts: [],
   idempotency: new Map(),
   events: [],
 });
 
-function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
+function reposOver(
+  store: Store,
+  failOnAppend: () => boolean,
+  failOnReceipt: () => boolean = () => false,
+): Repositories {
   const checkVersion = (
     current: { version: number } | undefined,
     expected: number | null,
@@ -179,6 +192,48 @@ function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
       countObservers: async (gameId) =>
         [...store.observers.values()].filter((o) => o.gameId === gameId).length,
     },
+    retention: {
+      schedule: async (gameId, policy) =>
+        void store.retention.set(gameId, { ...policy, attempts: 0 }),
+      policyOf: async (gameId) => {
+        const r = store.retention.get(gameId);
+        return r ? { days: r.days, deleteAfter: r.deleteAfter } : null;
+      },
+      due: async (at, maxAttempts, limit) =>
+        [...store.retention.entries()]
+          .filter(
+            ([, r]) =>
+              r.deleteAfter.getTime() <= at.getTime() &&
+              r.attempts < maxAttempts,
+          )
+          .slice(0, limit)
+          .map(([gameId]) => ({ gameId })),
+      // PostgreSQL の連鎖削除と同じく、ゲームの ID を持つものをすべて消す
+      deleteGame: async (gameId) => {
+        if (!store.games.delete(gameId)) return false;
+        store.sessions.delete(gameId);
+        store.retention.delete(gameId);
+        for (const [k, c] of store.credentials)
+          if (c.principal.gameId === gameId) store.credentials.delete(k);
+        for (const [k, i] of store.invitations)
+          if (i.gameId === gameId) store.invitations.delete(k);
+        for (const [k, o] of store.observers)
+          if (o.gameId === gameId) store.observers.delete(k);
+        for (const [k, r] of store.idempotency)
+          if (r.gameId === gameId) store.idempotency.delete(k);
+        store.events = store.events.filter((e) => e.gameId !== gameId);
+        return true;
+      },
+      recordFailure: async (gameId) => {
+        const r = store.retention.get(gameId)!;
+        r.attempts += 1;
+        return r.attempts;
+      },
+      saveReceipt: async (receipt) => {
+        if (failOnReceipt()) throw new Error('injected failure');
+        store.receipts.push(receipt);
+      },
+    },
     idempotency: {
       find: async (gameId, key) =>
         store.idempotency.get(`${gameId}:${key}`) ?? null,
@@ -197,10 +252,17 @@ function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
 export function memoryUnitOfWork() {
   let store = emptyStore();
   let failOnAppend = false;
+  let failOnReceipt = false;
   const uow: UnitOfWork = {
     async run(work) {
       const working = structuredClone(store);
-      const result = await work(reposOver(working, () => failOnAppend));
+      const result = await work(
+        reposOver(
+          working,
+          () => failOnAppend,
+          () => failOnReceipt,
+        ),
+      );
       store = working;
       return result;
     },
@@ -210,6 +272,10 @@ export function memoryUnitOfWork() {
     snapshot: () => store,
     failEventAppend: (on: boolean) => {
       failOnAppend = on;
+    },
+    /** 削除の受領記録の書き込みで失敗させる（削除のトランザクションの途中の障害） */
+    failReceipt: (on: boolean) => {
+      failOnReceipt = on;
     },
   };
 }

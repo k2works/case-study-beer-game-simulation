@@ -396,6 +396,10 @@ test('[US1.1/AC1.1.3] カスタム条件で作ると、ロビーに「カスタ�
   await expect(
     fac.getByText('条件: カスタム（変更: 初期在庫、注文の遅延）'),
   ).toBeVisible();
+  // 保持方針（既定の 90 日）と、バックアップに残る期間（US5.1/AC5.1.5）
+  await expect(fac.getByRole('note', { name: '保持方針' })).toContainText(
+    '保持期間 90 日',
+  );
   const retailer = players[3]!.page;
   await expect(
     retailer.getByRole('heading', { name: '小売店の画面' }),

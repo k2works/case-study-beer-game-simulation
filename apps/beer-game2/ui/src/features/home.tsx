@@ -34,6 +34,7 @@ export function NewGame() {
     backlogCost: '1.00',
   });
   const [disclosure, setDisclosure] = useState<DisclosurePolicy>('TEAM_TOTAL');
+  const [retentionDays, setRetentionDays] = useState('90');
   const field = (name: keyof typeof form, label: string, step = '1') => (
     <label>
       {label}
@@ -66,6 +67,7 @@ export function NewGame() {
           backlogCostMinor: toMinor(form.backlogCost),
           disclosure,
         },
+        retentionDays: Number(retentionDays),
       });
       // 復帰コードはロビーで一度だけ示す（履歴の state で渡し、表示後に消す）
       navigate(`/games/${created.gameId}/lobby`, {
@@ -100,6 +102,17 @@ export function NewGame() {
           全員が保存したら自動で次の週に進む
         </label>
         <p>外すと、進行役が「週を確定する」を押すまで進みません。</p>
+        <label>
+          保持期間（日）
+          <input
+            type="number"
+            min={1}
+            max={3650}
+            value={retentionDays}
+            onChange={(e) => setRetentionDays(e.target.value)}
+          />
+        </label>
+        <p>期間が過ぎると、ゲームの記録を削除します（1〜3650 日）。</p>
         <fieldset>
           <legend>条件（キット準拠から変えられます）</legend>
           <p>

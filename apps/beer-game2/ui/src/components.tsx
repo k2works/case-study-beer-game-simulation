@@ -1,5 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { ApiError, type Issue, type SettingsView } from './api/types.js';
+import {
+  ApiError,
+  type Issue,
+  type RetentionView,
+  type SettingsView,
+} from './api/types.js';
 import { CONDITION_LABEL, DISCLOSURE_LABEL, formatMoney } from './labels.js';
 
 /** 画面の見出し。題名を設定し、画面の切り替わりで見出しにフォーカスを移す */
@@ -123,5 +128,22 @@ export function SettingsSummary({
         </ul>
       )}
     </>
+  );
+}
+
+/** 保持方針（運営者へ示す）。削除予定日と、削除後もバックアップに残る期間 */
+export function RetentionNote({ retention }: { retention: RetentionView }) {
+  return (
+    <aside role="note" aria-label="保持方針">
+      <p>
+        保持期間 {retention.days} 日（
+        {new Date(retention.deleteAfter).toLocaleDateString('ja-JP')}{' '}
+        に削除します）。
+      </p>
+      <p>
+        データベースのバックアップには、削除後も最大 {retention.backupDays}{' '}
+        日残ります。
+      </p>
+    </aside>
   );
 }

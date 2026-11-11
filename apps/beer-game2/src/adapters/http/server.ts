@@ -67,6 +67,8 @@ const createBody = z.object({
   weeks: z.number().int(),
   demand: z.array(z.number()).optional(),
   commitMode: z.enum(['MANUAL', 'AUTO']).optional(),
+  // 保持期間（日）。範囲の検査はドメイン
+  retentionDays: z.number().optional(),
   // 範囲の検査はドメイン（項目ごとの修正内容を返す）。ここでは形と、未知の項目だけを拒否する
   conditions: z
     .strictObject({

@@ -28,6 +28,7 @@
     "container:check": "bash scripts/container-check.sh",
     "build": "tsc -p tsconfig.build.json",
     "start:prod": "node dist/main.js",
+    "retention": "tsx src/retention.ts",
     "docs:tour": "tsx scripts/guided-tour.ts",
     "docs:tour:check": "tsx scripts/guided-tour.ts --check"
   },

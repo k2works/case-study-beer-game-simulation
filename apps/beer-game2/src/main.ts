@@ -1,42 +1,15 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import pg from 'pg';
-import { HmacCredentialPolicy } from './adapters/http/credentials.js';
 import { buildServer } from './adapters/http/server.js';
-import { PgRateLimiter } from './adapters/persistence/pg-rate-limiter.js';
-import { PgExportReader } from './adapters/persistence/pg-export-reader.js';
-import { PgReviewReader } from './adapters/persistence/pg-review-reader.js';
 import { PgNotifier } from './adapters/persistence/pg-notifier.js';
-import { PgUnitOfWork } from './adapters/persistence/pg-unit-of-work.js';
-import { createApplication } from './application/index.js';
+import { PgRateLimiter } from './adapters/persistence/pg-rate-limiter.js';
+import { composeApplication, createPool } from './compose.js';
 import { loadConfig } from './config/index.js';
 
-// 紛らわしい文字（0/O、1/I/L）を除いた英数字から、8 桁の参加コードを作る
-const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-function joinCode(): string {
-  const bytes = randomBytes(8);
-  return Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
-}
-
 const config = loadConfig(process.env);
-const pool = new pg.Pool({ connectionString: config.databaseUrl });
-// アイドル中の接続の切断でプロセスが落ちないようにする（/ready が失敗として現れる）
-pool.on('error', (e) =>
-  console.error(
-    JSON.stringify({ level: 'error', msg: 'pool error', error: e.message }),
-  ),
-);
+const pool = createPool(config);
 const notifier = new PgNotifier(config.databaseUrl);
 await notifier.start();
 
-const reviews = new PgReviewReader(pool);
-const app = createApplication({
-  uow: new PgUnitOfWork(pool, { idempotencyKey: config.idempotencyKey }),
-  clock: { now: () => new Date() },
-  ids: { uuid: randomUUID, joinCode },
-  reviews,
-  exports: new PgExportReader(pool, reviews),
-  credentials: new HmacCredentialPolicy(config.credentialKeys),
-});
+const app = composeApplication(config, pool);
 
 const server = buildServer({
   app,

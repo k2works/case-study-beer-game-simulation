@@ -71,6 +71,8 @@ export interface ObservationView {
 export interface Lobby {
   commitMode: CommitMode;
   observerCount: number;
+  /** 進行役にだけ含まれる。保持方針（削除予定日と、削除後もバックアップに残る日数） */
+  retention?: RetentionView | null;
   /** 進行役にだけ含まれる。有効な観察用の招待 */
   observerInvitations?: { id: string; expiresAt: string }[];
   settings: SettingsView;
@@ -116,8 +118,16 @@ export interface RoleView {
   history: WeekRow[];
 }
 
+/** 保持方針（削除予定日と、削除後もバックアップに残る日数） */
+export interface RetentionView {
+  days: number;
+  deleteAfter: string;
+  backupDays: number;
+}
+
 export interface ConsoleView {
   settings: SettingsView;
+  retention: RetentionView | null;
   /** 現在の確定方式（進行中に切り替えられる） */
   commitMode: CommitMode;
   status: SessionStatus;
@@ -161,6 +171,7 @@ export interface ApiClient {
     weeks: number;
     commitMode: CommitMode;
     conditions: Conditions;
+    retentionDays: number;
   }): Promise<{ gameId: string; joinCode: string; recoveryCode: string }>;
   join(input: {
     joinCode: string;

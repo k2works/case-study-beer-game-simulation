@@ -6,6 +6,7 @@ import {
   ErrorMessage,
   Page,
   RecoveryCodeNote,
+  RetentionNote,
   SettingsSummary,
 } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
@@ -145,6 +146,7 @@ export function ConsoleScreen() {
         </p>
       )}
       <SettingsSummary settings={view.settings} />
+      {view.retention && <RetentionNote retention={view.retention} />}
       <p>
         確定方式:{' '}
         {view.commitMode === 'AUTO'

@@ -44,3 +44,9 @@ variable "log_retention_days" {
   type    = number
   default = 30
 }
+
+variable "retention_schedule" {
+  description = "保持の定期タスクの起動間隔（EventBridge Scheduler の式）"
+  type        = string
+  default     = "rate(5 minutes)"
+}

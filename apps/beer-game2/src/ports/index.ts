@@ -81,6 +81,34 @@ export interface ObserverRepository {
   countObservers(gameId: string): Promise<number>;
 }
 
+/**
+ * 保持と削除。削除は `games` からの連鎖削除で、ゲームの ID を持つ行をすべて消す。
+ * 受領記録は、ゲームを特定できない参照（鍵つきのダイジェスト）だけを持つ。
+ */
+export interface RetentionRepository {
+  schedule(
+    gameId: string,
+    policy: { days: number; deleteAfter: Date },
+  ): Promise<void>;
+  policyOf(gameId: string): Promise<{ days: number; deleteAfter: Date } | null>;
+  /** 時刻 `at` で期限に達し、失敗が `maxAttempts` 回未満のゲーム */
+  due(
+    at: Date,
+    maxAttempts: number,
+    limit: number,
+  ): Promise<{ gameId: string }[]>;
+  /** 削除する。既に無ければ false（別のタスクが先に削除した） */
+  deleteGame(gameId: string): Promise<boolean>;
+  /** 失敗を記録し、記録後の試行回数を返す */
+  recordFailure(gameId: string, at: Date): Promise<number>;
+  saveReceipt(receipt: {
+    reference: string;
+    outcome: 'DELETED';
+    recordedAt: Date;
+    expiresAt: Date;
+  }): Promise<void>;
+}
+
 export interface IdempotencyRecord {
   gameId: string;
   key: string;
@@ -102,6 +130,7 @@ export interface Repositories {
   sessions: SessionRepository;
   credentials: CredentialRepository;
   observers: ObserverRepository;
+  retention: RetentionRepository;
   idempotency: IdempotencyRepository;
   events: EventLog;
 }

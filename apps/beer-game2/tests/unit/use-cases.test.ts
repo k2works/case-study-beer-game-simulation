@@ -293,7 +293,15 @@ describe('役割別の状況（情報の制約）', () => {
       WHOLESALER: false,
       RETAILER: false,
     });
-    expect(JSON.stringify(c)).not.toContain('9');
+    // 入力値（9）を含まない（保持方針の日付と条件の値は、入力値と無関係なので除く）
+    expect(
+      JSON.stringify({
+        submitted: c.submitted,
+        versions: c.versions,
+        week: c.week,
+        status: c.status,
+      }),
+    ).not.toContain('9');
   });
 });
 
@@ -1451,5 +1459,100 @@ describe('出力（CSV・JSON）', () => {
       (await app.review({ token: t.players.RETAILER.token, gameId: t.gameId }))
         .canExport,
     ).toBe(false);
+  });
+});
+
+describe('保持と削除', () => {
+  const RETENTION_DAY = 24 * 60 * 60 * 1000;
+
+  it('[US5.1/AC5.1.1][US5.1/AC5.1.5] 作成すると保持期間 90 日が登録され、進行役のロビーに削除予定日とバックアップの期間が出る', async () => {
+    const c = await app.createGame({ weeks: 3 });
+    const lobby = await app.lobby({
+      token: c.facilitatorToken,
+      gameId: c.gameId,
+    });
+    expect(lobby.retention).toEqual({
+      days: 90,
+      deleteAfter: new Date(now.getTime() + 90 * RETENTION_DAY).toISOString(),
+      backupDays: 7,
+    });
+  });
+
+  it('[US5.1] 保持期間を指定して作成できる。範囲外は作成しない', async () => {
+    const c = await app.createGame({ weeks: 3, retentionDays: 30 });
+    const lobby = await app.lobby({
+      token: c.facilitatorToken,
+      gameId: c.gameId,
+    });
+    expect(lobby.retention?.days).toBe(30);
+    await expect(
+      app.createGame({ weeks: 3, retentionDays: 0 }),
+    ).rejects.toThrow(DomainError);
+    expect(mem.snapshot().games.size).toBe(1);
+  });
+
+  it('[US5.1/AC5.1.2] 期限に達したゲームだけを削除し、ゲーム記録・履歴・資格が消え、受領記録が残る', async () => {
+    const t = await setUpTable(3);
+    const keep = await app.createGame({ weeks: 3, retentionDays: 365 });
+    advance(90 * RETENTION_DAY - 1);
+    expect(await app.runRetention()).toMatchObject({ deleted: 0 });
+    advance(1);
+    const result = await app.runRetention();
+    expect(result).toMatchObject({
+      deleted: 1,
+      failed: 0,
+      permanentFailures: 0,
+    });
+    const store = mem.snapshot();
+    expect(store.games.has(t.gameId)).toBe(false);
+    expect(store.sessions.has(t.gameId)).toBe(false);
+    expect(store.events.some((e) => e.gameId === t.gameId)).toBe(false);
+    expect(
+      [...store.credentials.values()].some(
+        (c) => c.principal.gameId === t.gameId,
+      ),
+    ).toBe(false);
+    expect(store.games.has(keep.gameId)).toBe(true);
+    expect(store.receipts).toHaveLength(1);
+    expect(store.receipts[0]).toMatchObject({ outcome: 'DELETED' });
+    expect(JSON.stringify(store.receipts)).not.toContain(`"${t.gameId}"`);
+    await expect(
+      app.lobby({ token: t.facilitator, gameId: t.gameId }),
+    ).rejects.toThrow(UnauthorizedError);
+    // 2 回目の実行では、何も削除しない（一度だけ）
+    expect(await app.runRetention()).toMatchObject({ deleted: 0 });
+    expect(mem.snapshot().receipts).toHaveLength(1);
+  });
+
+  it('[US5.1/AC5.1.3] 削除の途中で失敗すると何も消えず、次の実行で再試行され、一度だけ削除される', async () => {
+    const c = await app.createGame({ weeks: 3, retentionDays: 1 });
+    advance(RETENTION_DAY);
+    mem.failReceipt(true);
+    expect(await app.runRetention()).toMatchObject({ deleted: 0, failed: 1 });
+    expect(mem.snapshot().games.has(c.gameId)).toBe(true);
+    expect(mem.snapshot().receipts).toHaveLength(0);
+    mem.failReceipt(false);
+    expect(await app.runRetention()).toMatchObject({ deleted: 1, failed: 0 });
+    expect(mem.snapshot().games.has(c.gameId)).toBe(false);
+    expect(mem.snapshot().receipts).toHaveLength(1);
+  });
+
+  it('[US5.1/AC5.1.3] 5 回失敗すると恒久的な失敗として数え、それ以降は再試行しない', async () => {
+    await app.createGame({ weeks: 3, retentionDays: 1 });
+    advance(RETENTION_DAY);
+    mem.failReceipt(true);
+    const results = [];
+    for (let i = 0; i < 6; i++) results.push(await app.runRetention());
+    expect(results.map((r) => r.failed)).toEqual([1, 1, 1, 1, 1, 0]);
+    expect(results[4]!.permanentFailures).toBe(1);
+    expect(results[5]).toMatchObject({ deleted: 0, failed: 0 });
+  });
+});
+
+describe('保持方針（コンソール）', () => {
+  it('[US5.1/AC5.1.5] 進行役のコンソールにも、保持方針が出る', async () => {
+    const t = await setUpTable();
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    expect(c.retention).toMatchObject({ days: 90, backupDays: 7 });
   });
 });

@@ -917,3 +917,18 @@ describe('出力（HTTP）', () => {
     ).toBe(403);
   });
 });
+
+describe('保持期間（HTTP）', () => {
+  it('[US5.1/AC5.1.1] 保持期間を渡して作成でき、進行役のロビーに削除予定日とバックアップの期間が出る。範囲外は 422', async () => {
+    const res = await post('/api/games', { weeks: 3, retentionDays: 30 });
+    expect(res.statusCode).toBe(201);
+    const lobby = await get(
+      `/api/games/${res.json().gameId}/lobby`,
+      cookieOf(res),
+    );
+    expect(lobby.json().retention).toMatchObject({ days: 30, backupDays: 7 });
+    expect(
+      (await post('/api/games', { weeks: 3, retentionDays: 4000 })).statusCode,
+    ).toBe(422);
+  });
+});

@@ -24,6 +24,7 @@ import {
   type IdempotencyRecord,
   type IdempotencyRepository,
   type ObserverRepository,
+  type RetentionRepository,
   type Principal,
   type Repositories,
   type SessionRepository,
@@ -521,6 +522,76 @@ class PgObservers implements ObserverRepository {
   }
 }
 
+class PgRetention implements RetentionRepository {
+  constructor(private readonly db: Db) {}
+
+  async schedule(gameId: string, policy: { days: number; deleteAfter: Date }) {
+    await this.db.query(
+      'UPDATE games SET retention_days = $2, delete_after = $3 WHERE game_id = $1',
+      [gameId, policy.days, policy.deleteAfter],
+    );
+  }
+
+  async policyOf(gameId: string) {
+    const { rows } = await this.db.query(
+      'SELECT retention_days, delete_after FROM games WHERE game_id = $1',
+      [gameId],
+    );
+    return rows[0]
+      ? {
+          days: rows[0].retention_days as number,
+          deleteAfter: rows[0].delete_after as Date,
+        }
+      : null;
+  }
+
+  async due(at: Date, maxAttempts: number, limit: number) {
+    const { rows } = await this.db.query(
+      `SELECT game_id FROM games
+        WHERE delete_after <= $1 AND deletion_attempts < $2
+        ORDER BY delete_after LIMIT $3`,
+      [at, maxAttempts, limit],
+    );
+    return rows.map((r) => ({ gameId: r.game_id as string }));
+  }
+
+  /** games からの連鎖削除で、ゲームの ID を持つすべての行を消す */
+  async deleteGame(gameId: string) {
+    const { rowCount } = await this.db.query(
+      'DELETE FROM games WHERE game_id = $1',
+      [gameId],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  async recordFailure(gameId: string, at: Date) {
+    const { rows } = await this.db.query(
+      `UPDATE games SET deletion_attempts = deletion_attempts + 1, deletion_failed_at = $2
+        WHERE game_id = $1 RETURNING deletion_attempts`,
+      [gameId, at],
+    );
+    return (rows[0]?.deletion_attempts as number | undefined) ?? 0;
+  }
+
+  async saveReceipt(receipt: {
+    reference: string;
+    outcome: 'DELETED';
+    recordedAt: Date;
+    expiresAt: Date;
+  }) {
+    await this.db.query(
+      `INSERT INTO deletion_receipts (reference, outcome, recorded_at, expires_at)
+       VALUES ($1,$2,$3,$4)`,
+      [
+        receipt.reference,
+        receipt.outcome,
+        receipt.recordedAt,
+        receipt.expiresAt,
+      ],
+    );
+  }
+}
+
 /** 応答の暗号化: AES-256-GCM。保存形式は iv(12) | tag(16) | 暗号文 */
 export function encrypt(key: Buffer, value: unknown): Buffer {
   const iv = randomBytes(12);
@@ -605,6 +676,7 @@ export function repositoriesOver(db: Db, idempotencyKey: Buffer): Repositories {
     sessions: new PgSessions(db),
     credentials: new PgCredentials(db),
     observers: new PgObservers(db),
+    retention: new PgRetention(db),
     idempotency: new PgIdempotency(db, idempotencyKey),
     events: new PgEvents(db),
   };
