@@ -111,6 +111,10 @@ jobs:
         working-directory: apps/beer-game2/infra/envs/staging
       - run: terraform validate
         working-directory: apps/beer-game2/infra/envs/staging
+      - run: terraform init -backend=false -input=false
+        working-directory: apps/beer-game2/infra/envs/production
+      - run: terraform validate
+        working-directory: apps/beer-game2/infra/envs/production
 
   scripts:
     runs-on: ubuntu-latest

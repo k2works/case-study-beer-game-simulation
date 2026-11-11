@@ -1,0 +1,11 @@
+output "url" { value = "https://${module.web.public_domain}" }
+output "ecr_repository_url" { value = module.ecr.repository_url }
+output "deploy_role_arn" { value = module.github_oidc.deploy_role_arn }
+output "ecs_cluster" { value = module.ecs.cluster_name }
+output "ecs_service" { value = module.ecs.service_name }
+output "api_task_family" { value = module.ecs.api_task_family }
+output "migrate_task_family" { value = module.ecs.migrate_task_family }
+output "web_bucket" { value = module.web.bucket_name }
+output "distribution_id" { value = module.web.distribution_id }
+output "task_security_group_id" { value = aws_security_group.tasks.id }
+output "task_subnet_ids" { value = module.network.public_subnet_ids }

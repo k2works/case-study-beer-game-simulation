@@ -170,8 +170,17 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   server.register(cookie);
 
+  // セキュリティヘッダー（NF-S9）。API は JSON と SSE だけを返すので、CSP はすべて拒否でよい
+  const SECURITY_HEADERS = {
+    'strict-transport-security': 'max-age=31536000; includeSubDomains',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+    'x-frame-options': 'DENY',
+  };
   server.addHook('onSend', async (request, reply) => {
     reply.header('x-correlation-id', request.id);
+    reply.headers(SECURITY_HEADERS);
   });
 
   // メトリクス: 要求ごとの応答時間と件数。次元のルートは、ID を含まない定義の形
@@ -580,6 +589,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, {
+      ...SECURITY_HEADERS,
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       connection: 'keep-alive',

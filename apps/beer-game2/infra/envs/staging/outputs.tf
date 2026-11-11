@@ -1,4 +1,4 @@
-output "url" { value = "https://${module.web.domain_name}" }
+output "url" { value = "https://${module.web.public_domain}" }
 output "ecr_repository_url" { value = module.ecr.repository_url }
 output "deploy_role_arn" { value = module.github_oidc.deploy_role_arn }
 output "ecs_cluster" { value = module.ecs.cluster_name }

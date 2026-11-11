@@ -1042,3 +1042,21 @@ describe('合成監視の入口', () => {
     expect((await get('/api/ready')).statusCode).toBe(503);
   });
 });
+
+describe('セキュリティヘッダー', () => {
+  it.each(['/health', '/api/ready', '/api/games/x/lobby'])(
+    '[US6.2] %s の応答に、HSTS・nosniff・Referrer-Policy・CSP・X-Frame-Options が付く',
+    async (url) => {
+      const res = await get(url);
+      expect(res.headers['strict-transport-security']).toBe(
+        'max-age=31536000; includeSubDomains',
+      );
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['referrer-policy']).toBe('no-referrer');
+      expect(res.headers['content-security-policy']).toBe(
+        "default-src 'none'; frame-ancestors 'none'",
+      );
+      expect(res.headers['x-frame-options']).toBe('DENY');
+    },
+  );
+});

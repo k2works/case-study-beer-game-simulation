@@ -134,6 +134,8 @@ describe('SSE', () => {
         signal: ctrl.signal,
       });
       expect(res.headers.get('content-type')).toBe('text/event-stream');
+      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+      expect(res.headers.get('strict-transport-security')).toMatch(/max-age/);
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       let text = decoder.decode((await reader.read()).value);

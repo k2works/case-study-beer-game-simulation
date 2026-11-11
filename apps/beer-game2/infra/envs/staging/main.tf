@@ -81,7 +81,7 @@ module "ecs" {
   subnet_ids             = module.network.public_subnet_ids
   task_security_group_id = aws_security_group.tasks.id
   target_group_arn       = module.alb.target_group_arn
-  allowed_origin         = "https://${module.web.domain_name}"
+  allowed_origin         = "https://${module.web.public_domain}"
   image                  = var.image
 
   secret_arns                    = module.secrets.secret_arns
@@ -96,7 +96,7 @@ module "ecs" {
 module "observability" {
   source      = "../../modules/observability"
   name        = local.name
-  ready_url   = "https://${module.web.domain_name}/api/ready"
+  ready_url   = "https://${module.web.public_domain}/api/ready"
   alert_email = var.alert_email
 }
 

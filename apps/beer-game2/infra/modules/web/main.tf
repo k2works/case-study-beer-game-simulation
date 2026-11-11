@@ -67,8 +67,9 @@ resource "aws_cloudfront_response_headers_policy" "security" {
 }
 
 locals {
-  s3_origin  = "web"
-  api_origin = "api"
+  custom_domain = var.domain_name != ""
+  s3_origin     = "web"
+  api_origin    = "api"
   # AWS のマネージドポリシー
   cache_disabled         = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # Managed-CachingDisabled
   cache_optimized        = "658327ea-f89d-4fab-a63d-7e88639e58f6" # Managed-CachingOptimized
@@ -152,9 +153,14 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
+  # 独自ドメインがあれば、ACM の証明書で TLS 1.2 以上（NF-S15、ADR-011）。無ければ既定の証明書
+  aliases = local.custom_domain ? [var.domain_name] : []
+
   viewer_certificate {
-    cloudfront_default_certificate = true
-    minimum_protocol_version       = "TLSv1"
+    cloudfront_default_certificate = local.custom_domain ? null : true
+    acm_certificate_arn            = local.custom_domain ? var.acm_certificate_arn : null
+    ssl_support_method             = local.custom_domain ? "sni-only" : null
+    minimum_protocol_version       = local.custom_domain ? "TLSv1.2_2021" : "TLSv1"
   }
 }
 
@@ -178,4 +184,11 @@ data "aws_iam_policy_document" "bucket" {
 resource "aws_s3_bucket_policy" "web" {
   bucket = aws_s3_bucket.web.id
   policy = data.aws_iam_policy_document.bucket.json
+}
+
+check "custom_domain_certificate" {
+  assert {
+    condition     = var.domain_name == "" || var.acm_certificate_arn != ""
+    error_message = "独自ドメインを指定するときは、acm_certificate_arn も指定してください。"
+  }
 }
