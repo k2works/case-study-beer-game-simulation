@@ -125,7 +125,20 @@ export interface RetentionView {
   backupDays: number;
 }
 
+/** 進行役のコンソールの、1 役割の状況（進行役だけが見られる） */
+export interface ConsoleRole {
+  holders: string[];
+  decision: LatestDecision | null;
+  inventory: number;
+  backlog: number;
+  incomingGoods: number[];
+  cumulativeCostMinor: number;
+  history: WeekRow[];
+}
+
 export interface ConsoleView {
+  /** 役割ごとの状況（4 分割で同時に見る） */
+  roles: Record<Role, ConsoleRole>;
   settings: SettingsView;
   retention: RetentionView | null;
   /** 現在の確定方式（進行中に切り替えられる） */

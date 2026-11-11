@@ -11,6 +11,7 @@ import {
 } from '../components.js';
 import { useApi, useLiveSnapshot } from '../hooks.js';
 import { ROLE_LABEL, ROLE_ORDER } from '../labels.js';
+import { RolePanel } from './role-panel.js';
 
 const newKey = () =>
   globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
@@ -170,16 +171,11 @@ export function ConsoleScreen() {
           </button>
         )}
       </p>
-      <table aria-label="入力状況">
-        <tbody>
-          {ROLE_ORDER.map((r) => (
-            <tr key={r}>
-              <th scope="row">{ROLE_LABEL[r]}</th>
-              <td>{view.submitted[r] ? '入力済み' : '未入力'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div role="group" aria-label="役割ごとの状況" className="console-grid">
+        {ROLE_ORDER.map((r) => (
+          <RolePanel key={r} role={r} view={view.roles[r]} />
+        ))}
+      </div>
       <button
         type="button"
         disabled={ended || paused || !allIn}

@@ -116,3 +116,34 @@ label.inline input {
 .chart .series-label {
   font-weight: bold;
 }
+
+/* 進行役のコンソール: 4 役割を 2 × 2 で同時に見る。狭い画面では 1 列 */
+.console-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.role-panel {
+  border: 1px solid #d5d8dd;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+.role-panel h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+.role-panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.75rem;
+  margin: 0.25rem 0;
+}
+.role-panel dd {
+  margin: 0;
+}
+@media (max-width: 40rem) {
+  .console-grid {
+    grid-template-columns: 1fr;
+  }
+}

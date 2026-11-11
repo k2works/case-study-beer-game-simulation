@@ -116,6 +116,8 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
       versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
       settings: kitSettings,
       commitMode: 'MANUAL',
+      retention: null,
+      roles: consoleRoles(),
     }),
     saveDecision: vi.fn().mockResolvedValue({ version: 1 }),
     commit: vi
@@ -588,16 +590,49 @@ describe('終了後の導線', () => {
 });
 
 describe('コンソール', () => {
-  it('[US2.1/AC2.1.3] 入力の有無だけが見え、そろうまで確定できない', async () => {
+  it('[US2.1/AC2.1.3] 4 役割の入力の有無が見え、そろうまで確定できない', async () => {
     renderAt('/games/g1/console', fakeApi());
     expect(
       await screen.findByRole('heading', { name: /コンソール/ }),
     ).toBeInTheDocument();
-    const table = screen.getByRole('table', { name: '入力状況' });
-    expect(within(table).getByText('二次卸')).toBeInTheDocument();
-    expect(screen.getAllByText('入力済み')).toHaveLength(3);
-    expect(screen.getAllByText('未入力')).toHaveLength(1);
+    expect(
+      within(screen.getByRole('region', { name: '二次卸の状況' })).getByText(
+        '未入力',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/^入力済み/)).toHaveLength(3);
     expect(screen.getByRole('button', { name: '週を確定する' })).toBeDisabled();
+  });
+
+  it('[US2.1] 4 分割で、役割ごとの担当・入力値と保存者・在庫・受注残・入荷予定・累積費用を同時に見られる', async () => {
+    renderAt('/games/g1/console', fakeApi());
+    const grid = await screen.findByRole('group', { name: '役割ごとの状況' });
+    const panels = within(grid).getAllByRole('region');
+    expect(panels.map((p) => p.getAttribute('aria-label'))).toEqual([
+      '工場の状況',
+      '一次卸の状況',
+      '二次卸の状況',
+      '小売店の状況',
+    ]);
+    const retailer = within(grid).getByRole('region', { name: '小売店の状況' });
+    expect(retailer).toHaveTextContent('担当: 花子、太郎');
+    expect(retailer).toHaveTextContent('入力済み: 8（太郎さんが保存）');
+    expect(retailer).toHaveTextContent('在庫20');
+    expect(retailer).toHaveTextContent('受注残3');
+    expect(retailer).toHaveTextContent('入荷予定（来週・再来週）4、6');
+    expect(retailer).toHaveTextContent('累積費用$12.00');
+  });
+
+  it('[US2.1] 役割ごとの週ごとの履歴を、区画の中で開いて見られる', async () => {
+    renderAt('/games/g1/console', fakeApi());
+    const retailer = await screen.findByRole('region', {
+      name: '小売店の状況',
+    });
+    const table = within(retailer).getByRole('table', {
+      name: '小売店の週ごとの結果',
+    });
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    expect(table).toHaveTextContent('$6.00');
   });
 
   it('[US1.2] 進行役が参加者を兼ねているときの、自分の画面への入口がある', async () => {
@@ -620,6 +655,7 @@ describe('コンソール', () => {
         },
         versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 1, RETAILER: 1 },
         settings: kitSettings,
+        roles: consoleRoles(),
       }),
     });
     renderAt('/games/g1/console', api);
@@ -653,6 +689,7 @@ const consoleView = (extra: object = {}) => ({
   versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
   settings: kitSettings,
   commitMode: 'MANUAL' as const,
+  roles: consoleRoles(),
   ...extra,
 });
 
@@ -1451,3 +1488,42 @@ describe('保持方針（コンソール）', () => {
     expect(note).toHaveTextContent(/最大\s*7\s*日/);
   });
 });
+
+/** 進行役のコンソールの、役割ごとの状況（小売店は共同担当で、入力済み） */
+function consoleRoles() {
+  const base = (submitted: boolean) => ({
+    holders: ['P'],
+    decision: submitted ? { quantity: 4, version: 1, savedBy: 'P' } : null,
+    inventory: 12,
+    backlog: 0,
+    incomingGoods: [4, 4],
+    cumulativeCostMinor: 600,
+    history: [
+      {
+        week: 1,
+        order: 4,
+        demand: 4,
+        received: 4,
+        shipped: 4,
+        endingInventory: 12,
+        endingBacklog: 0,
+        weeklyCostMinor: 600,
+        cumulativeCostMinor: 600,
+      },
+    ],
+  });
+  return {
+    FACTORY: base(true),
+    DISTRIBUTOR: base(true),
+    WHOLESALER: base(false),
+    RETAILER: {
+      ...base(true),
+      holders: ['花子', '太郎'],
+      decision: { quantity: 8, version: 2, savedBy: '太郎' },
+      inventory: 20,
+      backlog: 3,
+      incomingGoods: [4, 6],
+      cumulativeCostMinor: 1200,
+    },
+  };
+}

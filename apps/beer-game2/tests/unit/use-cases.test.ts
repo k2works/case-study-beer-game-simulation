@@ -277,7 +277,7 @@ describe('役割別の状況（情報の制約）', () => {
     );
   });
 
-  it('[US2.1] 進行役のコンソールは、入力の有無だけを見せる', async () => {
+  it('[US2.1] 進行役のコンソールは、役割ごとの当週の入力値・保存者・在庫・受注残・入荷予定・費用・履歴を見せる', async () => {
     const t = await setUpTable();
     await app.saveDecision({
       token: t.players.FACTORY.token,
@@ -293,15 +293,45 @@ describe('役割別の状況（情報の制約）', () => {
       WHOLESALER: false,
       RETAILER: false,
     });
-    // 入力値（9）を含まない（保持方針の日付と条件の値は、入力値と無関係なので除く）
-    expect(
-      JSON.stringify({
-        submitted: c.submitted,
-        versions: c.versions,
-        week: c.week,
-        status: c.status,
-      }),
-    ).not.toContain('9');
+    expect(c.roles.FACTORY).toEqual({
+      holders: ['P-FACTORY'],
+      decision: { quantity: 9, version: 1, savedBy: 'P-FACTORY' },
+      inventory: 12,
+      backlog: 0,
+      incomingGoods: [4, 4],
+      cumulativeCostMinor: 0,
+      history: [],
+    });
+    expect(c.roles.RETAILER.decision).toBeNull();
+  });
+
+  it('[US2.1] 週を確定すると、コンソールの役割ごとの履歴と費用が増える', async () => {
+    const t = await setUpTable();
+    await fillAll(t, 4);
+    const before = await app.console({
+      token: t.facilitator,
+      gameId: t.gameId,
+    });
+    await app.commitWeek({
+      token: t.facilitator,
+      gameId: t.gameId,
+      week: 1,
+      version: before.sessionVersion,
+      idempotencyKey: 'c1',
+    });
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    expect(c.roles.RETAILER.history).toEqual([
+      expect.objectContaining({ week: 1, order: 4, endingInventory: 12 }),
+    ]);
+    expect(c.roles.RETAILER.cumulativeCostMinor).toBe(600);
+    expect(c.roles.RETAILER.decision).toBeNull();
+  });
+
+  it('[US2.1/AC2.1.2] 参加者は、進行役のコンソール（他の役割の値）を開けない', async () => {
+    const t = await setUpTable();
+    await expect(
+      app.console({ token: t.players.RETAILER.token, gameId: t.gameId }),
+    ).rejects.toThrow(ForbiddenError);
   });
 });
 

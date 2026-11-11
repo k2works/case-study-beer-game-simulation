@@ -140,6 +140,13 @@ test('[US2.3/AC2.3.1] 作成 → 参加 → 割り当て → 開始 → 入力 �
 }) => {
   const { fac, facContext, players } = await startTable(browser);
 
+  // 進行役は、4 役割の状況を 4 分割で同時に見る（進行役だけ）
+  const grid = fac.getByRole('group', { name: '役割ごとの状況' });
+  await expect(grid.getByRole('region')).toHaveCount(4);
+  await expect(grid.getByRole('region', { name: '工場の状況' })).toContainText(
+    '在庫12',
+  );
+
   // 情報の制約: 小売店だけが顧客需要を見る
   await expect(players[3]!.page.getByText('今週の顧客需要')).toBeVisible({
     timeout: 15_000,
@@ -239,11 +246,10 @@ test('[US3.1/AC3.1.2] 停止 → 代理入力 → 再開 → 確定。停止中�
     .getByRole('dialog', { name: '代理入力の確認' })
     .getByRole('button', { name: '代理入力する' })
     .click();
-  await expect(
-    fac.getByRole('table', { name: '入力状況' }).getByRole('row', {
-      name: /二次卸 入力済み/,
-    }),
-  ).toBeVisible();
+  // 4 分割の二次卸の区画に、代理入力の値と保存者（進行役）が出る
+  await expect(fac.getByRole('region', { name: '二次卸の状況' })).toContainText(
+    '入力済み: 4（進行役さんが保存）',
+  );
 
   await fac.getByRole('button', { name: '再開する' }).click();
   await fac

@@ -69,6 +69,27 @@ export interface Dependencies {
   ttl?: { sessionMs: number; recoveryMs: number; observerInvitationMs: number };
 }
 
+/** 進行役のコンソールの、1 役割の状況 */
+export interface ConsoleRole {
+  holders: string[];
+  decision: { quantity: number; version: number; savedBy: string } | null;
+  inventory: number;
+  backlog: number;
+  incomingGoods: number[];
+  cumulativeCostMinor: number;
+  history: {
+    week: number;
+    order: number;
+    demand: number;
+    received: number;
+    shipped: number;
+    endingInventory: number;
+    endingBacklog: number;
+    weeklyCostMinor: number;
+    cumulativeCostMinor: number;
+  }[];
+}
+
 /** 再発行の対象。進行役自身か、このゲームの参加者 1 人 */
 export type CredentialTarget =
   { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };
@@ -168,6 +189,23 @@ export function createApplication(deps: Dependencies) {
     backlogCostMinor: s.backlogCostMinor,
     disclosure: s.disclosure,
   });
+
+  /** 役割の週ごとの結果（参加者の画面と、進行役のコンソールで共通） */
+  const historyOf = (session: Session, role: Role) =>
+    session.history.map((h) => {
+      const r = h.roles[role];
+      return {
+        week: h.week,
+        order: r.order,
+        demand: r.demand,
+        received: r.received,
+        shipped: r.shipped,
+        endingInventory: r.endingInventory,
+        endingBacklog: r.endingBacklog,
+        weeklyCostMinor: r.weeklyCostMinor,
+        cumulativeCostMinor: r.cumulativeCostMinor,
+      };
+    });
 
   /** 保持方針（進行役に示す）。削除予定日と、削除後もバックアップに残る日数 */
   async function retentionView(repos: Repositories, gameId: string) {
@@ -766,20 +804,7 @@ export function createApplication(deps: Dependencies) {
                 savedBy: nameOf(names, decision.savedBy),
               }
             : null,
-          history: session.history.map((h) => {
-            const r = h.roles[role];
-            return {
-              week: h.week,
-              order: r.order,
-              demand: r.demand,
-              received: r.received,
-              shipped: r.shipped,
-              endingInventory: r.endingInventory,
-              endingBacklog: r.endingBacklog,
-              weeklyCostMinor: r.weeklyCostMinor,
-              cumulativeCostMinor: r.cumulativeCostMinor,
-            };
-          }),
+          history: historyOf(session, role),
         };
       });
     },
@@ -839,6 +864,7 @@ export function createApplication(deps: Dependencies) {
         if (principal.kind !== 'FACILITATOR')
           throw new ForbiddenError('進行役の画面です');
         const session = await loadSession(repos, input.gameId);
+        const names = await repos.games.participantNames(input.gameId);
         return {
           status: session.status,
           week: session.week,
@@ -849,10 +875,35 @@ export function createApplication(deps: Dependencies) {
           submitted: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r] !== undefined]),
           ) as Record<Role, boolean>,
-          /** 役割ごとの入力の版（代理入力の楽観的排他に使う。値は含めない） */
+          /** 役割ごとの入力の版（代理入力の楽観的排他に使う） */
           versions: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r]?.version ?? 0]),
           ) as Record<Role, number>,
+          /** 役割ごとの状況（進行役だけが見られる。UI 設計 S06） */
+          roles: Object.fromEntries(
+            ROLES.map((r) => {
+              const state = session.states[r];
+              const d = session.decisions[r];
+              return [
+                r,
+                {
+                  holders: session.holders[r].map((id) => names[id] ?? ''),
+                  decision: d
+                    ? {
+                        quantity: d.quantity,
+                        version: d.version,
+                        savedBy: nameOf(names, d.savedBy),
+                      }
+                    : null,
+                  inventory: state.inventory,
+                  backlog: state.backlog,
+                  incomingGoods: [...state.incomingGoods],
+                  cumulativeCostMinor: state.cumulativeCostMinor,
+                  history: historyOf(session, r),
+                },
+              ];
+            }),
+          ) as Record<Role, ConsoleRole>,
         };
       });
     },
