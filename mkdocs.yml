@@ -140,6 +140,8 @@ nav:
           - Bolt 10 終了報告: development/beer-game2/bolt_10_report.md
           - Bolt 11 計画: development/beer-game2/bolt_11_plan.md
           - Bolt 11 終了報告: development/beer-game2/bolt_11_report.md
+          - Bolt 12 計画: development/beer-game2/bolt_12_plan.md
+          - Bolt 12 終了報告: development/beer-game2/bolt_12_report.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
@@ -148,6 +150,7 @@ nav:
           - 概要: operation/beer-game2/index.md
           - アプリケーション開発環境セットアップ: operation/beer-game2/application_dev_setup.md
           - AWS ステージング環境セットアップ: operation/beer-game2/aws_staging_setup.md
+          - AWS プロダクション環境セットアップ・運用: operation/beer-game2/aws_production_setup.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:

@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Creation**: [bolt_12_report](/development/beer-game2/bolt_12_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [aws_production_setup](/operation/beer-game2/aws_production_setup.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_12_plan](/development/beer-game2/bolt_12_plan.md) を作成（claude-code/claude-opus-5-5）
 * **Creation**: [bolt_11_report](/development/beer-game2/bolt_11_report.md) を作成（claude-code/claude-opus-5-5）
 * **Update**: [operation](/design/beer-game2/operation.md) を更新（実装済みのアラーム。claude-code/claude-opus-5-5）
 * **Creation**: [bolt_11_plan](/development/beer-game2/bolt_11_plan.md) を作成（claude-code/claude-opus-5-5）
