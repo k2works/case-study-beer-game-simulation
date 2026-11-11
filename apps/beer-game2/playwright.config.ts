@@ -1,7 +1,8 @@
 import { defineConfig } from '@playwright/test';
-
-const API_PORT = 3000;
-const UI_PORT = 5173;
+import {
+  E2E_API_PORT as API_PORT,
+  E2E_UI_PORT as UI_PORT,
+} from './tests/e2e/ports.js';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -27,6 +28,7 @@ export default defineConfig({
       command: 'npx vite',
       url: `http://localhost:${UI_PORT}`,
       reuseExistingServer: !process.env.CI,
+      env: { UI_PORT: String(UI_PORT), API_PORT: String(API_PORT) },
     },
   ],
 });

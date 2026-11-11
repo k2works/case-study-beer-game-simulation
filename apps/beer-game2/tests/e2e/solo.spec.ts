@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { expect, test } from '@playwright/test';
+import { E2E_API_URL, E2E_ORIGIN } from './ports.js';
 
 /**
  * ローカルで 1 人が、1 つのブラウザと開発用ボット（自動確定）（npm run dev:bots）で、1 ゲームを通す。
@@ -34,6 +35,7 @@ test('[US1.2] 1 人・1 ブラウザ + ボット 3 体で、最終週まで 1 �
 
   const bots = spawn('npx', ['tsx', 'scripts/dev-bots.ts', joinCode, '3'], {
     stdio: 'ignore',
+    env: { ...process.env, API_URL: E2E_API_URL, ORIGIN: E2E_ORIGIN },
   });
   try {
     for (const name of ['ボット1', 'ボット2', 'ボット3']) {

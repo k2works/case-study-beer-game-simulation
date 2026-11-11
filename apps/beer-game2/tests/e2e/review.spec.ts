@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { spawn } from 'node:child_process';
 import { expect, test } from '@playwright/test';
+import { E2E_API_URL, E2E_ORIGIN } from './ports.js';
 
 /**
  * 振り返り: 1 人 + ボット（反応的な発注）で 1 ゲームを終えて、役割別の推移を確認する。
@@ -32,7 +33,12 @@ test('[US4.2/AC4.2.1] 終了後に役割別の振り返りを見られ、終了�
 
   const bots = spawn('npx', ['tsx', 'scripts/dev-bots.ts', joinCode, '3'], {
     stdio: 'ignore',
-    env: { ...process.env, BOT_STRATEGY: 'reactive' },
+    env: {
+      ...process.env,
+      BOT_STRATEGY: 'reactive',
+      API_URL: E2E_API_URL,
+      ORIGIN: E2E_ORIGIN,
+    },
   });
   try {
     for (const name of ['ボット1', 'ボット2', 'ボット3']) {
