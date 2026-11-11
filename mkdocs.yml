@@ -142,6 +142,7 @@ nav:
           - Bolt 11 終了報告: development/beer-game2/bolt_11_report.md
           - Bolt 12 計画: development/beer-game2/bolt_12_plan.md
           - Bolt 12 終了報告: development/beer-game2/bolt_12_report.md
+          - リリース完了報告書 0.2: development/beer-game2/release_report-0_2_0.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
