@@ -16,6 +16,7 @@ import { buildReview, canDisclose } from '../domain/review.js';
 import { DecisionConflictError, PermissionError } from '../domain/values.js';
 import {
   PROXY_OPERATOR,
+  changeCommitMode as changeCommitModeRule,
   commitWeek as commitWeekRule,
   pauseSession as pauseSessionRule,
   proxyDecision as proxyDecisionRule,
@@ -456,6 +457,17 @@ export function createApplication(deps: Dependencies) {
       );
     },
 
+    /** 進行役が確定方式を変える（いつでも）。自動へ切り替えて、そろっていれば確定する */
+    changeCommitMode(input: {
+      token: string;
+      gameId: string;
+      commitMode: CommitMode;
+    }) {
+      return changeSession(input, (session, actor) =>
+        changeCommitModeRule(session, actor, input.commitMode),
+      );
+    },
+
     /** 進行役の代理入力。時刻は注入された時計から取り、イベントに残す */
     async proxyDecision(input: {
       token: string;
@@ -587,6 +599,7 @@ export function createApplication(deps: Dependencies) {
           status: session.status,
           week: session.week,
           sessionVersion: session.version,
+          commitMode: session.settings.commitMode,
           settings: settingsView(session.settings),
           submitted: Object.fromEntries(
             ROLES.map((r) => [r, session.decisions[r] !== undefined]),

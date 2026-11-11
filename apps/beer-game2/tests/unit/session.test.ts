@@ -9,6 +9,7 @@ import {
 } from '../../src/domain/game.js';
 import { ROLES } from '../../src/domain/role.js';
 import {
+  changeCommitMode,
   commitWeek,
   pauseSession,
   proxyDecision,
@@ -385,13 +386,13 @@ describe('自動確定（確定方式 AUTO）', () => {
     ]);
   });
 
-  it('[US2.4/AC2.4.2] 最終週の自動確定で、終了する', () => {
+  it('[US2.4/AC2.4.1] 最終週の自動確定で、終了する', () => {
     let s = autoSession(1);
     for (const role of ROLES) s = save(s, role).session;
     expect(s.status).toBe('ENDED');
   });
 
-  it('[US2.4] 手動（MANUAL）では、そろっても確定しない。手動の確定は種別 MANUAL で残る', () => {
+  it('[US2.4/AC2.4.2] 手動（MANUAL）では、そろっても確定しない。手動の確定は種別 MANUAL で残る', () => {
     let s = newSession();
     for (const role of ROLES) s = save(s, role).session;
     expect(s.week).toBe(1);
@@ -400,6 +401,101 @@ describe('自動確定（確定方式 AUTO）', () => {
       version: s.version,
     }).session;
     expect(done.history[0]?.commitKind).toBe('MANUAL');
+  });
+
+  it('[US2.4/AC2.4.3] 停止中は、代理入力でそろっても確定しない。再開すると、同じ操作で確定する', () => {
+    let s = autoSession();
+    for (const role of ['FACTORY', 'DISTRIBUTOR', 'WHOLESALER'] as const)
+      s = save(s, role).session;
+    s = pauseSession(s, FACILITATOR).session;
+    s = proxyDecision(s, FACILITATOR, 'RETAILER', 4, 0, new Date(0)).session;
+    expect(s.week).toBe(1);
+    expect(s.status).toBe('PAUSED');
+    const resumed = resumeSession(s, FACILITATOR);
+    expect(resumed.session.week).toBe(2);
+    expect(resumed.session.history[0]?.commitKind).toBe('AUTO');
+    expect(resumed.events.map((e) => e.type)).toEqual([
+      'SessionResumed',
+      'WeekCommitted',
+    ]);
+  });
+
+  it('[US2.4/AC2.4.3] 再開しても、そろっていなければ確定しない', () => {
+    let s = save(autoSession(), 'FACTORY').session;
+    s = pauseSession(s, FACILITATOR).session;
+    const resumed = resumeSession(s, FACILITATOR);
+    expect(resumed.session.week).toBe(1);
+    expect(resumed.events.map((e) => e.type)).toEqual(['SessionResumed']);
+  });
+
+  it('[US2.4/AC2.4.3] 手動のゲームは、再開してそろっていても確定しない', () => {
+    let s = fillAll(newSession());
+    s = pauseSession(s, FACILITATOR).session;
+    expect(resumeSession(s, FACILITATOR).session.week).toBe(1);
+  });
+});
+
+describe('確定方式の変更（changeCommitMode）', () => {
+  function autoSession(): Session {
+    let g = createGame({
+      id: 'g1',
+      joinCode: 'J',
+      weeks: 3,
+      commitMode: 'AUTO',
+    }).game;
+    ROLES.forEach((role, i) => {
+      g = joinGame(g, { participantId: `p${i}`, displayName: `P${i}` }).game;
+      g = assignRole(g, FACILITATOR, `p${i}`, role).game;
+    });
+    return startSession(startGame(g, FACILITATOR).game, 's1').session;
+  }
+
+  it('[US2.4/AC2.4.5] 進行役は、いつでも自動確定を無効にでき、以後はそろっても確定しない', () => {
+    const { session, events } = changeCommitMode(
+      autoSession(),
+      FACILITATOR,
+      'MANUAL',
+    );
+    expect(session.settings.commitMode).toBe('MANUAL');
+    expect(session.version).toBe(1);
+    expect(events).toEqual([
+      { type: 'AutoCommitChanged', sessionId: 's1', commitMode: 'MANUAL' },
+    ]);
+    const filled = fillAll(session);
+    expect(filled.week).toBe(1);
+  });
+
+  it('[US2.4/AC2.4.5] 停止中でも、無効にできる', () => {
+    const paused = pauseSession(autoSession(), FACILITATOR).session;
+    expect(
+      changeCommitMode(paused, FACILITATOR, 'MANUAL').session.settings
+        .commitMode,
+    ).toBe('MANUAL');
+  });
+
+  it('[US2.4/AC2.4.1] 進行中に有効へ切り替えたとき、そろっていれば、同じ操作で確定する', () => {
+    const filled = fillAll(newSession());
+    const { session, events } = changeCommitMode(filled, FACILITATOR, 'AUTO');
+    expect(session.week).toBe(2);
+    expect(events.map((e) => e.type)).toEqual([
+      'AutoCommitChanged',
+      'WeekCommitted',
+    ]);
+  });
+
+  it('参加者は変えられない。終了後と、同じ方式への変更は拒否する', () => {
+    expect(() =>
+      changeCommitMode(autoSession(), holder('RETAILER'), 'MANUAL'),
+    ).toThrow(PermissionError);
+    expect(() => changeCommitMode(autoSession(), FACILITATOR, 'AUTO')).toThrow(
+      /すでに/,
+    );
+    let ended = fillAll(newSession(1));
+    ended = commitWeek(ended, FACILITATOR, {
+      week: 1,
+      version: ended.version,
+    }).session;
+    expect(() => changeCommitMode(ended, FACILITATOR, 'AUTO')).toThrow(/終了/);
   });
 });
 

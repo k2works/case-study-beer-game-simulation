@@ -145,6 +145,29 @@ export function ConsoleScreen() {
         </p>
       )}
       <SettingsSummary settings={view.settings} />
+      <p>
+        確定方式:{' '}
+        {view.commitMode === 'AUTO'
+          ? '自動（4 役割の入力がそろうと確定します）'
+          : '進行役が確定'}
+        {!ended && (
+          <button
+            type="button"
+            onClick={() =>
+              void run(() =>
+                api.changeCommitMode(
+                  id,
+                  view.commitMode === 'AUTO' ? 'MANUAL' : 'AUTO',
+                ),
+              )
+            }
+          >
+            {view.commitMode === 'AUTO'
+              ? '自動確定を無効にする'
+              : '自動確定を有効にする'}
+          </button>
+        )}
+      </p>
       <table aria-label="入力状況">
         <tbody>
           {ROLE_ORDER.map((r) => (

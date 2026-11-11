@@ -700,3 +700,21 @@ describe('カスタム条件（HTTP）', () => {
     expect(res.statusCode).toBe(400);
   });
 });
+
+describe('確定方式の変更（HTTP）', () => {
+  it('[US2.4/AC2.4.5] 進行役は PUT で確定方式を変えられる。参加者は 403、不正な値は 400', async () => {
+    const { gameId, fac, players } = await table();
+    const change = (cookie: string, commitMode: unknown) =>
+      server.inject({
+        method: 'PUT',
+        url: `/api/games/${gameId}/commit-mode`,
+        payload: { commitMode } as object,
+        headers: { origin: ORIGIN, cookie },
+      });
+    expect((await change(fac, 'AUTO')).statusCode).toBe(204);
+    const c = await get(`/api/games/${gameId}/console`, fac);
+    expect(c.json().commitMode).toBe('AUTO');
+    expect((await change(players.RETAILER!, 'MANUAL')).statusCode).toBe(403);
+    expect((await change(fac, 'SOMETIMES')).statusCode).toBe(400);
+  });
+});

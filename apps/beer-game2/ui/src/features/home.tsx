@@ -20,7 +20,8 @@ export function NewGame() {
   const api = useApi();
   const navigate = useNavigate();
   const [weeks, setWeeks] = useState('20');
-  const [auto, setAuto] = useState(true);
+  // 自動確定の既定は無効（AC1.1.6）
+  const [auto, setAuto] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   // 条件（キット準拠の値で始める）。費用はドルで入力し、送るときに最小単位（セント）へ直す

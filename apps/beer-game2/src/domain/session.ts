@@ -1,5 +1,5 @@
 import type { Actor } from './actor.js';
-import type { Game, GameSettings } from './game.js';
+import type { CommitMode, Game, GameSettings } from './game.js';
 import { ROLES, type Role } from './role.js';
 import {
   initialRoleStates,
@@ -79,6 +79,7 @@ export type SessionEvent =
       at: string;
     }
   | { type: 'WeekCommitted'; sessionId: string; record: WeekRecord }
+  | { type: 'AutoCommitChanged'; sessionId: string; commitMode: CommitMode }
   | { type: 'SessionPaused'; sessionId: string }
   | { type: 'SessionResumed'; sessionId: string }
   | { type: 'SessionEnded'; sessionId: string };
@@ -143,16 +144,41 @@ export function pauseSession(session: Session, actor: Actor): SessionOutcome {
   };
 }
 
-/** 進行役が再開する。最後の確定済みの週の次から、入力を続けられる */
+/**
+ * 進行役が再開する。最後の確定済みの週の次から、入力を続けられる。
+ * 自動確定のゲームで、停止中に入力がそろっていれば、再開と同じ操作の中で確定する。
+ */
 export function resumeSession(session: Session, actor: Actor): SessionOutcome {
   requireFacilitator(actor, '再開');
   requireNotEnded(session);
   if (session.status !== 'PAUSED')
     throw new DomainError('停止中ではないため、再開できません');
-  return {
-    session: { ...session, status: 'ACTIVE', version: session.version + 1 },
-    events: [{ type: 'SessionResumed', sessionId: session.id }],
-  };
+  return withAutoCommit(
+    { ...session, status: 'ACTIVE', version: session.version + 1 },
+    [{ type: 'SessionResumed', sessionId: session.id }],
+  );
+}
+
+/**
+ * 進行役が確定方式を変える（いつでも。停止中も）。自動へ切り替えたとき、進行中で入力がそろっていれば、同じ操作の中で確定する。
+ */
+export function changeCommitMode(
+  session: Session,
+  actor: Actor,
+  commitMode: CommitMode,
+): SessionOutcome {
+  requireFacilitator(actor, '確定方式の変更');
+  requireNotEnded(session);
+  if (session.settings.commitMode === commitMode)
+    throw new DomainError('すでにその確定方式です');
+  return withAutoCommit(
+    {
+      ...session,
+      version: session.version + 1,
+      settings: { ...session.settings, commitMode },
+    },
+    [{ type: 'AutoCommitChanged', sessionId: session.id, commitMode }],
+  );
 }
 
 /**

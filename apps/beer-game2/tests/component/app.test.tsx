@@ -87,6 +87,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     resume: vi.fn().mockResolvedValue(undefined),
     proxyDecision: vi.fn().mockResolvedValue({ version: 1 }),
     reissue: vi.fn().mockResolvedValue({ recoveryCode: 'NEW-CODE' }),
+    changeCommitMode: vi.fn().mockResolvedValue(undefined),
     lobby: vi.fn().mockResolvedValue(lobbyBase),
     assign: vi.fn().mockResolvedValue(undefined),
     unassign: vi.fn().mockResolvedValue(undefined),
@@ -105,6 +106,7 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
       },
       versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
       settings: kitSettings,
+      commitMode: 'MANUAL',
     }),
     saveDecision: vi.fn().mockResolvedValue({ version: 1 }),
     commit: vi
@@ -201,7 +203,7 @@ describe('作成', () => {
     await userEvent.type(weeks, '10');
     await userEvent.click(screen.getByRole('button', { name: '作成する' }));
     expect(api.createGame).toHaveBeenCalledWith(
-      expect.objectContaining({ weeks: 10, commitMode: 'AUTO' }),
+      expect.objectContaining({ weeks: 10, commitMode: 'MANUAL' }),
     );
     expect(await screen.findByText('ABCD2345')).toBeInTheDocument();
   });
@@ -228,15 +230,26 @@ describe('作成', () => {
 });
 
 describe('確定方式の選択', () => {
-  it('[US2.4] 「全員が保存したら自動で次の週に進む」は既定でオン。外すと手動で作成する', async () => {
+  it('[US1.1/AC1.1.6] 「全員が保存したら自動で次の週に進む」は既定で無効。そのまま作ると手動', async () => {
     const api = fakeApi();
     renderAt('/new', api);
     const box = screen.getByLabelText('全員が保存したら自動で次の週に進む');
-    expect(box).toBeChecked();
-    await userEvent.click(box);
+    expect(box).not.toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: '作成する' }));
     expect(api.createGame).toHaveBeenCalledWith(
       expect.objectContaining({ weeks: 20, commitMode: 'MANUAL' }),
+    );
+  });
+
+  it('[US1.1/AC1.1.6] 有効にして作ると、自動確定のゲームになる', async () => {
+    const api = fakeApi();
+    renderAt('/new', api);
+    await userEvent.click(
+      screen.getByLabelText('全員が保存したら自動で次の週に進む'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '作成する' }));
+    expect(api.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ commitMode: 'AUTO' }),
     );
   });
 });
@@ -630,6 +643,7 @@ const consoleView = (extra: object = {}) => ({
   },
   versions: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 0, RETAILER: 2 },
   settings: kitSettings,
+  commitMode: 'MANUAL' as const,
   ...extra,
 });
 
@@ -1134,3 +1148,44 @@ const kitConditions = {
   backlogCostMinor: 100,
   disclosure: 'TEAM_TOTAL',
 };
+
+describe('確定方式の切り替え（コンソール）', () => {
+  it('[US2.4/AC2.4.5] 自動確定のゲームでは「自動」と示し、無効にできる', async () => {
+    const api = fakeApi({
+      console: vi.fn().mockResolvedValue(consoleView({ commitMode: 'AUTO' })),
+    });
+    renderAt('/games/g1/console', api);
+    expect(
+      await screen.findByText(
+        '確定方式: 自動（4 役割の入力がそろうと確定します）',
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: '自動確定を無効にする' }),
+    );
+    expect(api.changeCommitMode).toHaveBeenCalledWith('g1', 'MANUAL');
+  });
+
+  it('[US2.4/AC2.4.5] 手動のゲームでは「進行役が確定」と示し、有効にできる', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/console', api);
+    expect(
+      await screen.findByText('確定方式: 進行役が確定'),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: '自動確定を有効にする' }),
+    );
+    expect(api.changeCommitMode).toHaveBeenCalledWith('g1', 'AUTO');
+  });
+
+  it('終了後は切り替えを出さない', async () => {
+    renderAt(
+      '/games/g1/console',
+      fakeApi({
+        console: vi.fn().mockResolvedValue(consoleView({ status: 'ENDED' })),
+      }),
+    );
+    await screen.findByText(/ゲームは終了しました/);
+    expect(screen.queryByRole('button', { name: /自動確定を/ })).toBeNull();
+  });
+});

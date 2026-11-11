@@ -98,6 +98,7 @@ const reissueBody = z.discriminatedUnion('target', [
   }),
 ]);
 const commitBody = z.object({ week: z.number().int() });
+const commitModeBody = z.object({ commitMode: z.enum(['MANUAL', 'AUTO']) });
 
 function ifMatch(request: FastifyRequest): number {
   const raw = request.headers['if-match'];
@@ -416,6 +417,16 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       return reply.code(204).send();
     });
   }
+
+  server.put('/api/games/:id/commit-mode', async (request, reply) => {
+    const body = commitModeBody.parse(request.body);
+    await app.changeCommitMode({
+      token: await tokenOf(request, 'facilitator', 'participant'),
+      gameId: gameParam(request),
+      commitMode: body.commitMode,
+    });
+    return reply.code(204).send();
+  });
 
   server.put('/api/games/:id/proxy-decision', async (request) => {
     const body = decisionBody.parse(request.body);

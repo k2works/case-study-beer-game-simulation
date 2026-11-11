@@ -100,6 +100,8 @@ export interface RoleView {
 
 export interface ConsoleView {
   settings: SettingsView;
+  /** 現在の確定方式（進行中に切り替えられる） */
+  commitMode: CommitMode;
   status: SessionStatus;
   week: number;
   sessionVersion: number;
@@ -154,6 +156,7 @@ export interface ApiClient {
     quantity: number,
     version: number,
   ): Promise<{ version: number }>;
+  changeCommitMode(gameId: string, commitMode: CommitMode): Promise<void>;
   /** 漏れた資格を失効させ、新しい復帰コードを受け取る */
   reissue(
     gameId: string,

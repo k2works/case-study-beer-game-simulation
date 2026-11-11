@@ -12,6 +12,8 @@ test('[US4.2/AC4.2.1] 終了後に役割別の振り返りを見られ、終了�
   const menu = page.getByRole('navigation', { name: 'メインメニュー' });
   await page.goto('/new');
   await page.getByLabel('週数').fill('3');
+  // 自動確定の既定は無効（AC1.1.6）。ボットと遊ぶため、有効にする
+  await page.getByLabel('全員が保存したら自動で次の週に進む').check();
   await page.getByRole('button', { name: '作成する' }).click();
   await expect(page.getByRole('heading', { name: 'ロビー' })).toBeVisible();
   // 参加コード（復帰コードと区別するため、文言で探す）

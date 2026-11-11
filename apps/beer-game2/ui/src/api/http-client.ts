@@ -34,6 +34,8 @@ export function createHttpClient(): ApiClient {
     join: (input) => call('POST', '/api/join', input),
     recover: (code) => call('POST', '/api/recover', { code }),
     pause: (id) => call('POST', `${g(id)}/pause`, {}),
+    changeCommitMode: (id, commitMode) =>
+      call('PUT', `${g(id)}/commit-mode`, { commitMode }),
     resume: (id) => call('POST', `${g(id)}/resume`, {}),
     proxyDecision: (id, role, quantity, version) =>
       call(

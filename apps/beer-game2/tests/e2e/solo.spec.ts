@@ -12,6 +12,8 @@ test('[US1.2] 1 人・1 ブラウザ + ボット 3 体で、最終週まで 1 �
   await page.goto('/');
   await menu.getByRole('link', { name: '新しいゲーム' }).click();
   await page.getByLabel('週数').fill('2');
+  // 自動確定の既定は無効（AC1.1.6）。ボットと遊ぶため、有効にする
+  await page.getByLabel('全員が保存したら自動で次の週に進む').check();
   await page.getByRole('button', { name: '作成する' }).click();
   await expect(page.getByRole('heading', { name: 'ロビー' })).toBeVisible();
   // 参加コード（復帰コードと区別するため、文言で探す）

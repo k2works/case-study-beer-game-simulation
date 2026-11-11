@@ -1042,3 +1042,55 @@ describe('カスタム条件', () => {
     });
   });
 });
+
+describe('確定方式の変更', () => {
+  it('[US2.4/AC2.4.5] 進行役は進行中に自動確定を無効にでき、コンソールと参加者の画面に反映される', async () => {
+    const t = await setUpTable(3, true, 'AUTO');
+    await app.changeCommitMode({
+      token: t.facilitator,
+      gameId: t.gameId,
+      commitMode: 'MANUAL',
+    });
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    expect(c.commitMode).toBe('MANUAL');
+    const me = await app.roleState({
+      token: t.players.RETAILER.token,
+      gameId: t.gameId,
+    });
+    expect(me.commitMode).toBe('MANUAL');
+    await fillAll(t);
+    const after = await app.console({ token: t.facilitator, gameId: t.gameId });
+    expect(after.week).toBe(1);
+  });
+
+  it('[US2.4/AC2.4.3] 自動確定のゲームで、停止中に代理入力でそろえ、再開すると確定する', async () => {
+    const t = await setUpTable(3, true, 'AUTO');
+    await app.pauseSession({ token: t.facilitator, gameId: t.gameId });
+    for (const role of ROLES)
+      await app.proxyDecision({
+        token: t.facilitator,
+        gameId: t.gameId,
+        role,
+        quantity: 4,
+        expectedVersion: 0,
+      });
+    expect(
+      (await app.console({ token: t.facilitator, gameId: t.gameId })).week,
+    ).toBe(1);
+    await app.resumeSession({ token: t.facilitator, gameId: t.gameId });
+    expect(
+      (await app.console({ token: t.facilitator, gameId: t.gameId })).week,
+    ).toBe(2);
+  });
+
+  it('参加者は確定方式を変えられない', async () => {
+    const t = await setUpTable(3, true, 'AUTO');
+    await expect(
+      app.changeCommitMode({
+        token: t.players.RETAILER.token,
+        gameId: t.gameId,
+        commitMode: 'MANUAL',
+      }),
+    ).rejects.toThrow(PermissionError);
+  });
+});
