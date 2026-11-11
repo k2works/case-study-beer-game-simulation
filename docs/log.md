@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-11
+* **Update**: [ui-design](/design/beer-game2/ui-design.md) を更新（進行役のコンソールの 4 分割。claude-code/claude-opus-5-5）
 * **Verification**: [bolt_12_plan](/development/beer-game2/bolt_12_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
 * **Verification**: [bolt_11_plan](/development/beer-game2/bolt_11_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
 * **Creation**: [bolt_12_report](/development/beer-game2/bolt_12_report.md) を作成（claude-code/claude-opus-5-5）
