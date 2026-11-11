@@ -1,6 +1,7 @@
 import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
 import type { Conditions } from '../domain/conditions.js';
 import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
+import { OBSERVER_LIMIT, observe } from '../domain/observation.js';
 import {
   assignRole as assignRoleRule,
   unassignRole as unassignRoleRule,
@@ -13,7 +14,12 @@ import {
 } from '../domain/game.js';
 import { ROLES, type Role } from '../domain/role.js';
 import { buildReview, canDisclose } from '../domain/review.js';
-import { DecisionConflictError, PermissionError } from '../domain/values.js';
+import {
+  DecisionConflictError,
+  DisplayName,
+  DomainError,
+  PermissionError,
+} from '../domain/values.js';
 import {
   PROXY_OPERATOR,
   changeCommitMode as changeCommitModeRule,
@@ -52,7 +58,7 @@ export interface Dependencies {
   /** 読み取り専用の経路（振り返り） */
   reviews: ReviewReader;
   /** 資格の有効期間（省略時は仮の既定値） */
-  ttl?: { sessionMs: number; recoveryMs: number };
+  ttl?: { sessionMs: number; recoveryMs: number; observerInvitationMs: number };
 }
 
 /** 再発行の対象。進行役自身か、このゲームの参加者 1 人 */
@@ -125,7 +131,16 @@ export function createApplication(deps: Dependencies) {
   }
 
   const actorOf = (p: Principal): Actor =>
-    p.kind === 'FACILITATOR' ? FACILITATOR : participant(p.participantId ?? '');
+    p.kind === 'FACILITATOR'
+      ? FACILITATOR
+      : p.kind === 'OBSERVER'
+        ? { kind: 'OBSERVER', observerId: p.observerId ?? '' }
+        : participant(p.participantId ?? '');
+
+  const requireFacilitatorPrincipal = (p: Principal, operation: string) => {
+    if (p.kind !== 'FACILITATOR')
+      throw new PermissionError(`${operation}は進行役だけができます`);
+  };
 
   async function loadGame(repos: Repositories, gameId: string) {
     const game = await repos.games.find(gameId);
@@ -258,8 +273,7 @@ export function createApplication(deps: Dependencies) {
     }) {
       return uow.run(async (repos) => {
         const principal = await authenticate(repos, input.token, input.gameId);
-        if (principal.kind !== 'FACILITATOR')
-          throw new PermissionError('資格の再発行は進行役だけができます');
+        requireFacilitatorPrincipal(principal, '資格の再発行');
         const game = await loadGame(repos, input.gameId);
         const target: Principal =
           input.target.kind === 'FACILITATOR'
@@ -492,9 +506,123 @@ export function createApplication(deps: Dependencies) {
       };
     },
 
+    /** 観察用の招待の発行（進行役）。招待コードは、この応答で一度だけ返す */
+    issueObserverInvitation(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, '観察用の招待の発行');
+        const game = await loadGame(repos, input.gameId);
+        const invitationId = ids.uuid();
+        const cred = credentials.issue();
+        const validity = CredentialValidity.issue(
+          clock.now(),
+          ttl.observerInvitationMs,
+        );
+        await repos.observers.saveInvitation(cred.digest, {
+          id: invitationId,
+          gameId: game.id,
+          validity,
+        });
+        await repos.events.append(game.id, [
+          { type: 'ObserverInvited', gameId: game.id, invitationId },
+        ]);
+        return {
+          invitationId,
+          code: cred.token,
+          expiresAt: validity.expiresAt.toISOString(),
+        };
+      });
+    },
+
+    /** 観察用の招待の失効（進行役）。新しい参加だけを止め、参加済みの観察者は観察を続けられる */
+    revokeObserverInvitation(input: {
+      token: string;
+      gameId: string;
+      invitationId: string;
+    }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, '観察用の招待の失効');
+        const revoked = await repos.observers.revokeInvitation(
+          input.gameId,
+          input.invitationId,
+          clock.now(),
+        );
+        if (!revoked) throw new NotFoundError('招待が見つかりません');
+        await repos.events.append(input.gameId, [
+          {
+            type: 'ObserverInvitationRevoked',
+            gameId: input.gameId,
+            invitationId: input.invitationId,
+          },
+        ]);
+      });
+    },
+
+    /** 観察用の招待で、観察者として参加する。役割を持たず、読み取りだけ */
+    joinAsObserver(input: { code: string; displayName?: string }) {
+      return uow.run(async (repos) => {
+        const invitation = input.code
+          ? await repos.observers.findInvitation(
+              credentials.digestsOf(input.code),
+              clock.now(),
+            )
+          : null;
+        if (!invitation)
+          throw new UnauthorizedError(
+            '招待が無効です（失効または期限切れ）。進行役に確認してください',
+          );
+        if (
+          (await repos.observers.countObservers(invitation.gameId)) >=
+          OBSERVER_LIMIT
+        )
+          throw new DomainError(
+            `観察者は 1 ゲーム ${OBSERVER_LIMIT} 人までです`,
+          );
+        const name = input.displayName?.trim();
+        const observerId = ids.uuid();
+        await repos.observers.addObserver({
+          id: observerId,
+          gameId: invitation.gameId,
+          invitationId: invitation.id,
+          displayName: name ? DisplayName.of(name) : '観察者',
+        });
+        const token = await issue(
+          repos,
+          { gameId: invitation.gameId, kind: 'OBSERVER', observerId },
+          'SESSION',
+        );
+        await repos.events.append(invitation.gameId, [
+          { type: 'ObserverJoined', gameId: invitation.gameId, observerId },
+        ]);
+        return { gameId: invitation.gameId, observerId, token };
+      });
+    },
+
+    /**
+     * 観察（観察者と進行役だけ）。参加者には開かせない（自分の値から、合計を使って相手の値を逆算できるため）。
+     */
+    observation(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'PARTICIPANT')
+          throw new ForbiddenError(
+            '観察の画面は、観察者と進行役だけが開けます',
+          );
+        return observe(await loadSession(repos, input.gameId));
+      });
+    },
+
+    /** 変化の通知（SSE）の購読の認可。このゲームの進行役・参加者・観察者に通す */
+    async authorizeStream(input: { token: string; gameId: string }) {
+      await uow.run((repos) => authenticate(repos, input.token, input.gameId));
+    },
+
     lobby(input: { token: string; gameId: string }) {
       return uow.run(async (repos) => {
         const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'OBSERVER')
+          throw new ForbiddenError('観察者は、ロビーを開けません');
         const game = await loadGame(repos, input.gameId);
         return {
           gameId: game.id,
@@ -510,8 +638,17 @@ export function createApplication(deps: Dependencies) {
           commitMode: game.settings.commitMode,
           settings: settingsView(game.settings),
           ...(principal.kind === 'FACILITATOR'
-            ? { joinCode: game.joinCode }
+            ? {
+                joinCode: game.joinCode,
+                observerInvitations: (
+                  await repos.observers.activeInvitations(game.id, clock.now())
+                ).map((i) => ({
+                  id: i.id,
+                  expiresAt: i.expiresAt.toISOString(),
+                })),
+              }
             : {}),
+          observerCount: await repos.observers.countObservers(game.id),
           participants: game.participants.map((p) => ({
             id: p.id,
             displayName: p.displayName,

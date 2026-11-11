@@ -35,10 +35,11 @@ describe('CredentialValidity', () => {
     );
   });
 
-  it('有効期間の仮の既定値: ブラウザセッション 24 時間、復帰コード 30 日', () => {
+  it('有効期間の仮の既定値: ブラウザセッション 24 時間、復帰コード 30 日、観察用の招待 24 時間', () => {
     expect(CREDENTIAL_TTL).toEqual({
       sessionMs: 24 * 60 * 60 * 1000,
       recoveryMs: 30 * 24 * 60 * 60 * 1000,
+      observerInvitationMs: 24 * 60 * 60 * 1000,
     });
   });
 

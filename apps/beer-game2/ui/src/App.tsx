@@ -4,6 +4,7 @@ import { ApiContext, PollContext } from './hooks.js';
 import { ConsoleScreen } from './features/console.js';
 import { Home, Join, NewGame } from './features/home.js';
 import { LobbyScreen } from './features/lobby.js';
+import { ObservationScreen, ObserveJoin } from './features/observe.js';
 import { PlayScreen } from './features/play.js';
 import { ReviewScreen } from './features/review.js';
 import { Menu } from './menu.js';
@@ -24,6 +25,11 @@ export function App({
           <Route path="/" element={<Home />} />
           <Route path="/new" element={<NewGame />} />
           <Route path="/join" element={<Join />} />
+          <Route path="/observe" element={<ObserveJoin />} />
+          <Route
+            path="/games/:id/observation"
+            element={<ObservationScreen />}
+          />
           <Route path="/games/:id/lobby" element={<LobbyScreen />} />
           <Route path="/games/:id/play" element={<PlayScreen />} />
           <Route path="/games/:id/console" element={<ConsoleScreen />} />

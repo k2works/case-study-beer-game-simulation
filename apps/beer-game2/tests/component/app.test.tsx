@@ -28,6 +28,7 @@ const kitSettings = {
 
 const lobbyBase = {
   settings: kitSettings,
+  observerCount: 0,
   gameId: 'g1',
   status: 'PREPARING' as const,
   finalWeek: 10,
@@ -88,6 +89,14 @@ function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient {
     proxyDecision: vi.fn().mockResolvedValue({ version: 1 }),
     reissue: vi.fn().mockResolvedValue({ recoveryCode: 'NEW-CODE' }),
     changeCommitMode: vi.fn().mockResolvedValue(undefined),
+    issueObserverInvitation: vi.fn().mockResolvedValue({
+      invitationId: 'inv1',
+      code: 'OBS-CODE',
+      expiresAt: '2026-11-12T00:00:00.000Z',
+    }),
+    revokeObserverInvitation: vi.fn().mockResolvedValue(undefined),
+    observe: vi.fn().mockResolvedValue({ gameId: 'g1' }),
+    observation: vi.fn().mockResolvedValue(observationView()),
     lobby: vi.fn().mockResolvedValue(lobbyBase),
     assign: vi.fn().mockResolvedValue(undefined),
     unassign: vi.fn().mockResolvedValue(undefined),
@@ -1187,5 +1196,199 @@ describe('確定方式の切り替え（コンソール）', () => {
     );
     await screen.findByText(/ゲームは終了しました/);
     expect(screen.queryByRole('button', { name: /自動確定を/ })).toBeNull();
+  });
+});
+
+function observationView(extra: object = {}) {
+  return {
+    status: 'ACTIVE' as const,
+    week: 3,
+    step: 'INPUT' as const,
+    submitted: {
+      FACTORY: true,
+      DISTRIBUTOR: true,
+      WHOLESALER: false,
+      RETAILER: false,
+    },
+    totals: { lastCommittedWeek: 2, inventory: 40, backlog: 6, orders: 13 },
+    ...extra,
+  };
+}
+
+describe('観察用の招待（ロビー）', () => {
+  it('[US1.3/AC1.3.1] 進行役が招待を発行すると、招待コードを一度だけ示す', async () => {
+    const api = fakeApi();
+    renderAt('/games/g1/lobby', api);
+    await userEvent.click(
+      await screen.findByRole('button', { name: '観察用の招待を発行' }),
+    );
+    expect(api.issueObserverInvitation).toHaveBeenCalledWith('g1');
+    expect(
+      await screen.findByRole('note', { name: '観察用の招待コード' }),
+    ).toHaveTextContent('OBS-CODE');
+  });
+
+  it('[US1.3/AC1.3.4] 有効な招待の一覧から、確認を経て失効できる。観察者の人数を示す', async () => {
+    const api = fakeApi({
+      lobby: vi.fn().mockResolvedValue({
+        ...lobbyBase,
+        observerCount: 2,
+        observerInvitations: [
+          { id: 'inv1', expiresAt: '2026-11-12T00:00:00.000Z' },
+        ],
+      }),
+    });
+    renderAt('/games/g1/lobby', api);
+    expect(await screen.findByText('観察者: 2 人')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '招待を失効' }));
+    await userEvent.click(
+      within(
+        screen.getByRole('dialog', { name: '招待の失効の確認' }),
+      ).getByRole('button', { name: '失効する' }),
+    );
+    expect(api.revokeObserverInvitation).toHaveBeenCalledWith('g1', 'inv1');
+  });
+
+  it('[US1.3/AC1.3.2] 参加者のロビーには、招待の操作を出さない', async () => {
+    renderAt(
+      '/games/g1/lobby',
+      fakeApi({
+        lobby: vi.fn().mockResolvedValue({
+          ...lobbyBase,
+          viewer: { kind: 'PARTICIPANT', participantId: 'p1' },
+          joinCode: undefined,
+        }),
+      }),
+    );
+    await screen.findByText('開始を待っています');
+    expect(
+      screen.queryByRole('button', { name: '観察用の招待を発行' }),
+    ).toBeNull();
+  });
+});
+
+describe('観察者の参加（S10）', () => {
+  it('[US1.3/AC1.3.3] 招待コードと任意の表示名で参加し、観察の画面へ進む', async () => {
+    const api = fakeApi();
+    renderAt('/observe', api);
+    await userEvent.type(
+      screen.getByLabelText('観察用の招待コード'),
+      ' OBS-CODE ',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: '観察者として参加' }),
+    );
+    expect(api.observe).toHaveBeenCalledWith({
+      code: 'OBS-CODE',
+      displayName: '',
+    });
+    expect(
+      await screen.findByRole('heading', { name: '観察' }),
+    ).toBeInTheDocument();
+  });
+
+  it('[US1.3/AC1.3.4] 無効な招待は、進行役への確認を示し、入力を保持する', async () => {
+    const api = fakeApi({
+      observe: vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError(
+            401,
+            '招待が無効です（失効または期限切れ）。進行役に確認してください',
+          ),
+        ),
+    });
+    renderAt('/observe', api);
+    await userEvent.type(screen.getByLabelText('観察用の招待コード'), 'BAD');
+    await userEvent.click(
+      screen.getByRole('button', { name: '観察者として参加' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('進行役');
+    expect(screen.getByLabelText('観察用の招待コード')).toHaveValue('BAD');
+  });
+
+  it('メニューから観察者として参加できる', () => {
+    renderAt('/', fakeApi());
+    expect(
+      within(
+        screen.getByRole('navigation', { name: 'メインメニュー' }),
+      ).getByRole('link', { name: '観察者として参加' }),
+    ).toHaveAttribute('href', '/observe');
+  });
+});
+
+describe('観察（S07）', () => {
+  it('[US4.1/AC4.1.1] 現在週・ステップ・完了状況・在庫・受注残・注文のチーム合計を示す', async () => {
+    renderAt('/games/g1/observation', fakeApi());
+    expect(await screen.findByText('3 週目（入力中）')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: '完了状況' });
+    expect(within(table).getAllByText('入力済み')).toHaveLength(2);
+    const totals = screen.getByRole('list', { name: 'チーム合計' });
+    expect(totals).toHaveTextContent('在庫（2 週目の終わり）: 40');
+    expect(totals).toHaveTextContent('受注残（2 週目の終わり）: 6');
+    expect(totals).toHaveTextContent('注文（当週の入力済み）: 13');
+  });
+
+  it('[US4.1/AC4.1.3] 非表示の合計は、理由とともに「非表示」と示す', async () => {
+    renderAt(
+      '/games/g1/observation',
+      fakeApi({
+        observation: vi.fn().mockResolvedValue(
+          observationView({
+            totals: {
+              lastCommittedWeek: null,
+              inventory: null,
+              backlog: null,
+              orders: null,
+            },
+          }),
+        ),
+      }),
+    );
+    const totals = await screen.findByRole('list', { name: 'チーム合計' });
+    expect(totals).toHaveTextContent('在庫: まだ確定した週がありません');
+    expect(totals).toHaveTextContent(
+      '注文（当週の入力済み）: 非表示（入力済みが 2 役割未満）',
+    );
+  });
+
+  it('公開範囲が「進行状況だけ」なら、合計を出さない', async () => {
+    renderAt(
+      '/games/g1/observation',
+      fakeApi({
+        observation: vi
+          .fn()
+          .mockResolvedValue(observationView({ totals: null })),
+      }),
+    );
+    expect(
+      await screen.findByText('このゲームの公開範囲は「進行状況だけ」です。'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'チーム合計' })).toBeNull();
+  });
+
+  it('[US4.1/AC4.1.5] 観察の画面には、入力・確定・進行の操作が無い。終了したら振り返りへの導線を出す', async () => {
+    renderAt(
+      '/games/g1/observation',
+      fakeApi({
+        observation: vi
+          .fn()
+          .mockResolvedValue(
+            observationView({ status: 'ENDED', step: 'ENDED' }),
+          ),
+      }),
+    );
+    expect(
+      await screen.findByRole('link', { name: '振り返りを見る' }),
+    ).toHaveAttribute('href', '/games/g1/review');
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('[US4.1] 進行役のコンソールに、観察の画面への入口がある', async () => {
+    renderAt('/games/g1/console', fakeApi());
+    expect(
+      await screen.findByRole('link', { name: '観察を見る' }),
+    ).toHaveAttribute('href', '/games/g1/observation');
   });
 });

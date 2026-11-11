@@ -1094,3 +1094,210 @@ describe('確定方式の変更', () => {
     ).rejects.toThrow(PermissionError);
   });
 });
+
+describe('観察者', () => {
+  async function invite(t: Table) {
+    return app.issueObserverInvitation({
+      token: t.facilitator,
+      gameId: t.gameId,
+    });
+  }
+  async function joinAsObserver(t: Table) {
+    const inv = await invite(t);
+    return app.joinAsObserver({ code: inv.code, displayName: '見学者' });
+  }
+
+  it('[US1.3/AC1.3.1] 進行役が招待を求めると、参加コードと別の招待コードが発行され、ロビーに有効な招待が並ぶ', async () => {
+    const t = await setUpTable(3, false);
+    const inv = await invite(t);
+    const lobby = await app.lobby({ token: t.facilitator, gameId: t.gameId });
+    expect(inv.code).not.toBe(lobby.joinCode);
+    expect(lobby.observerInvitations).toEqual([
+      { id: inv.invitationId, expiresAt: inv.expiresAt },
+    ]);
+    // 生の招待コードは保存しない
+    expect(
+      JSON.stringify([...mem.snapshot().invitations.values()]),
+    ).not.toContain(inv.code);
+  });
+
+  it('[US1.3/AC1.3.2] 進行役以外は、招待を発行できない', async () => {
+    const t = await setUpTable(3, false);
+    await expect(
+      app.issueObserverInvitation({
+        token: t.players.RETAILER.token,
+        gameId: t.gameId,
+      }),
+    ).rejects.toThrow(PermissionError);
+  });
+
+  it('[US1.3/AC1.3.3] 観察者は役割を持たず、参加者の一覧に出ない', async () => {
+    const t = await setUpTable(3, false);
+    const o = await joinAsObserver(t);
+    expect(o.gameId).toBe(t.gameId);
+    const lobby = await app.lobby({ token: t.facilitator, gameId: t.gameId });
+    expect(lobby.participants).toHaveLength(4);
+    expect(lobby.observerCount).toBe(1);
+  });
+
+  it('[US1.3/AC1.3.3][US4.1/AC4.1.5] 観察者は、入力・確定・進行・準備の操作ができない', async () => {
+    const t = await setUpTable(3, false);
+    const o = await joinAsObserver(t);
+    const as = { token: o.token, gameId: t.gameId };
+    await expect(app.startGame(as)).rejects.toThrow(PermissionError);
+    await app.startGame({ token: t.facilitator, gameId: t.gameId });
+    const ops = [
+      app.saveDecision({
+        ...as,
+        role: 'RETAILER',
+        quantity: 1,
+        expectedVersion: 0,
+      }),
+      app.proxyDecision({
+        ...as,
+        role: 'RETAILER',
+        quantity: 1,
+        expectedVersion: 0,
+      }),
+      app.commitWeek({ ...as, week: 1, version: 0, idempotencyKey: 'k' }),
+      app.pauseSession(as),
+      app.changeCommitMode({ ...as, commitMode: 'AUTO' }),
+      app.issueObserverInvitation(as),
+      app.reissueCredential({ ...as, target: { kind: 'FACILITATOR' } }),
+    ];
+    for (const op of ops) await expect(op).rejects.toThrow(PermissionError);
+  });
+
+  it('[US4.1/AC4.1.2] 観察者は、役割別の状況・進行役のコンソール・ロビー・終了前の振り返りを取得できない', async () => {
+    const t = await setUpTable();
+    const inv = await app.issueObserverInvitation({
+      token: t.facilitator,
+      gameId: t.gameId,
+    });
+    const o = await app.joinAsObserver({ code: inv.code });
+    const as = { token: o.token, gameId: t.gameId };
+    await expect(app.roleState(as)).rejects.toThrow(ForbiddenError);
+    await expect(app.console(as)).rejects.toThrow(ForbiddenError);
+    await expect(app.lobby(as)).rejects.toThrow(ForbiddenError);
+    await expect(app.review(as)).rejects.toThrow(PermissionError);
+  });
+
+  it('[US4.1/AC4.1.1] 観察者は、観察の投影を取得できる（役割別の値と需要を含まない）', async () => {
+    const t = await setUpTable();
+    const inv = await app.issueObserverInvitation({
+      token: t.facilitator,
+      gameId: t.gameId,
+    });
+    const o = await app.joinAsObserver({ code: inv.code });
+    await fillAll(t, 6);
+    const view = await app.observation({ token: o.token, gameId: t.gameId });
+    expect(view).toMatchObject({
+      week: 1,
+      step: 'AWAITING_COMMIT',
+      totals: { orders: 24 },
+    });
+  });
+
+  it('[US4.1/AC4.1.4] 観察を開けるのは、そのゲームの観察者と進行役だけ（参加者・他のゲーム・資格なしは不可）', async () => {
+    const t = await setUpTable();
+    await expect(
+      app.observation({ token: t.facilitator, gameId: t.gameId }),
+    ).resolves.toBeDefined();
+    await expect(
+      app.observation({ token: t.players.RETAILER.token, gameId: t.gameId }),
+    ).rejects.toThrow(ForbiddenError);
+    await expect(
+      app.observation({ token: '', gameId: t.gameId }),
+    ).rejects.toThrow(UnauthorizedError);
+    const other = await setUpTable();
+    const inv = await app.issueObserverInvitation({
+      token: other.facilitator,
+      gameId: other.gameId,
+    });
+    const o = await app.joinAsObserver({ code: inv.code });
+    await expect(
+      app.observation({ token: o.token, gameId: t.gameId }),
+    ).rejects.toThrow(ForbiddenError);
+  });
+
+  it('[US1.3/AC1.3.4] 進行役が招待を失効させると、その招待での新しい参加はできない。参加済みの観察者は観察を続けられる', async () => {
+    const t = await setUpTable();
+    const inv = await invite(t);
+    const before = await app.joinAsObserver({ code: inv.code });
+    await app.revokeObserverInvitation({
+      token: t.facilitator,
+      gameId: t.gameId,
+      invitationId: inv.invitationId,
+    });
+    await expect(app.joinAsObserver({ code: inv.code })).rejects.toThrow(
+      UnauthorizedError,
+    );
+    await expect(
+      app.observation({ token: before.token, gameId: t.gameId }),
+    ).resolves.toBeDefined();
+    const lobby = await app.lobby({ token: t.facilitator, gameId: t.gameId });
+    expect(lobby.observerInvitations).toEqual([]);
+  });
+
+  it('観察用の招待は 24 時間で期限切れになる（境界）', async () => {
+    const t = await setUpTable(3, false);
+    const inv = await invite(t);
+    advance(DAY - 1);
+    await expect(app.joinAsObserver({ code: inv.code })).resolves.toBeDefined();
+    advance(1);
+    await expect(app.joinAsObserver({ code: inv.code })).rejects.toThrow(
+      UnauthorizedError,
+    );
+  });
+
+  it('観察者は 1 ゲーム 20 人まで', async () => {
+    const t = await setUpTable(3, false);
+    const inv = await invite(t);
+    for (let i = 0; i < 20; i++) await app.joinAsObserver({ code: inv.code });
+    await expect(app.joinAsObserver({ code: inv.code })).rejects.toThrow(
+      /20 人/,
+    );
+  });
+
+  it('参加コードでは観察者として参加できず、招待コードでは参加者として参加できない', async () => {
+    const t = await setUpTable(3, false);
+    const inv = await invite(t);
+    const lobby = await app.lobby({ token: t.facilitator, gameId: t.gameId });
+    await expect(app.joinAsObserver({ code: lobby.joinCode! })).rejects.toThrow(
+      UnauthorizedError,
+    );
+    await expect(
+      app.joinGame({ joinCode: inv.code, displayName: 'x' }),
+    ).rejects.toThrow(NotFoundError);
+  });
+
+  it('[US4.2] 終了後は、観察者にも振り返りを開示する', async () => {
+    const t = await setUpTable(1);
+    const inv = await invite(t);
+    const o = await app.joinAsObserver({ code: inv.code });
+    await fillAll(t);
+    const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+    await app.commitWeek({
+      token: t.facilitator,
+      gameId: t.gameId,
+      week: 1,
+      version: c.sessionVersion,
+      idempotencyKey: 'end',
+    });
+    await expect(
+      app.review({ token: o.token, gameId: t.gameId }),
+    ).resolves.toMatchObject({ weeks: [1] });
+  });
+
+  it('変化の通知の認可は、そのゲームの観察者・参加者・進行役に通す', async () => {
+    const t = await setUpTable(3, false);
+    const o = await joinAsObserver(t);
+    for (const token of [o.token, t.facilitator, t.players.FACTORY.token])
+      await expect(
+        app.authorizeStream({ token, gameId: t.gameId }),
+      ).resolves.toBeUndefined();
+    await expect(
+      app.authorizeStream({ token: 'nope', gameId: t.gameId }),
+    ).rejects.toThrow(UnauthorizedError);
+  });
+});

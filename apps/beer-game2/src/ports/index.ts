@@ -28,8 +28,9 @@ export interface SessionRepository {
 /** 資格に対応する主体。生の資格は保存せず、ダイジェストだけを持つ */
 export interface Principal {
   gameId: string;
-  kind: 'FACILITATOR' | 'PARTICIPANT';
+  kind: 'FACILITATOR' | 'PARTICIPANT' | 'OBSERVER';
   participantId?: string;
+  observerId?: string;
 }
 
 /** 資格の種類。ブラウザセッション（Cookie の値）と、復帰コード（Cookie を失ったときに戻るため） */
@@ -53,6 +54,32 @@ export interface CredentialRepository {
   revokeAll(principal: Principal, at: Date): Promise<void>;
 }
 
+/** 観察用の招待と観察者。招待コードは保存せず、ダイジェストだけを持つ */
+export interface ObserverRepository {
+  saveInvitation(
+    digest: string,
+    invitation: { id: string; gameId: string; validity: CredentialValidity },
+  ): Promise<void>;
+  /** 候補のダイジェストのうち、時刻 `at` で有効な招待 */
+  findInvitation(
+    digests: readonly string[],
+    at: Date,
+  ): Promise<{ id: string; gameId: string } | null>;
+  /** 失効させる。このゲームの招待でなければ false */
+  revokeInvitation(gameId: string, id: string, at: Date): Promise<boolean>;
+  activeInvitations(
+    gameId: string,
+    at: Date,
+  ): Promise<{ id: string; expiresAt: Date }[]>;
+  addObserver(observer: {
+    id: string;
+    gameId: string;
+    invitationId: string;
+    displayName: string;
+  }): Promise<void>;
+  countObservers(gameId: string): Promise<number>;
+}
+
 export interface IdempotencyRecord {
   gameId: string;
   key: string;
@@ -73,6 +100,7 @@ export interface Repositories {
   games: GameRepository;
   sessions: SessionRepository;
   credentials: CredentialRepository;
+  observers: ObserverRepository;
   idempotency: IdempotencyRepository;
   events: EventLog;
 }

@@ -718,3 +718,130 @@ describe('確定方式の変更（HTTP）', () => {
     expect((await change(fac, 'SOMETIMES')).statusCode).toBe(400);
   });
 });
+
+describe('観察者（HTTP）', () => {
+  async function observerOf(gameId: string, fac: string) {
+    const inv = await post(
+      `/api/games/${gameId}/observer-invitations`,
+      {},
+      fac,
+    );
+    const joined = await post('/api/observe', {
+      code: inv.json().code,
+      displayName: '見学者',
+    });
+    return { inv, joined, cookie: cookieOf(joined) };
+  }
+
+  it('[US1.3/AC1.3.1] 進行役が招待を発行すると 201 で招待コードが返り、観察者は参加すると観察者の Cookie を受け取る', async () => {
+    const { gameId, fac } = await table();
+    const { inv, joined } = await observerOf(gameId, fac);
+    expect(inv.statusCode).toBe(201);
+    expect(inv.json()).toMatchObject({
+      invitationId: expect.any(String),
+      code: expect.any(String),
+    });
+    expect(logs.join('')).not.toContain(inv.json().code);
+    expect(joined.statusCode).toBe(201);
+    expect(joined.json()).toEqual({ gameId });
+    expect(joined.cookies[0]!.name).toBe('bg_observer');
+    expect(String(joined.headers['set-cookie'])).toMatch(/HttpOnly/i);
+  });
+
+  it('[US1.3/AC1.3.2] 参加者が招待を求めると 403', async () => {
+    const { gameId, players } = await table();
+    const res = await post(
+      `/api/games/${gameId}/observer-invitations`,
+      {},
+      players.RETAILER!,
+    );
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('[US4.1/AC4.1.1] 観察者は観察を取得でき、役割別の値と需要を含まない', async () => {
+    const { gameId, fac, players } = await table();
+    const { cookie } = await observerOf(gameId, fac);
+    for (const role of ROLES)
+      await put(
+        `/api/games/${gameId}/decision`,
+        { role, quantity: 7 },
+        players[role]!,
+        0,
+      );
+    const res = await get(`/api/games/${gameId}/observation`, cookie);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      week: 1,
+      step: 'AWAITING_COMMIT',
+      totals: { orders: 28 },
+    });
+    expect(JSON.stringify(res.json())).not.toMatch(/demand|"7"|:7[,}]/);
+  });
+
+  it('[US4.1/AC4.1.2][US4.1/AC4.1.5] 観察者の資格では、役割別の状況・コンソール・ロビーは 403、変更の操作も 403', async () => {
+    const { gameId, fac } = await table();
+    const { cookie } = await observerOf(gameId, fac);
+    for (const url of ['me', 'console', 'lobby'])
+      expect(
+        (await get(`/api/games/${gameId}/${url}`, cookie)).statusCode,
+      ).toBe(403);
+    const writes = [
+      put(
+        `/api/games/${gameId}/decision`,
+        { role: 'RETAILER', quantity: 1 },
+        cookie,
+        0,
+      ),
+      put(
+        `/api/games/${gameId}/proxy-decision`,
+        { role: 'RETAILER', quantity: 1 },
+        cookie,
+        0,
+      ),
+      post(`/api/games/${gameId}/commit`, { week: 1 }, cookie, {
+        'if-match': '"0"',
+        'idempotency-key': 'k',
+      }),
+      post(`/api/games/${gameId}/pause`, {}, cookie),
+      post(`/api/games/${gameId}/observer-invitations`, {}, cookie),
+    ];
+    for (const res of await Promise.all(writes))
+      expect(res.statusCode).toBe(403);
+  });
+
+  it('[US4.1/AC4.1.4] 参加者は観察を開けない（403）。資格が無ければ 401', async () => {
+    const { gameId, players } = await table();
+    expect(
+      (await get(`/api/games/${gameId}/observation`, players.RETAILER!))
+        .statusCode,
+    ).toBe(403);
+    expect((await get(`/api/games/${gameId}/observation`)).statusCode).toBe(
+      401,
+    );
+  });
+
+  it('[US1.3/AC1.3.4] 進行役が招待を失効させると 204 で、その招待での参加は 401（進行役への確認を示す）', async () => {
+    const { gameId, fac } = await table();
+    const inv = await post(
+      `/api/games/${gameId}/observer-invitations`,
+      {},
+      fac,
+    );
+    const del = await server.inject({
+      method: 'DELETE',
+      url: `/api/games/${gameId}/observer-invitations/${inv.json().invitationId}`,
+      headers: { origin: ORIGIN, cookie: fac },
+    });
+    expect(del.statusCode).toBe(204);
+    const res = await post('/api/observe', { code: inv.json().code });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().detail).toMatch(/進行役/);
+    expect(logs.join('')).toMatch(/観察者の参加に失敗/);
+  });
+
+  it('[US3.2] 観察者の参加も、送信元ごとの専用の上限を超えると 429', async () => {
+    await boot(memoryRateLimiter(1, 60_000));
+    expect((await post('/api/observe', { code: 'x' })).statusCode).toBe(401);
+    expect((await post('/api/observe', { code: 'x' })).statusCode).toBe(429);
+  });
+});

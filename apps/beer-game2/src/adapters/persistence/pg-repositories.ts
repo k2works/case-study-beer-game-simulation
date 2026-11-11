@@ -23,6 +23,7 @@ import {
   type GameRepository,
   type IdempotencyRecord,
   type IdempotencyRepository,
+  type ObserverRepository,
   type Principal,
   type Repositories,
   type SessionRepository,
@@ -350,18 +351,22 @@ class PgCredentials implements CredentialRepository {
   ) {
     if (purpose === 'SESSION') {
       await this.db.query(
-        `INSERT INTO browser_sessions (credential_digest, game_id, actor_kind, participant_id, expires_at)
-         VALUES ($1,$2,$3,$4,$5)`,
+        `INSERT INTO browser_sessions (credential_digest, game_id, actor_kind, participant_id,
+           observer_id, expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
         [
           digest,
           principal.gameId,
           principal.kind,
           principal.participantId ?? null,
+          principal.observerId ?? null,
           validity.expiresAt,
         ],
       );
       return;
     }
+    if (principal.kind === 'OBSERVER')
+      throw new Error('観察者は復帰コードを持ちません');
     // 復帰コードは主体ごとに 1 つ。上書きで、前の復帰コードは使えなくなる
     const { rowCount } =
       principal.kind === 'FACILITATOR'
@@ -393,7 +398,7 @@ class PgCredentials implements CredentialRepository {
     const { rows } =
       purpose === 'SESSION'
         ? await this.db.query(
-            `SELECT game_id, actor_kind, participant_id FROM browser_sessions
+            `SELECT game_id, actor_kind, participant_id, observer_id FROM browser_sessions
              WHERE credential_digest = ANY($1) AND revoked_at IS NULL AND expires_at > $2
              LIMIT 1`,
             [digests, at],
@@ -413,16 +418,25 @@ class PgCredentials implements CredentialRepository {
       gameId: r.game_id,
       kind: r.actor_kind,
       ...(r.participant_id ? { participantId: r.participant_id } : {}),
+      ...(r.observer_id ? { observerId: r.observer_id } : {}),
     };
   }
 
   async revokeAll(principal: Principal, at: Date) {
     const participantId = principal.participantId ?? null;
     await this.db.query(
-      `UPDATE browser_sessions SET revoked_at = COALESCE(revoked_at, $4)
-       WHERE game_id = $1 AND actor_kind = $2 AND participant_id IS NOT DISTINCT FROM $3`,
-      [principal.gameId, principal.kind, participantId, at],
+      `UPDATE browser_sessions SET revoked_at = COALESCE(revoked_at, $5)
+       WHERE game_id = $1 AND actor_kind = $2 AND participant_id IS NOT DISTINCT FROM $3
+         AND observer_id IS NOT DISTINCT FROM $4`,
+      [
+        principal.gameId,
+        principal.kind,
+        participantId,
+        principal.observerId ?? null,
+        at,
+      ],
     );
+    if (principal.kind === 'OBSERVER') return;
     if (principal.kind === 'FACILITATOR') {
       await this.db.query(
         `UPDATE games SET facilitator_revoked_at = COALESCE(facilitator_revoked_at, $2)
@@ -436,6 +450,74 @@ class PgCredentials implements CredentialRepository {
         [principal.gameId, participantId, at],
       );
     }
+  }
+}
+
+class PgObservers implements ObserverRepository {
+  constructor(private readonly db: Db) {}
+
+  async saveInvitation(
+    digest: string,
+    inv: { id: string; gameId: string; validity: CredentialValidity },
+  ) {
+    await this.db.query(
+      `INSERT INTO observer_invitations (invitation_id, game_id, code_digest, expires_at)
+       VALUES ($1,$2,$3,$4)`,
+      [inv.id, inv.gameId, digest, inv.validity.expiresAt],
+    );
+  }
+
+  async findInvitation(digests: readonly string[], at: Date) {
+    const { rows } = await this.db.query(
+      `SELECT invitation_id, game_id FROM observer_invitations
+       WHERE code_digest = ANY($1) AND revoked_at IS NULL AND expires_at > $2 LIMIT 1`,
+      [digests, at],
+    );
+    return rows[0]
+      ? { id: rows[0].invitation_id, gameId: rows[0].game_id }
+      : null;
+  }
+
+  async revokeInvitation(gameId: string, id: string, at: Date) {
+    const { rowCount } = await this.db.query(
+      `UPDATE observer_invitations SET revoked_at = COALESCE(revoked_at, $3)
+       WHERE game_id = $1 AND invitation_id = $2`,
+      [gameId, id, at],
+    );
+    return (rowCount ?? 0) > 0;
+  }
+
+  async activeInvitations(gameId: string, at: Date) {
+    const { rows } = await this.db.query(
+      `SELECT invitation_id, expires_at FROM observer_invitations
+       WHERE game_id = $1 AND revoked_at IS NULL AND expires_at > $2 ORDER BY created_at`,
+      [gameId, at],
+    );
+    return rows.map((r) => ({
+      id: r.invitation_id as string,
+      expiresAt: r.expires_at as Date,
+    }));
+  }
+
+  async addObserver(o: {
+    id: string;
+    gameId: string;
+    invitationId: string;
+    displayName: string;
+  }) {
+    await this.db.query(
+      `INSERT INTO observers (observer_id, game_id, invitation_id, display_name)
+       VALUES ($1,$2,$3,$4)`,
+      [o.id, o.gameId, o.invitationId, o.displayName],
+    );
+  }
+
+  async countObservers(gameId: string) {
+    const { rows } = await this.db.query(
+      'SELECT count(*)::int AS n FROM observers WHERE game_id = $1',
+      [gameId],
+    );
+    return rows[0].n as number;
   }
 }
 
@@ -522,6 +604,7 @@ export function repositoriesOver(db: Db, idempotencyKey: Buffer): Repositories {
     games: new PgGames(db),
     sessions: new PgSessions(db),
     credentials: new PgCredentials(db),
+    observers: new PgObservers(db),
     idempotency: new PgIdempotency(db, idempotencyKey),
     events: new PgEvents(db),
   };

@@ -41,11 +41,14 @@ async function startTableWith(
     weeks = 2,
     coRetailer = false,
     conditions,
+    invite = false,
   }: {
     weeks?: number;
     coRetailer?: boolean;
     /** 作成の画面で、条件の欄を入力する */
     conditions?: Record<string, string>;
+    /** 開始前に、観察用の招待を発行する */
+    invite?: boolean;
   },
 ) {
   const facContext = await browser.newContext();
@@ -59,6 +62,16 @@ async function startTableWith(
   await fac.getByRole('button', { name: '作成する' }).click();
   await expect(fac.getByRole('heading', { name: 'ロビー' })).toBeVisible();
   const facRecoveryCode = await recoveryCodeOn(fac);
+  let inviteCode = '';
+  if (invite) {
+    await fac.getByRole('button', { name: '観察用の招待を発行' }).click();
+    inviteCode = (
+      await fac
+        .getByRole('note', { name: '観察用の招待コード' })
+        .locator('strong')
+        .innerText()
+    ).trim();
+  }
   // 参加コード（復帰コードと区別するため、文言で探す）
   const joinCode = (
     await fac
@@ -94,7 +107,7 @@ async function startTableWith(
   await expect(
     fac.getByRole('heading', { name: '進行役コンソール' }),
   ).toBeVisible();
-  return { fac, facContext, players, facRecoveryCode };
+  return { fac, facContext, players, facRecoveryCode, inviteCode };
 }
 
 async function enterOrders(players: Player[], quantity: number) {
@@ -391,6 +404,47 @@ test('[US1.1/AC1.1.3] カスタム条件で作ると、ロビーに「カスタ�
     retailer.getByRole('definition').filter({ hasText: /^20$/ }).first(),
   ).toBeVisible();
 
+  await facContext.close();
+  for (const p of players) await p.context.close();
+});
+
+test('[US4.1/AC4.1.1] 観察者は招待で参加し、チーム合計と進行状況だけを見る。参加者の画面は開けない', async ({
+  browser,
+}) => {
+  const { facContext, players, inviteCode } = await startTableWith(browser, {
+    invite: true,
+  });
+  const observerContext = await browser.newContext();
+  const observer = await observerContext.newPage();
+  await observer.goto('/observe');
+  await observer.getByLabel('観察用の招待コード').fill(inviteCode);
+  await observer.getByRole('button', { name: '観察者として参加' }).click();
+  await expect(observer.getByRole('heading', { name: '観察' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(observer.getByText('1 週目（入力中）')).toBeVisible();
+
+  // 1 役割だけの入力では、注文の合計を出さない（AC4.1.3）
+  await enterOrders([players[0]!], 5);
+  const totals = observer.getByRole('list', { name: 'チーム合計' });
+  await expect(totals).toContainText(
+    '注文（当週の入力済み）: 非表示（入力済みが 2 役割未満）',
+    { timeout: 15_000 },
+  );
+  await enterOrders([players[1]!], 6);
+  await expect(totals).toContainText('注文（当週の入力済み）: 11', {
+    timeout: 15_000,
+  });
+  await expect(
+    observer.getByRole('table', { name: '完了状況' }).getByText('入力済み'),
+  ).toHaveCount(2);
+
+  // 観察者は、参加者の画面（役割別の値）を開けない（AC4.1.2）
+  const gameId = /games\/([^/]+)\//.exec(observer.url())![1];
+  await observer.goto(`/games/${gameId}/play`);
+  await expect(observer.getByRole('alert')).toContainText('参加者の画面です');
+
+  await observerContext.close();
   await facContext.close();
   for (const p of players) await p.context.close();
 });

@@ -53,8 +53,26 @@ export interface SettingsView extends Conditions {
   changes: ConditionItem[];
 }
 
+/** 観察（観察者と進行役）。役割別の値と需要は含まない */
+export interface ObservationView {
+  status: SessionStatus;
+  week: number;
+  step: 'INPUT' | 'AWAITING_COMMIT' | 'PAUSED' | 'ENDED';
+  submitted: Record<Role, boolean>;
+  /** 公開範囲が「進行状況だけ」なら null。非表示の合計は null */
+  totals: {
+    lastCommittedWeek: number | null;
+    inventory: number | null;
+    backlog: number | null;
+    orders: number | null;
+  } | null;
+}
+
 export interface Lobby {
   commitMode: CommitMode;
+  observerCount: number;
+  /** 進行役にだけ含まれる。有効な観察用の招待 */
+  observerInvitations?: { id: string; expiresAt: string }[];
   settings: SettingsView;
   gameId: string;
   status: GameStatus;
@@ -157,6 +175,16 @@ export interface ApiClient {
     version: number,
   ): Promise<{ version: number }>;
   changeCommitMode(gameId: string, commitMode: CommitMode): Promise<void>;
+  issueObserverInvitation(
+    gameId: string,
+  ): Promise<{ invitationId: string; code: string; expiresAt: string }>;
+  revokeObserverInvitation(gameId: string, invitationId: string): Promise<void>;
+  /** 観察用の招待で参加する（観察者の Cookie が設定される） */
+  observe(input: {
+    code: string;
+    displayName: string;
+  }): Promise<{ gameId: string }>;
+  observation(gameId: string): Promise<ObservationView>;
   /** 漏れた資格を失効させ、新しい復帰コードを受け取る */
   reissue(
     gameId: string,

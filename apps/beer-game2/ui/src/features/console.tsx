@@ -321,6 +321,10 @@ export function ConsoleScreen() {
       {newCode && <RecoveryCodeNote label="新しい復帰コード" code={newCode} />}
 
       <p>
+        <Link to={`/games/${id}/observation`}>観察を見る</Link>
+        （観察者に見えている内容）
+      </p>
+      <p>
         <Link to={`/games/${id}/play`}>参加者として遊ぶ</Link>
         （この画面の進行役が、役割も担当しているとき）
       </p>

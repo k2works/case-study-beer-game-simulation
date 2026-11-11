@@ -34,6 +34,15 @@ export function createHttpClient(): ApiClient {
     join: (input) => call('POST', '/api/join', input),
     recover: (code) => call('POST', '/api/recover', { code }),
     pause: (id) => call('POST', `${g(id)}/pause`, {}),
+    issueObserverInvitation: (id) =>
+      call('POST', `${g(id)}/observer-invitations`, {}),
+    revokeObserverInvitation: (id, invitationId) =>
+      call(
+        'DELETE',
+        `${g(id)}/observer-invitations/${encodeURIComponent(invitationId)}`,
+      ),
+    observe: (input) => call('POST', '/api/observe', input),
+    observation: (id) => call('GET', `${g(id)}/observation`),
     changeCommitMode: (id, commitMode) =>
       call('PUT', `${g(id)}/commit-mode`, { commitMode }),
     resume: (id) => call('POST', `${g(id)}/resume`, {}),

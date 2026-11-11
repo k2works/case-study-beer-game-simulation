@@ -31,6 +31,14 @@ export const DISCLOSURE_LABEL: Record<DisclosurePolicy, string> = {
   PROGRESS_ONLY: '進行状況だけ',
 };
 
+/** 観察の、当週の段階 */
+export const STEP_LABEL = {
+  INPUT: '入力中',
+  AWAITING_COMMIT: '確定待ち',
+  PAUSED: '停止中',
+  ENDED: '終了',
+} as const;
+
 /** 工場は「発注」ではなく「生産要請」を決める */
 export const DECISION_LABEL = (role: Role) =>
   role === 'FACTORY' ? '生産要請数' : '発注数';

@@ -22,6 +22,9 @@ export function Menu() {
         <li>
           <NavLink to="/join">ゲームに参加</NavLink>
         </li>
+        <li>
+          <NavLink to="/observe">観察者として参加</NavLink>
+        </li>
         {gameId && (
           <>
             <li className="menu-sep" aria-hidden="true">

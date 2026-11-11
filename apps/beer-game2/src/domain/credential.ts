@@ -17,6 +17,8 @@ export const CREDENTIAL_TTL = {
   sessionMs: 24 * 60 * 60 * 1000,
   /** 復帰コード（参加者・進行役） */
   recoveryMs: 30 * 24 * 60 * 60 * 1000,
+  /** 観察用の招待（研修の 1 日） */
+  observerInvitationMs: 24 * 60 * 60 * 1000,
 } as const;
 
 export const CredentialValidity = {

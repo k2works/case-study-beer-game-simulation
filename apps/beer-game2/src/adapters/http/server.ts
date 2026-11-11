@@ -48,6 +48,7 @@ export interface ServerDependencies {
 export const COOKIE = {
   facilitator: 'bg_facilitator',
   participant: 'bg_participant',
+  observer: 'bg_observer',
 } as const;
 type Kind = keyof typeof COOKIE;
 
@@ -90,6 +91,10 @@ const assignBody = z.object({
 });
 const decisionBody = z.object({ role: roleSchema, quantity: z.number() });
 const recoverBody = z.object({ code: z.string().max(200) });
+const observeBody = z.object({
+  code: z.string().max(200),
+  displayName: z.string().optional(),
+});
 const reissueBody = z.discriminatedUnion('target', [
   z.object({ target: z.literal('FACILITATOR') }),
   z.object({
@@ -188,6 +193,8 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       // 復帰の失敗は、総当たりの検知のために記録する（コードは記録しない）
       if (request.routeOptions.url === '/api/recover')
         request.log.warn({ ip: request.ip }, '復帰に失敗しました');
+      if (request.routeOptions.url === '/api/observe')
+        request.log.warn({ ip: request.ip }, '観察者の参加に失敗しました');
       return problem(reply, 401, 'Unauthorized', error.message);
     }
     if (error instanceof ForbiddenError)
@@ -317,11 +324,50 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     };
   });
 
+  // 観察用の招待（進行役）。招待コードは、この応答で一度だけ返す
+  server.post('/api/games/:id/observer-invitations', async (request, reply) => {
+    const issued = await app.issueObserverInvitation({
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
+      gameId: gameParam(request),
+    });
+    return reply.code(201).send(issued);
+  });
+
+  server.delete(
+    '/api/games/:id/observer-invitations/:invitationId',
+    async (request, reply) => {
+      const { invitationId } = request.params as { invitationId: string };
+      await app.revokeObserverInvitation({
+        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
+        gameId: gameParam(request),
+        invitationId,
+      });
+      return reply.code(204).send();
+    },
+  );
+
+  // 観察者の参加。参加コードとは別の招待コードで、専用のレート制限を受ける
+  server.post('/api/observe', async (request, reply) => {
+    await limit(request, 'observe');
+    const body = observeBody.parse(request.body);
+    const joined = await app.joinAsObserver(body);
+    setSession(reply, 'observer', joined.token);
+    return reply.code(201).send({ gameId: joined.gameId });
+  });
+
+  // 観察（観察者と進行役）。逆算できない集計だけを返す
+  server.get('/api/games/:id/observation', async (request) =>
+    app.observation({
+      token: await tokenOf(request, 'observer', 'facilitator', 'participant'),
+      gameId: gameParam(request),
+    }),
+  );
+
   // 漏れた資格の失効と再発行（進行役）。進行役自身なら、新しい Cookie も設定する
   server.post('/api/games/:id/credentials/reissue', async (request, reply) => {
     const body = reissueBody.parse(request.body);
     const reissued = await app.reissueCredential({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       target:
         body.target === 'FACILITATOR'
@@ -335,7 +381,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   server.get('/api/games/:id/lobby', async (request) =>
     app.lobby({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
     }),
   );
@@ -343,7 +389,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   server.post('/api/games/:id/assignments', async (request, reply) => {
     const body = assignBody.parse(request.body);
     await app.assignRole({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       ...body,
     });
@@ -355,7 +401,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     async (request, reply) => {
       const { participantId } = request.params as { participantId: string };
       await app.unassignRole({
-        token: await tokenOf(request, 'facilitator', 'participant'),
+        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
         gameId: gameParam(request),
         participantId,
       });
@@ -365,7 +411,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   server.post('/api/games/:id/start', async (request, reply) => {
     await app.startGame({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
     });
     return reply.code(204).send();
@@ -373,7 +419,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   server.get('/api/games/:id/me', async (request) =>
     app.roleState({
-      token: await tokenOf(request, 'participant', 'facilitator'),
+      token: await tokenOf(request, 'participant', 'facilitator', 'observer'),
       gameId: gameParam(request),
     }),
   );
@@ -381,14 +427,14 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   // 振り返り（役割別の時系列）。ゲームが終了してから、進行役・参加者に開示する
   server.get('/api/games/:id/review', async (request) =>
     app.review({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
     }),
   );
 
   server.get('/api/games/:id/console', async (request) =>
     app.console({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
     }),
   );
@@ -396,7 +442,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   server.put('/api/games/:id/decision', async (request) => {
     const body = decisionBody.parse(request.body);
     const saved = await app.saveDecision({
-      token: await tokenOf(request, 'participant', 'facilitator'),
+      token: await tokenOf(request, 'participant', 'facilitator', 'observer'),
       gameId: gameParam(request),
       role: body.role,
       quantity: body.quantity,
@@ -408,7 +454,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   for (const action of ['pause', 'resume'] as const) {
     server.post(`/api/games/:id/${action}`, async (request, reply) => {
       const input = {
-        token: await tokenOf(request, 'facilitator', 'participant'),
+        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
         gameId: gameParam(request),
       };
       await (action === 'pause'
@@ -421,7 +467,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   server.put('/api/games/:id/commit-mode', async (request, reply) => {
     const body = commitModeBody.parse(request.body);
     await app.changeCommitMode({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       commitMode: body.commitMode,
     });
@@ -431,7 +477,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   server.put('/api/games/:id/proxy-decision', async (request) => {
     const body = decisionBody.parse(request.body);
     return app.proxyDecision({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       role: body.role,
       quantity: body.quantity,
@@ -446,7 +492,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       throw new HttpError(400, 'Idempotency-Key ヘッダーが必要です');
     }
     return app.commitWeek({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId: gameParam(request),
       week: body.week,
       version: ifMatch(request),
@@ -457,10 +503,10 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   // 状態の変化の通知（SSE）。内容は含めず、変化があったことだけを伝える
   server.get('/api/games/:id/stream', async (request, reply) => {
     const gameId = gameParam(request);
-    await app.lobby({
-      token: await tokenOf(request, 'facilitator', 'participant'),
+    await app.authorizeStream({
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
       gameId,
-    }); // 認証・認可の確認
+    }); // 認証・認可の確認（観察者にはロビーを見せないため、専用の確認）
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, {

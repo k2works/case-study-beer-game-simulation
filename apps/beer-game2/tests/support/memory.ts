@@ -28,12 +28,25 @@ interface StoredCredential {
 const samePrincipal = (a: Principal, b: Principal) =>
   a.gameId === b.gameId &&
   a.kind === b.kind &&
-  (a.participantId ?? null) === (b.participantId ?? null);
+  (a.participantId ?? null) === (b.participantId ?? null) &&
+  (a.observerId ?? null) === (b.observerId ?? null);
+
+interface StoredInvitation {
+  id: string;
+  gameId: string;
+  validity: Validity;
+}
 
 interface Store {
   games: Map<string, Game>;
   sessions: Map<string, Session>;
   credentials: Map<string, StoredCredential>;
+  /** 招待コードのダイジェスト → 招待 */
+  invitations: Map<string, StoredInvitation>;
+  observers: Map<
+    string,
+    { gameId: string; invitationId: string; displayName: string }
+  >;
   idempotency: Map<string, IdempotencyRecord>;
   events: { gameId: string; event: object }[];
 }
@@ -42,6 +55,8 @@ const emptyStore = (): Store => ({
   games: new Map(),
   sessions: new Map(),
   credentials: new Map(),
+  invitations: new Map(),
+  observers: new Map(),
   idempotency: new Map(),
   events: [],
 });
@@ -115,6 +130,49 @@ function reposOver(store: Store, failOnAppend: () => boolean): Repositories {
           });
         }
       },
+    },
+    observers: {
+      saveInvitation: async (digest, inv) =>
+        void store.invitations.set(digest, inv),
+      findInvitation: async (digests, at) => {
+        for (const d of digests) {
+          const inv = store.invitations.get(d);
+          if (
+            inv &&
+            store.games.has(inv.gameId) &&
+            CredentialValidity.isValid(inv.validity, at)
+          )
+            return { id: inv.id, gameId: inv.gameId };
+        }
+        return null;
+      },
+      revokeInvitation: async (gameId, id, at) => {
+        for (const [d, inv] of store.invitations) {
+          if (inv.id !== id || inv.gameId !== gameId) continue;
+          store.invitations.set(d, {
+            ...inv,
+            validity: CredentialValidity.revoke(inv.validity, at),
+          });
+          return true;
+        }
+        return false;
+      },
+      activeInvitations: async (gameId, at) =>
+        [...store.invitations.values()]
+          .filter(
+            (inv) =>
+              inv.gameId === gameId &&
+              CredentialValidity.isValid(inv.validity, at),
+          )
+          .map((inv) => ({ id: inv.id, expiresAt: inv.validity.expiresAt })),
+      addObserver: async (o) =>
+        void store.observers.set(o.id, {
+          gameId: o.gameId,
+          invitationId: o.invitationId,
+          displayName: o.displayName,
+        }),
+      countObservers: async (gameId) =>
+        [...store.observers.values()].filter((o) => o.gameId === gameId).length,
     },
     idempotency: {
       find: async (gameId, key) =>
