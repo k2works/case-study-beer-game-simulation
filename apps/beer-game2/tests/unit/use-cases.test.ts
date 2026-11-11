@@ -15,9 +15,11 @@ import {
   PermissionError,
   StaleError,
 } from '../../src/domain/values.js';
+import { ExportIncompleteError } from '../../src/domain/export.js';
 import { ConflictError } from '../../src/ports/index.js';
 import {
   fakeCredentials,
+  memoryExportReader,
   memoryReviewReader,
   memoryUnitOfWork,
   sequentialIds,
@@ -41,6 +43,7 @@ beforeEach(() => {
     ids: sequentialIds(),
     credentials: fakeCredentials(),
     reviews: memoryReviewReader(mem),
+    exports: memoryExportReader(mem),
   });
 });
 
@@ -568,6 +571,7 @@ describe('振り返り（終了後だけ開示）', () => {
       ids: sequentialIds(),
       credentials: fakeCredentials(),
       reviews: { read: async () => ({ sessionStatus: 'ENDED', rows: [] }) },
+      exports: memoryExportReader(mem),
     });
     const review = await emptyApp.review({
       token: t.facilitator,
@@ -1299,5 +1303,153 @@ describe('観察者', () => {
     await expect(
       app.authorizeStream({ token: 'nope', gameId: t.gameId }),
     ).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe('出力（CSV・JSON）', () => {
+  /** 2 週を通して終了させる（第 2 週は進行役の代理入力を含む） */
+  async function endedTable() {
+    const t = await setUpTable(2);
+    for (const week of [1, 2]) {
+      for (const role of ROLES) {
+        if (week === 2 && role === 'FACTORY')
+          await app.proxyDecision({
+            token: t.facilitator,
+            gameId: t.gameId,
+            role,
+            quantity: 9,
+            expectedVersion: 0,
+          });
+        else
+          await app.saveDecision({
+            token: t.players[role].token,
+            gameId: t.gameId,
+            role,
+            quantity: 4 + week,
+            expectedVersion: 0,
+          });
+      }
+      const c = await app.console({ token: t.facilitator, gameId: t.gameId });
+      await app.commitWeek({
+        token: t.facilitator,
+        gameId: t.gameId,
+        week,
+        version: c.sessionVersion,
+        idempotencyKey: `w${week}`,
+      });
+    }
+    return t;
+  }
+
+  it('[US4.3/AC4.3.1] 終了後、進行役は JSON を出力でき、設定・全週・全役割・意思決定（代理入力の別と週）・履歴を含む', async () => {
+    const t = await endedTable();
+    const out = await app.exportGame({
+      token: t.facilitator,
+      gameId: t.gameId,
+      format: 'json',
+    });
+    expect(out.contentType).toMatch(/application\/json/);
+    expect(out.filename).toBe(`beer-game-${t.gameId}.json`);
+    const doc = JSON.parse(out.body);
+    expect(doc.schemaVersion).toBe('beer-game2.export.v1');
+    expect(doc.game.settings.kind).toBe('KIT');
+    expect(doc.weeks).toHaveLength(2);
+    expect(doc.weeks[1].roles.FACTORY.order).toBe(9);
+    expect(doc.inputs).toHaveLength(8);
+    expect(doc.inputs).toContainEqual(
+      expect.objectContaining({
+        week: 2,
+        role: 'FACTORY',
+        quantity: 9,
+        by: 'PROXY',
+      }),
+    );
+    expect(doc.history.map((h: { type: string }) => h.type)).toEqual(
+      expect.arrayContaining(['GameCreated', 'WeekCommitted', 'SessionEnded']),
+    );
+    // 表示名と資格の出来事は含めない
+    expect(out.body).not.toContain('P-RETAILER');
+    expect(out.body).not.toContain('Credential');
+  });
+
+  it('[US4.3/AC4.3.2] CSV と JSON の数量と費用が一致する', async () => {
+    const t = await endedTable();
+    const as = { token: t.facilitator, gameId: t.gameId };
+    const json = JSON.parse(
+      (await app.exportGame({ ...as, format: 'json' })).body,
+    );
+    const csv = (await app.exportGame({ ...as, format: 'csv' })).body;
+    const [head, ...lines] = csv.trimEnd().split('\r\n');
+    const keys = head!.split(',');
+    expect(lines).toHaveLength(8);
+    for (const line of lines) {
+      const row = Object.fromEntries(
+        line.split(',').map((v, i) => [keys[i], v]),
+      );
+      const v = json.weeks[Number(row.week) - 1].roles[row.role!];
+      expect(Number(row.order)).toBe(v.order);
+      expect(Number(row.cumulative_cost_minor)).toBe(v.cumulativeCostMinor);
+    }
+  });
+
+  it('[US4.3] 出力は進行役だけで、終了後だけ', async () => {
+    const t = await setUpTable(2);
+    await expect(
+      app.exportGame({ token: t.facilitator, gameId: t.gameId, format: 'csv' }),
+    ).rejects.toThrow(PermissionError);
+    const ended = await endedTable();
+    await expect(
+      app.exportGame({
+        token: ended.players.RETAILER.token,
+        gameId: ended.gameId,
+        format: 'csv',
+      }),
+    ).rejects.toThrow(PermissionError);
+    const inv = await app.issueObserverInvitation({
+      token: ended.facilitator,
+      gameId: ended.gameId,
+    });
+    const o = await app.joinAsObserver({ code: inv.code });
+    await expect(
+      app.exportGame({ token: o.token, gameId: ended.gameId, format: 'json' }),
+    ).rejects.toThrow(PermissionError);
+  });
+
+  it('[US4.3/AC4.3.3] 記録が欠けていれば、部分的な結果を返さず失敗する', async () => {
+    const t = await endedTable();
+    const broken = createApplication({
+      uow: mem.uow,
+      clock: { now: () => now },
+      ids: sequentialIds(),
+      credentials: fakeCredentials(),
+      reviews: memoryReviewReader(mem),
+      exports: {
+        read: async (gameId) => {
+          const full = await memoryExportReader(mem).read(gameId);
+          return {
+            ...full,
+            source: { ...full.source!, rows: full.source!.rows.slice(1) },
+          };
+        },
+      },
+    });
+    await expect(
+      broken.exportGame({
+        token: t.facilitator,
+        gameId: t.gameId,
+        format: 'csv',
+      }),
+    ).rejects.toThrow(ExportIncompleteError);
+  });
+
+  it('[US4.3] 振り返りは、進行役にだけ「出力できる」と示す', async () => {
+    const t = await endedTable();
+    expect(
+      (await app.review({ token: t.facilitator, gameId: t.gameId })).canExport,
+    ).toBe(true);
+    expect(
+      (await app.review({ token: t.players.RETAILER.token, gameId: t.gameId }))
+        .canExport,
+    ).toBe(false);
   });
 });

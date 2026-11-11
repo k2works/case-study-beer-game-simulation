@@ -143,6 +143,8 @@ export type Metric = 'order' | 'inventory' | 'backlog' | 'shipped' | 'cost';
 
 /** 振り返り（役割別の時系列）。費用は最小単位（セント） */
 export interface ReviewView {
+  /** 出力（CSV・JSON）ができるか（進行役だけ） */
+  canExport: boolean;
   weeks: number[];
   demand: number[];
   series: Record<Metric, Record<Role, number[]>>;

@@ -119,6 +119,7 @@ describe('saveDecision', () => {
       {
         type: 'DecisionSaved',
         sessionId: 's1',
+        week: 1,
         role: 'RETAILER',
         quantity: 6,
         savedBy: 'p3',
@@ -167,6 +168,15 @@ describe('saveDecision', () => {
     expect(() =>
       saveDecision(newSession(), FACILITATOR, 'RETAILER', 1, 0),
     ).toThrow(PermissionError);
+  });
+});
+
+describe('入力のイベント', () => {
+  it('[US4.3/AC4.3.1] 参加者の保存のイベントは、週を持つ（出力で、週ごとの意思決定を識別する）', () => {
+    let s = fillAll(newSession());
+    s = commitWeek(s, FACILITATOR, { week: 1, version: s.version }).session;
+    const { events } = saveDecision(s, holder('RETAILER'), 'RETAILER', 3, 0);
+    expect(events[0]).toMatchObject({ type: 'DecisionSaved', week: 2 });
   });
 });
 
@@ -262,6 +272,7 @@ describe('代理入力（proxyDecision）', () => {
       {
         type: 'ProxyDecisionSubmitted',
         sessionId: 's1',
+        week: 1,
         role: 'WHOLESALER',
         quantity: 7,
         version: 1,

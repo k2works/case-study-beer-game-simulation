@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Writable } from 'node:stream';
 import cookie from '@fastify/cookie';
 import Fastify, {
@@ -104,6 +104,7 @@ const reissueBody = z.discriminatedUnion('target', [
 ]);
 const commitBody = z.object({ week: z.number().int() });
 const commitModeBody = z.object({ commitMode: z.enum(['MANUAL', 'AUTO']) });
+const exportQuery = z.object({ format: z.enum(['csv', 'json']) });
 
 function ifMatch(request: FastifyRequest): number {
   const raw = request.headers['if-match'];
@@ -431,6 +432,25 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       gameId: gameParam(request),
     }),
   );
+
+  // 出力（進行役・終了後）。全体を組み立ててから送る。本文の SHA-256 をヘッダーで返す
+  server.get('/api/games/:id/export', async (request, reply) => {
+    const { format } = exportQuery.parse(request.query);
+    const out = await app.exportGame({
+      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
+      gameId: gameParam(request),
+      format,
+    });
+    return reply
+      .type(out.contentType)
+      .header('content-disposition', `attachment; filename="${out.filename}"`)
+      .header('cache-control', 'no-store')
+      .header(
+        'x-checksum-sha256',
+        createHash('sha256').update(out.body).digest('hex'),
+      )
+      .send(out.body);
+  });
 
   server.get('/api/games/:id/console', async (request) =>
     app.console({

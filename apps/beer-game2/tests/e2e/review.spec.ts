@@ -133,6 +133,16 @@ test('[US4.2/AC4.2.1] 終了後に役割別の振り返りを見られ、終了�
     await page.getByRole('radio', { name: '在庫' }).focus();
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('radio', { name: '受注残' })).toBeChecked();
+
+    // 出力（進行役）: CSV を受け取ると、全週 × 4 役割の行と見出しがある（US4.3/AC4.3.1）
+    const href = await page
+      .getByRole('link', { name: 'CSV で出力' })
+      .getAttribute('href');
+    const csv = await page.request.get(href!);
+    expect(csv.status()).toBe(200);
+    const lines = (await csv.text()).trimEnd().split('\r\n');
+    expect(lines[0]).toMatch(/^schema_version,game_id,settings_kind/);
+    expect(lines).toHaveLength(1 + 3 * 4);
   } finally {
     bots.kill();
   }

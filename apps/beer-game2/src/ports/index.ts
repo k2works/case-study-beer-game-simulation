@@ -1,4 +1,5 @@
 import type { CredentialValidity } from '../domain/credential.js';
+import type { ExportSource } from '../domain/export.js';
 import type { Game } from '../domain/game.js';
 import type { ReviewRow } from '../domain/review.js';
 import type { Session } from '../domain/session.js';
@@ -147,6 +148,14 @@ export interface ReviewSource {
  */
 export interface ReviewReader {
   read(gameId: string): Promise<ReviewSource>;
+}
+
+/** 出力の元データの読み取り専用の経路。開示してよいかの判定はここでは行わない */
+export interface ExportReader {
+  read(gameId: string): Promise<{
+    sessionStatus: 'ACTIVE' | 'PAUSED' | 'ENDED' | null;
+    source: ExportSource | null;
+  }>;
 }
 
 /**

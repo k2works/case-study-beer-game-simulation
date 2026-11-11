@@ -3,13 +3,18 @@ import {
   type CredentialValidity as Validity,
 } from '../../src/domain/credential.js';
 import type { Game } from '../../src/domain/game.js';
-import { ROLES } from '../../src/domain/role.js';
+import {
+  EXPORT_HISTORY_TYPES,
+  EXPORT_INPUT_TYPES,
+} from '../../src/domain/export.js';
+import { ROLES, type Role } from '../../src/domain/role.js';
 import type { ReviewRow } from '../../src/domain/review.js';
 import type { Session } from '../../src/domain/session.js';
 import {
   ConflictError,
   type CredentialPolicy,
   type CredentialPurpose,
+  type ExportReader,
   type IdGenerator,
   type IdempotencyRecord,
   type Principal,
@@ -225,6 +230,67 @@ export function fakeCredentials(): CredentialPolicy {
       return { token, digest: `digest(${token})` };
     },
     digestsOf: (token) => [`digest(${token})`],
+  };
+}
+
+/** メモリ上の出力の元データ（UnitOfWork の保存内容とイベントから組み立てる） */
+export function memoryExportReader(mem: {
+  snapshot: () => Store;
+}): ExportReader {
+  return {
+    read: async (gameId) => {
+      const store = mem.snapshot();
+      const session = store.sessions.get(gameId);
+      if (!session) return { sessionStatus: null, source: null };
+      const rows = (await memoryReviewReader(mem).read(gameId)).rows;
+      const events = store.events
+        .filter((e) => e.gameId === gameId)
+        .map((e) => e.event as Record<string, unknown> & { type: string });
+      const s = session.settings;
+      return {
+        sessionStatus: session.status,
+        source: {
+          gameId,
+          finalWeek: s.finalWeek,
+          commitMode: s.commitMode,
+          settings: {
+            kind: s.kind,
+            changes: s.changes,
+            initialInventory: s.initialInventory,
+            orderDelayWeeks: s.orderDelayWeeks,
+            shipmentDelayWeeks: s.shipmentDelayWeeks,
+            productionDelayWeeks: s.productionDelayWeeks,
+            holdingCostMinor: s.holdingCostMinor,
+            backlogCostMinor: s.backlogCostMinor,
+            disclosure: s.disclosure,
+          },
+          demand: s.demand,
+          weeks: session.history.map((h) => ({
+            week: h.week,
+            commitKind: h.commitKind,
+          })),
+          rows,
+          inputs: events.flatMap((e) =>
+            e.type in EXPORT_INPUT_TYPES
+              ? [
+                  {
+                    week: (e.week as number | undefined) ?? null,
+                    role: e.role as Role,
+                    quantity: e.quantity as number,
+                    by: EXPORT_INPUT_TYPES[
+                      e.type as keyof typeof EXPORT_INPUT_TYPES
+                    ],
+                    at: '',
+                  },
+                ]
+              : [],
+          ),
+          history: events
+            .filter((e) => EXPORT_HISTORY_TYPES.includes(e.type))
+            .map((e) => ({ type: e.type, at: '' })),
+        },
+      };
+    },
   };
 }
 

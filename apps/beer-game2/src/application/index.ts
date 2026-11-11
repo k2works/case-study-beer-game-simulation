@@ -2,6 +2,7 @@ import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
 import type { Conditions } from '../domain/conditions.js';
 import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
 import { OBSERVER_LIMIT, observe } from '../domain/observation.js';
+import { buildExport } from '../domain/export.js';
 import {
   assignRole as assignRoleRule,
   unassignRole as unassignRoleRule,
@@ -38,6 +39,7 @@ import {
   type ReviewReader,
   type CredentialPolicy,
   type CredentialPurpose,
+  type ExportReader,
   type IdGenerator,
   type Principal,
   type Repositories,
@@ -57,6 +59,8 @@ export interface Dependencies {
   credentials: CredentialPolicy;
   /** 読み取り専用の経路（振り返り） */
   reviews: ReviewReader;
+  /** 読み取り専用の経路（出力） */
+  exports: ExportReader;
   /** 資格の有効期間（省略時は仮の既定値） */
   ttl?: { sessionMs: number; recoveryMs: number; observerInvitationMs: number };
 }
@@ -84,7 +88,7 @@ export interface CommitResult {
  * @landmark ユースケース層の入口。1 回の操作は 1 つのトランザクション。ルールを持たず、認証 → 集約の呼び出し → 保存の順に進めるだけ。
  */
 export function createApplication(deps: Dependencies) {
-  const { uow, ids, credentials, reviews, clock } = deps;
+  const { uow, ids, credentials, reviews, exports, clock } = deps;
   const ttl = deps.ttl ?? CREDENTIAL_TTL;
 
   /** 資格を発行して保存し、生の値を返す（生の値は保存しない） */
@@ -717,12 +721,47 @@ export function createApplication(deps: Dependencies) {
      * 開示の判定はドメインの `canDisclose` に集め、終了前は値を一切返さない。
      */
     async review(input: { token: string; gameId: string }) {
-      await uow.run((repos) => authenticate(repos, input.token, input.gameId));
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
       const source = await reviews.read(input.gameId);
       if (!canDisclose(source.sessionStatus)) {
         throw new PermissionError('振り返りは、ゲームが終了してから見られます');
       }
-      return buildReview(source.rows);
+      return {
+        ...buildReview(source.rows),
+        /** 出力（CSV・JSON）は進行役だけ */
+        canExport: principal.kind === 'FACILITATOR',
+      };
+    },
+
+    /**
+     * 出力（CSV・JSON）。進行役だけが、終了後だけ。全体を組み立ててから返し、欠けがあれば失敗する（部分的な結果を返さない）。
+     */
+    async exportGame(input: {
+      token: string;
+      gameId: string;
+      format: 'csv' | 'json';
+    }) {
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
+      requireFacilitatorPrincipal(principal, '出力');
+      const { sessionStatus, source } = await exports.read(input.gameId);
+      if (!canDisclose(sessionStatus) || !source)
+        throw new PermissionError('出力は、ゲームが終了してからできます');
+      const built = buildExport(source);
+      return input.format === 'csv'
+        ? {
+            contentType: 'text/csv; charset=utf-8',
+            filename: `beer-game-${input.gameId}.csv`,
+            body: built.csv,
+          }
+        : {
+            contentType: 'application/json; charset=utf-8',
+            filename: `beer-game-${input.gameId}.json`,
+            body: JSON.stringify(built.json, null, 2),
+          };
     },
 
     /** 進行役のコンソール。入力の有無だけを見せる */

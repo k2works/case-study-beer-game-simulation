@@ -20,6 +20,7 @@ afterEach(cleanup);
 
 const series = (f: (i: number) => number) => [1, 2, 3].map((_, i) => f(i));
 const review: ReviewView = {
+  canExport: false,
   weeks: [1, 2, 3],
   demand: [4, 8, 8],
   series: {
@@ -185,6 +186,7 @@ describe('振り返りの画面', () => {
 
   it('[US4.2/AC4.2.3] 0 件なら「データなし」を示す（エラーではない）', async () => {
     const empty: ReviewView = {
+      canExport: false,
       weeks: [],
       demand: [],
       series: Object.fromEntries(
@@ -269,5 +271,28 @@ describe('振り返りへの導線', () => {
       'href',
       '/games/g1/review',
     );
+  });
+});
+
+describe('出力の導線', () => {
+  it('[US4.3/AC4.3.1] 進行役には「CSV で出力」「JSON で出力」を示し、出力の API を指す', async () => {
+    open(
+      api({
+        review: vi.fn().mockResolvedValue({ ...review, canExport: true }),
+      }),
+    );
+    const csv = await screen.findByRole('link', { name: 'CSV で出力' });
+    expect(csv).toHaveAttribute('href', '/api/games/g1/export?format=csv');
+    expect(csv).toHaveAttribute('download');
+    expect(screen.getByRole('link', { name: 'JSON で出力' })).toHaveAttribute(
+      'href',
+      '/api/games/g1/export?format=json',
+    );
+  });
+
+  it('[US4.3] 進行役以外には、出力の導線を出さない', async () => {
+    open(api());
+    await screen.findByRole('table');
+    expect(screen.queryByRole('link', { name: /で出力/ })).toBeNull();
   });
 });

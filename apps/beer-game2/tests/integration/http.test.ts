@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Writable } from 'node:stream';
 import type { FastifyInstance } from 'fastify';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -7,6 +8,7 @@ import { ROLES } from '../../src/domain/role.js';
 import type { RateLimiter } from '../../src/ports/index.js';
 import {
   fakeCredentials,
+  memoryExportReader,
   memoryRateLimiter,
   memoryReviewReader,
   memoryUnitOfWork,
@@ -31,6 +33,7 @@ async function boot(
     ids: sequentialIds(),
     credentials: fakeCredentials(),
     reviews: memoryReviewReader(mem),
+    exports: memoryExportReader(mem),
   });
   server = buildServer({
     app,
@@ -843,5 +846,74 @@ describe('観察者（HTTP）', () => {
     await boot(memoryRateLimiter(1, 60_000));
     expect((await post('/api/observe', { code: 'x' })).statusCode).toBe(401);
     expect((await post('/api/observe', { code: 'x' })).statusCode).toBe(429);
+  });
+});
+
+describe('出力（HTTP）', () => {
+  async function ended() {
+    const created = await post('/api/games', { weeks: 1 });
+    const fac = cookieOf(created);
+    const { gameId, joinCode } = created.json();
+    const players: Record<string, string> = {};
+    for (const role of ROLES) {
+      const j = await post('/api/join', { joinCode, displayName: role });
+      players[role] = cookieOf(j);
+      await post(
+        `/api/games/${gameId}/assignments`,
+        { participantId: j.json().participantId, role },
+        fac,
+      );
+    }
+    await post(`/api/games/${gameId}/start`, {}, fac);
+    for (const role of ROLES)
+      await put(
+        `/api/games/${gameId}/decision`,
+        { role, quantity: 4 },
+        players[role]!,
+        0,
+      );
+    const c = await get(`/api/games/${gameId}/console`, fac);
+    await post(`/api/games/${gameId}/commit`, { week: 1 }, fac, {
+      'if-match': `"${c.json().sessionVersion}"`,
+      'idempotency-key': 'end',
+    });
+    return { gameId, fac, players };
+  }
+
+  it('[US4.3/AC4.3.1] 進行役は終了後に CSV を添付ファイルとして受け取り、SHA-256 のチェックサムが付く', async () => {
+    const { gameId, fac } = await ended();
+    const res = await get(`/api/games/${gameId}/export?format=csv`, fac);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/text\/csv/);
+    expect(res.headers['content-disposition']).toBe(
+      `attachment; filename="beer-game-${gameId}.csv"`,
+    );
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(res.headers['x-checksum-sha256']).toBe(
+      createHash('sha256').update(res.body).digest('hex'),
+    );
+    expect(res.body.split('\r\n')[0]).toMatch(/^schema_version,game_id/);
+  });
+
+  it('[US4.3/AC4.3.2] JSON にもスキーマ版が入る', async () => {
+    const { gameId, fac } = await ended();
+    const res = await get(`/api/games/${gameId}/export?format=json`, fac);
+    expect(res.statusCode).toBe(200);
+    expect(res.json().schemaVersion).toBe('beer-game2.export.v1');
+  });
+
+  it('[US4.3] 参加者は 403、形式が違えば 400、進行中は 403', async () => {
+    const { gameId, fac, players } = await ended();
+    expect(
+      (await get(`/api/games/${gameId}/export?format=csv`, players.RETAILER!))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (await get(`/api/games/${gameId}/export?format=xml`, fac)).statusCode,
+    ).toBe(400);
+    const { gameId: running, fac: fac2 } = await table();
+    expect(
+      (await get(`/api/games/${running}/export?format=csv`, fac2)).statusCode,
+    ).toBe(403);
   });
 });

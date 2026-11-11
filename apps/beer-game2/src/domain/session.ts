@@ -63,6 +63,8 @@ export type SessionEvent =
   | {
       type: 'DecisionSaved';
       sessionId: string;
+      /** 入力した週（出力で、週ごとの意思決定を識別する） */
+      week: number;
       role: Role;
       quantity: number;
       savedBy: string;
@@ -71,6 +73,7 @@ export type SessionEvent =
   | {
       type: 'ProxyDecisionSubmitted';
       sessionId: string;
+      week: number;
       role: Role;
       quantity: number;
       version: number;
@@ -213,6 +216,7 @@ export function saveDecision(
     {
       type: 'DecisionSaved',
       sessionId: session.id,
+      week: session.week,
       role,
       quantity: decision.quantity,
       savedBy: actor.participantId,
@@ -245,6 +249,7 @@ export function proxyDecision(
     {
       type: 'ProxyDecisionSubmitted',
       sessionId: session.id,
+      week: session.week,
       role,
       quantity: decision.quantity,
       version: decision.version,

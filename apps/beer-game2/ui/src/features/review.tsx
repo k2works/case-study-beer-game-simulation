@@ -194,6 +194,26 @@ export function ReviewScreen() {
           </table>
         </>
       )}
+      {review.canExport && <ExportLinks gameId={id} />}
     </Page>
+  );
+}
+
+/** 出力（進行役だけ）。全体を組み立ててから返すので、部分的なファイルは受け取らない */
+function ExportLinks({ gameId }: { gameId: string }) {
+  const base = `/api/games/${encodeURIComponent(gameId)}/export`;
+  return (
+    <section aria-labelledby="export-heading">
+      <h2 id="export-heading">データ出力</h2>
+      <p>
+        設定（キット準拠かカスタムか）・役割別の値・意思決定・履歴を含みます。
+      </p>
+      <a href={`${base}?format=csv`} download>
+        CSV で出力
+      </a>{' '}
+      <a href={`${base}?format=json`} download>
+        JSON で出力
+      </a>
+    </section>
   );
 }

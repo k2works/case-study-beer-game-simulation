@@ -4,6 +4,7 @@ import {
   createApplication,
   type Application,
 } from '../../src/application/index.js';
+import { PgExportReader } from '../../src/adapters/persistence/pg-export-reader.js';
 import { PgReviewReader } from '../../src/adapters/persistence/pg-review-reader.js';
 import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js';
 import { FACILITATOR } from '../../src/domain/actor.js';
@@ -211,6 +212,7 @@ describe('PgReviewReader（読み取り専用）', () => {
       ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
       credentials: fakeCredentials(),
       reviews: new PgReviewReader(pool),
+      exports: new PgExportReader(pool, new PgReviewReader(pool)),
     });
     const reader = new PgReviewReader(pool);
     const c = await app.createGame({ weeks: 2, commitMode: 'AUTO' });
@@ -286,6 +288,7 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
       ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
       credentials: fakeCredentials(),
       reviews: new PgReviewReader(pool),
+      exports: new PgExportReader(pool, new PgReviewReader(pool)),
     });
   });
 
@@ -337,6 +340,52 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
       (await app.lobby({ token: c.facilitatorToken, gameId: c.gameId }))
         .commitMode,
     ).toBe('AUTO');
+  });
+
+  it('[US4.3/AC4.3.1] 実 PostgreSQL で、終了後の出力に、入力の記録（週・時刻）と履歴の時刻が入る', async () => {
+    const { c, players } = await table();
+    for (const week of [1, 2]) {
+      for (const role of ROLES)
+        await app.saveDecision({
+          token: players[role]!.token,
+          gameId: c.gameId,
+          role,
+          quantity: 4,
+          expectedVersion: 0,
+        });
+      const v = await app.console({
+        token: c.facilitatorToken,
+        gameId: c.gameId,
+      });
+      await app.commitWeek({
+        token: c.facilitatorToken,
+        gameId: c.gameId,
+        week,
+        version: v.sessionVersion,
+        idempotencyKey: `e${week}`,
+      });
+    }
+    const doc = JSON.parse(
+      (
+        await app.exportGame({
+          token: c.facilitatorToken,
+          gameId: c.gameId,
+          format: 'json',
+        })
+      ).body,
+    );
+    expect(doc.weeks).toHaveLength(2);
+    expect(doc.inputs).toHaveLength(8);
+    expect(doc.inputs[0]).toMatchObject({ week: 1, by: 'PARTICIPANT' });
+    expect(Date.parse(doc.inputs[0].at)).not.toBeNaN();
+    expect(doc.history.map((h: { type: string }) => h.type)).toEqual([
+      'GameCreated',
+      'GameStarted',
+      'SessionStarted',
+      'WeekCommitted',
+      'WeekCommitted',
+      'SessionEnded',
+    ]);
   });
 
   it('[US2.3/AC2.3.1] 作成から最終週の確定まで通り、役割別の結果が残る', async () => {
@@ -408,6 +457,7 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
       ids: { uuid: () => randomUUID(), joinCode: () => 'x' },
       credentials: fakeCredentials(),
       reviews: new PgReviewReader(pool),
+      exports: new PgExportReader(pool, new PgReviewReader(pool)),
     });
     await expect(
       broken.commitWeek({

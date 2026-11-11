@@ -10,6 +10,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import { PgExportReader } from '../../src/adapters/persistence/pg-export-reader.js';
 import { PgReviewReader } from '../../src/adapters/persistence/pg-review-reader.js';
 import { PgNotifier } from '../../src/adapters/persistence/pg-notifier.js';
 import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js';
@@ -44,6 +45,7 @@ describe('PgNotifier（LISTEN / NOTIFY）', () => {
       ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
       credentials: fakeCredentials(),
       reviews: new PgReviewReader(pool),
+      exports: new PgExportReader(pool, new PgReviewReader(pool)),
     });
     const c = await app.createGame({ weeks: 2 });
     const mine = vi.fn();
@@ -102,6 +104,7 @@ describe('SSE', () => {
       ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
       credentials: fakeCredentials(),
       reviews: new PgReviewReader(pool),
+      exports: new PgExportReader(pool, new PgReviewReader(pool)),
     });
     const server = buildServer({
       app,

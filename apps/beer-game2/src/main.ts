@@ -3,6 +3,7 @@ import pg from 'pg';
 import { HmacCredentialPolicy } from './adapters/http/credentials.js';
 import { buildServer } from './adapters/http/server.js';
 import { PgRateLimiter } from './adapters/persistence/pg-rate-limiter.js';
+import { PgExportReader } from './adapters/persistence/pg-export-reader.js';
 import { PgReviewReader } from './adapters/persistence/pg-review-reader.js';
 import { PgNotifier } from './adapters/persistence/pg-notifier.js';
 import { PgUnitOfWork } from './adapters/persistence/pg-unit-of-work.js';
@@ -27,11 +28,13 @@ pool.on('error', (e) =>
 const notifier = new PgNotifier(config.databaseUrl);
 await notifier.start();
 
+const reviews = new PgReviewReader(pool);
 const app = createApplication({
   uow: new PgUnitOfWork(pool, { idempotencyKey: config.idempotencyKey }),
   clock: { now: () => new Date() },
   ids: { uuid: randomUUID, joinCode },
-  reviews: new PgReviewReader(pool),
+  reviews,
+  exports: new PgExportReader(pool, reviews),
   credentials: new HmacCredentialPolicy(config.credentialKeys),
 });
 

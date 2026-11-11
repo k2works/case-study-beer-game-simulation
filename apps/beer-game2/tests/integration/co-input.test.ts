@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PgExportReader } from '../../src/adapters/persistence/pg-export-reader.js';
 import { PgReviewReader } from '../../src/adapters/persistence/pg-review-reader.js';
 import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js';
 import {
@@ -34,6 +35,7 @@ beforeEach(async () => {
     ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
     credentials: fakeCredentials(),
     reviews: new PgReviewReader(pool),
+    exports: new PgExportReader(pool, new PgReviewReader(pool)),
   });
 });
 
