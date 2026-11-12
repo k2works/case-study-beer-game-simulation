@@ -1,0 +1,4214 @@
+{
+  "scenario": {
+    "weekCount": 50,
+    "initialInventory": 12,
+    "initialPipelineQuantity": 4,
+    "inventoryUnitCost": 50,
+    "backlogUnitCost": 100,
+    "demandSeries": [
+      4,
+      4,
+      4,
+      4,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8
+    ],
+    "decisionRule": "各役割は、その週に受けた注文の数をそのまま発注する"
+  },
+  "weeks": [
+    {
+      "week": 1,
+      "customerDemand": 4,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 600
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 600
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 600
+        },
+        "retailer": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 600
+        }
+      },
+      "teamCost": 2400,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 2,
+      "customerDemand": 4,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1200
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1200
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1200
+        },
+        "retailer": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1200
+        }
+      },
+      "teamCost": 2400,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 3,
+      "customerDemand": 4,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1800
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1800
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1800
+        },
+        "retailer": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 1800
+        }
+      },
+      "teamCost": 2400,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 4,
+      "customerDemand": 4,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 2400
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 2400
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 2400
+        },
+        "retailer": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 2400
+        }
+      },
+      "teamCost": 2400,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 5,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3000
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3000
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 8,
+          "backlog": 0,
+          "weeklyCost": 400,
+          "cumulativeCost": 2800
+        }
+      },
+      "teamCost": 2200,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 6,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3600
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3600
+        },
+        "wholesaler2": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 3600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 3000
+        }
+      },
+      "teamCost": 2000,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 7,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 4200
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 4200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 8,
+          "backlog": 0,
+          "weeklyCost": 400,
+          "cumulativeCost": 4000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 0,
+          "weeklyCost": 0,
+          "cumulativeCost": 3000
+        }
+      },
+      "teamCost": 1600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            4,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            4,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 8,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 4800
+        },
+        "wholesaler1": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 4800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 4200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 3400
+        }
+      },
+      "teamCost": 1800,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            4
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            4
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 9,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 5400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 8,
+          "backlog": 0,
+          "weeklyCost": 400,
+          "cumulativeCost": 5200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 0,
+          "weeklyCost": 0,
+          "cumulativeCost": 4200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 3800
+        }
+      },
+      "teamCost": 1400,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            4,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            4,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 10,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 4,
+          "receipt": 4,
+          "ordersReceived": 4,
+          "shipped": 4,
+          "inventory": 12,
+          "backlog": 0,
+          "weeklyCost": 600,
+          "cumulativeCost": 6000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 5400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 4600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 4200
+        }
+      },
+      "teamCost": 1600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            4
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "week": 11,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 8,
+          "backlog": 0,
+          "weeklyCost": 400,
+          "cumulativeCost": 6400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 0,
+          "weeklyCost": 0,
+          "cumulativeCost": 5400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 5000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 4600
+        }
+      },
+      "teamCost": 1200,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            4,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            4,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            4,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 12,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 6600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 5800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 5400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 5400
+        }
+      },
+      "teamCost": 1800,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            4
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 13,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 6800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 6200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 5800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 6200
+        }
+      },
+      "teamCost": 1800,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            4,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 14,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 7000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 6600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 6600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 7000
+        }
+      },
+      "teamCost": 2200,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            4
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 15,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 7200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 7000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 7400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 7800
+        }
+      },
+      "teamCost": 2200,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            4,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 16,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 7400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 7400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 8200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 4,
+          "ordersReceived": 8,
+          "shipped": 4,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 9000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 17,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 7600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 7800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 9000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 10200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 18,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 7800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 8200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 9800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 11400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 19,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 8000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 8600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 10600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 12600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 20,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 8200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 9000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 11400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 13800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 21,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 8400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 9400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 12200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 15000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 22,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 8600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 9800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 13000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 16200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 23,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 8800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 10200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 13800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 17400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 24,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 9000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 10600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 14600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 18600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 25,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 9200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 11000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 15400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 19800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 26,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 9400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 11400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 16200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 21000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 27,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 9600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 11800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 17000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 22200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 28,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 9800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 12200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 17800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 23400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 29,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 10000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 12600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 18600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 24600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 30,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 10200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 13000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 19400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 25800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 31,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 10400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 13400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 20200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 27000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 32,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 10600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 13800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 21000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 28200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 33,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 10800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 14200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 21800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 29400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 34,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 11000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 14600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 22600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 30600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 35,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 11200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 15000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 23400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 31800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 36,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 11400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 15400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 24200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 33000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 37,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 11600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 15800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 25000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 34200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 38,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 11800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 16200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 25800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 35400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 39,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 12000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 16600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 26600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 36600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 40,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 12200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 17000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 27400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 37800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 41,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 12400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 17400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 28200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 39000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 42,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 12600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 17800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 29000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 40200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 43,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 12800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 18200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 29800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 41400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 44,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 13000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 18600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 30600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 42600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 45,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 13200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 19000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 31400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 43800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 46,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 13400
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 19400
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 32200
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 45000
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 47,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 13600
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 19800
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 33000
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 46200
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 48,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 13800
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 20200
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 33800
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 47400
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 49,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 14000
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 20600
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 34600
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 48600
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "week": 50,
+      "customerDemand": 8,
+      "roles": {
+        "factory": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 4,
+          "backlog": 0,
+          "weeklyCost": 200,
+          "cumulativeCost": 14200
+        },
+        "wholesaler1": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 4,
+          "weeklyCost": 400,
+          "cumulativeCost": 21000
+        },
+        "wholesaler2": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 8,
+          "weeklyCost": 800,
+          "cumulativeCost": 35400
+        },
+        "retailer": {
+          "decision": 8,
+          "receipt": 8,
+          "ordersReceived": 8,
+          "shipped": 8,
+          "inventory": 0,
+          "backlog": 12,
+          "weeklyCost": 1200,
+          "cumulativeCost": 49800
+        }
+      },
+      "teamCost": 2600,
+      "slots": {
+        "delivery": {
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ],
+          "retailer": [
+            8,
+            8
+          ]
+        },
+        "order": {
+          "factory": [
+            8,
+            8
+          ],
+          "wholesaler1": [
+            8,
+            8
+          ],
+          "wholesaler2": [
+            8,
+            8
+          ]
+        },
+        "production": {
+          "factory": [
+            8,
+            8
+          ]
+        }
+      }
+    }
+  ]
+}

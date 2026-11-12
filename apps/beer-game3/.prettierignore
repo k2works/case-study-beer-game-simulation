@@ -1,0 +1,6 @@
+dist
+coverage
+node_modules
+package-lock.json
+tests/u2/fixtures/golden-50-weeks.json
+aidlc

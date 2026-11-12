@@ -1,0 +1,60 @@
+{
+  "name": "beer-game3",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ビールゲーム シミュレーション beer-game3（U1 薄い一通り）",
+  "type": "module",
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "scripts": {
+    "dev:server": "tsx watch --env-file-if-exists=.env src/server/main.ts",
+    "dev:web": "vite",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "start": "node --env-file-if-exists=.env dist/server/main.js",
+    "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs up",
+    "migrate:down": "node --env-file-if-exists=.env scripts/migrate.mjs down",
+    "test": "vitest run tests/u1 tests/u2 tests/u3",
+    "test:unit": "vitest run tests/u1/features tests/u1/unit tests/u2/features tests/u2/unit tests/u3/features tests/u3/unit",
+    "test:integration": "vitest run tests/u1/integration tests/u2/integration tests/u3/integration",
+    "test:web": "vitest run tests/u1/web tests/u3/web",
+    "test:coverage": "vitest run tests/u1 tests/u2 tests/u3 --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test:coverage"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.10",
+    "fastify": "5.12.8",
+    "node-pg-migrate": "9.0.0",
+    "pg": "8.23.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.9",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "jsdom": "31.0.0",
+    "prettier": "3.10.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}
