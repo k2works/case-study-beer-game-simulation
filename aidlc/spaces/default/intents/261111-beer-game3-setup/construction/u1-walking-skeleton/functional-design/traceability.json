@@ -1,0 +1,50 @@
+{
+  "stage": "functional-design",
+  "unit": "u1-walking-skeleton",
+  "upstream_ids": [
+    "AC1.1.1", "AC1.1.2", "AC1.1.3", "AC1.1.4", "AC1.1.5",
+    "AC1.2.1", "AC1.2.2", "AC1.2.3", "AC1.2.4",
+    "AC1.3.1", "AC1.3.2", "AC1.3.3",
+    "AC1.4.1", "AC1.4.2", "AC1.4.3", "AC1.4.4",
+    "AC1.5.1", "AC1.5.2", "AC1.5.3", "AC1.5.4", "AC1.5.5", "AC1.5.6", "AC1.5.7", "AC1.5.8", "AC1.5.9"
+  ],
+  "coverage": [
+    { "id": "AC1.1.1", "status": "OK", "target": "BR1.1" },
+    { "id": "AC1.1.2", "status": "OK", "target": "BR1.2" },
+    { "id": "AC1.1.3", "status": "OK", "target": "BR1.3" },
+    { "id": "AC1.1.4", "status": "OK", "target": "BR1.4" },
+    { "id": "AC1.1.5", "status": "OK", "target": "BR1.5" },
+    { "id": "AC1.2.1", "status": "OK", "target": "BR2.1" },
+    { "id": "AC1.2.2", "status": "OK", "target": "BR2.2" },
+    { "id": "AC1.2.3", "status": "OK", "target": "BR2.3" },
+    { "id": "AC1.2.4", "status": "OK", "target": "BR2.4" },
+    { "id": "AC1.3.1", "status": "OK", "target": "BR3.1" },
+    { "id": "AC1.3.2", "status": "OK", "target": "BR3.2" },
+    { "id": "AC1.3.3", "status": "OK", "target": "BR3.3" },
+    { "id": "AC1.4.1", "status": "OK", "target": "BR4.1; BR2.6" },
+    { "id": "AC1.4.2", "status": "OK", "target": "BR4.2" },
+    { "id": "AC1.4.3", "status": "OK", "target": "BR4.3" },
+    { "id": "AC1.4.4", "status": "OK", "target": "BR4.4" },
+    { "id": "AC1.5.1", "status": "OK", "target": "BR5.1" },
+    { "id": "AC1.5.2", "status": "OK", "target": "BR5.2" },
+    { "id": "AC1.5.3", "status": "OK", "target": "BR5.3" },
+    { "id": "AC1.5.4", "status": "OK", "target": "BR5.3" },
+    { "id": "AC1.5.5", "status": "OK", "target": "BR5.4" },
+    { "id": "AC1.5.6", "status": "OK", "target": "BR5.5" },
+    { "id": "AC1.5.7", "status": "OK", "target": "BR5.6" },
+    { "id": "AC1.5.8", "status": "OK", "target": "BR5.7; BR4.7" },
+    { "id": "AC1.5.9", "status": "OK", "target": "BR5.8" }
+  ],
+  "reverse": [
+    { "id": "BR1.6", "status": "N/A", "target": "FR1.3 の仮の既定。需要系列の指定なしでも作成できるようにする技術的な規則（種別の判定は U2）" },
+    { "id": "BR1.7", "status": "N/A", "target": "FR1.7 の種別。U1 では常にカスタム（判定は U2）" },
+    { "id": "BR1.8", "status": "N/A", "target": "FR10.2 の金額の単位。技術的な規則" },
+    { "id": "BR2.5", "status": "N/A", "target": "FR2.1 の表示名の検証。技術的な入力の規則" },
+    { "id": "BR4.5", "status": "N/A", "target": "FR7.1 の入力できる範囲（進行中の当週のみ）。技術的な状態の規則" },
+    { "id": "BR4.6", "status": "N/A", "target": "FR9.1 とゲーム単位の直列処理の決定（Q4）。技術的な排他の規則" },
+    { "id": "BR5.9", "status": "N/A", "target": "FR9.2 の原子的な保存。強化は U2（US2.4）" },
+    { "id": "BR5.10", "status": "N/A", "target": "FR11.2 の最小の終了の遷移。完全な生涯の管理は U3（US2.5）" },
+    { "id": "BR4.8", "status": "N/A", "target": "FR9.1 の判定の順（認可、再送、状態、検証）。技術的な規則" },
+    { "id": "BR5.11", "status": "N/A", "target": "FR9.1 の確定の事前条件（進行中の当週のみ）。技術的な状態の規則" }
+  ]
+}

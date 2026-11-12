@@ -1,0 +1,25 @@
+{
+  "stage": "code-generation",
+  "unit": "u1-walking-skeleton",
+  "version": 1,
+  "writes": [
+    { "path": "apps/beer-game3/.env.example" },
+    { "path": "apps/beer-game3/.gitignore" },
+    { "path": "apps/beer-game3/.nvmrc" },
+    { "path": "apps/beer-game3/.prettierignore" },
+    { "path": "apps/beer-game3/.prettierrc.json" },
+    { "path": "apps/beer-game3/README.md" },
+    { "path": "apps/beer-game3/eslint.config.js" },
+    { "path": "apps/beer-game3/index.html" },
+    { "path": "apps/beer-game3/migrations/" },
+    { "path": "apps/beer-game3/package-lock.json" },
+    { "path": "apps/beer-game3/package.json" },
+    { "path": "apps/beer-game3/scripts/" },
+    { "path": "apps/beer-game3/src/" },
+    { "path": "apps/beer-game3/tests/" },
+    { "path": "apps/beer-game3/tsconfig.build.json" },
+    { "path": "apps/beer-game3/tsconfig.json" },
+    { "path": "apps/beer-game3/vite.config.ts" },
+    { "path": "apps/beer-game3/vitest.config.ts" }
+  ]
+}
