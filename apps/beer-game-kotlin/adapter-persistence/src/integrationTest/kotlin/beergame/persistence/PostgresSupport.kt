@@ -35,4 +35,31 @@ object PostgresSupport {
 
     fun listenConnection(): () -> Connection =
         { DriverManager.getConnection(jdbcUrl(LISTEN_APPLICATION_NAME), container.username, container.password) }
+
+    /** 同じコンテナの別のデータベースへの URL（ロールは、クラスタ全体で共有される）。 */
+    private fun jdbcUrlFor(database: String): String = jdbcUrl().replace("/${container.databaseName}", "/$database")
+
+    /** コンテナの所有者（スーパーユーザー）で接続する。ロールの検査は、`SET ROLE` で切り替えて行う。 */
+    fun connectionTo(database: String = container.databaseName): Connection =
+        DriverManager.getConnection(jdbcUrlFor(database), container.username, container.password)
+
+    /** 空の専用データベースを作る（再作成）。 */
+    fun recreateDatabase(database: String) {
+        connectionTo().use { c ->
+            c.createStatement().use {
+                it.execute("DROP DATABASE IF EXISTS $database WITH (FORCE)")
+                it.execute("CREATE DATABASE $database")
+            }
+        }
+    }
+
+    fun dataSourceFor(database: String): HikariDataSource =
+        HikariDataSource(
+            HikariConfig().apply {
+                jdbcUrl = jdbcUrlFor(database)
+                username = container.username
+                password = container.password
+                maximumPoolSize = 4
+            },
+        )
 }
