@@ -9,6 +9,11 @@ info:
     **設計書に項目が無いため、本書では確定していないもの（未決）**は、各所の description に「未決」と書いた。
     リクエスト・レスポンスの本文の詳細な項目（設定の項目名、状態の投影の項目名など）は、設計書が正本として
     定めていないため、最小限の形だけを置き、Step 4〜9 の実装で確定して本書を更新する。
+
+    **Step 9（HTTP の実装）で、実装と照合して直した点**（手での照合。契約テストの自動化は B2）:
+    受付終了後の参加は `game.not_preparing`（409）、作成は最終週と需要系列を必須、状態の問い合わせの項目名の確定、
+    `?role=` の追加、`versions` の null、`/ready` の 503 は problem+json（`type` あり）、413・429 の追加、
+    `Set-Cookie`（HttpOnly・SameSite=Strict）の明記。ログ・相関 ID・セキュリティヘッダーは全応答に付く。
 servers:
   - url: /api/v1
 tags:
@@ -34,18 +39,22 @@ paths:
               $ref: "#/components/schemas/CreateGameRequest"
       responses:
         "201":
-          description: 作成した。応答は versions だけを返す。ゲームの ID と参加コードは Location とスナップショットの取得で得る（未決：作成の応答に gameId を含めるか。設計書は versions だけと定める）。
+          description: 作成した。応答は versions だけを返す。ゲームの ID は Location で、参加コードは進行役の状態の取得で得る（作成の応答に gameId を含めない。設計書は versions だけと定める）。進行役の資格を Set-Cookie で発行する。
           headers:
             Location:
-              description: 作成したゲームの状態の URL（未決：形式）
+              description: 作成したゲームの状態の URL（`/api/v1/games/{gameId}/state`）
               schema: { type: string }
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CommandResponse"
         "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/lobby:
@@ -53,7 +62,9 @@ paths:
       tags: [ゲーム]
       operationId: getLobby
       summary: ロビーを取得する（問い合わせ。lobby_* の投影）
-      description: 認可は進行役・参加者。本文の項目は未決（設計書は投影の表だけを定める）。参加者には、参加コード・割り当て・削除予定日を返さない（ui-design S04）。
+      description: |
+        認可は進行役。B1 の実装は進行役だけで、参加者には（資格の失敗と同じ）403 を返す（参加者向けのロビー＝参加コード・割り当てを含まない一覧は、読み取りの型に項目が無く、未実装。ui-design S04）。
+        本文の項目は、投影の表（lobby_*）から書き出す。
       parameters:
         - $ref: "#/components/parameters/GameId"
       responses:
@@ -103,7 +114,9 @@ paths:
       summary: 参加コードでゲームに参加する（JoinGame。game ストリーム）
       description: |
         認可は参加コード。有効な参加コードと表示名で、ロビーに参加し、復帰資格が保存される（AC1.2.1）。
-        無効・終了済み・不明・失効の参加コードは、区別せず同じ 403（`game.invitation_invalid`）を返す（列挙の防止。AC1.2.2）。
+        不明・形式不正の参加コードは、区別せず同じ 403（`game.invitation_invalid`）を返す（列挙の防止。AC1.2.2）。
+        **受付が終了したゲーム（開始済み）の参加は、403 ではなく 409 `game.not_preparing`** で、理由（参加の受付を終了している）を示す
+        （Gherkin AC1.2.2 の 2 つ目のシナリオに従う。設計書の「区別しない」との食い違いは、bolt_1_plan の Step 8 の食い違い 5 と Step 9 の結果に記録）。
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
@@ -114,7 +127,9 @@ paths:
               $ref: "#/components/schemas/JoinGameRequest"
       responses:
         "200":
-          description: 参加した。資格（Cookie）を発行する。
+          description: 参加した。資格（Cookie）を Set-Cookie で発行する。応答は versions だけ。参加者の ID は、状態の取得（participantId）で得る。
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
           content:
             application/json:
               schema:
@@ -122,7 +137,9 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/start:
@@ -157,15 +174,17 @@ paths:
       summary: 当週の数量を保存する（SaveDecision。session ストリーム）
       description: |
         認可は参加者（その役割の担当）。`If-Match` は意思決定の版（DecisionVersion）で、**このコマンドにだけ**付ける。
-        流通役は発注、生産役（工場）は生産要請として保存する（AC2.2.1）。数量は 0〜1000 の整数（範囲外・小数・空は 422。AC2.2.2）。
-        他の役割の入力は拒否する（403）。共同担当の競合は B6（`session.decision_conflict` は仕様に載せるが B1 では起きない）。
+        入力する役割は、**資格から決まる**（本文に役割を持たない）。役割が無い操作者（進行役、役割が未割り当ての参加者）は、資格の失敗と同じ 403。
+        流通役は発注、生産役（工場）は生産要請として保存する（AC2.2.1）。数量は 0〜1000 の整数（範囲外は 422 の quantity。
+        小数・空・文字は、形の誤りとして 422 の quantity。AC2.2.2）。
+        共同担当の競合は B6（`session.decision_conflict` は仕様に載せるが B1 では起きない）。
       parameters:
         - $ref: "#/components/parameters/SessionId"
         - $ref: "#/components/parameters/IdempotencyKey"
         - name: If-Match
           in: header
           required: false
-          description: 意思決定の版（DecisionVersion）。初回の保存は未指定または 0（未決：初回の表し方。設計書は版の初期値を定めていない）。
+          description: 意思決定の版（DecisionVersion。整数。`"3"` のように引用符で囲んでもよい）。初回の保存は未指定（0 として扱う）。整数でなければ 422（field は If-Match）。
           schema: { type: string }
       requestBody:
         required: true
@@ -194,6 +213,7 @@ paths:
       summary: 1 週を確定する（CommitWeek。session ストリーム）
       description: |
         認可は進行役。`If-Match` は使わず、本文の `requestedWeek` と `basis`（役割ごとの意思決定の版）を使う。
+        経路の `week` と本文の `requestedWeek` が違えば 422（field は requestedWeek）。
         判定の順は「週が違う → `session.week_advanced`」「週が同じで basis が現在の各役割の版と違う → `session.decisions_changed`」。
         入力が揃っていなければ `session.incomplete_decisions`（422。不足する役割を示す）。確定は 1 週につき一度だけ（AC2.3.2）。
       parameters:
@@ -231,9 +251,15 @@ paths:
       description: |
         認可は役割に応じた投影。参加者には自分の役割の在庫・受注残・入荷・受注・入力だけを返し、他の役割の値と将来の需要は返さない（AC2.1.1〜AC2.1.3）。小売店には当週の需要（受注）を含める。
         進行役には全役割の入力状況と確定した週の結果を返す。確定した週の結果には役割別の値（注文、在庫、受注残、出荷、費用）を含める（AC2.3.5）。
-        本文の項目名は未決（設計書は投影の表だけを定める）。
+        項目名は B1 の実装で確定した（スキーマのとおり）。`session` は準備中のゲームには無く、409 `session.not_active`。
+        資格が無効・別のゲーム・存在しないゲームは、区別せず同じ 403（`app.unauthorized`）。`sessionId` はこのゲームでは `gameId` と同じ。
       parameters:
         - $ref: "#/components/parameters/SessionId"
+        - name: role
+          in: query
+          required: false
+          description: 他の役割の状況を取得しようとする問い合わせ（AC2.1.2）。自分の役割と違えば、値を返さず 403。役割の 4 値以外は 422（field は role）。
+          schema: { $ref: "#/components/schemas/Role" }
       responses:
         "200":
           description: 状態
@@ -243,14 +269,17 @@ paths:
                 $ref: "#/components/schemas/SessionState"
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/ValidationProblem" }
   /games/{gameId}/state:
     get:
       tags: [ゲーム]
       operationId: getGameState
       summary: ゲームの状態（準備中・進行中）を取得する（問い合わせ）
       description: |
-        未決：設計書のエンドポイント表に、ゲームの状態（`gameId` から `sessionId` を引く経路）の問い合わせが無い。
-        画面が、開始後に `sessionId` を得る経路が必要なため、B1 の実装で確定する。ここでは仮に置き、設計書への反映を要確認とする。
+        設計書のエンドポイント表に無い（要反映）。画面が、開始後に `sessionId` を得る経路として B1 で置いた。
+        進行役には参加コードと最終週を、参加者には自分の `participantId` と役割を返す（呼び出した人ごとの投影）。
+        `sessionId` は、このゲームでは `gameId` と同じ（開始前は null）。
       parameters:
         - $ref: "#/components/parameters/GameId"
       responses:
@@ -280,7 +309,7 @@ paths:
       tags: [運用]
       operationId: getReady
       summary: 準備の確認（SELECT 1、接続プールの取得、通知の受信の生存）
-      description: 認可なし。負荷分散にはこちらを使う（AC6.1.4）。データベースに接続できない、または通知の受信が生きていないとき 503。
+      description: 認可なし。負荷分散にはこちらを使う（AC6.1.4）。データベースに接続できない（3 秒以内に `SELECT 1` が通らない）、または通知の受信が生きていないとき 503。
       security: []
       responses:
         "200":
@@ -290,11 +319,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
         "503":
-          description: 準備できていない（未決：本文の形。設計書は 503 の返却だけを定める）
+          description: |
+            準備できていない。**バックエンド自身が返す 503 は必ず `type` を持つ**ため、problem+json（`type` は `/problems/app.not_ready`）で返し、
+            `checks`（database、notifier の真偽）を添える（設計書は 503 の返却だけを定める。本文の形は B1 で確定）。
           content:
-            application/json:
+            application/problem+json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                $ref: "#/components/schemas/NotReadyProblem"
 security:
   - participationCookie: []
 components:
@@ -303,7 +334,7 @@ components:
       type: apiKey
       in: cookie
       name: bg_session
-      description: 資格の Cookie（HttpOnly、Secure、SameSite=Strict）。Cookie 名は未決（設計書に無い）。参加（join）・作成の応答で発行する。
+      description: 資格の Cookie（HttpOnly、SameSite=Strict、HTTPS の環境では Secure）。Cookie 名 `bg_session` は B1 の仮置き（設計書に無い）。参加（join）・作成の応答で発行する。値は 256 ビットの乱数で、URL・ログ・本文に含めない。
   parameters:
     GameId:
       name: gameId
@@ -329,7 +360,10 @@ components:
       schema: { type: string }
   headers:
     CorrelationId:
-      description: すべての応答に付ける相関 ID
+      description: すべての応答に付ける相関 ID（要求の `x-correlation-id` が UUID ならそれを使い、そうでなければ作る）
+      schema: { type: string }
+    SetCookie:
+      description: 資格の Cookie（`bg_session=<値>; Path=/; HttpOnly; SameSite=Strict; Max-Age=<秒>`。HTTPS の環境では `Secure`）。
       schema: { type: string }
   responses:
     Problem:
@@ -337,7 +371,7 @@ components:
       headers:
         x-correlation-id: { $ref: "#/components/headers/CorrelationId" }
         Retry-After:
-          description: "app.retry_exhausted（503）のときだけ付ける。"
+          description: "app.retry_exhausted（503。1 秒）と app.rate_limited（429。窓の残り秒数）のときだけ付ける。"
           schema: { type: integer }
       content:
         application/problem+json:
@@ -377,22 +411,33 @@ components:
       description: |
         problem+json の code（小文字のドット区切り `<領域>.<名前>`）の B1 の範囲の一覧。
         出典は ui-design.md「エラーの code と表示の辞書」と architecture-backend.md「入力の検証とエラーの写像」。
-        `game.start_condition_not_met`・`session.incomplete_decisions` などの個別の code 名は、設計書が正本（ドメインモデル）の
-        DomainError 名から導いた仮の綴りで、**未決**（ドメインモデルに code の一覧表は無く、例として 4 つが載るだけ）。
-        `validation.invalid_input`（入力検証の 422・構文エラーの 400 の code）も仮の名前で、設計書は「入力検証の誤りの code は辞書に足す」と述べるだけで名前を定めていない（**未決**）。
+        業務の code は、ドメインの `DomainError.code`（実装が正本。ドメインモデルに code の一覧表は無く、例として 4 つが載るだけ）。
+        `validation.invalid_input`（入力検証の 422・構文エラーの 400 の code）と、HTTP の層の code（`app.not_ready`、`app.rate_limited`、
+        `request.*`）は、設計書が名前を定めていないため、B1 の仮置き（**未決**。UI の辞書への追加が要る）。
+        権限の不足（業務の Forbidden）は、すべて `app.unauthorized`（資格の失敗と同じ本文。業務の理由を返さない）。
       enum:
         - session.decision_conflict
         - session.week_advanced
         - session.decisions_changed
         - session.already_started
+        - session.already_ended
+        - session.not_active
         - session.incomplete_decisions
         - game.invitation_invalid
+        - game.not_preparing
+        - game.already_created
+        - game.participant_not_found
         - game.start_condition_not_met
         - validation.invalid_input
         - app.retry_exhausted
         - app.idempotency_key_reused
         - app.unauthorized
         - app.internal
+        - app.not_ready
+        - app.rate_limited
+        - request.too_large
+        - request.not_found
+        - request.method_not_allowed
     Problem:
       type: object
       required: [type, title, status, code, correlationId]
@@ -425,6 +470,18 @@ components:
                   message:
                     type: string
                     description: 修正内容
+    NotReadyProblem:
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          required: [checks]
+          properties:
+            checks:
+              type: object
+              required: [database, notifier]
+              properties:
+                database: { type: boolean }
+                notifier: { type: boolean }
     StartConditionProblemBody:
       allOf:
         - $ref: "#/components/schemas/Problem"
@@ -443,14 +500,16 @@ components:
               items: { $ref: "#/components/schemas/Role" }
     StreamVersions:
       type: object
-      description: 追記後のストリームごとの版。
+      description: "追記後のストリームごとの版。そのコマンドが追記しなかったストリームは null（例: 作成は session が null、入力の保存は game が null）。"
       required: [game, session]
       properties:
-        game: { type: integer, minimum: 0 }
-        session:
-          type: integer
+        game:
+          type: [integer, "null"]
           minimum: 0
-          description: session ストリームが未作成（開始前）の間の値は未決。
+        session:
+          type: [integer, "null"]
+          minimum: 0
+          description: session ストリームが未作成（開始前）、またはそのコマンドが追記しなかったときは null。
     CommandResponse:
       type: object
       description: コマンドの応答は versions だけ。画面の表示は応答から作らず、スナップショットを取得して versions に追いつくまで待つ。
@@ -459,25 +518,26 @@ components:
         versions: { $ref: "#/components/schemas/StreamVersions" }
     CreateGameRequest:
       type: object
-      description: キット準拠の作成（B1）。カスタム条件（B7）は含めない。設定の項目名は未決。
-      required: [kind]
+      description: |
+        キット準拠の作成（B1）。カスタム条件（B7）は含めない。
+        **最終週と需要系列は必須**（キットの既定の系列は ASM-01 のとおり JSD の値が未確定のため、B1 では既定を置かない。custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
+        範囲（週 1〜50、需要 0〜1000、保持日数 1〜3650）の検証は domain が持つ。範囲外は 422 で、需要の誤りは対象の週（1 始まり）と修正内容を示す。
+        整数でない値（小数・文字・null）は、形の誤りとして 422（需要は対象の週つき）。JSON として不正な本文は 400。
+      required: [kind, finalWeek, demand]
       properties:
         kind:
           type: string
           enum: [KIT]
         finalWeek:
           type: integer
-          minimum: 1
-          maximum: 50
-          description: 最終週（AC1.1.5）。未指定ならキットの既定（既定値は ASM-01 のとおり未確定）。
+          description: 最終週（AC1.1.5。1〜50）。
         demand:
           type: array
-          description: 需要系列（最終週まで、各 0〜1000）。キット準拠の既定の系列は JSD の値の確認まで未確定（custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
-          items: { type: integer, minimum: 0, maximum: 1000 }
+          description: 需要系列（最終週以上の長さ、各 0〜1000）。
+          items: { type: integer }
         retentionDays:
           type: integer
-          minimum: 1
-          maximum: 3650
+          description: 保持日数（1〜3650）。未指定は 90（NF-S16）。
     JoinGameRequest:
       type: object
       required: [joinCode, displayName]
@@ -523,23 +583,25 @@ components:
             RETAILER: { type: integer, minimum: 0 }
     LobbyParticipant:
       type: object
-      required: [participantId, displayName]
+      required: [participantId, displayName, role]
       properties:
         participantId: { type: string, format: uuid }
-        displayName: { type: string }
+        displayName:
+          type: [string, "null"]
+          description: 表示名（周辺ストアの値。投影に無ければ null）。
         role:
           oneOf:
             - $ref: "#/components/schemas/Role"
             - type: "null"
     Lobby:
       type: object
-      description: 本文の項目は未決（ロビーの投影 lobby_*）。
-      required: [gameId, status, participants]
+      description: ロビーの投影（lobby_*）から書き出した、進行役向けの一覧。
+      required: [gameId, status, joinCode, participants, versions]
       properties:
         gameId: { type: string, format: uuid }
         status:
           type: string
-          enum: [PREPARING, STARTED]
+          enum: [PREPARING, STARTED, ENDED]
         joinCode:
           type: string
           description: 進行役にだけ返す。
@@ -549,7 +611,7 @@ components:
         versions: { $ref: "#/components/schemas/StreamVersions" }
     GameState:
       type: object
-      description: 未決（エンドポイントの存在ごと）。
+      description: 呼び出した人ごとの投影。進行役は `joinCode`・`finalWeek`、参加者は `participantId`・`role` を受け取る。
       required: [gameId, status, versions]
       properties:
         gameId: { type: string, format: uuid }
@@ -558,19 +620,35 @@ components:
             - string
             - "null"
           format: uuid
+          description: このゲームでは gameId と同じ。開始前（PREPARING）は null。
         status:
           type: string
-          enum: [PREPARING, STARTED]
+          enum: [PREPARING, STARTED, ENDED]
+        joinCode:
+          type: string
+          description: 進行役だけ。
+        finalWeek:
+          type: integer
+          description: 進行役だけ。
+        participantId:
+          type: string
+          format: uuid
+          description: 参加者だけ（自分の ID）。
+        role:
+          $ref: "#/components/schemas/Role"
         versions: { $ref: "#/components/schemas/StreamVersions" }
     RoleStatus:
       type: object
-      description: 役割別の状況。項目名は未決。
-      required: [inventory, backlog, arrivals, orders]
+      description: 役割別の状況（B1 で確定した項目名）。
+      required: [inventory, backlog, arrivals, orders, decision, decisionVersion]
       properties:
         inventory: { type: integer }
         backlog: { type: integer }
         arrivals: { type: integer, description: 当週に処理する入荷 }
-        orders: { type: integer, description: 当週の受注（小売店は当週の顧客需要） }
+        orders: { type: integer, description: 当週の受注 }
+        customerDemand:
+          type: integer
+          description: 小売店だけに含める、当週の顧客需要（AC2.1.3。他の役割には項目ごと含めない。将来の週の需要はどの応答にも含めない）。
         decision:
           type:
             - integer
@@ -579,28 +657,42 @@ components:
         decisionVersion: { type: integer, minimum: 0 }
     RoleWeekResult:
       type: object
-      description: 確定した週の、役割別の結果。AC2.3.5 の例示（注文、在庫、受注残、出荷、費用）。項目名は未決。
-      required: [role, week, order, inventory, backlog, shipment, cost]
+      description: 確定した週の、役割別の結果。AC2.3.5 の例示（注文、在庫、受注残、出荷、費用）。費用は最小単位（セント）の整数。
+      required: [role, week, orders, order, inventory, backlog, shipment, cost, cumulativeCost]
       properties:
         role: { $ref: "#/components/schemas/Role" }
         week: { type: integer }
-        order: { type: integer }
-        inventory: { type: integer }
-        backlog: { type: integer }
-        shipment: { type: integer }
-        cost: { type: number }
+        orders: { type: integer, description: その週に受けた注文 }
+        order: { type: integer, description: その週に発注（工場は生産要請）した数量 }
+        inventory: { type: integer, description: 週末の在庫 }
+        backlog: { type: integer, description: 週末の受注残 }
+        shipment: { type: integer, description: その週の出荷 }
+        cost: { type: integer, description: その週の費用（最小単位） }
+        cumulativeCost: { type: integer, description: 累計の費用（最小単位） }
     SessionState:
       type: object
-      description: 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。項目名は未決。
-      required: [sessionId, status, week, versions]
+      description: 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。
+      required: [sessionId, status, week, submittedRoleCount, versions]
       properties:
-        sessionId: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid, description: このゲームでは gameId と同じ }
         status:
           type: string
-          enum: [ACTIVE, ENDED]
+          enum: [ACTIVE, PAUSED, ENDED]
         week:
           type: integer
           description: 現在の週（第 1 週から）。最終週の確定後は終了。
+        submittedRoleCount:
+          type: integer
+          description: 当週の入力が済んだ役割の数（チーム全体の集計値）。
+        participantId:
+          type: string
+          format: uuid
+          description: 参加者だけ（自分の ID）。
+        role:
+          $ref: "#/components/schemas/Role"
+        finalWeek:
+          type: integer
+          description: 進行役だけ。
         roleStatus: { $ref: "#/components/schemas/RoleStatus" }
         roles:
           type: object

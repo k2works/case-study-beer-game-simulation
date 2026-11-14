@@ -48,6 +48,16 @@ sealed interface ConfigError {
     data class H2NotAllowed(
         val env: AppEnv?,
     ) : ConfigError
+
+    /** 必須の設定が無い。[name] は設定の名前だけで、値は持たない。 */
+    data class MissingSetting(
+        val name: String,
+    ) : ConfigError
+
+    /** 設定の値が不正（形式、範囲、重複）。[name] は設定の名前だけで、値は持たない（秘密を、ログや例外に出さない）。 */
+    data class InvalidSetting(
+        val name: String,
+    ) : ConfigError
 }
 
 data class AppConfig(

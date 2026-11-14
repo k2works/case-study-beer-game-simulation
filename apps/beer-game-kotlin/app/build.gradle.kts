@@ -1,3 +1,12 @@
+plugins {
+    application
+}
+
+// ローカルの起動: `APP_ENV=local DB_KIND=h2 ./gradlew :app:run`（引数で起動モード。既定は api）
+application {
+    mainClass.set("beergame.app.MainKt")
+}
+
 // 組み立てと起動。全モジュールに依存する。
 dependencies {
     implementation(project(":domain"))
@@ -5,7 +14,12 @@ dependencies {
     implementation(project(":adapter-persistence"))
     implementation(project(":adapter-http"))
     implementation(libs.ktor.server.netty)
+    implementation(libs.hikari)
+    implementation(libs.coroutines.core)
+    implementation(libs.serialization.json)
     runtimeOnly(libs.logback.classic)
+
+    testImplementation(libs.ktor.server.test.host)
 }
 
 // acceptanceTest: 受け入れ（Cucumber-JVM。@api のシナリオ）。ADR-012。
@@ -37,5 +51,30 @@ tasks.register<Test>("acceptanceTest") {
     testLogging {
         events("passed", "failed", "skipped")
         showStandardStreams = true
+    }
+}
+
+// integrationTest: 実 PostgreSQL（Testcontainers）を通す、HTTP の最小の統合。test の出力（試験の道具）も使う。
+val integrationTest: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
+    runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
+}
+
+configurations[integrationTest.implementationConfigurationName].extendsFrom(configurations.testImplementation.get())
+configurations[integrationTest.runtimeOnlyConfigurationName].extendsFrom(configurations.testRuntimeOnly.get())
+
+dependencies {
+    "integrationTestImplementation"(libs.testcontainers.postgresql)
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "実 PostgreSQL（Testcontainers）を通す HTTP の統合テストを実行する。"
+    group = "verification"
+    testClassesDirs = integrationTest.output.classesDirs
+    classpath = integrationTest.runtimeClasspath
+    shouldRunAfter(tasks.test)
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }

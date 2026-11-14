@@ -892,12 +892,82 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 9: HTTP と観測性（🔴🟢🟡）
 
-- [ ] 9.1 🔴 `testApplication` のテスト: 認証・認可（無効な資格は同じ応答）、入力の検証、problem+json（`type` が `/problems/{code}`）、応答は `versions` だけ、`/health`（生存）と `/ready`（DB を止めると失敗）
-- [ ] 9.2 🟢 Ktor のルート（仕様 `contracts/openapi.yaml` のとおり）、構造化ログ（資格・表示名・非公開の値を含めない）、`GET /health`（生存）と `GET /ready`（`SELECT 1`、接続プール、`ChangeNotifier.isAlive`）
-- [ ] 9.3 🔴🟢 **本番での H2 の拒否**（`APP_ENV` が `staging`・`production` で `DB_KIND=h2` なら起動に失敗する）。本番相当の設定で、鍵が無ければ起動に失敗する
-- [ ] 9.4 🟡 Refactor
+- [x] 9.1 🔴 `testApplication` のテスト: 認証・認可（無効な資格は同じ応答）、入力の検証、problem+json（`type` が `/problems/{code}`）、応答は `versions` だけ、`/health`（生存）と `/ready`（DB を止めると失敗）
+- [x] 9.2 🟢 Ktor のルート（仕様 `contracts/openapi.yaml` のとおり）、構造化ログ（資格・表示名・非公開の値を含めない）、`GET /health`（生存）と `GET /ready`（`SELECT 1`、接続プール、`ChangeNotifier.isAlive`）
+- [x] 9.3 🔴🟢 **本番での H2 の拒否**（`APP_ENV` が `staging`・`production` で `DB_KIND=h2` なら起動に失敗する）。本番相当の設定で、鍵が無ければ起動に失敗する
+- [x] 9.4 🟡 Refactor
 
 **ゲート 9**: 仕様と実装が手で照合できる範囲で一致していること（契約テストの自動化は B2）、ログの内容、H2 の拒否を確認する。
+
+**ゲート 9 の状態: 人の確認待ち（未承認）。** 下の「Step 9 の結果」は AI の自己申告で、承認ではない。コミットは未実施。
+
+#### Step 9 の結果（2026-11-14、AI の実施。ゲート 9 は人の確認待ち）
+
+**作ったもの**（`apps/beer-game-kotlin/`）:
+
+- `adapter-http/src/main/kotlin/beergame/http/`: `HttpModule`（`beerGameModule`。`/api/v1`）、`HttpDeps`（設定・`DatabaseProbe`・ログの出力先）、`CommandRoutes`・`QueryRoutes`・`OperationalRoutes`、`RequestParsing`・`FieldReaders`・`ListFieldReaders`（本文の**形**だけの検証。値の範囲は application）、`ProblemMapping`・`ProblemTexts`・`Problem`（**写像は 1 か所**。`when` の網羅）、`Responses`、`Guards`（レート制限・Origin・本文 64 KB）、`SecurityPolicies`（`OriginPolicy`・`RateLimiter`）、`Observability`（相関 ID・セキュリティヘッダー・ログ）、`ErrorHandling`（StatusPages）、`LogRecord`（`LogSink`・`Slf4jLogSink`）、`CallSupport`。
+- `app/src/main/`: `ServerConfig`（誤りを集める。鍵は `local` 以外で必須）、`Bootstrap`（`startApi`・マイグレーション）、`Main`（`api`・`migrate`。終了コード 0・64・70・78）、`Wiring`（`appPorts`・`databaseProbe`）、`resources/logback.xml`。`AppConfig.kt` に `MissingSetting`・`InvalidSetting` を足した。
+- 変更: `gradle/libs.versions.toml`（ktor-server-status-pages、ktor-server-test-host、slf4j-api 2.0.19＝logback 1.6.6 の前提の版）、`adapter-http`・`app` の `build.gradle.kts`（`application` プラグイン、`integrationTest` ソースセット）、`contracts/openapi.yaml`。**`domain/` と `application/` は触っていない。**
+- 試験: `adapter-http/src/test/`（`ProblemMappingSpec`、`RequestParsingSpec`、`SecurityPoliciesSpec`、`LogRecordSpec`、`HttpInfrastructureSpec`＝スタブの Ports）、`app/src/test/`（`HttpFlowSpec`＝実物の H2 を通す、`ServerConfigSpec`、`MainSpec`）、`app/src/integrationTest/`（`PostgresHttpSpec`＝PostgreSQL 18 の HTTP の最小の統合 1 本）。
+
+**実行したコマンドと結果（実測）**:
+
+| コマンド | 結果 |
+| :--- | :--- |
+| Red: `./gradlew :adapter-http:compileTestKotlin`（実装の前） | コンパイルエラー 114 件（`HttpSettings`、`beerGameModule`、`HttpDeps`、`LogRecord`、`toProblem` などが未定義） |
+| `./gradlew build integrationTest -x :app:acceptanceTest`（JDK 25。ktlint、警告のエラー化、Kover の検証を含む） | **成功**（2 分 3 秒。`:app:acceptanceTest` は Step 3 から意図した Red のため除外）。件数: domain 201、application 86、adapter-persistence（H2）46、adapter-http 70（新規）、app 55（新規。HttpFlowSpec 31、ServerConfigSpec 12、MainSpec 5 ほか）、integrationTest: adapter-persistence 44、app 1（PostgreSQL 18）。すべて成功。Gradle を並行で動かすと結果のディレクトリが競合して失敗するので、直列で実行した |
+| `./gradlew detektMain detektTest`（JDK 21） | 成功（違反 0 件。`@Suppress`・ベースライン・設定の緩和なし） |
+| `curl` による起動確認（`APP_ENV=local DB_KIND=h2 PORT=8089 ./gradlew :app:run`） | 作成（201、Set-Cookie、`{"versions":{"game":1,"session":null}}`）→ 同じキーの再送（同じ Location）→ 4 人の参加 → ロビー → 4 役割の割り当て → 開始（`game:10, session:1`）→ 4 役割の入力 → 確定（`session:6`）→ 小売店の状態（第 2 週、`customerDemand` 8）→ 問屋の状態（`customerDemand` なし）→ `?role=FACTORY`（403）→ 進行役の状態（結果）→ 資格なし・外部 Origin（403 で同じ本文）、壊れた本文（400）、需要 1001（422、第 2 週と修正内容）。すべて期待どおり。`/ready` 200、セキュリティヘッダーと `x-correlation-id` が付く |
+| `APP_ENV=production DB_KIND=postgres ./gradlew :app:run` | 終了コード 78。ログに足りない設定の**名前**だけ（CREDENTIAL_KEY・IDEMPOTENCY_KEY・RESPONSE_KEY・DB_URL・DB_USER・DB_PASSWORD・ALLOWED_ORIGINS）。サーバーは起動しない |
+| `APP_ENV=production DB_KIND=h2 ./gradlew :app:run` | 終了コード 78。「H2 は APP_ENV=local のときだけ許される（現在: production）」と、鍵の不足 |
+
+**TDD の順序の証跡**:
+
+1. 試験を実装より先に書いた（`ProblemMappingSpec`、`RequestParsingSpec`、`SecurityPoliciesSpec`、`LogRecordSpec`、`HttpInfrastructureSpec`）。実装の前は 114 件のコンパイルエラー（Red）。実装後の 1 回目で 70 件が通った（`Problem.kt` の型だけは試験の前に書いた）。
+2. 常に通る試験でないことを、実装を壊して確かめ、戻した: Origin の検査を常に許可 ＋ 権限の不足の写像を業務の code のまま ＋ `X-Content-Type-Options` を除く → 10 件が失敗（adapter-http 6 件、app 4 件）。ログに Cookie の値を入れる → ログの 2 件が失敗。
+3. 試験が見つけた実装の誤り: (a) StatusPages の `status(NotFound)` が、ルートの返した `game.participant_not_found`（404）を、経路の無い 404 に上書きした → 返した problem を覚えて返し直す形に直した。(b) Set-Cookie に Ktor の内部の印 `$x-enc=…` が付いた（`curl` で先に見つけ、その後に試験 `cookie shouldNotContain "\$x-enc"` を足し、試験が `URI_ENCODING` の既定でも落ちることを確かめてから、`renderSetCookieHeader(includeEncoding = false)` に直した。**(b) は、実装が先で、試験が後**）。
+4. 順序を守れなかった点: `Problem.kt` の型（`Problem`、`FieldError`）を、試験の前に書いた。`ServerConfigSpec` と `HttpFlowSpec` と `MainSpec` は、`app` の本体より先に書いた（Red はコンパイルの失敗として確認するのを省き、実装後の 1 回目の失敗 3 件を直した: 経路の 404 の上書き、確定の `basis` の版の食い違いによる試験の誤り、失敗を注入する時機の誤り。実装の誤りは 404 の上書きだけ）。
+
+**OpenAPI との手での照合（`contracts/openapi.yaml` を実装に合わせて直した）**:
+
+| 項目 | 結果 |
+| :--- | :--- |
+| 11 本の経路（`POST /games`、`GET /games/:id/lobby`、`PUT …/participants/:pid/role`、`POST /participations/join`、`POST /games/:id/start`、`PUT /sessions/:id/decisions`、`POST /sessions/:id/weeks/:week/commit`、`GET /sessions/:id/state`、`GET /games/:id/state`、`GET /health`、`GET /ready`） | すべて実装し、HttpFlowSpec と `curl` で通した。**ロビーは進行役だけ**（参加者向けのロビーは投影の型に項目が無く、未実装。参加者には 403）。仕様の「進行役・参加者」から外れる |
+| Step 8 の食い違い（受付終了後の参加） | Gherkin（理由を示す）に従い、**409 `game.not_preparing`**。openapi の join の 403 の説明を直した。不明・形式不正の参加コードは 403 `game.invitation_invalid`（同じ本文） |
+| 作成の必須項目 | `finalWeek` と `demand` を必須にした（キット既定の系列は ASM-01 未確定）。`retentionDays` は未指定で 90（NF-S16） |
+| `versions` | 追記しなかったストリームは `null`（openapi の `integer` を `integer or null` に直した） |
+| 作成の応答 | `versions` だけ。ゲームの ID は Location（`/api/v1/games/{id}/state`）。参加者の ID は応答に含めず、状態の `participantId` で得る |
+| `/ready` の 503 | 設計書は「503 の返却だけ」。**バックエンド自身の 503 は `type` を持つ**規則に合わせ、problem+json（`/problems/app.not_ready`、`checks`）にした |
+| 状態の項目名 | `SessionState`・`GameState`・`RoleStatus`・`RoleWeekResult` を確定（`customerDemand`、`participantId`、`role`、`submittedRoleCount`、`finalWeek`、費用は最小単位の整数と累計）。`?role=`（他の役割の取得。AC2.1.2）を足した |
+| `code` | 仕様の enum に、`game.not_preparing`、`game.already_created`、`game.participant_not_found`、`session.not_active`、`session.already_ended`、`app.not_ready`、`app.rate_limited`、`request.too_large`・`not_found`・`method_not_allowed` を足した（HTTP の層の名前は仮置き） |
+| 413・429 | 追加（本文 64 KB、レート制限。`Retry-After`） |
+| 403 | 業務の権限不足（`game.forbidden`・`session.forbidden`）も `app.unauthorized` の同じ本文にした（資格の失敗と区別しない。設計書の表どおり） |
+| `Set-Cookie` | `bg_session`（HttpOnly、SameSite=Strict、Path=/、Max-Age、HTTPS の環境だけ Secure）を明記 |
+| 契約テストの自動化 | 未実施（B2）。上の照合は目と HTTP の試験による |
+
+**設計書との食い違い・判断（人の確認が要る）**:
+
+1. **入力の保存の役割は資格から決める**。`SaveDecision` は役割が要るが、本文に持たせず、`snapshot`（認証つき）で参加者の役割を引いてから `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。設計書にこの規定は無い。
+2. **`/health`・`/ready` は `/api/v1` 配下**（openapi の servers のとおり）。ALB のヘルスチェックのパスの設定が要る。
+3. **`GET /games/:id/state`** は、設計書のエンドポイント表に無い（要反映。Step 3 の指摘のまま）。`sessionId` は `gameId` と同じ（ドメインモデルが「gameId は session の識別子でもある」）。
+4. **レート制限**: 接続元（`remoteHost`）ごとの固定窓、既定 600 件/分（**根拠なし。未計測**）。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5。
+5. **Origin の検査**: 許可リスト（`ALLOWED_ORIGINS`。`local` 以外は必須）か、Host と同じ権限。Origin も Referer も無い要求は許す（ブラウザの外のクライアント）。拒否は 403 `app.unauthorized`（専用の code は置かなかった）。
+6. **環境変数の名前は提案**（`CREDENTIAL_KEY`、`IDEMPOTENCY_KEY`、`RESPONSE_KEY`＝Base64 の 32 バイト、3 つは別の値、`DB_URL`・`DB_USER`・`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）。インフラ設計書の正本と未照合。`local` で鍵が無ければ使い捨ての鍵（再起動で資格が無効になる）。`DB_KIND=postgres` でも JDBC の URL が `jdbc:h2:` なら `local` 以外を拒否する（インフラ設計書 168 行の規定）。
+7. **`maxAttempts`（競合の再試行の上限）は 5 を仮置き**（Step 8 の未決のまま。未計測）。マイグレーションは H2（local）の起動時に自動で適用し、PostgreSQL の `api` は適用しない（`migrate` モード。設計書「デプロイの一部」）。`retention`・`rebuild-projections` は未実装（B11・B12）。
+8. **Cookie の `Max-Age` は、進行役も参加者も 30 日**（参加者の資格の期限）。進行役の保持日数（既定 90 日）より短い。Step 8 の判断 #14 の延長（B5 で分ける）。
+9. **ログ**: `LogRecord` は項目の許可リスト（試験で固定）。`message` はコードの固定文だけ。予期しない例外は、クラス名とスタックの各行を記録し、**メッセージは書かない**（接続文字列などが入りうる）。H2 の起動は WARN。
+10. **detekt 1.23.8 の `RedundantSuspendModifier`**（Kotlin 2.4 でビルドされたライブラリの suspend の呼び出しを検出できない。Step 7 の #10 と同じ原因）に対し、Ktor を呼ぶだけの補助（`respondProblem`・`respondJson`・`readBody`、試験の土台）を「suspend の関数型の値」にした。`@Suppress`・設定の緩和は使っていない。読みやすさは落ちる。
+11. `Dispatchers.IO` は、`databaseProbe` の既定の引数にした（`InjectDispatcher`）。
+12. 本番の ECS のイメージに H2 を含めない案（インフラ設計書）は未実施（H2 は persistence の runtimeOnly のまま）。
+
+**未決・未確認・未実施**:
+
+- SSE、観察者、出力、保持、参加・復帰の専用のレート制限、`LISTEN` 切断中の欠落の補完（Step 7 から未実装のまま）。鍵の版の複数保持（KeyRing）は B2。DB ロールの分離（読み取り専用の接続）は B2・B9。
+- ログの出力が CloudWatch で期待どおり収集されることは未確認（標準出力へ 1 行の JSON）。メトリクス（EMF）は未実装。
+- 並行リクエスト・負荷の下での挙動、PostgreSQL の `/ready` が LISTEN の切断を検出して 503 になること（HTTP を通して）は未確認（`ChangeNotifier` の契約は Step 7 で確認済み）。
+- 受け入れ（`:app:acceptanceTest`）の窓口の差し替えは Step 11（未実施。Red のまま）。
+- 初回の全体のビルドで、`PostgresHttpSpec` が 1 回失敗した（`POST /games` が 201 でなかった）。再実行で通り、同じ時間帯に別の Gradle を並行で動かしていたため、干渉の可能性が高いが、**原因は特定していない**。並行で動かした別のビルドが `integrationTest` の結果のディレクトリを消す失敗（`NoSuchFileException`）も確認した。
+- コミットは未実施。
 
 ### Step 10: UI（アウトサイドイン）（🔴🟢）
 
