@@ -112,6 +112,8 @@ nav:
           - テスト戦略: design/beer-game2/test-strategy.md
           - 非機能要件: design/beer-game2/non-functional.md
           - 運用要件: design/beer-game2/operation.md
+      - beer-game-kotlin:
+          - 概要: design/beer-game-kotlin/index.md
   - 開発:
       - 概要: development/index.md
       - beer-game:

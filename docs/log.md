@@ -1,5 +1,17 @@
 # Docs Update Log
 
+## 2026-11-14
+* **Update**: [ui-design](/design/beer-game-kotlin/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [test-strategy](/design/beer-game-kotlin/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-kotlin/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [operation](/design/beer-game-kotlin/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game-kotlin/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [domain-model](/design/beer-game-kotlin/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [data-model](/design/beer-game-kotlin/data-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-kotlin/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-kotlin/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-kotlin/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+
 ## 2026-11-11
 * **Creation**: [release_report-0_2_0](/development/beer-game2/release_report-0_2_0.md) を作成（claude-code/claude-opus-5-5）
 * **Update**: [ui-design](/design/beer-game2/ui-design.md) を更新（進行役のコンソールの 4 分割。claude-code/claude-opus-5-5）
