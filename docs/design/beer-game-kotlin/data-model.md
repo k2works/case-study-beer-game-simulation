@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -66,7 +66,7 @@ entity 保持削除
 | :--- | :--- | :--- |
 | ゲームの根（`game_roots`） | — | 連鎖削除の根。ゲームの作成と同じトランザクションで 1 行作る |
 | イベント（`events`） | Game・Session の 2 ストリーム | 追記専用。状態の正本であり、監査の記録を兼ねる |
-| 投影 | 読み取りモデル（[ドメインモデル](./domain-model.md) の投影） | ロビー、役割別の週結果、観察（チーム合計）、現在の意思決定、成果物など |
+| 投影 | 読み取りモデル（[ドメインモデル](./domain-model.md) の投影） | ロビー、役割別の週結果、観察（チーム合計）、現在の意思決定など（出力は投影にしない） |
 | 周辺ストア | D7 | 表示名、資格のダイジェスト、ブラウザセッション。イベントに入れない値 |
 | 冪等記録 | 横断 | 重複排除と、同じ結果の再返却（応答は暗号化） |
 | 保持方針、保持削除 | RetentionSaga（D8） | 期限と、削除の進行（プロセスマネージャーの状態） |
@@ -85,7 +85,7 @@ entity 保持削除
 | `CurrentDecisions` | `current_decisions` | 投影 |
 | `WeekRoleResults`（振り返り） | `week_commits`、`week_role_results` | 投影 |
 | `WeekTeamTotals`（観察） | `week_team_totals` | 投影 |
-| `ExportPackage` | `export_packages` | 投影 |
+| `ExportPackage` | （表なし） | 問い合わせ時に純粋関数 `buildExport` で作る（投影にしない） |
 | `RetentionPolicyView` | `retention_policies` | 投影 |
 | 表示名 | `display_profiles` | 周辺ストア |
 | 資格（進行役・復帰・観察用の招待） | `credentials` | 周辺ストア |
@@ -172,7 +172,7 @@ entity "idempotency_records" as idem {
   * scope : text <<PK>>
   * key_digest : text <<PK>>
   --
-  request_digest : text
+  request_digest : text（本文・対象・操作者 ID の HMAC）
   status_code : integer
   response : bytea（暗号化）
   expires_at : timestamptz
@@ -320,17 +320,6 @@ entity "week_team_totals" as wtt {
   contributors : integer
 }
 
-entity "export_packages" as ex {
-  * export_id : uuid <<PK>>
-  --
-  game_id : uuid <<FK, UK>>
-  schema_version : text
-  checksum : text
-  csv : text
-  json : jsonb
-  created_at : timestamptz
-}
-
 entity "retention_policies" as rp {
   * game_id : uuid <<PK, FK>>
   --
@@ -350,7 +339,6 @@ roots ||--o{ cd
 roots ||--o{ wc
 wc ||--|{ wrr
 wc ||--|| wtt
-roots ||--o| ex
 roots ||--|| rp
 @enduml
 ```
@@ -426,13 +414,13 @@ runs ..o| receipts : 完了時に 1 件
 read:    SELECT ... FROM events WHERE game_id = $1 AND stream_type = $2 ORDER BY stream_version
 decide:  純粋（State と Command から List<Event>）
 append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ...)
-         -> 一意制約 (game_id, stream_type, stream_version) の違反 = ConcurrencyConflict
+         -> 一意制約 uq_events_stream_version (game_id, stream_type, stream_version) の違反 = ConcurrencyConflict
 ```
 
 1. アプリケーション層は、対象ストリームの全イベントを読み、`replay` で状態にします。**読んだときの版（`expected`）**を覚えます。
 2. `decide` が返したイベント列を、**`expected + 1` から連続する版**で、1 回のトランザクションで追記します。
 3. 同じ版が既にあれば、一意制約の違反になります。これを `ConcurrencyConflict`（`Either` の左）に変換して返します。**ロックは取りません**（beer-game2 の `SELECT ... FOR UPDATE` は不要になります）。
-4. `ConcurrencyConflict` は、**自動で再試行します**（上限は小さな固定回数。実装開始時に決める）。再読み込みで状態が進んでいるため、`decide` が再評価され、業務上の競合（`DecisionConflict`、`StaleVersion`、`AlreadyStarted`）は `decide` が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。
+4. `ConcurrencyConflict` は、**自動で再試行します**（上限は小さな固定回数。実装開始時に決める）。再読み込みで状態が進んでいるため、`decide` が再評価され、業務上の競合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は `decide` が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。
 5. `decide` が空のイベント列を返したとき（例: 同じ役割への再割り当て）は、追記しません。
 
 複数ストリームのコマンド（`StartGame`）は、両ストリームを読み、両方の期待する版を持って、**同じトランザクションで**追記します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
@@ -455,14 +443,32 @@ data class EventStore(
 
 | 層 | 仕組み | 範囲 |
 | :--- | :--- | :--- |
-| コマンドの再送（HTTP） | `idempotency_records`。`(game_id, scope, key_digest)` で検索し、`request_digest` が同じなら、保存した応答（暗号化）をそのまま返す。違えば競合（409 相当） | 24 時間（NF-R6） |
+| コマンドの再送（HTTP） | `idempotency_records`。`(game_id, scope, key_digest)` で検索し、`request_digest` が同じなら、保存した**成功の応答**（暗号化）をそのまま返す。違えば `app.idempotency_key_reused`（409） | 24 時間（NF-R6） |
 | 追記の一回性 | ストリームの版の一意制約 | 永続 |
-| 週確定の一回性 | `WeekCommitted` は 1 週につき 1 件。`decide` が `requestedWeek` とストリームの版を検査する | 永続 |
+| 週確定の一回性 | `WeekCommitted` は 1 週につき 1 件。`decide` が `requestedWeek` と意思決定の版（`basis`）を検査する（ストリームの版は前提にしない） | 永続 |
 | 開始の一回性 | `SessionStarted` は `SESSION` ストリームの版 1 | 永続 |
 
 `idempotency_records` の行は、**追記と同じトランザクション**で書きます。これにより、「追記は成功したが記録が無い」状態を作りません。応答が資格の生の値を含む操作（ゲームの作成、参加、復帰）の再送も、同じ値を返せます（応答を暗号化して保存するため）。
 
+**コマンド処理の順**は、「認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影」です。冪等記録の照合を認可より先に置きません。入れ替えで失効した旧担当者が以前のキーを再送しても、保存済みの応答（参加・復帰では資格の生の値）を返さず、403 にするためです。
+
+- `request_digest` は、**本文・対象・操作者の ID** の鍵付き HMAC です。同じキーでも操作者が違えば `app.idempotency_key_reused`（409）になります。
+- 保存するのは**成功した応答だけ**です。業務の失敗（`Left`）は保存しません。再送は、同じ失敗を再計算して返します（状態が変わっていれば結果も変わりうる）。
+- 失効した資格が過去のキーを再送しても、認証の段階で 403 です（保存済みの応答は返りません）。
+
 ゲーム作成の冪等は、作成の要求（`scope = 'create'`）を、`GameCreated` の追記と同じトランザクションで、新しい `game_id` で保存します。同じ冪等キーの再送は、`(scope, key_digest)` の部分一意索引（`WHERE scope = 'create'`）で検索します。
+
+### 一意制約の衝突の扱い（制約名の正本）
+
+再試行・再照合の対象にする一意制約を、名前つきで次に定めます。**この表が正本**で、[バックエンドアーキテクチャ](./architecture-backend.md) も同じ表を持ちます。
+
+| 制約名 | 表 | 衝突の意味 | 扱い |
+| :--- | :--- | :--- | :--- |
+| `uq_events_stream_version` | `events` | 同じストリームへの同時の追記 | 読み直して `decide` からやり直す（`ConcurrencyConflict`、上限つき） |
+| `uq_idempotency_create` | `idempotency_records`（`scope = 'create'` の部分一意索引） | 同じキーのゲーム作成の同時の重複 | 記録を再照合し、保存済みの応答を返す（500 にしない） |
+| `pk_idempotency_records` | `idempotency_records` | 同じキー・同じ対象の同時の重複（空の列を返す操作を含む） | 記録を再照合し、本文の digest が同じなら保存済みの応答、違えば `app.idempotency_key_reused`（409） |
+
+上の 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID（ログ）で返します。制約には、この名前を明示して付けます（マイグレーション 001・002）。
 
 イベントの封筒の `command_id` は、同じコマンドから生まれたイベントを束ねるための識別子で、冪等キーとは別です（冪等キーのダイジェストはイベントに入れません）。
 
@@ -532,8 +538,19 @@ data class EventStore(
 | `week_commits` | `(game_id, week)` | `WeekCommitted` | `commit_kind` は `MANUAL`・`AUTO`。`stream_version` に、確定のイベントの版。**一度だけ確定**されることを、主キーでも守る |
 | `week_role_results` | `(game_id, week, role)` | `WeekCommitted` | **役割別の週結果**。需要（受注）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用。`(game_id, week)` は `week_commits` への外部キー（`CASCADE`） |
 | `week_team_totals` | `(game_id, week)` | `WeekCommitted` | 週ごとのチーム合計（発注、在庫、受注残）と寄与者数。**役割別の値を持たない** |
-| `export_packages` | `export_id` | `SessionEnded` | `game_id` 一意。`schema_version`、`checksum`、CSV、JSON。純粋関数 `buildExport` が `week_role_results` と設定から作る。設定の種別（カスタムの識別）を含む |
 | `retention_policies` | `game_id` | `GameCreated` | `retention_days` は 1〜3650（既定 90）、`delete_after > retention_starts_at` |
+
+### 出力は投影にしない（`export_packages` の廃止）
+
+出力（`ExportPackage`）は、同期投影にも非同期投影にもしません。**問い合わせの時に**、全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage`（`Either` を返さない）で、`week_role_results` と設定（`game_overview`、`game_settings`）から作ります。`checksum` と `schema_version` も要求時に算出します。表 `export_packages` は持ちません。したがって、最終週の確定（`WeekCommitted` と `SessionEnded` の追記）は出力の作成に依存せず、画面に「準備中」の状態は要りません。
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | 問い合わせ時に `buildExport` で作る | 最終週の確定（Must）が出力（Should）の失敗に左右されない。途中状態が無い。表が 1 つ減る |
+| B | `SessionEnded` の同期投影として保存（旧案） | 取得が速い。投影の失敗が最終週の確定を失敗させうる |
+| C | `SessionEnded` の後に別のトランザクションで作る | 確定とは切り離せるが、「準備中」の状態と再試行が要る |
+
+トレードオフ: 要求のたびに計算します。1 ゲームの結果は小さい（50 週 × 4 役割）ため許容し、大きければ将来キャッシュを検討します（未決事項）。
 
 ### 読み取りの規則（認可と開示）
 
@@ -542,7 +559,8 @@ data class EventStore(
 | 参加者（プレイ中） | 自分の役割の `role_current_states`・`current_decisions`・`week_role_results`、共通の `game_overview`・`session_overview`、ロビー（自分の役割と共同担当） | 他役割の行、`game_settings` の将来の需要、`week_team_totals` |
 | 進行役 | 全役割の入力状況、`game_settings`、`lobby_*`、`week_team_totals`、確定した週の記録 | 参加者の資格の値 |
 | 観察者 | `game_overview`、`session_overview`、`week_team_totals`（公開範囲と寄与者数で抑止） | 役割別の値、将来の需要、`week_role_results`（終了前） |
-| 全員（終了後） | `week_role_results`（全役割の時系列）、出力 | — |
+| 全員（終了後） | `week_role_results`（全役割の時系列） | — |
+| 進行役（出力） | 要求時に `buildExport` が作る出力（CSV・JSON）。`week_role_results` と設定から導出する | — |
 
 観察者の問い合わせは、DB の権限でも `week_role_results`・`role_current_states`・`current_decisions` に**到達できない**ようにします（最小権限。アプリのバグでも役割別の値が漏れにくい）。寄与者数による抑止（`contributors < 2` なら合計を出さない）は、問い合わせの層（`Disclosure`）で行います。
 
@@ -569,7 +587,7 @@ data class EventStore(
 
 ### 削除の網羅
 
-すべての表（`deletion_*` を除く）が、`game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ちます。**`DELETE FROM game_roots WHERE game_id = $1` の 1 回で、イベント、投影、周辺ストア、冪等記録、成果物が連鎖して消えます**（ADR-007）。`deletion_runs`・`deletion_attempts` は、同じトランザクションで明示的に削除します。
+すべての表（`deletion_*` を除く）が、`game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ちます。**`DELETE FROM game_roots WHERE game_id = $1` の 1 回で、イベント、投影、周辺ストア、冪等記録が連鎖して消えます**（ADR-007）。`deletion_runs`・`deletion_attempts` は、同じトランザクションで明示的に削除します。
 
 削除の網羅は、次のテストで確認します。
 
@@ -616,9 +634,9 @@ end
 | テーブル | 主キー | 主な制約 | 役割 |
 | :--- | :--- | :--- | :--- |
 | `game_roots` | `game_id` | — | 連鎖削除の根。`GameCreated` と同じトランザクションで挿入 |
-| `events` | `event_id` | `game_id` は外部キー（`CASCADE`）。`stream_type` は `GAME`・`SESSION`。**`(game_id, stream_type, stream_version)` 一意**。`stream_version >= 1`。`schema_version >= 1` | 追記専用の状態の正本。監査の記録を兼ねる（操作者の種別と ID、入力値を含む。表示名と資格は含まない） |
+| `events` | `event_id` | `game_id` は外部キー（`CASCADE`）。`stream_type` は `GAME`・`SESSION`。**`(game_id, stream_type, stream_version)` 一意（制約名 `uq_events_stream_version`）**。`stream_version >= 1`。`schema_version >= 1` | 追記専用の状態の正本。監査の記録を兼ねる（操作者の種別と ID、入力値を含む。表示名と資格は含まない） |
 | `projection_checkpoints` | `(game_id, stream_type)` | `game_id` は外部キー（`CASCADE`） | 投影が適用した最後の版 |
-| `idempotency_records` | `(game_id, scope, key_digest)` | `game_id` は外部キー（`CASCADE`）。応答は暗号化。`expires_at` は 24 時間後 | 冪等キーと応答の保存 |
+| `idempotency_records` | `(game_id, scope, key_digest)`（制約名 `pk_idempotency_records`） | `game_id` は外部キー（`CASCADE`）。応答は暗号化。`expires_at` は 24 時間後。`scope = 'create'` の部分一意索引 `uq_idempotency_create` | 冪等キーと**成功した応答だけ**の保存 |
 
 ## マイグレーション
 
@@ -632,7 +650,7 @@ end
 | 002 | 周辺ストア: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records` |
 | 003 | 投影（準備）: `game_overview`、`game_settings`、`lobby_*` |
 | 004 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
-| 005 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals`、`export_packages` |
+| 005 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
 | 006 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
 
 追記専用の保護（`events` への UPDATE/DELETE の禁止）、投影の `CHECK`（数量の上限）、観察者向けの権限は、001〜005 に含めます。
@@ -665,7 +683,8 @@ end
 | 5 | 観察の合計 | `week_team_totals` を別の投影に | `SUM` を毎回計算（beer-game2） |
 | 6 | 個人情報と秘密 | 周辺ストア（イベントに入れない） | 暗号化してイベントに含める |
 | 7 | 保持削除 | `game_roots` の連鎖削除 + 状態の行 | 表ごとの削除、`retention` ストリーム |
-| 8 | 冪等性 | 冪等記録（24 時間、応答を暗号化）を追記と同じトランザクションで | `command_id` の一意制約だけ（資格の再返却ができない） |
+| 8 | 冪等性 | 冪等記録（24 時間、成功した応答だけを暗号化して保存）を追記と同じトランザクションで。認可の後に照合 | `command_id` の一意制約だけ（資格の再返却ができない） |
+| 9 | 出力 | 問い合わせ時に純粋関数 `buildExport` で作る（`export_packages` 廃止） | 同期投影、`SessionEnded` 後の非同期投影 |
 
 ## beer-game2 からの変更
 
@@ -681,10 +700,12 @@ end
 | 8 | `week_results`（確定の記録）、`week_role_results` | `week_commits`、`week_role_results`（投影）。`session_version` の代わりに `stream_version` | ES |
 | 9 | 観察は `SUM` で計算 | `week_team_totals`（投影）。権限で役割別の行から分離 | 最小権限（BR-17） |
 | 10 | `sessions.settings`、`sessions.role_states`（JSONB） | `SessionStarted` のイベントと `role_current_states`（行） | 設定の写しはイベントが持つ。現在の役割状態は投影 |
-| 11 | `export_packages`（`PENDING`・`COMPLETE`・`FAILED`） | `export_packages`（`SessionEnded` の投影。`status` なし） | 同期投影で作るため、途中状態が無い |
+| 11 | `export_packages`（`PENDING`・`COMPLETE`・`FAILED`） | 表を廃止。問い合わせ時に全域の純粋関数 `buildExport` で作る | 最終週の確定を出力の作成から切り離す。途中状態が無い |
 | 12 | 保持の `deletion_runs` は完了後も行が残る（`game_id` つき） | 完了のトランザクションで `deletion_runs`・`deletion_attempts` も削除 | 削除後にゲーム ID を含む行を残さない（AC5.1.4） |
 | 13 | `retention_policies` は `games` を参照しない | `game_roots` への外部キー（連鎖削除）。証跡は `deletion_receipts` に限る | 投影として一緒に消す |
 | 14 | 復元は DB のバックアップ | 同じ + イベントの再生で状態と投影を再構築できる（FR-12） | ES の利点 |
+| 15 | 冪等記録の照合順と保存対象の規定なし | 認証 → 認可の前提検査 → 冪等記録の照合。`request_digest` に操作者 ID を含め、成功した応答だけを保存 | 失効した資格の再送で保存済みの応答を返さない |
+| 16 | 一意制約の名前の規定なし | `uq_events_stream_version`、`uq_idempotency_create`、`pk_idempotency_records` を正本の表で定め、衝突の扱いを決める | 同時の重複を 500 にしない |
 
 ## 未決事項
 
@@ -694,7 +715,7 @@ end
 - 投影の再構築の同時実行制御（そのゲームの追記を止めるか、アドバイザリロックを取るか）。
 - 数量の上限を、`CHECK`（固定値）にするか、設定の値と照合する検査にするか（beer-game2 から継続）。
 - `retention_starts_at` の起点（作成時か、終了時か。ドメインモデルの未決事項と共通）。
-- `export_packages` を投影として持つか、問い合わせのたびに作るか（本書は、投影として持つ案）。**同期投影にすると、その失敗が最終週の確定（`WeekCommitted` と `SessionEnded` の追記）を失敗させうる。** 対策として、`buildExport` を失敗しない全域関数にし（`Either` を返さない）、投影の更新に外部入出力を含めない。最終週の確定の所要時間の実測で重ければ、`SessionEnded` の後に別のトランザクションで作る非同期投影へ移す。
+- 出力（`buildExport`）の結果が大きい、または要求が多い場合のキャッシュの要否（解決済み: 表 `export_packages` は廃止し、要求時に作る。キャッシュは実測で必要になれば検討）。
 - `events` の長期の保持と、ゲーム削除前の分析の要否（beer-game2 から継続）。
 - 同期投影のトランザクション時間の実測。書き込みを圧迫する場合は、非同期投影へ移す（設計判断 4）。
 - JSON のシリアライズ方式と、アップキャストの実装の置き場所（[バックエンドアーキテクチャ](./architecture-backend.md) と [技術スタック](./tech-stack.md) で決める）。

@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -88,7 +88,7 @@ beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game2
 | イベント | `GameEvent`、`SessionEvent` | 起きた事実。過去形で命名し、変更しない。状態の唯一の源 |
 | 決定 | `decide` | `(State, Command) -> Either<DomainError, List<Event>>`。純粋 |
 | 進化 | `evolve` | `(State, Event) -> State`。純粋で全域（失敗しない） |
-| 再生 | `replay` | イベント列を `fold(evolve)` で状態へ畳み込むこと |
+| 再生 | `replay` | イベント列を `fold(evolve)` で状態へ畳み込むこと。検証上の性質は「永続化往復の同値性」「計算と事実の一致」「投影の整合」の 3 つに分ける（週次計算の節） |
 | 投影 | `project` | イベントを畳み込んで読み取りモデルの行を作る純粋関数 |
 | 意思決定の版 | `DecisionVersion` | 役割ごと・週ごとの意思決定の版。共同入力の競合検出に使う。**ストリームの版とは別** |
 | 操作者 | `Actor` | コマンドを発行した主体（進行役・参加者・観察者・匿名） |
@@ -249,19 +249,21 @@ sealed interface Command { val actor: Actor; val at: Instant }
 | `Forbidden` | 操作者に権限がない | 進行役以外の割り当て、他役割への入力、観察者の操作 |
 | `NotFound` | 対象が存在しない | 未知の参加者、未知の招待 |
 | `InvalidState` | 現在の状態では許されない | 準備中でない参加、一時停止中の確定 |
-| `Conflict` | 競合または古い版 | 意思決定の版違い、週・ストリームの版違い |
+| `Conflict` | 競合または古い要求 | 意思決定の版違い、週が進んだ後の要求（`WeekAdvanced`）、確定の前に入力が変わった（`DecisionsChanged`） |
 | `RuleViolation` | 業務ルール違反 | 開始条件の不足、入力が揃わない週確定 |
 
-**すべての `DomainError`（`GameError`・`SessionError`）は、安定した `code` と `category` を持ちます。** `code` は problem+json の `type` と、フロントエンドの表示文言の辞書の鍵に使うため、一度決めたら変えません（例: `session.week_advanced`、`session.decision_conflict`）。`category` は上の分類で、HTTP の状態への写像の入力になります。
+**すべての `DomainError`（`GameError`・`SessionError`）は、安定した `code` と `category` を持ちます。** `code` は、小文字のドット区切り `<領域>.<名前>` の 1 つの書式です。problem+json の `type`（`/problems/{code}`）と拡張メンバー `code` に同じ値を入れ、フロントエンドの表示文言の辞書の鍵にも使うため、一度決めたら変えません（例: `session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`）。`category` は上の分類で、HTTP の状態への写像の入力になります。
 
 ```kotlin
 sealed interface DomainError { val code: String; val category: ErrorCategory }
 enum class ErrorCategory { Forbidden, NotFound, InvalidState, Conflict, RuleViolation }
 // 例: data class WeekAdvanced(val requested: Week, val current: Week) : SessionError {
 //         override val code = "session.week_advanced"; override val category = ErrorCategory.Conflict }
+//      data class DecisionsChanged(val week: Week, val current: Map<Role, DecisionEntry>) : SessionError {
+//         override val code = "session.decisions_changed"; override val category = ErrorCategory.Conflict }
 ```
 
-`WeekAdvanced` は「確定で週が進んだ後の保存」を表し、`DecisionConflict`（同じ週で他の人が先に保存した）と区別します。画面の文言も別です（[UI 設計](./ui-design.md)）。
+`WeekAdvanced` は「確定で週が進んだ後の要求」を表します。`SaveDecision`、`SubmitProxyDecision`、`CommitWeek` が `requestedWeek` を持ち、現在の週と違えば返します。`DecisionConflict`（同じ週で他の人が先に保存した）、`DecisionsChanged`（確定の根拠にした入力が、確定の前に変わった）とは別の分類で、画面の文言も別です（[UI 設計](./ui-design.md)）。`StaleVersion`（`session` ストリームの版による確定の検査）は廃止しました（設計判断 D10）。
 
 ### Game 集約（準備）
 
@@ -427,9 +429,12 @@ sealed interface SessionCommand : Command {
     data class SaveDecision(override val actor: Actor, override val at: Instant, val role: Role,
         val requestedWeek: Week,                       // 画面が表示している週。確定後の古い画面からの保存を区別する
         val quantity: Quantity, val expectedDecisionVersion: DecisionVersion) : SessionCommand
-    data class SubmitProxyDecision(override val actor: Actor, override val at: Instant, val role: Role, val quantity: Quantity) : SessionCommand
+    data class SubmitProxyDecision(override val actor: Actor, override val at: Instant, val role: Role,
+        val requestedWeek: Week,                       // 画面が表示している週。確定後の古いコンソールからの代理入力を区別する
+        val quantity: Quantity) : SessionCommand       // 意思決定の版は要求しない（進行役の最終決定）。保存後の版は 1 増やす
     data class CommitWeek(override val actor: Actor, override val at: Instant,
-        val requestedWeek: Week, val expectedVersion: StreamVersion) : SessionCommand
+        val requestedWeek: Week,                       // 確定しようとしている週
+        val basis: RoleMap<DecisionVersion>) : SessionCommand   // 確定の根拠にした、各役割の意思決定の版
     data class SetCommitMode(override val actor: Actor, override val at: Instant, val mode: CommitMode) : SessionCommand
 }
 // SessionStarted は startGame が生成する（SessionCommand に開始は無い）
@@ -456,11 +461,26 @@ fun decideSession(state: SessionState, command: SessionCommand): Either<SessionE
             val after = evolveSession(state, saved)
             listOf(saved) + autoCommitEvents(after, command)         // AUTO かつ 4 役割が揃えば WeekCommitted（+ SessionEnded）
         }
+        is SubmitProxyDecision -> {
+            val data = state.activeOrPaused().bind()                // 一時停止中も受け付ける（UC-09: 停止 → 代理入力 → 再開）
+            ensure(command.actor.isFacilitator(data.gameId)) { SessionError.Forbidden("代理入力は進行役のみ") }
+            ensure(command.requestedWeek == data.week) {
+                SessionError.WeekAdvanced(command.requestedWeek, data.week)
+            }
+            val proxy = ProxyDecisionSubmitted(data.week, command.role, command.quantity,
+                data.decisionVersions[command.role].next(), command.actor.asEditor())
+            val after = evolveSession(state, proxy)
+            // Active のときだけ自動確定を判定する。Paused 中は確定せず、再開時（または手動確定）に判定する
+            listOf(proxy) + autoCommitEvents(after, command)
+        }
         is CommitWeek -> {
             val data = state.active().bind()
             ensure(command.actor.isFacilitator(data.gameId)) { SessionError.Forbidden("確定は進行役のみ") }
-            ensure(command.requestedWeek == data.week && command.expectedVersion == state.version) {
-                SessionError.StaleVersion(data.week, state.version)
+            ensure(command.requestedWeek == data.week) {                       // 判定順 1: 週が違う
+                SessionError.WeekAdvanced(command.requestedWeek, data.week)
+            }
+            ensure(command.basis == data.decisionVersions) {                   // 判定順 2: 週は同じで、入力が変わった
+                SessionError.DecisionsChanged(data.week, current = data.decisions)  // 現在の値と保存者を返す
             }
             commitEvents(data, CommitKind.MANUAL).bind()             // 揃っていなければ IncompleteDecisions
         }
@@ -491,18 +511,22 @@ fun evolveSession(state: SessionState, event: SessionEvent): SessionState = when
 
 `evolveSession` は `WeekCommitted` の `nextStates` をそのまま採用し、`simulateWeek` を呼び直しません（設計判断 D5）。
 
+`autoCommitEvents(after, command)` は、`after` が `Active` で、確定方式が `AUTO` で、4 役割が揃っているときだけ `commitEvents` の結果を返し、それ以外は空の列を返します。`Paused` の `after` では常に空です。`SetCommitMode(AUTO)` も、`Paused` 中は確定方式の変更だけを行い、確定は再開時に判定します。
+
+`SaveDecision`（参加者）と `SubmitProxyDecision`（進行役）は、どちらも「保存のイベント + 自動確定のイベント」を 1 回の追記で返します。違いは、`SaveDecision` が `Active` だけで受け付け、意思決定の版を要求するのに対し、`SubmitProxyDecision` は `Active` と `Paused` で受け付け、版を要求しない点です。
+
 #### 不変条件
 
 | 不変条件 | 内容 | 根拠 | 違反時の `SessionError`（分類） |
 | :--- | :--- | :--- | :--- |
-| 意思決定の条件 | 進行中のときだけ、0〜上限の整数を、役割ごとに 1 件保存できる | BR-10 | `NotActive`（`InvalidState`） |
+| 意思決定の条件 | 参加者の `SaveDecision` は進行中のときだけ、0〜上限の整数を、役割ごとに 1 件保存できる。**一時停止中の `SaveDecision` は拒否する**。進行役の代理入力は例外で、一時停止中も受け付ける（下の「代理入力」） | BR-10 | `NotActive`（`InvalidState`） |
 | 共同入力 | 同じ役割の意思決定は、1 つの値と 1 つの**意思決定の版**を、共同担当で共有する。版が古い保存は拒否し、**最新値と最後の保存者**を返す（変更を黙って失わない） | FR-16、BR-15 | `DecisionConflict(role, latest)`（`Conflict`） |
-| 代理入力 | 進行役だけが任意の役割へ入力できる。入力値、操作者、時刻をイベントに残す。意思決定の版を 1 増やすので、古い版を持つ参加者の保存は拒否される | FR-15 | `Forbidden` |
+| 代理入力 | 進行役だけが任意の役割へ入力できる。**進行中と一時停止中の両方で受け付ける**（UC-09、AC3.1.1: 停止 → 代理入力 → 再開）。`requestedWeek` を持ち、現在の週と違えば `WeekAdvanced`。入力値、操作者、時刻をイベントに残す。意思決定の版は要求しないが 1 増やすので、古い版を持つ参加者の保存は拒否される。一時停止中の代理入力では自動確定しない | FR-15 | `Forbidden`、`WeekAdvanced`（`Conflict`）、`AlreadyEnded` / `NotStarted`（`InvalidState`） |
 | 役割の確認 | 保存できるのは、`SessionStarted` の割り当ての写しに含まれる参加者だけ。観察者は常に拒否 | FR-04、FR-17 | `Forbidden` |
 | 週確定の条件 | 4 役割の意思決定が揃うまで確定できない | BR-12 | `IncompleteDecisions(missing)`（`RuleViolation`） |
-| 週確定の一回性 | 要求された週とストリームの版が現在と一致する場合だけ確定する。再送は、アプリケーション層の冪等記録が同じ結果を返す | FR-09 | `StaleVersion`（`Conflict`） |
+| 週確定の一回性 | `CommitWeek(requestedWeek, basis)` は、次の順で判定する。(1) 週が違えば `WeekAdvanced`。(2) 週が同じで、`basis` が現在の各役割の意思決定の版と違えば `DecisionsChanged`（現在の値と保存者を返す）。`session` ストリームの版は前提にしない（共同担当が保存し直しただけで、事実と違う「すでに確定されています」にならない）。再送は、アプリケーション層の冪等記録が同じ結果を返す | FR-09 | `WeekAdvanced`、`DecisionsChanged`（`Conflict`） |
 | 週確定の結果 | **役割別の週結果**（需要、出荷、発注、在庫、受注残、費用）と次週の役割状態を、1 つのイベントに含める | FR-13、FR-14 | — |
-| 自動確定 | 確定方式が `AUTO` で、進行中のときだけ、**最後の意思決定を保存するコマンドの `decide` が、保存と確定のイベントを一度に返す**。一時停止中は確定しない。再開時または `AUTO` への変更時に、揃っていれば確定する | FR-18、BR-16 | — |
+| 自動確定 | 確定方式が `AUTO` で、進行中のときだけ、**最後の意思決定を保存するコマンドの `decide` が、保存と確定のイベントを一度に返す**。対象のコマンドは `SaveDecision` と `SubmitProxyDecision`（進行中）。一時停止中は、代理入力でも `SetCommitMode(AUTO)` でも確定しない。再開時に、揃っていれば確定する（`SetCommitMode(AUTO)` を一時停止中に行った場合も、確定せず再開時に判定する）。進行中に `AUTO` へ変更して、すでに揃っていれば確定する | FR-18、BR-16 | — |
 | 終了 | 最終週を確定すると、同じ `decide` が `SessionEnded` を返す。終了後は、入力と確定を拒否する | 状態モデル | `AlreadyEnded`（`InvalidState`） |
 | 権限 | 意思決定は、その役割の参加者だけ。確定、停止、再開、終了、確定方式の変更は進行役だけ | — | `Forbidden` |
 | 非負・保存則 | 在庫と受注残は負にならない。確定の前後で、出荷数が下流の配送待ち行列へ入る | FR-06、BR-05〜BR-08 | （`simulateWeek` の性質テスト） |
@@ -522,10 +546,10 @@ state "Ended（終了）" as S3
 
 [*] --> S0
 S0 --> S1 : SessionStarted\n（startGame が追記）
-S1 --> S1 : DecisionSaved / ProxyDecisionSubmitted\nWeekCommitted [最終週でない]\nAutoCommitChanged
+S1 --> S1 : DecisionSaved / ProxyDecisionSubmitted\n（AUTO で揃えば WeekCommitted も）\nWeekCommitted [最終週でない]\nAutoCommitChanged
 S1 --> S2 : SessionPaused
 S2 --> S1 : SessionResumed\n（AUTO かつ揃っていれば WeekCommitted も）
-S2 --> S2 : AutoCommitChanged
+S2 --> S2 : AutoCommitChanged\nProxyDecisionSubmitted\n（進行役の代理入力。確定しない）
 S1 --> S3 : WeekCommitted + SessionEnded [最終週]\nSessionEnded（進行役の終了）
 S2 --> S3 : SessionEnded
 S3 --> [*]
@@ -553,7 +577,7 @@ fun startGame(game: GameState, session: SessionState, command: StartGame): Eithe
 }
 ```
 
-二重の開始は、`session` ストリームの版 1 への追記が重複するため、片方が必ず失敗します（開始の一回性）。失敗側は再読み込みして `AlreadyStarted` を得ます。
+二重の開始は、`session` ストリームの版 1 への追記が重複するため、片方が必ず失敗します（開始の一回性）。失敗側は再読み込みして `AlreadyStarted`（`session.already_started`、`InvalidState`）を得ます。
 
 ### 週次計算（simulateWeek）
 
@@ -576,9 +600,21 @@ fun simulateWeek(
 | 規則の正本 | 12 ステップと遅延（BR-02〜BR-09）。利用可能量 = 前週末在庫 + 当週入荷。充足対象 = 前週末受注残 + 当週受注。出荷 = 両者の小さい方。週末在庫 = `max(0, 利用可能量 - 充足対象)`、週末受注残 = `max(0, 充足対象 - 利用可能量)`。週次費用 = 週末在庫 × 在庫単価 + 週末受注残 × 受注残単価 |
 | 全域性 | 入力の型（`RoleMap`、`Quantity`、`Week`）が検証済みなので、`Either` を返さない（失敗しない） |
 | 需要 | 顧客需要は `settings.demand[week]` から小売店にだけ与える。他の役割の受注は、下流の注文が注文遅延を経て届いた値 |
-| 検証 | 既知の系列の golden test、性質テスト（在庫・受注残が非負、出荷が利用可能量を超えない）、**再生の同値性**（`fold(evolve)` の結果が、生で計算した結果と一致する）。[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md) |
+| 検証 | 既知の系列の golden test、性質テスト（在庫・受注残が非負、出荷が利用可能量を超えない）、**計算と事実の一致**（`fold(evolve)` の結果が、イベントのペイロードと `simulateWeek` を直接回した結果の両方と一致する。D5）。[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)。再生に関する 3 つの性質の区別は下記 |
 
 規則の詳細（12 ステップの順序、待ち行列の前進）は beer-game2 と同じで、本書は新しい規則を加えません。決定論性は `simulateWeek` が乱数・時計を持たないことで保たれます（NFR-01）。
+
+#### 再生に関する 3 つの性質
+
+「再生」（`fold(evolve)`）に関する検証は、次の 3 つの別の性質に分けます。旧称の「再生の同値性」は使いません。
+
+| 性質 | 内容 | 検証の場 |
+| :--- | :--- | :--- |
+| (a) 永続化往復の同値性 | コマンド実行中のメモリ上の状態 = DB から読んだイベントを再生した状態（シリアライズ、アップキャスト、版の順序を通る） | 統合テスト（実 DB） |
+| (b) 計算と事実の一致 | `fold(evolve)` の結果 = イベントのペイロード（`nextStates` など）と `simulateWeek` を直接回した結果（D5） | 単体・性質テスト |
+| (c) 投影の整合 | `fold(evolve)` の結果と投影の行の一致 | 運用の日次の検査（[運用要件](./operation.md)） |
+
+「1 件ずつ `evolve` した結果と `fold(evolve)` の結果の一致」は性質に含めません（`replay` が `fold(evolve)` そのものなので、実装に関係なく成り立ちます）。
 
 ### RetentionSaga（プロセスマネージャー）
 
@@ -631,9 +667,9 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-S03 | `SessionResumed` | `ResumeSession`。進行役、一時停止中 | なし |
 | EV-S04 | `SessionEnded` | `EndSession`（進行役）、または最終週の `WeekCommitted` と同じ `decide` | `reason`（`FINAL_WEEK` / `FACILITATOR`） |
 | EV-S05 | `DecisionSaved` | `SaveDecision`。進行中、その役割の参加者、意思決定の版が一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（`participantId`） |
-| EV-S06 | `ProxyDecisionSubmitted` | `SubmitProxyDecision`。進行役、進行中 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（進行役）。入力値・操作者・時刻（封筒）を残す（FR-15） |
+| EV-S06 | `ProxyDecisionSubmitted` | `SubmitProxyDecision`。進行役、進行中**または一時停止中**、`requestedWeek` が現在の週と一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（進行役）。入力値・操作者・時刻（封筒）を残す（FR-15） |
 | EV-S07 | `AutoCommitChanged` | `SetCommitMode`。進行役 | `mode`（`MANUAL` / `AUTO`） |
-| EV-S08 | `WeekCommitted` | `CommitWeek`（進行役、4 役割が揃う、週と版が一致）、または `AUTO` の `SaveDecision` / `ResumeSession` / `SetCommitMode` が揃った状態を作った場合 | `week`、`commitKind`（`MANUAL` / `AUTO`）、`decisions`（`RoleMap<Quantity>`、確定した発注）、`results`（`RoleMap<RoleWeekResult>`）、`nextStates`（`RoleMap<RoleState>`）、`contributors`（寄与者数。現在は 4 役割） |
+| EV-S08 | `WeekCommitted` | `CommitWeek`（進行役、進行中、4 役割が揃う、週が一致し、`basis` が現在の意思決定の版と一致）、または `AUTO` の進行中に `SaveDecision` / `SubmitProxyDecision` / `ResumeSession` / `SetCommitMode` が揃った状態を作った場合（一時停止中の代理入力と `SetCommitMode` は確定しない） | `week`、`commitKind`（`MANUAL` / `AUTO`）、`decisions`（`RoleMap<Quantity>`、確定した発注）、`results`（`RoleMap<RoleWeekResult>`）、`nextStates`（`RoleMap<RoleState>`）、`contributors`（寄与者数。現在は 4 役割） |
 
 `RoleWeekResult` は、受注（需要）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用を持ちます。`WeekCommitted` は 1 件で、1 週の事実のすべてを含みます。
 
@@ -668,8 +704,9 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 | `CurrentDecisions` | `DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | 当週の役割ごとの意思決定（値、版、最後の保存者）。確定でクリア | 当該役割の参加者（自分の値）、進行役（入力状況） |
 | `WeekRoleResults`（振り返り） | `WeekCommitted` | 週 × 役割の結果（需要、出荷、発注、在庫、受注残、費用、累積費用）。**終了後に全役割**を開示する | 終了後は全員。プレイ中は自分の役割の行だけ |
 | `WeekTeamTotals`（観察） | `WeekCommitted` | 週ごとのチーム合計（発注、在庫、受注残）と寄与者数。**役割別の値を持たない** | 観察者・進行役。公開範囲と寄与者数で抑止（下記） |
-| `ExportPackage` | `SessionEnded`（と `WeekCommitted` の結果） | 設定と全週記録の CSV・JSON。設定の種別（カスタムの識別）を含む | 進行役 |
 | `RetentionPolicyView` | `GameCreated` | 保持日数、保持開始、削除期限（削除の検出に使う） | 運営（システム）。進行役に状況を示す |
+
+**出力（`ExportPackage`）は投影にしません。** 問い合わせの時に、全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage`（`Either` を返さない）で、`WeekRoleResults` と設定から作ります。`checksum` と `schema_version` も要求時に算出します。設定と全週記録の CSV・JSON で、設定の種別（カスタムの識別）を含みます。閲覧できるのは進行役です。出力は読み取りの導出であり、最終週の確定（`WeekCommitted` と `SessionEnded` の追記）は出力の作成に依存しません（設計判断 D11）。
 
 **開示の判定（`Disclosure`）** は、投影の読み取りに掛ける純粋関数です。
 
@@ -762,6 +799,26 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 
 `AssignRole` は、すでに別の役割にいる参加者に対して `RoleUnassigned` と `RoleAssigned` の 2 イベントを返します（[ガイド §7.4](../../reference/関数型プログラミングガイド_Kotlin編.md) の 1 コマンドから複数イベント）。同じ役割への再割り当ては、イベントを返さず（`Right(emptyList())`）、履歴に足しません。代替案は、付け替えを拒否して先に解除を要求する案です（進行役の操作が増える）。
 
+### D10: `CommitWeek` の前提は、`session` ストリームの版でなく、週と意思決定の版
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | `CommitWeek(requestedWeek, basis: RoleMap<DecisionVersion>)`。週が違えば `WeekAdvanced`、週が同じで `basis` が現在の版と違えば `DecisionsChanged` | 確定の前提が「確定の根拠にした入力」そのものになる。共同担当の保存でストリームの版が進んでも、入力が変わっていなければ確定できる。画面の文言が事実と合う |
+| B | `expectedVersion: StreamVersion`（`StaleVersion`）のまま | 実装が単純。ただし、共同担当が保存し直しただけで `StaleVersion` になり、画面に事実と違う「すでに確定されています」が出る |
+| C | `StaleVersion` を「週が進んだ」と「状態が更新された」の 2 つに分ける | 文言は分けられる。ただし、入力が変わっていない更新（確定の根拠に無関係な追記）でも拒否される |
+
+トレードオフ: A は、コマンドが `basis`（4 役割の版）を運びます。API の `If-Match` は `SaveDecision`（意思決定の版）だけに付け、`CommitWeek` は本文に `requestedWeek` と `basis` を持ちます。
+
+### D11: 出力は投影にせず、問い合わせ時に純粋関数で作る
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | 問い合わせ時に、全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage` で作る。`checksum` と `schema_version` も要求時に算出する | 最終週の確定（Must）が出力（Should）の作成に依存しない。途中状態（準備中・失敗）が無く、画面に「準備中」が要らない。表が 1 つ減る |
+| B | `SessionEnded` の同期投影として `export_packages` に保存する | 取得が速い。ただし、投影の失敗が最終週の確定の追記を失敗させうる |
+| C | `SessionEnded` の後に、別のトランザクションで非同期に作る | 確定とは切り離せる。ただし、「準備中」の状態、失敗時の再試行、画面の待ちが要る |
+
+トレードオフ: A は、要求のたびに計算します。1 ゲームの結果は小さい（50 週 × 4 役割）ため許容し、重ければ将来キャッシュを検討します（未決事項）。
+
 ## beer-game2 からの変更
 
 | # | beer-game2 | beer-game-kotlin | 理由 |
@@ -780,6 +837,9 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 | 12 | 時刻・乱数はユースケースが集約へ渡す | コマンドの `at`、`gameId`、`JoinCode` などの値として運ぶ。`decide` は時計を読まない | 純粋性の維持（ガイド §4.4） |
 | 13 | 共同担当の付け替えは暗黙 | `AssignRole` が 2 イベントを返す（D9） | イベントで事実を残す |
 | 14 | `WeekCommitted` に役割別の結果と確定の方式 | 同じ内容に、`decisions`、`nextStates` を加える（D5） | 再生で一致し、規則の変更に強い |
+| 15 | `ExportPackage` は `SessionEnded` の投影（`PENDING`・`COMPLETE`・`FAILED`） | 投影にせず、問い合わせ時に全域の純粋関数 `buildExport` で作る（D11） | 最終週の確定を出力の作成から切り離す |
+| 16 | `CommitWeek` は `expectedVersion`（ストリームの版）で `StaleVersion` | `CommitWeek(requestedWeek, basis)`。`WeekAdvanced` と `DecisionsChanged`。`StaleVersion` は廃止（D10） | 共同担当の保存だけで拒否しない |
+| 17 | 代理入力は進行中のみ、`requestedWeek` なし、確定しない | 一時停止中も受け付け、`requestedWeek` を持ち、進行中の `AUTO` で揃えば確定する | UC-09（停止 → 代理入力 → 再開）、AC2.4.1 |
 
 ## 未決事項
 
@@ -787,8 +847,9 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 - 観察用の招待の有効期間の既定値、観察者の人数の上限、参加者数の上限、観察者の復帰の要否（beer-game2 の未決事項を引き継ぎ）。
 - 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。`Pipeline` の長さが遅延に等しいという前提の確認。
 - 自動確定の猶予（beer-game2 は設けない）。設けるなら `decide` に時間の入力が要ります。
-- `SetCommitMode(AUTO)` で、すでに 4 役割が揃っている場合に、ただちに確定するか（本書は確定する案）。ユーザーストーリー AC2.4.x と照合します。
-- 代理入力に意思決定の版を要求しない（進行役の最終決定）扱いが、AC3.1.x と整合するか。
+- `SetCommitMode(AUTO)` で、進行中にすでに 4 役割が揃っている場合に、ただちに確定するか（本書は確定する案。一時停止中は確定せず再開時に判定）。ユーザーストーリー AC2.4.x と照合します。
+- 代理入力に意思決定の版を要求しない（進行役の最終決定。版は 1 増やす）扱いが、AC3.1.x と整合するか。
+- 出力（`buildExport`）が大きい場合のキャッシュの要否（D11。要求時に作るため、当面は不要）。
 - キット準拠の既定の需要系列（ASM-01）。JSD の値を確認するまで、`KitPreset` の `demand` は未確定です。
 - 数量の上限（既定 1000）を、固定値にするか、`GameSettings` の項目にするか。
 - 終了後の資格の扱い（NF-S4）。`Started` の規則で足りるか、終了後は `Ended` の投影で拒否するか。

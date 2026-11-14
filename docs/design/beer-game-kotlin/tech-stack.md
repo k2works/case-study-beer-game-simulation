@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -125,7 +125,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | カテゴリ | 技術 | 版 | 用途 |
 | :--- | :--- | :--- | :--- |
 | テストフレームワーク | Kotest（`kotest-runner-junit5`、`kotest-assertions-core`） | **6.2.7** | ユニット・統合テスト。`shouldBe`、日本語のテスト名（ガイド §8.2、§9.4） |
-| プロパティベーステスト | Kotest Property（`kotest-property`。`checkAll`、`forAll`、`Arb`） | **6.2.7** | `simulateWeek` の性質、`decide` / `evolve` の性質、再生の同値性（[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| プロパティベーステスト | Kotest Property（`kotest-property`。`checkAll`、`forAll`、`Arb`） | **6.2.7** | `simulateWeek` の性質、`decide` / `evolve` の性質、永続化往復の同値性・計算と事実の一致・投影の整合（[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | 実行基盤 | JUnit Platform（Gradle の `useJUnitPlatform()`） | `junit-jupiter` の最新は 6.1.3（2026-08-07）。**Kotest 6.2.7 が要求する JUnit の版は、実装開始時に確認** | テストの実行 |
 | 統合テスト | Testcontainers（`testcontainers-postgresql`） | **2.0.5** | 実 PostgreSQL 18 のコンテナ。イベントストア、投影、並行性 |
 | 仮想時間 | `kotlinx-coroutines-test`（`runTest`、`currentTime`） | coroutines と同じ **1.11.0** | 再試行、タイムアウト、定期タスク |
