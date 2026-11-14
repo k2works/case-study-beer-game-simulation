@@ -971,19 +971,118 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 10: UI（アウトサイドイン）（🔴🟢）
 
-- [ ] 10.1 🔴 `@ui` のシナリオ（画面を通す 1 本）と、コンポーネントのテスト。API の型は仕様から生成する。**テストのエラーの握りつぶし（`.catch(() => {})` など）をしない**（実バグを隠した beer-game2 の B1 の学び #2。フロントエンドの lint で検出する方針は B2 で決める）
-- [ ] 10.2 🟢 React + Vite の最小の画面（ゲームの作成、参加、割り当て、開始、入力、確定、状態の表示）。**最小に絞る**
-- [ ] 10.3 🟡 Refactor
+- [x] 10.1 🔴 `@ui` のシナリオ（画面を通す 1 本）と、コンポーネントのテスト。API の型は仕様から生成する（**B1 では生成せず、手書きの型にした**。下の「型の生成の扱い」）。**テストのエラーの握りつぶし（`.catch(() => {})` など）をしない**（実バグを隠した beer-game2 の B1 の学び #2。フロントエンドの lint で検出する方針は B2 で決める）
+- [x] 10.2 🟢 React + Vite の最小の画面（ゲームの作成、参加、割り当て、開始、入力、確定、状態の表示）。**最小に絞る**
+- [x] 10.3 🟡 Refactor（整形・lint の指摘への対応のみ。構造の変更はしていない）
 
 **ゲート 10**: 画面が、API の仕様と型に従っていることを確認する。
 
+**ゲート 10 の状態: 人の確認待ち（未承認）。** 下の「Step 10 の結果」は AI の自己申告で、承認ではない。コミットは未実施。
+
+#### Step 10 の結果（2026-11-14、AI の実施。ゲート 10 は人の確認待ち）
+
+**作ったもの**（`apps/beer-game-kotlin/web/`。触ったのは `web/` とこの記録だけ）:
+
+- 設定: `package.json`（scripts: `dev`・`build`・`test`・`typecheck`・`lint`・`format(:check)`・`verify`・`acceptance`）、`vite.config.ts`（ポートは環境変数 `UI_PORT`・`API_PORT`。`/api` を中継）、`vitest.config.ts`、`tsconfig.json`、`eslint.config.js`（ESLint 推奨 + typescript-eslint 推奨のみ）、`.prettierrc.json`、`.prettierignore`、`index.html`。
+- 画面（`src/`）: `App.tsx`（URL: `/`、`/new`、`/join`、`/games/:id/lobby`・`play`・`console`。スキップリンク）、`features/welcome`（S01）、`features/setup`（S02）、`features/participation`（S03）、`features/lobby`（S04。進行役）、`features/play`（S05）、`features/console`（S06）。共通: `api/`（`types.ts`＝手書きの型、`client.ts`＝`ApiClient` と fetch 実装、`errors.ts`、`problems.ts`＝`code` の辞書、`catchUp.ts`＝versions に追いつくまで再取得、`ApiContext.tsx`）、`components/`（`PageHeading`、`ErrorNotice`、`ValidationSummary`、`Dialog`、`useLoad`）、`labels.ts`、`styles.css`。
+- 試験: コンポーネント・単体の 8 ファイル 70 件（`api/problems`・`client`・`catchUp`、`features/setup`・`participation`・`lobby`・`play`・`console`）、補助 `testing/`（`fakeApi`＝呼ばれると想定していないメソッドは失敗する、`render`）。受け入れ: `steps/walking-skeleton.steps.mjs`（スタブから実物に差し替え）、`support/hooks.mjs`（Vite を専用ポートで起動、Chromium、終了時に止める）、`support/console-window.mjs`（前提の準備は実 API、操作は実ブラウザ）、`cucumber.mjs`。
+
+**実行したコマンドと結果（実測）**:
+
+| コマンド | 結果 |
+| :--- | :--- |
+| Red 1: `npx vitest run`（実装の前） | 8 ファイルすべて失敗、テスト 0 件（`../../api/errors` などの実装が無く import を解決できない） |
+| Red 2: `npx cucumber-js`（実バックエンドを起動し、画面の実装の前） | Given 3 つ（ゲーム作成・4 人の参加と割り当て・開始・入力の保存）は**実 API で通り**、「進行役のコンソールを開いている」が失敗（見出しが 10 秒待っても現れない）。画面が無いことによる失敗で、シナリオが実バックエンドに繋がっていることも確認 |
+| `npx vitest run`（Green） | **8 ファイル・70 件成功** |
+| 試験が常に通るものでないことの確認 | 実装を 2 か所壊した（`catchUp` の追いつきの判定を `>=` から null 判定だけに、確定の `basis` を 0 固定に）→ **6 件が失敗**（catchUp 3、コンソール 2、プレイ 1）。戻して 70 件成功 |
+| `npm run verify`（`prettier --check`、`eslint --max-warnings=0`、`tsc --noEmit`、`vitest run`、`vite build`） | **すべて成功**（build: 111 モジュール、JS 281 kB） |
+| バックエンドの起動: `APP_ENV=local DB_KIND=h2 PORT=3100 ALLOWED_ORIGINS=http://localhost:5273 app/build/install/app/bin/app`（`./gradlew :app:installDist` で作った同じアプリ。他のエージェントの Gradle と競合させないため `:app:run` でなくこちら） | 起動、`/api/v1/ready` が 200 |
+| `npx cucumber-js`（`@ui`。Vite は 5273、バックエンドは 3100。Chromium で実画面） | **1 シナリオ・8 ステップすべて成功**（Undefined・Pending なし。`--dry-run` でも未定義なし）。「週を確定」→ 確認ダイアログ → 第 2 週と、4 役割の第 1 週の結果（例: `小売店 第 1 週の結果: 受注 4、発注 4、在庫 12、受注残 0、出荷 4、費用 600（累計 600）`） |
+| 終了処理 | バックエンドのプロセスを停止し、3100・5273 に待ち受けが残っていないことを確認。3000・5173 は使っていない |
+
+**TDD の順序の証跡**: 試験（コンポーネント 8 ファイルと `@ui` のステップ）を実装より先に書き、Red 1・2 を確認してから実装した。例外（正直に記す）: ① `src/api/types.ts`（仕様の手書き写し）は試験の前に書いた。② 画面の実装は 1 回でまとめて書き、1 回目の実行で 70 件が通った（1 件ずつの Red は確認していない。Red は「実装が無い」という粒度。代わりに上の破壊の確認をした）。③ 試験の誤りを 2 件直した: `client.test` で同じ `Response` を 2 回読んだ、全角の空白が Testing Library の照合で正規化されるのに文字列で比べた（`\s+` の正規表現に）。実装の誤りではない。④ `@ui` の初回の失敗は実装でなく環境（下の食い違い 3）。
+
+**使った版**（すべて `npm view` で実在を確認。beer-game2 の確認値に合わせた）: react 19.3.1、react-dom 19.3.1、react-router 8.5.1、vite 8.3.6、@vitejs/plugin-react 6.3.0、typescript 6.0.3（最新は 7.0.2 だが採らない）、vitest 5.1.0、@testing-library/react 16.3.3・jest-dom 7.0.1・user-event 14.6.8（最新は 14.6.10）、jsdom 31.0.0（最新 31.0.1）、eslint 10.14.0（最新 10.15.0）、typescript-eslint 8.72.1、@eslint/js 10.0.1、prettier 3.9.10（最新 3.10.1）、@types/react・react-dom 19.3.0、@types/node 26.6.6、playwright 1.65.1（Step 3 から。Chromium を導入）、@cucumber/cucumber 13.3.0（Step 3 から）。実行は Node 24.11.0（Node 26 は未導入のまま。`.nvmrc` は作っていない）。**OpenAPI の型の生成ツール、契約テストの道具、PMD は入れていない**。`npm install` が「中程度の脆弱性 8 件」と表示した（未調査）。
+
+**型の生成の扱い**: 生成ツールは B2 で選定・承認するため、B1 では `src/api/types.ts` に `contracts/openapi.yaml` の B1 の範囲を**手書き**した（B2 で生成に置き換える。ファイルの先頭にも明記）。`ErrorCode` は `openapi.yaml` の enum の手写しで、辞書は `Record<ErrorCode, ...>` なので、`code` を足すと型エラーで漏れが分かる（仕様との同期は手動で、自動の検査は B2 の契約テストまで無い）。
+
+**設計書・仕様との食い違い・未決・未確認（人の確認が要る）**:
+
+1. **参加者が、参加の後に進めない（API の欠け）**。`POST /participations/join` の応答は `versions` だけで、`gameId` を返さない（`Location` も無い）。参加者は `gameId` を知る手段が無く、S03 は「参加しました。進行役が開始するまでお待ちください。」で止まる。S04 の参加者向けの表示は、ロビーの取得が進行役専用（参加者は 403）のため作れていない。S05 は `/games/:id/play` を直接開けば動く（コンポーネントのテストで確認）が、`@ui` と実ブラウザでは確かめていない（シナリオが進行役の 1 本のため）。**対応案: 参加の応答に `gameId`（`Location`）を足す。バックエンド・仕様の変更が要り、この Step の範囲外なので触っていない。人の判断が要る。**
+2. **Gherkin の「「週を確定」を押す」は、確認ダイアログを書いていない**。UI 設計は確認ダイアログを必須とするため、窓口の `pressCommitWeek` が、ダイアログの「第 N 週を確定」まで押す。シナリオに 1 ステップ足すかは未決。
+3. **開発用の中継（Vite）の Origin**: ブラウザの変更系の要求は、Vite の中継を通すとバックエンドが見る `Host` と `Origin` が一致せず、403（`app.unauthorized`）になった（読み取りは通る）。実ブラウザで初めて出た問題で、Step 9 の試験では出ない。`ALLOWED_ORIGINS=http://localhost:5273` を指定して解消（`hooks.mjs` の接続失敗の案内にも記載）。中継側で Origin を書き換える案は採っていない（検査を弱めるため）。開発手順書への反映は未実施。
+4. **未実装（B1 の画面の範囲でも、実装を見送ったもの）**: SSE と自動更新（手動更新のボタンだけ。B1 の範囲外）、古い応答を適用しない規則、「結果が不明」の表示（クライアントは同じ冪等キーで自動再送するが、「結果を確認しています…」と入力欄の読み取り専用は無い）、反映待ちは「保存は完了しています。更新に時間がかかっています。…」の文言だけ（「あなたが保存した値（反映中）」の表示は無い）、参加コードのコピー、S01 のヘルプへの導線、オフライン。Dialog の Tab の循環・Escape・フォーカスの復帰は実装したが、**試験していない**。
+5. **仮置きの文言・値（設計書に無い）**: `game.not_preparing`「参加の受付は終了しています。」、参加後「参加しました。進行役が開始するまでお待ちください。」、付け替えの確認のボタン「移す」「戻って確認」と見出し「割り当ての付け替え」、「確定した週の結果」と結果の 1 行の形式、一般の文言（通信・権限・サーバー）、未知の `code` の扱い。作成画面の初期値（最終週 12、需要系列 4 を 12 週）は画面イメージの例で、キットの既定は ASM-01 のとおり未確定。費用は最小単位の整数のまま表示している（単位は未決）。
+6. **進行役のコンソール**: 各役割の入力値は出すが、担当者の名前と保存者は出さない（状態の API に項目が無い）。4 分割・週ごとの履歴・停止/再開/終了・代理入力・資格の失効は B5 以降。開始（S04）の後は、versions の追いつきを待たずにコンソールへ遷移し、コンソール側が取得する（同期投影の前提）。
+7. **アクセシビリティ**: ラベル、`aria-invalid`・`aria-describedby`、`aria-live`・`role="status"`・`role="alert"` の使い分け、見出しへのフォーカス、`document.title` の更新、スキップリンクは実装し、一部は試験した。**axe の自動検査、コントラスト比の確認、200% 拡大、スクリーンリーダーの確認は未実施**。
+8. **lint**: `steps/`・`support/`（.mjs）は ESLint の対象外（Prettier のみ）。`.catch(() => {})` の検出の規則は入れていない（B2 で決める）。テストはエラーを握りつぶしていない（`.catch((e) => e)` は取り出して `ApiError` の中身を検証している）。
+9. **作業中の逸脱**: 一度、スクラッチのデバッグ用スクリプトを heredoc で書こうとして拒否された（実行されていない）。以後は Write ツールで書き、デバッグ後に一時ファイルを削除した。
+10. **未実施**: 手での画面の操作確認（人の目）、ロビー・作成・参加・プレイの実ブラウザでの E2E（`@ui` は進行役の 1 本のみ）、コミット。
+
 ### Step 11: 受け入れの green（🟢）
 
-- [ ] 11.1 `@api` のシナリオが、**PostgreSQL とローカル（H2）の両方**で green（受け入れの正は PostgreSQL）
+- [x] 11.1 `@api` のシナリオが、**PostgreSQL とローカル（H2）の両方**で green（受け入れの正は PostgreSQL）
 - [ ] 11.2 `@ui` のシナリオと、ウォーキングスケルトンの E2E が green
-- [ ] 11.3 **Undefined・Pending のステップが無い**
+- [x] 11.3 **Undefined・Pending のステップが無い**（`@api` の範囲。`@ui` は 11.2 の担当）
 
-**ゲート 11**: シナリオが、業務の言葉のまま green であることを、人が確認する。
+**ゲート 11**: シナリオが、業務の言葉のまま green であることを、人が確認する。**人の確認待ち（未承認）。**
+
+#### Step 11（@api）の結果（2026-11-14、AI の実施。**ゲート 11 は人の確認待ち（未承認）**。コミットは未実施）
+
+**作ったもの・変えたもの**（`apps/beer-game-kotlin/app/`）:
+
+- `app/build.gradle.kts`: `acceptanceTest` ソースセットを `main` に依存させた（`sourceSets.main` の output と、`implementation`・`runtimeOnly` を継ぐ）。`acceptanceTestImplementation` に `testcontainers-postgresql`（既存のカタログ。`integrationTest` と同じ）を足した。タスクは 2 つ: `acceptanceTest`（PostgreSQL。受け入れの正）、`acceptanceTestH2`（H2）。DB は、システムプロパティ `acceptance.db`（`postgres` | `h2`。未指定は `postgres`）で選ぶ。新しい依存はない。
+- `app/src/acceptanceTest/kotlin/beergame/acceptance/`: `RunningApp.kt`（シナリオごとに Ktor（Netty、ポート 0）を、本番と同じ組み立て（`appPorts`＝application + adapter-persistence、`beerGameModule`）で起動。PostgreSQL は JVM で 1 つの Testcontainers `postgres:18-alpine` を共有し、H2 はシナリオごとに独立したメモリ DB。ログは集める）、`GamePlayApi.kt`（`java.net.http.HttpClient` で HTTP を呼ぶだけの窓口。業務ロジックなし）、`ScenarioContext.kt`（シナリオの状態、`@Before`・`@After`、受け入れ用の需要系列）、`GameSetupSteps.kt`・`WeeklyPlaySteps.kt`・`OperationsSteps.kt`（ステップ定義）。`WalkingSkeletonSteps.kt` は削除し、`GamePlayApi.kt` は `UnwiredGamePlayApi` から実物の窓口に置き換えた。
+- `features/weekly-play/decision.feature`: AC2.2.2 のアウトラインの 1 行を、原文に合わせて直した（下の「食い違い 1」）。
+
+**実行したコマンドと結果（実測）**:
+
+| 確認 | コマンド | 結果 |
+| :--- | :--- | :--- |
+| H2 の初回 | `./gradlew :app:acceptanceTestH2` | 27 シナリオ中 25 成功・2 失敗（AC2.2.2 の小数・空白。食い違い 1）。209 ステップ中 207 成功 |
+| 修正後（H2） | 同上 | **27 シナリオ成功、209 ステップ成功**（約 20 秒） |
+| 修正後（PostgreSQL 18.7、Testcontainers） | `./gradlew :app:acceptanceTest` | **27 シナリオ成功、209 ステップ成功**。ログで `PostgreSQL 18.7`（`postgres:18-alpine`）を確認 |
+| Red の確認（変異） | `Disclosure.kt` を一時的に「全役割に顧客需要を返す」へ変えて `:app:acceptanceTestH2` | AC2.1.3 が `当週の顧客需要が含まれている` で失敗（26 成功・1 失敗）。**直ちに元へ戻した**（`application/` に差分なし） |
+| Undefined の確認 | ステップ 1 つの文言を一時的に変えて実行 | `UndefinedStepException`、27 中 1 件が undefined で **BUILD FAILED**。元へ戻した。Pending も同様（Cucumber 8 は既定で厳格） |
+| 全体 | `./gradlew build integrationTest acceptanceTest acceptanceTestH2`（JDK 25） | **BUILD SUCCESSFUL**（約 1 分 16 秒）。ktlint 0 件（`acceptanceTest` のソースセットを含む）、警告はエラー |
+
+シナリオ数 27 は、Step 3 の記録（28 件中 `@ui` の 1 件を除外）と一致する。`@ui` は `@api` のフィルタで実行されない。
+
+**原文との照合表**（ID → 原文の要点 → シナリオ → 期待値の確認内容 → 結果。原文は `docs/requirements/beer-game2/user_story.md`）:
+
+| ID | 原文の要点 | シナリオ | ステップが HTTP で確かめること | 結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| AC1.1.1 | 有効なキット準拠設定で、参加コード付きの準備中ゲームが一度だけ作成される | 作成 | 201・`Location`・資格。状態が `PREPARING` で `joinCode` あり。同じ冪等キー・本文の再送で、同じゲームの ID と資格が返る（「1 つのまま」は、HTTP では ID の同一で確かめる。行数の数えは Kotest 側） | 成功（PG・H2） |
+| AC1.1.2 | 無効な需要系列では作成せず、対象週と修正内容を表示 | 無効な需要系列 | 422、`Location`・資格なし。`errors` に `week=5`・`field=demand`、`message` に 0・1000・整数（実際は「需要は 0〜1000 の整数」） | 成功。ただし「0 以上 1000 以下の整数にする」の語尾は、応答の文言とは違う（意味は一致） |
+| AC1.2.1 | 有効な参加コードで表示名を入力すると、ロビーに参加し、復帰資格が保存される | 参加 | 参加の成功、ロビー（進行役）に表示名がある。発行された資格で `GET /games/:id/state` が 200 で `participantId` を返す | 成功 |
+| AC1.2.2 | 無効または終了済みのコードでは参加せず、理由を表示 | 無効なコード、受付終了の 2 本 | 403 `game.invitation_invalid`、409 `game.not_preparing`。資格なし、`title` あり | 成功 |
+| AC1.2.3 | 4 役割のいずれかに参加者がいないと、開始を拒否し、不足を示す | 開始の拒否 | 422、ゲームは `PREPARING` のまま、`missingRoles` がちょうど一次卸 | 成功 |
+| AC1.2.5 | 1 人に複数の役割を割り当てようとすると、割り当てず理由を示す | 付け替え（D9） | 割り当ては 200。ロビーで、山本が小売店 → 二次卸に変わり、小売店にいない | 成功。**原文と異なる（D9 の解釈）**。「移したことが示される」は、API が明示しないため、前後のロビーの差で確かめた（食い違い 2） |
+| AC2.1.1 | 自役割の在庫・受注残・入荷・受注だけを表示 | 自分の役割 | 200、`role`、`roleStatus` に 4 項目。`roles`・`results`・他の参加者の表示名・参加コードを含まない | 成功 |
+| AC2.1.2 | 他の役割のリソースを取得しようとすると、権限エラーで値を返さない | 他の役割 | `?role=RETAILER` で 403 `app.unauthorized`、`roleStatus` なし | 成功 |
+| AC2.1.3 | 小売店以外には、当週・将来の需要を開示しない | 開示 2 本 | 二次卸: `customerDemand` の項目なし。将来の需要（第 2〜12 週の 901〜911）が応答のどの値にも出ない。小売店: `customerDemand`＝第 1 週の 4 | 成功。変異（全役割へ開示）で失敗することを確認 |
+| AC2.2.1 | 未確定の当週に非負整数を入力すると、流通役は発注、生産役は生産要請として保存 | アウトライン 2 行 | 保存 200、自分の状況の `decision`＝数量。種類は、API の状況に出ないので、4 役割をそろえて確定し、結果の `order`＝保存した数量であることで確かめた（種類と役割の対応は原文のまま） | 成功。種類の区別そのものは API に出ない（食い違い 3） |
+| AC2.2.2 | 負数・小数・空白を確定しようとすると、入力を保持し、修正方法を示す | アウトライン 3 行と境界 3 行 | 422、保存されない、`field=quantity` で「整数」を含む。境界: 0・1000 は 200、1001 は 422 | 成功（食い違い 1 の修正後）。「入力を保持」は画面の関心で `@api` の対象外（Step 3 の記録のとおり） |
+| AC2.3.1 | 4 役割の入力後に週を確定すると、結果が保存される | 確定 | 確定 200、進行役の状態が第 2 週、第 1 週の結果が 4 役割。各参加者の状態が第 2 週。値の計算は Kotest の golden が担う | 成功 |
+| AC2.3.2 | 同じ確定要求が重複すると、一度だけ計上される | 再送、別キー | 再送（同じキー・本文）は 200 で、週は第 2 週、結果は 4 件のまま。別キーは 409 `session.week_advanced`、結果は 4 件のまま | 成功 |
+| AC2.3.4 | 同一の初期状態と意思決定から再計算すると、全状態と費用が一致 | 2 つのゲーム | 2 つのゲームの進行役の状態の `roles` と `results`（費用を含む）が完全に一致 | 成功 |
+| AC2.3.5 | 確定の結果に、役割別の値（注文、在庫、受注残、出荷、費用）が含まれる | 結果の項目 | 4 役割それぞれに `order`・`inventory`・`backlog`・`shipment`・`cost` がある | 成功 |
+| （US2.3） | 「4 役割の入力後に」 | 入力がそろわない確定 | 422 `session.incomplete_decisions`、週は第 1 週のまま、`missingRoles`＝工場 | 成功 |
+| AC6.1.1 | 構造化ログに相関 ID・操作・結果・所要時間があり、資格・表示名・非公開の値を含まない | ログ | 応答の `x-correlation-id` と同じ相関 ID のログがあり、`operation`・`result`・`durationMillis` が出力された JSON の行にある。ログ全文に、全員の資格（Cookie の値）、表示名「田中」、参加コード、`bg_session` が無い | 成功 |
+| AC6.1.4 | 準備のヘルスチェックが、データベースに接続できないと失敗する | `/ready` | 初めは 200。接続プールを閉じると `/ready` が 503（`app.not_ready`）、`/health` は 200 のまま | 成功。「負荷分散の対象から外す」は ALB の動作で対象外（Step 3 の記録のとおり）。DB の切断は、接続プールを閉じる擬似であり、実 DB のネットワーク切断ではない |
+| AC2.3.3・AC6.1.2 | （障害の注入が要る） | Gherkin にしない | Kotest と統合テストが担う（Step 3 の判断どおり） | 対象外 |
+
+**食い違い・バグ・未決・未確認**:
+
+1. **シナリオが原文より厳しかった（シナリオを直した）**: AC2.2.2 の「数量は 0 以上 1000 以下の整数で入力するという修正方法」。原文は「修正方法を示す」だけ。アプリケーションは、小数・空白に「整数で指定してください。」と返し、範囲を含まない（範囲外の数値には範囲を含む）。シナリオの期待を「数量の修正方法が示される」（`quantity` の誤りで、整数を示す）に直し、理由をフィーチャーのコメントに書いた。アプリケーションは直していない。範囲まで示したいかは未決（UI の辞書が補うか、API の文言を揃えるか）。
+2. **AC1.2.5「移したことが示される」**: コマンドの応答は `versions` だけで、ロビーは現在の役割だけを持つ（RoleUnassigned・RoleAssigned の履歴は投影にあるが、HTTP では出ない）。付け替えの明示（`moved`、移動元の役割など）は API に無いため、ステップは割り当ての前後の差（小売店 → 二次卸）で確かめた。**明示の通知が要るか**は未決（要るなら B1 の API の追加、または B2）。原文との差（拒否 → 付け替え）の人の確認は、ゲート 3 のまま未決。
+3. **AC2.2.1「発注／生産要請として扱われる」**: API の状況に種類の項目が無い。結果の `order`（工場は生産要請）に数量が反映されることまでを確かめた。種類のラベルは、原文（流通役＝発注、生産役＝生産要請）を、ステップの中で役割から導いている（薄いが、原文の知識を 1 か所に持つ）。
+4. **AC1.2.2 の理由**: 理由は problem+json の `code` と `title` で確かめた。`code` の名前（`game.invitation_invalid`、`game.not_preparing`）は、Step 8・9 で確定した仮置きのまま（設計書に一覧が無い）。
+5. **需要系列**: JSD の値が未確認（ASM-01）のため、受け入れ用の系列（第 1 週 4、第 2〜12 週が 901〜911）を使った。**JSD 準拠の受入判定は保留**（既存の判断）。「キット準拠」の `kind` は `KIT` のみで、プリセットの値は未確定。
+6. **配線の差**: 受け入れは、`startApi`（`Main` の起動経路）ではなく、`appPorts`・`beerGameModule` を直接組み立てる（DB 切断のためにデータソースを持つ必要があり、時計・ID は本番と同じ）。起動の経路（設定の読み込み、鍵）は、`MainSpec`・`ServerConfigSpec`・`PostgresHttpSpec` が担う。H2 は `acceptanceTestH2` のみで、`DB_KIND=h2` の環境変数経路は通していない。
+7. **既知の警告（無害）**: Cucumber が、グルーのパッケージにステップ以外のクラス（`Role`、`RunningApp` など）があると警告する。パッケージを分ければ消せるが、未実施（失敗には影響しない）。Netty のネイティブアクセスの警告（JDK 25）も出る。
+8. **未確認**: 並行の確定（AC2.3.2 の「同時」）は Gherkin の対象外（統合テスト）。受け入れの実行時間は、H2 が約 20 秒、PostgreSQL が約 50 秒（コンテナの起動を含む）で、CI での実測は未実施。`acceptanceTest` を `check` に組み込むかは Step 12 の判断。
+9. **規律の記録**: ステップ定義は、実物のアプリケーションがすでにある状態で書いたため、Pending → Failing の Red は、Step 3 の記録（Undefined・Failing）に加え、変異（上の表）と Undefined の一時変更で確かめた。ktlint の整形は、ktlint のフォーマッタ（`ktlintAcceptanceTestSourceSetFormat`）で行い、それ以外はファイルツールで編集した。
 
 ### Step 12: 検証と終了（✅）
 
