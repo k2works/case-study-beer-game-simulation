@@ -37,6 +37,9 @@ value class DemandSeries private constructor(
 ) {
     fun at(week: Week): Units = weeks.getOrNull(week.value - 1) ?: Units(0)
 
+    /** 系列そのもの（週 1 から順の整数）。永続化の往復（イベントの JSON への変換）に使う。 */
+    fun asInts(): List<Int> = weeks.map { it.value }
+
     /** 次の週の需要（週の値は 1 始まりなので、0 始まりの添字としてそのまま次の週を指す）。 */
     fun after(week: Week): Units = weeks.getOrNull(week.value) ?: Units(0)
 

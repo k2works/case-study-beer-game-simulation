@@ -1,15 +1,24 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
+plugins {
+    alias(libs.plugins.kotlin.serialization)
+}
+
 // JDBC による永続化。application と domain に依存する。
 dependencies {
     api(project(":application"))
     api(project(":domain"))
+    implementation(libs.coroutines.core)
+    implementation(libs.serialization.json)
     implementation(libs.hikari)
     implementation(libs.flyway.core)
     implementation(libs.flyway.postgresql)
-    runtimeOnly(libs.postgresql)
+    // PSQLException の制約名のフィールド（serverErrorMessage.constraint）を読むため、コンパイル時にも要る。
+    implementation(libs.postgresql)
     runtimeOnly(libs.h2)
 }
 
-// integrationTest: 実 PostgreSQL（Testcontainers）を使う試験の置き場。B1 の Step 2 では試験を置かない。
+// integrationTest: 実 PostgreSQL（Testcontainers）を使う試験の置き場。test の出力（共有の契約テスト）も使う。
 val integrationTest: SourceSet by sourceSets.creating {
     compileClasspath += sourceSets.main.get().output + sourceSets.test.get().output
     runtimeClasspath += sourceSets.main.get().output + sourceSets.test.get().output
@@ -29,4 +38,8 @@ tasks.register<Test>("integrationTest") {
     testClassesDirs = integrationTest.output.classesDirs
     classpath = integrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
+    testLogging {
+        events("failed")
+        exceptionFormat = TestExceptionFormat.FULL
+    }
 }
