@@ -6,9 +6,42 @@ import org.jlleitschuh.gradle.ktlint.KtlintExtension
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
-    alias(libs.plugins.kover) apply false
+    // ルートでも適用し、全モジュールの計測を合算した報告・ゲートに使う（kover(project(...)) の依存を下に置く）。
+    alias(libs.plugins.kover)
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.ktlint) apply false
+}
+
+dependencies {
+    listOf("domain", "application", "adapter-persistence", "adapter-http", "app").forEach { kover(project(":$it")) }
+}
+
+// ---- カバレッジのゲート（Kover。全モジュールの test・integrationTest・acceptanceTest・acceptanceTestH2 を合算）----
+// koverVerify は、計測の対象の Test タスクをすべて先に実行する（実測: --dry-run で依存を確認した）。
+// 設計（docs/design/beer-game-kotlin/test-strategy.md）の目標は、全体の行 85%・分岐 75% と domain の行 100%。
+// domain の行 100% は、コンパイラ生成のコード（value class のプライマリコンストラクタのプロパティ、
+// object のプロパティの getter）が未到達のため、現在は届かない（実測 97.5%）。
+// domain の行のゲートは domain/build.gradle.kts（暫定の下限 97%。目標 100% ではない）。除外か閾値の見直しかは、人の判断を待つ。
+// 注: 0.9.11 の検査の規則（rule）には、パッケージで絞る filters が無い（実測: コンパイルエラー）。そのため domain は、モジュールごとの検査で行う。
+kover {
+    reports {
+        verify {
+            rule("全体の行 85%") {
+                bound {
+                    minValue = 85
+                    coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE
+                    aggregationForGroup = kotlinx.kover.gradle.plugin.dsl.AggregationType.COVERED_PERCENTAGE
+                }
+            }
+            rule("全体の分岐 75%") {
+                bound {
+                    minValue = 75
+                    coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH
+                    aggregationForGroup = kotlinx.kover.gradle.plugin.dsl.AggregationType.COVERED_PERCENTAGE
+                }
+            }
+        }
+    }
 }
 
 val ktlintVersion = libs.versions.ktlint.tool.get()
@@ -19,6 +52,16 @@ val kotestAssertions = libs.kotest.assertions
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlinx.kover")
+
+    // integrationTest・acceptanceTest はテストコードなので、計測の対象（本番コード）から外す。
+    // 外さないと beergame.acceptance などのテストのクラスが、本番コードとして行数に入る。
+    extensions.configure<kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension> {
+        currentProject {
+            sources {
+                excludedSourceSets.addAll("integrationTest", "acceptanceTest")
+            }
+        }
+    }
     apply(plugin = "io.gitlab.arturbosch.detekt")
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
 

@@ -113,10 +113,66 @@ API の契約テストの**実装**（道具の選定と承認の後。選定の
 
 ### Step 2: Kover の合算とゲート（🔴🟢）
 
-- [ ] 2.1 Kover が `test`・`integrationTest`・受け入れを合算できるか実測する
-- [ ] 2.2 層ごとの目標と、全体のゲート（行 85%・分岐 75%）を、実測に基づいて設定する。**domain の行 100% と、生成コード（`value class` の生成メンバー）の扱い**を調べ、**人の判断が要る場合は、閾値を黙って下げず、事実と選択肢を記録する**
+- [x] 2.1 Kover が `test`・`integrationTest`・受け入れを合算できるか実測する
+- [ ] 2.2 層ごとの目標と、全体のゲート（行 85%・分岐 75%）を、実測に基づいて設定する。**domain の行 100% と、生成コード（`value class` の生成メンバー）の扱い**を調べ、**人の判断が要る場合は、閾値を黙って下げず、事実と選択肢を記録する**（全体のゲートは設定済み。**domain の行 100% は未達のため [ ] のまま**。暫定の下限 97% を設定し、人の判断待ち）
 
-**ゲート 2**: 実測と、ゲートの設定を、人が確認する。
+**ゲート 2**: 実測と、ゲートの設定を、人が確認する。**（待ち。承認済みではない）**
+
+#### Step 2 の結果（実測。2026-11-15）
+
+**1. 合算の可否（2.1）: 合算できる。**
+
+- Kover 0.9.11 は、ルート（`build.gradle.kts`）で `kover` プラグインを適用し、`dependencies { kover(project(":domain")) ... }` で全 5 モジュールを集めると、ルートの `koverXmlReport`・`koverVerify` が全モジュールを合算する。
+- 公式ドキュメント（kotlin.github.io/kotlinx-kover。取得した版は 0.9.8 の記述）の記述: 「既定ではすべてのテストタスクを計測する」。実測でも、`adapter-persistence` と `app` の `build/kover/bin-reports/` に `test.ic`・`integrationTest.ic`・`acceptanceTest.ic`・`acceptanceTestH2.ic` が生成された。`./gradlew koverVerify --dry-run` で、`koverVerify` が `test`・`integrationTest`・`acceptanceTest`・`acceptanceTestH2` をすべて先に実行する依存を確認した（追加の設定は不要）。
+- **落とし穴（実測）**: `integrationTest`・`acceptanceTest` のソースセットのクラス（`beergame.acceptance.*`、`PostgresSupport` など）が、本番コードとして行数に入った（`beergame/acceptance` が 549 行カバー）。各モジュールで `kover { currentProject { sources { excludedSourceSets.addAll("integrationTest", "acceptanceTest") } } }` を設定して外した。
+- 公式ドキュメントで**確認できなかった事項**: `excludedSourceSets` の記述そのもの（ビルドが通り、効果を実測で確認しただけ）。0.9.11 の版固有のドキュメントは未確認。
+
+**2. カバレッジの実測（合算。`./gradlew check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport`）**
+
+| 範囲 | 行 | 分岐 |
+| :--- | ---: | ---: |
+| **全体（合算）** | **3141/3245 = 96.8%** | **804/1030 = 78.1%** |
+| domain | 784/804 = 97.5% | 160/163 = 98.2% |
+| application | 569/576 = 98.8% | 98/127 = 77.2% |
+| adapter-persistence | 921/938 = 98.2% | 165/233 = 70.8% |
+| adapter-http | 587/615 = 95.4% | 257/335 = 76.7% |
+| app | 280/312 = 89.7% | 124/172 = 72.1% |
+
+- B1（`test` のみ、モジュール別）との差: adapter-http の行は 70.4% → 95.4%、分岐は 55.8% → 76.7%（受け入れ・統合が HTTP を通すため）。合算で、設計の層ごとの目安（adapter-http 行 90%・分岐 75%）を満たした。application の分岐（目安 85%）と adapter-persistence の分岐（目安 75%）は、目安に届かない（目安で、ゲートではない）。app の行は、起動部を含む（設計は「起動部は除外」としたが、除外は未設定）。
+- 上の数値の読み方: 層の値は、合算の報告をパッケージ（`beergame/domain` など）で集計した。
+
+**3. ゲートの設定（2.2）**
+
+| ゲート | 設定 | 場所 | 実測 |
+| :--- | ---: | :--- | ---: |
+| 全体の行 | 85% | `build.gradle.kts`（ルート。合算） | 96.8% |
+| 全体の分岐 | 75% | 同上 | 78.1%（余裕 3.1 ポイント） |
+| domain の行 | **暫定の下限 97%**（目標 100%） | `domain/build.gradle.kts`（モジュール単位） | 97.5% |
+
+- 設計の目標のうち、層ごとの他の目標は「目安」なので、ゲートにしていない（設計どおり）。
+- Kover 0.9.11 の検査の規則（`rule`）には、パッケージで絞る `filters` が無い（実測: コンパイルエラー）。そのため domain の行は、domain モジュールの `koverVerify`（domain の `test` だけの計測。値は合算と同じ 784/804）に置いた。
+- **閾値割れで失敗すること（実測）**: 全体の分岐を 85%、domain の行を 100% に一時的に変えて `./gradlew koverVerify --continue` を実行し、`:koverVerify`・`:domain:koverVerify` が FAILED になることを確認した。その後、元の値（75%・97%）に戻した。戻したあと `./gradlew koverVerify` は BUILD SUCCESSFUL。
+
+**4. domain の行 100% の事実と選択肢（人の判断）**
+
+- **未到達の 20 行（784/804）の内訳**: すべて、手で書いた処理ではなく、コンパイラが生成するコードに対応する行。
+  - `value class` のプライマリコンストラクタのプロパティの行（`val value: Int,` など）9 行（`Quantities.kt` の 10・28、`Values.kt` の 22・44・61・83・96・110・125。ボックス化したクラスの `getValue` など）。
+  - `object Projections` のプロパティ宣言の行（`val gameOverview =` ほか 9 行）。プロパティ初期化の行は通るが、宣言の行に対応する getter（`getGameOverview()` など）が、どこからも呼ばれない（`Projections.all` は内部でフィールドを直接読む）。
+  - `Foundation.kt` 56 行 `fun toRef(): ActorRef =` の 1 行。本体は呼ばれている（application・adapter-persistence の試験）が、宣言の行の命令の一部が未到達。**原因は未確認**（生成コードの疑い。バイトコードは未確認）。
+  - 合計 19 行（9＋9＋1）を特定できた。報告の「未到達 20 行」との差の 1 行は、**内訳は未確認**（部分的に到達した行 4 行の集計の違いの可能性）。
+- **除外で 100% に届くか（実測）**: 届かない。Kover の除外は、クラス単位（`classes(...)`）か、注釈（`annotatedBy`）しか確認できない。生成コードだけを除く方法は、確認できなかった。実験として `Projections*`・`Quantity`・`Units` を除外すると、domain は 611/620（行 98.5%）に変わっただけで、**実処理の行 184 行が計測から消えた**（行 100% にも届かない）。実験は元に戻した。
+- 選択肢（決めるのは人）:
+  1. **閾値の見直し**: domain の行のゲートを 97%（現状の実測 97.5% に基づく下限）のまま、設計書の「100%」を、実測に合わせて書き換える。
+  2. **コードの変更で生成コードを減らす**: `object Projections` の `val` を `private val` にする、`value class` をやめて通常のクラスにする、など。いずれも設計・アプリのコードの変更で、本 Step の範囲外（`value class` は設計判断）。
+  3. **クラス単位の除外**: 実処理を含むクラスごと除外することになるため、お勧めしない（上の実測）。
+  4. **注釈による除外**: 自前の注釈（例: `@Generated` 相当）を作って `annotatedBy` で除外する。生成される getter には付けられないため、効果は未確認。
+- **現状の設定**: 97%（現状より悪化させないための暫定の下限。目標 100% は未達のまま）。
+
+**5. 未確認**
+
+- GitHub Actions 上での Kover の実行（ローカルの JDK 25・macOS だけで実測）。
+- `suspend` による分岐の揺れ（全体の分岐 75% の余裕は 3.1 ポイント）。複数回の実行での揺れは未測定。
+- app の起動部の除外（設計の「起動部を除外」）は未設定。除外すると app の行は上がる。
 
 ### Step 3: 追記専用権限の否定テストと連鎖削除（🔴🟢）
 
@@ -166,10 +222,62 @@ API の契約テストの**実装**（道具の選定と承認の後。選定の
 
 ### Step 4: CI の整備（🟢）
 
-- [ ] 4.1 CI の工程（ktlint、detekt（JDK 21 の専用ジョブ）、PMD、fixture、`test`、`integrationTest`、受け入れ（`@api`）、カバレッジ）を整える。DB の統合が 1 件も実行されなければ失敗、Undefined・Pending で失敗
-- [ ] 4.2 N-1 互換ジョブの雛形（直前のリリースが無い間は実行しない）
+- [x] 4.1 CI の工程（ktlint、detekt（JDK 21 の専用ジョブ）、PMD、fixture、`test`、`integrationTest`、受け入れ（`@api`）、カバレッジ）を整える。DB の統合が 1 件も実行されなければ失敗、Undefined・Pending で失敗（**ワークフローの作成とローカルでの各工程の実測まで。GitHub Actions 上の実行は未確認**）
+- [x] 4.2 N-1 互換ジョブの雛形（直前のリリースが無い間は実行しない）
 
-**ゲート 4**: CI の構成を、人が確認する。
+**ゲート 4**: CI の構成を、人が確認する。**（待ち。承認済みではない）**
+
+#### Step 4 の結果（実測。2026-11-15）
+
+**1. ジョブの構成（`.github/workflows/beer-game-kotlin.yml`。検証のみ、デプロイなし）**
+
+| ジョブ | JDK / Node | 内容 | `timeout-minutes` |
+| :--- | :--- | :--- | ---: |
+| `test` | JDK 25 | `check -x pmd`（ktlint・test・モジュール依存）→ `integrationTest`（PostgreSQL 18）→ `acceptanceTest`（`@api`、PostgreSQL）→ `acceptanceTestH2` → **DB の統合が実行されたことの検査** → `koverVerify koverXmlReport`（カバレッジのゲート）→ Kover の報告を保存 | 30 |
+| `detekt` | JDK 21 | `detekt detektMain detektTest` | 15 |
+| `pmd` | JDK 25 | `pmdFixtureTest`（先）→ 層ごとの検査（4 タスク） | 15 |
+| `web` | Node 26 | `npm ci`、`npm run verify`（format・lint・typecheck・Vitest・build）、`npm run acceptance:dry-run`（Undefined の検出） | 15 |
+| `ui` | JDK 25・Node 26 | Playwright の Chromium を導入し、H2 のバックエンド（ポート 3100）を起動して `npm run acceptance`（`@ui`） | 20 |
+| `n1` | — | N-1 互換の雛形（下記） | 10 |
+
+- **PMD の重複の整理**: `check` が `pmd` に依存するため、`test` ジョブは `check -x pmd` にして、PMD は `pmd` ジョブだけで実行する。`./gradlew check -x pmd ... --dry-run` で、PMD のタスクがグラフに含まれないことを確認した（0 件）。
+- **`timeout-minutes` の根拠**: ローカルの実測で、`check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport --rerun-tasks`（再コンパイルを含む）が 3 分 25 秒。CI の依存の取得・コンテナの取得・Gradle のキャッシュ無しを見込んで 30 分。設計の実行時間の目標（全体 12 分）との比較は、GitHub Actions 上の実測が無いので**未確認**。
+
+**2. 失敗の条件（実測）**
+
+| 条件 | 結果 | 実測の方法 |
+| :--- | :--- | :--- |
+| Undefined のステップ（`@api`） | **失敗**（`UndefinedStepException`。`:app:acceptanceTestH2 FAILED`、29 tests completed, 1 failed） | 一時的に、定義の無いステップのシナリオを `features/weekly-play/` に置いて実行し、削除した（`git status` に残っていない） |
+| Pending のステップ | **未実測**（Cucumber-JVM は、strict が既定のため Undefined と同じく失敗する想定。確認していない） | — |
+| DB の統合が 0 件・全件スキップ | **失敗**（`::error::` を出して終了コード 1） | ワークフローの検査の手順（`test` の結果の XML の合計）を、実際の結果に実行して合格を確認（integrationTest 55 件＋1 件、acceptanceTest 28 件（スキップ 1）、acceptanceTestH2 28 件（スキップ 1））。0 件で落ちる分岐は、条件式の確認だけで、**0 件の状態での実行は未実測** |
+| カバレッジの閾値割れ | **失敗**（Step 2 の結果） | 閾値を一時的に上げて実行 |
+| Docker が無い | 統合・受け入れ（PostgreSQL）が失敗する想定（Testcontainers）。**未実測** | — |
+| Cucumber-JS の Undefined（`@ui`） | `web` ジョブの dry-run、`ui` ジョブの実行で検出される（Cucumber-JS の strict が既定）。**Undefined を置いての実測は未実施** | — |
+
+- 受け入れの `skipped=1` は、`@ui` のシナリオ（Cucumber-JVM は `@api` だけを実行する）と見ているが、**どのシナリオかは未確認**。
+
+**3. Node の工程（`web`・`ui`）を追加した**
+
+- `web`: `npm run verify`（ローカルで B1 に実行済み）と `npm run acceptance:dry-run`（今回ローカルで実行、`1 scenario (1 skipped)`）。
+- `ui`: `web/support/hooks.mjs` の案内どおり、`APP_ENV=local DB_KIND=h2 PORT=3100 ALLOWED_ORIGINS=http://localhost:5273 ./gradlew :app:run` で起動し、`/api/v1/ready` を待って `npm run acceptance` を実行する。**ローカルで同じ手順を実行した**（起動 8 回目の確認で ready、`1 scenario (1 passed)`、`8 steps (8 passed)`、約 2.5 秒）。バックエンドは実行後に停止した（ポート 3100 のみ。人の開発サーバーの 3000・5173 は触っていない）。
+- **未実施**: Playwright の e2e と axe（設計の CI の工程にあるが、本 Bolt の範囲外）。ブラウザ行列（Firefox・WebKit 等）は定期実行の工程。`ui` ジョブの `npx playwright install --with-deps chromium` は、GitHub Actions の runner 上で**未確認**（ローカルは導入済みのブラウザを使った）。
+
+**4. N-1 互換ジョブの雛形（`n1`）**
+
+- `git tag --list 'beer-game-kotlin-v*'` で直前のリリースのタグを探す。**タグの名前の規約は未決**（仮に `beer-game-kotlin-v*`）。タグが無い間は、検査の工程を実行しない（`if: steps.previous.outputs.tag != ''`）。
+- タグが有るのに本実装が無い場合は、意図的に**失敗**する（`exit 1`）。黙って通すと、検査があるように見えて何も確かめない状態になるため。本実装の手順（タグの取り出し・読み取り側のビルド・golden の再生）は、コメントに記した（設計 M22）。**本実装は範囲外・未着手**。
+- ローカルで、`git tag --list 'beer-game-kotlin-v*'` が空であることは確認していない（未確認）。
+
+**5. actions の版**
+
+- `actions/checkout`（v7.0.1）・`actions/setup-node`（v7.1.0）・`actions/upload-artifact`（v7.0.2）は、beer-game3.yml に書かれている SHA とコメントの版を、そのまま使って SHA 固定した（beer-game3.yml の記述を転記したもので、**GitHub 上での照合はしていない**）。
+- `actions/setup-java`（`@v4`）と `gradle/actions/setup-gradle`（`@v4`）は、SHA を確認できる情報が（リポジトリ内に）無いため、**未固定のまま**。固定は未実施。
+
+**6. 検証**
+
+- YAML の構文: `ruby -ryaml -e 'YAML.load_file(ARGV[0])'` で読み込め、ジョブは `test`・`detekt`・`pmd`・`web`・`ui`・`n1` の 6 つ。
+- **GitHub Actions 上の実行は、未確認**（push していない）。特に、`ui` のバックグラウンド起動と待機、`n1` のシェル、`$GITHUB_OUTPUT` の扱い、アップロードした報告の経路は、ローカルでは再現していない。
+- ローカルで、`./gradlew check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport --rerun-tasks` が BUILD SUCCESSFUL（detekt は JDK 25 で無効。detekt・PMD の今回の変更による再実行はしていない）。
 
 ### Step 5: API の契約テストの道具の候補の提示（🔵）
 

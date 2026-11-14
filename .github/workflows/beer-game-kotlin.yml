@@ -1,7 +1,18 @@
 name: beer-game-kotlin
 
 # beer-game-kotlin の CI（検証のみ。デプロイはしない）。
-# 設計: docs/development/beer-game-kotlin/bolt_1_plan.md の Step 2
+# 設計: docs/design/beer-game-kotlin/test-strategy.md「CI のテスト実行」、docs/development/beer-game-kotlin/bolt_2_plan.md の Step 2・4
+#
+# 工程と、設計の対応:
+#   test    : ktlint、test、integrationTest（PostgreSQL 18）、受け入れ @api（PostgreSQL・H2）、カバレッジのゲート
+#   detekt  : JDK 21 の専用ジョブ（detekt 1.23.8 は JDK 25 で動かないため）
+#   pmd     : fixture のテスト → 層ごとの検査
+#   web     : フロントエンド（format・lint・typecheck・コンポーネント・build）と、Cucumber-JS の Undefined 検査
+#   ui      : 受け入れ @ui（Cucumber-JS + Playwright。H2 のバックエンドを起動する）
+#   n1      : N-1 互換（雛形。直前のリリースのタグが無い間は、中身を実行しない）
+#
+# actions の版: checkout・setup-node・upload-artifact は、beer-game3.yml と同じ SHA 固定（コメントの版）。
+# setup-java・gradle/actions は、固定する SHA を確認できていないため、版のタグのまま（未固定）。
 
 on:
   pull_request:
@@ -28,28 +39,59 @@ defaults:
     working-directory: apps/beer-game-kotlin
 
 jobs:
-  verify:
-    name: verify（ktlint・test・モジュール依存）
+  test:
+    name: test（ktlint・test・統合・受け入れ @api・カバレッジ）
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # ローカルの実測: 全工程を再コンパイルつきで 3 分 25 秒。依存の取得とコンテナの取得を見込んで 30 分。
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
-      # detekt は JDK 25 で動かないため、別のジョブ（detekt）で実行する。ここでは自動で無効になる。
-      - name: ktlint・test・モジュール依存の検査・Kover
-        run: ./gradlew check koverXmlReport --no-daemon
+      # PMD は pmd ジョブで実行するので、ここでは除く（check が pmd に依存するため、重複を避ける）。
+      # detekt は JDK 25 で動かないため、ここでは自動で無効になる（detekt ジョブで実行する）。
+      - name: ktlint・test・モジュール依存の検査
+        run: ./gradlew check -x pmd --no-daemon
+      # Testcontainers が PostgreSQL 18 のコンテナを起動する（runner の Docker を使う。Docker が無ければ失敗）。
+      - name: integrationTest（実 PostgreSQL 18）
+        run: ./gradlew integrationTest --no-daemon
+      # Undefined・Pending のステップがあれば、Cucumber-JVM が失敗にする（実測: Undefined で FAILED）。
+      - name: 受け入れ @api（PostgreSQL 18。正）
+        run: ./gradlew acceptanceTest --no-daemon
+      - name: 受け入れ @api（H2。ローカル開発の経路の確認）
+        run: ./gradlew acceptanceTestH2 --no-daemon
+      # DB の統合が 1 件も実行されなかった（0 件、または全件スキップ）場合は失敗にする（スキップの暗黙の増加を防ぐ）。
+      - name: DB の統合が実行されたことの検査
+        run: |
+          total() { grep -h -o '<testsuite [^>]*>' "$1"/*.xml 2>/dev/null | grep -o " $2=\"[0-9]*\"" | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}'; }
+          status=0
+          for d in adapter-persistence/build/test-results/integrationTest app/build/test-results/integrationTest app/build/test-results/acceptanceTest app/build/test-results/acceptanceTestH2; do
+            t=$(total "$d" tests); s=$(total "$d" skipped)
+            echo "$d: tests=$t skipped=$s"
+            if [ "$t" -eq 0 ] || [ "$t" -eq "$s" ]; then echo "::error::$d で実行された試験が 0 件です"; status=1; fi
+          done
+          exit $status
+      # test・integrationTest・acceptanceTest・acceptanceTestH2 を合算して検査する（全体の行 85%・分岐 75%、domain の行は暫定の下限）。
+      - name: カバレッジのゲート（Kover。閾値割れで失敗）
+        run: ./gradlew koverVerify koverXmlReport --no-daemon
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: kover-report
+          path: apps/beer-game-kotlin/build/reports/kover/report.xml
+          retention-days: 14
+          if-no-files-found: ignore
 
   detekt:
     name: detekt（JDK 21）
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      # detekt 1.23.8 は JDK 25 で動かない（同梱の Kotlin コンパイラが 25.0.x を解釈できない）。B2 で代替を判断する。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # detekt 1.23.8 は JDK 25 で動かない（同梱の Kotlin コンパイラが 25.0.x を解釈できない）。専用ジョブで維持する（人の決定）。
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -61,9 +103,9 @@ jobs:
   pmd:
     name: PMD（fixture のテストと、層ごとの検査）
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -76,17 +118,91 @@ jobs:
       - name: PMD（ドメイン・アプリケーション・アダプター・main・テスト。違反は 0 件）
         run: ./gradlew pmdDomainApplication pmdAdapter pmdMain pmdTest --no-daemon
 
-  integration:
-    name: integrationTest（PostgreSQL 18）
+  web:
+    name: web（format・lint・typecheck・コンポーネント・build）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+      - run: npm ci
+      # prettier、eslint、tsc、Vitest、vite build
+      - run: npm run verify
+      # ステップ定義の無いステップ（Undefined）を、バックエンド無しで検出する。
+      - run: npm run acceptance:dry-run
+
+  ui:
+    name: 受け入れ @ui（Cucumber-JS + Playwright）
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin/web
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
-      # Testcontainers が PostgreSQL 18 のコンテナを起動する（runner の Docker を使う）。Step 2 の時点では試験は無い。
-      - name: integrationTest
-        run: ./gradlew integrationTest --no-daemon
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # バックエンドを、H2 の専用ポート 3100 で起動する（画面の Origin を許可する。web/support/hooks.mjs の案内と同じ）。
+      - name: バックエンドの起動（H2）
+        working-directory: apps/beer-game-kotlin
+        env:
+          APP_ENV: local
+          DB_KIND: h2
+          PORT: '3100'
+          ALLOWED_ORIGINS: http://localhost:5273
+        run: nohup ./gradlew :app:run --no-daemon > app.log 2>&1 &
+      - name: バックエンドの準備の待機
+        run: |
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:3100/api/v1/ready > /dev/null; then echo "起動を確認（${i} 回目）"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::バックエンドが起動しませんでした"; cat ../app.log; exit 1
+      # Undefined・Pending のステップがあれば、Cucumber-JS が失敗にする（strict が既定）。
+      - run: npm run acceptance
+      - name: バックエンドの停止
+        if: always()
+        run: pkill -f 'beergame.app.MainKt' || true
+
+  n1:
+    name: N-1 互換（雛形）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # 直前のリリースのタグを探す。タグの名前の規約は未決のため、仮に beer-game-kotlin-v* とする。
+      # タグが無い間（最初のリリース前）は、以降の工程を実行しない。
+      - name: 直前のリリースのタグ
+        id: previous
+        run: |
+          tag=$(git tag --list 'beer-game-kotlin-v*' --sort=-v:refname | head -n 1)
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if [ -z "$tag" ]; then echo "直前のリリースが無いため、N-1 互換の検査は実行しません。"; fi
+      - name: 雛形（本実装は未着手。タグが有るときだけ到達する）
+        if: steps.previous.outputs.tag != ''
+        run: |
+          # 本実装の手順（設計: test-strategy.md の「N-1 互換のジョブ（M22）」）:
+          #   1. 直前のリリースのタグ（${{ steps.previous.outputs.tag }}）を git worktree で取り出し、読み取り側（アップキャストと evolve）をビルドする
+          #   2. 現在の書く版が作る golden（各イベントの種類を網羅したイベント列の JSON）を、旧版の読み取り側で再生する
+          #   3. 期待する状態にならなければ失敗にする（読む側を先にリリースする規則に従う）
+          echo "::error::N-1 互換の検査は未実装です（タグ ${{ steps.previous.outputs.tag }} が存在するため、実装が必要です）"
+          exit 1
