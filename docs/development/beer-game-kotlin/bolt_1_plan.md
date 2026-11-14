@@ -557,13 +557,37 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 2: リポジトリの土台（🔵）
 
-- [ ] 2.1 Gradle ラッパー（Gradle 9.9.1 の予定）、バージョンカタログ（確認済みの版で固定）、`.editorconfig`、`.gitignore`、`.nvmrc`（26）
-- [ ] 2.2 Gradle のマルチモジュール: `domain`、`application`、`adapter-persistence`、`adapter-http`、`app`。**`domain` は Kotlin 標準と Arrow だけに依存**（ビルドで強制）
-- [ ] 2.3 ktlint と detekt（標準ルール。違反 0）の最小の設定、Kover の最小の設定、`ForbiddenMethodCall`（ドメインでの時計・乱数・UUID の禁止）。**厳格な適用の完成（PMD の 14 ルール、fixture、ベースラインなし・`@Suppress` なし）は B2**
-- [ ] 2.4 `.github/workflows/beer-game-kotlin.yml`（ktlint、detekt、`test`、`integrationTest`。PostgreSQL 18 のサービス。検証のみ）
-- [ ] 2.5 空の状態で、`./gradlew` の検査・テストが緑で、モジュールの依存の違反を実際に検出する（意図的な違反で失敗し、戻して成功）
+- [x] 2.1 Gradle ラッパー（Gradle 9.9.1 の予定）、バージョンカタログ（確認済みの版で固定）、`.editorconfig`、`.gitignore`（`.nvmrc`（26）はフロントエンドの Step 10 で作る）
+- [x] 2.2 Gradle のマルチモジュール: `domain`、`application`、`adapter-persistence`、`adapter-http`、`app`。**`domain` は Kotlin 標準と Arrow だけに依存**（ビルドで強制）
+- [x] 2.3 ktlint と detekt（標準ルール。違反 0）の最小の設定、Kover の最小の設定、`ForbiddenMethodCall`（ドメインでの時計・乱数・UUID の禁止）。**厳格な適用の完成（PMD の 14 ルール、fixture、ベースラインなし・`@Suppress` なし）は B2**
+- [x] 2.4 `.github/workflows/beer-game-kotlin.yml`（ktlint、detekt、`test`、`integrationTest`。PostgreSQL 18 のサービス。検証のみ）
+- [x] 2.5 空の状態で、`./gradlew` の検査・テストが緑で、モジュールの依存の違反を実際に検出する（意図的な違反で失敗し、戻して成功）
 
 **ゲート 2**: 構成、依存関係の導入の承認の記録、モジュールの依存の検査を、人が確認する。
+
+**Step 2 の結果（AI 実施済み。ゲート 2 は人の確認待ち）**: 場所は `apps/beer-game-kotlin/`。実行は `JAVA_HOME` を JDK 25.0.2（OpenJDK）にして行った。
+
+| 項目 | 結果 |
+| :--- | :--- |
+| `./gradlew build`（JDK 25.0.2） | **成功**（5 モジュール、テスト計 8 件、ktlint、Kover の各タスクが緑。detekt は下記の理由で無効） |
+| `./gradlew build`（JDK 21.0.12） | **成功**（detekt の `detekt`・`detektMain`・`detektTest` を含む） |
+| Gradle 9.9.1 と Kotlin 2.4.21 | ビルドは成功（テスト済みの範囲の上限は 2.4.20-Beta1 だったが、動いた） |
+| 依存の解決 | カタログの全ライブラリ（Ktor 3.6.1、Arrow 2.3.0、coroutines 1.11.0、serialization 1.13.0、PostgreSQL JDBC 42.7.14、HikariCP 7.1.0、Flyway 13.12.2、Logback 1.6.6、Kotest 6.2.7、Testcontainers 2.0.5、H2 2.5.252、Cucumber-JVM 8.0.4、detekt-cli 1.23.8、ktlint 1.8.0）が Maven Central に実在する（POM の取得で確認）。Gradle プラグインは Gradle Plugin Portal で確認: `org.jetbrains.kotlin.jvm` 2.4.21、`io.gitlab.arturbosch.detekt` 1.23.8、`org.jlleitschuh.gradle.ktlint` **14.2.0**（ktlint 本体は 1.8.0 を指定）、`org.jetbrains.kotlinx.kover` 0.9.11。実際にビルドで解決・使用したのは Kotlin、Kover、detekt、ktlint、Arrow、coroutines、serialization、Ktor（core・netty）、Hikari、Flyway（core・postgresql）、PostgreSQL JDBC、H2、Logback、Kotest、Testcontainers。Cucumber-JVM は B1 の Step 3 で使うためカタログのみ |
+| Kover 0.9.11 | `test` を計測し、`koverXmlReport`・`koverVerify` が動く（閾値は未設定。2 つのソースセットの合算は B2） |
+| ktlint 1.8.0 | 動く。違反（余分な空白など）で `ktlintMainSourceSetCheck` が失敗することを確認。`.editorconfig` で、テストの関数名の camelCase を外した（日本語のバッククォートのテスト名を書くとき）。ファイル名とクラス名の一致は外していない（1 つの実装のため） |
+| コンパイラの警告をエラーに | 動く。非推奨の呼び出しで `warnings found and -Werror specified` となりビルド失敗を確認（未使用変数は K2 では警告にならなかった） |
+| `integrationTest` | `adapter-persistence` にソースセットとタスクを定義（Testcontainers の PostgreSQL。試験は未作成）。`./gradlew integrationTest` は NO-SOURCE で成功 |
+| **detekt 1.23.8 と JDK 25** | **動かない**。`Execution failed for task ':domain:detekt'` / `java.lang.IllegalArgumentException: 25.0.2`（同梱の Kotlin コンパイラの `JavaVersion.parse`）。既定の `--jvm-target` も `Invalid value (25) passed to --jvm-target, must be one of [1.6 … 22]` で失敗する。回避として、`jvmTarget = "22"` を指定し、**JDK 22 以下で動かしたときだけ detekt を有効にする**（JDK 25 では無効にして警告を出す）。CI は detekt を JDK 21 の専用ジョブで実行する。**B2 の受入条件「detekt が Kotlin 2.4 を解析できる」は、JDK 21 上では、Kotlin 2.4.21 のテストコード（Kotest）の解析に成功した範囲までは確認した。ただし本物のドメインのコードでは未確認**。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断する |
+| `ForbiddenMethodCall`（`domain` のみ） | JDK 21 上で動く。`Instant.now` と `UUID.randomUUID` を `domain` に置くと `detektMain` が 2 件を報告して失敗（行・理由つき）。**`mutableListOf` は報告されなかった**（インライン関数のため。可変コレクションの禁止は PMD の `NoMutableCollectionFactory` に任せる。B2）。設定は `config/detekt/detekt-domain.yml` |
+
+**モジュール依存の強制（2.5）**:
+
+1. `domain` の依存は `arrow-core` だけ。`domain:verifyDomainDependencies`（`check` に含める）が、解決した依存の group を `org.jetbrains.kotlin`・`org.jetbrains`・`io.arrow-kt` に限り、他のモジュールへの依存も禁止する。
+2. 違反 A: `domain` に `ktor-server-core` を足す → `verifyDomainDependencies` が `domain の依存の違反: 許可外のライブラリ=[io.ktor:ktor-server-core-jvm:3.6.1, …]` で **失敗**。戻して成功。
+3. 違反 B: `domain` が `adapter-http` に依存する、違反 C: `application` が `adapter-http` に依存する → どちらも `Circular dependency between the following tasks`（`:adapter-http:classes`）で **ビルドが失敗**（依存の向きが逆転するため循環になる）。戻して成功。
+4. 各モジュールの `test`（Kotest）が、クラスパスの向き（`domain` と `application` に Ktor・JDBC ドライバーが無いこと、`adapter-persistence` に JDBC ドライバーがあること、など）を確かめる。
+
+**未確認・未実施**: `.github/workflows/beer-game-kotlin.yml` は YAML の構文のみ確認（`ruby -ryaml`）。GitHub Actions 上の実行は未確認で、`actions/checkout@v4`・`actions/setup-java@v4`・`gradle/actions/setup-gradle@v4` の版の確認・SHA の固定は未実施（beer-game3 は SHA 固定）。`integrationTest` ジョブは Testcontainers（runner の Docker）で PostgreSQL 18 を使う想定で、現時点では試験が無い。Flyway の H2 への適用は、マイグレーションが無いため **未確認（Step 6 以降）**。PMD、契約テストの道具、Cucumber の `acceptanceTest` は未導入（B2・Step 3）。コミットは未実施。
 
 ### Step 3: 契約と受け入れの入口（🔵🔴）
 

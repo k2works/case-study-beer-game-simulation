@@ -1,0 +1,20 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{kt,kts}]
+max_line_length = 120
+# 本プロジェクトは 1 つの実装なので、ファイル名とクラス名の一致は外さない。
+
+# テストでは、バッククォートで書く日本語のテスト名を許すため、関数名の camelCase の強制を外す。
+[**/src/*[tT]est/**/*.kt]
+ktlint_standard_function-naming = disabled
+
+[*.{yml,yaml,toml,json}]
+indent_size = 2
