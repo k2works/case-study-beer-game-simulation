@@ -4,7 +4,7 @@ title: "Bolt 1 計画 - 基盤と縦の最小（ウォーキングスケルト�
 description: "beer-game-kotlin の Bolt 1 のステップ計画。ゴール、仮説、対象の受入条件、着手前に人の判断が要る項目、TDD のステップと承認ゲート、完了条件。承認済み（2026-11-14）。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T13:07:51Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-14T08:52:24Z }
 ---
@@ -21,7 +21,7 @@ verified:
 | ゲート密度 | **密**（ステップごとに、人が検証する） |
 | アプローチ | アウトサイドイン（[開発戦略](./development_strategy.md) の序盤）。**受け入れのシナリオと API の仕様が先** |
 | テスト戦略 | Comprehensive（`simulateWeek`、集約、イベントストア）、Standard（その他） |
-| 状態 | **承認済み（2026-11-14、ユーザー）。着手前の判断項目 9 件の承認を含む。**実行は未着手（Step 1 から） |
+| 状態 | **承認済み（2026-11-14、ユーザー）。着手前の判断項目 9 件の承認を含む。** Step 1〜12 の実装と記録は完了（2026-11-14、AI の実施）。**ゲート 1〜12 はすべて人の確認待ち（未承認）。** 結果は [Bolt 1 終了報告](./bolt_1_report.md) |
 
 > **承認の状態について**: リリース計画・開発戦略・本書（着手前の判断項目 9 件を含む）は、2026-11-14 に、ユーザーが明示的に承認しました。**PMD の導入と、API の契約テストの道具の選定・導入の承認は含みません（B2 で求めます）。**
 
@@ -157,8 +157,7 @@ package "計算" {
     inventory
     backlog
     orderPipeline
-    shipmentPipeline
-    productionPipeline
+    deliveryPipeline（工場では生産）
     cumulativeCost : Money
     arrivals : Quantity
     orders : Quantity
@@ -411,8 +410,8 @@ entity "role_current_states" as rcs {
   inventory : integer
   backlog : integer
   order_pipeline : jsonb
-  shipment_pipeline : jsonb
-  production_pipeline : jsonb
+  shipment_pipeline : jsonb（deliveryPipeline を書く）
+  production_pipeline : jsonb（NULL 可。B1 では書かない）
   cumulative_cost_minor : bigint
   arrivals : integer
   orders : integer
@@ -505,7 +504,7 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### 設計書との差分と反映の要否
 
-名前・型・遷移・表・画面は、設計書（ドメインモデル、データモデル、UI 設計）と一致しており、**設計書の記述との差分はありません**。次の 3 点は、設計書への反映が要るか、人が判断する項目です。
+名前・型・遷移・表・画面は、**着手前の時点では**設計書（ドメインモデル、データモデル、UI 設計）と一致しており、設計書の記述との差分はありませんでした。**実装で変わった点は、完了時に設計書へ反映し、上の図のうち `RoleState`（待ち行列は `orderPipeline` と `deliveryPipeline` の 2 つ）と `role_current_states.production_pipeline`（NULL 可）を実装に合わせて直しました（`validating-design` 完了時の軸 B、[終了報告](./bolt_1_report.md)）。** 着手前に挙げた次の 3 点は、設計書への反映が要るか、人が判断する項目です。
 
 1. **マイグレーションの単位と B1 の範囲**: マイグレーション 003 は観察者向けの `lobby_observer_invitations`・`lobby_observers`、005 は `week_team_totals` を含みます。B1 はこれらを設計どおりに作りますが、書き込む投影は Step 7 で決めます（B9 まで空でも、B1 の受入条件には影響しない）。分けるなら、データモデルのマイグレーション計画を直す必要があります（設計書への反映の候補）。
 2. **付け替えの解除**: `RoleUnassigned` は付け替えの内部のイベントとして B1 に含みますが、単独の `UnassignRole`（S04 の「外す」）は Step 5.1 に無く、B1 に含めるかは未決です（設計書は `UnassignRole` を定義済みなので、含める場合は設計書の変更は不要）。
@@ -1022,7 +1021,7 @@ Lobby --> Console : 進行役: 「開始する」
 ### Step 11: 受け入れの green（🟢）
 
 - [x] 11.1 `@api` のシナリオが、**PostgreSQL とローカル（H2）の両方**で green（受け入れの正は PostgreSQL）
-- [ ] 11.2 `@ui` のシナリオと、ウォーキングスケルトンの E2E が green
+- [x] 11.2 `@ui` のシナリオと、ウォーキングスケルトンの E2E が green（Step 10 の結果のとおり、実 Chromium・実バックエンド H2 で 1 シナリオ・8 ステップ成功。**参加者の画面の E2E は未実施**）
 - [x] 11.3 **Undefined・Pending のステップが無い**（`@api` の範囲。`@ui` は 11.2 の担当）
 
 **ゲート 11**: シナリオが、業務の言葉のまま green であることを、人が確認する。**人の確認待ち（未承認）。**
@@ -1086,29 +1085,44 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 12: 検証と終了（✅）
 
-- [ ] 12.1 全テスト（`test`、`integrationTest`、受け入れ）、ktlint、detekt、Kover（domain の行 100%）が緑
-- [ ] 12.2 ログ・`/ready`・H2 の拒否のデモ。依存関係の導入の承認と版の確認の記録がある
-- [ ] 12.3 Bolt 終了報告（`bolt_1_report.md`）。**デモ項目の実操作の申告**。実績の所要（人の検証時間を含む）を記録し、リリース計画の残りの Bolt の所要を再調整する
-- [ ] 12.4 判断と学びを、ジャーナルに書く
-- [ ] 12.5 **設計書の更新**（実装で変わった設計判断。H2 の実測の結果を含む）と、**`validating-design` の完了時の実施**（3 軸）。結果を終了報告に記録する
+- [ ] 12.1 全テスト（`test`、`integrationTest`、受け入れ）、ktlint、detekt、Kover（domain の行 100%）が緑 — **domain の行 100% を除いて達成**。全テスト・ktlint 違反 0・detekt 違反 0（JDK 21）・Kover の記録は済み。domain の行は 97.5%（784/804）で**未達**（未到達は value class の生成コード由来。除外するか閾値を見直すかは人の判断）
+- [ ] 12.2 ログ・`/ready`・H2 の拒否のデモ。依存関係の導入の承認と版の確認の記録がある — **AI が curl とテストで確認した。人の実操作は未実施**。依存関係は、判断項目 1 の承認（2026-11-14）と版の確認の記録はあるが、追加した依存（`junit-bom`・`junit-platform-suite`・`junit-platform-launcher`・`slf4j-api` ほか）の承認の範囲は人の判断待ち
+- [x] 12.3 Bolt 終了報告（`bolt_1_report.md`）を作成した。**デモ項目の実操作の申告は無い（人の実操作は未実施）**。実績の所要は 2026-11-14 の 1 セッション（AI の連続実行。人の検証時間を含まない）で、**リリース計画の残りの Bolt の所要の再調整はしない**（人の検証を含めた実績を取ってから判断）
+- [x] 12.4 判断と学びを、ジャーナル（[20261114](../../journal/beer-game-kotlin/20261114.md)）に書いた
+- [x] 12.5 **設計書の更新**（実装で変わった設計判断。H2 の実測の結果を含む。設計書・ADR は更新済みで、コミットは未実施）と、**`validating-design` の完了時の実施**（3 軸）。結果は終了報告に記録した（人の判断待ちが残る）
 
-**ゲート 12（Bolt の承認）**: 人が、完了条件を確認し、Bolt を承認する。
+**ゲート 12（Bolt の承認）**: 人が、完了条件を確認し、Bolt を承認する。**人の確認待ち（未承認）。**
+
+#### Step 12 の結果（2026-11-14、AI の実施。ゲート 12 は人の確認待ち）
+
+詳細は [Bolt 1 終了報告](./bolt_1_report.md)。要点は次のとおり。
+
+| 項目 | 結果 |
+| :--- | :--- |
+| 全体のビルド | `./gradlew build integrationTest acceptanceTest acceptanceTestH2`（JDK 25）が BUILD SUCCESSFUL（5 分 28 秒） |
+| テスト件数 | domain 201、application 86、adapter-persistence 46（H2）+ 統合 44（PostgreSQL 18）、adapter-http 70、app 55 + 統合 1、受け入れ `@api` 27 シナリオ・209 ステップ（PostgreSQL と H2 の両方）。Kotlin 側は合計 559 件、失敗 0。web の Vitest 70 件。`@ui` 1 シナリオ・8 ステップ成功 |
+| 静的解析 | ktlint 違反 0、コンパイラ警告のエラー化、`verifyDomainDependencies` 通過。detekt は JDK 25 では動かず、JDK 21（Corretto 21.0.12）で違反 0。`@Suppress` の実使用 0、ベースラインなし |
+| Kover（`test` のみの計測） | domain 行 97.5%・分岐 98.2%、application 行 97.7%・分岐 70.9%、adapter-persistence 行 98.0%・分岐 65.3%、adapter-http 行 70.4%・分岐 55.8%、app 行 94.5%・分岐 62.2%。受け入れとの合算は B2 の確認事項 |
+| 実起動 | `APP_ENV=local DB_KIND=h2` で起動し、curl で作成から確定まで通った。production で秘密情報なし、production で H2 は、どちらも終了コード 78 で起動しない |
+| `validating-design`（完了時） | 軸 A・B・C の結果は終了報告に記録。判断待ちの項目は終了報告の「人の判断が要る項目」 |
 
 ---
 
 ## 完了条件（Definition of Done）
 
-- [ ] 対象の受入条件（上記）が、テストと Gherkin のシナリオでパスしている（テスト名とタグにストーリー ID を含む）
-- [ ] ローカル（H2）と PostgreSQL の両方で、作成から確定までのシナリオが通る（受け入れの正は PostgreSQL）
-- [ ] **Undefined・Pending のステップが無い**。タグの一覧と意味が文書化されている
-- [ ] `contracts/openapi.yaml` に、ウォーキングスケルトンの経路が書かれ、`@api` のシナリオと一致している
-- [ ] H2 の実測の記録がある。ポート `ProjectionLock`・`ChangeNotifier` の契約テストが、両実装で green
-- [ ] DB 統合テストが、CI で**必ず実行される**（スキップされない）。domain の行 100%
-- [ ] ktlint・detekt が違反 0 で通り、モジュールの依存の違反を検出する
-- [ ] ログに、資格・表示名・非公開値が含まれない（テストで確認）。本番相当の設定で、鍵が無い、または H2 が選ばれると、起動に失敗する
-- [ ] 依存関係の導入の承認と版の確認の記録がある
-- [ ] **完了時に `validating-design` を実施し、不整合が 0 件（または人が判断済み）。結果が Bolt 終了報告に記録されている**（[開発戦略](./development_strategy.md)）
-- [ ] **コードを、人が全行理解して承認した**
+> 2026-11-14 の Step 12 で、機械的に確認できたものだけを [x] にした。人の確認が要るものと未達は [ ] のまま、理由を書く。
+
+- [x] 対象の受入条件（上記）が、テストと Gherkin のシナリオでパスしている（テスト名とタグにストーリー ID を含む）— `@api` 27 シナリオ成功。AC2.3.3・AC6.1.2 は Gherkin にせず Kotest と統合テスト。**シナリオと原文の照合（ゲート 3）は人の確認待ち**
+- [x] ローカル（H2）と PostgreSQL の両方で、作成から確定までのシナリオが通る（受け入れの正は PostgreSQL）— `@api` は両方で成功。`@ui` は H2 のバックエンド
+- [x] **Undefined・Pending のステップが無い**。タグの一覧と意味が文書化されている（`features/TAGS.md`）
+- [x] `contracts/openapi.yaml` に、ウォーキングスケルトンの経路が書かれ、`@api` のシナリオと一致している — 11 本の経路を手で照合した。契約テストの自動化は B2
+- [x] H2 の実測の記録がある。ポート `ProjectionLock`・`ChangeNotifier` の契約テストが、両実装で green
+- [ ] DB 統合テストが、CI で**必ず実行される**（スキップされない）。domain の行 100% — **未達**。domain の行は 97.5%（784/804。value class の生成コード由来）。CI のワークフローは作ったが、**GitHub Actions 上では未実行**（`integrationTest` はローカルで Docker により実行して成功）
+- [x] ktlint・detekt が違反 0 で通り、モジュールの依存の違反を検出する — detekt は JDK 21 でだけ動く（JDK 25 では動かない。B2 で判断）
+- [x] ログに、資格・表示名・非公開値が含まれない（テストで確認）。本番相当の設定で、鍵が無い、または H2 が選ばれると、起動に失敗する
+- [ ] 依存関係の導入の承認と版の確認の記録がある — 判断項目 1 の承認と版の確認の記録はある。**追加した依存（`junit-bom` ほか）の承認の範囲は人の判断待ち**
+- [ ] **完了時に `validating-design` を実施し、不整合が 0 件（または人が判断済み）。結果が Bolt 終了報告に記録されている**（[開発戦略](./development_strategy.md)）— 実施して終了報告に記録した。**人の判断待ちが残る**ため未達
+- [ ] **コードを、人が全行理解して承認した** — **未実施**（人の承認待ち）
 
 ### デモ項目
 
@@ -1187,6 +1201,7 @@ Lobby --> Console : 進行役: 「開始する」
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-14 | **Step 12（検証と終了）を実施**。12.3〜12.5 を [x]、12.1・12.2 は未達・未実施の理由つきで [ ]。11.2 を [x]。完了条件は達成したものだけ [x]。設計の節の `RoleState` と ER 図を実装に合わせて修正（`validating-design` 完了時の軸 B）。ゲート 1〜12 は人の確認待ち。終了報告は [bolt_1_report](./bolt_1_report.md) | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **Step 3（契約と受け入れの入口）を実施**（3.1〜3.4 を [x]。結果は Step 3 の末尾。**ゲート 3 は人の確認待ち**） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **#1（レイヤーを貫く順序）をユーザーが案 A と判断**。本書の順序を維持し、開発戦略の B1 の説明を直した。Step 4 以降に着手できる（#12〜#14 は各 Step で決める） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **`validating-design` の実施結果を反映**（承認済みの計画への修正。上の表の #2・#3・#5〜#11）。**人に再確認を求める**。#1（レイヤーを貫く順序）は人の判断待ち | claude-code/claude-sonnet-5-5 |
