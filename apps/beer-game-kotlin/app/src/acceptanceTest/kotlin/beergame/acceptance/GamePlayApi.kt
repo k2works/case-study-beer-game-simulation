@@ -1,111 +1,192 @@
 package beergame.acceptance
 
-/** 受け入れから見た 4 つの役割（業務の言葉）。 */
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.util.UUID
+
+/** 受け入れから見た 4 つの役割（業務の言葉）。[apiName] は API の値。 */
 enum class Role(
     val label: String,
+    val apiName: String,
 ) {
-    RETAILER("小売店"),
-    WHOLESALER("二次卸"),
-    DISTRIBUTOR("一次卸"),
-    FACTORY("工場"),
+    RETAILER("小売店", "RETAILER"),
+    WHOLESALER("二次卸", "WHOLESALER"),
+    DISTRIBUTOR("一次卸", "DISTRIBUTOR"),
+    FACTORY("工場", "FACTORY"),
+    ;
+
+    companion object {
+        fun ofLabel(label: String): Role = entries.firstOrNull { it.label == label } ?: error("知らない役割: $label")
+
+        fun ofApi(name: String): Role = entries.firstOrNull { it.apiName == name } ?: error("知らない役割の値: $name")
+    }
 }
 
-/** 作成したゲームの参照。 */
-data class GameRef(
-    val id: String,
-)
+/** HTTP の応答。本文は遅延して JSON にする。 */
+class ApiResponse(
+    val status: Int,
+    private val headers: java.net.http.HttpHeaders,
+    val text: String,
+) {
+    val json: JsonObject by lazy { Json.parseToJsonElement(text).jsonObject }
 
-/** 確定した週の、役割別の結果（AC2.3.5 の項目）。 */
-data class RoleWeekResult(
-    val role: Role,
-    val week: Int,
-    val order: Int,
-    val inventory: Int,
-    val backlog: Int,
-    val shipment: Int,
-    val cost: Double,
-)
+    fun header(name: String): String? = headers.firstValue(name).orElse(null)
 
-/** 参加者が自分の役割で見る状況。 */
-data class RoleView(
-    val role: Role,
-    val week: Int,
-)
+    /** `Set-Cookie` の資格（bg_session）の値。 */
+    fun credential(): String? =
+        headers
+            .allValues("Set-Cookie")
+            .firstOrNull { it.startsWith("bg_session=") }
+            ?.substringAfter("bg_session=")
+            ?.substringBefore(";")
+
+    /** problem+json の `code`。 */
+    fun code(): String? = if (status >= HTTP_ERROR) json["code"]?.jsonPrimitive?.content else null
+
+    /** `Location`（`/api/v1/games/{gameId}/state`）から取り出したゲームの ID。 */
+    fun createdGameId(): String? = header("Location")?.removePrefix("/api/v1/games/")?.removeSuffix("/state")
+
+    companion object {
+        const val HTTP_ERROR = 400
+    }
+}
+
+fun JsonObject.text(name: String): String = getValue(name).jsonPrimitive.content
+
+fun JsonObject.obj(name: String): JsonObject = getValue(name).jsonObject
+
+fun JsonObject.array(name: String): JsonArray = getValue(name).jsonArray
+
+fun JsonObject.number(name: String): Int = text(name).toInt()
 
 /**
- * 受け入れが、アプリケーションに対して行う操作と問い合わせ。
- * ステップ定義はこの窓口だけを呼ぶ（薄く保つ）。Step 9〜11 で、Ktor のテスト用アプリケーション（実 DB）を通す実装に差し替える。
+ * 受け入れが、アプリケーションに対して行う操作と問い合わせ。HTTP を呼ぶだけで、業務ロジックを持たない。
+ * ステップ定義はこの窓口だけを呼ぶ（薄く保つ）。
  */
-interface GamePlayApi {
-    fun createKitGame(): GameRef
+class GamePlayApi(
+    private val baseUrl: String,
+) {
+    private val client = HttpClient.newHttpClient()
+
+    fun newKey(): String = UUID.randomUUID().toString()
+
+    private fun send(
+        method: String,
+        path: String,
+        body: String?,
+        cookie: String?,
+        key: String?,
+    ): ApiResponse {
+        val builder = HttpRequest.newBuilder(URI.create("$baseUrl$path"))
+        cookie?.let { builder.header("Cookie", "bg_session=$it") }
+        key?.let { builder.header("Idempotency-Key", it) }
+        val publisher =
+            if (body == null) {
+                HttpRequest.BodyPublishers.noBody()
+            } else {
+                builder.header("Content-Type", "application/json")
+                HttpRequest.BodyPublishers.ofString(body)
+            }
+        val response = client.send(builder.method(method, publisher).build(), HttpResponse.BodyHandlers.ofString())
+        return ApiResponse(response.statusCode(), response.headers(), response.body())
+    }
+
+    fun get(
+        path: String,
+        cookie: String? = null,
+    ) = send("GET", path, null, cookie, null)
+
+    fun post(
+        path: String,
+        body: String? = null,
+        cookie: String? = null,
+        key: String? = newKey(),
+    ) = send("POST", path, body, cookie, key)
+
+    fun put(
+        path: String,
+        body: String,
+        cookie: String? = null,
+        key: String? = newKey(),
+    ) = send("PUT", path, body, cookie, key)
+
+    // ---- ゲームの準備と参加 ----
+
+    fun createGame(
+        body: String,
+        key: String = newKey(),
+    ) = post("/games", body, key = key)
+
+    fun gameState(
+        gameId: String,
+        cookie: String?,
+    ) = get("/games/$gameId/state", cookie)
+
+    fun lobby(
+        gameId: String,
+        cookie: String?,
+    ) = get("/games/$gameId/lobby", cookie)
+
+    fun join(
+        joinCode: String,
+        displayName: String,
+    ) = post("/participations/join", """{"joinCode":"$joinCode","displayName":"$displayName"}""")
 
     fun assignRole(
-        game: GameRef,
+        gameId: String,
+        participantId: String,
         role: Role,
-    )
+        facilitator: String?,
+    ) = put("/games/$gameId/participants/$participantId/role", """{"role":"${role.apiName}"}""", facilitator)
 
-    fun start(game: GameRef)
+    fun start(
+        gameId: String,
+        facilitator: String?,
+    ) = post("/games/$gameId/start", cookie = facilitator)
 
+    // ---- 1 週の進行 ----
+
+    /** [quantityJson] は JSON の値そのもの（数値、文字列など）。形の誤りも送れるようにする。 */
     fun saveDecision(
-        game: GameRef,
-        role: Role,
+        gameId: String,
         week: Int,
-        quantity: Int,
-    )
+        quantityJson: String,
+        participant: String?,
+    ) = put("/sessions/$gameId/decisions", """{"week":$week,"quantity":$quantityJson}""", participant)
+
+    fun commitBody(
+        week: Int,
+        basis: Map<Role, Int>,
+    ): String =
+        """{"requestedWeek":$week,"basis":{${basis.entries.joinToString(
+            ",",
+        ) { "\"${it.key.apiName}\":${it.value}" }}}}"""
 
     fun commitWeek(
-        game: GameRef,
+        gameId: String,
         week: Int,
-    )
+        body: String,
+        facilitator: String?,
+        key: String = newKey(),
+    ) = post("/sessions/$gameId/weeks/$week/commit", body, facilitator, key)
 
-    fun currentWeek(game: GameRef): Int
+    fun sessionState(
+        gameId: String,
+        cookie: String?,
+        role: Role? = null,
+    ) = get("/sessions/$gameId/state${role?.let { "?role=${it.apiName}" } ?: ""}", cookie)
 
-    fun weekResults(
-        game: GameRef,
-        week: Int,
-    ): List<RoleWeekResult>
+    // ---- 運用 ----
 
-    fun viewAs(
-        game: GameRef,
-        role: Role,
-    ): RoleView
-}
+    fun health() = get("/health")
 
-/**
- * 内側（ドメイン・アプリケーション・HTTP）がまだ無い間の窓口。何もしないで、開始直後の状態を返す。
- * これにより、シナリオは Given・When を通り、Then のアサーションで失敗する（Red）。Step 4〜9 の後に実物へ差し替える。
- */
-object UnwiredGamePlayApi : GamePlayApi {
-    override fun createKitGame() = GameRef("unwired")
-
-    override fun assignRole(
-        game: GameRef,
-        role: Role,
-    ) = Unit
-
-    override fun start(game: GameRef) = Unit
-
-    override fun saveDecision(
-        game: GameRef,
-        role: Role,
-        week: Int,
-        quantity: Int,
-    ) = Unit
-
-    override fun commitWeek(
-        game: GameRef,
-        week: Int,
-    ) = Unit
-
-    override fun currentWeek(game: GameRef) = 1
-
-    override fun weekResults(
-        game: GameRef,
-        week: Int,
-    ) = emptyList<RoleWeekResult>()
-
-    override fun viewAs(
-        game: GameRef,
-        role: Role,
-    ) = RoleView(role, week = 1)
+    fun ready() = get("/ready")
 }
