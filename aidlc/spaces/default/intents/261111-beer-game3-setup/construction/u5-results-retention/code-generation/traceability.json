@@ -1,0 +1,32 @@
+{
+  "stage": "code-generation",
+  "unit": "u5-results-retention",
+  "upstream_ids": [
+    "AC4.1.1", "AC4.1.2", "AC4.1.3", "AC4.1.4",
+    "AC4.2.1", "AC4.2.2", "AC4.2.3",
+    "AC5.1.1", "AC5.1.2", "AC5.1.3",
+    "NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7", "NFR8", "NFR9", "NFR11"
+  ],
+  "coverage": [
+    { "id": "AC4.1.1", "status": "OK", "target": "apps/beer-game3/tests/u5/features/results.spec.ts" },
+    { "id": "AC4.1.2", "status": "OK", "target": "apps/beer-game3/tests/u5/web/results-screen.spec.tsx" },
+    { "id": "AC4.1.3", "status": "OK", "target": "apps/beer-game3/src/web/chart.ts" },
+    { "id": "AC4.1.4", "status": "OK", "target": "apps/beer-game3/src/server/reporting/reporting.ts" },
+    { "id": "AC4.2.1", "status": "OK", "target": "apps/beer-game3/tests/u5/features/export.spec.ts" },
+    { "id": "AC4.2.2", "status": "OK", "target": "apps/beer-game3/src/server/reporting/csv.ts" },
+    { "id": "AC4.2.3", "status": "OK", "target": "apps/beer-game3/tests/u5/unit/csv.spec.ts" },
+    { "id": "AC5.1.1", "status": "OK", "target": "apps/beer-game3/tests/u5/features/retention.spec.ts" },
+    { "id": "AC5.1.2", "status": "OK", "target": "apps/beer-game3/src/server/retention/policy.ts" },
+    { "id": "AC5.1.3", "status": "OK", "target": "apps/beer-game3/src/server/retention/job.ts" },
+    { "id": "NFR1", "status": "OK", "target": "apps/beer-game3/tests/u5/integration/retention-pg.spec.ts" },
+    { "id": "NFR2", "status": "OK", "target": "apps/beer-game3/src/server/session/game-session.ts" },
+    { "id": "NFR3", "status": "OK", "target": "apps/beer-game3/tests/u5/features/performance.spec.ts" },
+    { "id": "NFR4", "status": "OK", "target": "apps/beer-game3/src/server/session/pg-store.ts" },
+    { "id": "NFR5", "status": "OK", "target": "apps/beer-game3/src/server/retention/scheduler.ts" },
+    { "id": "NFR6", "status": "OK", "target": "apps/beer-game3/tests/u5/features/access-matrix.spec.ts" },
+    { "id": "NFR7", "status": "OK", "target": "apps/beer-game3/migrations/1763200000000_u5-results-retention.sql" },
+    { "id": "NFR8", "status": "OK", "target": "apps/beer-game3/src/web/ResultsChart.tsx" },
+    { "id": "NFR9", "status": "OK", "target": "apps/beer-game3/tests/u5/unit/job.spec.ts" },
+    { "id": "NFR11", "status": "OK", "target": "apps/beer-game3/src/web/messages.ts" }
+  ]
+}

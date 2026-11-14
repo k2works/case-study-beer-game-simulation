@@ -1,42 +1,43 @@
 # Code Structure
 
-## Repository Layout
+## ルート
 
-| Path | Classification | Responsibility |
-|---|---|---|
-| `apps/beer-game/` | Application placeholder | ビールゲーム本体の予定領域。現在は空 |
-| `docs/requirements/beer-game/` | Specification | ビールゲームの RDRA 2.0 要件 |
-| `docs/{design,development,adr,operation,review}/beer-game/` | Documentation placeholders | 後続成果物の索引 |
-| `gulpfile.js` | Configuration / task entry | Gulp タスクモジュールの登録 |
-| `ops/scripts/` | Utility / operations | ドキュメント、Vault、SSH、SonarQube、OKF 等のタスク |
-| `ops/docker/` | Infrastructure | MkDocs と SonarQube のコンテナ定義 |
-| `ops/nix/` | Development environment | 言語別 Nix shell |
-| `.github/workflows/` | CI/CD | ドキュメントとコンテナの GitHub Actions |
+| パス | 内容 |
+| :--- | :--- |
+| `apps/` | アプリ。`beer-game`（v1）と `beer-game2`（v2）。 |
+| `docs/` | OKF（フロントマター）形式の文書。MkDocs で公開。 |
+| `ops/` | `scripts/`（Gulp タスクの実体）、`docker/`（mkdoc、sonarqube-local）、`nix/`。 |
+| `.github/workflows/` | CI/CD（8 本）。 |
+| `gulpfile.js`、`mkdocs.yml`、`package.json`、`Dockerfile`、`docker-compose.yml`、`flake.nix`、`.devcontainer/` | 開発環境と文書運用。 |
 
-## Module Patterns
+## apps/beer-game2（`@beer-game2/app`）
 
-`gulpfile.js` は各 `ops/scripts/*.js` の default export に Gulp インスタンスを渡します。各モジュールは関連タスクを登録する機能単位構成です。`shared.js` は Docker 環境の整理、利用可否判定、URL オープンを提供します。
+```text
+src/
+  domain/        値、役割、条件、simulate-week、Game / Session 集約、観察、レビュー、出力、保持（12 ファイル）
+  ports/         リポジトリ、UnitOfWork、Clock などの契約（index.ts）
+  application/   ユースケース（index.ts 913 行）、errors
+  adapters/
+    http/        Fastify サーバー、資格
+    persistence/ pg リポジトリ、通知、レート制限、出力・レビューの読み取り、unit of work
+    observability/ EMF メトリクス
+  config/        環境変数の読み込み
+  compose.ts, main.ts, retention.ts   合成と起動
+ui/              React: App、features（home/lobby/play/console/observe/review/role-panel）、api、components
+migrations/      SQL 6 本（初期、確定方式、継続と資格、カスタム条件、観察者、保持）
+infra/           Terraform: modules 9、envs 2（staging/production）
+scripts/         acceptance-matrix、dev-bots、guided-tour、smoke、container-check、deploy/
+tests/           unit 14、component 2、integration 9、e2e 4、support
+```
 
-## Application Source Status
+分類: Model/Entity は `domain/`、Service/UseCase は `application/`、Repository は `adapters/persistence/`、Controller と Middleware は `adapters/http/`、Configuration は `config/` と `compose.ts`、Migration は `migrations/`、Test は `tests/`、Static は `ui/`。
 
-ビールゲーム向けの Model、Controller、Service、Repository、UI Component、Migration、Test は存在しません。したがって、既存のアプリケーション規約、import graph、循環依存、公開 API はまだありません。
+## apps/beer-game（`@beer-game/app`、v1）
 
-## File Classification
+`src/{api,application,domain,infrastructure,learning,retention,security,ui}`、`migrations` 5 本、`tests/{u1..u5,e2e,manual}`、`performance/`、`infra/main.tf`。UI は `src/ui` 内（router なし。ADR-006）。
 
-- Configuration: `package.json`、`mkdocs.yml`、`docker-compose.yml`、`flake.nix`、`.devcontainer/devcontainer.json`
-- Utilities: `ops/scripts/*.js`
-- CI/CD: `.github/workflows/*.yml`
-- Specifications: `docs/requirements/beer-game/requirements_definition.md`
-- Static assets: `docs/assets/`
-- Tests / migrations: なし
+## コードのパターン
 
-## Sources
-
-- `package.json`
-- `gulpfile.js`
-- `ops/scripts/`
-- `apps/beer-game/`
-
-## Assumptions & Open Questions
-
-- 後続設計でアプリのパッケージ境界とテスト配置を決める必要があります。
+- 層の依存は lint で強制（domain は何にも依存しない）。
+- JSDoc の `@landmark` と `@guidedTour` タグから、サイトシーイング・マップとガイドツアーを生成し、CI で一致を検査する。
+- 値は金額を minor 単位の整数で保持。遅延は待ち行列の段の数で表す。

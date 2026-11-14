@@ -1,0 +1,18 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u5-results-retention",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7", "NFR8", "NFR9", "NFR10", "NFR11"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1, NFR1.2" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2, NFR2.3, NFR2.4, NFR2.5" },
+    { "id": "NFR3", "status": "OK", "target": "NFR3.1, NFR3.2, NFR3.3, NFR3.4, NFR3.5" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4, NFR4.5" },
+    { "id": "NFR5", "status": "OK", "target": "NFR5.1, NFR5.2" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3, NFR6.4, NFR6.5, NFR6.6, NFR6.7, NFR6.8" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1, NFR7.2, NFR7.3" },
+    { "id": "NFR8", "status": "OK", "target": "NFR8.1, NFR8.2（U5 の画面の検査項目）。全体のコントラストなどの検査は u6-nfr-verification が行う" },
+    { "id": "NFR9", "status": "OK", "target": "NFR9.1, NFR9.2, NFR9.3, NFR9.4, NFR9.5" },
+    { "id": "NFR10", "status": "N/A", "target": "主要ブラウザでの検査は u6-nfr-verification が行う。U5 は新しい技術を導入せず、SVG と標準のダウンロードの機能だけを使う" },
+    { "id": "NFR11", "status": "OK", "target": "NFR11.1, NFR11.2（出力の識別子を英語のままにする解釈は、Q6 の A で人が確認した）。全体の検査は u6-nfr-verification が行う" }
+  ]
+}

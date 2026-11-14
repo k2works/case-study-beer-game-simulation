@@ -1,45 +1,33 @@
 # Dependencies
 
-## External Dependencies
+## パッケージ間
 
-| Dependency | Consumer | Purpose |
-|---|---|---|
-| Node.js / npm | root tooling | Gulp タスク実行と package 管理 |
-| Docker / Docker Compose | MkDocs / SonarQube / dev container | container 実行 |
-| Nix | development environments | 再現可能な shell |
-| Git | journal / release tasks | 履歴取得と release 操作 |
-| Python / MkDocs | documentation | docs build / serve |
-| GitHub Actions, Pages, GHCR | CI workflows | publish |
-| PlantUML server | manual builder | diagram rendering URL |
-| SonarQube | quality utility | static analysis |
+`apps/beer-game` と `apps/beer-game2` は互いに依存しない独立した npm パッケージ。ルートの `package.json` はアプリから参照されない（文書運用専用）。ワークスペース設定（`workspaces`）はない。
 
-## Internal Dependency Graph
+## beer-game2 の内部（層）
 
-- `gulpfile.js` → `ops/scripts/mkdocs.js`
-- `gulpfile.js` → `ops/scripts/manual.js`
-- `gulpfile.js` → `ops/scripts/journal.js`
-- `gulpfile.js` → `ops/scripts/vault.js`
-- `gulpfile.js` → `ops/scripts/ssh.js`
-- `gulpfile.js` → `ops/scripts/sonar_local.js`
-- `gulpfile.js` → `ops/scripts/okf.js`
-- `ops/scripts/{mkdocs,sonar_local}.js` → `ops/scripts/shared.js`
-- `docs/requirements/beer-game/requirements_definition.md` → JSD 公開資料（根拠資料）
-- `apps/beer-game/` → 実装依存関係なし
+```mermaid
+flowchart TD
+  adapters --> application
+  adapters --> ports
+  adapters --> domain
+  application --> ports
+  application --> domain
+  ports --> domain
+```
 
-## Dependency Risks
+テキスト代替: adapters は application、ports、domain に依存し、application は ports と domain に、ports は domain に依存する。domain はどこにも依存しない。`config` に依存できるのは adapters と合成のみ（`eslint.config.js`）。循環参照は、lint の規則上は発生しない。個別ファイルの import は読んでいない。
 
-- package version は caret range であり、lockfile によって実インストールを固定しています。
-- PlantUML server への外部接続はマニュアル build の可用性と privacy に影響し得ます。
-- 運用スクリプトは Docker、Git、Python 等の PATH 上の外部 CLI を前提とします。
-- アプリ本体の runtime dependencies は未定です。
+## 外部依存（本番）
 
-## Sources
+- beer-game2: `@fastify/cookie`、`fastify`、`node-pg-migrate`、`pg`、`react`、`react-dom`、`react-router`、`zod`（8 件）。
+- beer-game: 上記に加え `@aws-sdk/client-sqs`、`@fastify/cors`、`@fastify/rate-limit`、`@fastify/static`。
+- ルート: `dotenv`、`gulp`、`marked`、`plantuml-encoder`。
 
-- `package.json`
-- `package-lock.json`
-- `gulpfile.js`
-- `ops/scripts/`
+## 実行時の外部サービス
 
-## Assumptions & Open Questions
+PostgreSQL（compose、CI のサービス）、AWS（ECS、RDS、S3、CloudFront、Secrets、OIDC）、v1 は SQS。RDS の CA バンドル（`truststore.pki.rds.amazonaws.com`）を Docker イメージの作成時に取得する。
 
-- ビールゲーム実装時に、既存ルート package へ同居させるか独立 workspace にするか決める必要があります。
+## 脆弱性・古さ
+
+CI は `npm audit --omit=dev --audit-level=high` を beer-game2 で実行する。今回は audit を実行しておらず、結果は未確認。v1 は `^` 範囲で、v2 の固定版より古い（例: Vitest 4 と 5、ESLint 9 と 10）。

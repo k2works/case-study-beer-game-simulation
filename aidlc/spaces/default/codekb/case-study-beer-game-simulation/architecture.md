@@ -1,79 +1,86 @@
-# Architecture
+# Architecture Analysis
 
-## Architecture Analysis
+## System Overview
 
-### System Overview
+リポジトリは 2 つの独立したアプリ（`apps/beer-game` の v1 と `apps/beer-game2` の v2）、プロジェクト別のドキュメント群（`docs/`）、ドキュメント運用ツール（ルートの Gulp と `ops/`）、CI/CD（`.github/workflows/`）で構成されます。`apps/beer-game3` は存在しません。以下は主に v2 の構造です。
 
-現在のリポジトリは、ビールゲーム要件ドキュメントと Node.js ベースのドキュメント運用ツールから構成されます。ビールゲーム本体のランタイムアーキテクチャは未実装です。将来のアプリケーション領域として `apps/beer-game/` が確保されています。
+## Architectural Style
 
-### Architectural Style
+- v2: ports and adapters（ヘキサゴナル）の 1 つの Node プロセス（モジュラーモノリス）と、Vite でビルドする React の SPA。層の依存は ESLint の `no-restricted-imports` で強制（`apps/beer-game2/eslint.config.js`、ADR-003）。
+- v1: レイヤード（api / application / domain / infrastructure）に、保持期間削除のワーカー（SQS）と outbox を加えた構成。
+- 週次計算は副作用のない純粋関数（`apps/beer-game2/src/domain/simulate-week.ts`）。ゲーム集約とセッション集約を分けている（ADR-004）。
+- 永続化は ORM なしで SQL と `pg`。更新通知は SSE（バージョンのみ）と PostgreSQL の `LISTEN/NOTIFY`。
+- 配備: コンテナ（ECS）、静的ファイルは S3 と CloudFront、DB は RDS。Terraform で定義。
 
-現状は「ドキュメント中心の単一リポジトリ」です。Gulp が運用タスクの入口となり、`ops/scripts/` の機能別モジュールへ委譲します。対象アプリは実質 greenfield であり、要件から特定の Web アーキテクチャを実装済みと判断できる証拠はありません。
-
-### Component Relationships
+## Component Relationships
 
 ```mermaid
 flowchart LR
-  Developer["開発者"] --> Npm["npm / Gulp"]
-  Npm --> Ops["ops/scripts"]
-  Ops --> MkDocs["MkDocs / Docker"]
-  Ops --> Manual["Manual HTML builder"]
-  Ops --> Quality["SonarQube / OKF"]
-  Requirements["Beer Game requirements"] --> FutureApp["apps/beer-game (未実装)"]
-  FutureApp -. "今後実装" .-> Participants["進行役・参加者・観察者"]
+  UI[ui: React SPA] -->|REST / SSE| HTTP[adapters/http: Fastify]
+  HTTP --> APP[application: ユースケース]
+  APP --> DOM[domain: 値・集約・simulateWeek]
+  APP --> PORTS[ports: 契約]
+  PG[adapters/persistence: pg] -.実装.-> PORTS
+  PG --> DB[(PostgreSQL)]
+  CFG[config] --> HTTP
+  OBS[adapters/observability: EMF] --> HTTP
 ```
 
-<!-- Text fallback: 開発者は npm/Gulp から運用スクリプトを実行し、MkDocs、マニュアル生成、品質管理を利用する。要件文書は未実装の apps/beer-game に入力され、将来は利用者へサービスを提供する。 -->
+テキスト代替: UI は REST と SSE で HTTP アダプターを呼ぶ。HTTP アダプターはアプリケーション層のユースケースを呼び、ユースケースはドメインと ports（契約）に依存する。永続化アダプターが ports を実装して PostgreSQL に接続する。domain は他の層に依存しない。
 
-### Data Flow
+## Data Flow
 
-現時点でビールゲームの実データフローはありません。要件上は、進行役が設定と需要系列を登録し、参加者の意思決定が注文・生産遅延へ入り、全役割の入力完了後に週次状態を一度だけ確定し、終了後に分析結果へ投影する流れが必要です。
+発注の入力は HTTP で受け、アプリケーション層が集約を読み込み、ドメインの規則で検証して保存する。4 役割の入力がそろうと週を確定し、`simulateWeek` が役割別の週結果を返し、トランザクション（unit of work）で保存する。変更後は版が上がり、SSE と `NOTIFY` で購読者へ通知し、UI は最新の状態を取得し直す。
 
-### Key Design Decisions
+## Key Design Decisions
 
-- Node.js ESM は運用ツールに採用済みですが、対象アプリへの採用決定ではありません。
-- ドキュメントは MkDocs と GitHub Actions で公開できます。
-- アプリ本体は既存運用ツールと分離して `apps/beer-game/` に配置する余地があります。
+`docs/adr/beer-game2/` に 13 本（v1 を継承 ADR-002、ports and adapters ADR-003、ゲームとセッションの集約分離 ADR-004、役割別結果と SQL 読み取りモデル ADR-005、SSE はバージョンのみ ADR-006、資格の鍵の版管理 ADR-009、CloudFront のドメインと TLS ADR-011、配送パイプラインと Terraform ADR-012、技術スタックの版 ADR-013 ほか）。v1 は `docs/adr/beer-game/` に 8 本。
 
-### Improvement Opportunities
+## Improvement Opportunities
 
-- ドメイン計算を副作用のない決定論的コアとして分離する。
-- 週確定をトランザクションと冪等キーで保護する。
-- 役割別認可と情報投影をサーバー境界で強制する。
-- リアルタイム画面更新と永続化を交換可能なアダプターに分離する。
-- 要件 ID とテストを結び付ける。
+- 500 行超のファイル（`application/index.ts` 913 行、`pg-repositories.ts` 684 行、`http/server.ts` 615 行）の分割余地。
+- v1 と v2 のワークフロー・Dockerfile・マイグレーションの重複。
+- 範囲と土台の決定は未確定（`business-overview.md` の未確定事項を参照）。
 
 ## Interaction Diagrams
 
+### 週の確定（役割の入力から結果の保存まで）
+
 ```mermaid
 sequenceDiagram
-  participant P as 参加者
-  participant UI as 役割別 UI
-  participant API as ゲーム API
-  participant Core as 週次計算コア
-  participant DB as 永続化
-  P->>UI: 発注数または生産要請数を入力
-  UI->>API: 意思決定を確定
-  API->>DB: 役割別入力を保存
-  API->>DB: 全 4 役割の完了を確認
-  alt 全役割が完了
-    API->>Core: 現在状態と意思決定で次週を計算
-    Core-->>API: 在庫・受注残・遅延・費用
-    API->>DB: 原子的かつ一度だけ週を確定
-    API-->>UI: 次週状態を役割別に投影
-  else 未完了
-    API-->>UI: 他役割の入力待ち
-  end
+  participant P as 参加者(UI)
+  participant H as http
+  participant A as application
+  participant D as domain
+  participant R as persistence
+  P->>H: PUT /api/games/:id/decision
+  H->>A: 入力を渡す（資格を検証）
+  A->>R: セッションを読み込む
+  A->>D: 入力を検証して反映
+  A->>R: 保存
+  P->>H: POST /api/games/:id/commit
+  H->>A: 週の確定
+  A->>D: simulateWeek（純粋関数）
+  A->>R: 週結果と状態を原子的に保存
+  R-->>P: SSE で版の更新を通知
 ```
 
-<!-- Text fallback: 参加者の意思決定を API が保存し、全役割が揃った場合だけ計算コアを呼び、次週状態を原子的に保存して役割別 UI へ返す。 -->
+テキスト代替: 参加者が決定を PUT し、アプリケーション層が集約に反映して保存する。確定の POST でドメインの `simulateWeek` が週結果を計算し、永続化アダプターが原子的に保存して、SSE で版の更新が全員に届く。
 
-## Sources
+### ゲームの作成から開始まで
 
-- `gulpfile.js`
-- `ops/scripts/`
-- `docs/requirements/beer-game/requirements_definition.md`
+```mermaid
+sequenceDiagram
+  participant F as 進行役
+  participant H as http
+  participant A as application
+  F->>H: POST /api/games
+  H->>A: ゲーム設定を作成
+  Note over H,A: 参加コードと進行役の資格を返す
+  F->>H: POST /api/join（参加者）
+  F->>H: POST /api/games/:id/assignments
+  F->>H: POST /api/games/:id/start
+  H->>A: 4 役割がそろえば開始
+```
 
-## Assumptions & Open Questions
-
-- 図のゲーム API、計算コア、永続化、UI は要件から導いた候補境界であり、現時点では未実装です。
+テキスト代替: 進行役がゲームを作成し、参加者が参加コードで参加する。進行役が役割を割り当て、4 役割がそろうと開始できる。

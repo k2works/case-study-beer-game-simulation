@@ -15,13 +15,19 @@
 - 2026-11-12T08:45:00Z — U3: 実装の編集とテスト補助の一部で、ファイルツールでなく python や heredoc の一括置換を使った（指示は「成果物はファイルツールで書く」）。ソースの機械的な置換が多かったため。成果物（code-summary、traceability、source-manifest、この diary）はファイルツールで書いた。
 - 2026-11-12T08:45:00Z — U3: `apps/beer-game3/.prettierignore` に `aidlc` を足した。ハーネスが `apps/beer-game3/aidlc/.aidlc-sessions/` に作業用のファイルを置くようになり、`prettier --check .` が失敗したため（アプリのソースではない実行時の置き場）。
 
+- 2026-11-13T03:20:31Z [unit u4-access-recovery] — U4: 参加の窓の検査は、参加コードが本文にあるため `onRequest` でなく `preValidation` に置いた。形式不正の本文（コードの欠落）は 422 で、窓に数えない。認可は `onRequest` のまま、本文の解析より前。
+- 2026-11-13T03:20:31Z [unit u4-access-recovery] — U4: 無効な資格情報（なし、無効、不明・失効・期限切れ、権限なし、別のゲーム、存在しないゲーム）を、すべて同じ 403 の本文にした。文言は画面が自分の送った資格情報の種類から選ぶ。
+
 ## Tradeoffs
 <!-- example: 2026-05-29T10:14:32Z — picked TDD over BDD this run; the team is unit-first and the domain is well-understood -->
+- 2026-11-13T03:20:31Z [unit u4-access-recovery] — U4: 窓の鍵は生の IP アドレスでなく、鍵付きの要約（`keyedDigest(normalizeSource(ip))`）にした。IP アドレスを DB に残さず、ログの `src` とも突き合わせられる。代わりに、鍵を変えると窓が一度リセットされる。
 - 2026-11-12T08:45:00Z — U3: 入力のたびに、占有の中で `assignments` と `hasActiveToken` の 2 回の読み取りが増える（参加者の入力だけ）。NFR6.3 の競合を防ぐ代わりの費用で、1 回の入力あたり数行の読み取りのため許容した。
 - 2026-11-12T08:45:00Z — U3: 復帰用 token の失効は、`return_tokens.revoked_at` と `participants.replaced_at` を同じコミットで更新する。旧担当者の参加者の行と週の記録は消さない（履歴と入力者のラベルを残すため）ので、ロビーや投影の参加者の一覧に、入れ替え済みの人が `replaced: true` で残る。
 - 2026-11-12T08:45:00Z — U3: U1 の画面の試験を、設計（BR12.4）に合わせて改めた。ロビーの表示を「#参加順 表示名」から「表示名 #参加順」に変えたため、`tests/u1/web` の 5 つの期待の文字列を直した。
 
 ## Open questions
+- 2026-11-13T03:20:31Z [unit u4-access-recovery] — U4 (質問): 移行の `return_tokens.last_used_at` は NOT NULL で既定値がない。ローリングデプロイ中に旧版が insert すると失敗する。既定値 `default now()` を付けるか、停止してから移行する前提を手順書に書くか。
+- 2026-11-13T03:20:31Z [unit u4-access-recovery] — U4 (質問): 設計文書 `security-design.md` の観察者の投影の項目名が、`entities.md` と実装（`teamWeeklyCost` など）と食い違っている。どちらを正本にするか。
 <!-- example: 2026-05-29T10:14:32Z — confirm the retention window with compliance before the next stage hardens the schema -->
 - 2026-11-12T08:45:00Z — U3 (質問): 履歴の change に足した `unassign` を、設計文書（entities.md、functional-spec.md の履歴の表）にも反映するか。コードと試験は `unassign` を持つ。
 - 2026-11-12T08:45:00Z — U3 (質問): 5 人目の割当ての拒否は、U1 の実装が 409 `state` を返す（BR12.3 の violation は 409 `conflict`）。種類の違いは同じ 409 だが、設計の記述に揃えるなら U1 の振る舞いと試験の変更が要る。今回は U1 のままにした。

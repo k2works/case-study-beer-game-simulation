@@ -1,0 +1,31 @@
+{
+  "stage": "functional-design",
+  "unit": "u4-access-recovery",
+  "upstream_ids": [
+    "AC2.1.1", "AC2.1.2",
+    "AC2.9.1", "AC2.9.2",
+    "AC3.1.1", "AC3.1.2",
+    "AC3.2.1", "AC3.2.2", "AC3.2.3", "AC3.2.4",
+    "AC5.4.1", "AC5.4.2"
+  ],
+  "coverage": [
+    { "id": "AC2.1.1", "status": "OK", "target": "BR16.1" },
+    { "id": "AC2.1.2", "status": "OK", "target": "BR16.2" },
+    { "id": "AC2.9.1", "status": "OK", "target": "BR15.3; BR15.1; BR15.4" },
+    { "id": "AC2.9.2", "status": "OK", "target": "BR15.2" },
+    { "id": "AC3.1.1", "status": "OK", "target": "BR20.1; BR20.2" },
+    { "id": "AC3.1.2", "status": "OK", "target": "BR20.2" },
+    { "id": "AC3.2.1", "status": "OK", "target": "BR17.4; BR17.5" },
+    { "id": "AC3.2.2", "status": "OK", "target": "BR17.4; BR17.1; BR17.2" },
+    { "id": "AC3.2.3", "status": "OK", "target": "BR17.1; BR17.3" },
+    { "id": "AC3.2.4", "status": "OK", "target": "BR17.6" },
+    { "id": "AC5.4.1", "status": "OK", "target": "BR19.1" },
+    { "id": "AC5.4.2", "status": "OK", "target": "BR18.2; BR18.1" }
+  ],
+  "reverse": [
+    { "id": "BR18.3", "status": "N/A", "target": "接続元の特定は AC5.4.2 の「同じ接続元」の前提を成り立たせる技術上の規則" },
+    { "id": "BR19.2", "status": "N/A", "target": "ADR-002 と U4 の実装メモ（外へ出る経路を AccessControl に限る）による構造の規則" },
+    { "id": "BR19.3", "status": "N/A", "target": "AC5.4.1 の拒否を全経路で保証するための試験の規則" },
+    { "id": "BR20.3", "status": "N/A", "target": "FR12.2 の切断中の画面の扱い（AC3.2.2 の前提）" }
+  ]
+}

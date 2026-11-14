@@ -2,35 +2,31 @@
 
 ## Run Record
 
-- Date: 2026-10-27T03:08:42Z
-- Commit: 258e450367415d0593b66b369c0bf432c4dcec3e
-
-## Scan Notes
-
-アプリケーション本体は未実装です。リポジトリ全体の人手作成領域を対象に、要件、空の application placeholder、root tooling、運用スクリプト、環境・CI 設定を確認しました。dependency folder、build output、IDE cache、AI-DLC 自身の導入物は対象外です。
+- Date: 2026-11-11
+- Commit: a5077d43ea409254a4d9656a2b4d1bd5638ae4b2
 
 ## Scope of Analysis
 
 ```yaml
 scope_version: 1
 kind: full
-intent: beer-game-development
-fingerprint: 05fc5d3ef3cc0396bda6bc1bb9b87d5f630d7ef2
+intent: 261111-beer-game3-setup
+fingerprint: c1865e6ab0130f900b737bf613245c74c87198ac
 analyzed:
   paths:
     - ./
   components:
-    - Documentation Workspace
-    - Documentation Automation
-    - Security and Operations Utilities
-    - CI Workflows
-    - Beer Game Requirements
-    - Beer Game Application
-    - Node.js Runtime
-    - Container and Nix Environment
+    - beer-game2 domain
+    - beer-game2 ports
+    - beer-game2 application
+    - beer-game2 http adapter
+    - beer-game2 persistence adapter
+    - beer-game2 ui
+    - beer-game2 infra
+    - beer-game v1 app
+    - Documentation set
+    - Ops tooling
+    - CI workflows
 shallow:
-  paths:
-    - docs/reference/
-    - docs/template/
-    - docs/assets/
+  paths: []
 ```

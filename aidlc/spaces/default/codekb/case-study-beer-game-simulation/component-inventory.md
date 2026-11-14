@@ -1,62 +1,51 @@
 # Component Inventory
 
-## Documentation Workspace
+## beer-game2 domain
+- 責任: 値、役割、条件（キット準拠とカスタム）、週次計算 `simulateWeek`、Game / Session 集約、観察、レビュー、出力、保持の規則。
+- 場所: `apps/beer-game2/src/domain/`（12 ファイル）。
+- 依存: なし（lint で他の層への依存を禁止）。
 
-- **Responsibility**: 要件、設計、開発、運用、レビュー、参照資料を Markdown で管理する。
-- **Dependencies**: MkDocs Configuration、Documentation Automation。
-- **Status**: 稼働中。ビールゲーム固有では要件定義のみ実質的内容あり。
+## beer-game2 ports
+- 責任: リポジトリ、UnitOfWork、Clock などの契約。
+- 場所: `apps/beer-game2/src/ports/index.ts`。
+- 依存: domain。
 
-## Documentation Automation
+## beer-game2 application
+- 責任: ユースケース（読み込み → 集約の呼び出し → 保存）。規則は持たない。
+- 場所: `apps/beer-game2/src/application/`。
+- 依存: domain、ports。
 
-- **Responsibility**: Gulp を入口に MkDocs 起動、マニュアル変換、journal 生成を行う。
-- **Dependencies**: Node.js Runtime、Container and Nix Environment。
-- **Status**: 稼働中。
+## beer-game2 http adapter
+- 責任: Fastify のルート、Problem JSON、資格（HMAC）、SSE。
+- 場所: `apps/beer-game2/src/adapters/http/`。
+- 依存: application、domain、ports、config。
 
-## Security and Operations Utilities
+## beer-game2 persistence adapter
+- 責任: PostgreSQL への保存、unit of work、`LISTEN/NOTIFY`、レート制限、出力・レビューの読み取り。
+- 場所: `apps/beer-game2/src/adapters/persistence/`、`migrations/`。
+- 依存: ports、domain、`pg`。
 
-- **Responsibility**: Vault 暗号化、SSH 操作、SonarQube、OKF の補助タスクを提供する。
-- **Dependencies**: Node.js Runtime、外部 CLI、環境変数。
-- **Status**: 稼働中だがビールゲーム本体からは独立。
+## beer-game2 ui
+- 責任: React の画面（ホーム、ロビー、プレイ、コンソール、観察、振り返り）、API クライアント、折れ線グラフ。
+- 場所: `apps/beer-game2/ui/`。
+- 依存: HTTP API、react-router。
 
-## CI Workflows
+## beer-game2 infra
+- 責任: AWS の Terraform（alb、ecr、ecs、github_oidc、network、observability、rds、secrets、web）と staging / production の合成。
+- 場所: `apps/beer-game2/infra/`。
 
-- **Responsibility**: MkDocs 公開と Docker image publish を自動化する。
-- **Dependencies**: GitHub Actions、Docker、GitHub Pages / GHCR。
-- **Status**: 定義済み。
+## beer-game v1 app
+- 責任: v1 の API・UI・保持ワーカー（SQS）・outbox・学習ビュー。参照用。
+- 場所: `apps/beer-game/`。
 
-## Beer Game Requirements
+## Documentation set
+- 責任: 要件、設計、ADR、開発計画、運用手順、レビュー、ジャーナル、ガイド、テンプレート。
+- 場所: `docs/`。MkDocs（`mkdocs.yml`）で公開。
 
-- **Responsibility**: ビールゲームの価値、外部環境、システム境界、内部構造、FR/NFR/BR を定義する。
-- **Dependencies**: JSD 改訂版ビールゲームキットの参照資料。
-- **Status**: draft。
+## Ops tooling
+- 責任: Gulp タスク（MkDocs、マニュアル、ジャーナル、vault、SSH、SonarQube、OKF）。
+- 場所: `gulpfile.js`、`ops/scripts/`、`ops/docker/`、`ops/nix/`。
 
-## Beer Game Application
-
-- **Responsibility**: 複数人ゲーム、週次計算、情報制約、復元、分析を実現する予定領域。
-- **Dependencies**: Beer Game Requirements。
-- **Status**: 未実装（`apps/beer-game/` は `.gitkeep` のみ）。
-
-## Node.js Runtime
-
-- **Responsibility**: Gulp と運用スクリプトの実行。
-- **Dependencies**: npm dependencies。
-- **Status**: Node.js 22.x を前提。
-
-## Container and Nix Environment
-
-- **Responsibility**: ドキュメント、品質ツール、多言語開発環境を再現可能にする。
-- **Dependencies**: Docker / Docker Compose / Nix。
-- **Status**: 定義済み。
-
-## Sources
-
-- `package.json`
-- `gulpfile.js`
-- `ops/`
-- `.github/workflows/`
-- `docs/requirements/beer-game/requirements_definition.md`
-- `apps/beer-game/`
-
-## Assumptions & Open Questions
-
-- Beer Game Application は後続工程で複数コンポーネントへ分割される可能性があります。
+## CI workflows
+- 責任: beer-game2 の CI と staging / production のデプロイ・ロールバック、v1 の CI、Docker 公開、MkDocs 公開。
+- 場所: `.github/workflows/`（8 本）。

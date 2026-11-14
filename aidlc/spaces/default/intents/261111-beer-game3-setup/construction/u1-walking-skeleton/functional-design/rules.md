@@ -109,7 +109,7 @@ rules:
     category: validation
     applies_to: [Participant.displayName]
     trigger: 参加の要求
-    logic: IF 空、または 40 文字を超える THEN 拒否する。同名は拒否しない
+    logic: IF 空、または 40 文字を超える THEN 拒否する。同名は拒否しない。U5（BR23.10）: 前後の空白を除いた先頭が =、+、-、@、タブ、復帰のものも 422 で拒否する（占有の前に検証する。参加と担当者の入れ替えで同じ定義）
     violation: 拒否する（422 validation）
     source: FR2.1
   - id: BR2.6

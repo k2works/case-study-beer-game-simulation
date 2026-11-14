@@ -166,15 +166,18 @@ paths:
     get:
       summary: 終了後の全役割の時系列を返す。プレイ中は開示しない
       responses:
-        "200": { description: 時系列 }
-        "403": { description: 終了前は他役割の時系列を開示しない }
+        "200": { description: "ResultsView { gameId, setupKind, weekCount, confirmedWeeks, customerDemand[], roles[{ role, weeks[{ week, receipt, ordersReceived, shipped, inventory, backlog, decision, weeklyCost, cumulativeCost }] }], teamCumulativeCost }。参加者と進行役。Cache-Control: no-store" }
+        "403": { description: "終了前は他役割の時系列を開示しない（理由「ゲームが終了するまで、結果は見られません」）。観察者・無効・別のゲーム・削除済みは、無効な資格情報と同一の本文" }
   /games/{gameId}/export:
     get:
       summary: ゲーム設定と全週の記録を出力する（進行役）
       parameters:
         - { name: format, in: query, required: true, schema: { type: string, enum: [csv, json] } }
       responses:
-        "200": { description: 出力。CSV と JSON で同じ数値になる }
+        "200": { description: "出力。CSV（UTF-8 の BOM、CRLF、RFC 4180）と JSON（{ game, records }）で同じ数値になる。attachment、ファイル名 beer-game-{gameId}.csv|json、Cache-Control: no-store、nosniff" }
+        "403": { description: 進行役以外、無効、別のゲーム、削除済み（無効な資格情報と同一の本文） }
+        "409": { description: 進行役でも、ゲームが終了していない（state） }
+        "422": { description: format が csv でも json でもない、または欠落（認可のあとに検査する） }
 ```
 
 U1 は参加、割当て、開始、入力、確定、状態の取得を持つ。U3 は一時停止、再開、終了、担当者の入れ替え、代理入力、進行管理の入口を足す。U4 は観察者の入口と、復帰用 token の再接続を足す。U5 は結果と出力の入口を足す。
@@ -235,7 +238,7 @@ GameSession:
       U1: [games, game_settings, demand_series, participants, role_assignments, week_records, pipeline_slots, access_codes, return_tokens（基本の列）, idempotency_records]
       U3: [operation_log_entries]
       U4: [return_tokens への有効期間と最後の操作の時刻の列の追加]
-      U5: [retention_policies]
+      U5: [games への last_operation_at の列の追加。保持期間はアプリケーションの設定で持ち、表は作らない（U5 の Functional Design Q3）]
     migration: 後続の Unit は、自分が足す表を別の移行として足す。既存の表の列の削除や意味の変更は、同じ変更の中で使う側も直す
     concurrency: 同じゲームへの書き込みは 1 つずつ順に処理する（U1 の Functional Design の決定）。それでも保存の版の検査は安全装置として残し、版が食い違う保存は拒否する
 ```
@@ -270,11 +273,16 @@ U1 が最小の形（参加コードと進行役用コード、参加者を特�
 GameLifecycle:
   end: (gameId, reason: facilitator | finalWeek | autoEnd) -> Game
     # 終了週の確定で自動終了する。終了から保持期間を数える
-  delete: (gameId)
-    # ゲームの集約と、参加コード、復帰用 token を、同じ保存の中で削除する
+  autoEnd: (gameId, staleBefore: Date) -> ended | not-stale | already-ended | not-found
+    # 占有の中で、終了しておらず lastOperationAt <= staleBefore を再検査する。履歴の end は system
+  deleteIfExpired: (gameId, expiredBefore: Date) -> deleted | not-expired | not-found
+    # 占有の中で、終了済みで endedAt <= expiredBefore を再検査し、ゲームの集約、参加コード、復帰用 token、
+    # 冪等の記録、操作の履歴を、同じ保存の中で削除する（GameTx.deleteGame。外部キーの on delete cascade）
   query:
-    endedGames: () -> [gameId, endedAt]       # 保持期限の判定に使う
-    staleRunningGames: () -> [gameId, lastOperationAt]   # 最後の操作から 30 日の自動終了に使う
+    findExpiredGames: (before, limit, exclude[]) -> [gameId]   # 終了の古い順。保持期限の判定に使う
+    findStaleGames: (before, limit, exclude[]) -> [gameId]     # 最後の操作の古い順。自動終了に使う
+    # exclude は順序と上限の前に除く（失敗が続くゲームが後ろの正常なゲームを塞がない）
+  runExclusive: (key, fn) -> { acquired: true, value } | { acquired: false }   # 定期処理の二重実行の防止
 ```
 
 ## 契約の所有の規則
@@ -298,7 +306,7 @@ GameLifecycle:
 
 | Contract | Question | Blocks |
 | :--- | :--- | :--- |
-| C5 | 削除の対象に、AccessControl の表（参加コード、復帰用 token）を含める。U4 が U5 より後に完成した場合の扱い | U4、U5 |
+| C5 | （確定済み・U5）削除の対象に、参加コード、進行役用コード、観察者用コード、復帰用 token、冪等の記録、操作の履歴を含める。外部キーの連鎖で消える | — |
 | C1 | ポーリングの周期（数秒）の具体値。週確定後 2 秒以内の反映（NFR3、仮の値）との関係 | U1、U6 |
 | C1 | 発注数・生産要請数の上限（`requirements.md` の未確定事項） | U1 |
 

@@ -1,0 +1,18 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u6-nfr-verification",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7", "NFR8", "NFR9", "NFR10", "NFR11"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1, NFR1.2（全体の負荷と CI で重ねて検証する部分。計算そのものの golden test は u2-weekly-rules が担当）" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2, NFR2.3（負荷の下での整合性の検査と、試験の信頼性。週確定の原子性の作りは u1-walking-skeleton と u2-weekly-rules が担当）" },
+    { "id": "NFR3", "status": "OK", "target": "NFR3.1, NFR3.2, NFR3.3, NFR3.4, NFR3.5, NFR3.6（通常負荷での入力確定・反映・取り直しの応答。週確定の処理そのものの時間と書き込みの順番待ちは u1-walking-skeleton が担当）" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4（15 チームの同時利用を全体の負荷で測る部分。取り直しを順番待ちに入れない作りは u1-walking-skeleton が担当）" },
+    { "id": "NFR5", "status": "OK", "target": "NFR5.1（切断からの復帰と token の有効期間の検証は u4-access-recovery が担当する。U6 は負荷試験の整合性の検査に含めるだけ）" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3, NFR6.4（U6 が作る試験と CI を、守るべき環境と情報から隔てる要件。上流の NFR6 のコードの強度、ゲーム・役割単位の権限の検証、試行回数の制限は u1-walking-skeleton と u4-access-recovery が担当）" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1, NFR7.2（試験のデータと成果物に個人情報を持ち込まない要件。上流の NFR7 の保持期間、自動終了、削除は u5-results-retention が担当）" },
+    { "id": "NFR8", "status": "OK", "target": "NFR8.1, NFR8.2, NFR8.3, NFR8.4（全画面・全状態の検査。各 Unit の自分の画面の検査は各 Unit が担当し、U6 は重ねて検査する）" },
+    { "id": "NFR9", "status": "OK", "target": "NFR9.1, NFR9.2, NFR9.3, NFR9.4（U6 の検証の結果を後から追跡できる要件。上流の NFR9 の操作の履歴の機能は u3-facilitation が担当し、U6 は検証しない）" },
+    { "id": "NFR10", "status": "OK", "target": "NFR10.1, NFR10.2" },
+    { "id": "NFR11", "status": "OK", "target": "NFR11.1, NFR11.2（全画面の日本語表示。出力の識別子の扱いは u5-results-retention の Q6 の A を引き継ぐ）" }
+  ]
+}
