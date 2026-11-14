@@ -1,0 +1,18 @@
+{
+  "name": "@beer-game-kotlin/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ビールゲーム（Kotlin 版）の画面。現時点は、受け入れ（Cucumber-JS + Playwright。@ui のシナリオ）の骨組みだけ。画面の実装は B1 の Step 10。",
+  "engines": {
+    "node": "^24 || >=26"
+  },
+  "scripts": {
+    "acceptance": "cucumber-js",
+    "acceptance:dry-run": "cucumber-js --dry-run"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "13.3.0",
+    "playwright": "1.65.1"
+  }
+}
