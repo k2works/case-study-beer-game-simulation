@@ -91,9 +91,11 @@ class GameSetupSteps {
                 .json
                 .array("errors")
                 .map { it.jsonObject }
-        val error = errors.singleOrNull { it["week"]?.jsonPrimitive?.content == week.toString() }
-        expect(error != null) { "第 $week 週を示す誤りがない: $errors" }
-        expect(error!!.text("field") == "demand") { "対象が需要ではない: ${error.text("field")}" }
+        val error =
+            checkNotNull(errors.singleOrNull { it["week"]?.jsonPrimitive?.content == week.toString() }) {
+                "第 $week 週を示す誤りがない: $errors"
+            }
+        expect(error.text("field") == "demand") { "対象が需要ではない: ${error.text("field")}" }
         val message = error.text("message")
         expect("0" in message && "1000" in message && "整数" in message) { "修正内容が、0〜1000 の整数を示していない: $message" }
     }

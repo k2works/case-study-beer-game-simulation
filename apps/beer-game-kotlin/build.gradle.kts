@@ -80,3 +80,98 @@ subprojects {
         enabled = detektSupported
     }
 }
+
+// ---- PMD（関数型ルールの XPath の検査）----
+// PMD の Gradle プラグイン（pmd）は Java 用なので使わず、PMD のコマンドライン（PmdCli）を JavaExec で実行する。
+// Kotlin の解析は pmd-kotlin が担う。ルールは config/pmd/ に置く（層ごとにルールセットを分ける。@Suppress は使わない）。
+val pmdTool by configurations.creating
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    pmdTool(libs.pmd.cli)
+    pmdTool(libs.pmd.kotlin)
+}
+
+val pmdReportDir = layout.buildDirectory.dir("pmd")
+
+// fixture のテスト: 違反するコードとしないコードを並べた fixture に fp-kotlin-rules.xml を実行し、
+// 期待した「行 ルール名」だけが報告される（過不足なし）ことを検査する。処理エラー・ルールの設定の誤りも失敗にする。
+tasks.register<JavaExec>("pmdFixtureTest") {
+    group = "verification"
+    description = "PMD の関数型ルールを fixture に実行し、期待どおりの違反だけが報告されることを検査する。"
+    classpath = pmdTool
+    mainClass.set("net.sourceforge.pmd.cli.PmdCli")
+    workingDir = rootDir
+    isIgnoreExitValue = true
+    val report = pmdReportDir.map { it.file("fixture.xml") }
+    args(
+        "check", "-d", "config/pmd/fixtures", "-R", "config/pmd/fp-kotlin-rules.xml",
+        "-f", "xml", "-r", report.get().asFile.path, "--no-cache", "--no-progress",
+    )
+    doFirst { report.get().asFile.parentFile.mkdirs() }
+    doLast {
+        val doc = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder()
+            .parse(report.get().asFile)
+        fun texts(tag: String, attr: String) =
+            (0 until doc.getElementsByTagName(tag).length).map {
+                (doc.getElementsByTagName(tag).item(it) as org.w3c.dom.Element).getAttribute(attr)
+            }
+        val problems = texts("error", "msg") + texts("configerror", "msg")
+        check(problems.isEmpty()) { "PMD の処理エラーまたはルールの設定の誤り: $problems" }
+        val violations = doc.getElementsByTagName("violation")
+        val actual = (0 until violations.length).map {
+            val e = violations.item(it) as org.w3c.dom.Element
+            "${e.getAttribute("beginline")} ${e.getAttribute("rule")}"
+        }.sorted()
+        val expected = rootDir.resolve("config/pmd/fixtures/expected.txt").readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }.sorted()
+        check(actual == expected) {
+            "fixture の違反が期待と一致しない。\n期待 ${expected.size} 件: $expected\n実際 ${actual.size} 件: $actual"
+        }
+        logger.lifecycle("pmdFixtureTest: 期待どおり ${actual.size} 件")
+    }
+}
+
+// 層ごとの検査。ルールセットは層ごとに分け、外すルールはルールセットの中で理由とともに明示する。
+// 違反が 1 件でもあれば失敗する（PMD の終了コード 4）。ベースラインは使わない。
+fun registerPmd(taskName: String, ruleset: String, dirs: List<String>) =
+    tasks.register<JavaExec>(taskName) {
+        group = "verification"
+        description = "PMD を $ruleset で実行する（違反 0 件）。"
+        classpath = pmdTool
+        mainClass.set("net.sourceforge.pmd.cli.PmdCli")
+        workingDir = rootDir
+        val existing = dirs.filter { rootDir.resolve(it).isDirectory }
+        inputs.files(existing.map { rootDir.resolve(it) })
+        inputs.dir(rootDir.resolve("config/pmd"))
+        args(
+            "check", "-d", existing.joinToString(","), "-R", "config/pmd/$ruleset",
+            "-f", "text", "--no-cache", "--no-progress",
+        )
+    }
+
+val modules = listOf("domain", "application", "adapter-persistence", "adapter-http", "app")
+val pmdDomainApp = registerPmd("pmdDomainApplication", "ruleset-domain.xml", listOf("domain/src/main", "application/src/main"))
+val pmdAdapter = registerPmd("pmdAdapter", "ruleset-adapter.xml", listOf("adapter-persistence/src/main", "adapter-http/src/main"))
+val pmdMainApp = registerPmd("pmdMain", "ruleset-main.xml", listOf("app/src/main"))
+val pmdTestCode = registerPmd(
+    "pmdTest",
+    "ruleset-test.xml",
+    modules.flatMap { m -> listOf("test", "integrationTest", "acceptanceTest").map { "$m/src/$it" } },
+)
+
+tasks.register("pmd") {
+    group = "verification"
+    description = "PMD の fixture のテストと、層ごとの検査をすべて実行する。"
+    dependsOn("pmdFixtureTest", pmdDomainApp, pmdAdapter, pmdMainApp, pmdTestCode)
+}
+
+// 各モジュールの check にも組み込み、ローカルでも CI と同じタスクで再現できるようにする。
+subprojects {
+    tasks.matching { it.name == "check" }.configureEach {
+        dependsOn(rootProject.tasks.named("pmd"))
+    }
+}

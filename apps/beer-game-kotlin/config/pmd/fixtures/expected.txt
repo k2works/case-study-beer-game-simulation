@@ -1,0 +1,20 @@
+# fixture（Fixture.kt）に対して、fp-kotlin-rules.xml が報告すべき違反。「行 ルール名」を 1 行に 1 件。
+# 関数型プログラミングガイド（Kotlin 編）§9.6「ルールの確認」の期待どおり（17 件）。
+# これと一致しなければ pmdFixtureTest が失敗する（余分な報告も、足りない報告も失敗）。
+4 NoVarProperty
+14 NoNotNullAssertion
+18 NoThrow
+20 NoMutableCollectionInSignature
+20 NoMutableCollectionInSignature
+26 SideEffectInNonSuspendFunction
+27 SideEffectInNonSuspendFunction
+30 NoRunBlocking
+31 NoVarClassParameter
+32 NoMutableCollectionFactory
+34 NoReduce
+35 NoGenericCatch
+36 NoNestedFlatMap
+37 NoGlobalScope
+38 NoRawConcurrency
+39 NoRawConcurrency
+40 NoThreadSleep

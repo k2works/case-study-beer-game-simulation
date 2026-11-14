@@ -1,0 +1,238 @@
+<?xml version="1.0"?>
+<!--
+  関数型ルール 14 個の定義（正本）。関数型プログラミングガイド（Kotlin 編）§9.6 のとおり。
+  層ごとのルールセット（ruleset-*.xml）が、このファイルを参照し、外すルールだけを理由とともに明示する。
+  message に波括弧を書かない（PMD が MessageFormat として解釈して内部エラーになる）。
+  fixture のテスト（./gradlew pmdFixtureTest）で、期待どおりの違反だけが報告されることを確かめている。
+-->
+<ruleset name="FP Kotlin Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>関数型プログラミングガイド（Kotlin 編）に準拠したカスタムルール</description>
+
+    <rule name="NoVarProperty" language="kotlin"
+          message="var プロパティは val にし、状態の書き換えではなく新しい値を作る"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>クラスやトップレベルの var プロパティを禁止する。関数内のローカルな var は許す。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PropertyDeclaration[@Mutable = true()]
+    [not(ancestor::FunctionBody or ancestor::AnonymousInitializer or ancestor::SecondaryConstructor)]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoNotNullAssertion" language="kotlin"
+          message="!! を使わず、?: や ?.let で null を型として扱う"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>非 null 表明（!!）を禁止する。</description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryOperator[Excl]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoThrow" language="kotlin"
+          message="throw の代わりに Either などの戻り値の型で失敗を表す"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>throw 式を禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//JumpExpression[T-THROW]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoMutableCollectionInSignature" language="kotlin"
+          message="公開関数の引数と戻り値では読み取り専用のコレクション型を使う"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>公開関数のシグネチャに MutableList / MutableSet / MutableMap / MutableCollection を使うことを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//FunctionDeclaration[not(ancestor::FunctionBody)]
+    [not(pmd-kotlin:modifiers() = ('private', 'protected', 'internal'))]
+    //SimpleUserType[not(ancestor::FunctionBody)]/SimpleIdentifier/T-Identifier
+        [@Text = ('MutableList', 'MutableSet', 'MutableMap', 'MutableCollection')]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="SideEffectInNonSuspendFunction" language="kotlin"
+          message="時計・乱数・スリープ・標準出力などの副作用は suspend 関数の中に置くか、引数で外から受け取る"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>suspend でない関数の中で、隠れた入力や副作用を持つ呼び出しをすることを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression
+    [ancestor::FunctionDeclaration[1]]
+    [not(ancestor::FunctionDeclaration[1]/Modifiers//T-SUSPEND)]
+    [
+        (
+            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = ('println', 'print')]
+            and PostfixUnarySuffix[1]/CallSuffix
+        )
+        or (
+            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'System']
+            and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/T-Identifier
+                [@Text = ('currentTimeMillis', 'nanoTime')]
+            and PostfixUnarySuffix[2]/CallSuffix
+        )
+        or (
+            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'Random']
+            and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/T-Identifier
+                [starts-with(@Text, 'next')]
+            and PostfixUnarySuffix[2]/CallSuffix
+        )
+        or (
+            PrimaryExpression/SimpleIdentifier/T-Identifier
+                [@Text = ('Instant', 'LocalDate', 'LocalDateTime', 'LocalTime', 'ZonedDateTime', 'OffsetDateTime')]
+            and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text = 'now']
+            and PostfixUnarySuffix[2]/CallSuffix
+        )
+        or (
+            PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'UUID']
+            and PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text = 'randomUUID']
+            and PostfixUnarySuffix[2]/CallSuffix
+        )
+    ]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoRunBlocking" language="kotlin"
+          message="runBlocking で suspend の型付けを打ち消さない。呼び出し側も suspend にするか、境界で一度だけ使う"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>runBlocking の呼び出しを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression
+    [PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'runBlocking']]
+    [PostfixUnarySuffix[1]/CallSuffix]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoVarClassParameter" language="kotlin"
+          message="コンストラクタの var は val にし、変更は copy で新しい値を作る"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>コンストラクタのプロパティを var で宣言することを禁止する。イベントやコマンドなどの値は不変にする。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//ClassParameter[T-VAR]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoMutableCollectionFactory" language="kotlin"
+          message="可変コレクションの生成は buildList / buildSet / buildMap の内側に閉じ込める"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>buildList / buildSet / buildMap の外で、可変コレクションを生成することを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression
+    [PrimaryExpression/SimpleIdentifier/T-Identifier
+        [@Text = ('mutableListOf', 'mutableSetOf', 'mutableMapOf', 'arrayListOf', 'hashSetOf', 'hashMapOf',
+                  'linkedSetOf', 'linkedMapOf', 'ArrayList', 'HashSet', 'HashMap', 'LinkedHashSet', 'LinkedHashMap')]]
+    [PostfixUnarySuffix/CallSuffix]
+    [not(ancestor::PostfixUnaryExpression
+        [PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = ('buildList', 'buildSet', 'buildMap')]])]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoReduce" language="kotlin"
+          message="reduce は空のコレクションで例外を投げる。fold か reduceOrNull を使う"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>reduce / reduceRight の呼び出しを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression/PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier
+    [@Text = ('reduce', 'reduceRight')]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoGenericCatch" language="kotlin"
+          message="Exception / Throwable を広く catch せず、Either.catch で値にするか、想定する例外の型だけを catch する"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>Exception / Throwable / RuntimeException を catch することを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//CatchBlock[Type//T-Identifier[@Text = ('Exception', 'Throwable', 'RuntimeException')]]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoNestedFlatMap" language="kotlin"
+          message="flatMap の入れ子は、either ブロックと bind()、または sequence ビルダーで平らに書く"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>flatMap の中で flatMap を呼ぶことを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression
+    [PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text = 'flatMap']]
+    [ancestor::PostfixUnaryExpression
+        [PostfixUnarySuffix/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text = 'flatMap']]]
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoGlobalScope" language="kotlin"
+          message="GlobalScope を使わず、coroutineScope の中で起動して構造化並行性を保つ"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>GlobalScope の使用を禁止する。</description>
+        <priority>2</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'GlobalScope']
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoRawConcurrency" language="kotlin"
+          message="スレッドやロックを直接扱わず、コルーチンと Atomic で共有状態を更新する"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>Thread の生成、thread、Executors、synchronized、@Synchronized を禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+(
+    //PostfixUnaryExpression
+        [PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = ('Thread', 'thread', 'synchronized')]]
+        [PostfixUnarySuffix[1]/CallSuffix]
+    | //PostfixUnaryExpression
+        [PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'Executors']]
+    | //SingleAnnotation/UnescapedAnnotation/UserType/SimpleUserType/SimpleIdentifier/T-Identifier
+        [@Text = 'Synchronized']
+)
+            ]]></value></property>
+        </properties>
+    </rule>
+
+    <rule name="NoThreadSleep" language="kotlin"
+          message="Thread.sleep はスレッドを塞ぐ。suspend 関数の delay を使い、テストでは runTest の仮想時間を使う"
+          class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+        <description>Thread.sleep の呼び出しを禁止する。</description>
+        <priority>3</priority>
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//PostfixUnaryExpression
+    [PrimaryExpression/SimpleIdentifier/T-Identifier[@Text = 'Thread']]
+    [PostfixUnarySuffix[1]/NavigationSuffix/SimpleIdentifier/T-Identifier[@Text = 'sleep']]
+            ]]></value></property>
+        </properties>
+    </rule>
+</ruleset>

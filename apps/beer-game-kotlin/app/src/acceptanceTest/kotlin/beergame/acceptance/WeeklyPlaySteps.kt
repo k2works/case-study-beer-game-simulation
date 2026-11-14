@@ -344,7 +344,7 @@ class WeeklyPlaySteps {
         val error = errors.singleOrNull()
         expect(error != null && error.text("field") == "quantity") { "数量の誤りが示されていない: $errors" }
         // 修正方法は、整数で指定することを含む（範囲外の数値の応答は、範囲も含むが、ここでは固定しない）。
-        val message = error!!.text("message")
+        val message = checkNotNull(error) { "数量の誤りが示されていない: $errors" }.text("message")
         expect("整数" in message) { "修正方法が、整数で指定することを示していない: $message" }
     }
 

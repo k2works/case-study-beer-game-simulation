@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!--
+  ドメイン・アプリケーション層のルールセット。最も厳格で、外すルールは無い（全 14 ルール + 標準の Kotlin ルール）。
+-->
+<ruleset name="Domain and Application Kotlin Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>ドメイン・アプリケーション用。全ルールを有効にする。</description>
+
+    <!--
+      標準ルール FunctionNameTooShort（既定は 3 文字以上。閾値は XPath に固定で、プロパティが無いため xpath を上書きする）だけ、
+      閾値を 2 にする（ルールは外さない。1 文字の名前は引き続き違反）。
+      理由: Kotlin の慣用の工場関数 of（Quantity.of、Week.of、Settings.of など。失敗を Either で返す値の生成）が 2 文字のため。
+      ルールの緩和なので、ゲートで人の確認を待つ（bolt_2_plan.md Step 1 の結果）。
+    -->
+    <rule ref="category/kotlin/bestpractices.xml">
+        <exclude name="FunctionNameTooShort"/>
+    </rule>
+    <rule ref="category/kotlin/bestpractices.xml/FunctionNameTooShort">
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//FunctionDeclaration/SimpleIdentifier/T-Identifier[string-length(@Text) < 2]
+            ]]></value></property>
+        </properties>
+    </rule>
+    <rule ref="category/kotlin/errorprone.xml"/>
+    <rule ref="config/pmd/fp-kotlin-rules.xml"/>
+</ruleset>

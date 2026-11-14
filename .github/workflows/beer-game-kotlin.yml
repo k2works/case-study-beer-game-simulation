@@ -58,6 +58,24 @@ jobs:
       - name: detekt（ForbiddenMethodCall を含む。違反は 0 件）
         run: ./gradlew detekt detektMain detektTest --no-daemon
 
+  pmd:
+    name: PMD（fixture のテストと、層ごとの検査）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # 先に fixture のテストで、ルール自体が期待どおりに働くことを確かめる（期待と 1 件でも違えば失敗）。
+      - name: PMD の fixture のテスト（14 ルール・17 件）
+        run: ./gradlew pmdFixtureTest --no-daemon
+      # 関数型ルール（14 個）と標準の Kotlin ルールを、層ごとのルールセットで実行する。違反は 0 件。
+      - name: PMD（ドメイン・アプリケーション・アダプター・main・テスト。違反は 0 件）
+        run: ./gradlew pmdDomainApplication pmdAdapter pmdMain pmdTest --no-daemon
+
   integration:
     name: integrationTest（PostgreSQL 18）
     runs-on: ubuntu-24.04

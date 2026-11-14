@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!--
+  テスト（test・integrationTest・acceptanceTest）のルールセット。テストの都合で外すルールだけを下に書く。
+  層ごとの緩和で、件所ごとの抑制（@Suppress）ではない。ゲート 1 で人が確認する。
+
+  外さないルール（テストでも守る）: NoNotNullAssertion、NoReduce、NoGenericCatch、NoNestedFlatMap、NoGlobalScope、
+  NoThreadSleep（runTest の仮想時間を使う）、NoMutableCollectionInSignature。
+
+  外すルールと理由（現に報告された箇所の種類）:
+  - NoVarProperty・NoVarClassParameter・NoMutableCollectionFactory: Cucumber の World（シナリオごとの状態）、
+    テストの台本の累積（GameScript など）、Kotest の beforeSpec で組み立てる共有の資源。シナリオが進むごとに状態が変わる。
+  - SideEffectInNonSuspendFunction: テストが時計・乱数・UUID の値を作る（試験データ、再現用の ID）。本体の純粋性の検査はテストの対象外。
+  - NoRunBlocking: Cucumber のステップと JUnit の関数は suspend にできず、同期の境界で suspend の本体を呼ぶ。
+  - NoThrow: アサーションの失敗や、テスト用の部品の想定外の呼び出しを表す例外（AssertionError など）。
+  - NoRawConcurrency: 実プロセスのサーバーを別のスレッドで動かす受け入れ試験の部品（RunningApp.kt）。
+  - FunctionNameTooShort（標準）: ドメインの試験データを作る 1 文字の関数（q・u・w・m。Quantity・Units・Week・Money を短く作る
+    試験用の記法。domain/src/test の TestSupport.kt）が、試験の全体で使われているため。名前の変更は、試験の全体に及ぶ。
+-->
+<ruleset name="Test Kotlin Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>テスト用。テストの都合で外すルールだけを明示する。</description>
+
+    <rule ref="category/kotlin/bestpractices.xml">
+        <exclude name="FunctionNameTooShort"/>
+    </rule>
+    <rule ref="category/kotlin/errorprone.xml"/>
+    <rule ref="config/pmd/fp-kotlin-rules.xml">
+        <exclude name="NoVarProperty"/>
+        <exclude name="NoVarClassParameter"/>
+        <exclude name="NoMutableCollectionFactory"/>
+        <exclude name="SideEffectInNonSuspendFunction"/>
+        <exclude name="NoRunBlocking"/>
+        <exclude name="NoThrow"/>
+        <exclude name="NoRawConcurrency"/>
+    </rule>
+</ruleset>

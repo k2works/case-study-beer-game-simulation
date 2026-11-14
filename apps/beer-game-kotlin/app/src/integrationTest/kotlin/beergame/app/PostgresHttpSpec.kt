@@ -74,8 +74,11 @@ class PostgresHttpSpec :
                             key = "pg-create",
                         )
                     created.status shouldBe HttpStatusCode.Created
-                    val facilitator = created.credential()!!
-                    val id = created.headers[HttpHeaders.Location]!!.removePrefix("$API/games/").removeSuffix("/state")
+                    val facilitator = checkNotNull(created.credential()) { "進行役の資格情報がない" }
+                    val id =
+                        checkNotNull(created.headers[HttpHeaders.Location]) { "Location がない" }
+                            .removePrefix("$API/games/")
+                            .removeSuffix("/state")
                     val joinCode =
                         client
                             .call(
@@ -86,13 +89,15 @@ class PostgresHttpSpec :
                             .str("joinCode")
                     val players =
                         ROLES.associateWith { role ->
-                            client
-                                .call(
-                                    HttpMethod.Post,
-                                    "/participations/join",
-                                    """{"joinCode":"$joinCode","displayName":"参加者-$role"}""",
-                                    key = "pg-join-$role",
-                                ).credential()!!
+                            checkNotNull(
+                                client
+                                    .call(
+                                        HttpMethod.Post,
+                                        "/participations/join",
+                                        """{"joinCode":"$joinCode","displayName":"参加者-$role"}""",
+                                        key = "pg-join-$role",
+                                    ).credential(),
+                            ) { "参加者 $role の資格情報がない" }
                         }
                     val lobby =
                         client

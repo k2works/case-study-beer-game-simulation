@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  アプリケーションの起動（app の main）のルールセット。境界（コンポジションルート）として、外すルールを下に書く。
+  層ごとの緩和で、件所ごとの抑制（@Suppress）ではない。ゲート 1 で人が確認する。
+
+  外すルールと理由（現に報告された箇所）:
+  - NoRunBlocking: 起動時に一度だけ、実際の待受ポートを同期で取得する（Bootstrap.kt）。設計の「境界で一度だけ」。
+  - SideEffectInNonSuspendFunction: 時計と ID の生成を、本物の部品（Instant.now、UUID.randomUUID）として組み立てる
+    （Bootstrap.kt、Wiring.kt）。ドメインとアプリケーションへは、関数として渡す。
+  - NoRawConcurrency: 終了の合図でサーバーを閉じるシャットダウンフック（Main.kt の Thread）。
+  - FunctionNameTooShort（標準）: 閾値を 2 にする（外さない）。
+-->
+<ruleset name="Main Kotlin Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>起動（main）用。境界の都合で外すルールだけを明示する。</description>
+
+    <rule ref="category/kotlin/bestpractices.xml">
+        <exclude name="FunctionNameTooShort"/>
+    </rule>
+    <rule ref="category/kotlin/bestpractices.xml/FunctionNameTooShort">
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//FunctionDeclaration/SimpleIdentifier/T-Identifier[string-length(@Text) < 2]
+            ]]></value></property>
+        </properties>
+    </rule>
+    <rule ref="category/kotlin/errorprone.xml"/>
+    <rule ref="config/pmd/fp-kotlin-rules.xml">
+        <exclude name="NoRunBlocking"/>
+        <exclude name="SideEffectInNonSuspendFunction"/>
+        <exclude name="NoRawConcurrency"/>
+    </rule>
+</ruleset>

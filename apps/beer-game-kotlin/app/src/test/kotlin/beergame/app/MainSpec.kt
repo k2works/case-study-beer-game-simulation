@@ -101,8 +101,9 @@ class MainSpec :
 
             val startup = logs.records.first { it.operation == "startup" }
             startup.level shouldBe "WARN"
-            startup.message!! shouldContain "APP_ENV=local"
-            startup.message!! shouldContain "DB_KIND=h2"
+            val message = checkNotNull(startup.message) { "startup のメッセージがない" }
+            message shouldContain "APP_ENV=local"
+            message shouldContain "DB_KIND=h2"
         }
     })
 

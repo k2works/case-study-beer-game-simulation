@@ -33,11 +33,12 @@ class OperationsSteps {
     fun structuredLogIsEmitted() {
         val correlationId = checkNotNull(ctx.response().header(CORRELATION_HEADER)) { "応答に相関 ID がない" }
         val record =
-            ctx.app.logs
-                .all()
-                .firstOrNull { it.correlationId == correlationId }
-        expect(record != null) { "相関 ID $correlationId のログが出力されていない" }
-        expect(record!!.operation.isNotBlank()) { "操作がない" }
+            checkNotNull(
+                ctx.app.logs
+                    .all()
+                    .firstOrNull { it.correlationId == correlationId },
+            ) { "相関 ID $correlationId のログが出力されていない" }
+        expect(record.operation.isNotBlank()) { "操作がない" }
         expect(record.result.isNotBlank()) { "結果がない" }
         expect(record.durationMillis >= 0) { "所要時間がない" }
         // 出力される形（1 行の JSON）にも、4 つの項目の名前がある。

@@ -16,6 +16,8 @@ kotest = "6.2.7"
 testcontainers = "2.0.5"
 kover = "0.9.11"
 detekt = "1.23.8"
+# PMD は CI のツール（実行時の依存関係ではない）。関数型ルールの XPath の検査に使う。導入は 2026-11-14 に承認済み。
+pmd = "7.29.0"
 ktlint-tool = "1.8.0"
 ktlint-plugin = "14.2.0"
 cucumber = "8.0.4"
@@ -46,6 +48,8 @@ cucumber-junit-platform-engine = { module = "io.cucumber:cucumber-junit-platform
 junit-bom-cucumber = { module = "org.junit:junit-bom", version.ref = "junit-cucumber" }
 junit-platform-suite = { module = "org.junit.platform:junit-platform-suite" }
 junit-platform-launcher-cucumber = { module = "org.junit.platform:junit-platform-launcher" }
+pmd-cli = { module = "net.sourceforge.pmd:pmd-cli", version.ref = "pmd" }
+pmd-kotlin = { module = "net.sourceforge.pmd:pmd-kotlin", version.ref = "pmd" }
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 
 [plugins]

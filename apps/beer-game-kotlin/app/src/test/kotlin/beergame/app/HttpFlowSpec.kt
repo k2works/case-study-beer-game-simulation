@@ -59,7 +59,7 @@ private suspend fun HttpClient.createGame(
 private suspend fun ApplicationTestBuilder.prepared(tag: String): Game {
     val created = client.createGame(key = "create-$tag")
     val facilitator = created.credential() ?: error("進行役の資格が発行されていない")
-    val id = created.headers[HttpHeaders.Location]!!.removePrefix("$API/games/").removeSuffix("/state")
+    val id = created.location().removePrefix("$API/games/").removeSuffix("/state")
     val joinCode = client.call(HttpMethod.Get, "/games/$id/state", cookie = facilitator).body().str("joinCode")
     val cookies =
         ROLES.associateWith { role ->
@@ -184,8 +184,8 @@ class HttpFlowSpec :
                 body.keys shouldBe setOf("versions")
                 body.obj("versions").str("game") shouldBe "1"
                 body.obj("versions")["session"] shouldBe JsonNull
-                response.headers[HttpHeaders.Location]!! shouldContain "/api/v1/games/"
-                val cookie = response.headers.getAll("Set-Cookie")!!.single { it.startsWith("bg_session=") }
+                response.location() shouldContain "/api/v1/games/"
+                val cookie = checkNotNull(response.headers.getAll("Set-Cookie")).single { it.startsWith("bg_session=") }
                 cookie shouldContain "HttpOnly"
                 cookie shouldContain "SameSite=Strict"
                 cookie shouldContain "Path=/"
@@ -193,7 +193,7 @@ class HttpFlowSpec :
                 cookie shouldNotContain "Secure"
                 // Ktor の内部の符号化の印（$x-enc）を、利用者へ出さない
                 cookie shouldNotContain "\$x-enc"
-                response.bodyAsText() shouldNotContain response.credential()!!
+                response.bodyAsText() shouldNotContain response.requireCredential()
             }
         }
 
@@ -286,8 +286,8 @@ class HttpFlowSpec :
         test("[US1.2/AC1.2.3] 4 役割がそろわない開始: 422 の game.start_condition_not_met で、不足する役割を示す。開始されない") {
             withWorld {
                 val created = client.createGame(key = "c3")
-                val facilitator = created.credential()!!
-                val id = created.headers[HttpHeaders.Location]!!.removePrefix("$API/games/").removeSuffix("/state")
+                val facilitator = created.requireCredential()
+                val id = created.location().removePrefix("$API/games/").removeSuffix("/state")
 
                 val response = client.call(HttpMethod.Post, "/games/$id/start", cookie = facilitator, key = "s3")
 
@@ -658,7 +658,8 @@ class HttpFlowSpec :
                 text shouldNotContain "bg_session"
                 text shouldNotContain "Cookie"
                 (world.logs.all().size > 15) shouldBe true
-                world.logs.all().map { it.correlationId } shouldContain response.headers["x-correlation-id"]!!
+                val correlationId = checkNotNull(response.headers["x-correlation-id"])
+                world.logs.all().map { it.correlationId } shouldContain correlationId
                 val commit = world.logs.all().first { it.operation == "commitWeek" }
                 commit.status shouldBe 200
                 commit.result shouldBe "ok"
@@ -685,8 +686,8 @@ class HttpFlowSpec :
                 )
             withWorld(world) {
                 val created = client.createGame(key = "c-err")
-                val facilitator = created.credential()!!
-                val id = created.headers[HttpHeaders.Location]!!.removePrefix("$API/games/").removeSuffix("/state")
+                val facilitator = created.requireCredential()
+                val id = created.location().removePrefix("$API/games/").removeSuffix("/state")
                 broken.set(true)
 
                 val response = client.call(HttpMethod.Post, "/games/$id/start", cookie = facilitator, key = "start-err")
@@ -746,8 +747,8 @@ class HttpFlowSpec :
         test("[NF] コマンドの応答の本文は versions（game と session）だけ: 作成・参加・割り当て・開始・保存・確定のすべて") {
             withWorld {
                 val created = client.createGame(key = "shape")
-                val facilitator = created.credential()!!
-                val id = created.headers[HttpHeaders.Location]!!.removePrefix("$API/games/").removeSuffix("/state")
+                val facilitator = created.requireCredential()
+                val id = created.location().removePrefix("$API/games/").removeSuffix("/state")
                 val joinCode =
                     client
                         .call(
@@ -785,7 +786,7 @@ class HttpFlowSpec :
                     response.body().keys shouldBe setOf("versions")
                     response.body().obj("versions").keys shouldBe setOf("game", "session")
                 }
-                joined.bodyAsText() shouldNotContain joined.credential()!!
+                joined.bodyAsText() shouldNotContain joined.requireCredential()
                 val game = started("shape-2")
                 val saved = save(game, "RETAILER", 1, "shape-save")
                 saved.body().keys shouldBe setOf("versions")
@@ -795,6 +796,10 @@ class HttpFlowSpec :
     })
 
 private fun World.countGames(): Int = count("game_roots")
+
+private fun HttpResponse.location(): String = checkNotNull(headers[HttpHeaders.Location]) { "Location がない" }
+
+private fun HttpResponse.requireCredential(): String = checkNotNull(credential()) { "資格情報がない" }
 
 private fun deadNotifier(ports: Ports): Ports = ports.withNotifier(ports.notifier.copy(isAlive = { false }))
 
