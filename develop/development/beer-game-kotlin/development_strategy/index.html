@@ -4027,6 +4027,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#h2-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ローカル開発は H2、検証は PostgreSQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6861,6 +6872,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9639,6 +9685,15 @@
 <li><strong>Refactor</strong>: テストが緑のまま設計を改善する。構造の変更と動作の変更を、同じコミットに入れない。</li>
 </ol>
 <p>AI がサイクルを回し、人が承認ゲートでコードを全行理解して検証します。<strong>共通の土台（<code>EventStore</code> の型、集約の <code>decide</code> の型）を作り替える最初のスライドでは、後続の振る舞いのテストも先に書いて失敗を確かめてから実装する</strong>（プロジェクトの規約。順序を守れなかったときは、規則を壊すとテストが落ちることを個別に確かめ、Bolt 終了報告に記録する）。</p>
+<h3 id="h2-postgresql">ローカル開発は H2、検証は PostgreSQL<a class="headerlink" href="#h2-postgresql" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザーの決定（2026-11-14）</strong>: Kotlin 版のローカル開発（開発機での起動・動作確認）は、PostgreSQL ではなく <strong>H2 の PostgreSQL モード</strong>で行います（実行の選択は設定 <code>DB_KIND=postgres|h2</code>。本番・ステージングでは H2 を拒否して起動に失敗する）。次の規律は、全局面で変えません。</p>
+<ul>
+<li><strong>統合テスト、受け入れ（Cucumber <code>@api</code> / <code>@ui</code>）、E2E、CI、ステージング、本番は PostgreSQL 18 のまま</strong>（Testcontainers、RDS）。<strong>H2 は、設計の検証（並行性・権限・部分一意索引・連鎖削除）や性能の計測に使わない。</strong></li>
+<li>PostgreSQL 固有の機能（アドバイザリロックは <code>ProjectionLock</code>、<code>LISTEN</code> / <code>NOTIFY</code> は <code>ChangeNotifier</code>）は<strong>ポートの裏に隠し、PostgreSQL 版と H2 版の両方を実装する</strong>。H2 版は、プロセス内の読み書きロックとプロセス内のイベントで、<strong>単一プロセスでのみ有効</strong>。ポートの<strong>契約テストを両実装で実行する</strong>（PostgreSQL 版は統合テスト、H2 版はユニット）。</li>
+<li>部分一意索引、DB ロールと GRANT、接続プールの分離、<code>jsonb</code> などは、<strong>PostgreSQL の統合テストでだけ検証する</strong>。H2 版で省略した制約は、<strong>ローカルでは守られない</strong>。</li>
+<li><strong>H2 でしか通らない記述を禁止する</strong>（PostgreSQL の統合テストが正）。ローカルで通っても CI で落ちる乖離は起きうるリスクとして扱う（<a href="../release_plan/">リリース計画</a> のリスク台帳）。</li>
+<li>H2 の PostgreSQL モードで動く範囲は、2026-11-14 に公式ドキュメントで確認できた範囲では、アドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルの差異が<strong>確認できなかった</strong>（非対応とは断定しない）。<strong>B1 の最初に実測して確定する</strong>（未確認）。H2 の導入は承認待ち。</li>
+</ul>
 <h3 id="_5">テストの種類とレイヤーの対応<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>詳細は <a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> を正とします。</p>
 <table>
@@ -9659,9 +9714,15 @@
 </tr>
 <tr>
 <td style="text-align: left;">イベントストア・投影</td>
-<td style="text-align: left;">統合（実 PostgreSQL、Testcontainers）</td>
+<td style="text-align: left;">統合（実 PostgreSQL 18、Testcontainers。H2 は使わない）</td>
 <td style="text-align: left;">版の一意制約、冪等、競合、連鎖削除、権限、再構築</td>
 <td style="text-align: left;">序盤（B1・B2）、中盤で主役</td>
+</tr>
+<tr>
+<td style="text-align: left;">ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code></td>
+<td style="text-align: left;">契約テストを両実装で実行（PostgreSQL 版: 統合、H2 版: ユニット）</td>
+<td style="text-align: left;">排他・共有、コミット後の通知、ロールバックでは通知しない。H2 版は単一プロセスのみ</td>
+<td style="text-align: left;">序盤（B1）、中盤</td>
 </tr>
 <tr>
 <td style="text-align: left;">アプリケーション（関数の束）</td>
@@ -9707,7 +9768,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">テスト</td>
-<td style="text-align: left;"><code>test</code>（ユニット・性質）と <code>integrationTest</code>（DB・HTTP）。DB の統合が 1 件も実行されなければ失敗</td>
+<td style="text-align: left;"><code>test</code>（ユニット・性質。ポートの契約テストの H2 版を含む）と <code>integrationTest</code>（PostgreSQL 18 の DB・HTTP。ポートの契約テストの PostgreSQL 版を含む）。DB の統合が 1 件も実行されなければ失敗。H2 は CI の検証に使わない</td>
 <td style="text-align: left;">マージしない</td>
 </tr>
 <tr>
@@ -9990,7 +10051,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">B1</td>
-<td style="text-align: left;">ローカルの E2E（作成 → 確定 → 状態の表示）。<code>simulateWeek</code> と <code>decide</code>/<code>evolve</code> の性質テスト。DB 統合（版・冪等・原子性）。golden</td>
+<td style="text-align: left;">H2 の PostgreSQL モードの実測の記録。ローカル（H2）の E2E（作成 → 確定 → 状態の表示）と、PostgreSQL での同じシナリオ。<code>simulateWeek</code> と <code>decide</code>/<code>evolve</code> の性質テスト。DB 統合（PostgreSQL。版・冪等・原子性）。ポートの契約テスト（両実装）。golden</td>
 </tr>
 <tr>
 <td style="text-align: left;">B2</td>
@@ -10200,6 +10261,7 @@
 <p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJBQ1RJVklUWSIgc3R5bGU9IndpZHRoOjU5MnB4O2hlaWdodDo3MDhweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNTkycHgiIGhlaWdodD0iNzA4cHgiIHZpZXdCb3g9IjAgMCA1OTIgNzA4IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjE4OC4xMjEiIHk9IjMyLjk5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjE0LjQxNSIgZm9udC13ZWlnaHQ9IjcwMCI+44Ki44Km44OI44K144Kk44OJ44Kk44Oz77yIRVMrQ1FSU++8iTwvdGV4dD48L2c+PGVsbGlwc2UgY3g9IjI4MC44MjkiIGN5PSI2Mi4yOTciIHJ4PSIxMCIgcnk9IjEwIiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PHJlY3QgeD0iODMuNzI5IiB5PSI5Mi4yOTciIHdpZHRoPSIzOTQuMTk5IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSI5My43MjkiIHk9IjExMy40MzYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjM3NC4xOTkiPuODh+ODoumgheebruOCkiBHaXZlbi9XaGVuL1RoZW4g44Gu44K344OK44Oq44Kq44Gr44GZ44KL77yI5Lq644GoIEFJIOOBp+WQiOaEj++8iTwvdGV4dD48cmVjdCB4PSIxNjQuNTU3IiB5PSIxNDYuMjY2IiB3aWR0aD0iMjMyLjU0NCIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTc0LjU1NyIgeT0iMTY3LjQwNCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjEyLjU0NCI+RTJFIC8gSFRUUCDjga7jgrfjg4rjg6rjgqrjgpLmm7jjgY/vvIhSZWTvvIk8L3RleHQ+PHJlY3QgeD0iMTYiIHk9IjI0NC4yMzQiIHdpZHRoPSI1MjkuNjU3IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyNiIgeT0iMjY1LjM3MyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNTA5LjY1NyI+5LiA5q615YaF5YG044G45LiL44KK44KL77yI55S76Z2iIOKGkiBIVFRQIOKGkiDjgqLjg5fjg6rjgrHjg7zjgrfjg6fjg7Mg4oaSIOODieODoeOCpOODsyDihpIg44Kk44OZ44Oz44OI44K544OI44Ki44O75oqV5b2x77yJPC90ZXh0PjxyZWN0IHg9IjY3LjE1OCIgeT0iMjk4LjIwMyIgd2lkdGg9IjQyNy4zNDEiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9Ijc3LjE1OCIgeT0iMzE5LjM0MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNDA3LjM0MSI+44Gd44Gu5bGk44Gu44OG44K544OI44KS5pu444GP77yIUmVk77yJ44CC44G+44Gg54Sh44GE5YaF5YG044Gv44CB6Zai5pWw44Gu5p2f44Gu44K544K/44OW44Gn572u44GPPC90ZXh0PjxyZWN0IHg9IjE5Mi41MjYiIHk9IjM1Mi4xNzIiIHdpZHRoPSIxNzYuNjA0IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyMDIuNTI2IiB5PSIzNzMuMzExIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIxNTYuNjA0Ij7mnIDlsI/jga7lrp/oo4XjgafpgJrjgZnvvIhHcmVlbu+8iTwvdGV4dD48cmVjdCB4PSIyMjIuODI4IiB5PSI0MDYuMTQxIiB3aWR0aD0iMTE2LjAwMSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMjMyLjgyOCIgeT0iNDI3LjI3OSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iOTYuMDAxIj7jg6rjg5XjgqHjgq/jgr/jg6rjg7PjgrA8L3RleHQ+PHJlY3QgeD0iMTUxLjA1NCIgeT0iNDYwLjEwOSIgd2lkdGg9IjI1OS41NSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTYxLjA1NCIgeT0iNDgxLjI0OCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjM5LjU1Ij7mib/oqo3jgrLjg7zjg4jvvIhCMeOAnEIzIOOBr+OCueODhuODg+ODl+OBlOOBqOOBq+Wvhu+8iTwvdGV4dD48cG9seWdvbiBwb2ludHM9IjI4MC44MjksMjAwLjIzNCwyOTIuODI5LDIxMi4yMzQsMjgwLjgyOSwyMjQuMjM0LDI2OC44MjksMjEyLjIzNCwyODAuODI5LDIwMC4yMzQiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41O3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48cG9seWdvbiBwb2ludHM9IjIzMy45MSw1MTQuMDc4LDMyNy43NDgsNTE0LjA3OCwzMzkuNzQ4LDUyNi4wNzgsMzI3Ljc0OCw1MzguMDc4LDIzMy45MSw1MzguMDc4LDIyMS45MSw1MjYuMDc4LDIzMy45MSw1MTQuMDc4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PHRleHQgeD0iMjMzLjkxIiB5PSI1MjkuODg2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjExIiB0ZXh0TGVuZ3RoPSI5My44MzgiPuacgOOCguWGheWBtOOBvuOBp+WIsOmBlD88L3RleHQ+PHRleHQgeD0iMzM5Ljc0OCIgeT0iNTIzLjQ4NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMSIgdGV4dExlbmd0aD0iMzMiPuOBhOOBhOOBiDwvdGV4dD48cmVjdCB4PSIxOTguODI4IiB5PSI1NTguMDc4IiB3aWR0aD0iMTY0LjAwMSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMjA4LjgyOCIgeT0iNTc5LjIxNyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMTQ0LjAwMSI+44K544K/44OW44KS5a6f6KOF44Gr572u44GN5o+b44GI44KLPC90ZXh0PjxyZWN0IHg9IjE3MS41NTMiIHk9IjYxMi4wNDciIHdpZHRoPSIyMTguNTUyIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxODEuNTUzIiB5PSI2MzMuMTg2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIxOTguNTUyIj7jgrfjg4rjg6rjgqrjgYwgZ3JlZW4g44Gr44Gq44KL44GT44Go44KS56K66KqNPC90ZXh0PjxlbGxpcHNlIGN4PSIyODAuODI5IiBjeT0iNjc3LjAxNiIgcng9IjExIiByeT0iMTEiIGZpbGw9Im5vbmUiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48ZWxsaXBzZSBjeD0iMjgwLjgyOSIgY3k9IjY3Ny4wMTYiIHJ4PSI2IiByeT0iNiIgZmlsbD0iIzIyMiIgc3R5bGU9InN0cm9rZTojMjIyO3N0cm9rZS13aWR0aDoxOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iNzIuMjk3IiB4Mj0iMjgwLjgyOSIgeTI9IjkyLjI5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw4Mi4yOTcsMjgwLjgyOSw5Mi4yOTcsMjg0LjgyOSw4Mi4yOTcsMjgwLjgyOSw4Ni4yOTciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSIxMjYuMjY2IiB4Mj0iMjgwLjgyOSIgeTI9IjE0Ni4yNjYiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksMTM2LjI2NiwyODAuODI5LDE0Ni4yNjYsMjg0LjgyOSwxMzYuMjY2LDI4MC44MjksMTQwLjI2NiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjI3OC4yMDMiIHgyPSIyODAuODI5IiB5Mj0iMjk4LjIwMyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSwyODguMjAzLDI4MC44MjksMjk4LjIwMywyODQuODI5LDI4OC4yMDMsMjgwLjgyOSwyOTIuMjAzIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iMzMyLjE3MiIgeDI9IjI4MC44MjkiIHkyPSIzNTIuMTcyIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDM0Mi4xNzIsMjgwLjgyOSwzNTIuMTcyLDI4NC44MjksMzQyLjE3MiwyODAuODI5LDM0Ni4xNzIiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSIzODYuMTQxIiB4Mj0iMjgwLjgyOSIgeTI9IjQwNi4xNDEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksMzk2LjE0MSwyODAuODI5LDQwNi4xNDEsMjg0LjgyOSwzOTYuMTQxLDI4MC44MjksNDAwLjE0MSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjQ0MC4xMDkiIHgyPSIyODAuODI5IiB5Mj0iNDYwLjEwOSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw0NTAuMTA5LDI4MC44MjksNDYwLjEwOSwyODQuODI5LDQ1MC4xMDksMjgwLjgyOSw0NTQuMTA5IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iMjI0LjIzNCIgeDI9IjI4MC44MjkiIHkyPSIyNDQuMjM0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDIzNC4yMzQsMjgwLjgyOSwyNDQuMjM0LDI4NC44MjksMjM0LjIzNCwyODAuODI5LDIzOC4yMzQiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjMzOS43NDgiIHkxPSI1MjYuMDc4IiB4Mj0iNTU3LjY1NyIgeTI9IjUyNi4wNzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjU1My42NTcsMzc5LjE1Niw1NTcuNjU3LDM2OS4xNTYsNTYxLjY1NywzNzkuMTU2LDU1Ny42NTcsMzc1LjE1NiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iNTU3LjY1NyIgeTE9IjIxMi4yMzQiIHgyPSI1NTcuNjU3IiB5Mj0iNTI2LjA3OCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxsaW5lIHgxPSI1NTcuNjU3IiB5MT0iMjEyLjIzNCIgeDI9IjI5Mi44MjkiIHkyPSIyMTIuMjM0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIzMDIuODI5LDIwOC4yMzQsMjkyLjgyOSwyMTIuMjM0LDMwMi44MjksMjE2LjIzNCwyOTguODI5LDIxMi4yMzQiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSI0OTQuMDc4IiB4Mj0iMjgwLjgyOSIgeTI9IjUxNC4wNzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksNTA0LjA3OCwyODAuODI5LDUxNC4wNzgsMjg0LjgyOSw1MDQuMDc4LDI4MC44MjksNTA4LjA3OCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjE4MC4yMzQiIHgyPSIyODAuODI5IiB5Mj0iMjAwLjIzNCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSwxOTAuMjM0LDI4MC44MjksMjAwLjIzNCwyODQuODI5LDE5MC4yMzQsMjgwLjgyOSwxOTQuMjM0IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iNTM4LjA3OCIgeDI9IjI4MC44MjkiIHkyPSI1NTguMDc4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDU0OC4wNzgsMjgwLjgyOSw1NTguMDc4LDI4NC44MjksNTQ4LjA3OCwyODAuODI5LDU1Mi4wNzgiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSI1OTIuMDQ3IiB4Mj0iMjgwLjgyOSIgeTI9IjYxMi4wNDciIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksNjAyLjA0NywyODAuODI5LDYxMi4wNDcsMjg0LjgyOSw2MDIuMDQ3LDI4MC44MjksNjA2LjA0NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjY0Ni4wMTYiIHgyPSIyODAuODI5IiB5Mj0iNjY2LjAxNiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw2NTYuMDE2LDI4MC44MjksNjY2LjAxNiwyODQuODI5LDY1Ni4wMTYsMjgwLjgyOSw2NjAuMDE2IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjw/cGxhbnR1bWwtc3JjIFBQOUJJbmpINUNWdC1ISHRnUllHc2Zxa0lZdDFUa1NacUJOR2VHUUFJV3BqVGt3dm9OSUlMNUFjWVNONmU0d2JiV1h2czhlbkhscWtkaW9DaV84aHo3X2xjRDg3MzhTeHp2eDd4dF9Fb01WcFJvcDF2M0R6Ty1Lb2RKNFRpSWVQLS1ELXdBUE5mZnVqQlFfUzNxa2ZoVm5nQmYtUVBWTVViSHlWNUFENmN5YUoyemN0cmxocW9wTU8zOG5XWVVqcExjTE1CUU9Nb25FTWtxbUw5MWlEMVlvX1l3U2x1N0dTVjdKM0dYTTl2ckFwd1BjcWMxUkZDdmQ1X3lCOTJuanpiZDFxYndyTm5acmRSTGdoODFkcnhSMXo1Wlo1R0Z2YXNIX3JBcXBiZjU5S2t1b1JsaFhybDJJaEZjWUx3aEQ5c3NDckQ1TUVlSjl2WDZQcmNDWC15Q1BuNXQtY0JIVjY4bHVvQkRVM2dydzJwUjg5dEExdGZBNkxDdFJ4YnZYak9kZER5WTBnN0I4aVo4NHhSQ2p1bm1faE5PSTdwTnNaXzhCZlhqS0UtWERUalA0NExTOHpFLVhNVFE3c19qdE44ZnZZLW1qd1lsbUJFU2pRVnMyMUJiTGRXZVFFb1Q3SXhESkwyS2V0VHdyamZiRWpNaGM4Y3RfNHpqeHlPdzRYREJKM0lrZFVvMWhjV3VhNTdVVUZKZWp0UXJiaW9HSDBjNllDVndyZHc3UFpNTmlvQVI5Uk9XQklwRVRFV2tRdDRGQjZzMlQ2cU5QT1JTMDdPekJHVm90QTFfNVF3bjVjUE4xTE9WYjl5djBOLUdDZWNDQ0FSY3AtMFcwMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
 <h3 id="_24">手順の要点<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
 <ol>
+<li><strong>B1 の最初（H2 の実測）</strong>: <strong>H2 の PostgreSQL モードの実測を最初に行う</strong>。アドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルのどれが H2 で動くかを短い試験で確かめ、結果を B1 の記録に残して、H2 版で置き換える・省略する制約の一覧を確定する（H2 の導入は承認後。B1 の 4 日に含め、超過したら予備 B16 で吸収する）。</li>
 <li><strong>B1</strong>: <strong>Cucumber の基盤（Cucumber-JVM と Cucumber-JS、E2E）を最初に作る</strong>。キット準拠のゲームを通す 1 本の日本語 Gherkin のシナリオから入り、<code>decideGame</code>/<code>decideSession</code>/<code>simulateWeek</code> の最小、<code>EventStore.append</code>、同期投影、Ktor、React の最小の順に内側へ下りる。共通の土台の最初のスライドでは、後続の振る舞いのテストも先に書く。</li>
 <li><strong>B2</strong>: Kotlin 固有の不確実性を、<strong>テストで</strong>解消する。<strong>静的解析とルール設定の厳格な適用の受入条件</strong>（<a href="#静的解析とルール設定厳格に適用">静的解析とルール設定</a>。fixture によるルールの確認、規約違反コードで CI が落ちること、detekt・PMD と Kotlin 2.4 の互換）、Kover が 2 つのソースセットを合算すること、追記専用権限の否定テストと連鎖削除の Red を確かめる。<strong>悪ければ B3 以降を止める</strong>（<a href="../release_plan/">リリース計画</a>）。</li>
 <li><strong>B3</strong>: デプロイの定義（コンテナ、Terraform）を、適用せずに <code>validate</code>・<code>plan</code> とスモークテストで検証する。</li>
@@ -10310,6 +10372,7 @@
 <hr />
 <h2 id="_36">未決事項<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>H2 の導入の承認</strong>（<code>com.h2database:h2</code>、開発用の新規依存）と、H2 の版の確認。<strong>H2 の PostgreSQL モードで動く範囲の実測</strong>（B1 の最初）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、Flyway のベンダー別の配置（共通の部分を最大化し、差分だけ分ける）を確定する。</li>
 <li><strong>PMD の導入の承認</strong>（新規の CI ツール。承認までは detekt と ktlint で進める）。技術スタック（T5）、テスト戦略（静的解析の節）、リリース計画（B2）は、本書に合わせて更新済み（2026-11-14）。</li>
 <li>PMD の Gradle での実行方法と、Kotlin 2.4 の構文の解析の可否（未確認。B2 の受入条件）。</li>
 <li>detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認して確定する（ガイドの例は未確認）。</li>
@@ -10338,6 +10401,11 @@
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;">初版作成（承認待ち）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;">ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18 とする決定（ユーザー）を反映。B1 の最初に H2 の実測を加えた</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 </tbody>

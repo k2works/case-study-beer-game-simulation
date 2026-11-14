@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション、インデックスを整理した正本。">
+        <meta name="description" content="Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。">
       
       
         <meta name="author" content="Project Team">
@@ -2791,7 +2791,57 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#h2-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ローカル開発（H2 の PostgreSQL モード）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ローカル開発（H2 の PostgreSQL モード）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        方言の差分
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#h2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H2 版で省略する制約（ローカルでは守られない）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_27" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        乖離のリスクと対策
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_28" class="md-nav__link">
     <span class="md-ellipsis">
       
         インデックス（主なもの）
@@ -2802,7 +2852,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_27" class="md-nav__link">
+  <a href="#_29" class="md-nav__link">
     <span class="md-ellipsis">
       
         設計判断のまとめ
@@ -2824,7 +2874,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_28" class="md-nav__link">
+  <a href="#_30" class="md-nav__link">
     <span class="md-ellipsis">
       
         未決事項
@@ -2835,7 +2885,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_29" class="md-nav__link">
+  <a href="#_31" class="md-nav__link">
     <span class="md-ellipsis">
       
         出典
@@ -6695,6 +6745,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9415,7 +9500,7 @@
 <li>イベントに入れない<strong>個人情報（表示名）と秘密（資格のダイジェスト）は、周辺ストア</strong>に置きます（NF-S14）。</li>
 <li>すべての表は <code>game_roots(game_id)</code> への外部キー（<code>ON DELETE CASCADE</code>）を持ち、<strong>1 回の削除で漏れなく消えます</strong>（NFR-07、ADR-007 を引き継ぎ）。</li>
 </ul>
-<p>データベースは PostgreSQL で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは Flyway を採用案とし、導入は承認待ちです。<a href="../tech-stack/">技術スタック</a> T4）。永続化の失敗は、例外のまま漏らさず境界で <code>Either</code> に変換します（<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド §7.6</a>）。</p>
+<p>データベースは PostgreSQL 18 で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは Flyway を採用案とし、導入は承認待ちです。<a href="../tech-stack/">技術スタック</a> T4）。<strong>ただし、開発機でのローカル開発（起動と動作確認）だけは、H2 の PostgreSQL モードで動かせるようにします</strong>（ユーザーの決定、2026-11-14。<a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/">ADR-014</a>）。統合テスト、CI、ステージング、本番は PostgreSQL 18 のままです。PostgreSQL 固有の機能（アドバイザリロック、LISTEN/NOTIFY）はポートの裏に隠し、H2 版では守られない制約があります（「<a href="#ローカル開発h2-の-postgresql-モード">ローカル開発（H2 の PostgreSQL モード）</a>」）。永続化の失敗は、例外のまま漏らさず境界で <code>Either</code> に変換します（<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド §7.6</a>）。</p>
 <h3 id="beer-game2">beer-game2 からの設計方針の変更<a class="headerlink" href="#beer-game2" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -9658,7 +9743,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <ol>
 <li>アプリケーション層は、対象ストリームの全イベントを読み、<code>replay</code> で状態にします。<strong>読んだときの版（<code>expected</code>）</strong>を覚えます。</li>
 <li><code>decide</code> が返したイベント列を、<strong><code>expected + 1</code> から連続する版</strong>で、1 回のトランザクションで追記します。</li>
-<li>同じ版が既にあれば、一意制約の違反になります。これを <code>AppFailure.ConcurrencyConflict</code>（<code>Either</code> の左）に変換して返します。<strong>行や版のロックは取りません</strong>（beer-game2 の <code>SELECT ... FOR UPDATE</code> は不要になります）。ただし、<strong>コマンドは、そのゲームのアドバイザリロックの共有ロック <code>pg_advisory_xact_lock_shared(game_id)</code> をトランザクションの先頭で取ります</strong>。共有ロックどうしは待ち合わないので、コマンドの並行性は変わりません。投影の再構築が排他ロックを取る間だけ、コマンドが待ちます（下記「投影の再構築」）。</li>
+<li>同じ版が既にあれば、一意制約の違反になります。これを <code>AppFailure.ConcurrencyConflict</code>（<code>Either</code> の左）に変換して返します。<strong>行や版のロックは取りません</strong>（beer-game2 の <code>SELECT ... FOR UPDATE</code> は不要になります）。ただし、<strong>コマンドは、そのゲームの共有ロックを、ポート <code>ProjectionLock</code> を通してトランザクションの先頭で取ります</strong>（PostgreSQL 版の実体は <code>pg_advisory_xact_lock_shared(game_id)</code>。H2 版はプロセス内の読み書きロック）。共有ロックどうしは待ち合わないので、コマンドの並行性は変わりません。投影の再構築が排他ロックを取る間だけ、コマンドが待ちます（下記「投影の再構築」）。</li>
 <li><code>ConcurrencyConflict</code>（<code>AppFailure.ConcurrencyConflict</code>）は、<strong>自動で再試行します</strong>（上限は小さな固定回数。実装開始時に決める。上限に達したら <code>AppFailure.RetryExhausted</code>）。再読み込みで状態が進んでいるため、<code>decide</code> が再評価され、業務上の競合（<code>DecisionConflict</code>、<code>WeekAdvanced</code>、<code>DecisionsChanged</code>、<code>AlreadyStarted</code>）は <code>decide</code> が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。</li>
 <li><code>decide</code> が空のイベント列を返したとき（例: 同じ役割への再割り当て）は、追記しません。</li>
 </ol>
@@ -9759,6 +9844,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 </tbody>
 </table>
 <p>上の 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID（ログ）で返します。制約には、この名前を明示して付けます（マイグレーション 001・002）。</p>
+<p><strong>H2 版（ローカルのみ）の扱い。</strong> <code>uq_events_stream_version</code> と <code>pk_idempotency_records</code> は、通常の一意制約・主キーなので、共通のマイグレーションに同じ名前で置きます（H2 で違反時に制約名を取り出せるかは、B1 の最初の実測で確認する未確認事項です）。<strong><code>uq_idempotency_create</code>（<code>scope = 'create'</code> の部分一意索引）は、H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため、H2 版では省略し、アプリケーション側の検査（挿入の前に <code>(scope, key_digest)</code> を検索して再照合）に置き換えます。</strong>ゲーム作成の同時の重複は、ローカルでは制約で守られません（単一プロセスで 1 人が使う前提で許容。検証は PostgreSQL の統合テストだけで行う）。</p>
 <p>イベントの封筒の <code>command_id</code> は、同じコマンドから生まれたイベントを束ねるための識別子で、冪等キーとは別です（冪等キーのダイジェストはイベントに入れません）。</p>
 <h3 id="_11">イベントのスキーマ<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
 <ul>
@@ -9770,6 +9856,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <ul>
 <li>アプリケーションが使う DB ロールには、<code>events</code> の <strong>INSERT と SELECT だけ</strong>を与え、UPDATE と DELETE を与えません。</li>
 <li>保持削除は、別のロールが <code>game_roots</code> を削除し、<strong>外部キーの連鎖</strong>で <code>events</code> の行が消えます。連鎖削除が、<code>events</code> に DELETE 権限を持たないロールでも動くことは、実装開始時に確認します（未決事項）。</li>
+<li><strong>この保護（ロール、GRANT、<code>TRUNCATE</code> の拒否）は PostgreSQL の統合テストでだけ検証します。H2 版（ローカル）では省略し、単一の接続ユーザーで動かします。ローカルでは追記専用は守られません</strong>（下記「ローカル開発（H2 の PostgreSQL モード）」）。</li>
 </ul>
 <h3 id="_13">スナップショット<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
 <p><strong>導入しません。</strong> 判断は次のとおりです。</p>
@@ -9855,29 +9942,37 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <p>投影の行は、<code>events</code> からいつでも作り直せます。<strong>手順</strong>: ゲームの投影の行を削除し、<code>events</code> を <code>stream_version</code> の順に畳み込み、<code>projection_checkpoints</code> を更新する。スキーマの変更（投影の列の追加など）は、マイグレーションの後にこの再構築で埋めます。</p>
 <h4 id="m23">再構築の同時実行制御（アドバイザリロック。M23）<a class="headerlink" href="#m23" title="Permanent link">&para;</a></h4>
 <p>研修中に投影が不整合になったときの業務手順は、「運用担当が運営者を通じて進行役に<strong>停止</strong>を依頼し、<strong>停止中に再構築して再開</strong>する」です（<a href="../operation/">運用要件</a>）。停止中でも、追記を伴う操作（代理入力、資格の再発行、観察者の参加）は受け付けるため、再構築とコマンドを<strong>同じゲームについて同時に走らせない</strong>制御が要ります。</p>
+<p>ロックは、<strong>ポート <code>ProjectionLock</code></strong>（関数の束。定義は <a href="../architecture-backend/">バックエンドアーキテクチャ</a>）の裏に隠し、2 つの実装を持ちます。</p>
 <table>
 <thead>
 <tr>
 <th style="text-align: left;">役</th>
-<th style="text-align: left;">ロック</th>
+<th style="text-align: left;">ポートの関数</th>
+<th style="text-align: left;">PostgreSQL 版（統合テスト・CI・ステージング・本番）</th>
+<th style="text-align: left;">H2 版（ローカルのみ）</th>
 <th style="text-align: left;">取る場所</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align: left;">コマンド（追記と投影の更新）</td>
-<td style="text-align: left;"><code>pg_advisory_xact_lock_shared(game_id)</code>（共有）</td>
+<td style="text-align: left;"><code>acquireShared(tx, gameId)</code></td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock_shared(game_id)</code></td>
+<td style="text-align: left;">プロセス内の読み書きロックの読み取り側（ゲームごと）</td>
 <td style="text-align: left;">トランザクションの先頭（読み込みの前）</td>
 </tr>
 <tr>
 <td style="text-align: left;">再構築</td>
-<td style="text-align: left;"><code>pg_advisory_xact_lock(game_id)</code>（排他）</td>
+<td style="text-align: left;"><code>acquireExclusive(tx, gameId)</code></td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock(game_id)</code></td>
+<td style="text-align: left;">同じ読み書きロックの書き込み側</td>
 <td style="text-align: left;">トランザクションの先頭。投影の行の削除から <code>projection_checkpoints</code> の更新までを 1 トランザクションで行う</td>
 </tr>
 </tbody>
 </table>
 <ul>
-<li><code>game_id</code> は 64 ビットのキーへ写す（UUID の上位 64 ビットなど）。トランザクションの終了で自動的に解放される（<code>xact</code>）。</li>
+<li>PostgreSQL 版の <code>game_id</code> は 64 ビットのキーへ写す（UUID の上位 64 ビットなど）。トランザクションの終了で自動的に解放される（<code>xact</code>）。H2 版は、トランザクションの終了（COMMIT / ROLLBACK）のフックで解放する。</li>
+<li><strong>H2 版のロックは単一のプロセスでだけ有効です。複数のプロセスでは保証しません</strong>（<code>rebuild-projections</code> を API と別のプロセスで動かすと、再構築とコマンドは直列にならない。ローカルでは API を止めてから再構築する）。</li>
 <li>共有ロックどうしは待ち合わないので、通常のコマンドの並行性は変わりません。再構築中は、コマンドは排他ロックが外れるまで待ちます。再構築が 1 トランザクションなので、コマンドが見るのは再構築の前後のどちらかで、途中の投影は見えません。</li>
 <li>これにより、「研修中は再構築しない」という制約は不要になります（停止は業務上の運用であり、データの整合のためのものではなくなる。停止を依頼する理由は、再構築中の入力の待ちを避けるため）。</li>
 <li>ロック待ちの上限（<code>lock_timeout</code>）と、待ちが上限を超えたときのコマンドの応答は、未決事項です（短く待って再試行、または 503 <code>app.retry_exhausted</code> と <code>Retry-After</code>）。</li>
@@ -10042,7 +10137,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 </tr>
 </tbody>
 </table>
-<p>観察者の問い合わせは、DB の権限でも <code>game_join_codes</code>・<code>week_role_results</code>・<code>role_current_states</code>・<code>current_decisions</code> に<strong>到達できない</strong>ようにします（観察者のロールに SELECT を与えるのは、上の 3 表だけ）（最小権限。アプリのバグでも役割別の値が漏れにくい）。寄与者数による抑止（<code>contributors &lt; 2</code> なら合計を出さない）は、問い合わせの層（<code>Disclosure</code>）で行います。</p>
+<p>観察者の問い合わせは、DB の権限でも <code>game_join_codes</code>・<code>week_role_results</code>・<code>role_current_states</code>・<code>current_decisions</code> に<strong>到達できない</strong>ようにします（観察者のロールに SELECT を与えるのは、上の 3 表だけ）（最小権限。アプリのバグでも役割別の値が漏れにくい。<strong>H2 版（ローカル）にはロールがなく、この DB の権限は守られない</strong>。権限の否定テストは PostgreSQL の統合テストでだけ行う）。寄与者数による抑止（<code>contributors &lt; 2</code> なら合計を出さない）は、問い合わせの層（<code>Disclosure</code>）で行います。</p>
 <h3 id="week_team_totals">設計判断: 観察のための <code>week_team_totals</code><a class="headerlink" href="#week_team_totals" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -10171,6 +10266,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <h2 id="_25">マイグレーション<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
 <ul>
 <li>スキーマの変更は、<strong>番号つきの SQL マイグレーション</strong>で行い、適用の履歴を DB に残します。管理ツールは Flyway を採用案とします（導入は承認待ち。<a href="../tech-stack/">技術スタック</a> T4）。</li>
+<li><strong>PostgreSQL 用と H2 用で、共通の部分を最大化し、差分だけを分けます</strong>（Flyway のベンダー別の場所。配置の案は下表。詳細は B1 の最初の実測の後に確定します）。</li>
 <li>変更は、<strong>拡張 → 互換 → 縮小</strong>の順に分け、ロールバックできる単位にします（NFR-12）。</li>
 <li><strong>イベントは、マイグレーションで書き換えません。</strong> イベントの形の変更は <code>schema_version</code> とアップキャストで吸収します。投影の形の変更は、マイグレーションで表を直し、<strong>再構築</strong>で埋めます。</li>
 </ul>
@@ -10178,38 +10274,183 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <thead>
 <tr>
 <th style="text-align: left;">番号（予定）</th>
+<th style="text-align: left;">場所</th>
 <th style="text-align: left;">内容</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align: left;">001</td>
-<td style="text-align: left;"><code>game_roots</code>、<code>events</code>（一意制約、<code>CHECK</code>、追記専用のロール権限）、<code>projection_checkpoints</code></td>
+<td style="text-align: left;">共通</td>
+<td style="text-align: left;"><code>game_roots</code>、<code>events</code>（名前つきの一意制約、<code>CHECK</code>）、<code>projection_checkpoints</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">002</td>
-<td style="text-align: left;">周辺ストア: <code>display_profiles</code>、<code>credentials</code>、<code>browser_sessions</code>、<code>idempotency_records</code></td>
+<td style="text-align: left;">共通</td>
+<td style="text-align: left;">周辺ストア: <code>display_profiles</code>、<code>credentials</code>、<code>browser_sessions</code>、<code>idempotency_records</code>（主キー <code>pk_idempotency_records</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">003</td>
+<td style="text-align: left;">共通</td>
 <td style="text-align: left;">投影（準備）: <code>game_overview</code>、<code>game_join_codes</code>、<code>game_settings</code>、<code>lobby_*</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">004</td>
+<td style="text-align: left;">共通</td>
 <td style="text-align: left;">投影（進行）: <code>session_overview</code>、<code>role_current_states</code>、<code>current_decisions</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">005</td>
+<td style="text-align: left;">共通</td>
 <td style="text-align: left;">投影（結果）: <code>week_commits</code>、<code>week_role_results</code>、<code>week_team_totals</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">006</td>
+<td style="text-align: left;">共通</td>
 <td style="text-align: left;">保持: <code>retention_policies</code>、<code>deletion_runs</code>、<code>deletion_attempts</code>、<code>deletion_receipts</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">101</td>
+<td style="text-align: left;">PostgreSQL</td>
+<td style="text-align: left;">DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、<code>events</code> の追記専用、<code>TRUNCATE</code> の拒否、観察者向けの権限</td>
+</tr>
+<tr>
+<td style="text-align: left;">102</td>
+<td style="text-align: left;">PostgreSQL</td>
+<td style="text-align: left;">部分一意索引 <code>uq_idempotency_create</code>（<code>WHERE scope = 'create'</code>）、<code>jsonb</code> の列に依存する検査</td>
+</tr>
+<tr>
+<td style="text-align: left;">201</td>
+<td style="text-align: left;">H2</td>
+<td style="text-align: left;">H2 で表せる形への置き換え（あれば）。PostgreSQL 固有の制約を省略した旨のコメント</td>
 </tr>
 </tbody>
 </table>
-<p>追記専用の保護（<code>events</code> への UPDATE/DELETE の禁止）、投影の <code>CHECK</code>（数量の上限）、観察者向けの権限は、001〜005 に含めます。</p>
-<h2 id="_26">インデックス（主なもの）<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>db/migration/
+├── common/      001〜006（両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダで切り替える案）
+├── postgres/    101〜（PostgreSQL 固有。ロール、GRANT、部分一意索引、jsonb）
+└── h2/          201〜（H2 固有。置き換えがあるときだけ）
+# Flyway の場所: PostgreSQL = common + postgres、H2 = common + h2
+</code></pre></div>
+<ul>
+<li>追記専用の保護、観察者向けの権限、部分一意索引は PostgreSQL の場所（101・102）にだけ置きます。投影の <code>CHECK</code>（数量の上限）は、共通（001〜005）に含めます。</li>
+<li><code>events.payload</code> の型は、PostgreSQL は <code>jsonb</code> です。H2 の PostgreSQL モードで <code>jsonb</code> が使えることは公式ドキュメントで確認できなかったため、共通の DDL ではプレースホルダ（例 <code>${json_type}</code>）にし、H2 側の型は B1 の最初の実測で決めます（仮置き）。</li>
+<li>共通の DDL を H2 で通せることは<strong>未確認</strong>です。通らない文は、共通から PostgreSQL 側と H2 側へ分けます（共通を最大化する方針は変えない）。</li>
+</ul>
+<h2 id="h2-postgresql">ローカル開発（H2 の PostgreSQL モード）<a class="headerlink" href="#h2-postgresql" title="Permanent link">&para;</a></h2>
+<p>ユーザーの決定（2026-11-14）により、<strong>開発機でのローカル開発（起動と動作確認）だけ</strong>、H2 の PostgreSQL モードで動かせるようにします（<a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/">ADR-014</a>、提案中）。Docker や PostgreSQL がなくても起動できることが目的です。</p>
+<p><strong>範囲の線引き。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">用途</th>
+<th style="text-align: left;">データベース</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ローカル開発（開発機での起動・動作確認）</td>
+<td style="text-align: left;"><strong>H2（PostgreSQL モード）</strong> または PostgreSQL。設定 <code>DB_KIND=h2\|postgres</code> で選ぶ（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">統合テスト、受け入れ（Cucumber の <code>@api</code>）、CI</td>
+<td style="text-align: left;"><strong>PostgreSQL 18</strong>（Testcontainers）</td>
+</tr>
+<tr>
+<td style="text-align: left;">ステージング、本番</td>
+<td style="text-align: left;"><strong>PostgreSQL 18</strong>（RDS）。起動時の検査で H2 を拒否する</td>
+</tr>
+</tbody>
+</table>
+<p><strong>H2 を、設計の検証（並行性、権限、部分一意索引、連鎖削除）や性能の計測には使いません。</strong> それらの正は PostgreSQL の統合テストです。</p>
+<p><strong>確認できた事実と、できなかった事実。</strong> 2026-11-14 に H2 の公式ドキュメント（<a href="https://h2database.com/html/features.html">features</a> の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、<strong>ドキュメントで確認できませんでした</strong>（「非対応」と断定するものではありません）。実際の動作は、<strong>B1 の最初に実測して確定します（未確認）</strong>。H2 の版も実装開始時に確認します（<a href="../tech-stack/">技術スタック</a>）。</p>
+<h3 id="_26">方言の差分<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">PostgreSQL 18</th>
+<th style="text-align: left;">H2（PostgreSQL モード。ローカルのみ）</th>
+<th style="text-align: left;">扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">再構築との直列化（アドバイザリロック）</td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock(_shared)</code></td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">ポート <code>ProjectionLock</code> の裏に隠す。H2 版は<strong>プロセス内の読み書きロック</strong>（単一プロセスでのみ有効）</td>
+</tr>
+<tr>
+<td style="text-align: left;">SSE の版の通知（LISTEN/NOTIFY）</td>
+<td style="text-align: left;"><code>pg_notify</code> と専用の LISTEN 接続</td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">ポート <code>ChangeNotifier</code> の裏に隠す。H2 版は<strong>プロセス内のイベント</strong>（コミット後に配信。単一プロセスでのみ有効）</td>
+</tr>
+<tr>
+<td style="text-align: left;">部分一意索引 <code>uq_idempotency_create</code></td>
+<td style="text-align: left;">あり（<code>WHERE scope = 'create'</code>）</td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">H2 版は<strong>省略</strong>し、アプリケーション側の再照合に置き換える</td>
+</tr>
+<tr>
+<td style="text-align: left;">DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、追記専用、<code>TRUNCATE</code> の拒否</td>
+<td style="text-align: left;">あり</td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">H2 版は<strong>省略</strong>（単一の接続ユーザー）</td>
+</tr>
+<tr>
+<td style="text-align: left;">接続プールの分離（観察者用など）</td>
+<td style="text-align: left;">用途別</td>
+<td style="text-align: left;">単一のプール</td>
+<td style="text-align: left;">H2 版は<strong>省略</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>jsonb</code></td>
+<td style="text-align: left;"><code>events.payload</code></td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">型はプレースホルダで切り替える。H2 側の型は B1 の実測で決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ）</td>
+<td style="text-align: left;">指定どおり</td>
+<td style="text-align: left;">動作の同一性は確認できなかった</td>
+<td style="text-align: left;">H2 では検証しない（PostgreSQL の統合テストが正）</td>
+</tr>
+<tr>
+<td style="text-align: left;">SQLSTATE（40001、40P01、55P03、23505 の制約名）</td>
+<td style="text-align: left;">アダプターが <code>AppFailure</code> に写す</td>
+<td style="text-align: left;">確認できなかった</td>
+<td style="text-align: left;">H2 版の写像は B1 の実測で確定。写せない場合は H2 では再試行を行わない</td>
+</tr>
+<tr>
+<td style="text-align: left;">名前つきの一意制約、<code>ON DELETE CASCADE</code>、<code>CHECK</code></td>
+<td style="text-align: left;">あり</td>
+<td style="text-align: left;">標準の SQL だが、H2 での動作は未確認</td>
+<td style="text-align: left;">共通の DDL に置き、B1 の実測で確認</td>
+</tr>
+</tbody>
+</table>
+<h3 id="h2">H2 版で省略する制約（ローカルでは守られない）<a class="headerlink" href="#h2" title="Permanent link">&para;</a></h3>
+<p>次の制約は、H2 版では<strong>守られません</strong>。ローカルで動いたことは、これらの制約が正しいことを意味しません。</p>
+<ol>
+<li><code>uq_idempotency_create</code>（同じキーのゲーム作成の同時の重複。アプリ側の再照合だけ）。</li>
+<li><code>events</code> の追記専用（UPDATE・DELETE・<code>TRUNCATE</code> の拒否）。</li>
+<li>DB ロールの分離と、観察者のロールが <code>game_join_codes</code> などへ到達できないこと（NF-S18）。アプリのバグによる漏えいを DB が止めない。</li>
+<li>接続プールの分離（観察者用のプールの配線）。</li>
+<li>複数のプロセスにまたがる、再構築との直列化と SSE の通知（<code>ProjectionLock</code>・<code>ChangeNotifier</code> は単一のプロセスでだけ有効）。</li>
+<li>削除用のロールの限定（<code>game_roots</code> 以外を直接削除できないこと）。</li>
+<li>分離レベルによる一貫した読み取り（REPEATABLE READ）の保証。</li>
+</ol>
+<h3 id="_27">乖離のリスクと対策<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
+<p>ローカル（H2）で通っても、CI（PostgreSQL）で落ちる乖離が起きえます。対策は次のとおりです。</p>
+<ol>
+<li><strong>H2 でしか通らない記述を禁止する。</strong> PostgreSQL の統合テストが正で、H2 のために共通の DDL や SQL を曲げない（通らない文は PostgreSQL 側と H2 側に分ける）。</li>
+<li><strong>ポートの契約テストを両実装で実行する。</strong> <code>ProjectionLock</code>・<code>ChangeNotifier</code> の契約テストを、PostgreSQL 版は統合テスト、H2 版はユニットテストで実行する。</li>
+<li><strong>受け入れ（Cucumber の <code>@api</code>）は PostgreSQL で実行する。</strong></li>
+<li>本番・ステージングでの H2 の拒否（起動時の検査。<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）。</li>
+</ol>
+<h2 id="_28">インデックス（主なもの）<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10256,7 +10497,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 </tr>
 <tr>
 <td style="text-align: left;"><code>idempotency_records</code></td>
-<td style="text-align: left;"><code>(expires_at)</code>、<code>(scope, key_digest)</code>（部分一意、<code>WHERE scope = 'create'</code>）</td>
+<td style="text-align: left;"><code>(expires_at)</code>、<code>(scope, key_digest)</code>（部分一意、<code>WHERE scope = 'create'</code>。<strong>PostgreSQL のみ。H2 版は省略</strong>）</td>
 <td style="text-align: left;">期限切れの掃除、作成の再送の検索</td>
 </tr>
 <tr>
@@ -10272,7 +10513,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 </tbody>
 </table>
 <p>投影の主キー（<code>(game_id, week, role)</code> など）が、振り返りと出力の問い合わせ（<code>WHERE game_id = $1 ORDER BY week, role</code>）の索引を兼ねます。</p>
-<h2 id="_27">設計判断のまとめ<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>
+<h2 id="_29">設計判断のまとめ<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10336,6 +10577,12 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <td style="text-align: left;">出力</td>
 <td style="text-align: left;">問い合わせ時に純粋関数 <code>buildExport</code> で作る（<code>export_packages</code> 廃止）</td>
 <td style="text-align: left;">同期投影、<code>SessionEnded</code> 後の非同期投影</td>
+</tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">ローカル開発の DB</td>
+<td style="text-align: left;">H2 の PostgreSQL モード（ローカルだけ。ユーザーの決定）。PostgreSQL 固有の機能はポート（<code>ProjectionLock</code>・<code>ChangeNotifier</code>）の裏に隠し、2 実装を持つ。部分一意索引・ロール・プール分離などは PostgreSQL の統合テストでだけ検証し、H2 版では省略する</td>
+<td style="text-align: left;">ローカルも PostgreSQL（Docker）、H2 を統合テストにも使う（検証が弱くなるため不採用）</td>
 </tr>
 </tbody>
 </table>
@@ -10488,9 +10735,21 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <td style="text-align: left;">暫定で作成時。画面に削除予定日とバックアップの残存を表示。終了時起点の案は未決</td>
 <td style="text-align: left;">M5</td>
 </tr>
+<tr>
+<td style="text-align: left;">24</td>
+<td style="text-align: left;">データベースは PostgreSQL だけ</td>
+<td style="text-align: left;">ローカル開発だけ H2（PostgreSQL モード）も使えるようにする。再構築のロックと SSE の通知はポートの裏で 2 実装。H2 版で省略する制約を明記</td>
+<td style="text-align: left;">ユーザーの決定（2026-11-14。ADR-014）</td>
+</tr>
+<tr>
+<td style="text-align: left;">25</td>
+<td style="text-align: left;">マイグレーションは 1 系統</td>
+<td style="text-align: left;">共通（001〜006）・PostgreSQL（101〜）・H2（201〜）の場所に分ける案。配置は B1 で確定</td>
+<td style="text-align: left;">共通を最大化し、差分だけを分ける</td>
+</tr>
 </tbody>
 </table>
-<h2 id="_28">未決事項<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h2>
+<h2 id="_30">未決事項<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h2>
 <ul>
 <li>マイグレーションの管理ツールは Flyway を採用案とします（<a href="../tech-stack/">技術スタック</a> T4。<strong>導入は承認待ち</strong>）。適用の自動化（起動時か CI のジョブか）は、導入の承認後に決めます。</li>
 <li>追記の <code>ConcurrencyConflict</code> の自動再試行の上限と、再試行の間隔（実装開始時に、競合の頻度を測って決める）。</li>
@@ -10502,11 +10761,14 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <li><code>events</code> の長期の保持と、ゲーム削除前の分析の要否（beer-game2 から継続）。</li>
 <li>同期投影のトランザクション時間の実測。書き込みを圧迫する場合は、非同期投影へ移す（設計判断 4）。</li>
 <li>JSON のシリアライズ方式とアップキャストの置き場所（解決済み: kotlinx.serialization と <code>EventCodec</code>。アップキャストは adapter-persistence。<a href="../architecture-backend/">バックエンドアーキテクチャ</a>、<a href="../tech-stack/">技術スタック</a>）。</li>
+<li><strong>H2 の PostgreSQL モードで動く範囲の実測（B1 の最初）</strong>: 共通の DDL が通るか、<code>jsonb</code> に相当する型、名前つき制約の違反時に制約名を取れるか、<code>ON DELETE CASCADE</code> の動作、SQLSTATE、分離レベル、部分インデックスの可否。結果で、共通と H2 の場所の配分、省略する制約の一覧、プレースホルダを確定する。H2 の版の確認と導入は承認待ち（<a href="../tech-stack/">技術スタック</a>）。</li>
+<li>H2 版の <code>ProjectionLock</code> が <code>lock_timeout</code> 相当の待ちの上限をどう扱うか（PostgreSQL 版は SQLSTATE 55P03 を <code>RetryExhausted</code> に写す。H2 版は待ちの上限つきの取得で同じ契約を満たす）。</li>
 <li>観察者の DB ロールに SELECT を与える表（<code>game_overview</code>・<code>session_overview</code>・<code>week_team_totals</code>）の権限の否定テスト（<code>game_join_codes</code> を読めないこと）は、最初のスライドの Red のテストで確かめる（<a href="../test-strategy/">テスト戦略</a>）。</li>
 </ul>
-<h2 id="_29">出典<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h2>
+<h2 id="_31">出典<a class="headerlink" href="#_31" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../domain-model/">ドメインモデル設計（Kotlin 版）</a></li>
+<li><a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/">ADR-014 ローカル開発に H2（PostgreSQL モード）を使う</a>、<a href="https://h2database.com/html/features.html">H2 公式ドキュメント（features）</a>（2026-11-14 確認）</li>
 <li><a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド 関数型プログラミング（Kotlin 編）</a> 第 7 章（イベントソーシング、CQRS、永続化とトランザクション境界）</li>
 <li><a href="../../beer-game2/data-model/">beer-game2 データモデル設計</a>、<a href="../../../requirements/beer-game2/requirements_definition/">要件定義</a></li>
 <li><a href="../../../adr/beer-game2/005-role-results-and-sql-read-models/">ADR-005</a>、<a href="../../../adr/beer-game2/007-cascade-deletion-without-queues/">ADR-007</a>、<a href="../../../adr/beer-game2/008-auto-commit-and-event-audit/">ADR-008</a>、<a href="../../../adr/beer-game2/009-credential-key-versions/">ADR-009</a></li>

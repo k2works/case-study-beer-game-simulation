@@ -2571,6 +2571,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="環境">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#h2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ローカルの開発環境と H2 の拒否
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2728,6 +2745,17 @@
     <span class="md-ellipsis">
       
         ID5: データベースのロールの分離
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#id6-h2-postgresql-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ID6: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-14）
       
     </span>
   </a>
@@ -6517,6 +6545,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9329,6 +9392,12 @@
 <td style="text-align: left;">Maven Central</td>
 </tr>
 <tr>
+<td style="text-align: left;">ローカル開発用 DB</td>
+<td style="text-align: left;">H2（<code>com.h2database:h2</code>）</td>
+<td style="text-align: left;"><strong>2.5.252</strong>（確認日 2026-11-14）</td>
+<td style="text-align: left;">Maven Central の <code>maven-metadata.xml</code>（<code>&lt;release&gt;</code>。ファイルの公開は 2026-09-26）。<strong>ローカル開発だけ</strong>（本番・ステージング・CI・統合テストでは使わない。<a href="../tech-stack/">技術スタック</a> T7）。公式のサポート期限は確認できていない。<strong>導入は承認待ち</strong></td>
+</tr>
+<tr>
 <td style="text-align: left;">コンテナのイメージ</td>
 <td style="text-align: left;">Eclipse Temurin</td>
 <td style="text-align: left;">タグ <code>25-jre</code>、<code>25-jre-noble</code> を確認</td>
@@ -9355,6 +9424,10 @@
 <tr>
 <td style="text-align: left;">Micrometer</td>
 <td style="text-align: left;">最新は 1.18.0 の RC のみ確認した。採用しない案（バックエンドの BD9）のため、確認は不要</td>
+</tr>
+<tr>
+<td style="text-align: left;">H2 の PostgreSQL モードで動く範囲、H2 と JDK 25・Flyway の組み合わせ</td>
+<td style="text-align: left;">公式ドキュメント（features）では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベルの差異を<strong>確認できなかった</strong>。<strong>B1 の最初に実測して確定する</strong></td>
 </tr>
 </tbody>
 </table>
@@ -9388,7 +9461,7 @@
 <tr>
 <td style="text-align: left;">データベース</td>
 <td style="text-align: left;">RDS for PostgreSQL 18（Multi-AZ、暗号化、PITR、バックアップ 7 日）</td>
-<td style="text-align: left;">変更なし。<strong>データベースのロールを用途別に分ける</strong></td>
+<td style="text-align: left;">変更なし。<strong>データベースのロールを用途別に分ける</strong>。<strong>ローカル開発だけ H2 の PostgreSQL モード</strong>（設計判断 ID6。ステージング・本番は PostgreSQL のまま）</td>
 </tr>
 <tr>
 <td style="text-align: left;">非同期・キュー</td>
@@ -9529,6 +9602,7 @@
 </tr>
 </tbody>
 </table>
+<p><strong>ローカルの H2 では</strong>、上のロールの分離、接続プールの分離、<code>LISTEN</code> の専用接続は<strong>再現しない</strong>（PostgreSQL の統合テストでだけ検証する）。通知の受信は、ポート <code>ChangeNotifier</code> の H2 版（プロセス内のイベント）に置き換わる。本番・ステージングは、この表のとおり PostgreSQL のロールで動く。</p>
 <p><strong>接続数の見積もり</strong>: タスク数 × （書き込み + 読み取り + 観察者の各プールの最大 + 通知 1 本）+ 運用のタスク。この合計が、RDS のインスタンスの接続数の上限を超えないことを、タスクの最大数（4）で確認します。プールの大きさは、負荷試験で決めます（未決事項）。接続を集約するプロキシや接続プーラーは、<code>LISTEN</code> が動かない可能性があるため、<strong>本設計では置きません</strong>。</p>
 <h2 id="_7">環境<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <table>
@@ -9543,30 +9617,37 @@
 <tbody>
 <tr>
 <td style="text-align: left;">ローカル</td>
-<td style="text-align: left;">開発・確認</td>
-<td style="text-align: left;">バックエンドは Gradle で起動、フロントエンドは Vite（<code>/api</code> をプロキシ）。DB は Docker の PostgreSQL 18</td>
+<td style="text-align: left;">開発・確認（起動・動作確認）</td>
+<td style="text-align: left;">バックエンドは Gradle で起動、フロントエンドは Vite（<code>/api</code> をプロキシ）。<strong>DB は H2 の PostgreSQL モード（既定。Docker 不要。<code>DB_KIND=h2</code>）</strong>。PostgreSQL 18 で確認したい場合は <code>DB_KIND=postgres</code>（Docker）。H2 では、アドバイザリロックとイベント通知はプロセス内の実装（単一プロセスのみ）、ロール・部分一意索引などは省略される（<strong>省略した制約はローカルで守られない</strong>。<a href="../data-model/">データモデル</a>）</td>
 <td style="text-align: left;">—</td>
 </tr>
 <tr>
 <td style="text-align: left;">CI</td>
 <td style="text-align: left;">検証</td>
-<td style="text-align: left;">GitHub Actions（PostgreSQL 18 のサービスコンテナ）</td>
+<td style="text-align: left;">GitHub Actions（<strong>PostgreSQL 18</strong> のサービスコンテナと Testcontainers）。統合テストと受け入れ（<code>@api</code>）は PostgreSQL で実行し、<strong>H2 は使わない</strong></td>
 <td style="text-align: left;">—</td>
 </tr>
 <tr>
 <td style="text-align: left;">ステージング</td>
 <td style="text-align: left;">本番前の確認</td>
-<td style="text-align: left;">main へのマージで自動（ローリング）</td>
+<td style="text-align: left;">main へのマージで自動（ローリング）。<strong>PostgreSQL（RDS）のみ。H2 は起動時に拒否</strong></td>
 <td style="text-align: left;">専用</td>
 </tr>
 <tr>
 <td style="text-align: left;">本番</td>
 <td style="text-align: left;">運用</td>
-<td style="text-align: left;">手動の承認後（ブルー/グリーン）</td>
+<td style="text-align: left;">手動の承認後（ブルー/グリーン）。<strong>PostgreSQL（RDS）のみ。H2 は起動時に拒否</strong></td>
 <td style="text-align: left;">専用</td>
 </tr>
 </tbody>
 </table>
+<h3 id="h2">ローカルの開発環境と H2 の拒否<a class="headerlink" href="#h2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Docker なしで起動できる</strong>: ローカルの既定は、プロセス内の H2（PostgreSQL モード）。マイグレーションは Flyway のベンダー別の場所の H2 用を適用する（共通の部分を最大化し、差分だけを分ける。配置は B1 で確定）。</li>
+<li><strong>選択は設定で行う</strong>: <code>DB_KIND=postgres|h2</code>。<code>AppConfig.load</code> が、環境の種別（<code>APP_ENV=local|ci|staging|production</code> など。名前は B1 で確定）と合わせて検証する。</li>
+<li><strong>本番・ステージングで H2 を拒否する検査</strong>: <code>APP_ENV</code> が <code>staging</code> または <code>production</code> のとき、<code>DB_KIND=h2</code>、または JDBC の URL が <code>jdbc:h2:</code> で始まる設定は、<code>AppConfig.load</code> が<strong>起動前に失敗</strong>させる（起動しない。通知の受信や接続の準備に進まない）。この検査は、設定の単体テストで、<strong>環境ごとの全組み合わせ</strong>を確かめる。Terraform のタスク定義も <code>DB_KIND=postgres</code> を固定で渡し、H2 の依存関係は本番のイメージに含めない（二重の防御）。</li>
+<li><strong>ローカルの乖離の防止</strong>: CI の統合テスト・受け入れは PostgreSQL が正で、H2 でしか通らない記述は禁止する（<a href="../test-strategy/">テスト戦略</a>）。</li>
+</ul>
 <p>各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（beer-game2 と同じ）。</p>
 <h2 id="jvm">コンテナと JVM<a class="headerlink" href="#jvm" title="Permanent link">&para;</a></h2>
 <h3 id="_8">イメージ<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
@@ -9623,7 +9704,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <tbody>
 <tr>
 <td style="text-align: left;">起動</td>
-<td style="text-align: left;">設定を読み込み、検証する（<code>AppConfig.load</code>。失敗なら起動しない）-&gt; 接続プールを作る -&gt; 通知の受信を始める -&gt; HTTP の受付を始める。<code>/ready</code> は、<strong>データベースの接続、通知の受信の接続の生存</strong>が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない。<strong>起動時間の測る区間（L4）</strong>: <a href="../non-functional/">NF-P16</a> と <a href="../operation/">運用要件</a> と同じく、<strong>コンテナのプロセスの開始から <code>/ready</code> が成功するまで</strong>（マイグレーションの適用を除く。p95 30 秒以下は提案）。サービスのヘルスチェックの猶予期間は、この実測の p95 より長く取る。RTO 15 分（NF-R4）は、この起動時間と、必要な場合の再構築（NF-P18）を含めて見積もる</td>
+<td style="text-align: left;">設定を読み込み、検証する（<code>AppConfig.load</code>。失敗なら起動しない。<strong>本番・ステージングで <code>DB_KIND=h2</code> なら失敗する</strong>）-&gt; 接続プールを作る -&gt; 通知の受信を始める -&gt; HTTP の受付を始める。<code>/ready</code> は、<strong>データベースの接続、通知の受信の接続の生存</strong>が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない。<strong>起動時間の測る区間（L4）</strong>: <a href="../non-functional/">NF-P16</a> と <a href="../operation/">運用要件</a> と同じく、<strong>コンテナのプロセスの開始から <code>/ready</code> が成功するまで</strong>（マイグレーションの適用を除く。p95 30 秒以下は提案）。サービスのヘルスチェックの猶予期間は、この実測の p95 より長く取る。RTO 15 分（NF-R4）は、この起動時間と、必要な場合の再構築（NF-P18）を含めて見積もる</td>
 </tr>
 <tr>
 <td style="text-align: left;">マイグレーションとの順序</td>
@@ -9805,6 +9886,12 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <td style="text-align: left;">N-1 互換のジョブを加える。JDK の期限は Temurin の値（2031-09-30）に統一</td>
 <td style="text-align: left;">M22、M17</td>
 </tr>
+<tr>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">ローカルの DB は Docker の PostgreSQL 18</td>
+<td style="text-align: left;">ローカル開発だけ H2 の PostgreSQL モード（Docker 不要）。CI・ステージング・本番は PostgreSQL のまま。本番・ステージングでは起動時の検査で H2 を拒否</td>
+<td style="text-align: left;">ユーザーの決定（2026-11-14）。設計判断 ID6</td>
+</tr>
 </tbody>
 </table>
 <h2 id="_11">設計判断<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
@@ -9931,6 +10018,34 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 </tr>
 </tbody>
 </table>
+<h3 id="id6-h2-postgresql-2026-11-14">ID6: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-14）<a class="headerlink" href="#id6-h2-postgresql-2026-11-14" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">案</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">評価</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
+<td style="text-align: left;">ローカル開発だけ H2 の PostgreSQL モード。CI・統合テスト・ステージング・本番は PostgreSQL 18。実行は <code>DB_KIND</code> で選び、本番・ステージングでは起動時に H2 を拒否する</td>
+<td style="text-align: left;">Docker なしで起動できる。単一プロセスの制約と省略した制約があり、ローカルと CI の乖離が起きうる（対策は <a href="../tech-stack/">技術スタック</a> T7）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B</td>
+<td style="text-align: left;">ローカルも Docker の PostgreSQL 18</td>
+<td style="text-align: left;">乖離がない。Docker が要る</td>
+</tr>
+<tr>
+<td style="text-align: left;">C</td>
+<td style="text-align: left;">H2 を CI・ステージングにも使う</td>
+<td style="text-align: left;">環境が軽くなる。RDS の本番と離れ、並行性・権限の検証が空になる。却下</td>
+</tr>
+</tbody>
+</table>
+<p>トレードオフ: A は、拒否の検査（設定の単体テストと、Terraform の固定値）で、H2 の本番混入を防ぐ。H2 でしか通らない記述は禁止し、PostgreSQL の統合テストを正とする。</p>
 <h2 id="_12">前提と見直しの条件<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <ul>
 <li>常時 2 タスクで足りる前提: 同時に進行するゲームが少数（学習セッション単位）。負荷試験で、JVM の起動とヒープを含めて確認する。</li>
@@ -9951,13 +10066,14 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <li>ブルー/グリーンの実装（CodeDeploy）と、ステージングのローリングの差の許容。</li>
 <li>合成監視（CloudWatch Synthetics）の費用と、頻度（1 分ごと）の妥当性。</li>
 <li>アカウントの分離（環境ごと）の方針。</li>
+<li><strong>H2（設計判断 ID6）</strong>: 導入は承認待ち。PostgreSQL モードで動く範囲は公式ドキュメントで確認できなかったため、B1 の最初に実測する。環境の種別の設定名（<code>APP_ENV</code> など）と、Flyway のベンダー別の場所の配置は B1 で確定する。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせ、公式のサポート期限は実装開始時に確認する。</li>
 <li>投影の再構築のタスクを、デプロイの標準の手順に含める条件。再構築中の追記の扱いは、アドバイザリロックで決定済み（M23）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（<a href="../data-model/">データモデル</a> の未決事項）。</li>
 </ul>
 <h2 id="_14">出典<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../architecture-backend/">バックエンドアーキテクチャ（Kotlin 版）</a>、<a href="../data-model/">データモデル（Kotlin 版）</a>、<a href="../operation/">運用要件</a>、<a href="../non-functional/">非機能要件</a></li>
 <li><a href="../../beer-game2/architecture-infrastructure/">beer-game2 のインフラストラクチャアーキテクチャ</a>、<a href="../../beer-game2/tech-stack/">beer-game2 の技術スタック</a></li>
-<li>バージョンの確認元（2026-11-14）: Maven Central のメタデータ（Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（<code>services.gradle.org/versions/current</code>）、endoflife.date（<code>eclipse-temurin</code>）、Docker Hub（<code>eclipse-temurin</code> のタグ）</li>
+<li>バージョンの確認元（2026-11-14）: Maven Central のメタデータ（H2、Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（<code>services.gradle.org/versions/current</code>）、endoflife.date（<code>eclipse-temurin</code>）、Docker Hub（<code>eclipse-temurin</code> のタグ）</li>
 <li><a href="../../../reference/%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/">アーキテクチャ設計ガイド</a></li>
 <li><a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド 関数型プログラミングガイド（Kotlin 編）</a> 第 9 章（静的解析）</li>
 <li><a href="../../../adr/beer-game2/007-cascade-deletion-without-queues/">ADR-007</a>、<a href="../../../adr/beer-game2/011-cloudfront-domain-tls-headers/">ADR-011</a>、<a href="../../../adr/beer-game2/012-delivery-pipeline-and-terraform/">ADR-012</a></li>

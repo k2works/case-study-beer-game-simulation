@@ -6618,6 +6618,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -9507,6 +9542,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>設計の暫定の決定の確認</strong>（保持の起点、研修中の再構築の運用。<a href="../../../review/beer-game-kotlin/design_review_20261114/">レビュー</a> の M5・M23）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 設計書の <code>draft</code> から <code>stable</code> への確認（人）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>リリース計画の承認（本書）</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>H2 の導入の承認</strong>（<code>com.h2database:h2</code>、ローカル開発専用の新規依存。ユーザーの決定 2026-11-14: ローカル開発は H2 の PostgreSQL モード。統合・受け入れ・CI・ステージング・本番は PostgreSQL 18）。版は公式の情報で確認してから確定する。<strong>B1 の最初に実測して、動く範囲を確定する</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>PMD と Cucumber の導入の承認</strong>（いずれも新規の依存関係。PMD は CI のツール、Cucumber-JVM と Cucumber-JS はテストの依存関係。版は公式の情報で確認してから確定する。<a href="../development_strategy/">開発戦略</a> の未決事項）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Kotlin 版の ADR の作成（ES+CQRS、同期投影、冪等記録と認可の順序、detekt・PMD の判断、Cucumber の導入と Kotest との使い分け）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Bolt 1 の計画（ステップ計画）の作成と承認</li>
@@ -9612,9 +9648,9 @@
 <tr>
 <td style="text-align: center;">B1</td>
 <td style="text-align: left;">U1</td>
-<td style="text-align: left;"><strong>基盤と縦の最小（ES）</strong>: Gradle のマルチモジュール（domain・application・adapters）、<strong>Cucumber の基盤（Cucumber-JVM の <code>@api</code> と Cucumber-JS + Playwright の <code>@ui</code>、フィーチャーファイルの配置、日本語 Gherkin の最初のシナリオ、タグ（ストーリー・受入条件の ID、<code>@api</code>/<code>@ui</code>、重要度）の文書化、生きたドキュメントの公開の最小の導線）</strong>、<code>events</code>・<code>game_roots</code>・<code>idempotency_records</code>（Flyway 001）、<code>EventStore.append</code>（版の一意制約）、<code>decideGame</code>/<code>decideSession</code>/<code>simulateWeek</code> の最小、同期投影、Ktor API、React の最小。キット準拠のゲームを、作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで、ローカルで通す。入口は、このウォーキングスケルトンの日本語 Gherkin のシナリオにする</td>
+<td style="text-align: left;"><strong>基盤と縦の最小（ES）</strong>: <strong>最初に、H2 の PostgreSQL モードの実測</strong>（アドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルのどれが動くか。結果を記録し、H2 版で置き換える・省略する制約を確定）。<strong>ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の PostgreSQL 版と H2 版、実行の選択（<code>DB_KIND</code>）と本番での H2 の拒否</strong>。Gradle のマルチモジュール（domain・application・adapters）、<strong>Cucumber の基盤（Cucumber-JVM の <code>@api</code> と Cucumber-JS + Playwright の <code>@ui</code>、フィーチャーファイルの配置、日本語 Gherkin の最初のシナリオ、タグ（ストーリー・受入条件の ID、<code>@api</code>/<code>@ui</code>、重要度）の文書化、生きたドキュメントの公開の最小の導線）</strong>、<code>events</code>・<code>game_roots</code>・<code>idempotency_records</code>（Flyway 001）、<code>EventStore.append</code>（版の一意制約）、<code>decideGame</code>/<code>decideSession</code>/<code>simulateWeek</code> の最小、同期投影、Ktor API、React の最小。キット準拠のゲームを、作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで、ローカル（H2）と PostgreSQL の両方で通す（受け入れの正は PostgreSQL）。入口は、このウォーキングスケルトンの日本語 Gherkin のシナリオにする</td>
 <td style="text-align: left;">2 ストリームと <code>startGame</code> の原子的な追記は妥当か。Kotlin 2.4・JDK 25・Gradle・Ktor・Arrow の組み合わせは動くか。<strong>Cucumber-JVM と Cucumber-JS の 2 つの処理系で、フィーチャーファイルを 1 か所から参照できるか。日本語 Gherkin のシナリオを、Undefined → Pending → Failing → Passing の順に回せるか</strong>。AI の出力の質は、どの密度のゲートが要るか</td>
-<td style="text-align: left;">ローカルで E2E が通る（<strong>Gherkin のシナリオが green。Undefined・Pending のステップがない</strong>）。<code>simulateWeek</code> と <code>decide</code>/<code>evolve</code> のプロパティテスト。DB 統合（版・冪等・原子性）。golden テスト。<strong>タグの一覧と意味が文書化され、依存関係の導入の承認と版の確認の記録がある</strong></td>
+<td style="text-align: left;">ローカル（H2）で E2E が通り、PostgreSQL（Testcontainers）でも同じシナリオが通る（<strong>Gherkin のシナリオが green。Undefined・Pending のステップがない</strong>）。<code>simulateWeek</code> と <code>decide</code>/<code>evolve</code> のプロパティテスト。DB 統合（PostgreSQL。版・冪等・原子性）。ポートの契約テストが両実装で green。H2 の実測の記録がある。golden テスト。<strong>タグの一覧と意味が文書化され、依存関係の導入の承認と版の確認の記録がある</strong></td>
 <td style="text-align: center;">4 日</td>
 </tr>
 <tr>
@@ -10004,38 +10040,6 @@
 <td style="text-align: left;">B2 の受入条件にする（違反コードで CI が落ちること）。代替（detekt 2 alpha、PMD の XPath の拡充、ktlint のカスタムルール）の判断を B2 内で行い、ADR に記録する</td>
 </tr>
 <tr>
-<td style="text-align: left;">R16</td>
-<td style="text-align: left;">PMD が Kotlin 2.4 の構文を解析できない、または Gradle での実行や層ごとのルールセットの分割と両立せず、14 個の関数型ルールを使えない（ガイドは PMD 7.29.0 で確認しており、他の版では保証されない）</td>
-<td style="text-align: left;">U1</td>
-<td style="text-align: center;">高</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: left;">B2 の受入条件にする。使う版で fixture を実行し、期待件数と一致することを確かめる（未確認の間は「実装開始時に確認」）。解析できない場合は、ルールを detekt と ktlint のカスタムルールへ移す案と、PMD の版を変える案を比較し、ADR にする。<strong>厳格さは落とさない（違反 0 件、ベースラインなし、<code>@Suppress</code> なし）</strong></td>
-</tr>
-<tr>
-<td style="text-align: left;">R17</td>
-<td style="text-align: left;">厳格な静的解析の適用（違反 0 件、ベースラインなし）で、B1・B2 の所要が膨らみ、以降の Bolt が圧迫される</td>
-<td style="text-align: left;">全体</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: left;">最初のコードから全ルールを有効にする（後から入れるほど修正が高くつく）。ルールの緩和は ADR と人の承認を要件にし、「通らないから外す」を認めない。B1 の実績で B3 以降を再調整する</td>
-</tr>
-<tr>
-<td style="text-align: left;">R18</td>
-<td style="text-align: left;">Cucumber の導入で、受入条件が Gherkin と Kotest に二重に書かれ、保守の負担が増える。2 つの処理系（Cucumber-JVM と Cucumber-JS）でステップ定義が重複し、フィーチャーファイルの配置が崩れる</td>
-<td style="text-align: left;">全体</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: left;">受入条件・デモ項目は Gherkin、ドメインの純粋関数・性質・DB/HTTP の細部は Kotest と、書く場所を分ける。1 つのシナリオは 1 つの層（<code>@api</code> か <code>@ui</code>）だけで実行する。ステップ定義は薄く保つ。フィーチャーファイルは 1 か所にまとめる案を第一とし、B1 で確定する。承認ゲートで二重の記述がないことを確認する</td>
-</tr>
-<tr>
-<td style="text-align: left;">R19</td>
-<td style="text-align: left;">Cucumber-JVM・Cucumber-JS の版、Kotlin 2.4 や JDK 25 との互換、依存関係の混在（Cucumber-JS の複数の版）が未確認で、導入が遅れる。導入の承認が遅れる</td>
-<td style="text-align: left;">U1</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: center;">中</td>
-<td style="text-align: left;">版は公式の情報で確認してから確定する（確認できなければ「実装開始時に確認」）。B1 の最初に、最小のシナリオで両処理系の動作を確かめる。導入の承認を計画の承認と同時に依頼する</td>
-</tr>
-<tr>
 <td style="text-align: left;">R2</td>
 <td style="text-align: left;">Kotlin 2.4・JDK 25・Gradle 9・Kover・Kotest・Arrow の組み合わせに、未知の不具合がある</td>
 <td style="text-align: left;">U1</td>
@@ -10147,6 +10151,46 @@
 <td style="text-align: center;">中</td>
 <td style="text-align: left;">beer-game2 は参照のみ。beer-game3 とは別プロジェクトとして扱う</td>
 </tr>
+<tr>
+<td style="text-align: left;">R16</td>
+<td style="text-align: left;">PMD が Kotlin 2.4 の構文を解析できない、または Gradle での実行や層ごとのルールセットの分割と両立せず、14 個の関数型ルールを使えない（ガイドは PMD 7.29.0 で確認しており、他の版では保証されない）</td>
+<td style="text-align: left;">U1</td>
+<td style="text-align: center;">高</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">B2 の受入条件にする。使う版で fixture を実行し、期待件数と一致することを確かめる（未確認の間は「実装開始時に確認」）。解析できない場合は、ルールを detekt と ktlint のカスタムルールへ移す案と、PMD の版を変える案を比較し、ADR にする。<strong>厳格さは落とさない（違反 0 件、ベースラインなし、<code>@Suppress</code> なし）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">R17</td>
+<td style="text-align: left;">厳格な静的解析の適用（違反 0 件、ベースラインなし）で、B1・B2 の所要が膨らみ、以降の Bolt が圧迫される</td>
+<td style="text-align: left;">全体</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">最初のコードから全ルールを有効にする（後から入れるほど修正が高くつく）。ルールの緩和は ADR と人の承認を要件にし、「通らないから外す」を認めない。B1 の実績で B3 以降を再調整する</td>
+</tr>
+<tr>
+<td style="text-align: left;">R18</td>
+<td style="text-align: left;">Cucumber の導入で、受入条件が Gherkin と Kotest に二重に書かれ、保守の負担が増える。2 つの処理系（Cucumber-JVM と Cucumber-JS）でステップ定義が重複し、フィーチャーファイルの配置が崩れる</td>
+<td style="text-align: left;">全体</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">受入条件・デモ項目は Gherkin、ドメインの純粋関数・性質・DB/HTTP の細部は Kotest と、書く場所を分ける。1 つのシナリオは 1 つの層（<code>@api</code> か <code>@ui</code>）だけで実行する。ステップ定義は薄く保つ。フィーチャーファイルは 1 か所にまとめる案を第一とし、B1 で確定する。承認ゲートで二重の記述がないことを確認する</td>
+</tr>
+<tr>
+<td style="text-align: left;">R19</td>
+<td style="text-align: left;">Cucumber-JVM・Cucumber-JS の版、Kotlin 2.4 や JDK 25 との互換、依存関係の混在（Cucumber-JS の複数の版）が未確認で、導入が遅れる。導入の承認が遅れる</td>
+<td style="text-align: left;">U1</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">版は公式の情報で確認してから確定する（確認できなければ「実装開始時に確認」）。B1 の最初に、最小のシナリオで両処理系の動作を確かめる。導入の承認を計画の承認と同時に依頼する</td>
+</tr>
+<tr>
+<td style="text-align: left;">R20</td>
+<td style="text-align: left;"><strong>ローカル（H2）で通っても、CI（PostgreSQL）で落ちる乖離</strong>。H2 の PostgreSQL モードでアドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルが動く範囲は、公式ドキュメントで確認できなかった（2026-11-14。非対応とは断定しない）。H2 版で省略した制約は、ローカルでは守られない。H2 版のロックと通知は単一プロセスでのみ有効</td>
+<td style="text-align: left;">全体</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">(a) H2 でしか通らない記述を禁止する（PostgreSQL の統合テストが正）。(b) ポートの契約テストを両実装で実行する（PostgreSQL 版は統合、H2 版はユニット）。(c) 受け入れ（Cucumber <code>@api</code>）は PostgreSQL で実行する。B1 の最初に H2 の動く範囲を実測して確定する。本番・ステージングで H2 を選べないよう、起動時の検査で拒否する。B1 の 4 日に含め、超過したら予備 B16 で吸収する</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -10231,7 +10275,7 @@
 <h2 id="_24">次のステップ<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>本書の承認</strong>（人）。あわせて、設計の暫定の決定（保持の起点、研修中の再構築の運用）を確認する。</li>
-<li><strong>PMD と Cucumber の導入の承認</strong>（人。新規の依存関係。PMD は CI のツール、Cucumber-JVM と Cucumber-JS はテストの依存関係）。版は公式の情報で確認してから確定する。承認までは、静的解析は detekt と ktlint で進め、PMD のルールセットは B2 で fixture のテストと合わせて導入する（<a href="../development_strategy/">開発戦略</a> の未決事項）。</li>
+<li><strong>H2 の導入の承認</strong>（人。ローカル開発専用の新規依存。版は公式の情報で確認してから確定する）。あわせて、<strong>PMD と Cucumber の導入の承認</strong>（人。新規の依存関係。PMD は CI のツール、Cucumber-JVM と Cucumber-JS はテストの依存関係）。版は公式の情報で確認してから確定する。承認までは、静的解析は detekt と ktlint で進め、PMD のルールセットは B2 で fixture のテストと合わせて導入する（<a href="../development_strategy/">開発戦略</a> の未決事項）。</li>
 <li>設計書（<code>draft</code>）を人が確認し、<code>stable</code> にする。技術スタック・テスト戦略を、開発戦略（Cucumber の依存関係、CI の工程、タグによるトレーサビリティ、PMD）に合わせて更新する。</li>
 <li>Kotlin 版の ADR を作成する（ES+CQRS、同期投影、冪等記録と認可の順序、detekt・PMD の判断、Cucumber の導入と Kotest との使い分け）。</li>
 <li><code>apps/beer-game-kotlin/</code> を作成する（<strong>新規ディレクトリのため、承認ゲート</strong>）。フロントエンドの配置（beer-game2 の再利用か、新規か）と、フィーチャーファイルの配置を B1 で決める。</li>
@@ -10251,6 +10295,11 @@
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;">初版作成（承認待ち）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;">ユーザーの決定（ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18）を反映: B1 の最初に H2 の実測、ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の 2 実装と契約テスト、リスク R20、H2 の導入の承認を追加。Bolt の所要と日程は変更しない</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>
