@@ -8,6 +8,7 @@
 | :--- | :--- | :--- |
 | [beer-game](./beer-game/index.md) | 改訂版ビールゲームを再現し、サプライチェーンの動的挙動を学習するシミュレーション | 未着手 |
 | [beer-game2](./beer-game2/index.md) | beer-game の知見をもとに、要件と設計を改訂して作り直す v2。共同担当、カスタム条件、観察者、自動確定を含む | 進行中（Release 0.2 の範囲の機能が完了。ステージングは未達。[リリース完了報告書 0.2](./beer-game2/release_report-0_2_0.md)） |
+| [beer-game-kotlin](./beer-game-kotlin/index.md) | beer-game2 の Kotlin 版の開発計画（リリース計画・Bolt 計画） | 未着手 |
 
 ## 補足
 
