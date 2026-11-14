@@ -1,0 +1,9 @@
+# すべてダミーの値の例（実在のアカウント・ドメイン・バケット・リポジトリではない）。
+# コピーして terraform.tfvars にし、値を入れる（terraform.tfvars はコミットしない）。
+github_repository   = "<owner>/<repo>"
+image               = "<ECR の URL>@sha256:<ステージングで検証した 64 桁のダイジェスト>"
+web_bucket_name     = "<静的ファイルのバケット名（全世界で一意）>"
+domain_name         = "<独自ドメイン>"
+acm_certificate_arn = "arn:aws:acm:us-east-1:<アカウント ID>:certificate/<証明書 ID>"
+# ステージングと同じアカウントなら false（OIDC プロバイダーは 1 アカウントに 1 つ）
+create_oidc_provider = false

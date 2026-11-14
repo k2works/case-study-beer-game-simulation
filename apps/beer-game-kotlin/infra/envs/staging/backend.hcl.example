@@ -1,0 +1,9 @@
+# ダミーの値の例（実在のバケット・アカウントではない）。
+# コピーして backend.hcl にし、値を入れる（backend.hcl はコミットしない）。
+# バケットは、手順書に従って人が作る（暗号化・バージョニング・パブリックアクセスのブロック）。
+# ロックは S3 のロックファイル（Terraform 1.10 以降の use_lockfile）。DynamoDB は使わない。
+bucket       = "<状態のバケット名>"
+key          = "beer-game-kotlin/staging/terraform.tfstate"
+region       = "ap-northeast-1"
+encrypt      = true
+use_lockfile = true
