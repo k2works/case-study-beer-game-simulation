@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -27,6 +27,9 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 | :--- | :--- | :--- |
 | 言語・JDK・Gradle・PostgreSQL のサポート期限 | endoflife.date の API（`kotlin`、`eclipse-temurin`、`gradle`、`postgresql`） | 2026-11-14 |
 | ライブラリの最新の安定版 | Maven Central の `maven-metadata.xml`（`<release>` と `lastUpdated`） | 2026-11-14 |
+| Cucumber-JVM、PMD の最新の安定版 | Maven Central の `maven-metadata.xml`（`io.cucumber:cucumber-java`、`cucumber-junit-platform-engine`、`net.sourceforge.pmd:pmd-core`、`pmd-kotlin`） | 2026-11-14 |
+| Cucumber-JS（`@cucumber/cucumber`）の最新の安定版と要求する Node | npm レジストリ（`registry.npmjs.org/@cucumber/cucumber`） | 2026-11-14 |
+| PMD の公開日 | GitHub の PMD のリリース（`pmd/pmd`。`pmd_releases/7.29.0`） | 2026-11-14 |
 | Ktor の SSE とレート制限のプラグイン名 | Ktor 公式ドキュメント（`ktor.io/docs`。Ktor 3.6.1 の版を表示） | 2026-11-14 |
 | フロントエンド・インフラ・CI | beer-game2 の技術スタックが 2026-11-09 に確認した値を**そのまま引き継ぐ**。本書では再確認していない | 2026-11-09（beer-game2） |
 
@@ -57,10 +60,13 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 | 10 | 接続プール | HikariCP 7.1.0（2026-06-14） | **7.1.0**。JDK 25 との組み合わせは、実装開始時に確認 |
 | 11 | マイグレーション | Flyway 13.12.2（2026-11-12） | **13.12.2**（**選定済み**。設計判断 T4。導入は承認待ち） |
 | 12 | テスト | Kotest 6.2.7（2026-11-11）。Testcontainers は **2 系**（`testcontainers-postgresql` 2.0.5、2026-04-20）で、1 系（`postgresql` 1.21.4）は 2025-12-16 が最後 | **Kotest 6.2.7**、**Testcontainers 2.0.5**（設計判断 T3） |
-| 13 | detekt | **安定版は 1.23.8**（2025-02-21、`io.gitlab.arturbosch`）。`dev.detekt` の **2.0.0-alpha.6**（2026-08-04）は alpha のみ | **1.23.8 を第一候補**。ただし、Kotlin 2.4 のコードを解析できるかは**未確認**。**ウォーキングスケルトンの最初のビルドの受入条件**（規約違反のコードを 1 つ置き、CI が落ちること）で確認し、不可なら設計判断 T5 の代替へ（期限: 最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中） |
-| 14 | ktlint | 1.8.0（2025-12-15） | **1.8.0**。整形の適用範囲は、ガイド §9.4 に従い `.editorconfig` で絞る（設計判断 T5） |
+| 13 | detekt | **安定版は 1.23.8**（2025-02-21、`io.gitlab.arturbosch`）。`dev.detekt` の **2.0.0-alpha.6**（2026-08-04）は alpha のみ | **1.23.8 を第一候補**。ただし、Kotlin 2.4 のコードを解析できるかは**未確認**。**B2 の受入条件**（規約違反のコードを 1 つ置き、CI が落ちること。違反 0 件・ベースラインなし・`@Suppress` なし）で確認し、不可なら設計判断 T5 の代替へ（期限: B2 の中。B2 で確定できなければ B3 以降を止める） |
+| 14 | ktlint | 1.8.0（2025-12-15） | **1.8.0**。整形の適用範囲は、ガイド §9.4 に従い `.editorconfig` で絞る（設計判断 T5）。違反は 0 件で、整形の中核のルールは外さない |
 | 15 | カバレッジ | Kover Gradle プラグイン 0.9.11（2026-09-29） | **0.9.11**（設計判断 T6） |
 | 16 | Node.js（フロントエンドのビルド・テスト用） | beer-game2 が確認した Node 26（Active LTS。EOL 2029-04-30） | **Node 26 LTS** を、フロントエンドのビルドと E2E にだけ使う。バックエンドの実行環境には含めない |
+| 17 | PMD（XPath のカスタムルール。CI のツール） | `net.sourceforge.pmd:pmd-core` と `pmd-kotlin` の最新は **7.29.0**（Maven Central の更新は 2026-10-30。GitHub のリリース `pmd_releases/7.29.0` の公開は 2026-10-30）。サポート期限は、公式に公表された表を確認できていない | **7.29.0**（ガイド §9.6 が確認した版と同じ。fixture で 17 件になる）。Kotlin 2.4 の構文の解析の可否は**未確認**で、B2 の受入条件。**導入は承認待ち**（設計判断 T5。補完として採用） |
+| 18 | Cucumber-JVM | `io.cucumber:cucumber-java` と `cucumber-junit-platform-engine` の最新は **8.0.4**（Maven Central の更新は 2026-10-02）。サポート期限は、公式に公表された表を確認できていない | **8.0.4**。導入は決定済み。**版の確認と依存関係の承認が要る**。Kotlin のステップ定義を `cucumber-java` で書けるか、JUnit Platform（Kotest 6.2.7 が要求する版。`junit-platform-suite` の最新は 6.1.3）との組み合わせは、**実装開始時（B1）にビルドで確認** |
+| 19 | Cucumber-JS（`@cucumber/cucumber`） | 最新は **13.3.0**（npm の公開は 2026-10-05）。要求する Node は `22 \|\| 24 \|\| >=26` で、**Node 26 LTS（事項 16）を満たす**。サポート期限は、公式に公表された表を確認できていない | **13.3.0**。導入は決定済み。**版の確認と依存関係の承認が要る**。パッケージは `@cucumber/cucumber`（旧 `cucumber` ではない）。Playwright（1.65.0。beer-game2 の確認値）との組み合わせは、B1 で確認 |
 
 ## バックエンド
 
@@ -138,8 +144,11 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | 統合テスト | Testcontainers（`testcontainers-postgresql`） | **2.0.5** | 実 PostgreSQL 18 のコンテナ。イベントストア、投影、並行性 |
 | 仮想時間 | `kotlinx-coroutines-test`（`runTest`、`currentTime`） | coroutines と同じ **1.11.0** | 再試行、タイムアウト、定期タスク |
 | カバレッジ | Kover（Gradle プラグイン） | **0.9.11** | 行、命令、分岐の計測と閾値（設計判断 T6）。計測できる指標の種類は、実装開始時に確認 |
-| 静的解析 | detekt | **1.23.8**（Kotlin 2.4 の解析の可否は未確認。**最初のビルドの受入条件**） | 関数型の規約、複雑度（[ガイド §9.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**`ForbiddenMethodCall` で、ドメインのモジュールでの `Instant.now`・`Clock.system*`・`UUID.randomUUID`・`Random` を禁止**し、純粋性を静的検査で守る（[テスト戦略](./test-strategy.md)） |
-| 整形 | ktlint | **1.8.0** | 書式。副作用の大きいルールは `.editorconfig` で外す（[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| 受け入れ（バックエンド） | Cucumber-JVM（`cucumber-java`、`cucumber-junit-platform-engine`） | **8.0.4**（確認日 2026-11-14、Maven Central）。導入は決定済み。承認待ち | 日本語 Gherkin の受入条件・デモ項目（`@api`）。Ktor のテスト用アプリケーションと実 PostgreSQL（Testcontainers）を通す。Gradle のソースセット（`acceptanceTest` を想定） |
+| 受け入れ（画面） | Cucumber-JS（`@cucumber/cucumber`）+ Playwright | **13.3.0**（確認日 2026-11-14、npm。要求する Node は `22 \|\| 24 \|\| >=26`）。導入は決定済み。承認待ち | 日本語 Gherkin の `@ui` のシナリオ。実 Ktor サーバーを通す。タグ（`@US2.4`、`@AC2.4.1`、`@api`/`@ui`、重要度）でストーリーとの対応を取る。生きたドキュメントの公開は CI で自動化（公開の道具は B1〜B2 で選ぶ。**版は未確認**） |
+| 静的解析（中心） | detekt | **1.23.8**（Kotlin 2.4 の解析の可否は未確認。**B2 の受入条件**） | 複雑度、関数型の規約（[ガイド §9.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**違反 0 件（`maxIssues: 0`）、ベースラインなし、`@Suppress` なし**で、最初のコードから全ルールを有効にする。**`ForbiddenMethodCall` で、ドメインのモジュールでの `Instant.now`・`Clock.system*`・`UUID.randomUUID`・`Random` を禁止**し、純粋性を静的検査で守る（[テスト戦略](./test-strategy.md)）。除外が要る層は、ルールセットのファイルを層ごとに分けて外す |
+| 静的解析（補完。CI のツール） | PMD（XPath のカスタムルール。`pmd-core`、`pmd-kotlin`） | **7.29.0**（確認日 2026-11-14、Maven Central。Kotlin 2.4 の構文の解析の可否は未確認）。**導入は承認待ち** | detekt に無い関数型の規約を補う、**14 個の XPath ルール**（`var` の禁止、可変コレクション、`!!`、`throw`、`runBlocking`、`GlobalScope` など。[ガイド §9.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**ルールは、fixture で期待件数（ガイドの例は PMD 7.29.0 で 17 件）と一致することを、テストファーストで確かめ、CI に組み込む**。ルールの `message` に `{` と `}` を書かない。層ごとにルールセットを分ける（B2 の受入条件） |
+| 整形 | ktlint | **1.8.0** | 書式。違反は 0 件。副作用の大きいルールだけを `.editorconfig` で調整する（日本語のバッククォートのテスト名のため、関数名の camelCase はテストで外す。[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。整形の中核のルールは外さない |
 | 画面テスト | Vitest、@testing-library/react、jsdom | beer-game2 の確認値（5.1.0、16.3.3、31.0.0） | コンポーネントのテスト |
 | E2E | @playwright/test、@axe-core/playwright | beer-game2 の確認値（1.65.0、4.14.0） | 実ブラウザ（実際の Ktor サーバー）での受入テストとアクセシビリティ |
 | 変異テスト | **選定未決** | **実装開始時に確認** | domain の品質指標は行の数値より変異テストを優先。導入の要否は、ウォーキングスケルトンで判断（[テスト戦略](./test-strategy.md)）。Pitest の Kotlin 対応と版は、本書では確認していない |
@@ -161,7 +170,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 
 ## 新しく導入する依存関係（導入時に承認を得る）
 
-beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）は承認待ちです。
+beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）に、**Cucumber（導入は決定済み。版の確認と承認が要る）と PMD（承認待ち）**を加えた行は、承認待ちです。
 
 | 依存関係 | 用途 | 代替（導入しない場合） | 導入の判断 |
 | :--- | :--- | :--- | :--- |
@@ -175,7 +184,10 @@ beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き
 | Testcontainers（postgresql） | 実 DB の統合テスト | CI のサービスコンテナだけ（手元で再現しにくい） | ガイドの表にある。導入を推奨。開発依存のみ |
 | kotlinx-coroutines-test | 仮想時間 | 実時間の待ち | 導入を推奨。開発依存のみ |
 | Kover | カバレッジ | JaCoCo を直接 | Kotlin 向け。導入を推奨。開発依存のみ |
-| detekt、ktlint | 静的解析と整形 | PMD のカスタムルール、自作の検査（ガイド §9.5） | ガイド §9.3、§9.4。導入を推奨（detekt の互換は要確認） |
+| detekt、ktlint | 静的解析と整形 | 自作の検査（ガイド §9.5） | ガイド §9.3、§9.4。導入を推奨（detekt の互換は B2 で確認）。違反 0・ベースラインなし・`@Suppress` なしで厳格に適用 |
+| PMD（`pmd-core`、`pmd-kotlin` 7.29.0。XPath のカスタムルール） | detekt に無い関数型の規約の補完（14 個の関数型ルール）。CI のツールで、実行時の依存関係ではない | 自作の検査、detekt のカスタムルール（別途ビルドが要る） | **承認待ち**（開発戦略が採用を提案）。承認までは detekt と ktlint で進め、B2 で fixture のテストと合わせて導入する |
+| Cucumber-JVM（`cucumber-java`、`cucumber-junit-platform-engine` 8.0.4） | `@api` の受入条件の自動実行（日本語 Gherkin） | Kotest だけで受入条件を表す（導入しないという案は、ユーザーが 2026-11-14 に却下） | **導入は決定済み。版の確認は済み（8.0.4）。依存関係の導入の承認が要る**（B1）。開発依存のみ |
+| Cucumber-JS（`@cucumber/cucumber` 13.3.0） | `@ui` の受入条件の自動実行（Playwright と組み合わせる） | 同上 | **導入は決定済み。版の確認は済み（13.3.0）。依存関係の導入の承認が要る**（B1）。開発依存のみ。プロジェクトの依存として入れる（グローバルにインストールしない） |
 | 変異テストの道具、Gradle の依存関係の検査 | テストの強さ、脆弱性 | なし（**選定未決**） | **実装開始時に選定し、あらためて承認を得る** |
 
 ## 設計判断
@@ -217,17 +229,28 @@ beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き
 
 Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認した値。コミュニティ版で足りる機能の範囲は、実装開始時に確認する。
 
-### T5: 静的解析は detekt を中心にし、ktlint は整形を絞って併用する
+### T5: 静的解析は detekt を中心にし、PMD の XPath を補完として採用し、ktlint は整形を絞って併用する（厳格に適用）
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用）** | detekt（1.23.8 を第一候補）で複雑度と関数型の規約、ktlint（1.8.0）で書式。ktlint の整形ルールは `.editorconfig` で調整する | ガイド §9.3、§9.5 の「複数人の開発、長く保守するプロダクト」の推奨に従う。CI で警告 0 を強制する |
-| B | detekt 2.0 の alpha（`dev.detekt`） | Kotlin 2.4 に対応している見込みはあるが、alpha であり、安定性を確認していない |
-| C | PMD のカスタムルール（ガイド §9.6） | `var` の禁止などの専用ルールを XPath で書ける。標準の Kotlin ルールが少ない。detekt の標準ルールで足りない規約の補完として使う（未決事項） |
+| **A（採用。中心）** | detekt（1.23.8 を第一候補）で複雑度と関数型の規約、ktlint（1.8.0）で書式。ktlint の整形ルールは `.editorconfig` で調整する | ガイド §9.3、§9.5 の「複数人の開発、長く保守するプロダクト」の推奨に従う。**違反 0 件、ベースラインなし、`@Suppress` なし**を CI で強制する |
+| B | detekt 2.0 の alpha（`dev.detekt`） | Kotlin 2.4 に対応している見込みはあるが、alpha であり、安定性を確認していない。A が解析できない場合の代替 |
+| **C（採用。補完）** | PMD のカスタムルール（ガイド §9.6。7.29.0） | `var` の禁止などの専用ルールを XPath で書ける（14 個の関数型ルール）。標準の Kotlin ルールが少ないため、**単独では使わず、detekt の標準ルールで足りない規約の補完として使う**。fixture で期待件数を確かめてから CI に組み込む。**導入は承認待ち** |
 
-トレードオフ: A は、**detekt 1.23.8 が Kotlin 2.4 のコードを解析できるか**に依存する。解析できない場合は、Kotlin の版を下げず、B（alpha）、C（PMD の XPath）、または ktlint のカスタムルールを選び直す。
+トレードオフ: A は、**detekt 1.23.8 が Kotlin 2.4 のコードを解析できるか**に依存する。解析できない場合は、Kotlin の版を下げず、B（alpha）、C の拡充（PMD の XPath）、または ktlint のカスタムルールを選び直す。C は、**PMD が Kotlin 2.4 の構文を解析できるか**にも依存する（未確認）。C は、ルールの読み間違いで、違反の見逃しや誤検出が起きうるため、**ルール自体を fixture でテストファーストに確かめる**（ガイド §9.6）。
 
-**受入条件と期限（M17）**: ウォーキングスケルトンの**最初のビルド**で、「規約違反のコードを 1 つ置き、CI が落ちること」を確認する。落ちれば A を確定する。落ちなければ（解析できない、または規則が効かない）、**最初の Bolt の中**で代替を選ぶ。この判断は ADR に記録する。純粋性の規則（`ForbiddenMethodCall` による `Instant.now` などの禁止）も同じ受入条件で確認する。
+**厳格な適用（開発戦略 [静的解析とルール設定](../../development/beer-game-kotlin/development_strategy.md)）**:
+
+- 本プロジェクトは新規の実装で、既存の違反がないため、**14 個の関数型ルールと detekt の標準ルールを、最初から全て有効にする**。違反は 0 件で、ベースライン（既存の違反の許容リスト）を使わず、`@Suppress` とルールの無効化コメントを使わない。
+- 除外が要る層は、**ルールセットのファイルを層ごとに分けて外す**（ドメインは全ルールを有効、アダプター、`main`、テストは外すルールと範囲を明示する）。ルールの緩和・除外は、理由を ADR に記録し、人が承認する。
+- detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認して確定する（ガイドの設定は、実行して確認していない例）。
+
+**受入条件と期限（M17、B2）**: B2 で、次を確認する（満たせなければ B3 以降を止め、代替を選ぶ。選択は ADR に記録する）。
+
+- 「規約違反のコードを 1 つ置き、CI が落ちること」（detekt と PMD のそれぞれ）。落ちれば A（と C）を確定する。落ちなければ（解析できない、または規則が効かない）、B の代替を選ぶ。
+- PMD が Kotlin 2.4 の構文を解析でき、fixture の期待件数と一致すること。
+- 純粋性の規則（`ForbiddenMethodCall` による `Instant.now` などの禁止）も、同じ受入条件で確認する。
+- `maxIssues: 0`、ベースラインなし、`@Suppress` なしで、全コードが緑であること。
 
 ### T6: カバレッジの計測は Kover
 
@@ -257,6 +280,8 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 13 | 型を共有（TypeScript） | API の契約は `contracts/openapi.yaml`（手書きの正本）。開始 API、`If-Match` の範囲、SSE のストリーム種別、problem+json の `type` / `code` が変わる | 言語が分かれた。実態に合わせた（M16） |
 | 14 | 純粋性・規約はレビューと ESLint | detekt の `ForbiddenMethodCall` で時計・乱数の呼び出しを禁止。detekt と Kotlin 2.4 の互換を最初のビルドの受入条件にする | M17、M18 |
 | 15 | （該当なし。Node の期限を使っていた） | JDK 25 の EOL は Temurin の値（2031-09-30）に統一 | 使う配布の値（M17） |
+| 16 | 受入は、Vitest と Playwright のテスト | 受入条件・デモ項目は日本語 Gherkin。バックエンドは Cucumber-JVM（`@api`）、画面は Cucumber-JS + Playwright（`@ui`）。純粋関数・性質・DB/HTTP の細部は Kotest の Given/When/Then | 2026-11-14 の決定。チームの規約（Given/When/Then を先に定義）を、業務の言葉の契約として実行できる形にする。生きたドキュメントは CI で自動公開 |
+| 17 | ESLint の警告は許容する運用もありうる | 静的解析は厳格に適用（違反 0 件、ベースラインなし、`@Suppress` なし）。PMD の XPath を補完として採用（導入は承認待ち）。層ごとにルールセットを分ける | 2026-11-14 の決定。AI が大量にコードを生成するため、規約違反を機械で守らせる（開発戦略） |
 
 ## アップグレード計画
 
@@ -265,14 +290,19 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 実装の開始時 | 全体 | 上の版へ更新し、Gradle のロックで固定。**Kotlin 2.4.21 と Gradle 9.9.1、detekt、Arrow、Kover、Kotest、Ktor の組み合わせを、最初のビルドで確認**する。確認できなかった項目（本書で「実装開始時に確認」としたもの）を、ここで埋める |
 | 実装の期間中 | JDK | 25 のパッチ版のみ更新（LTS を維持） |
 | 2029 年末まで | JDK 25 | EOL 2031-09-30 まで。次の LTS への更新は、2030 年ごろに計画する（次の LTS の版は未確認） |
-| detekt 2 が安定版になった時 | detekt | 1.23.8（または代替）から 2 系へ |
+| detekt 2 が安定版になった時 | detekt | 1.23.8（または代替）から 2 系へ。ルールを緩めずに移行し、fixture のテストで回帰を確かめる |
+| PMD の新しい版が出た時 | PMD | 7.29.0 から更新する場合は、fixture の期待件数が変わらないことを確かめてから上げる（ガイドは 7.29.0 で確認。他の版では保証されない） |
 | Kotlin 2.4 のサポートが終わる前 | Kotlin | 次のマイナーへ。サポート終了日は公表されていないため、Kotlin のリリースの通知を確認する |
 | 継続 | 依存パッケージ | メジャーの更新は、変更点を確認して小さく行う |
 
 ## 未決事項
 
-- **確認できていない項目**（受入条件: 最初のビルド。detekt は「規約違反のコードを置き、CI が落ちること」）: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25。実装開始時にビルドで確認する。
-- **選定未決**: 変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
+- **確認できていない項目**（受入条件: 最初のビルド。detekt と PMD は「規約違反のコードを置き、CI が落ちること」）: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、PMD 7.29.0 の Kotlin 2.4 の構文の解析、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25、Cucumber-JVM 8.0.4 と JUnit Platform・Kotlin の組み合わせ、Cucumber-JS 13.3.0 と Playwright の組み合わせ。実装開始時にビルドで確認する。
+- **承認待ち**: PMD の導入（新規の CI ツール）、Cucumber-JVM と Cucumber-JS の依存関係の導入（導入は決定済み。版は確認済み）。承認の後、開発戦略の未決事項（技術スタックへの Cucumber の追加）は解消する。
+- **公式のサポート期限を確認できていない**: Cucumber-JVM、Cucumber-JS、PMD（Maven Central と npm の最新の版と更新日だけを確認した）。
+- **選定未決**: 生きたドキュメントの公開の道具（Pickles、Cucumber Reports など。B1〜B2 で選び、版を確認）、変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
+- PMD の Gradle での実行方法（プラグインか、CLI の実行か）。detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認する。
+- フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）と、Cucumber のステップ定義の置き場（B1）。
 - Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
 - **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。
 - Ktor のエンジン（Netty か CIO）の最終確認（設計判断 T2）。
@@ -282,8 +312,9 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 ## 出典
 
 - endoflife.date の API（`kotlin`、`eclipse-temurin`、`gradle`、`postgresql`）、2026-11-14
-- Maven Central の `maven-metadata.xml`（`io.ktor:ktor-server-core`、`io.arrow-kt:arrow-core`、`org.jetbrains.kotlinx:kotlinx-coroutines-core`、`kotlinx-serialization-json`、`org.postgresql:postgresql`、`com.zaxxer:HikariCP`、`org.flywaydb:flyway-core`、`io.kotest:kotest-runner-junit5`、`kotest-property`、`org.junit.jupiter:junit-jupiter`、`org.testcontainers:testcontainers-postgresql`、`io.gitlab.arturbosch.detekt:detekt-cli`、`dev.detekt:detekt-cli`、`com.pinterest.ktlint:ktlint-cli`、`ch.qos.logback:logback-classic`）、Gradle プラグインポータル（`org.jetbrains.kotlinx:kover-gradle-plugin`）、2026-11-14
+- Maven Central の `maven-metadata.xml`（`io.ktor:ktor-server-core`、`io.arrow-kt:arrow-core`、`org.jetbrains.kotlinx:kotlinx-coroutines-core`、`kotlinx-serialization-json`、`org.postgresql:postgresql`、`com.zaxxer:HikariCP`、`org.flywaydb:flyway-core`、`io.kotest:kotest-runner-junit5`、`kotest-property`、`org.junit.jupiter:junit-jupiter`、`org.testcontainers:testcontainers-postgresql`、`io.gitlab.arturbosch.detekt:detekt-cli`、`dev.detekt:detekt-cli`、`com.pinterest.ktlint:ktlint-cli`、`ch.qos.logback:logback-classic`、`io.cucumber:cucumber-java`、`io.cucumber:cucumber-junit-platform-engine`、`org.junit.platform:junit-platform-suite`、`net.sourceforge.pmd:pmd-core`、`net.sourceforge.pmd:pmd-kotlin`）、npm レジストリ（`@cucumber/cucumber`）、GitHub の PMD のリリース（`pmd/pmd`）、Gradle プラグインポータル（`org.jetbrains.kotlinx:kover-gradle-plugin`）、2026-11-14
 - Ktor 公式ドキュメント（`https://ktor.io/docs/server-server-sent-events.html`、`https://ktor.io/docs/server-rate-limit.html`）、2026-11-14
+- [開発戦略（Kotlin 版）](../../development/beer-game-kotlin/development_strategy.md)（静的解析の厳格な適用、BDD と Cucumber の導入）
 - [beer-game2 の技術スタック](../beer-game2/tech-stack.md)（フロントエンド・インフラの版。2026-11-09 の確認値）
 - [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 3 章、第 4 章、第 7 章、第 8 章、第 9 章、第 10 章
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[テスト戦略](./test-strategy.md)、[非機能要件](./non-functional.md)

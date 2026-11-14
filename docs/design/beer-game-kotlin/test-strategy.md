@@ -1,10 +1,10 @@
 ---
 type: Design
 title: "テスト戦略 - ビールゲームシミュレーション（Kotlin 版）"
-description: "Kotlin 版のテスト戦略。BDD（Given/When/Then を先に）、decide/evolve/simulateWeek の純粋関数テスト、プロパティベーステスト、イベントストアと投影の統合テスト、冪等性・競合・復元・再構築、カバレッジ目標の判断、CI、トレーサビリティを整理した正本。"
+description: "Kotlin 版のテスト戦略。BDD（受入条件は日本語 Gherkin と Cucumber、ドメインは Kotest の Given/When/Then）、decide/evolve/simulateWeek の純粋関数テスト、プロパティベーステスト、イベントストアと投影の統合テスト、冪等性・競合・復元・再構築、カバレッジ目標の判断、静的解析の厳格な適用（detekt・PMD・ktlint）、CI、タグからのトレーサビリティを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 ---
 
 # テスト戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -43,7 +43,7 @@ beer-game2 のテスト戦略は、beer-game（v1）の実測（199 件、行 90
 | :--- | :--- | :--- |
 | ユニット（ドメイン、投影、アプリケーション）+ UI コンポーネント | 65% 以上 | 純粋関数は速く、規則の網羅に向く。ES の Given/When/Then は、ここで書く |
 | 統合（API + DB） | 30% 以下 | 並行性、冪等性、復元、再構築、権限の検証に必要な分 |
-| E2E | 5% 以下 | 利用の流れの要所だけ |
+| E2E・受け入れ（Cucumber `@api` / `@ui`、Playwright） | 5% 以下 | 受入条件・デモ項目の要所だけ。実サーバー・実 DB を通すため、件数は絞る（シナリオの数の目標は、B1 の実績で見直す） |
 
 プロパティベーステストは、**1 件のテストが多数の入力を試す**ため、件数の割合ではなく、ユニットの一部として数えます。
 
@@ -53,11 +53,13 @@ beer-game2 のテスト戦略は、beer-game（v1）の実測（199 件、行 90
 @startuml
 title テストレベルと責務（Kotlin 版）
 
+rectangle "受け入れ（Cucumber、日本語 Gherkin）\n@api: Cucumber-JVM + 実 Ktor + 実 PostgreSQL\n@ui: Cucumber-JS + Playwright + 実 Ktor サーバー\n受入条件・デモ項目を、業務の言葉のシナリオで検証" as ACC #palegreen
 rectangle "E2E（Playwright + axe）\n実ブラウザ + 実 Ktor サーバー + 実 PostgreSQL で、利用の流れとアクセシビリティを検証" as E2E #palegreen
 rectangle "統合（Kotest + Testcontainers）\nイベントストア、投影、冪等性、競合（複数コルーチン・複数プロセス）、復元、再構築、権限、連鎖削除、HTTP の契約" as INT #khaki
 rectangle "UI コンポーネント（Testing Library）\n画面の振る舞い、共同入力の競合、ルーティング" as UI #lightblue
 rectangle "ユニット（Kotest + Kotest Property）\ndecide / evolve / startGame / simulateWeek / 投影 / 開示 / 値オブジェクト / ハンドラ（関数の束を差し替え）" as UNIT #lightblue
 
+ACC -[hidden]down-> E2E
 E2E -[hidden]down-> INT
 INT -[hidden]down-> UI
 UI -[hidden]down-> UNIT
@@ -73,7 +75,8 @@ UI -[hidden]down-> UNIT
 | UI コンポーネント | 画面の表示、入力、エラー、フォーカス、共同入力の競合、ルーティング | `ui/src/features/` | beer-game2 と同じ（`ApiClient` を差し替える） |
 | HTTP の統合 | 境界（認証、Origin 検査、冪等キー、版、エラー形式、セキュリティヘッダー、相関 ID、レート制限、SSE）の契約を検証する | Ktor のアダプター（`testApplication`） | ハンドラはメモリ上の関数の束、または実 DB |
 | DB の統合 | 永続化、**ストリームの版の競合と自動再試行**、同一トランザクションでの追記・投影・冪等記録・周辺ストア、**複数ストリームの原子的な追記（`StartGame`）**、**再生・再構築・復元**、**追記専用の権限**、連鎖削除の網羅、マイグレーションを、実際の PostgreSQL 18 で検証する | `EventStore`、投影の更新、周辺ストア、`RetentionSaga` の実行、2 つの API プロセス | Testcontainers の PostgreSQL 18（専用のコンテナ。誤った DB への接続を、接続先の検査で防ぐ） |
-| E2E | 利用の流れの要所を、実ブラウザで確認する。アクセシビリティを自動検査する（axe） | 作成、参加、共同入力、確定、観察、SSE の切断、200% 拡大 | 実際の Ktor サーバー、実 DB |
+| **受け入れ（Cucumber）** | **受入条件とデモ項目**を、日本語 Gherkin のシナリオとして、実サーバー・実 DB を通して検証する。シナリオが人と AI の契約で、Cucumber の実行結果が承認ゲートの検証材料になる。**1 つのシナリオは 1 つの層だけで実行する**（`@api` か `@ui`） | `@api`: ストーリーの受入条件（アプリケーション・HTTP・永続化を通す）。`@ui`: 画面を通す必要のある業務（振り返りの表示など） | `@api`: Cucumber-JVM、Ktor のテスト用アプリケーション、Testcontainers の PostgreSQL 18。`@ui`: Cucumber-JS、Playwright、実際の Ktor サーバー、実 DB |
+| E2E | 利用の流れの要所を、実ブラウザで確認する。アクセシビリティを自動検査する（axe）。**業務の受入条件は Cucumber の `@ui` が担い、ここでは、実ブラウザでしか確認できないこと（拡大、フォーカス、SSE、axe）と、画面をまたぐ流れに限る** | 作成、参加、共同入力、確定、観察、SSE の切断、200% 拡大 | 実際の Ktor サーバー、実 DB |
 
 **DB の統合テストは、CI では必ず実行する**。Docker が使えない場合は、スキップではなく失敗にする（環境変数 `CI` が設定されている場合）。手元では、スキップした件数を結果に明示する（beer-game2 の方針を維持）。
 
@@ -82,14 +85,51 @@ UI -[hidden]down-> UNIT
 - 規則の分岐は、ドメインのユニットで網羅する。HTTP の統合では、境界の契約（ステータス、ヘッダー、エラー形式）だけを確認する。
 - **永続化の整合性、並行性、再生・再構築・復元は、DB の統合でだけ検証する**。ユニットでは、メモリ上の関数の束を使う。
 - 画面の分岐は、コンポーネントで確認する。E2E は、画面をまたぐ流れと、実ブラウザでしか確認できないこと（拡大、フォーカス、SSE、axe）に限る。
+- **受入条件は Gherkin、実装の細部と網羅は Kotest が担う。同じ振る舞いを、Gherkin と Kotest で二重に書かない**。受け入れ（Cucumber）は、受入条件の代表例（正常系・主な否定）を実サーバーで通す。規則の分岐の網羅、純粋関数の性質、DB・HTTP の細部（版の競合、権限、境界値）は、下のレベルの Kotest で書く。
+- **同じシナリオを `@api` と `@ui` の両方で実行しない**（ステップ定義を二重に持たない）。
 
 ## 開発の進め方（BDD と TDD）
 
-- **BDD（Given/When/Then を先に）**: 受入条件は、実装より先に、Given/When/Then の振る舞いの例として定義する。**ES では、Given は過去のイベントの列、When はコマンド、Then は新しいイベントの列またはエラー**であり、そのままテストコードになる。
+**Gherkin と Cucumber を導入します**（2026-11-14 の決定。[開発戦略](../../development/beer-game-kotlin/development_strategy.md) が正。導入の手続き、具体的な成果物と版は、B1 で公式の情報から確認してから確定し、依存関係の導入の承認を得る）。
+
+- **BDD（Given/When/Then を先に）**: 振る舞いは、実装より先に Given/When/Then で定義する。書く場所は、対象で分ける。
+  - **受入条件・デモ項目**: **日本語 Gherkin**（フィーチャーファイル）。**Cucumber** が実行する。業務の言葉で読める契約で、生きたドキュメントとして公開する。
+  - **ドメインの純粋関数・性質・DB と HTTP の細部**: **Kotest の日本語のテスト名**で Given/When/Then。**ES では、Given は過去のイベントの列、When はコマンド、Then は新しいイベントの列またはエラー**であり、そのままテストコードになる。イベントの列は実装の詳細に近く、Gherkin にすると冗長になるため、Kotest のビルダー（Object Mother）で組み立てる。
+  - **二重に書かない**: 受入条件は Gherkin、実装の細部と網羅は Kotest。
 - **TDD**: 失敗するテストを書き、**失敗を確認してから**、最小限を実装し、通ったらリファクタリングする。先回りして実装しない。
 - **土台を変える最初のスライドでは、後続の振る舞いのテストも先に書く**（`EventStore` の型や、集約の `decide` の型など、共通の土台を作るとき）。順序を守れなかったときは、規則を壊すとテストが落ちることを個別に確かめ、記録に残す。
-- **ストーリーとの対応**: テスト名に、ストーリー・受入条件の ID を含める（例: `[US2.4/AC2.4.1] Given 自動確定が有効 When 4 役割の入力がそろう Then 週が一度だけ確定される`）。Kotest の日本語のテスト名を使う（[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md) のとおり、関数名の camelCase を強制する整形ルールは外す）。
-- **配置**: Gradle のソースセットでレベルを分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合）。E2E とコンポーネントは、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない。
+
+### アウトサイドインのサイクル（Cucumber）
+
+1. デモ項目・受入条件を日本語 Gherkin のシナリオにし、Mob Elaboration（人 + AI）で合意する。AI が書いた場合も、人が業務の言葉と例の妥当性を検証してから承認する（シナリオが契約）。
+2. 実行する。ステップ定義が無いので **Undefined** になる。
+3. ステップ定義を書く（**Pending**）。まだ無い内側の関数を呼び、アサーションを書いて **Failing（Red）** を確認する。
+4. 内側へ一段ずつ下り（画面 → HTTP → アプリケーション → ドメイン → イベントストア・投影）、各層を Kotest で TDD し、**Passing（Green）** にする。
+5. リファクタリングする。**シナリオは業務の言葉のまま変えない**。
+
+中盤のインサイドアウトでは、受入条件のシナリオを実装の前に書いて合意しておき、ドメインと永続化の Kotest を先に進め、**Bolt の最後に Cucumber で実行して結合を確認する**。
+
+### Gherkin の書き方・タグ・配置
+
+| 項目 | 方針 |
+| :--- | :--- |
+| 言語・語彙 | 日本語 Gherkin。ファイルの先頭に `# language: ja`（`機能`・`背景`・`シナリオ`・`前提`・`もし`・`ならば`・`かつ`）。語彙は [ドメインモデル](./domain-model.md) のユビキタス言語に合わせ、**イベント名・テーブル名などの実装の言葉を持ち込まない**。言語を混在させない |
+| 整理 | 機能領域ごとにフォルダを切る。領域は [ユーザーストーリー](../../requirements/beer-game2/user_story.md) の Epic（ゲーム準備と参加、1 週の意思決定、継続と復旧、観察と振り返り、保持、運用と観測性）に合わせる。1 ファイルに 3〜15 シナリオを目安にする |
+| タグ | ストーリーと受入条件の ID（`@US2.4`、`@AC2.4.1`）、層（`@api`、`@ui`）、重要度（`@acceptance-criteria`、`@happy-path`、`@negative`、`@core`）。`@wip` は作業中の一時的なもので、完了時に削除する。**タグの一覧と意味を、フィーチャーファイルと同じ場所のテキストファイルに文書化する** |
+| 層の分担 | `@api`: Cucumber-JVM（Gradle のソースセット `acceptanceTest` を想定）。Ktor のテスト用アプリケーションと実 PostgreSQL（Testcontainers）を通す。`@ui`: Cucumber-JS（`@cucumber/cucumber`、プロジェクトの依存として導入し、依存ツリーに複数の版を混在させない）と Playwright。実 Ktor サーバーを通す。画面を通す必要のある業務（振り返りの表示など）だけを `@ui` にし、ほかは `@api` にする |
+| 配置（B1 で確定） | フィーチャーファイルは `apps/beer-game-kotlin/features/<機能領域>/` に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の `acceptanceTest`、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所と合わせられるかを B1 で確認する。テストのレベルは、Gradle のソースセットで分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合、`acceptanceTest` = Cucumber-JVM）。コンポーネントと E2E は、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない |
+| 実行 | `@api` は Gradle のタスク、`@ui` は `npx cucumber-js`。CI の毎回の工程に含める。**Undefined・Pending のステップがあれば失敗** |
+
+### ステップ定義の責務
+
+- **薄く保ち、業務ロジックを持ち込まない**。中身は、アプリケーションの関数と、過去のイベントのビルダーを呼ぶだけにする。
+- アウトサイドインでは、ステップ定義から呼ぶ「まだ無い内側」の関数と型が、設計を駆動する。
+- ステップ定義も静的解析の対象である（テストの層のルールセット。[静的解析と規約の検査](#静的解析と規約の検査)）。
+- 1 つのシナリオは 1 つの層だけで実行し、同じシナリオを `@api` と `@ui` の両方で実行してステップ定義を二重に持たない。
+
+### Kotest 側のテスト名（ストーリーとの対応）
+
+Kotest のテスト名には、引き続きストーリー・受入条件の ID を含める（例: `[US2.4/AC2.4.1] Given 自動確定が有効 When 4 役割の入力がそろう Then 週が一度だけ確定される`）。日本語のテスト名を使う（[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md) のとおり、関数名の camelCase を強制する整形ルールは、テストで外す）。**Gherkin のシナリオには ID を名前に入れず、タグ（`@US`・`@AC`）で表す**。
 
 ### テストの形（スケッチ）
 
@@ -285,7 +325,7 @@ Testcontainers の PostgreSQL 18 を使い、**マイグレーションを適用
 
 ## E2E
 
-Playwright と axe で、**実際の Ktor サーバー**と実 DB に対して、利用の流れの要所（作成、参加、共同入力、確定、観察、SSE の切断、200% 拡大）を確認します。beer-game2 の内容を引き継ぎます。**API の契約は変わらない**ため、E2E のシナリオは、beer-game2 のものがそのまま使えるはずです（変わる場合は、設計の矛盾として扱う）。
+Playwright と axe で、**実際の Ktor サーバー**と実 DB に対して、利用の流れの要所（作成、参加、共同入力、確定、観察、SSE の切断、200% 拡大）を確認します。beer-game2 の内容を引き継ぎます。**API の契約は変わらない**ため、E2E のシナリオは、beer-game2 のものがそのまま使えるはずです（変わる場合は、設計の矛盾として扱う）。業務の受入条件のシナリオは、Cucumber の `@ui`（上記）に移す。実装は Playwright を共有し、E2E のディレクトリの配置は B1 で決める。
 
 ## カバレッジ目標
 
@@ -448,7 +488,7 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | NF-O5 | ダッシュボードの目視 | リリース前 |
 | NF-O6 | イベントのスキーマのテスト（追跡できる操作がイベントになること） | 毎回 |
 | NF-O7 | Kover のカバレッジのゲート | 毎回 |
-| NF-O8 | detekt、ktlint、警告のエラー化 | 毎回 |
+| NF-O8 | detekt、PMD、ktlint、警告のエラー化（違反 0）、ルールの fixture テスト | 毎回 |
 | NF-O9 | 設計文書のレビュー（コードとの同期） | PR ごと |
 | NF-O10 | `/ready` のテスト | 毎回 |
 | NF-O11 | パイプラインとロールバックの試験、**N-1 互換のジョブ**（CI のジョブ「N-1 互換」）、復元の訓練 | 毎回（N-1）、デプロイ時、四半期 |
@@ -470,17 +510,64 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 
 ## 静的解析と規約の検査
 
-関数型の規約は、レビューだけに頼らず、静的解析で機械的に守らせます（[ガイド 第 9 章](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
+関数型の規約は、レビューだけに頼らず、静的解析で機械的に守らせます。**[ガイド 第 9 章](../../reference/関数型プログラミングガイド_Kotlin編.md) を、最初のコードから、例外なく、厳格に適用します**（2026-11-14 の決定。詳細と理由は [開発戦略](../../development/beer-game-kotlin/development_strategy.md) の「静的解析とルール設定（厳格に適用）」が正）。
+
+### 厳格さの定義
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 違反の件数 | detekt、PMD、ktlint、コンパイラの警告の違反を **0 件**にする（detekt の `build.maxIssues: 0`、警告をエラーとして扱う） |
+| ベースライン | **使わない**（既存の違反の許容リストを持たない。新規の実装で、既存の違反がない） |
+| 抑制 | `@Suppress` と、ルールの無効化コメントを**使わない**。外す範囲は、**層ごとのルールセットのファイルで明示する** |
+| ルールの緩和 | 理由を ADR に記録し、人が承認する。「通らないから外す」は認めない |
+| マージ | 1 つでも失敗したら、マージしない。ローカルでも同じタスクで再現できる |
+| 対象 | ドメイン、アプリケーション、アダプター、テスト（ステップ定義を含む）のすべて |
+
+### ツールと役割
+
+| ツール | 役割 | 扱い |
+| :--- | :--- | :--- |
+| detekt | 中心の静的解析（複雑度、潜在的なバグ、例外、`ForbiddenMethodCall`） | 標準ルールを有効にし、`maxIssues: 0` |
+| **PMD（XPath のカスタムルール）** | 関数型の規約の **14 個のルール**（ガイド §9.6）。detekt に無い規約（`var` の禁止など）を補う。標準の Kotlin ルールは使わず、XPath で規約をルールにする | 補完として採用する。**導入は承認待ち**（新規の CI ツール）。承認までは detekt と ktlint で進め、PMD のルールセットは B2 で fixture のテストと合わせて導入する |
+| ktlint | 整形 | `.editorconfig` で、整形の副作用が出るルールだけを調整する（下記） |
+| Checkstyle、SpotBugs | Java 用 | 使わない（Kotlin に適用できない） |
+
+### 検査の一覧
 
 | 検査 | 内容 | CI での扱い |
 | :--- | :--- | :--- |
 | コンパイラの警告 | 警告をエラーとして扱う | 毎回 |
-| detekt | 複雑度、`TooGenericExceptionCaught`、`SwallowedException`、`UnsafeCallOnNullableType`、`ForbiddenMethodCall`（可変コレクションの生成）など。設定値は、**実際の detekt の版で確認してから確定する**（ガイドの例は未確認の設定） | 毎回（警告 0） |
+| detekt | 複雑度（`CyclomaticComplexMethod`、`CognitiveComplexMethod`、`LongParameterList`）、`TooGenericExceptionCaught`、`SwallowedException`、`UnsafeCallOnNullableType`、`ForbiddenMethodCall`（`mutableListOf` など）、`MaxLineLength` など。設定値（ルール名と既定値）は、**導入する detekt の版の公式ドキュメントで確認してから確定する**（ガイドの例は実際に走らせて確認していない設定） | 毎回（違反 0） |
+| **PMD の 14 個の関数型ルール** | `NoVarProperty`、`NoVarClassParameter`、`NoMutableCollectionInSignature`、`NoMutableCollectionFactory`、`NoReduce`、`NoNotNullAssertion`、`NoThrow`、`NoGenericCatch`、`SideEffectInNonSuspendFunction`、`NoRunBlocking`、`NoGlobalScope`、`NoRawConcurrency`、`NoThreadSleep`、`NoNestedFlatMap`（ガイド §9.6）。最初から全て有効にする。Kotlin 2.4 の構文を解析できるかは、**未確認**（B2 の受入条件） | 毎回（違反 0。導入の承認後） |
+| **ルールの fixture テスト** | 違反するコードと違反しないコードを並べた fixture で、**期待する行だけが報告される**ことを確かめる（テストファースト）。ローカルな `var`、`private` 関数、`suspend` 関数の中、`buildList` の内側、純粋関数は報告されないことも確かめる。ガイドの例は PMD 7.29.0 で 17 件。**使う版で fixture を実行して件数を確かめる**（他の版は保証されない）。ルールの変更は、fixture のテストで回帰を防ぐ。ルールの `message` に `{` と `}` を書かない（PMD の `MessageFormat` で失敗する） | 毎回（ルールの変更時は必須） |
 | **純粋性の静的検査（M18）** | detekt の `ForbiddenMethodCall` で、**ドメインのモジュール**での `Instant.now`、`Clock.system*`（`systemUTC`、`systemDefaultZone` など）、`UUID.randomUUID`、`Random`（`kotlin.random.Random`、`java.util.Random`、`SecureRandom`）を禁止する。時刻・ID・乱数はコマンドの値で受け取る。**純粋性の主たる保証はこの検査**で、「同じ入力から同じ出力」の性質テストは補助とする。`ForbiddenMethodCall` が型解決を要する設定は、実際の版で確認する | 毎回（違反は失敗） |
 | **detekt と Kotlin 2.4 の互換（M17）** | **ウォーキングスケルトンの最初のビルドの受入条件**: 規約違反のコードを 1 つ置き（ドメインのモジュールで `Instant.now()` を呼ぶ、または `var`）、**CI が落ちること**を確認する。detekt 1.23.8 が Kotlin 2.4 を解析できない、または規則が効かない場合の代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）を選ぶ期限は、**最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中**。選択は ADR に記録する（[技術スタック](./tech-stack.md) 設計判断 T5） | 最初のビルド（受入条件）。以降は毎回 |
-| ktlint | 書式。**整形の副作用が大きいルールは `.editorconfig` で外す**（日本語のテスト名を妨げない） | 毎回 |
+| ktlint | 書式。**整形の副作用が出るルールだけを `.editorconfig` で調整する**: 関数名の camelCase の強制は、**テストで外す**（日本語のバッククォートのテスト名を妨げない）。ファイル名のルールを外すかは導入時に判断（外すなら ADR）。引数が 2 つ以上の関数シグネチャの分割などの中核の整形は、外さずに受け入れる | 毎回 |
 | 層の依存 | ドメインのモジュールは、Kotlin の標準と Arrow だけに依存する（Ktor、JDBC に依存しない）。Gradle のモジュール分割で強制する（[バックエンドアーキテクチャ](./architecture-backend.md)） | 毎回（ビルドで失敗） |
-| `var`、可変コレクション | ドメインでの `var` と共有する可変コレクションを禁止する。detekt の標準で足りない場合は、カスタムルールで補う（ガイド §9.6、未決事項） | 毎回 |
+| `var`、可変コレクション | PMD の `NoVarProperty`・`NoVarClassParameter`・`NoMutableCollection*` と、detekt の `ForbiddenMethodCall` で禁止する（上記の PMD のルール） | 毎回 |
+
+### 層ごとのルールセット
+
+ルールは、**層ごとにファイルを分けて、外す範囲を明示する**（`@Suppress` が写り込まないようにするため。ガイド §9.6）。
+
+| 層 | ルールセット | 外してよいもの |
+| :--- | :--- | :--- |
+| ドメイン | 全ルールを有効（最も厳格）。純粋性の `ForbiddenMethodCall` を含む | なし |
+| アプリケーション | 全ルールを有効 | なし |
+| アダプター（Ktor、JDBC、`EventStore`） | 全ルールを有効。境界の都合で必要なものだけ外す | 例: 外部ライブラリの例外を `Either.catch` で値にする箇所に限り `NoThrow`・`NoGenericCatch`。外すルールと範囲は ADR に記録 |
+| 起動（`main`） | 境界として扱う | `NoRunBlocking`（一度きりの境界） |
+| テスト（ステップ定義を含む） | 全ルールを有効。必要なものだけ外す | `NoThreadSleep` は外さない（`runTest` の仮想時間を使う）。`NoThrow` の扱いは、Kotest の検証で必要な範囲を確認して決める |
+
+構文では表せない規約（`sealed interface` の `when` に `else` を書かない、純粋関数の性質をプロパティベーステストで書く）は、レビューとテストで守り、承認ゲートのチェックリストに入れる。静的解析は、検出できる種類の問題にしか効かない。設計書とコードの食い違い（イベント名、`code`、制約名）は、契約テストと golden で守る。
+
+### 最初のビルドの受入条件（B2）
+
+次を満たせない場合は、B3 以降を止め、代替を選ぶ（[技術スタック](./tech-stack.md) 設計判断 T5）。
+
+- [ ] 規約違反のコードを 1 つ置くと、CI が落ちる（ドメインのモジュールで `Instant.now()`、`var` など。detekt と PMD のそれぞれで確認する）
+- [ ] detekt が Kotlin 2.4 のコードを解析できる。PMD が Kotlin 2.4 の構文を解析でき、fixture の期待件数と一致する
+- [ ] `maxIssues: 0`、ベースラインなし、`@Suppress` なしで、全コードが緑
+- [ ] ktlint の `.editorconfig` の調整が、実際の版で動く
 
 ## CI との連携
 
@@ -491,14 +578,17 @@ title CI のテスト実行（Kotlin 版）
 start
 :プルリクエスト / main へのプッシュ;
 partition "毎回" {
-  :ktlint、detekt、コンパイル（警告をエラー）;
+  :ktlint、detekt、PMD（14 個の関数型ルール）、コンパイル（警告をエラー）\n違反 0、ベースラインなし、@Suppress なし;
+  :ルールの fixture テスト（期待する行だけが報告されるか。\nルールセットを層ごとに確認）;
   :ユニット・性質のテスト（./gradlew test）;
   :統合テスト（Testcontainers の PostgreSQL 18。\nDB の統合は必須。Docker が無ければ失敗）;
+  :受け入れ（Cucumber @api。Gradle のタスク。\nUndefined・Pending があれば失敗）;
   :カバレッジのゲート（行 85%、分岐 75%）;
   :フロントエンド（format、lint、typecheck、コンポーネント）;
-  :Playwright e2e + axe（Chromium、実 Ktor サーバー）;
+  :受け入れ（Cucumber-JS @ui + Playwright）、Playwright e2e + axe\n（Chromium、実 Ktor サーバー）;
   :依存関係・秘密情報・コンテナ・IaC の検査;
-  :ストーリー ID の整合の検査（トレーサビリティの表を生成）;
+  :タグ（@US・@AC）からトレーサビリティの表を生成し、整合を検査;
+  :生きたドキュメント（フィーチャーファイル）の公開（自動）;
   :N-1 互換（直前のリリースの読み取り側で、\n現在の書く版の golden を再生）;
 }
 partition "定期（夜間）" {
@@ -514,6 +604,9 @@ stop
 | 項目 | 方針 |
 | :--- | :--- |
 | 失敗時 | どの工程が失敗しても、マージしない。カバレッジの閾値割れも失敗とする |
+| 静的解析の工程 | ktlint、detekt、PMD は、違反 0 件で合格（ベースラインなし、`@Suppress` なし）。**ルールの fixture テストを、ルールの検査より前に実行する**（ルールが読み間違いで違反を見逃していないことを先に確かめる）。ローカルでも同じ Gradle のタスクで再現できる。PMD は導入の承認後に工程へ加える（承認までは detekt と ktlint） |
+| 受け入れ（Cucumber）の工程 | `@api`（Cucumber-JVM、Gradle のタスク）と `@ui`（`npx cucumber-js`）を毎回実行する。Undefined・Pending のステップがあれば失敗。`@wip` が残っていれば失敗（提案） |
+| 生きたドキュメント | フィーチャーファイルを、ビルドごとに公開する。**CI で自動化し、手作業で生成しない**。ツール（Pickles、Cucumber Reports など）と公開先は B1〜B2 で選ぶ |
 | 実行時間の目標（提案） | ユニット + 性質: 30 秒以内（コンパイルを除く）、統合（コンテナの起動を含む）: 3 分以内、E2E: 5 分以内、全体: 12 分以内（beer-game2 は 10 分。Gradle のビルドとコンテナの起動を加えた分を見込んだ。実測で見直す） |
 | **N-1 互換のジョブ（M22）** | 直前のリリース（タグ）の**読み取り側**（アップキャストと `evolve`）を取得してビルドし、**現在の書く版が作る golden（各イベントの種類を網羅したイベント列の JSON）を再生**して、期待する状態になることを確かめる。旧イメージが新しいイベントを読めない障害（運用の障害パターン 16、NF-O11）の回帰テスト。新しいイベントの種類の追加は `schema_version` では制御できないため、**ジョブが落ちたら、読む側を先にリリースする規則（読める版 → 書く版）に従い、新しい種類を書き始めるのを 1 リリース以上遅らせる**（[データモデル](./data-model.md)）。直前のリリースが無い間（最初のリリース前）は実行しない |
 | 並列化 | テストクラス単位で並列に実行。DB の統合は、ゲームごとに ID を分け、干渉しない。DB のコンテナは、テストの実行全体で 1 つを共有する |
@@ -523,7 +616,14 @@ stop
 
 ## トレーサビリティ（ユーザーストーリー → テスト）
 
-テスト名にストーリー・受入条件の ID を含める規約により、**対応表を自動で生成**します（テスト結果の XML から ID を抽出する。生成の道具は実装開始時に決める）。下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です。ストーリーの内容は beer-game2 の [ユーザーストーリー](../../requirements/beer-game2/user_story.md) を参照します。
+**対応表は、タグから自動で抽出して生成します**。
+
+- **Gherkin のシナリオ**: タグ `@US<番号>`・`@AC<番号>`（例: `@US2.4 @AC2.4.1`）と、層のタグ（`@api`、`@ui`）、重要度のタグから抽出する。Cucumber の実行結果（メッセージ形式や JUnit XML など。形式は B1 で選ぶ）と突き合わせ、**受入条件ごとに、実行したシナリオの数と結果**を出す。
+- **Kotest のテスト**: テスト名の ID（`[US2.4/AC2.4.1]`）を、テスト結果の XML から抽出する。
+- **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)）に存在しない ID を持つタグ・テスト、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。生成の道具は実装開始時に決める。
+- **生きたドキュメントとの連携**: タグから、機能領域・ストーリー別のシナリオのダイジェストを生成する（開発戦略の終盤の重点）。
+
+下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です。**受入条件の代表例は、すべてのストーリーで Cucumber のシナリオ（`@api`、画面を通す業務は `@ui`）に持たせ**、下表の「主なレベル」は、それを補う Kotest などのテストを示します。ストーリーの内容は beer-game2 の [ユーザーストーリー](../../requirements/beer-game2/user_story.md) を参照します。
 
 | ストーリー | 受入条件 | 主なレベル | 備考 |
 | :--- | :--- | :--- | :--- |
@@ -556,7 +656,7 @@ stop
 | 6 | DB 統合は専用の DB（環境変数） | Testcontainers の PostgreSQL 18。CI で必須（Docker が無ければ失敗） | 手元でも CI でも同じ経路 |
 | 7 | 追記専用の権限の検証は無い | `events` への `UPDATE` / `DELETE` の拒否、連鎖削除の確認、**否定テスト（`game_roots` の DELETE、`events` の TRUNCATE、所有者・メンバーでないこと、削除ロールの範囲）、観察者のプールの配線**を加える | データモデルの追記専用の保護（H12、H13） |
 | 8 | 層の依存は ESLint の `no-restricted-imports` | Gradle のモジュール分割（ドメインは Arrow と標準だけに依存） | JVM 版 |
-| 9 | 静的解析は ESLint + Prettier | detekt + ktlint（ガイド §9）。コンパイラの警告もエラー | ガイド §9 |
+| 9 | 静的解析は ESLint + Prettier | detekt + PMD（XPath の 14 個の関数型ルール。導入は承認待ち）+ ktlint（ガイド §9）。コンパイラの警告もエラー。**違反 0・ベースラインなし・`@Suppress` なし**。層ごとのルールセット。ルールの fixture テストを CI に組み込む | ガイド §9、開発戦略の決定（2026-11-14） |
 | 10 | カバレッジのゲートは、行・関数・文 85%、分岐 75% | **行 85%、分岐 75%**（全体）と `domain` の行 100% がゲート。層ごとの他の目標は目安。Kover は `test` と `integrationTest` を合算。関数・文は対象外 | Kover の指標（要確認）、H14 |
 | 11 | 実行時間の目標は全体 10 分 | 全体 12 分（提案） | Gradle のビルドとコンテナの起動を見込む |
 | 12 | 負荷試験は 75 の SSE 接続（ブラウザ + サーバー） | 加えて、**JVM のウォームアップ後の定常値**、起動時間、ヒープ / GC、ストリーム長、再構築時間を計測 | JVM と ES で新しく測る |
@@ -567,6 +667,8 @@ stop
 | 17 | （イベントの新旧の互換の検査は無い。イベントを持たないため） | **N-1 互換のジョブ**を CI に加える | 旧イメージが新しいイベントを読めない障害の防止（M22） |
 | 18 | （この検証の記載なし） | `pg_notify` のロールバック時の不発と `LISTEN` の再購読を、DB の統合に加える | 通知の検証（L4） |
 | 19 | （投影の再構築が無い） | 再構築中のコマンドとの同時実行制御（アドバイザリロック）のテストを加える | 停止中の再構築（M23） |
+| 20 | 受入条件は、Vitest・Playwright のテスト名に ID を入れて表す | **受入条件・デモ項目は日本語 Gherkin + Cucumber**（`@api`: Cucumber-JVM、`@ui`: Cucumber-JS + Playwright）。ドメインの純粋関数・性質・DB/HTTP の細部は Kotest の Given/When/Then。ID は Gherkin ではタグ、Kotest ではテスト名 | 契約をそのまま実行できる形にする。開発戦略の決定（2026-11-14） |
+| 21 | トレーサビリティは、テスト名の ID から抽出 | **タグ（`@US`・`@AC`）と Kotest のテスト名の ID の両方**から自動抽出する。生きたドキュメントを CI で自動公開する | 同上 |
 
 ## 設計判断
 
@@ -601,9 +703,15 @@ stop
 - 変異テストの導入の要否（ウォーキングスケルトンの最初の実測で判断）と、Kotlin 向けの道具（Pitest の対応は本書では確認していない）。
 - Kotest Property に、状態に応じて操作を選ぶ操作列の機能があるか（なければ自前）。生成列の分布の下限（提案: `WeekCommitted` 10%、`SessionEnded` 2%）の値。
 - detekt 1.23.8 と Kotlin 2.4 の互換（最初のビルドの受入条件。落ちる場合の代替の選択は最初の Bolt の中）。`ForbiddenMethodCall` が効く設定。
+- **PMD の導入の承認**（新規の CI ツール）。PMD の Gradle での実行方法、Kotlin 2.4 の構文の解析の可否、使う版での fixture の件数（ガイドの例は PMD 7.29.0 で 17 件。版は実装開始時に確認）。承認後は、[技術スタック](./tech-stack.md)（T5）と [リリース計画](../../development/beer-game-kotlin/release_plan.md) の B2 の記述を合わせる。
+- ktlint の `.editorconfig` で、ファイル名のルールを外すか（導入時に判断。外すなら ADR）。テストの層ごとのルールセットで外す範囲（Kotest の検証での `NoThrow` の扱い）。
+- **Cucumber の導入**（導入は決定済み）: Cucumber-JVM・Cucumber-JS の具体的な成果物と版（実装開始時に、公式の情報で確認する。本書では確認していない）、依存関係の導入の承認、フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）、ステップ定義の置き場、実行結果の形式（トレーサビリティの抽出に使う）。B1 で確定する。
+- 生きたドキュメントの公開ツール（Pickles、Cucumber Reports など）と公開先（B1〜B2）。
+- 受け入れ（Cucumber）のシナリオ数の目標と、実行時間の目標への影響（実行時間の目標は、Cucumber の工程を含めて実測で見直す）。`@wip` が残っていれば失敗とするか。
+- **他の文書の更新**: [技術スタック](./tech-stack.md) に Cucumber と PMD の依存関係を加える（本書の担当外）。
 - 夜間の計測（NF-P15・P18）の試行回数とウォームアップの回数（提案値。JMH を使うか自前か）。NF-C8 の最悪ケース（保存回数の上限）の値。
 - N-1 互換のジョブが使う「直前のリリース」の取得方法（タグから取得してビルドするか、保存した成果物を使うか）。
-- ストーリー ID の整合の検査（テストに存在しない ID、受入条件に対応するテストが無いもの）の厳しさ（警告か、失敗か）。
+- ストーリー ID の整合の検査（タグ・テストに存在しない ID、受入条件に対応するシナリオまたはテストが無いもの）の厳しさ（警告か、失敗か）。
 - 実 DB での負荷試験の環境（CI の夜間か、ステージングか）。
 - 手動のアクセシビリティの確認（スクリーンリーダー）を実施する担当者と時期。
 - Kover が計測できる指標の種類（行・命令・分岐のほか、関数・文の有無）と、生成コードの除外の方法。**`test` と `integrationTest` の合算が動くか**（H14）、`suspend` による分岐の揺れ（全体の分岐 75% の見直し）。
@@ -612,11 +720,12 @@ stop
 - 出力（`buildExport`）が大きい場合のキャッシュ（H3、将来の検討）。
 - 投影の再構築の同時実行制御は、**停止中に再構築し、`pg_advisory_xact_lock_shared` / `pg_advisory_xact_lock` で排他する**と決めた（M23。テストは DB の統合に反映済み）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（短い待ちか 503 `app.retry_exhausted`）の値。
 - カバレッジの数値を、beer-game3（行 80%）と揃えるか。
-- 詳細の設定値（プロパティベーステストの試行回数、detekt の閾値）は、実際の版で確認してから決める。
+- 詳細の設定値（プロパティベーステストの試行回数、detekt の閾値、PMD のルールの XPath）は、実際の版で確認してから決める。
 
 ## 出典
 
 - [テスト戦略ガイド](../../reference/テスト戦略ガイド.md)、[ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（イベントソーシング、CQRS、永続化）、第 8 章（テスト戦略）、第 9 章（静的解析）
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[技術スタック（Kotlin 版）](./tech-stack.md)、[非機能要件（Kotlin 版）](./non-functional.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[運用要件](./operation.md)
 - [beer-game2 のテスト戦略](../beer-game2/test-strategy.md)、[ユーザーストーリー（beer-game2）](../../requirements/beer-game2/user_story.md)
+- [開発戦略（Kotlin 版）](../../development/beer-game-kotlin/development_strategy.md)、[BDD 導入ガイド](../../reference/BDD導入ガイド.md)
 - [ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)
