@@ -33,3 +33,7 @@ dist/
 test-results/
 playwright-report/
 .env
+
+# Generated and harness-local files
+__pycache__/
+apps/beer-game3/aidlc/.aidlc-sessions/
