@@ -37,6 +37,7 @@
   "homepage": "https://github.com/k2works/{project_name}#readme",
   "type": "module",
   "dependencies": {
+    "@k2works/claude-code-booster": "^6.8.0",
     "dotenv": "^17.2.3",
     "gulp": "^5.0.0",
     "marked": "^18.0.9",
