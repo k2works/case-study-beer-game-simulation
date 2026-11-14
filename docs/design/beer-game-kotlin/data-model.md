@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -735,21 +735,23 @@ db/migration/
 
 **H2 を、設計の検証（並行性、権限、部分一意索引、連鎖削除）や性能の計測には使いません。** それらの正は PostgreSQL の統合テストです。
 
+**実測（B1 の Step 1。2026-11-14）。** 公式ドキュメントで確認できなかった項目を、H2 2.5.252（PostgreSQL モード。`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`）で実際に動かして確かめた。結果は下の「方言の差分」の表のとおり。**結論: アドバイザリロック、`LISTEN`/`NOTIFY`、部分一意索引、`GRANT TRUNCATE` は動かず、設計どおり、ポートの裏に隠す・省略するのが妥当。権限の強制（SELECT のみのロールの拒否）、分離レベル、`ON DELETE CASCADE`、SQLSTATE（23505・23513・40001）は動いた。** 設計が H2 で成り立たなくなる項目は無く、**ローカル構成は成立する**。実測の手順は、使い捨てのコード（リポジトリに残さない）で、29 項目を実行した。Flyway の適用は、Step 2 のビルドで確かめる（未確認）。
+
 **確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**（「非対応」と断定するものではありません）。実際の動作は、**B1 の最初に実測して確定します（未確認）**。H2 の版も実装開始時に確認します（[技術スタック](./tech-stack.md)）。
 
 ### 方言の差分
 
 | 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ） | 扱い |
 | :--- | :--- | :--- | :--- |
-| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)` | 確認できなかった | ポート `ProjectionLock` の裏に隠す。H2 版は**プロセス内の読み書きロック**（単一プロセスでのみ有効） |
-| SSE の版の通知（LISTEN/NOTIFY） | `pg_notify` と専用の LISTEN 接続 | 確認できなかった | ポート `ChangeNotifier` の裏に隠す。H2 版は**プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） |
-| 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 確認できなかった | H2 版は**省略**し、アプリケーション側の再照合に置き換える |
-| DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、追記専用、`TRUNCATE` の拒否 | あり | 確認できなかった | H2 版は**省略**（単一の接続ユーザー） |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)` | **動かない**（実測: 関数が無い。SQLState 90022） | ポート `ProjectionLock` の裏に隠す。H2 版は**プロセス内の読み書きロック**（単一プロセスでのみ有効） |
+| SSE の版の通知（LISTEN/NOTIFY） | `pg_notify` と専用の LISTEN 接続 | **動かない**（実測: `LISTEN`・`NOTIFY` は構文エラー、`pg_notify` は関数が無い） | ポート `ChangeNotifier` の裏に隠す。H2 版は**プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） |
+| 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | **動かない**（実測: `CREATE UNIQUE INDEX … WHERE` は構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える |
+| DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、追記専用、`TRUNCATE` の拒否 | あり | **一部動く**（実測: `CREATE ROLE`・`GRANT SELECT`・`REVOKE`・`CREATE USER` は動き、SELECT のみのロールは INSERT・UPDATE・DELETE・`TRUNCATE`・DROP・CREATE を拒否した（SQLState 90096）。**`GRANT TRUNCATE` は構文エラー**。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。H2 でも権限の一部は強制されるが、**権限の検証の正は PostgreSQL の統合テスト**（`GRANT TRUNCATE` と所有者の挙動が検証できないため） |
 | 接続プールの分離（観察者用など） | 用途別 | 単一のプール | H2 版は**省略** |
-| `jsonb` | `events.payload` | 確認できなかった | 型はプレースホルダで切り替える。H2 側の型は B1 の実測で決める |
-| 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | 動作の同一性は確認できなかった | H2 では検証しない（PostgreSQL の統合テストが正） |
-| SQLSTATE（40001、40P01、55P03、23505 の制約名） | アダプターが `AppFailure` に写す | 確認できなかった | H2 版の写像は B1 の実測で確定。写せない場合は H2 では再試行を行わない |
-| 名前つきの一意制約、`ON DELETE CASCADE`、`CHECK` | あり | 標準の SQL だが、H2 での動作は未確認 | 共通の DDL に置き、B1 の実測で確認 |
+| `jsonb` | `events.payload` | **型は通るが挙動が違う**（実測: `jsonb` は H2 では `json`。**`setString` で入れた文字列は、JSON の文字列値になる**（`"{\"a\":1}"`）。`FORMAT JSON` を付けて初めて JSON のオブジェクトになる） | **H2 版の `events.payload` は、`FORMAT JSON` で書くか、`text` 列にする**。型と書き込みの SQL は、方言ごとの場所（またはプレースホルダ）で分ける。`timestamptz` は H2 の PostgreSQL モードで不明なデータ型のため、**共通の DDL は `timestamp with time zone` と書く**（実測） |
+| 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | **設定は通る**（実測: READ COMMITTED・REPEATABLE READ・SERIALIZABLE の設定が通る。動作の同一性は未確認） | H2 では検証しない（PostgreSQL の統合テストが正） |
+| SQLSTATE（40001、40P01、55P03、23505 の制約名） | アダプターが `AppFailure` に写す | **一部動く**（実測: 一意違反は 23505、`CHECK` 違反は 23513、REPEATABLE READ の同時更新は **40001**。**違反した制約の名前は、メッセージに大文字で含まれる**（`UQ_EVENTS_STREAM_VERSION`）。PostgreSQL のような制約名の専用フィールドは未確認） | H2 版の写像: 23505 はメッセージ中の制約名（**大文字小文字を区別せず**）で `uq_events_stream_version` などに写す。40001 は `ConcurrencyConflict` として再試行する |
+| 名前つきの一意制約、`ON DELETE CASCADE`、`CHECK` | あり | **動く**（実測: 名前つきの一意制約、`ON DELETE CASCADE`（親の削除で子が 0 件になる）、名前つきの `CHECK`、`uuid`・`bytea`・`information_schema`・`pg_catalog.pg_class` の参照） | 共通の DDL に置く |
 
 ### H2 版で省略する制約（ローカルでは守られない）
 

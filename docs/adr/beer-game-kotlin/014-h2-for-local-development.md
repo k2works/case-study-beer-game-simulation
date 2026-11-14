@@ -4,7 +4,7 @@ title: "ADR-014: ローカル開発だけ H2（PostgreSQL モード）を使い�
 description: "H2 の PostgreSQL モードはローカル開発の起動・動作確認にだけ使い、テスト・CI・ステージング・本番は PostgreSQL 18 のままとする。アドバイザリロックと通知はポートの裏で両対応にする。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
 ---
 
 # ADR-014: ローカル開発だけ H2（PostgreSQL モード）を使い、PostgreSQL 固有の機能をポートで抽象化する
@@ -64,6 +64,7 @@ Kotlin 版は、開発機での起動と動作確認に限り、H2 の PostgreSQ
 
 ## コンプライアンス
 
+- **B1 の Step 1 の実測（2026-11-14、実施済み）**: H2 2.5.252 の PostgreSQL モードで 29 項目を実測した。**アドバイザリロック、`LISTEN`/`NOTIFY`、部分一意索引、`GRANT TRUNCATE` は動かず**（ポートの裏に隠す・省略する決定は妥当）、**`jsonb` は挙動が違い**（`setString` では JSON の文字列値になる）、ロールの権限の強制・分離レベル・`ON DELETE CASCADE`・SQLSTATE（23505・23513・40001）は動いた。設計が成り立たなくなる項目は無い。詳細は [データモデル](../../design/beer-game-kotlin/data-model.md) の「ローカル開発」節。人のゲート 1 の確認は待ち。
 - **ポートの契約テスト**: `ProjectionLock` と `ChangeNotifier` の契約テストを、両実装で実行する（PostgreSQL 版は統合テスト、H2 版はユニット）。
 - **本番で H2 を拒否する起動の検査**: 本番・ステージングの環境で `DB_KIND=h2` を指定すると、起動に失敗することを、テストで検証する。
 - **PostgreSQL での統合テスト・受け入れ**: 並行性、権限、部分一意索引、連鎖削除、`jsonb` は、PostgreSQL 18（Testcontainers）の統合テストでだけ検証する。受け入れ（Cucumber の `@api`）は PostgreSQL で実行する。CI で H2 を使わないことを確認する。

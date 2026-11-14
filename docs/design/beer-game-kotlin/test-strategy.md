@@ -4,7 +4,7 @@ title: "テスト戦略 - ビールゲームシミュレーション（Kotlin �
 description: "Kotlin 版のテスト戦略。BDD（受入条件は日本語 Gherkin と Cucumber、ドメインは Kotest の Given/When/Then）、decide/evolve/simulateWeek の純粋関数テスト、プロパティベーステスト、イベントストアと投影の統合テスト、冪等性・競合・復元・再構築、カバレッジ目標の判断、静的解析の厳格な適用（detekt・PMD・ktlint）、CI、タグからのトレーサビリティを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
 ---
 
 # テスト戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -780,7 +780,7 @@ stop
 ## 未決事項
 
 - **API の契約テストの道具**（OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成）の選定と、導入の承認（B2。公式の情報で確認して選ぶ。本書では確認していない）。`problem+json` の `code` の列挙や SSE が、OpenAPI で表せる範囲（SSE は表せない部分を自前のテストで補う想定）。
-- **H2 の PostgreSQL モードの実測**（B1 の最初）: アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルがどこまで動くかを実測する（公式ドキュメントで確認できなかった。非対応とは断定しない）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、H2 のスモークの範囲を確定する。H2 の版と導入は承認待ち（[技術スタック](./tech-stack.md)）。
+- **H2 の PostgreSQL モードの実測**（**実測済み（2026-11-14、B1 の Step 1）。結果は [データモデル](./data-model.md) の「ローカル開発」節**。以下は実測前の項目で、Flyway の適用だけ未確認）: アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルがどこまで動くかを実測する（公式ドキュメントで確認できなかった。非対応とは断定しない）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、H2 のスモークの範囲を確定する。H2 の版と導入は承認待ち（[技術スタック](./tech-stack.md)）。
 - 変異テストの導入の要否（ウォーキングスケルトンの最初の実測で判断）と、Kotlin 向けの道具（Pitest の対応は本書では確認していない）。
 - Kotest Property に、状態に応じて操作を選ぶ操作列の機能があるか（なければ自前）。生成列の分布の下限（提案: `WeekCommitted` 10%、`SessionEnded` 2%）の値。
 - detekt 1.23.8 と Kotlin 2.4 の互換（最初のビルドの受入条件。落ちる場合の代替の選択は最初の Bolt の中）。`ForbiddenMethodCall` が効く設定。

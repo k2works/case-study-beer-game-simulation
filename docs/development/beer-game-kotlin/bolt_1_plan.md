@@ -4,7 +4,7 @@ title: "Bolt 1 計画 - 基盤と縦の最小（ウォーキングスケルト�
 description: "beer-game-kotlin の Bolt 1 のステップ計画。ゴール、仮説、対象の受入条件、着手前に人の判断が要る項目、TDD のステップと承認ゲート、完了条件。承認済み（2026-11-14）。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:10:21Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-14T08:52:24Z }
 ---
@@ -539,11 +539,21 @@ Lobby --> Console : 進行役: 「開始する」
 
 **最初に行います**（[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)）。結果で、H2 版で置き換える・省略する制約を確定します。
 
-- [ ] 1.1 H2（2.5.252）の PostgreSQL モードで、次が動くかを、小さな検証用のコード（使い捨て。成果物にしない）で実測する: アドバイザリロック、`LISTEN` / `NOTIFY`、部分一意索引、`CREATE ROLE` / `GRANT` / `REVOKE`（`TRUNCATE` を含む）、`jsonb`、一意違反と直列化失敗の SQLSTATE、分離レベル（READ COMMITTED、REPEATABLE READ）、`ON DELETE CASCADE`、Flyway の適用
-- [ ] 1.2 結果を表にして、[データモデル](../../design/beer-game-kotlin/data-model.md) の「ローカル開発」節と未決事項に記録する（動いた／動かなかった／部分的）
-- [ ] 1.3 H2 版で置き換える・省略する制約の一覧を確定する（省略した制約は、ローカルでは守られないと明記する）
+- [x] 1.1 H2（2.5.252）の PostgreSQL モードで、次が動くかを、小さな検証用のコード（使い捨て。成果物にしない）で実測する: アドバイザリロック、`LISTEN` / `NOTIFY`、部分一意索引、`CREATE ROLE` / `GRANT` / `REVOKE`（`TRUNCATE` を含む）、`jsonb`、一意違反と直列化失敗の SQLSTATE、分離レベル（READ COMMITTED、REPEATABLE READ）、`ON DELETE CASCADE`、Flyway の適用
+- [x] 1.2 結果を表にして、[データモデル](../../design/beer-game-kotlin/data-model.md) の「ローカル開発」節と未決事項に記録する（動いた／動かなかった／部分的）
+- [x] 1.3 H2 版で置き換える・省略する制約の一覧を確定する（省略した制約は、ローカルでは守られないと明記する）
 
 **ゲート 1**: 実測の結果と、H2 版の置き換え・省略の一覧を、人が確認する。結果が悪ければ（設計が H2 で成り立たなければ）、ここで止めて方針を相談する。
+
+**Step 1 の結果（AI 実施済み。ゲート 1 は人の確認待ち）**: H2 2.5.252 の PostgreSQL モードで 29 項目を実測した（使い捨てのコード。リポジトリに残していない）。詳細は [データモデル](../../design/beer-game-kotlin/data-model.md) の「ローカル開発」節の方言の差分の表。**設計が H2 で成り立たなくなる項目は無く、ローカル構成は成立する。**
+
+| 結果 | 項目 |
+| :--- | :--- |
+| 動かない | アドバイザリロック、`LISTEN`/`NOTIFY`/`pg_notify`、部分一意索引、`GRANT TRUNCATE`、`timestamptz`（`timestamp with time zone` なら動く） |
+| 挙動が違う | `jsonb`（`setString` で入れると JSON の文字列値になる。`FORMAT JSON` か `text` 列が要る）。違反した制約名は、メッセージに大文字で含まれる |
+| 動く | 名前つきの一意制約、`ON DELETE CASCADE`、`CHECK`、一意違反 23505、`CHECK` 違反 23513、同時更新の競合 40001（REPEATABLE READ）、分離レベルの設定、`FOR UPDATE`、`ON CONFLICT DO NOTHING`、`uuid`・`bytea`、`information_schema`、ロールと `GRANT SELECT`（SELECT のみのロールは INSERT・UPDATE・DELETE・TRUNCATE・DROP を拒否） |
+
+**H2 版の置き換え・省略（確定）**: アドバイザリロック → プロセス内の読み書きロック、`LISTEN`/`NOTIFY` → プロセス内のイベント（どちらも単一プロセスのみ）。部分一意索引、`GRANT TRUNCATE`、接続プールの分離 → 省略（ローカルでは守られない）。`events.payload` と `timestamp` の型・書き込みは、方言ごとに分ける。権限の検証の正は PostgreSQL の統合テスト。Flyway の H2 への適用は、Step 2 のビルドで確かめる（未確認）。
 
 ### Step 2: リポジトリの土台（🔵）
 
