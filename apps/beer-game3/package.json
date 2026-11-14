@@ -14,11 +14,20 @@
     "start": "node --env-file-if-exists=.env dist/server/main.js",
     "migrate": "node --env-file-if-exists=.env scripts/migrate.mjs up",
     "migrate:down": "node --env-file-if-exists=.env scripts/migrate.mjs down",
-    "test": "vitest run tests/u1 tests/u2 tests/u3",
-    "test:unit": "vitest run tests/u1/features tests/u1/unit tests/u2/features tests/u2/unit tests/u3/features tests/u3/unit",
-    "test:integration": "vitest run tests/u1/integration tests/u2/integration tests/u3/integration",
-    "test:web": "vitest run tests/u1/web tests/u3/web",
-    "test:coverage": "vitest run tests/u1 tests/u2 tests/u3 --coverage",
+    "test": "vitest run tests/u1 tests/u2 tests/u3 tests/u4 tests/u5 tests/u6",
+    "test:u4": "vitest run tests/u4",
+    "test:u5": "vitest run tests/u5",
+    "test:u6": "vitest run tests/u6",
+    "test:unit": "vitest run tests/u1/features tests/u1/unit tests/u2/features tests/u2/unit tests/u3/features tests/u3/unit tests/u4/features tests/u4/unit tests/u5/features tests/u5/unit tests/u6/features tests/u6/unit",
+    "test:integration": "vitest run tests/u1/integration tests/u2/integration tests/u3/integration tests/u4/integration tests/u5/integration tests/u6/integration",
+    "test:web": "vitest run tests/u1/web tests/u3/web tests/u4/web tests/u5/web",
+    "test:coverage": "vitest run tests/u1 tests/u2 tests/u3 tests/u4 tests/u5 tests/u6 --coverage",
+    "verify:load": "node --import tsx verification/load/main.ts",
+    "verify:load:smoke": "node --import tsx verification/load/main.ts --mode smoke",
+    "verify:load:main": "node --import tsx verification/load/main.ts --mode main",
+    "verify:render": "node --import tsx verification/load/render-check.ts",
+    "verify:prod-deps": "node verification/ci/prod-deps.ts",
+    "e2e": "playwright test --config verification/e2e/playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -35,7 +44,9 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
@@ -46,6 +57,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "@vitest/coverage-v8": "5.1.0",
+    "axe-core": "4.14.0",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
@@ -55,6 +67,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
     "vite": "8.3.8",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "yaml": "2.9.1"
   }
 }

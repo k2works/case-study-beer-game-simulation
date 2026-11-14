@@ -4,3 +4,7 @@ node_modules
 package-lock.json
 tests/u2/fixtures/golden-50-weeks.json
 aidlc
+verify-summary.json
+verify-summary.md
+test-results
+playwright-report
