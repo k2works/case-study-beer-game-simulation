@@ -281,10 +281,77 @@ API の契約テストの**実装**（道具の選定と承認の後。選定の
 
 ### Step 5: API の契約テストの道具の候補の提示（🔵）
 
-- [ ] 5.1 OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成の候補を、公式の情報（Maven Central、npm）で確認し、比較表にする（版、保守状況、Kotlin／Ktor との相性、problem+json の `code` の列挙や SSE の表現力、新規依存の数）
-- [ ] 5.2 **人が選び、承認する**。承認後に、契約テストと型の生成を CI に組み込む（**本 Bolt の範囲に含めるかは、承認の時点で判断**）
+- [ ] 5.1 OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成の候補を、公式の情報（Maven Central、npm）で確認し、比較表にする（**比較表は未作成**。ユーザーが 2026-11-14 に選定・承認した）
+- [x] 5.2 承認後に、契約テストと型の生成を CI に組み込む（2026-11-15 実施。下の「Step 5 の結果」）
 
-**ゲート 5**: 道具の選定と、導入の承認（人）。
+**ゲート 5**: 道具の選定と、導入の承認（人）。選定・承認は 2026-11-14 に済み。**実装の確認（人）は待ち**。
+
+#### Step 5 の結果（実測。2026-11-15）
+
+**1. 使った道具と版（確認した値）**
+
+| 道具 | 版 | 確認 |
+| :--- | :--- | :--- |
+| `@redocly/cli`（devDependency、固定） | 2.78.0 | `npm view @redocly/cli version` |
+| `openapi-typescript`（devDependency、固定） | 7.13.0 | `npm view`。peer は `typescript ^5.x` |
+| `com.networknt:json-schema-validator`（`app` の test のみ） | 3.0.9 | Maven Central の maven-metadata（latest・release）と POM。推移的に jackson-databind 3.1.8、itu 1.17.0、slf4j（テスト実行時に jackson-dataformat-yaml） |
+
+これ以外の依存は足していない。
+
+**2. 型の生成の試行（スパイク）の結果**
+
+- `npm install -D openapi-typescript@7.13.0` は、予想どおり **ERESOLVE で失敗**（peer `typescript ^5.x` と web の TypeScript 6.0.3 の衝突）。
+- `package.json` に `"overrides": { "openapi-typescript": { "typescript": "$typescript" } }` を足すと導入でき、`npm ls` は `openapi-typescript@7.13.0 -> typescript@6.0.3 deduped`。
+- TS 6.0.3 で、生成（`openapi-typescript ../contracts/openapi.yaml`）が成功。生成物を `src/api/generated/schema.d.ts` に置き、`src/api/types.ts` を生成物からの写しに置き換えた。**`npm run typecheck`（tsc）、Vitest（70 件）、lint、format:check、build（`npm run verify`）がすべて通った**。`npm ci --dry-run`（スクラッチ）も成功。
+- **結論: 採用**。手書きの型は、画面だけの型（`CreateGameResult`、`ProblemBody`、整数以外も受ける `CreateGameRequest`）と実行時の値（`ROLES`）に絞った。`CreateGameRequest` が仕様より狭くならないこと、`ROLES` が `Role` を網羅することは、型の検査で守る。
+- スクリプト: `api:lint`（`redocly lint ... --config ../contracts/redocly.yaml`）、`api:generate`（生成と prettier での整形）、`api:check`（`scripts/check-generated.mjs`。生成し直してコミット済みと比べる。差分 0 でなければ失敗）。`contracts/redocly.yaml` は `recommended-strict`（警告も失敗）に、3 つのルールだけを off（info-license、tag-description、operation-4xx-response。理由は同ファイルに記載）。
+
+**3. 契約テスト（`app/src/test/kotlin/beergame/app/contract/`。13 件）**
+
+- **置き場の判断**: 指示は `adapter-http` だったが、`adapter-http` のテストには永続化の読み取り側（投影）が無く、成功の応答（状態の投影）を作れない。H2 の永続化と全経路の組み立てがあるのは `app` のため、`app` の test に置いた（PostgreSQL 不要。H2 のメモリ上）。`app/build.gradle.kts` の `test` の入力に `contracts/openapi.yaml` を加えた（仕様だけを変えたときにテストが再実行されるように）。
+- 検査: 応答の適合（スキーマ・`unevaluatedProperties: false` による未宣言の項目の検出・状態・Content-Type・ヘッダー）、全体の守り（429・413・500・503 が全操作に宣言されていること）、リクエストの適合（事例 39 件の仕様の判定と実装の受理・拒否、Idempotency-Key 必須）、エラー `code` の一致（欠けても余っても失敗）、ルートの網羅、検査自体が違反を見つけること（常に緑でない確認）。
+- code の突き合わせの前提: ドメインの code はソースの走査（kotlin-reflect を足さないため）、HTTP の層は `Codes` のリフレクションで集める。分類が Forbidden のドメインの誤り（`session.forbidden`、`game.forbidden`）は `app.unauthorized` に写るため仕様に載せず、参加コードの失敗（`game.invitation_invalid`）だけが例外（ProblemMapping.kt）。
+
+**4. 契約テストが見つけた不一致と対処（Red の実測）**
+
+最初の実行は 13 件中 8 件が失敗した（Red）。うち、テストの誤りは経路の接頭辞・Forbidden の扱い・503 の再現用の状態の 3 点で、テスト側を直した。**仕様と実装の不一致は次のとおりで、実装（アダプターの本体）は変えず、仕様を実装に合わせた**（実装が設計書・受入条件に沿っているため）。
+
+| # | 不一致 | 対処 |
+| :--- | :--- | :--- |
+| 1 | 409 の problem に、実装は拡張メンバー（`requestedWeek`・`currentWeek`・`role`・`latest`・`week`・`current`）を返すが、仕様に無い | `ConflictProblem`・`ConflictProblemBody`・`DecisionEntry` を追加し、saveDecision・commitWeek の 409 に使用 |
+| 2 | 429（レート制限）が、全操作（探針を除く）に掛かるが、7 操作に宣言が無い | 7 操作に 429 を追加 |
+| 3 | 413（64 KB 超）が、変更系の全操作に掛かるが、4 操作に宣言が無い | assignRole・startGame・saveDecision・commitWeek に追加 |
+| 4 | 500 が、問い合わせ系 3 操作に宣言が無い | getLobby・getSessionState・getGameState に追加 |
+| 5 | CreateGameRequest の範囲（最終週 1〜50、需要 0〜1000、保持日数 1〜3650）が、説明文だけでスキーマに無く、実装は範囲外を 422 にする | `minimum`・`maximum` を追加 |
+| 6 | 表示名が、実装は 1〜80 文字だが、仕様は「上限は未決」 | `minLength: 1`・`maxLength: 80` を追加 |
+| 7 | `GameState.sessionId` が、実装は常に含める（開始前は null）が、仕様は任意（型の生成で、画面が `string \| null` と読めなくなって発覚） | `required` に追加 |
+
+**これらの仕様の変更は、ADR-008 の「仕様が先」に照らすと、実装に合わせた後追いの修正**。人の確認が要る（特に 5・6 の範囲を仕様に重複して持つこと）。
+
+**5. 変異の確認（わざと仕様と実装をずらし、失敗→戻して成功）**
+
+| 変異 | 結果 |
+| :--- | :--- |
+| 仕様の `ErrorCode` から `session.week_advanced` を削除 | 契約テスト 2 件が失敗（code の一致、応答の適合） |
+| 実装の応答の項目名 `submittedRoleCount` を変更 | 応答の適合が失敗（必須項目の欠落と未宣言の項目を指摘） |
+| 実装のルート `/games/{gameId}/start` を `/begin` に変更 | 8 件が失敗。ルートの網羅は「実装にあって仕様に無い: begin、仕様にあって実装に無い: start」を指摘 |
+| 実装の code `app.rate_limited` を変更 | code の一致が「仕様にあって実装に無い、実装にあって仕様に無い」を指摘 |
+| 仕様の `$ref` を壊す（スクラッチの写し） | `redocly lint` が終了コード 1（no-unresolved-refs） |
+| 仕様の `HealthStatus` の enum に値を追加 | `api:check` が終了コード 1（再生成を促す） |
+
+いずれも元に戻し、アダプターの本体のコードに差分が残っていないことを `git status` で確認した。
+
+**6. CI**: `.github/workflows/beer-game-kotlin.yml` に `contract` ジョブ（`npm ci` → `api:lint` → `api:check`）を追加し、`web`（typecheck を含む）は `contract` の後、`test`（契約テストを含む）は `contract` と `web` の後に実行する（順序: 仕様の検証 → 型の生成 → 型の検査 → テスト）。YAML の構文は Ruby で読み込めることまで確認。**GitHub Actions 上の実行は未確認**。
+
+**7. 静的解析**: ktlint 緑、PMD（`pmd` 全タスク）違反 0（fixture 17 件は期待どおり）、detekt（JDK 21、`:app` の detekt・detektMain・detektTest）緑。`@Suppress` なし、ルールの緩和なし。
+
+**8. 未確認・未決**
+- 問い合わせ系の 503（`app.retry_exhausted`）が起きうるかは未確認（コマンド系だけ検証。問い合わせ系の仕様に 503 は無い）。
+- SSE の検査は、B1 の範囲に SSE が無いため未実施。
+- スキーマで表せない条件（経路の週と `requestedWeek` の一致、需要系列の長さ、空白だけの表示名）は、事例と説明文で扱うだけ。
+- `required` が実装より緩い仕様（#7 のような）は、応答の適合では検出できない（任意の項目は、無くても適合）。型の生成と typecheck で補うが、網羅は保証しない。
+- 設計書・ADR の更新が要る点（直していない）: test-strategy.md の「契約テストは adapter-http」に読める記述の置き場（実際は app）、CI の工程表への `contract` ジョブ、エンドポイント表（architecture-backend.md）への 409 拡張メンバーと 429・413・500 の共通宣言の反映。
+- 全体の確認: `./gradlew check -x pmd koverVerify`（JDK 25。integrationTest・acceptanceTest・acceptanceTestH2 を含む）が **BUILD SUCCESSFUL（4 分 35 秒）**。Kover のゲートを含めて通った（契約テスト追加後の合算の数値は未記録）。
 
 ### Step 6: 検証と終了（✅）
 

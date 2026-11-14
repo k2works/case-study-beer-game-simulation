@@ -18,6 +18,8 @@ kover = "0.9.11"
 detekt = "1.23.8"
 # PMD は CI のツール（実行時の依存関係ではない）。関数型ルールの XPath の検査に使う。導入は 2026-11-14 に承認済み。
 pmd = "7.29.0"
+# API の契約テスト（応答の適合の検査）。OpenAPI 3.1 の方言を持つ JSON Schema の検証器。テストだけで使う。導入は 2026-11-14 に承認済み。
+json-schema-validator = "3.0.9"
 ktlint-tool = "1.8.0"
 ktlint-plugin = "14.2.0"
 cucumber = "8.0.4"
@@ -50,6 +52,7 @@ junit-platform-suite = { module = "org.junit.platform:junit-platform-suite" }
 junit-platform-launcher-cucumber = { module = "org.junit.platform:junit-platform-launcher" }
 pmd-cli = { module = "net.sourceforge.pmd:pmd-cli", version.ref = "pmd" }
 pmd-kotlin = { module = "net.sourceforge.pmd:pmd-kotlin", version.ref = "pmd" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
 detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
 
 [plugins]

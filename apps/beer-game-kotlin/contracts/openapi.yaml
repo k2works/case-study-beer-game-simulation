@@ -75,6 +75,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/Lobby"
         "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/participants/{participantId}/role:
     put:
       tags: [ゲーム]
@@ -104,7 +106,9 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /participations/join:
@@ -164,7 +168,9 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/StartConditionProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /sessions/{sessionId}/decisions:
@@ -202,8 +208,10 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
-        "409": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/ConflictProblem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /sessions/{sessionId}/weeks/{week}/commit:
@@ -239,8 +247,10 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "403": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
-        "409": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/ConflictProblem" }
+        "413": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/IncompleteDecisionsProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
   /sessions/{sessionId}/state:
@@ -271,6 +281,8 @@ paths:
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
         "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/state:
     get:
       tags: [ゲーム]
@@ -290,6 +302,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/GameState"
         "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /health:
     get:
       tags: [運用]
@@ -385,6 +399,17 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ValidationProblemBody"
+    ConflictProblem:
+      description: 入力の競合・確定の根拠の変化・週の進行（409）。code に応じた詳細を、拡張メンバーで添える（`session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`）。
+      headers:
+        x-correlation-id: { $ref: "#/components/headers/CorrelationId" }
+        Retry-After:
+          description: "app.retry_exhausted（503。1 秒）と app.rate_limited（429。窓の残り秒数）のときだけ付ける。"
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ConflictProblemBody"
     StartConditionProblem:
       description: 開始条件の不足（`game.start_condition_not_met`）または二重の開始（409 `session.already_started`）など。不足する役割を示す。
       headers:
@@ -470,6 +495,38 @@ components:
                   message:
                     type: string
                     description: 修正内容
+    DecisionEntry:
+      type: object
+      description: 役割ごとの、保存済みの入力（数量と版）。
+      required: [quantity, version]
+      properties:
+        quantity: { type: integer }
+        version: { type: integer, minimum: 0 }
+    ConflictProblemBody:
+      description: 409 の拡張メンバー。どれが付くかは code による。
+      allOf:
+        - $ref: "#/components/schemas/Problem"
+        - type: object
+          properties:
+            requestedWeek:
+              type: integer
+              description: "`session.week_advanced`: 要求した週"
+            currentWeek:
+              type: integer
+              description: "`session.week_advanced`: 現在の週"
+            role:
+              description: "`session.decision_conflict`: 競合した役割"
+              $ref: "#/components/schemas/Role"
+            latest:
+              description: "`session.decision_conflict`: 最新の入力（無ければ項目ごと付けない）"
+              $ref: "#/components/schemas/DecisionEntry"
+            week:
+              type: integer
+              description: "`session.decisions_changed`: 確定の対象の週"
+            current:
+              type: object
+              description: "`session.decisions_changed`: 現在の、役割ごとの入力"
+              additionalProperties: { $ref: "#/components/schemas/DecisionEntry" }
     NotReadyProblem:
       allOf:
         - $ref: "#/components/schemas/Problem"
@@ -530,13 +587,17 @@ components:
           enum: [KIT]
         finalWeek:
           type: integer
+          minimum: 1
+          maximum: 50
           description: 最終週（AC1.1.5。1〜50）。
         demand:
           type: array
-          description: 需要系列（最終週以上の長さ、各 0〜1000）。
-          items: { type: integer }
+          description: 需要系列（最終週以上の長さ、各 0〜1000）。長さの下限は最終週に依存するので、スキーマでは表さない（domain が検証する）。
+          items: { type: integer, minimum: 0, maximum: 1000 }
         retentionDays:
           type: integer
+          minimum: 1
+          maximum: 3650
           description: 保持日数（1〜3650）。未指定は 90（NF-S16）。
     JoinGameRequest:
       type: object
@@ -545,7 +606,9 @@ components:
         joinCode: { type: string }
         displayName:
           type: string
-          description: 表示名。長さの上限は未決（設計書に値が無い）。
+          minLength: 1
+          maxLength: 80
+          description: 表示名。前後の空白を除いて 1〜80 文字（コードポイントの数。domain の `DisplayName`。空白だけの表示名は domain が拒否する）。
     AssignRoleRequest:
       type: object
       required: [role]
@@ -612,7 +675,7 @@ components:
     GameState:
       type: object
       description: 呼び出した人ごとの投影。進行役は `joinCode`・`finalWeek`、参加者は `participantId`・`role` を受け取る。
-      required: [gameId, status, versions]
+      required: [gameId, sessionId, status, versions]
       properties:
         gameId: { type: string, format: uuid }
         sessionId:

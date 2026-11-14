@@ -20,6 +20,15 @@ dependencies {
     runtimeOnly(libs.logback.classic)
 
     testImplementation(libs.ktor.server.test.host)
+    // API の契約テスト（contracts/openapi.yaml と実装の一致の検査）だけで使う。本番の依存には入れない。
+    // 実物の永続化（H2）と全経路の組み立てがあるのは app だけなので、契約テストは app の test に置く。
+    testImplementation(libs.json.schema.validator)
+}
+
+// 契約テスト（beergame.app.contract）は、仕様 contracts/openapi.yaml を読む。仕様を変えたら test を再実行する（入力に加える）。
+// domain の code の走査は、domain のクラスが classpath にあるため、domain の変更でも再実行される。
+tasks.named<Test>("test") {
+    inputs.file(rootProject.file("contracts/openapi.yaml")).withPropertyName("openApiSpec")
 }
 
 // acceptanceTest: 受け入れ（Cucumber-JVM。@api のシナリオ）。ADR-012。

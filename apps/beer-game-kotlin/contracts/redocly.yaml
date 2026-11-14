@@ -1,0 +1,12 @@
+# OpenAPI 仕様（openapi.yaml）の検証の設定（Redocly CLI。`npm run api:lint`、web/ で実行）。
+# recommended-strict は、推奨ルールの警告をすべて失敗（error）にする。警告を放置して CI が緑になる状態を作らないため。
+extends:
+  - recommended-strict
+
+rules:
+  # 社内向けの学習用アプリで、仕様をライセンス付きで公開しない。
+  info-license: off
+  # タグ（ゲーム・参加・進行・意思決定・運用）は、見出しだけの分類で、説明を要する情報を持たない。
+  tag-description: off
+  # /health と /ready は、認可も入力も無い探針で、4XX を返さない（失敗は 503 だけ）。
+  operation-4xx-response: off
