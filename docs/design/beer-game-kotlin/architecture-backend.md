@@ -474,6 +474,8 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 
 **B1 の実装で確定した、経路の補足（2026-11-14）。** (1) `SaveDecision` の `role` は本文に持たせず、**認証つきの `snapshot` で参加者の役割を引いてから** `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) `GET /sessions/:id/state` の `?role=`（他の役割の取得。AC2.1.2）は、自分の役割と違えば `game.forbidden`（HTTP では `app.unauthorized`）。(3) `POST /games` の応答は `versions` だけで、ゲームの ID は `Location`（`/api/v1/games/{id}/state`）、資格は `Set-Cookie`。参加の応答は `versions` だけで、`gameId` を含まない（**参加者が、参加後に `gameId` を知る手段が無い。未決事項**）。(4) 作成の入力は `finalWeek` と `demand` を必須とし、`retentionDays` は未指定で 90。(5) `UnassignRole`（`DELETE …/role`）は B1 に実装していない。
 
+**B2 の契約テストで確定した、仕様の補足（2026-11-15）。** [契約テスト](./test-strategy.md)（`app` の test）が仕様と実装の不一致を見つけ、実装は変えず、**仕様（`contracts/openapi.yaml`）を実装に合わせた**（ADR-008 の「仕様が先」に照らすと後追い。人の確認待ち）。(1) **409 の problem に拡張メンバー**を持つ: 実装は `requestedWeek`・`currentWeek`・`role`・`latest`・`week`・`current` を返す。仕様に `ConflictProblem`・`ConflictProblemBody`・`DecisionEntry` を追加し、`saveDecision`・`commitWeek` の 409 に使う（どのメンバーがどちらの操作かは、仕様と `ProblemMapping.kt` が正本）。(2) **429（`app.rate_limited`）は、探針（`/health`・`/ready`）を除く全操作に、413（`request.too_large`、本文 64 KB 超）は変更系の全操作に、500 は問い合わせ系を含む全操作に宣言**する（HTTP の層の共通の守り。7 操作・4 操作・3 操作の宣言漏れを足した）。(3) **`CreateGameRequest` の範囲**を `minimum`・`maximum` で持つ（最終週 1〜50、需要 0〜1000、保持日数 1〜3650。範囲外は 422）。(4) **表示名は 1〜80 文字**（`minLength: 1`、`maxLength: 80`。「上限は未決」だった）。(5) **`GameState.sessionId` は `required`**（開始前は `null`）。(6) 参加コードの失敗（`game.invitation_invalid`）と、分類が Forbidden のドメインの誤り（`session.forbidden`・`game.forbidden`。HTTP では `app.unauthorized` に写る）の `code` の扱いは、`ProblemMapping.kt` が正本。範囲と表示名の長さを**仕様にも重複して持つ**ことの確認は人の判断。
+
 beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしていました。本書は、**開始が 2 つのストリームにまたがる**ため、ゲームの資源として `POST /games/:id/start` にします（beer-game2 からの変更。API の表を持つ他文書への影響として、呼び出し元で確認してください）。
 
 ### 入力の検証とエラーの写像
@@ -679,7 +681,7 @@ apps/beer-game-kotlin/
 | 静的解析 | detekt（複雑度、潜在的なバグ、例外の握りつぶし）、ktlint（整形。`.editorconfig` で調整。[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。コンパイラの警告をエラーにする | CI が失敗 |
 | 契約 | OpenAPI と実装の一致を、契約テストで確認する（[フロントエンド](./architecture-frontend.md)） | CI が失敗 |
 
-ツールの版と、採用する Kotlin の版との互換性は、B1 で確認しました（2026-11-14）。**detekt 1.23.8 は JDK 25 で動きません**（`Execution failed for task ':domain:detekt'` / `java.lang.IllegalArgumentException: 25.0.2`。同梱の Kotlin コンパイラの `JavaVersion.parse`。既定の `--jvm-target` も 22 までしか受け付けない）。回避として `jvmTarget = "22"` を指定し、**JDK 22 以下で動かしたときだけ detekt を有効にします**（JDK 25 では無効にして警告）。CI は detekt を JDK 21 の専用ジョブで実行します。JDK 21 上では、Kotlin 2.4.21 のドメインとテストのコードの解析に成功し、違反は 0 件です。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断します（B2 の受入条件「detekt が Kotlin 2.4 を解析できる」は、JDK 21 上では確認済み）。detekt 1.23.8 は、Kotlin 2.4 でビルドされたライブラリの `suspend` の呼び出しを検出できず、`RedundantSuspendModifier` が誤検知します（原因は未調査）。`@Suppress`・設定の緩和は使わず、ライブラリの suspend を呼ぶだけの関数を非 `suspend` のブロッキング関数にする、または `suspend` の関数型の値にして回避しました。`ForbiddenMethodCall`（`domain` の時計・乱数・UUID の禁止）は JDK 21 上で動きます（`mutableListOf` はインライン関数のため検出されず、可変コレクションの禁止は PMD の `NoMutableCollectionFactory` に任せる。B2）。厳格な適用（PMD の 14 ルール、fixture、ベースラインなし）は B2 です。
+ツールの版と、採用する Kotlin の版との互換性は、B1 で確認しました（2026-11-14）。**detekt 1.23.8 は JDK 25 で動きません**（`Execution failed for task ':domain:detekt'` / `java.lang.IllegalArgumentException: 25.0.2`。同梱の Kotlin コンパイラの `JavaVersion.parse`。既定の `--jvm-target` も 22 までしか受け付けない）。回避として `jvmTarget = "22"` を指定し、**JDK 22 以下で動かしたときだけ detekt を有効にします**（JDK 25 では無効にして警告）。CI は detekt を JDK 21 の専用ジョブで実行します。JDK 21 上では、Kotlin 2.4.21 のドメインとテストのコードの解析に成功し、違反は 0 件です。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断します（B2 の受入条件「detekt が Kotlin 2.4 を解析できる」は、JDK 21 上では確認済み）。detekt 1.23.8 は、Kotlin 2.4 でビルドされたライブラリの `suspend` の呼び出しを検出できず、`RedundantSuspendModifier` が誤検知します（原因は未調査）。`@Suppress`・設定の緩和は使わず、ライブラリの suspend を呼ぶだけの関数を非 `suspend` のブロッキング関数にする、または `suspend` の関数型の値にして回避しました。`ForbiddenMethodCall`（`domain` の時計・乱数・UUID の禁止）は JDK 21 上で動きます（`mutableListOf` はインライン関数のため検出されず、可変コレクションの禁止は PMD の `NoMutableCollectionFactory` に任せる。B2）。厳格な適用（PMD の 14 ルール、fixture、ベースラインなし）は B2 です。**B2 の結果（2026-11-15）**: PMD 7.29.0 を `PmdCli`（`JavaExec`）で導入し、層ごとのルールセット 4 つ（`config/pmd/`）で全層の違反 0、fixture は期待 17 件と一致した。detekt は JDK 21 の専用ジョブで維持する（ユーザーの決定）。**アダプター（`NoThrow` ほか）・`main`・テストのルールの緩和は層単位で、外したルールの新規違反はその層で検出されない**（記録は [ADR-011](../../adr/beer-game-kotlin/011-strict-static-analysis.md)。承認待ち）。`adapter-persistence` の `throw`・可変コレクション・`var` をコードで直すかは人の判断。契約（OpenAPI と実装の一致）は、`app` の test の契約テスト（13 件）と、型の生成物の差分 0（`api:check`）で守る。
 
 B1 の実装のパッケージは、設計のサブパッケージ（`{shared,game,session,…}`）に分けず、各モジュールの 1 つのパッケージにまとめています（`beergame.domain`、`beergame.application`、`beergame.http`、`beergame.persistence`）。ファイルの単位（`Game.kt`、`Session.kt`、`SimulateWeek.kt` など）で分けています。Flyway は `common/V001〜V005`、`postgres/V102`（部分一意索引 `uq_idempotency_create`）で、V101（DB ロールと GRANT）は B2 のために空けています。H2 専用のマイグレーション（201〜）は作りません。
 
@@ -740,6 +742,10 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 | 36 | `/health`・`/ready` はルート直下を想定 | `/api/v1` の配下。`/ready` の 503 は problem+json（`app.not_ready`）。413（`request.too_large`）・429（`app.rate_limited`）を追加（2026-11-14、B1） | OpenAPI の servers に合わせる。バックエンド自身の 503 は `type` を持つ規則 |
 | 37 | `Disclosure` は `domain` | `application`（2026-11-14、B1） | [ドメインモデル](./domain-model.md) 変更 #29 |
 | 38 | detekt・PMD で関数型の規約を CI で検査（JDK 25 を想定） | detekt 1.23.8 は JDK 25 で動かず、JDK 21 の専用ジョブで実行する。厳格な適用（PMD）は B2（2026-11-14、B1） | detekt 1.23.8 が `jvmTarget` 22 までしか受け付けない |
+| 39（以降は B2 の実装で変わった点。2026-11-15） | 409 の problem は `code`・`type` など標準のメンバーだけ（仕様に拡張メンバーが無い） | 実装が返す拡張メンバー（`requestedWeek`・`currentWeek`・`role`・`latest`・`week`・`current`）を仕様の `ConflictProblem` に持つ | 契約テストが不一致を検出。仕様を実装に合わせた（人の確認待ち） |
+| 40 | 429・413・500 は、一部の操作にだけ宣言 | 429 は探針を除く全操作、413 は変更系の全操作、500 は問い合わせ系を含む全操作に宣言（HTTP の層の共通の守り） | 同上 |
+| 41 | 作成の範囲（最終週・需要・保持日数）と表示名の長さは、説明文だけ・上限未決 | スキーマに `minimum`・`maximum`（1〜50、0〜1000、1〜3650）、表示名は 1〜80 文字。`GameState.sessionId` は `required` | 同上 |
+| 42 | 関数型の規約は detekt・PMD で守る（PMD の導入は B2） | PMD を導入し、層ごとのルールセット 4 つ。アダプター・`main`・テストは層単位で緩和（承認待ち）。契約テストは `app` の test | B2 の Step 1・5 |
 
 ## 設計判断
 
@@ -880,7 +886,8 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 - **ロビーの並び**（同じ時刻なら参加者 ID の順）と、参加コードの重複（`uq_game_join_codes_code`、12 文字の乱数なので再試行しない）。
 - **`session_overview.week` が最終週 + 1 になる**（最終週が 50 未満のゲームが最終週を確定すると。[データモデル](./data-model.md) の未決事項）。
 - 設定の上限（数量、遅延、本文のサイズ）の値と、検査の方法（beer-game2 から継続）。
-- `events` に UPDATE / DELETE を与えないロールでも、連鎖削除が動くことの確認（[データモデル](./data-model.md) から継続）。
+- `events` に UPDATE / DELETE を与えないロールでも、連鎖削除が動くことの確認: **B2 で実測済み（動く）**。V101 でロール 4 つを作った（[データモデル](./data-model.md)）。アプリのコードを用途別のロール・接続に切り替える作業は未着手（B3 以降）。
+- **B2 で出た未決（2026-11-15）**: 仕様の後追い修正 7 件の確認（上の「B2 の契約テストで確定した、仕様の補足」）。SSE の契約テストが未検査。問い合わせ系の 503（`app.retry_exhausted`）が起きうるか未確認。`adapter-persistence` の違反をコードで直すか（`ChangeNotifiers.kt` の `throw`、`JdbcEventStore.kt`・`JdbcTx.kt` の可変コレクション、`JdbcSupport.kt` の `var`）。
 - **H2 の PostgreSQL モードで動く範囲の実測: B1 で完了**（Step 1・7。結果と配置は [データモデル](./data-model.md)）。残りは、H2 での性能・分離レベルの動作の同一性（未確認）。`com.h2database:h2` の導入の承認は、B1 の Gate 2 の記録を参照。
 - `APP_ENV`・`DB_KIND` の名前と、ステージング・本番の配備での固定の方法、本番のイメージに H2 のドライバを含めない構成（[インフラストラクチャ](./architecture-infrastructure.md)、[技術スタック](./tech-stack.md) の担当と整合する）。
 

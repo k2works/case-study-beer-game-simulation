@@ -85,7 +85,7 @@ Contract ..> Routes
 | 項目 | 設計 |
 | :--- | :--- |
 | 開発 | Vite の開発サーバーが、`/api` を Ktor へプロキシする（接続先は環境変数。ポートは固定の値を書かない）。バックエンドは Gradle で起動し、データベースは Docker の PostgreSQL（**B1 の実装は、ローカルなら H2 でもよい**。`APP_ENV=local DB_KIND=h2`）。**B1 の実装の場所は `apps/beer-game-kotlin/web/`**（設計の `ui/` でなく `web/`。Vite のポートは環境変数 `UI_PORT`・`API_PORT`）。**中継（Vite）を通すと、バックエンドが見る `Host` と `Origin` が一致せず、変更系の要求が 403 になる**（実ブラウザで初めて判明）。バックエンドの Origin 検査を弱めず、`ALLOWED_ORIGINS=http://localhost:<UI のポート>` を指定する（開発手順書への反映は未実施） |
-| 型の生成 | `contracts/openapi.yaml` から、`ui/src/shared/api/generated/` へ生成する。**生成物はコミットしない**（ビルドの前に必ず生成する）。仕様が変わると、型エラーで影響する画面が分かる。**B1 の実装は、生成ツールの選定・承認が B2 のため、`web/src/api/types.ts` に B1 の範囲を手書きした**（ファイルの先頭に明記。`ErrorCode` は openapi.yaml の enum の手写しで、辞書は `Record<ErrorCode, ...>` なので、`code` を足すと型エラーで漏れが分かる。仕様との同期は手動で、自動の検査は B2 の契約テストまで無い） |
+| 型の生成 | `contracts/openapi.yaml` から、`ui/src/shared/api/generated/` へ生成する。**生成物はコミットしない**（ビルドの前に必ず生成する）。仕様が変わると、型エラーで影響する画面が分かる。**B2 の実装（2026-11-15）は、この設計と異なり、生成物 `web/src/api/generated/schema.d.ts` をコミットし、`api:check` で差分 0 を検査する**（変更表 18。人の確認が要る）。**B1 の実装は、生成ツールの選定・承認が B2 のため、`web/src/api/types.ts` に B1 の範囲を手書きした**（ファイルの先頭に明記。`ErrorCode` は openapi.yaml の enum の手写しで、辞書は `Record<ErrorCode, ...>` なので、`code` を足すと型エラーで漏れが分かる。仕様との同期は手動で、自動の検査は B2 の契約テストまで無い） |
 | 配信 | 静的ファイルを、S3 へ版つきで配置し、CloudFront から配信する（[インフラストラクチャ](./architecture-infrastructure.md)）。**フロントエンドは、バックエンドのイメージに含めない**（beer-game2 と同じ） |
 | E2E | Playwright。開発者が使う開発サーバーとは別の、専用のポートで起動する（開発中のサーバーを止めない）。**B1 の実装: Cucumber-JS + Playwright（Chromium）。Vite は 5273、バックエンドは 3100**（3000・5173 は使わない）。前提の準備は実 API、操作は実ブラウザ |
 
@@ -114,8 +114,8 @@ TS --> AC
 | 項目 | 設計 |
 | :--- | :--- |
 | 仕様 | `contracts/openapi.yaml` に、エンドポイント、リクエスト・レスポンスのスキーマ、**`problem+json` の `code` の一覧**（`type` は `/problems/{code}`）、ヘッダー（`Idempotency-Key`、`If-Match`、`x-correlation-id`）、SSE の通知の形を書く |
-| 型の生成 | 仕様から TypeScript の**型だけ**を生成する（実行時のコードを持たない生成物を選ぶ）。生成ツールは実装開始時に確認して決める |
-| 実装との一致 | Kotlin 側に、**契約テスト**を置く。実際のルートを呼び、応答が仕様のスキーマに適合することを検査する。仕様の更新を忘れたルートの変更は、CI で失敗する。検証の方法は未決事項 |
+| 型の生成 | 仕様から TypeScript の**型だけ**を生成する（実行時のコードを持たない生成物を選ぶ）。**B2 で `openapi-typescript` 7.13.0 を導入した**（`api:generate`。生成物は `src/api/generated/schema.d.ts` にコミットし、`api:check` で「生成し直してコミット済みと差分 0」を検査する。`redocly lint`（`api:lint`）で仕様を検証する。peer の TypeScript は `overrides` で 6.0.3 に通した） |
+| 実装との一致 | Kotlin 側に、**契約テスト**を置く。実際のルートを呼び、応答が仕様のスキーマに適合することを検査する。仕様の更新を忘れたルートの変更は、CI で失敗する。**B2 で、`app` の test に契約テスト 13 件を置いた**（networknt `json-schema-validator`。[テスト戦略](./test-strategy.md)）。SSE と、スキーマで表せない条件は検査できない |
 | `ApiClient` | 生成した型を使う、手書きの薄い層（`fetch` の包み、`Idempotency-Key` の付与、`If-Match`（`SaveDecision` だけ）、`problem+json` の `code` の解釈、相関 ID の取り出し）。`ApiClient` は引き続き差し替え可能にして、コンポーネントをテストする |
 | 変更の手順 | API を変えるときは、**仕様 -> 契約テスト（失敗）-> Kotlin の実装 -> 型の再生成 -> 画面**の順に進める |
 
@@ -250,7 +250,8 @@ beer-game2 から変更しません（画面の位置は URL、サーバー状�
 | 14 | `useLiveSnapshot`（SSE の版の通知 + 再取得） | `catchUp` と手動更新。SSE は未実装 | B1 の範囲外 |
 | 15 | 開発時の中継は `/api` を Ktor へ | 中継を通すと Origin が一致せず変更系が 403。`ALLOWED_ORIGINS` を指定する | 実ブラウザで初めて判明（Step 10） |
 | 16 | 参加者向けロビー（S04）が参加後に見える | B1 の API はロビーが進行役だけで、参加の応答が `gameId` を返さない。参加者は参加後に進めない（未決事項） | API の欠け |
-| 17 | `.catch(() => {})` などの握りつぶしの検出（lint の方針は未決） | B1 は、テストがエラーを握りつぶさない運用。lint の規則は入れていない（B2 で決める）。ESLint は `steps/`・`support/`（.mjs）の対象外 | 実バグを隠した beer-game2 の B1 の学び #2 |
+| 17 | `.catch(() => {})` などの握りつぶしの検出（lint の方針は未決） | B1 は、テストがエラーを握りつぶさない運用。lint の規則は入れていない。**B2 でも入れていない（未実施。B3 以降で決める）**。ESLint は `steps/`・`support/`（.mjs）の対象外 | 実バグを隠した beer-game2 の B1 の学び #2 |
+| 18（B2 の実装。2026-11-15） | 型は OpenAPI から生成し、**生成物はコミットしない**。B1 は `web/src/api/types.ts` に手書き | **`openapi-typescript` 7.13.0 で生成し、生成物 `src/api/generated/schema.d.ts` をコミットする**（`api:check` が差分 0 を検査。ビルドの前の生成ではなく、コミット済みの生成物と一致させる運用）。`types.ts` は生成物からの写しに置き換え、手書きは画面だけの型（`CreateGameResult`、`ProblemBody`、整数以外も受ける `CreateGameRequest`）と実行時の値（`ROLES`）に絞った。`CreateGameRequest` が仕様より狭くならないこと、`ROLES` が `Role` を網羅することは、型の検査で守る。仕様の `GameState.sessionId` の `required` 化（`string \| null`）で、画面の型が正しくなった | B2 の Step 5。「コミットしない」とした設計と異なる（人の確認が要る） |
 
 ## 設計判断
 

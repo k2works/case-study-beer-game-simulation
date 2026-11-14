@@ -509,7 +509,18 @@ interface TransactionRunner {
 ### 追記専用の保護
 
 - アプリケーションが使う DB ロールには、`events` の **INSERT と SELECT だけ**を与え、UPDATE と DELETE を与えません。
-- 保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。連鎖削除が、`events` に DELETE 権限を持たないロールでも動くことは、実装開始時に確認します（未決事項）。
+- 保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。連鎖削除が、`events` に DELETE 権限を持たないロールでも動くことは、**B2 の Step 3 で実測した（2026-11-14、PostgreSQL 18）**: `events` の DELETE 権限が無い削除ロールで `game_roots` を 1 回 DELETE すると、`game_id` を持つ全表から当該ゲームの行が消え、別のゲームの行は残った。PostgreSQL が参照の整合性のトリガーを、子の表の所有者の権限で実行するためで、**`SECURITY DEFINER` の関数や別の削除用ロールは不要**（R6 は解消。1 回の実測で、他の版は未確認）。
+
+**V101 のロールと GRANT（B2）。** ロールは `beergame_writer`・`beergame_reader`・`beergame_observer`・`beergame_deleter`（`NOLOGIN`、非特権、継承なし。`CREATE ROLE` は存在しなければ作る）。所有者は新しいロールを作らず、マイグレーションを実行する接続のユーザー（本番の RDS で、マイグレーション用のユーザーをどう作るかは未決）。
+
+| ロール | 権限 |
+| :--- | :--- |
+| `beergame_writer` | `events`・`game_roots` は SELECT・INSERT のみ。投影・周辺ストア・冪等記録・`projection_checkpoints` は SELECT・INSERT・UPDATE・DELETE（再構築が行を消すため） |
+| `beergame_reader` | 投影の表（`projection_checkpoints`・`game_join_codes`・`game_settings` を含む）と `display_profiles`（ロビーの表示名の結合）の SELECT のみ。`credentials`・`browser_sessions`・`idempotency_records` は含めない（用途別のプールの配線で確定。未決） |
+| `beergame_observer` | `game_overview`・`session_overview`・`week_team_totals` の SELECT のみ（`game_join_codes`・役割別の表には到達できない） |
+| `beergame_deleter` | `game_roots` の SELECT・DELETE のみ（WHERE 句の列の参照に SELECT が要る）。`deletion_*` の GRANT は、その表を作る B11 のマイグレーションで書く |
+
+**否定テスト（`RolePrivilegesSpec`、11 件）**: 書き込みロールが `events` を UPDATE・DELETE・TRUNCATE できない、`game_roots` を DELETE・UPDATE・TRUNCATE（`CASCADE` つきを含む）できない、4 ロールが表の所有者でも所有者ロールのメンバーでもなく特権属性が無い、削除ロールの DELETE 権限が `game_roots` だけ、観察者が SELECT できる表が設計の 3 表と完全に一致し書き込み権限が無い、連鎖削除、書き込みロールが過剰に絞られていない（INSERT・SELECT ができる）こと、全ロールが `flyway_schema_history` を読めないこと。拒否は SQLSTATE 42501 で確認する。権限を変異で足す（`GRANT UPDATE, DELETE, TRUNCATE ON events TO beergame_writer` など）と 11 件中 6 件が失敗することを確認した。
 - **この保護（ロール、GRANT、`TRUNCATE` の拒否）は PostgreSQL の統合テストでだけ検証します。H2 版（ローカル）では省略し、単一の接続ユーザーで動かします。ローカルでは追記専用は守られません**（下記「ローカル開発（H2 の PostgreSQL モード）」）。
 
 ### スナップショット
@@ -708,7 +719,7 @@ end
 | 004 | 共通 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | 005 | 共通 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
 | 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
-| 101 | PostgreSQL | DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限 |
+| 101 | PostgreSQL | **B2 で作成（`V101__database_roles.sql`）**。DB ロールと GRANT（書き込み・読み取り・観察者・削除。所有者はマイグレーションの接続のユーザー）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限。**V102 より小さい番号のため、V102 まで適用済みの DB には Flyway がそのまま適用できない（下の注意）** |
 | 102 | PostgreSQL | 部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
 | 201 | H2 | **作らない**（B1 の Step 7 で、共通の V001〜V005 が H2 にそのまま適用できたため）。省略した制約は、ローカルでは守られない |
 
@@ -717,11 +728,12 @@ end
 ```text
 db/migration/
 ├── common/      V001〜V005（B1。両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダ ${json_type} で切り替える）。V006（保持）は B11
-├── postgres/    V102（B1）。V101（ロール、GRANT）は B2
+├── postgres/    V101（B2。ロール、GRANT）、V102（B1）
 └── h2/          作らない
 # Flyway の場所: PostgreSQL = common + postgres、H2 = common
 ```
 
+- **V101 と V102 の順序の注意（B2）。** Flyway は、適用済みの最大の版より小さい未適用の版を、既定で検証エラーにします。V101 は V102 より小さいため、**V102 まで適用済みの既存の DB には、そのままでは適用できません**。現時点では PostgreSQL の永続環境が無い（ローカルは H2、CI は使い捨て）ので問題になりませんが、**ステージング・本番を作る前に、`outOfOrder` を許すか、番号を付け替えるかを決めます（人の判断。未決）**。
 - 追記専用の保護、観察者向けの権限、部分一意索引は PostgreSQL の場所（101・102）にだけ置きます。投影の `CHECK`（数量の上限）は、共通（001〜005）に含めます。
 - `events.payload` の型は、PostgreSQL は `jsonb`、H2 は `json` です（プレースホルダ `${json_type}`。**B1 で確定**）。書き込みは方言ごとに分けます（PostgreSQL は `CAST(? AS jsonb)`、H2 は `? FORMAT JSON`）。読み込みは両方 `CAST(payload AS VARCHAR)`。
 - 共通の DDL は H2 で通ることを B1 の Step 7 で確認しました（`text` 型の主キー・一意制約、`GENERATED ALWAYS AS IDENTITY`、`timestamp with time zone`、`bytea`、`ON DELETE CASCADE`、`CHECK`）。再適用は 0 件です。
@@ -848,12 +860,15 @@ db/migration/
 | 29 | `EventStore.read` の失敗は `PersistenceFailure`、`append` は `Unit`、`transaction` は `fun interface Transaction` | `read` は `AppFailure`、`append` は封筒の列、`TransactionRunner` は通常の `interface`。`GameCreated` の追記は `game_roots` を同じトランザクションで作る | 同期投影が版つきの封筒を要する。総称のメソッドは `fun interface` にできない |
 | 30 | `role_current_states.production_pipeline` は必須の想定 | NULL を許し、B1 では書かない。`shipment_pipeline` に `deliveryPipeline`、`order_pipeline` に `orderPipeline` | キットでは生産の待ち行列が配送と同じ。B1 のイベントに初期条件が載らない |
 | 31 | 観察者向けの 3 表（003・005 の中）は B1 で作り、書く | 表は作るが、**書き込みは B9 まで省く** | B1 に観察者のイベントが無く、公開範囲の規則（`Disclosure`）は B9 |
+| 32（以降は B2 の実装で変わった点。2026-11-15） | 連鎖削除が `events` に DELETE 権限が無いロールでも動くかは未検証（実装開始時に確認） | **実測済み（動く）**。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）と GRANT。否定テスト 11 件（PostgreSQL 18）。`SECURITY DEFINER` は不要 | B2 の Step 3 |
+| 33 | V101 は V102 の前のつもり（番号の順序は考慮なし） | **V101 < V102 のため、V102 まで適用済みの DB に Flyway がそのまま適用できない**。永続環境の前に、`outOfOrder` か番号の付け替えを決める（未決） | Flyway の既定の検証 |
+| 34 | 読み取りロールの表の一覧は無い | `display_profiles` を含める（ロビーの表示名の結合）。`credentials`・`browser_sessions`・`idempotency_records` は含めない（未決） | B2 の判断 |
 
 ## 未決事項
 
 - マイグレーションの管理ツールは Flyway です（[技術スタック](./tech-stack.md) T4。B1 で導入。マイグレーション 001〜005 は B1 の Gate 7 の承認待ち）。適用の自動化は、B1 の実装で **H2（local）の起動時は自動、PostgreSQL の `api` は適用せず `migrate` モード**とした（本番での運用の最終決定は、導入の承認後）。
 - 追記の `ConcurrencyConflict` の自動再試行の上限と、再試行の間隔（実装開始時に、競合の頻度を測って決める）。
-- `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認。動かない場合の代替（`SECURITY DEFINER` の関数、削除用のロール）。
+- `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認: **解決済み（B2 の実測。動く。代替は不要）**。**未決（B2 で出たもの）**: V101 と V102 の順序（上）、読み取りロールの権限の範囲（`credentials` ほか）、所有者のロールの作り方（RDS）、通知の受信（`LISTEN`）専用のロールと接続、`deletion_*` の GRANT（B11）、アプリの用途別のロール・接続への切り替え（B3 以降）。
 - 再構築の同時実行制御（解決済み: アドバイザリロック。コマンドは共有、再構築は排他。M23）。**未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。研修中の再構築の所要時間の実測。
 - 数量の上限を、`CHECK`（固定値）にするか、設定の値と照合する検査にするか（beer-game2 から継続）。
 - `retention_starts_at` の起点: **暫定で作成時**（M5）。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決で、人の確認が要る（ドメインモデルの未決事項と共通）。
@@ -866,7 +881,7 @@ db/migration/
 - **投影の整合性の検査**（`projected_version` と `MAX(stream_version)` の照合の運用）、投影の再構築（B12）、`LISTEN` の切断中の欠落を `projection_checkpoints` の数秒ごとの照合で補う処理、冪等記録の掃除の定期タスクは、B1 では**未実装**。
 - 参加者のロビーの並び（`joined_at`、同時刻なら `participant_id` の順）。参加の順を保つ規則は未決（B1 の受入条件に無い）。
 - H2 版の `ProjectionLock` が `lock_timeout` 相当の待ちの上限をどう扱うか（PostgreSQL 版は SQLSTATE 55P03 を `RetryExhausted` に写す。H2 版は待ちの上限つきの取得で同じ契約を満たす）。
-- 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、最初のスライドの Red のテストで確かめる（[テスト戦略](./test-strategy.md)）。
+- 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、B2 の `RolePrivilegesSpec` で確認した（観察者が SELECT できる表が 3 表と完全に一致）。観察者の接続プールの配線の検査（H13）は B3 以降（[テスト戦略](./test-strategy.md)）。
 
 ## 出典
 

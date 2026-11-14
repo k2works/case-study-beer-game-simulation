@@ -153,7 +153,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | 受け入れ（バックエンド） | Cucumber-JVM（`cucumber-java`、`cucumber-junit-platform-engine`） | **8.0.4**（確認日 2026-11-14、Maven Central）。導入は決定済み。承認待ち | 日本語 Gherkin の受入条件・デモ項目（`@api`）。Ktor のテスト用アプリケーションと実 PostgreSQL（Testcontainers）を通す。Gradle のソースセット（`acceptanceTest` を想定） |
 | 受け入れ（画面） | Cucumber-JS（`@cucumber/cucumber`）+ Playwright | **13.3.0**（確認日 2026-11-14、npm。要求する Node は `22 \|\| 24 \|\| >=26`）。導入は決定済み。承認待ち | 日本語 Gherkin の `@ui` のシナリオ。実 Ktor サーバーを通す。タグ（`@US2.4`、`@AC2.4.1`、`@api`/`@ui`、重要度）でストーリーとの対応を取る。生きたドキュメントの公開は CI で自動化（公開の道具は B1〜B2 で選ぶ。**版は未確認**） |
 | 静的解析（中心） | detekt | **1.23.8**（Kotlin 2.4 の解析の可否は未確認。**B2 の受入条件**） | 複雑度、関数型の規約（[ガイド §9.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**違反 0 件（`maxIssues: 0`）、ベースラインなし、`@Suppress` なし**で、最初のコードから全ルールを有効にする。**`ForbiddenMethodCall` で、ドメインのモジュールでの `Instant.now`・`Clock.system*`・`UUID.randomUUID`・`Random` を禁止**し、純粋性を静的検査で守る（[テスト戦略](./test-strategy.md)）。除外が要る層は、ルールセットのファイルを層ごとに分けて外す |
-| 静的解析（補完。CI のツール） | PMD（XPath のカスタムルール。`pmd-core`、`pmd-kotlin`） | **7.29.0**（確認日 2026-11-14、Maven Central。Kotlin 2.4 の構文の解析の可否は未確認）。**導入は承認待ち** | detekt に無い関数型の規約を補う、**14 個の XPath ルール**（`var` の禁止、可変コレクション、`!!`、`throw`、`runBlocking`、`GlobalScope` など。[ガイド §9.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**ルールは、fixture で期待件数（ガイドの例は PMD 7.29.0 で 17 件）と一致することを、テストファーストで確かめ、CI に組み込む**。ルールの `message` に `{` と `}` を書かない。層ごとにルールセットを分ける（B2 の受入条件） |
+| 静的解析（補完。CI のツール） | PMD（XPath のカスタムルール。`pmd-core`、`pmd-kotlin`） | **7.29.0**（確認日 2026-11-14、Maven Central）。**B2 で導入済み（ユーザーが承認、2026-11-14）**。Kotlin 2.4 の構文の解析は、今回のコードの全範囲で構文エラーなし（PMD が Kotlin 2.4 の全構文を保証するとは確認していない）。`pmd-cli`・`pmd-kotlin` を `pmdTool` 構成に置き、`PmdCli` を `JavaExec` で実行する（Gradle の `pmd` プラグインは Java 用なので使わない） | detekt に無い関数型の規約を補う、**14 個の XPath ルール**（`var` の禁止、可変コレクション、`!!`、`throw`、`runBlocking`、`GlobalScope` など。[ガイド §9.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**ルールは、fixture で期待件数（ガイドの例は PMD 7.29.0 で 17 件）と一致することを、テストファーストで確かめ、CI に組み込む**。ルールの `message` に `{` と `}` を書かない。層ごとにルールセットを分ける（B2 の受入条件） |
 | 整形 | ktlint | **1.8.0** | 書式。違反は 0 件。副作用の大きいルールだけを `.editorconfig` で調整する（日本語のバッククォートのテスト名のため、関数名の camelCase はテストで外す。[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。整形の中核のルールは外さない |
 | 画面テスト | Vitest、@testing-library/react、jsdom | beer-game2 の確認値（5.1.0、16.3.3、31.0.0） | コンポーネントのテスト |
 | E2E | @playwright/test、@axe-core/playwright | beer-game2 の確認値（1.65.0、4.14.0） | 実ブラウザ（実際の Ktor サーバー）での受入テストとアクセシビリティ |
@@ -176,7 +176,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 
 ## 新しく導入する依存関係（導入時に承認を得る）
 
-**承認の状況（2026-11-14）**: **B1 で使う依存関係**（Ktor、Arrow、kotlinx.coroutines・serialization・coroutines-test、PostgreSQL JDBC、HikariCP、Flyway、Logback、Kotest、Testcontainers、Kover、detekt、ktlint、Cucumber-JVM、Cucumber-JS、H2）の導入は、ユーザーが承認した（[Bolt 1 計画](../../development/beer-game-kotlin/bolt_1_plan.md) の判断項目 1。版は導入の直前に公式の情報で確認する）。**PMD と、API の契約テストの道具は、B2 で承認を求める**（未承認）。下の表の「承認待ち」は、この区別で読む。
+**承認の状況（2026-11-14）**: **B1 で使う依存関係**（Ktor、Arrow、kotlinx.coroutines・serialization・coroutines-test、PostgreSQL JDBC、HikariCP、Flyway、Logback、Kotest、Testcontainers、Kover、detekt、ktlint、Cucumber-JVM、Cucumber-JS、H2）の導入は、ユーザーが承認した（[Bolt 1 計画](../../development/beer-game-kotlin/bolt_1_plan.md) の判断項目 1。版は導入の直前に公式の情報で確認する）。**PMD と、API の契約テストの道具は、B2 で承認を求めた。ユーザーは 2026-11-14 に、PMD の導入と、契約テストの道具の選定・導入を承認した**（上の変更表 28・29）。下の表の「承認待ち」は、この区別で読む。
 
 beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）に、**Cucumber（導入は決定済み。版の確認と承認が要る）と PMD（承認待ち）**に、**H2（ローカル開発用。次表の最終行近く）**を加えた行は、承認待ちです。
 
@@ -193,12 +193,12 @@ beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き
 | kotlinx-coroutines-test | 仮想時間 | 実時間の待ち | 導入を推奨。開発依存のみ |
 | Kover | カバレッジ | JaCoCo を直接 | Kotlin 向け。導入を推奨。開発依存のみ |
 | detekt、ktlint | 静的解析と整形 | 自作の検査（ガイド §9.5） | ガイド §9.3、§9.4。導入を推奨（detekt の互換は B2 で確認）。違反 0・ベースラインなし・`@Suppress` なしで厳格に適用 |
-| PMD（`pmd-core`、`pmd-kotlin` 7.29.0。XPath のカスタムルール） | detekt に無い関数型の規約の補完（14 個の関数型ルール）。CI のツールで、実行時の依存関係ではない | 自作の検査、detekt のカスタムルール（別途ビルドが要る） | **承認待ち**（開発戦略が採用を提案）。承認までは detekt と ktlint で進め、B2 で fixture のテストと合わせて導入する |
+| PMD（`pmd-core`、`pmd-kotlin` 7.29.0。XPath のカスタムルール） | detekt に無い関数型の規約の補完（14 個の関数型ルール）。CI のツールで、実行時の依存関係ではない | 自作の検査、detekt のカスタムルール（別途ビルドが要る） | **導入済み（B2。ユーザーが 2026-11-14 に承認）**。fixture のテストと合わせて導入した（17 件で一致） |
 | Cucumber-JVM（`cucumber-java`、`cucumber-junit-platform-engine` 8.0.4） | `@api` の受入条件の自動実行（日本語 Gherkin） | Kotest だけで受入条件を表す（導入しないという案は、ユーザーが 2026-11-14 に却下） | **導入は決定済み。版の確認は済み（8.0.4）。依存関係の導入の承認が要る**（B1）。開発依存のみ |
 | Cucumber-JS（`@cucumber/cucumber` 13.3.0） | `@ui` の受入条件の自動実行（Playwright と組み合わせる） | 同上 | **導入は決定済み。版の確認は済み（13.3.0）。依存関係の導入の承認が要る**（B1）。開発依存のみ。プロジェクトの依存として入れる（グローバルにインストールしない） |
 | H2（`com.h2database:h2` 2.5.252。ローカル開発用） | 開発機で Docker なしに起動する DB（PostgreSQL モード）。**開発用の構成だけ**に含め、本番のイメージに入れない | ローカルも Docker の PostgreSQL 18 を使う（beer-game2 と同じ。Docker が要る） | **承認待ち**（ユーザーの決定。導入の承認が要る。ライセンスは pom に MPL 2.0 と EPL 1.0 の記載。実装開始時にプロジェクトの方針と照合する）。**統合テスト・CI・受け入れ・ステージング・本番には使わない**（設計判断 T7）。B1 の最初に、PostgreSQL モードで動く範囲を実測する |
 | 変異テストの道具、Gradle の依存関係の検査 | テストの強さ、脆弱性 | なし（**選定未決**） | **実装開始時に選定し、あらためて承認を得る** |
-| **API の契約テストの道具**（OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成） | 仕様（`contracts/openapi.yaml`）と実装のずれの検出、フロントエンドの型の生成（[テスト戦略](./test-strategy.md) の API の契約テスト） | 型を手で二重に書く（ずれが実行時まで分からない。ADR-008 で退けた）。自前の検査 | **選定未決。B2 で、公式の情報で確認して選び、導入の承認を得る**（本書では確認していない） |
+| **API の契約テストの道具**（OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成） | 仕様（`contracts/openapi.yaml`）と実装のずれの検出、フロントエンドの型の生成（[テスト戦略](./test-strategy.md) の API の契約テスト） | 型を手で二重に書く（ずれが実行時まで分からない。ADR-008 で退けた）。自前の検査 | **選定・導入済み（B2、2026-11-15。ユーザーが 2026-11-14 に選定・導入を承認）**: `@redocly/cli` 2.78.0（`redocly lint`。web の devDependency、固定）、`com.networknt:json-schema-validator` 3.0.9（`app` の test のみ。Jackson 3 を推移的に追加）、`openapi-typescript` 7.13.0（web の devDependency、固定。peer が `typescript ^5.x` のため、`overrides` で TypeScript 6.0.3 に通した）。版は `npm view` と Maven Central の maven-metadata・POM で確認した。**`overrides` による peer の回避と Jackson 3 の推移的な追加を、承認の範囲とするかは人の確認が要る** |
 
 ## 設計判断
 
@@ -320,6 +320,15 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 26 | HikariCP 7.1.0 と JDK 25 の組み合わせは未確認 | **ビルドとテスト（PostgreSQL 18.7、H2）で動作した** | Step 7〜11 |
 | 27 | H2 の導入は承認待ち。Flyway の H2 への適用は未確認 | **導入した**（2.5.252。Flyway 13.12.2 の H2 への適用は共通の V001〜V005 で確認）。H2 の依存は `adapter-persistence` の `runtimeOnly`。本番のイメージに含めない案は未実施 | Step 2・7・9 |
 
+**B2 の実装で確認できた・変わった点（2026-11-15）。**
+
+| # | 初稿・B1 の記述 | B2 の実装で確認した結果 | 理由・扱い |
+| :--- | :--- | :--- | :--- |
+| 28 | PMD の Kotlin 2.4 の構文の解析は未確認。導入は承認待ち。Gradle での実行方法は未確認 | **導入した（7.29.0。ユーザーが承認）**。今回のコードの全範囲で構文エラーなし。fixture は期待 17 件と一致。`PmdCli` を `JavaExec` で実行（`pmd` プラグインは Java 用）。PMD が Kotlin 2.4 の全構文を保証するとは確認していない | Step 1 |
+| 29 | 契約テストの道具・型の生成ツールは選定未決 | **選定・導入済み**: `@redocly/cli` 2.78.0、networknt `json-schema-validator` 3.0.9（Jackson 3 を推移的に追加）、`openapi-typescript` 7.13.0。peer の `typescript ^5.x` と TypeScript 6.0.3 の衝突（`npm install` が ERESOLVE で失敗）は、`package.json` の `"overrides": { "openapi-typescript": { "typescript": "$typescript" } }` で解消。生成物は TS 6.0.3 で `tsc`・Vitest・lint・build がすべて通った（**`overrides` を承認の範囲とするかは人の確認**） | Step 5 |
+| 30 | detekt は JDK 25 での代替を B2 で判断 | **JDK 21 の専用ジョブで維持**（ユーザーの決定）。detekt 2 系が安定したら見直す。`@Suppress` の実使用 0、ベースラインなし | Step 1 |
+| 31 | Kover は `test` を計測（合算は未確認） | 0.9.11 は全 Test タスクを合算できる。`excludedSourceSets` で統合・受け入れのソースセットを外す。ルールに `filters` が無く、domain の行のゲートは domain モジュールに置く | Step 2 |
+
 ## アップグレード計画
 
 | 時期 | 対象 | 内容 |
@@ -336,10 +345,10 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 
 - **B1 の結果（2026-11-14。上の変更表 19〜27）**: Kotlin 2.4.21 と Gradle 9.9.1、Kotest 6.2.7、HikariCP 7.1.0、Flyway 13.12.2、H2 の適用、Cucumber-JVM 8.0.4（独立したクラスパス）と Cucumber-JS 13.3.0 + Playwright 1.65.1 はビルドと実行で確認した。**未確認のまま**: PMD の Kotlin 2.4 の構文の解析（B2）、detekt の JDK 25 での代替（B2）、Arrow の `arrow-fx-coroutines`・`arrow-resilience` の版（B1 は Arrow core のみ使用）、Ktor のエンジン（B1 は Netty）。**依存関係の導入の承認の記録**: Cucumber・H2 を含む B1 の依存は、ユーザーが承認済み（上の「承認の状況」）。`junit-bom`・`junit-platform-suite`・`junit-platform-launcher`・`slf4j-api` の追加は、承認の範囲の周辺で、Gate の確認が要る。
 - **確認できていない項目**（受入条件: 最初のビルド。detekt と PMD は「規約違反のコードを置き、CI が落ちること」）: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、PMD 7.29.0 の Kotlin 2.4 の構文の解析、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25、Cucumber-JVM 8.0.4 と JUnit Platform・Kotlin の組み合わせ、Cucumber-JS 13.3.0 と Playwright の組み合わせ。実装開始時にビルドで確認する。
-- **承認待ち**: PMD の導入（新規の CI ツール）、Cucumber-JVM と Cucumber-JS の依存関係の導入（導入は決定済み。版は確認済み）。承認の後、開発戦略の未決事項（技術スタックへの Cucumber の追加）は解消する。
+- **承認の状況（B2、2026-11-15）**: PMD の導入と、契約テストの道具の選定・導入は、ユーザーが 2026-11-14 に承認した。Cucumber・H2 を含む B1 の依存も承認済み。**承認の範囲として人の確認が要るもの**: `openapi-typescript` の peer を `overrides` で TypeScript 6.0.3 に通したこと、networknt による Jackson 3 の推移的な追加、B1 で足した `junit-bom` ほか（B1 の判断項目 #13）。
 - **公式のサポート期限を確認できていない**: Cucumber-JVM、Cucumber-JS、PMD（Maven Central と npm の最新の版と更新日だけを確認した）。
 - **選定未決**: 生きたドキュメントの公開の道具（Pickles、Cucumber Reports など。B1〜B2 で選び、版を確認）、変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
-- PMD の Gradle での実行方法（プラグインか、CLI の実行か）。detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認する。
+- PMD の Gradle での実行方法: **解決済み（B2。`PmdCli` を `JavaExec` で実行）**。detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認する（`FunctionNameTooShort` は PMD の標準ルールで、閾値が XPath に固定されているため `xpath` を上書きした。B2）。
 - フィーチャーファイルの配置は **B1 で確定**（共有の `features/`。[テスト戦略](./test-strategy.md)）。
 - Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
 - **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。

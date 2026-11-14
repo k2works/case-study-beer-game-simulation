@@ -373,19 +373,25 @@ API を追加・変更する Bolt（**B1 以降のすべて**）は、次の順�
 | 型の生成物 | 仕様から生成した TypeScript の型が、コミット済みのものと一致する（差分 0）。フロントエンドの typecheck が通る | CI（毎回） |
 | SSE | 版の通知の形（ストリームごとの `versions`）を、仕様の記述（OpenAPI で表せる範囲）と照合する。**表せない部分は自前のテストで補う** | `test`、統合 |
 
+**B2 の実装（2026-11-15）。** 契約テストは **`app/src/test/kotlin/beergame/app/contract/`**（13 件）に置いた。`adapter-http` の test には永続化の読み取り側（投影）が無く、成功の応答（状態の投影）を作れないため、H2 の永続化と全経路の組み立てがある `app` の `test` に置いた（PostgreSQL は不要）。`app/build.gradle.kts` の `test` の入力に `contracts/openapi.yaml` を加え、仕様だけを変えてもテストが再実行されるようにした。検査は、応答の適合（スキーマ、`unevaluatedProperties: false` による未宣言の項目の検出、状態、Content-Type、ヘッダー）、全体の守り（429・413・500・503 が全操作に宣言されていること）、リクエストの適合（事例 39 件の仕様の判定と実装の受理・拒否、`Idempotency-Key` 必須）、エラー `code` の一致（欠けても余っても失敗）、ルートの網羅、検査自体が違反を見つけること（常に緑でない確認）。`code` の突き合わせは、ドメインの `code` をソースの走査（`kotlin-reflect` を足さないため）、HTTP の層を `Codes` のリフレクションで集める。分類が Forbidden のドメインの誤り（`session.forbidden`、`game.forbidden`）は `app.unauthorized` に写るため仕様に載せず、参加コードの失敗（`game.invitation_invalid`）だけが例外。
+
+**検出できない領域（人の確認が要る）。** スキーマで表せない条件（経路の週と `requestedWeek` の一致、需要系列の長さ、空白だけの表示名）は、事例と説明文でしか扱えない。`required` が実装より緩い仕様は、応答の適合では検出できない（任意の項目は、無くても適合）。型の生成と typecheck で補うが、網羅は保証しない。SSE は B1 の範囲に無く、未検査。
+
 ### CI の順序
 
-仕様の検証 → 型の生成 → 型の検査 → 契約テストを含むテスト（ADR-008）。
+仕様の検証（`redocly lint`）→ 型の生成（`api:check`: 生成し直してコミット済みと差分 0）→ 型の検査（`tsc`）→ 契約テストを含むテスト（ADR-008）。CI では `contract` → `web` → `test` の順に実行する（`web` は `contract` の後、`test` は `contract` と `web` の後）。
 
 ### 導入の時期
 
 | Bolt | 内容 |
 | :--- | :--- |
 | B1 | `contracts/openapi.yaml` に、ウォーキングスケルトンの経路（作成、参加、割り当て、開始、入力、確定、状態の表示）を書く。`@api` のシナリオが、この経路を通す |
-| B2 | **契約テストの基盤と、型の生成を、CI に組み込む**。**仕様と実装を意図的にずらすと、CI が落ちる**ことを確認する。道具を選定し、導入の承認を得る |
+| B2 | **契約テストの基盤と、型の生成を、CI に組み込んだ（2026-11-15）**。**仕様と実装を意図的にずらすと、CI のタスクが落ちる**ことを、変異 6 件で確認した（**ローカルの同じタスク。GitHub Actions 上は未確認**）。道具は、ユーザーが 2026-11-14 に選定・導入を承認した |
 | B3 以降 | API を足すたびに、仕様 → 契約テスト → 実装の順に進める（各 Bolt の完了条件） |
 
-道具（仕様の適合を検査するライブラリ、または自前の検査。型の生成）は**選定未決**です。B2 で、公式の情報で確認して選び、導入の承認を得ます（外部ライブラリの導入）。
+**道具（選定済み。B2、2026-11-15 に確認した版）**: OpenAPI の妥当性の検査は `@redocly/cli` 2.78.0（`redocly lint`、`contracts/redocly.yaml`。`recommended-strict`。`info-license`・`tag-description`・`operation-4xx-response` の 3 ルールだけ off）、応答・リクエストのスキーマ適合の検査は `com.networknt:json-schema-validator` 3.0.9（`app` の test のみ。Jackson 3 を推移的に追加）、TypeScript の型の生成は `openapi-typescript` 7.13.0（peer が `typescript ^5.x` のため、`web/package.json` の `overrides` で TypeScript 6.0.3 に通した。生成物は `src/api/generated/schema.d.ts` にコミットし、`api:check` で差分 0 を検査する）。
+
+**契約テストが見つけた仕様の後追い修正（B2）。** 初回は 13 件中 8 件が失敗した。実装でなく**仕様を実装に合わせて**直したのは 7 件（409 の拡張メンバー `ConflictProblem`、429・413・500 の未宣言、作成の範囲、表示名の長さ 1〜80 文字、`GameState.sessionId` の `required`）。ADR-008 の「仕様が先」に照らすと後追いで、**人の確認が要る**（[Bolt 2 終了報告](../../development/beer-game-kotlin/bolt_2_report.md) の #2）。
 
 ## E2E
 
@@ -413,11 +419,26 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | 関数 | 85% | （指標なし。Kover の対応は実装開始時に確認） |
 | 文 | 85% | （同上） |
 | 分岐 | 75% | 75%（全体。ただし `suspend` が生成する分岐で揺れうるため、実測で見直す） |
-| `domain` の行 | — | 100%（ゲート） |
+| `domain` の行 | — | **目標 100%、実装済みのゲートは暫定の下限 97%**（B2。実測 97.5%。**100% は未達で、人の判断待ち**） |
+
+**B2 の実測とゲートの設定（2026-11-15。合算）**
+
+| 範囲 | 行 | 分岐 | ゲート（設定場所） |
+| :--- | ---: | ---: | :--- |
+| 全体 | 96.8%（3141/3245） | 78.1%（804/1030） | 行 85%・分岐 75%（ルートの `koverVerify`。分岐の余裕は 3.1 ポイント） |
+| domain | 97.5%（784/804） | 98.2% | 行は暫定の下限 97%（`domain/build.gradle.kts`） |
+| application | 98.8% | 77.2% | 目安（95% / 85%）。分岐が届かない |
+| adapter-persistence | 98.2% | 70.8% | 目安（90% / 75%）。分岐が届かない |
+| adapter-http | 95.4% | 76.7% | 目安（90% / 75%）。満たした |
+| app | 89.7% | 72.1% | 目安なし。起動部の除外は未設定 |
+
+閾値割れで失敗することは、全体の分岐を 85%、domain の行を 100% に一時的に変えて確認した（`:koverVerify`・`:domain:koverVerify` が FAILED。元に戻して BUILD SUCCESSFUL）。この数値は Step 2 の実測で、契約テスト追加後の再測定値は記録していない。GitHub Actions 上の合算、`suspend` による分岐の揺れ（複数回の実行）は未測定。
+
+**domain の行 100% が届かない理由（B2 の事実。未到達 20 行）**: value class のコンストラクタのプロパティの行 9（`Quantities.kt`・`Values.kt`）、`object Projections` の getter の宣言の行 9（`Projections.all` は内部でフィールドを直接読み、getter が呼ばれない）、`Foundation.kt` の `toRef` の宣言の行 1（原因は未確認。生成コードの疑い）が 19 行で、残り 1 行の内訳は未確認。生成コードだけを除く Kover の設定は確認できなかった（`Projections*`・`Quantity`・`Units` をクラス単位で除外すると、実処理の 184 行が計測から消えて 98.5% にしかならない）。選択肢は、(1) 設計書の 100% を実測に合わせて書き換え、ゲートは 97% のままにする、(2) `private val` や通常のクラスへの変更（設計・コードの変更）、(3) クラス単位の除外（非推奨）、(4) 注釈による除外（効果は未確認）。**決めるのは人**（[Bolt 2 終了報告](../../development/beer-game-kotlin/bolt_2_report.md) の #1）。
 
 ### Kover の計測の範囲（H14）
 
-**Kover は `test` と `integrationTest` を合算して計測する設定にする**。`adapters/persistence` の行 90% は、DB の統合を含めないと到達できないためである。合算されないと、判定が意図とずれる。合算の設定がビルドで動くことは、**B1 の時点でも未確認**（Step 8 の記録: Kover が `integrationTest` を計測に含めるかは未確認で、`test` の分だけと見ている。2 つのソースセットの合算は B2）。
+**Kover は `test` と `integrationTest` を合算して計測する設定にする**。`adapters/persistence` の行 90% は、DB の統合を含めないと到達できないためである。合算されないと、判定が意図とずれる。合算の設定がビルドで動くことは、B1 の時点では未確認だった。**B2 の実測（2026-11-15）で確認した**: Kover 0.9.11 は、ルート（`build.gradle.kts`）で `kover` プラグインを適用し、`dependencies { kover(project(":domain")) ... }` で全 5 モジュールを集めると、ルートの `koverXmlReport`・`koverVerify` が全モジュールを合算する。既定ですべての Test タスク（`test`・`integrationTest`・`acceptanceTest`・`acceptanceTestH2`）を計測し、追加の設定は不要（`koverVerify` がこれらを先に実行する依存を `--dry-run` で確認）。**落とし穴**: `integrationTest`・`acceptanceTest` のソースセットのクラス（`beergame.acceptance.*`、`PostgresSupport` など）が本番コードの行に入るため、各モジュールで `kover { currentProject { sources { excludedSourceSets.addAll("integrationTest", "acceptanceTest") } } }` を設定して外した（`excludedSourceSets` の記述は、公式ドキュメントで確認できず、ビルドが通り効果を実測した）。検査の規則（`rule`）には、パッケージで絞る `filters` が無く（実測: コンパイルエラー）、domain の行のゲートは domain モジュールの `koverVerify` に置いた。**app の起動部の除外は未設定。**
 
 **B1 の実測（2026-11-14）と、`domain` の行 100% のゲート。** Kover 0.9.11 は `test` を計測し、`koverXmlReport`・`koverVerify` が動く（閾値は未設定）。`domain` の行は 570/581（98.1%。Step 5・6）、のちに 784/804（97.5%。Step 8）。**行 100% には届かない**: 未到達の行は、`value class` のプライマリコンストラクタの行（`val value: Int,` など）に対応する**コンパイラ生成のメンバー**（ボックス化したクラスの `getValue`、`Comparable` の橋渡し）で、通常のコードからは呼ばれない。手で書いたコードの未到達の分岐は 2 つだけ（最終週の上限 50 のフォールバック `week.next() ?: week`、無名クラスの `simpleName ?: "anonymous"`）。**「`domain` の行 100%」のゲートは、この生成コードの扱い（除外の設定、または閾値の見直し）を、B1 の終了までに決める**（未決事項）。application は 97.8%、adapter-persistence は 98.0%（`test` の分だけ）。
 
@@ -427,7 +448,7 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 
 | 層 | 行 | 分岐 | 判定 | 方針 |
 | :--- | ---: | ---: | :--- | :--- |
-| `domain`（集約、`simulateWeek`、値オブジェクト、`RetentionSaga`。**`Disclosure` は B1 の実装では `application`**） | 100% | 90% | 行 100% は**ゲート**。分岐は目安 | 中核。例と性質のテストで網羅する。`sealed` の網羅が生む到達不能な分岐は、除外ではなく分岐の目標を 100% にしないことで扱う |
+| `domain`（集約、`simulateWeek`、値オブジェクト、`RetentionSaga`。**`Disclosure` は B1 の実装では `application`**） | 100% | 90% | 行 100% が**ゲートの目標**（B2 の実装は暫定の下限 97%。上記）。分岐は目安 | 中核。例と性質のテストで網羅する。`sealed` の網羅が生む到達不能な分岐は、除外ではなく分岐の目標を 100% にしないことで扱う |
 | 投影（`Projection`） | 100% | 90% | 目安 | 純粋。投影の整合（性質 (c)）も含める |
 | `application`（ハンドラ） | 95% | 85% | 目安 | 手順の分岐（冪等、競合、再試行、権限）を網羅する |
 | `adapters/persistence`（イベントストア、投影の更新、周辺ストア） | 90% | 75% | 目安 | 分岐は DB の統合で確認する（合算が前提） |
@@ -594,7 +615,7 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | ツール | 役割 | 扱い |
 | :--- | :--- | :--- |
 | detekt | 中心の静的解析（複雑度、潜在的なバグ、例外、`ForbiddenMethodCall`） | 標準ルールを有効にし、`maxIssues: 0` |
-| **PMD（XPath のカスタムルール）** | 関数型の規約の **14 個のルール**（ガイド §9.6）。detekt に無い規約（`var` の禁止など）を補う。標準の Kotlin ルールは使わず、XPath で規約をルールにする | 補完として採用する。**導入は承認待ち**（新規の CI ツール）。承認までは detekt と ktlint で進め、PMD のルールセットは B2 で fixture のテストと合わせて導入する |
+| **PMD（XPath のカスタムルール）** | 関数型の規約の **14 個のルール**（ガイド §9.6）。detekt に無い規約（`var` の禁止など）を補う。標準の Kotlin ルールは使わず、XPath で規約をルールにする | 補完として採用する。**導入済み（B2、2026-11-14〜15。ユーザーが承認。7.29.0）**。Gradle の `pmd` プラグインは Java 用なので使わず、`PmdCli` を `JavaExec` で実行する（`pmdTool` 構成）。タスクは `pmdFixtureTest`・`pmdDomainApplication`・`pmdAdapter`・`pmdMain`・`pmdTest`・まとめて `pmd`（各モジュールの `check` が `pmd` に依存） |
 | ktlint | 整形 | `.editorconfig` で、整形の副作用が出るルールだけを調整する（下記） |
 | Checkstyle、SpotBugs | Java 用 | 使わない（Kotlin に適用できない） |
 
@@ -604,8 +625,8 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | :--- | :--- | :--- |
 | コンパイラの警告 | 警告をエラーとして扱う | 毎回 |
 | detekt | 複雑度（`CyclomaticComplexMethod`、`CognitiveComplexMethod`、`LongParameterList`）、`TooGenericExceptionCaught`、`SwallowedException`、`UnsafeCallOnNullableType`、`ForbiddenMethodCall`（`mutableListOf` など）、`MaxLineLength` など。設定値（ルール名と既定値）は、**導入する detekt の版の公式ドキュメントで確認してから確定する**（ガイドの例は実際に走らせて確認していない設定） | 毎回（違反 0） |
-| **PMD の 14 個の関数型ルール** | `NoVarProperty`、`NoVarClassParameter`、`NoMutableCollectionInSignature`、`NoMutableCollectionFactory`、`NoReduce`、`NoNotNullAssertion`、`NoThrow`、`NoGenericCatch`、`SideEffectInNonSuspendFunction`、`NoRunBlocking`、`NoGlobalScope`、`NoRawConcurrency`、`NoThreadSleep`、`NoNestedFlatMap`（ガイド §9.6）。最初から全て有効にする。Kotlin 2.4 の構文を解析できるかは、**未確認**（B2 の受入条件） | 毎回（違反 0。導入の承認後） |
-| **ルールの fixture テスト** | 違反するコードと違反しないコードを並べた fixture で、**期待する行だけが報告される**ことを確かめる（テストファースト）。ローカルな `var`、`private` 関数、`suspend` 関数の中、`buildList` の内側、純粋関数は報告されないことも確かめる。ガイドの例は PMD 7.29.0 で 17 件。**使う版で fixture を実行して件数を確かめる**（他の版は保証されない）。ルールの変更は、fixture のテストで回帰を防ぐ。ルールの `message` に `{` と `}` を書かない（PMD の `MessageFormat` で失敗する） | 毎回（ルールの変更時は必須） |
+| **PMD の 14 個の関数型ルール** | `NoVarProperty`、`NoVarClassParameter`、`NoMutableCollectionInSignature`、`NoMutableCollectionFactory`、`NoReduce`、`NoNotNullAssertion`、`NoThrow`、`NoGenericCatch`、`SideEffectInNonSuspendFunction`、`NoRunBlocking`、`NoGlobalScope`、`NoRawConcurrency`、`NoThreadSleep`、`NoNestedFlatMap`（ガイド §9.6）。最初から全て有効にする。**B2 の実測: Kotlin 2.4 のコードを全ソースセットで解析でき、構文エラーなし（PMD が Kotlin 2.4 の全構文を保証するとは確認していない）。全層で違反 0** | 毎回（違反 0） |
+| **ルールの fixture テスト** | 違反するコードと違反しないコードを並べた fixture で、**期待する行だけが報告される**ことを確かめる（テストファースト）。ローカルな `var`、`private` 関数、`suspend` 関数の中、`buildList` の内側、純粋関数は報告されないことも確かめる。ガイドの例は PMD 7.29.0 で 17 件。**使う版で fixture を実行して件数を確かめる**（他の版は保証されない）。**B2 の実測: 7.29.0 で 17 件が期待と一致**（`config/pmd/fixtures/Fixture.kt` と `expected.txt`。タスク `pmdFixtureTest` が、期待と過不足なく一致しなければ、また処理エラー・設定の誤りがあれば失敗する）。ルールの変更は、fixture のテストで回帰を防ぐ。ルールの `message` に `{` と `}` を書かない（PMD の `MessageFormat` で失敗する） | 毎回（ルールの変更時は必須） |
 | **純粋性の静的検査（M18）** | detekt の `ForbiddenMethodCall` で、**ドメインのモジュール**での `Instant.now`、`Clock.system*`（`systemUTC`、`systemDefaultZone` など）、`UUID.randomUUID`、`Random`（`kotlin.random.Random`、`java.util.Random`、`SecureRandom`）を禁止する。時刻・ID・乱数はコマンドの値で受け取る。**純粋性の主たる保証はこの検査**で、「同じ入力から同じ出力」の性質テストは補助とする。`ForbiddenMethodCall` が型解決を要する設定は、実際の版で確認する | 毎回（違反は失敗） |
 | **detekt と Kotlin 2.4 の互換（M17）。B1 の結果（2026-11-14）** | **detekt 1.23.8 は JDK 25 で動かない**（`IllegalArgumentException: 25.0.2`、`--jvm-target` が 22 まで）。**JDK 21 では、Kotlin 2.4.21 の `domain`・`application`・テストのコードを解析でき、`ForbiddenMethodCall`（`Instant.now`・`UUID.randomUUID` を `domain` に置くと失敗。`mutableListOf` はインライン関数のため報告されない）も効き、違反 0 件**。回避: `jvmTarget = "22"` を指定し、JDK 22 以下のときだけ detekt を有効にする。CI は detekt を JDK 21 の専用ジョブで実行する。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断する。**`RedundantSuspendModifier`** は、Kotlin 2.4 でビルドされたライブラリの suspend の呼び出しを検出できず誤検知する（原因は未調査）。`@Suppress`・設定の緩和は使わず、非 `suspend` のブロッキング関数にする／`suspend` の関数型の値にして回避。以下は元の設計: **ウォーキングスケルトンの最初のビルドの受入条件**: 規約違反のコードを 1 つ置き（ドメインのモジュールで `Instant.now()` を呼ぶ、または `var`）、**CI が落ちること**を確認する。detekt 1.23.8 が Kotlin 2.4 を解析できない、または規則が効かない場合の代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）を選ぶ期限は、**最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中**。選択は ADR に記録する（[技術スタック](./tech-stack.md) 設計判断 T5） | 最初のビルド（受入条件）。以降は毎回 |
 | ktlint | 書式。**整形の副作用が出るルールだけを `.editorconfig` で調整する**: 関数名の camelCase の強制は、**テストで外す**（日本語のバッククォートのテスト名を妨げない）。ファイル名のルールを外すかは導入時に判断（外すなら ADR）。引数が 2 つ以上の関数シグネチャの分割などの中核の整形は、外さずに受け入れる | 毎回 |
@@ -624,16 +645,29 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | 起動（`main`） | 境界として扱う | `NoRunBlocking`（一度きりの境界） |
 | テスト（ステップ定義を含む） | 全ルールを有効。必要なものだけ外す | `NoThreadSleep` は外さない（`runTest` の仮想時間を使う）。`NoThrow` の扱いは、Kotest の検証で必要な範囲を確認して決める |
 
+**B2 の実装（`apps/beer-game-kotlin/config/pmd/`。2026-11-15）。** 14 ルールの定義の正本は `fp-kotlin-rules.xml`。層ごとのルールセットは次のとおり。
+
+| ファイル | 対象 | 外すもの |
+| :--- | :--- | :--- |
+| `ruleset-domain.xml` | `domain/src/main`・`application/src/main` | 外すルールは**なし**。**標準の `FunctionNameTooShort` の閾値を 3→2 文字に下げた**（ルールは外していない。閾値は XPath に固定でプロパティが無いため、`xpath` を上書き。失敗を `Either` で返す工場関数 `of`（`Quantity.of`・`Week.of`・`Settings.of` など 14 か所）が 2 文字のため） |
+| `ruleset-adapter.xml` | `adapter-persistence/src/main`・`adapter-http/src/main` | `NoThrow`、`NoVarProperty`、`NoVarClassParameter`、`NoMutableCollectionFactory`、`NoRawConcurrency`、`SideEffectInNonSuspendFunction`、標準の `LooseCoupling`。`FunctionNameTooShort` は閾値 2 |
+| `ruleset-main.xml` | `app/src/main` | `NoRunBlocking`（起動時に実際のポートを同期で取得する 1 か所）、`SideEffectInNonSuspendFunction`（`Bootstrap.kt`・`Wiring.kt`）、`NoRawConcurrency`（シャットダウンフックの `Thread`）。`FunctionNameTooShort` は閾値 2 |
+| `ruleset-test.xml` | 全モジュールの `test`・`integrationTest`・`acceptanceTest` | `NoVarProperty`・`NoVarClassParameter`・`NoMutableCollectionFactory`、`SideEffectInNonSuspendFunction`、`NoRunBlocking`、`NoThrow`、`NoRawConcurrency`、標準の `FunctionNameTooShort`。**外さない**: `NoNotNullAssertion`、`NoReduce`、`NoGenericCatch`、`NoNestedFlatMap`、`NoGlobalScope`、`NoThreadSleep`、`NoMutableCollectionInSignature` |
+
+緩和は**層（ルールセット）単位**で、`@Suppress` は使っていない。**外したルールの新規違反は、その層では検出されなくなる**（件所ごとではない）。この粗さと、`FunctionNameTooShort` の閾値の変更は、**人の承認が要る**（記録は [ADR-011](../../adr/beer-game-kotlin/011-strict-static-analysis.md)。承認待ち）。`adapter-persistence` の違反（`ChangeNotifiers.kt` の `throw`、`JdbcEventStore.kt`・`JdbcTx.kt` の可変コレクション、`JdbcSupport.kt` の `var`）をコードで直すかも人の判断。実行時間は、負荷が高いときに `pmd` 全体で 2〜15 分とばらついた（GitHub Actions 上は未実測）。ルールセットの読み込みに失敗すると、PMD は ERROR を出して終了コードが非 0 になる（ログの最後は `Found no violations.` と出るため、終了コードに頼る）。
+
 構文では表せない規約（`sealed interface` の `when` に `else` を書かない、純粋関数の性質をプロパティベーステストで書く）は、レビューとテストで守り、承認ゲートのチェックリストに入れる。静的解析は、検出できる種類の問題にしか効かない。設計書とコードの食い違い（イベント名、`code`、制約名）は、契約テストと golden で守る。
 
 ### 最初のビルドの受入条件（B2）
 
 次を満たせない場合は、B3 以降を止め、代替を選ぶ（[技術スタック](./tech-stack.md) 設計判断 T5）。
 
-- [ ] 規約違反のコードを 1 つ置くと、CI が落ちる（ドメインのモジュールで `Instant.now()`、`var` など。detekt と PMD のそれぞれで確認する）
-- [ ] detekt が Kotlin 2.4 のコードを解析できる。PMD が Kotlin 2.4 の構文を解析でき、fixture の期待件数と一致する
-- [ ] `maxIssues: 0`、ベースラインなし、`@Suppress` なしで、全コードが緑
-- [ ] ktlint の `.editorconfig` の調整が、実際の版で動く
+B2 の結果（2026-11-15。**人の確認は未**）を併記する。
+
+- [x] 規約違反のコードを 1 つ置くと、CI が落ちる（ドメインのモジュールで `Instant.now()`、`var` など。detekt と PMD のそれぞれで確認する）: **ローカルの同じ Gradle タスクで確認**（PMD は 2 件、detekt の `ForbiddenMethodCall` は 1 件で失敗）。GitHub Actions 上は未確認
+- [x] detekt が Kotlin 2.4 のコードを解析できる（JDK 21 上）。PMD が Kotlin 2.4 の構文を解析でき、fixture の期待件数（17 件）と一致する
+- [x] `maxIssues: 0`、ベースラインなし、`@Suppress` なしで、全コードが緑（層単位の緩和つき。承認待ち）
+- [ ] ktlint の `.editorconfig` の調整が、実際の版で動く（**B2 では個別に確認していない。未確認**）
 
 ## CI との連携
 
@@ -671,7 +705,7 @@ stop
 | 項目 | 方針 |
 | :--- | :--- |
 | 失敗時 | どの工程が失敗しても、マージしない。カバレッジの閾値割れも失敗とする |
-| 静的解析の工程 | ktlint、detekt、PMD は、違反 0 件で合格（ベースラインなし、`@Suppress` なし）。**ルールの fixture テストを、ルールの検査より前に実行する**（ルールが読み間違いで違反を見逃していないことを先に確かめる）。ローカルでも同じ Gradle のタスクで再現できる。PMD は導入の承認後に工程へ加える（承認までは detekt と ktlint） |
+| 静的解析の工程 | ktlint、detekt、PMD は、違反 0 件で合格（ベースラインなし、`@Suppress` なし）。**ルールの fixture テストを、ルールの検査より前に実行する**（ルールが読み間違いで違反を見逃していないことを先に確かめる）。ローカルでも同じ Gradle のタスクで再現できる。PMD は B2 で `pmd` ジョブとして加えた（下の「B2 の CI の構成」） |
 | 受け入れ（Cucumber）の工程 | `@api`（Cucumber-JVM、Gradle のタスク）と `@ui`（`npx cucumber-js`）を毎回実行する。Undefined・Pending のステップがあれば失敗。`@wip` が残っていれば失敗（提案） |
 | 生きたドキュメント | フィーチャーファイルを、ビルドごとに公開する。**CI で自動化し、手作業で生成しない**。ツール（Pickles、Cucumber Reports など）と公開先は B1〜B2 で選ぶ |
 | 実行時間の目標（提案） | ユニット + 性質: 30 秒以内（コンパイルを除く）、統合（コンテナの起動を含む）: 3 分以内、E2E: 5 分以内、全体: 12 分以内（beer-game2 は 10 分。Gradle のビルドとコンテナの起動を加えた分を見込んだ。実測で見直す） |
@@ -680,6 +714,26 @@ stop
 | 失敗の記録 | Playwright のトレースとスクリーンショット、性質のテストの反例を保存する |
 | 定期実行の結果 | 負荷試験と計測の結果を保存し、推移を確認する |
 | 差し替えの検査 | **DB の統合が 1 件も実行されなかった場合は、失敗**とする（スキップの暗黙の増加を防ぐ） |
+
+### B2 の CI の構成（実装。`.github/workflows/beer-game-kotlin.yml`。2026-11-15）
+
+検証のみで、デプロイは含まない。**GitHub Actions 上の実行は未確認**（push していない。ローカルで各工程の同じタスクを実測した）。
+
+| ジョブ | JDK / Node | 内容 | `timeout-minutes` |
+| :--- | :--- | :--- | ---: |
+| `contract` | Node | `npm ci` → `api:lint`（`redocly lint`）→ `api:check`（生成し直してコミット済みと差分 0） | — |
+| `test` | JDK 25 | `check -x pmd`（ktlint・test・モジュール依存）→ `integrationTest`（PostgreSQL 18）→ `acceptanceTest`（`@api`、PostgreSQL）→ `acceptanceTestH2` → **DB の統合が実行されたことの検査** → `koverVerify koverXmlReport` → Kover の報告の保存。`contract` と `web` の後に実行 | 30 |
+| `detekt` | **JDK 21** | `detekt detektMain detektTest`（JDK 25 では動かないため専用ジョブ。ユーザーの決定） | 15 |
+| `pmd` | JDK 25 | `pmdFixtureTest`（先）→ 層ごとの検査（`pmdDomainApplication`・`pmdAdapter`・`pmdMain`・`pmdTest`） | 15 |
+| `web` | Node 26 | `npm ci`、`npm run verify`（format・lint・typecheck・Vitest・build）、`npm run acceptance:dry-run`（Undefined の検出）。`contract` の後に実行 | 15 |
+| `ui` | JDK 25・Node 26 | Playwright の Chromium を導入し、H2 のバックエンド（ポート 3100）を起動して `npm run acceptance`（`@ui`） | 20 |
+| `n1` | — | N-1 互換の雛形。`git tag --list 'beer-game-kotlin-v*'`（**タグ名は仮**）で直前のリリースを探し、無ければ実行しない。タグがあって本実装が無ければ意図的に失敗する（本実装は B12） | 10 |
+
+- `check` は `pmd` に依存するため、`test` ジョブは `check -x pmd` にして、PMD は `pmd` ジョブだけで実行する（`--dry-run` で PMD のタスクがグラフに無いことを確認）。
+- `timeout-minutes: 30`（`test`）の根拠は、ローカルの実測 3 分 25 秒（再コンパイルを含む）に、依存の取得・コンテナの取得・キャッシュ無しを見込んだ値。設計の全体 12 分との比較は未確認。`pmd` はローカルの負荷下で 2〜15 分とばらついたため、15 分で足りるかは未確認。
+- **失敗の条件の実測**: Undefined のステップ（`@api`）は失敗した（`UndefinedStepException`）。カバレッジの閾値割れは失敗した。**Pending は未実測**。DB の統合が 0 件・全件スキップのときの失敗は、検査の手順を実際の結果で合格させ、条件式を確認しただけで、**0 件の状態での実行は未実測**。Docker が無い場合の失敗（Testcontainers）と、Cucumber-JS（`@ui`）の Undefined による失敗も未実測。
+- action の版: `actions/checkout`・`setup-node`・`upload-artifact` は beer-game3.yml の SHA を転記して固定した（GitHub 上の照合はしていない）。`actions/setup-java`・`gradle/actions/setup-gradle` は `@v4` のまま、SHA を確認できず**未固定**。
+- 未実施: Playwright の e2e と axe（本 Bolt の範囲外）、ブラウザ行列、生きたドキュメントの公開、タグ（`@US`・`@AC`）の整合検査、`@Suppress`・ベースラインの機械検査。
 
 ## トレーサビリティ（ユーザーストーリー → テスト）
 
@@ -743,6 +797,11 @@ stop
 | 26 | 受け入れの `@api` は PostgreSQL | PostgreSQL（正）と H2 の両方で 27 シナリオ・209 ステップが緑。PostgreSQL 18.7 を `postgres:18-alpine`（Testcontainers）で確認。受け入れは `startApi`（`Main` の起動経路）でなく、`appPorts`・`beerGameModule` を直接組み立てる（DB 切断のためにデータソースを持つ）。起動経路は `MainSpec`・`ServerConfigSpec`・`PostgresHttpSpec` が担う | DB 切断の注入 |
 | 27 | detekt を CI の毎回の工程で実行（JDK 25 を想定） | detekt は JDK 21 の専用ジョブ。JDK 25 では無効にして警告 | detekt 1.23.8 が JDK 25 で動かない |
 | 28 | Kover は `test` と `integrationTest` を合算 | B1 は `test` の分だけを計測（合算は未確認で B2）。`domain` の行 100% は、コンパイラ生成のメンバーのため届かない（ゲートの扱いは未決） | Step 4・5・6・8 の実測 |
+| 29（以降は B2 の実装で変わった点。2026-11-15） | Kover は `test` と `integrationTest` を合算（未確認）。`domain` の行 100% がゲート | **合算できる**（既定ですべての Test タスクを計測。ソースセットは `excludedSourceSets` で外す）。全体の行 85%・分岐 75% を設定（実測 96.8%・78.1%）。**`domain` の行は暫定の下限 97%**（実測 97.5%。100% は未達。人の判断待ち） | B2 の Step 2 の実測 |
+| 30 | 契約テストは `adapter-http`（に読める）。道具は選定未決 | **`app` の test に置いた**（13 件）。道具は `@redocly/cli` 2.78.0、networknt `json-schema-validator` 3.0.9、`openapi-typescript` 7.13.0（`overrides` で TypeScript 6.0.3）。仕様の 7 件を実装に合わせて後追いで直した（人の確認待ち） | `adapter-http` に投影が無く、成功の応答を作れない。B2 の Step 5 |
+| 31 | PMD の導入は承認待ち。Gradle での実行方法は未確認 | **導入した**（7.29.0。fixture は 17 件で一致）。`PmdCli` を `JavaExec` で実行。層ごとのルールセット 4 つ。`FunctionNameTooShort` の閾値を 2 文字へ。層単位の緩和は粗い（人の承認待ち。ADR-011） | B2 の Step 1 |
+| 32 | CI の工程は `ktlint`・`detekt`・`PMD`・テスト・カバレッジ | ジョブを `contract`・`test`・`detekt`（JDK 21）・`pmd`・`web`・`ui`・`n1` に分けた。**GitHub Actions 上は未実行** | B2 の Step 4・5 |
+| 33 | 追記専用権限の否定テストは「加える」 | PostgreSQL 18 で 11 件（`RolePrivilegesSpec`）。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）。**連鎖削除は動く**（実測） | B2 の Step 3（[データモデル](./data-model.md)） |
 
 ## 設計判断
 
@@ -786,13 +845,13 @@ stop
 
 ## 未決事項
 
-- **API の契約テストの道具**（OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成）の選定と、導入の承認（B2。公式の情報で確認して選ぶ。本書では確認していない）。`problem+json` の `code` の列挙や SSE が、OpenAPI で表せる範囲（SSE は表せない部分を自前のテストで補う想定）。
+- **API の契約テストの道具**: **選定・導入済み（B2、2026-11-15。ユーザーが 2026-11-14 に承認）**。未決は、`problem+json` の `code` の列挙は表せたが、**SSE が OpenAPI で表せる範囲と、SSE の契約テスト**（B1 の範囲に SSE が無く未検査）、仕様の後追い修正 7 件の確認（人）、`overrides` や Jackson 3 の推移的な追加を承認の範囲とするか（人）。
 - **B1 の実装で出た未決（2026-11-14）**: (1) **`domain` の行 100% のゲート**の扱い（コンパイラ生成のメンバーの除外か、閾値の見直し）を B1 の終了までに決める。(2) **`acceptanceTest` を `check` に組み込むか**（Step 12 の判断）。受け入れの実行時間（H2 が約 20 秒、PostgreSQL が約 50 秒。コンテナの起動を含む）の CI での実測は未実施。(3) AC1.2.5 の原文との差（付け替え）と、AC2.3.3・AC6.1.2 を Gherkin にしない判断の、人の確認（ゲート 3）。(4) AC2.2.2 の「修正方法」の範囲（アプリケーションは小数・空白に「整数で指定してください。」と返し、範囲を含まない）。(5) AC1.2.5「移したことが示される」: API が付け替えを明示しないため、割り当ての前後のロビーの差で確かめた。(6) AC2.2.1 の「発注／生産要請」の種類は、API の状況に出ないため、結果の `order` に数量が反映されることまでを確かめ、種類のラベルはステップの中で役割から導いている。(7) Cucumber がグルーのパッケージにステップ以外のクラスがあると警告する（無害。パッケージを分ければ消える）。Netty のネイティブアクセスの警告（JDK 25）。(8) `features/TAGS.md` が `acceptanceTest` のリソースに含まれる（無害）。(9) 生きたドキュメントの公開、Cucumber のメッセージ形式の選定（トレーサビリティの抽出）、`@US`・`@AC` タグの整合検査の自動化、フロントエンドの lint で握りつぶし（`.catch(() => {})`）を検出する規則は未実施（B1〜B2）。`@ui` のステップの `{int}` が `{float}` の候補も出す（スニペットの提案のみ）。(10) 受け入れ用の需要系列（第 1 週 4、第 2〜12 週が 901〜911）は手で選んだ値で、JSD の値ではない（ASM-01）。
 - **H2 の PostgreSQL モードの実測**（**実測済み（2026-11-14、B1 の Step 1・7）。結果は [データモデル](./data-model.md) の「ローカル開発」節。Flyway の適用も Step 7 で確認済み**。以下は実測前の項目: アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルがどこまで動くかを実測する（公式ドキュメントで確認できなかった。非対応とは断定しない）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、H2 のスモークの範囲を確定する。H2 の版と導入は承認待ち（[技術スタック](./tech-stack.md)）。
 - 変異テストの導入の要否（ウォーキングスケルトンの最初の実測で判断）と、Kotlin 向けの道具（Pitest の対応は本書では確認していない）。
 - Kotest Property に、状態に応じて操作を選ぶ操作列の機能があるか（なければ自前）。生成列の分布の下限（提案: `WeekCommitted` 10%、`SessionEnded` 2%）の値。
-- detekt 1.23.8 と Kotlin 2.4 の互換（最初のビルドの受入条件。落ちる場合の代替の選択は最初の Bolt の中）。`ForbiddenMethodCall` が効く設定。
-- **PMD の導入の承認**（新規の CI ツール）。PMD の Gradle での実行方法、Kotlin 2.4 の構文の解析の可否、使う版での fixture の件数（ガイドの例は PMD 7.29.0 で 17 件。版は実装開始時に確認）。承認後は、[技術スタック](./tech-stack.md)（T5）と [リリース計画](../../development/beer-game-kotlin/release_plan.md) の B2 の記述を合わせる。
+- detekt 1.23.8 と Kotlin 2.4 の互換: **JDK 21 専用ジョブで維持（ユーザーの決定、2026-11-14。detekt 2 系が安定したら見直す）**。JDK 21 上で `ForbiddenMethodCall` が効くことは確認済み。ジョブの GitHub Actions 上の再現は未確認。
+- **PMD**: **導入済み（B2。ユーザーが承認。7.29.0）**。Gradle での実行方法（`PmdCli` を `JavaExec`）、Kotlin 2.4 の解析（今回のコードの範囲で可。全構文の保証は未確認）、fixture 17 件の一致は確認済み。未決は、**層単位の緩和の承認と ADR（ADR-011 に追記済み・承認待ち）**、`FunctionNameTooShort` の閾値の変更の承認、`adapter-persistence` の違反をコードで直すか、`pmd` ジョブの GitHub Actions 上の実行時間。
 - ktlint の `.editorconfig` で、ファイル名のルールを外すか（導入時に判断。外すなら ADR）。テストの層ごとのルールセットで外す範囲（Kotest の検証での `NoThrow` の扱い）。
 - **Cucumber の導入**（導入は決定済み）: Cucumber-JVM・Cucumber-JS の具体的な成果物と版（実装開始時に、公式の情報で確認する。本書では確認していない）、依存関係の導入の承認、フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）、ステップ定義の置き場、実行結果の形式（トレーサビリティの抽出に使う）。B1 で確定する。
 - 生きたドキュメントの公開ツール（Pickles、Cucumber Reports など）と公開先（B1〜B2）。
@@ -803,9 +862,9 @@ stop
 - ストーリー ID の整合の検査（タグ・テストに存在しない ID、受入条件に対応するシナリオまたはテストが無いもの）の厳しさ（警告か、失敗か）。
 - 実 DB での負荷試験の環境（CI の夜間か、ステージングか）。
 - 手動のアクセシビリティの確認（スクリーンリーダー）を実施する担当者と時期。
-- Kover が計測できる指標の種類（行・命令・分岐のほか、関数・文の有無）と、生成コードの除外の方法。**`test` と `integrationTest` の合算が動くか**（H14）、`suspend` による分岐の揺れ（全体の分岐 75% の見直し）。
+- Kover が計測できる指標の種類（行・命令・分岐のほか、関数・文の有無）と、生成コードの除外の方法（**B2: 合算は動く**。生成コードだけを除く方法は確認できず、`domain` の行 100% は人の判断待ち）。`suspend` による分岐の揺れ（全体の分岐 75% の余裕は 3.1 ポイント。複数回の実行での揺れは未測定）、app の起動部の除外（未設定）、GitHub Actions 上の合算（未確認）。
 - 追記の競合の自動再試行の上限（データモデルの未決事項）。決まったら、アプリケーション層のテストに反映する。
-- 連鎖削除が、`events` に DELETE 権限を持たないロールでも動くか。最初のスライドの Red のテストで確かめ、動かない場合の代替に合わせて、権限のテストを確定する。
+- 連鎖削除が、`events` に DELETE 権限を持たないロールでも動くか: **実測済み（B2 の Step 3。動く。PostgreSQL 18 での 1 回の実測）**。権限の否定テストは `RolePrivilegesSpec`（11 件）。残りは、観察者の接続プールの配線の検査（H13）と、`deletion_*` の GRANT の検査（B11）。
 - 出力（`buildExport`）が大きい場合のキャッシュ（H3、将来の検討）。
 - 投影の再構築の同時実行制御は、**停止中に再構築し、`pg_advisory_xact_lock_shared` / `pg_advisory_xact_lock` で排他する**と決めた（M23。テストは DB の統合に反映済み）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（短い待ちか 503 `app.retry_exhausted`）の値。
 - カバレッジの数値を、beer-game3（行 80%）と揃えるか。

@@ -145,8 +145,10 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 | 読み取り | api（問い合わせ） | 投影の SELECT のみ | 接続プール |
 | 観察者の読み取り | api（観察者の問い合わせ） | `week_team_totals`、`game_overview`（参加コードなし）、`session_overview` の SELECT のみ。役割別の表と、参加コードを持つ `game_join_codes` には到達できない（M1） | 別の接続プール |
 | 通知の受信 | api | `LISTEN` のみ | **プールの外の専用の接続**（1 タスクにつき 1 本） |
-| 削除 | retention | `game_roots` の DELETE、`deletion_*` の読み書き。連鎖削除が、`events` に DELETE を持たないロールでも動くかは、実装開始時に確認する（[データモデル](./data-model.md) の未決事項） | 接続プール（小さく） |
+| 削除 | retention | `game_roots` の DELETE、`deletion_*` の読み書き。連鎖削除が、`events` に DELETE を持たないロールでも動くことは、**B2 で実測済み**（`game_roots` の SELECT・DELETE のみで動く。`deletion_*` の GRANT は B11） | 接続プール（小さく） |
 | 所有者 | migrate | スキーマの変更（DDL）、ロールと権限の定義 | 1 回限りの接続 |
+
+**B2 の実装（2026-11-15）。** V101（PostgreSQL 専用）が、ロール `beergame_writer`（書き込み）・`beergame_reader`（読み取り。`display_profiles` を含む）・`beergame_observer`（観察者の読み取り）・`beergame_deleter`（削除）を `NOLOGIN` の非特権ロールとして作る（GRANT の表は [データモデル](./data-model.md)）。**所有者のロールは作らず、マイグレーションを実行する接続のユーザー**とした。本番の RDS で、マイグレーション用のユーザーをどう作るかは**未決（B3 以降）**。通知の受信（`LISTEN` のみ）のロールは、`LISTEN` が特別な権限を要さないため作っていない（専用の接続の配線は B3 以降）。アプリのコードは用途別のロール・接続に切り替えていない（単一の接続ユーザーのまま）。**V101 は V102 より小さい番号で、V102 まで適用済みの DB には Flyway がそのまま適用できない**（永続環境の前に確認が要る）。
 
 **ローカルの H2 では**、上のロールの分離、接続プールの分離、`LISTEN` の専用接続は**再現しない**（PostgreSQL の統合テストでだけ検証する）。通知の受信は、ポート `ChangeNotifier` の H2 版（プロセス内のイベント）に置き換わる。本番・ステージングは、この表のとおり PostgreSQL のロールで動く。
 
@@ -262,6 +264,7 @@ stop
 @enduml
 ```
 
+- **B2 の CI の実装（`.github/workflows/beer-game-kotlin.yml`。検証のみ、デプロイなし。GitHub Actions 上の実行は未確認）**: ジョブは `contract`（仕様の検証と型の生成物の差分 0）、`test`（ktlint・test・`integrationTest`・`acceptanceTest`・`acceptanceTestH2`・DB の統合の実行の検査・Kover のゲート）、`detekt`（**JDK 21 の専用ジョブ**）、`pmd`（fixture → 層ごとの検査）、`web`（`npm run verify`、Cucumber-JS の dry-run）、`ui`（Playwright の Chromium、H2 のバックエンド、`@ui`）、`n1`（N-1 の雛形。タグ名は仮）。詳細は [テスト戦略](./test-strategy.md) の「B2 の CI の構成」。`actions/setup-java`・`gradle/actions/setup-gradle` は `@v4` で SHA 未固定（`checkout`・`setup-node`・`upload-artifact` は beer-game3.yml の SHA を転記）。
 - CI は、GitHub Actions の **OIDC** で、環境ごとの最小権限のロールを引き受ける（長期のアクセスキーを置かない）。beer-game2 と同じ。
 - JDK と Gradle の準備、Gradle のキャッシュは、公式のアクションで行い、各アクションの版は、コミット SHA で固定する（beer-game2 と同じ方針）。
 - 依存関係の検査は、JVM の依存関係（Maven Central の成果物）に対応するツールを、実装開始時に選ぶ（未決事項）。秘密情報、コンテナ、IaC の検査は beer-game2 のツールの方針（gitleaks、Trivy、Checkov または同等のもの）を引き継ぐ。
@@ -296,6 +299,8 @@ stop
 | 10 | 再構築の概念が無い | 研修中は、停止を依頼して停止中に再構築する。アドバイザリロックで排他（M23）。観察者のロールは参加コードを持つ表に到達できない（M1） | ES + CQRS |
 | 11 | CI に新旧の互換の検査は無い | N-1 互換のジョブを加える。JDK の期限は Temurin の値（2031-09-30）に統一 | M22、M17 |
 | 12 | ローカルの DB は Docker の PostgreSQL 18 | ローカル開発だけ H2 の PostgreSQL モード（Docker 不要）。CI・ステージング・本番は PostgreSQL のまま。本番・ステージングでは起動時の検査で H2 を拒否 | ユーザーの決定（2026-11-14）。設計判断 ID6 |
+| 13（以降は B2 の実装で変わった点。2026-11-15） | DB ロールの GRANT と連鎖削除は設計のみ（実測前） | V101 でロール 4 つを作成。連鎖削除は実測済み。所有者はマイグレーションの接続のユーザー。V101 < V102 の順序の注意 | B2 の Step 3 |
+| 14 | CI の検証の工程は上の図のとおり（ジョブの分割は未定） | `contract`・`test`・`detekt`（JDK 21）・`pmd`・`web`・`ui`・`n1` に分割。**GitHub Actions 上は未実行** | B2 の Step 4・5 |
 
 ## 設計判断
 
@@ -363,7 +368,8 @@ stop
 ## 未決事項
 
 - Kotlin 2.4.21、Gradle 9.9.1、JDK 25、Ktor 3.6.1、Arrow 2.3.0 の互換性の確認（実装開始時）。
-- detekt 1.23.8 が Kotlin 2.4 に対応するかは、**最初のビルドの受入条件**で確認する（規約違反コードで CI が落ちること）。代替の選択の期限は、最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中。
+- detekt 1.23.8 と Kotlin 2.4: **JDK 21 の専用ジョブで維持（ユーザーの決定、2026-11-14）。GitHub Actions 上の再現は未確認。**
+- **B2 で出た未決（2026-11-15）**: V101 と V102 の順序（`outOfOrder` か番号の付け替え）、RDS のマイグレーション用ユーザーの作り方、用途別の接続プールの配線、`LISTEN` の専用接続、`ui`・`n1` ジョブと `pmd` の実行時間の GitHub Actions 上での確認、action の SHA 固定（`setup-java`・`setup-gradle`）、N-1 のタグ名。
 - コンテナのベースイメージ（Temurin の `25-jre-noble` を想定。JDK の期限は 2031-09-30 に統一済み）の、軽量な派生の採否と、そのサポート期限の確認。
 - タスクのサイズ、ヒープの割合、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウンの値（負荷試験で決める）。
 - `LISTEN` の接続と、RDS の接続数の上限の整合（タスクの最大数での確認）。

@@ -55,7 +55,7 @@ beer-game2 は、バックエンドとフロントエンドが TypeScript の型
 
 - 仕様を手で書く手間がかかり、実装との一致を契約テストで補う必要がある。
 - 保存のたびにスナップショットの取得が 1 回増える。
-- 型の生成ツールと、契約テストの方法（仕様の適合の検査に使うライブラリ、または自前の検査）は、選定が未決（外部ライブラリの導入には承認が要る）。
+- 型の生成ツールと、契約テストの方法は、B2 で選定・導入した（備考の B2 の実装の結果）。スキーマで表せない条件と SSE は、契約テストで検出できない。
 
 ## コンプライアンス
 
@@ -69,5 +69,7 @@ beer-game2 は、バックエンドとフロントエンドが TypeScript の型
 - 著者: claude-code
 - 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-007](./007-functional-core-with-arrow.md)、[ADR-012](./012-gherkin-and-cucumber.md)
 - **B1 の実装の結果（2026-11-14）**: `contracts/openapi.yaml` に B1 の経路（11 本）を書き、実装に合わせて直した（契約テストの自動化は B2。照合は目と HTTP の試験）。`code` は、設計の例に加え、`game.not_preparing`（受付終了後の参加は 409）、`game.already_created`、`game.participant_not_found`、`game.start_condition_not_met`、`session.not_active`、`session.already_ended`、`session.incomplete_decisions`、`validation.invalid_input`、`app.not_ready`、`app.rate_limited`、`request.too_large`・`not_found`・`method_not_allowed` を確定した（HTTP の層の名前は仮置き）。業務の権限不足も `app.unauthorized` の同じ本文で返す（資格の失敗と区別しない）。TypeScript の型の生成は B1 では行わず、`web/src/api/types.ts` を手書きした（B2 で生成に置き換える）。コマンドの応答は `versions` だけで、作成のゲーム ID は `Location`、参加の応答は `gameId` を含まない（参加者が参加後に進めない。未決）。
+- **B2 の実装の結果（2026-11-15）**: 契約テストと型の生成を導入した。道具は、ユーザーが 2026-11-14 に選定・導入を承認した `@redocly/cli` 2.78.0（仕様の検証）、networknt `json-schema-validator` 3.0.9（応答・リクエストの適合。`app` の test のみ。Jackson 3 を推移的に追加）、`openapi-typescript` 7.13.0（型だけの生成。peer の TypeScript は `overrides` で 6.0.3 に通した）。契約テスト 13 件は、`adapter-http` でなく **`app` の test** に置いた（成功の応答を作れる全経路の組み立てが `app` にあるため）。CI は `contract` → `web` → `test` の順（仕様の検証 → 型の生成 → 型の検査 → テスト）。**仕様と実装を意図的にずらす変異 6 件で、いずれも失敗することを確認した**（ローカルの同じタスク。GitHub Actions 上は未確認）。
+- **仕様の後追い修正（人の確認待ち）**: 契約テストの初回は 13 件中 8 件が失敗し、うち 7 件は**実装でなく仕様を実装に合わせて直した**（409 の拡張メンバー、429・413・500 の未宣言、作成の範囲、表示名の長さ、`GameState.sessionId` の `required`）。実装が設計書・受入条件に沿っていたためだが、本 ADR の「仕様が先」に照らすと**後追い**であり、B1 で「手で照合した」一致が不十分だったことを示す。範囲と表示名の長さを仕様にも重複して持つことを含め、**人の確認が要る**。契約テストが検出できない領域（スキーマで表せない条件、`required` が実装より緩い仕様、SSE）も残る（[Bolt 2 終了報告](../../development/beer-game-kotlin/bolt_2_report.md)）。
 - 設計書の指摘（解決済み）: 契約テストの項目が、テスト戦略とリリース計画に無かった。2026-11-14 に、テスト戦略（API の契約テストの節）とリリース計画（B1 の仕様、B2 の契約テストと型の生成、リスク R21）に反映した。
 - 参照: [フロントエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-frontend.md)、[バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[設計レビュー](../../review/beer-game-kotlin/design_review_20261114.md)
