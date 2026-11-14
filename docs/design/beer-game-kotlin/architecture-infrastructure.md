@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "Kotlin 版のインフラアーキテクチャ。beer-game2 の ECS Fargate、CloudFront、RDS、Terraform、CI/CD を踏襲し、JVM のコンテナ、起動と終了、メモリ、Gradle のビルド、データベースのロール、確認したバージョンなど JVM 固有の変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -28,7 +28,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
 
 | 区分 | 技術 | 確認した版 | 出典・備考 |
 | :--- | :--- | :--- | :--- |
-| 実行環境 | JDK（LTS） | **25** | endoflife.date（Oracle JDK）。25 は 2025-09-16 に GA、サポート期限 2030-09-30（延長 2033-09-30）。21 は 2028-09-30。**これは Oracle JDK の期限**で、コンテナに使うディストリビューションの期限は別に確認する |
+| 実行環境 | JDK（Eclipse Temurin、LTS） | **25** | endoflife.date の `eclipse-temurin`（2026-11-14 に再確認）。25 は LTS、2025-09-22 リリース、**EOL 2031-09-30**。コンテナに実際に使う配布（Eclipse Temurin のイメージ）の値で、[技術スタック](./tech-stack.md) と同じ。Oracle JDK の期限（2030-09-30）は、使わない配布の値のため採用しない |
 | 言語 | Kotlin | **2.4.21**（安定版の最新）。2.5.0 は RC | Maven Central（kotlin-stdlib）。2.5.0 の安定版が出たときに更新を判断する |
 | ビルド | Gradle | **9.9.1** | Gradle の公式のバージョン情報（current） |
 | Web | Ktor（`ktor-server-core`） | **3.6.1** | Maven Central |
@@ -37,9 +37,9 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T06:48:09Z }
 | JSON | kotlinx.serialization（JSON） | **1.13.0** | Maven Central |
 | DB ドライバ | PostgreSQL JDBC | **42.7.14** | Maven Central |
 | 接続プール | HikariCP | **7.1.0** | Maven Central |
-| マイグレーション | Flyway（`flyway-core`） | **13.12.2** | Maven Central。ライセンスと機能の範囲は導入時に確認 |
-| ログ | Logback（`logback-classic`） | **1.6.6** | Maven Central。採用は未決（[バックエンド](./architecture-backend.md)） |
-| 静的解析 | detekt（`io.gitlab.arturbosch.detekt`） | **1.23.8**（安定版の最新、2025-02-21）。`dev.detekt` の 2.0.0 は alpha | Maven Central。**採用する Kotlin 2.4 に 1.23.8 が対応するかは未確認** |
+| マイグレーション | Flyway（`flyway-core`） | **13.12.2** | Maven Central。**選定済み**（[技術スタック](./tech-stack.md) T4）。**導入は新しい依存関係として承認待ち**。ライセンスと機能の範囲は導入時に確認 |
+| ログ | Logback（`logback-classic`） | **1.6.6** | Maven Central。**選定済み**（アプリのログは自前の `LogRecord` の JSON、Logback は枠組みのログ用）。導入は承認待ち |
+| 静的解析 | detekt（`io.gitlab.arturbosch.detekt`） | **1.23.8**（安定版の最新、2025-02-21）。`dev.detekt` の 2.0.0 は alpha | Maven Central。**採用する Kotlin 2.4 に 1.23.8 が対応するかは未確認。ウォーキングスケルトンの最初のビルドの受入条件**（規約違反のコードを 1 つ置き、CI が落ちること。[テスト戦略](./test-strategy.md)）。代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）は、最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中で選ぶ |
 | 整形 | ktlint | **1.8.0** | Maven Central |
 | コンテナのイメージ | Eclipse Temurin | タグ `25-jre`、`25-jre-noble` を確認 | Docker Hub。軽量な派生（Alpine など）の有無は確認していない |
 
@@ -128,7 +128,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 | CloudFront | beer-game2 と同じ。SSE（`/api/v1/games/:id/events`）は、キャッシュなしで、オリジンの応答を待つ時間の上限を超えない心拍を送る（バックエンドの設計）。オリジンの応答の待ち時間の設定は、実装開始時に確認する |
 | ALB | HTTPS、アイドルタイムアウト 60 秒、ヘルスチェックは `/ready`。**JVM の起動に時間がかかるため、サービスのヘルスチェックの猶予期間を設ける**（値は起動時間の実測で決める） |
 | API サービス | Fargate、常時 2 タスク、CPU 60% で 2〜4 に自動増減。ステートレス。本番はブルー/グリーン（CodeDeploy）、ステージングはローリング。**タスクのサイズの初期案: 1 vCPU / 2 GiB。ヒープ、再生の所要時間、GC の測定の後に決める**（設計判断 ID2） |
-| 保持・マイグレーション・再構築のタスク | **同じイメージ**を、起動引数（`retention`、`migrate`、`rebuild-projections`）で切り替える。保持は EventBridge で 5 分ごと、マイグレーションはデプロイの一部（アプリの起動前）に 1 回限り、再構築は運用者が必要なときに起動する |
+| 保持・マイグレーション・再構築のタスク | **同じイメージ**を、起動引数（`retention`、`migrate`、`rebuild-projections`）で切り替える。保持は EventBridge で 5 分ごと、マイグレーションはデプロイの一部（アプリの起動前）に 1 回限り、再構築は運用者が必要なときに起動する（**研修中は、運営者を通じて進行役に「停止」を依頼し、停止中に再構築して再開**する。停止中でも追記を伴う操作は走るため、再構築は `pg_advisory_xact_lock(game_id)`（排他）を取り、コマンド側は `pg_advisory_xact_lock_shared(game_id)` を取る。[データモデル](./data-model.md)、[運用要件](./operation.md)） |
 | RDS | beer-game2 と同じ。**ロールを用途別に作る**（下の表） |
 | 秘密情報 | DB の接続情報を、**ロールごとに別の秘密**として持つ。資格の鍵（複数の版）、応答の暗号鍵は変更なし。実行ロールには、そのタスクに必要な秘密の参照権限だけを与える |
 | 観測 | beer-game2 と同じ。JSON ログとメトリクス（EMF）は標準出力へ出し、コンテナのログドライバが CloudWatch Logs へ送る。**JVM のヒープ・GC、再生のイベント数と時間、再試行の回数**のアラームを加える |
@@ -141,7 +141,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 | :--- | :--- | :--- | :--- |
 | 書き込み | api（コマンド）、rebuild-projections | `events` は INSERT / SELECT のみ。投影・周辺ストア・冪等記録は読み書き | 接続プール（HikariCP）。トランザクション単位 |
 | 読み取り | api（問い合わせ） | 投影の SELECT のみ | 接続プール |
-| 観察者の読み取り | api（観察者の問い合わせ） | `week_team_totals`、`game_overview`、`session_overview` の SELECT のみ。役割別の表には到達できない | 別の接続プール |
+| 観察者の読み取り | api（観察者の問い合わせ） | `week_team_totals`、`game_overview`（参加コードなし）、`session_overview` の SELECT のみ。役割別の表と、参加コードを持つ `game_join_codes` には到達できない（M1） | 別の接続プール |
 | 通知の受信 | api | `LISTEN` のみ | **プールの外の専用の接続**（1 タスクにつき 1 本） |
 | 削除 | retention | `game_roots` の DELETE、`deletion_*` の読み書き。連鎖削除が、`events` に DELETE を持たないロールでも動くかは、実装開始時に確認する（[データモデル](./data-model.md) の未決事項） | 接続プール（小さく） |
 | 所有者 | migrate | スキーマの変更（DDL）、ロールと権限の定義 | 1 回限りの接続 |
@@ -189,7 +189,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 
 | 局面 | 設計 |
 | :--- | :--- |
-| 起動 | 設定を読み込み、検証する（`AppConfig.load`。失敗なら起動しない）-> 接続プールを作る -> 通知の受信を始める -> HTTP の受付を始める。`/ready` は、**データベースの接続、通知の受信の接続の生存**が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない |
+| 起動 | 設定を読み込み、検証する（`AppConfig.load`。失敗なら起動しない）-> 接続プールを作る -> 通知の受信を始める -> HTTP の受付を始める。`/ready` は、**データベースの接続、通知の受信の接続の生存**が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない。**起動時間の測る区間（L4）**: [NF-P16](./non-functional.md) と [運用要件](./operation.md) と同じく、**コンテナのプロセスの開始から `/ready` が成功するまで**（マイグレーションの適用を除く。p95 30 秒以下は提案）。サービスのヘルスチェックの猶予期間は、この実測の p95 より長く取る。RTO 15 分（NF-R4）は、この起動時間と、必要な場合の再構築（NF-P18）を含めて見積もる |
 | マイグレーションとの順序 | マイグレーションのタスクが完了してから、アプリのタスクを起動する（デプロイの手順で保証）。アプリは起動時に、**期待するスキーマの版が適用済みか**を確認し、未適用なら準備できていない |
 | 終了 | ECS は、タスクの停止時に SIGTERM を送り、一定の時間の後に強制終了する（停止の猶予時間は、サービスの設定で調整できる）。アプリは SIGTERM で、**新しい要求の受付を止め、処理中の要求を完了させ、SSE の接続を閉じ、接続プールを閉じる**。クライアントは、SSE が切れても再接続し、スナップショットを取得して追いつく（再生なしの設計） |
 | 負荷分散との整合 | ALB のターゲットの登録解除の遅延（deregistration delay）と、アプリの終了の猶予を整合させる。長い SSE の接続は、猶予の後に切られてよい（クライアントが再接続する） |
@@ -220,6 +220,7 @@ partition "検証（バックエンド: Gradle）" {
   :ktlint、detekt、関数型規約、コンパイル（警告をエラー）;
   :ユニット・コンポーネントテスト（純粋関数、インメモリ）;
   :統合テスト（PostgreSQL 18、契約テスト）;
+  :N-1 互換（直前のリリースの読み取り側で、\n現在の書く版の golden を再生）;
 }
 partition "検証（フロントエンド: npm）" {
   :OpenAPI の検証 -> 型の生成 -> 型の検査;
@@ -255,6 +256,7 @@ stop
 - 依存関係の検査は、JVM の依存関係（Maven Central の成果物）に対応するツールを、実装開始時に選ぶ（未決事項）。秘密情報、コンテナ、IaC の検査は beer-game2 のツールの方針（gitleaks、Trivy、Checkov または同等のもの）を引き継ぐ。
 - ステージングで承認した**同じイメージのダイジェスト**を、本番へ昇格させる。
 - スキーマの変更は、旧アプリが動く間は、必須の列・制約を削除しない（拡張 → 互換 → 縮小）。**イベントは書き換えない**（形の変更は `schema_version` とアップキャスト。[データモデル](./data-model.md)）。投影の形の変更は、マイグレーションの後に**投影の再構築**で埋めるため、再構築のタスクをデプロイの手順に含められるようにする。
+- **N-1 互換のジョブ（M22）**: 直前のリリースの読み取り側（アップキャストと `evolve`）で、現在の書く版の golden を再生する（[テスト戦略](./test-strategy.md)）。新しいイベントの種類の追加は `schema_version` で制御できないため、**読む側を先にリリースする規則（読める版 → 書く版）に、「新しいイベントの種類を書き始める前に、読む側を 1 リリース以上先行させる」を加える**。ロールバックで旧イメージが動いても、新しいイベントを読める状態を保つため。
 - スモークテストに、**自動確定**（4 役割の入力で、週が確定すること）を加える。
 
 ## 品質属性への対応
@@ -279,7 +281,9 @@ stop
 | 6 | DB の接続情報は 1 種類 | ロールごとの接続情報（書き込み、読み取り、観察者、削除、所有者）。通知の受信の専用の接続 | `events` の追記専用、最小権限、`LISTEN` |
 | 7 | CI は `npm` の検証 | Gradle の検証 + 契約テスト + 型の生成 + npm の検証。スモークに自動確定を加える | Kotlin と OpenAPI の契約 |
 | 8 | メトリクスは、応答時間・競合など | JVM のヒープ・GC、再生のイベント数と時間、再試行の回数、投影の不一致を加える | JVM と ES |
-| 9 | マイグレーションは node-pg-migrate | **Flyway** を候補（番号つきの SQL。設計判断 ID4） | JVM のエコシステム |
+| 9 | マイグレーションは node-pg-migrate | **Flyway**（番号つきの SQL。選定済み。導入は承認待ち。設計判断 ID4） | JVM のエコシステム |
+| 10 | 再構築の概念が無い | 研修中は、停止を依頼して停止中に再構築する。アドバイザリロックで排他（M23）。観察者のロールは参加コードを持つ表に到達できない（M1） | ES + CQRS |
+| 11 | CI に新旧の互換の検査は無い | N-1 互換のジョブを加える。JDK の期限は Temurin の値（2031-09-30）に統一 | M22、M17 |
 
 ## 設計判断
 
@@ -313,11 +317,11 @@ stop
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用、候補）** | Flyway（番号つきの SQL、履歴テーブル） | [データモデル](./data-model.md) の「番号つきの SQL」に合う。JVM のエコシステム。ライセンスの範囲と機能は導入時に確認 |
+| **A（採用）** | Flyway（番号つきの SQL、履歴テーブル） | [データモデル](./data-model.md) の「番号つきの SQL」に合う。JVM のエコシステム。ライセンスの範囲と機能は導入時に確認 |
 | B | Liquibase | 変更の記述形式が豊富。XML や YAML の変更セットが、SQL の直接の管理より間接になる |
 | C | 自前（番号つきの SQL と履歴テーブル） | 依存が増えない。履歴と適用の標準化を自前で作る |
 
-[技術スタック](./tech-stack.md) で確定します。導入は、**新しい依存関係として承認を得ます**。
+[技術スタック](./tech-stack.md) の T4 で選定済みです（選定は未決ではない）。導入は、**新しい依存関係として承認待ち**です。
 
 ### ID5: データベースのロールの分離
 
@@ -337,8 +341,8 @@ stop
 ## 未決事項
 
 - Kotlin 2.4.21、Gradle 9.9.1、JDK 25、Ktor 3.6.1、Arrow 2.3.0 の互換性の確認（実装開始時）。
-- detekt 1.23.8 が採用する Kotlin に対応するかの確認と、非対応の場合の代替（バックエンドの未決事項と共通）。
-- コンテナのベースイメージのディストリビューションの選定と、そのサポート期限の確認。
+- detekt 1.23.8 が Kotlin 2.4 に対応するかは、**最初のビルドの受入条件**で確認する（規約違反コードで CI が落ちること）。代替の選択の期限は、最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中。
+- コンテナのベースイメージ（Temurin の `25-jre-noble` を想定。JDK の期限は 2031-09-30 に統一済み）の、軽量な派生の採否と、そのサポート期限の確認。
 - タスクのサイズ、ヒープの割合、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウンの値（負荷試験で決める）。
 - `LISTEN` の接続と、RDS の接続数の上限の整合（タスクの最大数での確認）。
 - 依存関係の脆弱性の検査ツールの選定（JVM の依存関係に対応するもの）。
@@ -346,13 +350,13 @@ stop
 - ブルー/グリーンの実装（CodeDeploy）と、ステージングのローリングの差の許容。
 - 合成監視（CloudWatch Synthetics）の費用と、頻度（1 分ごと）の妥当性。
 - アカウントの分離（環境ごと）の方針。
-- 投影の再構築のタスクを、デプロイの標準の手順に含める条件と、再構築中の追記の扱い（[データモデル](./data-model.md) の未決事項）。
+- 投影の再構築のタスクを、デプロイの標準の手順に含める条件。再構築中の追記の扱いは、アドバイザリロックで決定済み（M23）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（[データモデル](./data-model.md) の未決事項）。
 
 ## 出典
 
 - [バックエンドアーキテクチャ（Kotlin 版）](./architecture-backend.md)、[データモデル（Kotlin 版）](./data-model.md)、[運用要件](./operation.md)、[非機能要件](./non-functional.md)
 - [beer-game2 のインフラストラクチャアーキテクチャ](../beer-game2/architecture-infrastructure.md)、[beer-game2 の技術スタック](../beer-game2/tech-stack.md)
-- バージョンの確認元（2026-11-14）: Maven Central のメタデータ（Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（`services.gradle.org/versions/current`）、endoflife.date（Oracle JDK）、Docker Hub（`eclipse-temurin` のタグ）
+- バージョンの確認元（2026-11-14）: Maven Central のメタデータ（Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（`services.gradle.org/versions/current`）、endoflife.date（`eclipse-temurin`）、Docker Hub（`eclipse-temurin` のタグ）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
 - [ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 9 章（静的解析）
 - [ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)

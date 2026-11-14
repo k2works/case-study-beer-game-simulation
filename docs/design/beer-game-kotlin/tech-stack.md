@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -34,7 +34,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 
 ## 選定の方針
 
-- 言語は、バックエンドを Kotlin、フロントエンドを TypeScript とする。**型の共有はしない**（バックエンドの API 契約を OpenAPI などで共有するかは未決事項）。
+- 言語は、バックエンドを Kotlin、フロントエンドを TypeScript とする。**言語をまたぐ型の共有はしない**。API の契約は、**`contracts/openapi.yaml` を手書きの正本**とし、フロントエンドは仕様から型を生成する（決定済み。[バックエンドアーキテクチャ](./architecture-backend.md)、[フロントエンドアーキテクチャ](./architecture-frontend.md)）。バックエンドのコードから仕様を生成する方式は採らない。
 - ドメインは純粋にし、副作用は境界へ寄せる。`suspend` を副作用の表現とし、自前の `IO` 型は作らない（[ガイド §4.2](../../reference/関数型プログラミングガイド_Kotlin編.md)、[§10.1](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - 失敗は例外でなく `Either` と `Raise` で返す。Arrow の `Either`、`either { }`、`zipOrAccumulate` を使う（[ガイド §3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - ORM は使わず、SQL と JDBC を直接扱う。イベントの追記と投影の更新を、1 つのトランザクションの中で明示するため（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)、beer-game2 の ADR-002 と同じ考え方）。
@@ -46,7 +46,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 | # | 事項 | 確認結果（2026-11-14） | 判断 |
 | :--- | :--- | :--- | :--- |
 | 1 | Kotlin | 2.4 系が最新（2.4.0 は 2026-06-03、最新パッチ 2.4.21 は 2026-10-08）で、サポート中。2.3 は 2026-06-03 にサポート終了 | **2.4.21** を第一候補。K2 コンパイラ、`@JvmInline value class`、コンテキストパラメータの扱いは、実装開始時に確認 |
-| 2 | JDK | **25 が LTS**（Temurin。2025-09-22 リリース、EOL 2031-09-30）。26 は LTS でなく EOL 2026-09-22、27 は LTS でなく EOL 2027-03-23 | **JDK 25（LTS）** を採用。LTS の次の版は、実装の期間中に採用しない |
+| 2 | JDK | **25 が LTS**（Temurin。2025-09-22 リリース、EOL 2031-09-30）。26 は LTS でなく EOL 2026-09-22、27 は LTS でなく EOL 2027-03-23 | **JDK 25（LTS）** を採用。**配布は Eclipse Temurin**（コンテナのイメージ `eclipse-temurin`。EOL 2031-09-30 は endoflife.date の `eclipse-temurin` の値で、[インフラ](./architecture-infrastructure.md) も同じ。Oracle JDK の 2030-09-30 は使わない配布の値）。LTS の次の版は、実装の期間中に採用しない |
 | 3 | Gradle | 9.9.1（2026-11-10）。実行できる Java は 17〜26、テスト済みの Kotlin は 2.0.0〜2.4.20-Beta1 まで | **9.9.1**。Kotlin 2.4.21 との組み合わせは、**テスト済みの範囲の上限が 2.4.20-Beta1 のため、実装開始時にビルドで確認する** |
 | 4 | PostgreSQL | 18 の最新は 18.7、EOL 2030-11-14。17 は EOL 2029-11-08 | **PostgreSQL 18**（beer-game2 と同じ。RDS の標準サポートは beer-game2 が確認した 2031-02-28 まで） |
 | 5 | Ktor | 3.6.1（Maven Central の更新は 2026-10-29）。3.x の系列 | **3.6.1** |
@@ -55,9 +55,9 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 | 8 | kotlinx.serialization | `kotlinx-serialization-json` の最新は 1.13.0（2026-11-11） | **1.13.0** |
 | 9 | PostgreSQL JDBC | 42.7.14（2026-10-07） | **42.7.14** |
 | 10 | 接続プール | HikariCP 7.1.0（2026-06-14） | **7.1.0**。JDK 25 との組み合わせは、実装開始時に確認 |
-| 11 | マイグレーション | Flyway 13.12.2（2026-11-12） | **13.12.2**（設計判断 T4） |
+| 11 | マイグレーション | Flyway 13.12.2（2026-11-12） | **13.12.2**（**選定済み**。設計判断 T4。導入は承認待ち） |
 | 12 | テスト | Kotest 6.2.7（2026-11-11）。Testcontainers は **2 系**（`testcontainers-postgresql` 2.0.5、2026-04-20）で、1 系（`postgresql` 1.21.4）は 2025-12-16 が最後 | **Kotest 6.2.7**、**Testcontainers 2.0.5**（設計判断 T3） |
-| 13 | detekt | **安定版は 1.23.8**（2025-02-21、`io.gitlab.arturbosch`）。`dev.detekt` の **2.0.0-alpha.6**（2026-08-04）は alpha のみ | **1.23.8 を第一候補**。ただし、Kotlin 2.4 のコードを解析できるかは**未確認**。実装開始時に確認し、不可なら設計判断 T5 の代替へ |
+| 13 | detekt | **安定版は 1.23.8**（2025-02-21、`io.gitlab.arturbosch`）。`dev.detekt` の **2.0.0-alpha.6**（2026-08-04）は alpha のみ | **1.23.8 を第一候補**。ただし、Kotlin 2.4 のコードを解析できるかは**未確認**。**ウォーキングスケルトンの最初のビルドの受入条件**（規約違反のコードを 1 つ置き、CI が落ちること）で確認し、不可なら設計判断 T5 の代替へ（期限: 最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中） |
 | 14 | ktlint | 1.8.0（2025-12-15） | **1.8.0**。整形の適用範囲は、ガイド §9.4 に従い `.editorconfig` で絞る（設計判断 T5） |
 | 15 | カバレッジ | Kover Gradle プラグイン 0.9.11（2026-09-29） | **0.9.11**（設計判断 T6） |
 | 16 | Node.js（フロントエンドのビルド・テスト用） | beer-game2 が確認した Node 26（Active LTS。EOL 2029-04-30） | **Node 26 LTS** を、フロントエンドのビルドと E2E にだけ使う。バックエンドの実行環境には含めない |
@@ -67,18 +67,18 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 | カテゴリ | 技術 | 版 | beer-game2 | 用途 | サポート期限 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 言語 | Kotlin（JVM） | **2.4.21** | TypeScript 6.0.3 | ドメイン、アプリケーション、アダプター | Kotlin 2.4 はサポート中（終了日は公表なし） |
-| 実行環境 | JDK（Eclipse Temurin） | **25（LTS）** | Node 26 | API、保持の定期タスク、マイグレーション | 2031-09-30 |
+| 実行環境 | JDK（Eclipse Temurin） | **25（LTS）** | Node 26 | API、保持の定期タスク、マイグレーション | 2031-09-30（Temurin。endoflife.date） |
 | ビルド | Gradle（Kotlin DSL） | **9.9.1** | npm | ビルド、テスト、静的解析、依存関係の固定 | 9 系はサポート中（終了日は公表なし） |
 | Web フレームワーク | Ktor Server | **3.6.1** | Fastify 5.12.8 | REST API、SSE | - |
 | Ktor の部品 | `ktor-server-netty`（エンジン）、`ktor-server-content-negotiation`、`ktor-serialization-kotlinx-json`、`ktor-server-status-pages`、`ktor-server-call-id`、`ktor-server-call-logging`、`ktor-server-cors`、`ktor-server-default-headers`、`ktor-server-hsts`、`ktor-server-rate-limit`、**`ktor-server-sse`**、`ktor-server-auth` | 3.6.1（テスト用に `ktor-server-test-host` を加える。開発依存のみ。プラグイン名の確認は SSE とレート制限のみで、他は実装開始時に確認） | @fastify/* 一式 | 下記の対応表 | - |
 | 関数型 | Arrow（`arrow-core`、`arrow-fx-coroutines`、`arrow-resilience`） | **2.3.0**（`arrow-core`）。他は実装開始時に確認 | （なし） | `Either`、`Raise`、`zipOrAccumulate`、`parMap`、`Schedule`（再試行） | - |
 | 非同期 | kotlinx.coroutines | **1.11.0** | Promise / async | `suspend` を副作用とする。`Dispatchers.IO` にブロッキング I/O を閉じ込める | - |
-| シリアライズ | kotlinx.serialization（`kotlinx-serialization-json`） | **1.13.0** | zod（検証） | API の JSON と、イベントの `payload`（`event_type` を判別子にした sealed の多相） | - |
+| シリアライズ | kotlinx.serialization（`kotlinx-serialization-json`） | **1.13.0** | zod（検証） | API の JSON と、イベントの `payload`（`event_type` を判別子にした sealed の多相）。**変換は `EventCodec`、アップキャストは `adapter-persistence`**（決定済み） | - |
 | 入力検証 | 自前のスマートコンストラクタ + Arrow の `zipOrAccumulate` | Arrow に含む | zod 4.6.7 | 境界の検証、誤りを集める（[ドメインモデル](./domain-model.md)） | - |
 | DB ドライバ | PostgreSQL JDBC（`org.postgresql:postgresql`） | **42.7.14** | pg 8.23.1 | PostgreSQL への接続 | - |
 | 接続プール | HikariCP | **7.1.0** | pg の Pool | 接続の再利用、上限、待ち時間の計測 | - |
-| マイグレーション | Flyway（`flyway-core`、PostgreSQL 用モジュール） | **13.12.2** | node-pg-migrate 9.0.0 | 番号つきの SQL マイグレーションと履歴 | - |
-| ログ | SLF4J + Logback Classic、アプリのログは `LogRecord` の JSON を標準出力へ | Logback **1.6.6** | Pino | 構造化ログ。`LogRecord` に表示名・資格の項目を**持たせない**（型で漏れを防ぐ。[ガイド §7.7](../../reference/関数型プログラミングガイド_Kotlin編.md)） | - |
+| マイグレーション | Flyway（`flyway-core`、PostgreSQL 用モジュール）。**選定済み、導入は承認待ち** | **13.12.2** | node-pg-migrate 9.0.0 | 番号つきの SQL マイグレーションと履歴 | - |
+| ログ | SLF4J + Logback Classic（**選定済み、導入は承認待ち**）、アプリのログは `LogRecord` の JSON を標準出力へ | Logback **1.6.6** | Pino | 構造化ログ。`LogRecord` に表示名・資格の項目を**持たせない**（型で漏れを防ぐ。[ガイド §7.7](../../reference/関数型プログラミングガイド_Kotlin編.md)） | - |
 | メトリクス | CloudWatch EMF（JSON 形式） | 依存関係なし | 同左 | 応答時間、競合、再試行、確定など | - |
 
 AWS SDK は、キューを持たない設計のため、**依存関係に含めません**。
@@ -118,7 +118,15 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | リアルタイム | EventSource（ブラウザ標準） | - | SSE の受信と、ポーリングへの切り替え |
 | 実行環境（ビルド・テスト用） | Node.js | 26（LTS） | フロントエンドのビルド、Vitest、Playwright |
 
-フロントエンドの設計は、[フロントエンドアーキテクチャ](./architecture-frontend.md) を参照します。**API の契約（応答の形、エラー形式、SSE のイベント）は、beer-game2 から変えません**。
+フロントエンドの設計は、[フロントエンドアーキテクチャ](./architecture-frontend.md) を参照します。**API の契約は、beer-game2 から次の点で変わります**（それ以外の応答の形は引き継ぎます）。
+
+- **ゲームの開始**は `POST /games/:id/start`（2 ストリームへの原子的な追記。[バックエンド](./architecture-backend.md)）。
+- **`If-Match` は `SaveDecision`（意思決定の版）にだけ**付く。`CommitWeek` は本文の `requestedWeek` と `basis` を使う（H6）。
+- コマンドの応答は `{ versions: { game, session }, ... }` で、画面はスナップショットを取り直して `versions` に追いつく（H8）。
+- **SSE の通知に、ストリームの種別**（`game`、`session`）が加わる（版が別のため）。
+- エラーは problem+json で、`type` は `/problems/{code}`、拡張メンバー `code` が同じ値（`<領域>.<名前>`）。アプリケーション層の失敗にも `code` を持つ（`app.retry_exhausted`、`app.idempotency_key_reused`、`app.unauthorized`。H9、M7）。
+
+契約の正本は `contracts/openapi.yaml`（手書き）で、フロントエンドが型を生成します。
 
 ## テスト・品質
 
@@ -130,12 +138,12 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | 統合テスト | Testcontainers（`testcontainers-postgresql`） | **2.0.5** | 実 PostgreSQL 18 のコンテナ。イベントストア、投影、並行性 |
 | 仮想時間 | `kotlinx-coroutines-test`（`runTest`、`currentTime`） | coroutines と同じ **1.11.0** | 再試行、タイムアウト、定期タスク |
 | カバレッジ | Kover（Gradle プラグイン） | **0.9.11** | 行、命令、分岐の計測と閾値（設計判断 T6）。計測できる指標の種類は、実装開始時に確認 |
-| 静的解析 | detekt | **1.23.8**（Kotlin 2.4 の解析の可否は未確認） | 関数型の規約、複雑度（[ガイド §9.3](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| 静的解析 | detekt | **1.23.8**（Kotlin 2.4 の解析の可否は未確認。**最初のビルドの受入条件**） | 関数型の規約、複雑度（[ガイド §9.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**`ForbiddenMethodCall` で、ドメインのモジュールでの `Instant.now`・`Clock.system*`・`UUID.randomUUID`・`Random` を禁止**し、純粋性を静的検査で守る（[テスト戦略](./test-strategy.md)） |
 | 整形 | ktlint | **1.8.0** | 書式。副作用の大きいルールは `.editorconfig` で外す（[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | 画面テスト | Vitest、@testing-library/react、jsdom | beer-game2 の確認値（5.1.0、16.3.3、31.0.0） | コンポーネントのテスト |
 | E2E | @playwright/test、@axe-core/playwright | beer-game2 の確認値（1.65.0、4.14.0） | 実ブラウザ（実際の Ktor サーバー）での受入テストとアクセシビリティ |
-| 変異テスト | 未選定 | **実装開始時に確認** | ドメイン層の検討（[テスト戦略](./test-strategy.md)）。Kotlin に対応した道具の存在と版は、本書では確認していない |
-| 依存関係の脆弱性検査 | 未選定 | **実装開始時に確認** | Gradle の依存関係の検査と更新の自動化（Dependabot または Renovate） |
+| 変異テスト | **選定未決** | **実装開始時に確認** | domain の品質指標は行の数値より変異テストを優先。導入の要否は、ウォーキングスケルトンで判断（[テスト戦略](./test-strategy.md)）。Pitest の Kotlin 対応と版は、本書では確認していない |
+| 依存関係の脆弱性検査 | **選定未決** | **実装開始時に確認** | Gradle の依存関係の検査と更新の自動化（Dependabot または Renovate） |
 
 ## インフラ・運用
 
@@ -153,7 +161,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 
 ## 新しく導入する依存関係（導入時に承認を得る）
 
-beer-game2 に無く、Kotlin 版で新しく導入するものです。**すべて承認待ちです**。
+beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）は承認待ちです。
 
 | 依存関係 | 用途 | 代替（導入しない場合） | 導入の判断 |
 | :--- | :--- | :--- | :--- |
@@ -168,7 +176,7 @@ beer-game2 に無く、Kotlin 版で新しく導入するものです。**すべ
 | kotlinx-coroutines-test | 仮想時間 | 実時間の待ち | 導入を推奨。開発依存のみ |
 | Kover | カバレッジ | JaCoCo を直接 | Kotlin 向け。導入を推奨。開発依存のみ |
 | detekt、ktlint | 静的解析と整形 | PMD のカスタムルール、自作の検査（ガイド §9.5） | ガイド §9.3、§9.4。導入を推奨（detekt の互換は要確認） |
-| 変異テストの道具、Gradle の依存関係の検査 | テストの強さ、脆弱性 | なし（未選定） | **実装開始時に選定し、あらためて承認を得る** |
+| 変異テストの道具、Gradle の依存関係の検査 | テストの強さ、脆弱性 | なし（**選定未決**） | **実装開始時に選定し、あらためて承認を得る** |
 
 ## 設計判断
 
@@ -217,7 +225,9 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | B | detekt 2.0 の alpha（`dev.detekt`） | Kotlin 2.4 に対応している見込みはあるが、alpha であり、安定性を確認していない |
 | C | PMD のカスタムルール（ガイド §9.6） | `var` の禁止などの専用ルールを XPath で書ける。標準の Kotlin ルールが少ない。detekt の標準ルールで足りない規約の補完として使う（未決事項） |
 
-トレードオフ: A は、**detekt 1.23.8 が Kotlin 2.4 のコードを解析できるか**に依存する。解析できない場合は、Kotlin の版を下げず、B（alpha）か C を実装開始時に選び直す。この判断は ADR に記録する。
+トレードオフ: A は、**detekt 1.23.8 が Kotlin 2.4 のコードを解析できるか**に依存する。解析できない場合は、Kotlin の版を下げず、B（alpha）、C（PMD の XPath）、または ktlint のカスタムルールを選び直す。
+
+**受入条件と期限（M17）**: ウォーキングスケルトンの**最初のビルド**で、「規約違反のコードを 1 つ置き、CI が落ちること」を確認する。落ちれば A を確定する。落ちなければ（解析できない、または規則が効かない）、**最初の Bolt の中**で代替を選ぶ。この判断は ADR に記録する。純粋性の規則（`ForbiddenMethodCall` による `Instant.now` などの禁止）も同じ受入条件で確認する。
 
 ### T6: カバレッジの計測は Kover
 
@@ -241,9 +251,12 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 7 | Pino、EMF の JSON | `LogRecord` の JSON と EMF の JSON（Logback は枠組みのログ用） | 型で資格・表示名の漏れを防ぐ（ガイド §7.7） |
 | 8 | Vitest、fast-check | Kotest（プロパティを含む）、Kover | ガイド §8 |
 | 9 | ESLint、typescript-eslint、Prettier | detekt、ktlint（フロントエンドは変更なし） | ガイド §9 |
-| 10 | tsx、`npm audit` | Gradle の依存関係の検査（未選定） | 実装開始時に選定 |
+| 10 | tsx、`npm audit` | Gradle の依存関係の検査（選定未決） | 実装開始時に選定 |
 | 11 | 状態は行の更新 | イベントの追記（専用の製品を使わず PostgreSQL） | 設計判断 T1 |
 | 12 | `package-lock.json` で固定 | Gradle のバージョンカタログと依存関係ロック | JVM 版 |
+| 13 | 型を共有（TypeScript） | API の契約は `contracts/openapi.yaml`（手書きの正本）。開始 API、`If-Match` の範囲、SSE のストリーム種別、problem+json の `type` / `code` が変わる | 言語が分かれた。実態に合わせた（M16） |
+| 14 | 純粋性・規約はレビューと ESLint | detekt の `ForbiddenMethodCall` で時計・乱数の呼び出しを禁止。detekt と Kotlin 2.4 の互換を最初のビルドの受入条件にする | M17、M18 |
+| 15 | （該当なし。Node の期限を使っていた） | JDK 25 の EOL は Temurin の値（2031-09-30）に統一 | 使う配布の値（M17） |
 
 ## アップグレード計画
 
@@ -258,10 +271,10 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 
 ## 未決事項
 
-- **確認できていない項目**: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25。実装開始時にビルドで確認する。
-- 変異テストの道具、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
-- Docker の実行イメージ（JDK 25 の JRE を含むもの）の名前とタグ。
-- API の契約を OpenAPI などの定義で持ち、フロントエンドと共有するか（beer-game2 は TypeScript の型を共有していた。Kotlin 版では共有できない）。
+- **確認できていない項目**（受入条件: 最初のビルド。detekt は「規約違反のコードを置き、CI が落ちること」）: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25。実装開始時にビルドで確認する。
+- **選定未決**: 変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
+- Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
+- **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。
 - Ktor のエンジン（Netty か CIO）の最終確認（設計判断 T2）。
 - `ktor-server-rate-limit` の状態を共有する方法（参加・復帰の専用の制限。beer-game2 から継続）。
 - フレームワークのログ（Ktor、Hikari、Flyway）を JSON にするか（追加の依存関係が要る）。

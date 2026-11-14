@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 
 [beer-game2 のバックエンドアーキテクチャ](../beer-game2/architecture-backend.md) の機能・API の振る舞い・セキュリティ・運用要件を正本として引き継ぎ、次の点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
 
-- 書き込みは、`decide` / `evolve`（[ドメインモデル](./domain-model.md)）を呼ぶ**薄いコマンド処理**に集約します。ロック（`SELECT ... FOR UPDATE`）と版つき更新は、追記の一意制約と自動再試行に置き換えます（[データモデル](./data-model.md)）。
+- 書き込みは、`decide` / `evolve`（[ドメインモデル](./domain-model.md)）を呼ぶ**薄いコマンド処理**に集約します。ロック（`SELECT ... FOR UPDATE`）と版つき更新は、追記の一意制約と自動再試行に置き換えます（再構築との同時実行の制御にだけ、アドバイザリロックを使います）（[データモデル](./data-model.md)）。
 - 読み取りは、同期投影の表を SQL で読む**問い合わせ側**です。
 - 依存は、インターフェースの階層でなく**関数の型の束**で表します（[ガイド §7.2](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - 失敗は例外でなく `Either` で返し、境界で HTTP の応答へ写します（[ガイド 第 3 章](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
@@ -58,7 +58,7 @@ package "domain（純粋）" {
   [decideSession / evolveSession] as Session
   [startGame] as Start
   [simulateWeek] as Sim
-  [Projection<Row>（投影の純粋関数）] as Proj
+  [Projection（Event -> List<RowChange>。純粋）] as Proj
   [Disclosure・KitPreset・RetentionSaga の decide / evolve] as Svc
   [値オブジェクト・Command・Event・DomainError] as VO
 }
@@ -121,10 +121,15 @@ typealias IssueCredential = suspend (CredentialKind, ExpiresAt) -> IssuedCredent
 
 /** イベントストア。PostgreSQL 版とインメモリ版を差し替える（データモデルのスケッチと同じ形） */
 data class EventStore(
-    val read: suspend (Tx, GameId, StreamType) -> Either<PersistenceFailure, StreamRead>,
-    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppendFailure, Unit>,
-    val transaction: suspend (suspend (Tx) -> Either<AppFailure, CommandOutcome>) -> Either<AppFailure, CommandOutcome>,
+    val read: suspend (Tx, GameId, StreamType) -> Either<AppFailure, StreamRead>,                    // Left は Persistence
+    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, Unit>, // Left は ConcurrencyConflict か Persistence
+    val transaction: TransactionRunner,
 )
+
+/** 失敗の型は AppFailure（正本。下の「コマンド処理の流れ」）。追記の競合は AppFailure.ConcurrencyConflict で、独立した AppendFailure の型は持たない。データモデルの署名もこれに合わせる */
+fun interface TransactionRunner {
+    suspend operator fun <A> invoke(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A>
+}
 
 /** コマンドの応答。画面の表示に使う内容は持たない（ストリームごとの追記後の版だけ） */
 data class CommandOutcome(val versions: Versions)
@@ -149,7 +154,8 @@ data class Ports(val now: Now, val newId: NewId, val issueCredential: IssueCrede
 | :--- | :--- |
 | 原子性 | ブロックが `Left` を返したら **ROLLBACK**。追記と投影（周辺ストア・冪等記録・通知を含む）は、同じトランザクションで、全部成功か全部失敗のどちらか。投影が `Left` を返したら、追記も取り消される |
 | 分離レベル | **READ COMMITTED**。競合の検出は、分離レベルでなく `events` の一意制約（`uq_events_stream_version`）で行う |
-| 再試行の対象 | `ConcurrencyConflict` に加え、SQLSTATE **40001**（直列化失敗）と **40P01**（デッドロック）。いずれも `execute` が、読み込みからやり直す（上限つき） |
+| ロック（再構築との同時実行） | コマンドのトランザクションは、`BEGIN` の直後に **`pg_advisory_xact_lock_shared(game_id)`** を取る（コマンドどうしは互いを待たない）。投影の再構築は排他の `pg_advisory_xact_lock(game_id)` を取り、コマンドと同時に走らない（下の「投影の更新と再構築」）。`game_id` は、UUID から導いた 64 ビット整数に写す（衝突は不要な待ちを生むだけで、整合性は損なわない）。トランザクションの終わりで自動的に解放される |
+| 再試行の対象 | `AppFailure.ConcurrencyConflict`。アダプターは、`uq_events_stream_version` の違反、SQLSTATE **40001**（直列化失敗）、**40P01**（デッドロック）をすべて `ConcurrencyConflict` に写す。`execute` が、読み込みからやり直す（上限つき） |
 | キャンセル | COMMIT と ROLLBACK は **`NonCancellable`** で行う。`CancellationException` は握りつぶさず、**再送出**する（`PersistenceFailure` に変えない）。クライアントの切断でコルーチンがキャンセルされても、トランザクションは必ず閉じる |
 
 `decide` は `Now` や `NewId` を持ちません。時刻、`GameId`、`JoinCode`、`ParticipantId` などは、ルートがコマンドの値に詰めてから `execute` へ渡します（[ドメインモデル](./domain-model.md) 変更 12、[ガイド §4.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
@@ -174,7 +180,7 @@ database "PostgreSQL" as DB
 P -> R : PUT /sessions/:id/decisions\n（Idempotency-Key、If-Match = 意思決定の版）
 R -> R : 認証（操作者・資格の有効性）-> Actor\n本文の検証（誤りを集める）-> SaveDecision
 R -> X : execute(command, key)
-X -> DB : BEGIN（READ COMMITTED）
+X -> DB : BEGIN（READ COMMITTED）\npg_advisory_xact_lock_shared(game_id)
 X -> X : 認可の前提検査（ゲームの一致、資格の種別）
 X -> DB : 冪等記録を照合（同じキー・対象・操作者）
 alt 記録あり、要求のダイジェスト（本文・対象・操作者）が同じ
@@ -204,13 +210,15 @@ R --> P : 200（versions のみ）/ 問題の応答
 ```
 
 ```kotlin
+/** アプリケーション層の失敗の唯一の正本。EventStore、execute、ルートの写像がすべてこの型を使う（データモデルの署名も同じ） */
 sealed interface AppFailure {
-    data class Invalid(val errors: NonEmptyList<ValidationError>) : AppFailure       // 境界で集めた入力の誤り
+    data class Invalid(val errors: NonEmptyList<ValidationError>) : AppFailure       // 境界で集めた入力の誤り（ルートが execute の前に作る）
     data class Domain(val error: DomainError) : AppFailure                           // decide が返した業務上の失敗
-    data object Unauthorized : AppFailure                                            // 資格が無効（失効・期限切れ・不明を区別しない）。403
-    data object IdempotencyKeyReused : AppFailure                                    // 同じキーで要求の内容（本文・対象・操作者）が違う
-    data object RetryExhausted : AppFailure                                          // 競合の再試行が上限に達した
-    data class Persistence(val failure: PersistenceFailure) : AppFailure             // 例外を境界で値にしたもの
+    data object ConcurrencyConflict : AppFailure                                     // 追記の競合。uq_events_stream_version の違反、40001、40P01。execute が再試行する
+    data object RetryExhausted : AppFailure                                          // 競合の再試行が上限に達した、または再構築のロックの待ちが上限に達した。app.retry_exhausted（503、Retry-After）
+    data object IdempotencyKeyReused : AppFailure                                    // 同じキーで要求の内容（本文・対象・操作者）が違う。app.idempotency_key_reused（409）
+    data object Unauthorized : AppFailure                                            // 資格が無効（失効・期限切れ・不明を区別しない）。app.unauthorized（403）
+    data class Persistence(val failure: PersistenceFailure) : AppFailure             // 例外を境界で値にしたもの。500 と相関 ID
 }
 
 /** 1 本のストリームのコマンド。ストリームごとの decide / evolve を渡すだけで、ルールは持たない */
@@ -226,7 +234,7 @@ suspend fun <S, C, E> Ports.execute(
                 ctx.authorizePrecheck(tx).bind()                              // 資格の有効性、ゲームの一致。無効なら Unauthorized（403）
                 side.findIdempotent(tx, ctx.key).mapLeft(AppFailure::Persistence).bind()
                     ?.let { return@either ctx.replayStored(it).bind() }       // 成功の応答だけが保存されている。digest（本文・対象・操作者）が違えば IdempotencyKeyReused
-                val read = events.read(tx, stream.gameId, stream.type).mapLeft(AppFailure::Persistence).bind()
+                val read = events.read(tx, stream.gameId, stream.type).bind()
                 val state = read.events.fold(initial, evolve)                  // 再生（純粋）
                 val decided = decide(state, command).mapLeft(AppFailure::Domain).bind()
                 events.append(tx, mapOf(stream.type to read.version), decided.toNew(ctx, read.version)).bind()
@@ -240,17 +248,17 @@ suspend fun <S, C, E> Ports.execute(
         }
     }
 
-/** ConcurrencyConflict と、40001・40P01 を再試行する。業務上の競合（DecisionConflict など）は decide が返すので再試行しない。`isConcurrencyConflict()` は、この 3 つの原因を含む */
+/** AppFailure.ConcurrencyConflict だけを再試行する（アダプターが、版の違反・40001・40P01 をこの値に写している）。業務上の競合（DecisionConflict など）は decide が返すので再試行しない */
 tailrec suspend fun <A> withAppendRetry(
     remaining: Int, block: suspend () -> Either<AppFailure, A>,
 ): Either<AppFailure, A> =
     when (val r = block()) {
         is Either.Left ->
-            if (r.value is AppFailure.Persistence && r.value.failure.isConcurrencyConflict() && remaining > 1)
-                withAppendRetry(remaining - 1, block)
-            else if (r.value is AppFailure.Persistence && r.value.failure.isConcurrencyConflict())
-                AppFailure.RetryExhausted.left()
-            else r
+            when {
+                r.value is AppFailure.ConcurrencyConflict && remaining > 1 -> withAppendRetry(remaining - 1, block)
+                r.value is AppFailure.ConcurrencyConflict -> AppFailure.RetryExhausted.left()
+                else -> r
+            }
         is Either.Right -> r
     }
 ```
@@ -263,7 +271,8 @@ tailrec suspend fun <A> withAppendRetry(
 - **冪等記録に保存するのは、成功した応答だけ**です。業務の失敗（`Left`）は保存せず、再送は同じ失敗を再計算して返します。保存する応答は `versions`（追記後の版）だけです（H8）。
 - 追記は **`decide` が空の列を返したときは行いません**（同じ役割への再割り当てなど）。冪等記録だけを書きます（このとき、同時の重複は `pk_idempotency_records` で検出します。下の冪等性の節）。
 - **自動確定のための特別な処理はありません。** `decideSession` が `DecisionSaved`（または `ProxyDecisionSubmitted`）と `WeekCommitted`（と `SessionEnded`）を 1 回の戻り値で返すため、`execute` から見ると、複数イベントの追記が 1 回あるだけです。手動と自動の確定が同時に起きても、2 回目は追記が版の違反となり、再試行後の `decide` が `WeekAdvanced` または `AlreadyEnded` を返します（確定は一度だけ）。
-- **投影は追記の後に更新します**（同じトランザクション）。追記で一意制約に負けたコマンドは、投影を更新する前に失敗するので、投影の書き込みどうしが競合しません。ただし `game_overview` は、`game` と `session` の両方のイベントから更新されるため、投影の行を `SELECT ... FOR UPDATE` で更新します（設計判断 BD6）。イベントストアにはロックを使いません。
+- **投影は追記の後に更新します**（同じトランザクション）。追記で一意制約に負けたコマンドは、投影を更新する前に失敗するので、投影の書き込みどうしが競合しません。`game_overview` は `game` と `session` の両方のイベントから更新されるため、複数の投影の行を書くコマンドが並びうる点は、**ロックの順序の規則**で守ります（下の「投影の行のロックの順序」、設計判断 BD6）。イベントストアにはロックを使いません。
+- **コマンドは、トランザクションの先頭で `pg_advisory_xact_lock_shared(game_id)` を取ります**（再構築との同時実行の制御。M23）。取れるまでの待ちには上限（`lock_timeout`）を置き、超えたら `AppFailure.RetryExhausted`（503、`Retry-After`）を返します。上限の値と、再構築中のコマンドの応答（短く待つか、すぐ 503 を返すか）は未決事項です。
 
 ### 周辺ストアへの書き込み
 
@@ -311,16 +320,17 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 
 | 種類 | 発生源 | 扱い |
 | :--- | :--- | :--- |
-| `ConcurrencyConflict`（追記の版の違反）、SQLSTATE 40001・40P01 | `events` の一意制約、直列化失敗、デッドロック | **`execute` が自動で再試行する**（再読み込み -> 再評価）。上限は小さな固定回数で、実装開始時に競合の頻度を測って決める（[データモデル](./data-model.md)）。上限に達したら `RetryExhausted`（`app.retry_exhausted`、503、再送を促す） |
+| `ConcurrencyConflict`（追記の版の違反）、SQLSTATE 40001・40P01 | `events` の一意制約、直列化失敗、デッドロック | **`execute` が自動で再試行する**（再読み込み -> 再評価）。上限は小さな固定回数で、実装開始時に競合の頻度を測って決める（[データモデル](./data-model.md)）。上限に達したら `AppFailure.RetryExhausted`（`code` = `app.retry_exhausted`、**503 と `Retry-After`**。利用者に操作し直しを促す） |
 | `DecisionConflict` | `decide`（意思決定の版が古い） | 再試行しない。409 で、最新値と最後の保存者を返す（変更を黙って失わせない） |
 | `WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`、`AlreadyEnded` | `decide` | 再試行しない。409 で、現在の状態を示す（`DecisionsChanged` は現在の値と保存者を返す） |
-| `IdempotencyKeyReused` | 冪等記録 | 再試行しない。409 |
+| `IdempotencyKeyReused` | 冪等記録 | 再試行しない。409（`app.idempotency_key_reused`） |
+| `Unauthorized` | 認可の前提検査 | 再試行しない。403（`app.unauthorized`） |
 
 再試行は、**認可を含めて `decide` を最初から評価し直す**ため、再読み込みの後に権限や状態が変わっていても正しく判定します。再試行のあいだに待ちは入れず、上限に達しても失敗が続くときは、遅延を足す（ジッターつきの `Schedule`。[ガイド §4.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）かどうかを、計測して決めます（未決事項）。
 
 ### 永続化の境界
 
-JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version` は `ConcurrencyConflict`、`uq_idempotency_create` と `pk_idempotency_records` は冪等記録の再照合、それ以外は `PersistenceFailure`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `ConcurrencyConflict` と同じ再試行の対象です。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `PersistenceFailure` に変えない）。
+JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version` は `AppFailure.ConcurrencyConflict`、`uq_idempotency_create` と `pk_idempotency_records` は冪等記録の再照合、それ以外は `AppFailure.Persistence`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `AppFailure.ConcurrencyConflict` に写し、同じ再試行の対象にします。アドバイザリロックの待ちが `lock_timeout` を超えたとき（SQLSTATE 55P03）は `AppFailure.RetryExhausted` に写します。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `Persistence` に変えない）。
 
 ## 問い合わせ側
 
@@ -330,16 +340,23 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | :--- | :--- |
 | 読み込み | 読み取り専用のデータベースロールで、投影の表を SELECT する。1 つの問い合わせは、1 つの画面の分だけを返す |
 | 開示 | 取得した行に、純粋関数 `Disclosure` を掛ける（将来の需要の除外、寄与者数が 2 未満の合計の抑止、終了後だけ全役割）。**表の選択**も、利用者の種別で決める |
-| 観察者 | 観察者の問い合わせは、`week_team_totals`、`game_overview`、`session_overview` だけを読む。**別の読み取り専用ロール（接続プール）**を使い、役割別の表（`week_role_results`、`role_current_states`、`current_decisions`）に DB の権限として到達できない（[データモデル](./data-model.md) の最小権限） |
+| 観察者 | 観察者の問い合わせが読む表は、**`game_overview`（参加コードを含まない）、`session_overview`、`week_team_totals` の 3 表に統一**する。**別の読み取り専用ロール（接続プール）**を使い、役割別の表（`week_role_results`、`role_current_states`、`current_decisions`）と、**参加コードを持つ `game_join_codes`** に DB の権限として到達できない（[データモデル](./data-model.md) の最小権限。NF-S18）。観察者に参加コードが見えると参加者として加われるため（FR-17・BR-17） |
+| 参加コード | `join_code` は `game_overview` から分け、投影の表 **`game_join_codes(game_id, join_code)`** に置く。読むのは**進行役・参加者の問い合わせだけ**（読み取り用のロール）。観察者のロールには、この表の SELECT を与えない |
 | 版 | 応答に、どのストリームの、どの版までを反映したか（`projection_checkpoints.projected_version`）を載せる。画面は版で新旧を判断する（[フロントエンド](./architecture-frontend.md)） |
+| 一貫した読み取り | 問い合わせは、**読み取り専用の REPEATABLE READ のトランザクション**で行い、**`projection_checkpoints` を同じトランザクションで読む**。応答の `versions` が、同じ応答の行より新しくならない（行より新しい版を返すと、画面が通知を捨てて古い表示のまま残る）。複数の表を読む問い合わせも、同じ時点の行を返す。これは、投影の再構築（1 つのトランザクションで置き換え）の途中の状態を読まないことにもなる |
 | 表示名 | `display_profiles` を結合する。読めるのは、そのゲームの操作者だけ |
 | 一貫性 | 同期投影なので、追記が成功した後の問い合わせは必ず反映済み。通知を受けて取得した状態の版は、通知の版以上。コマンドの応答の `versions` 以上の版のスナップショットを、画面は取得できる |
 | 出力 | 出力のパッケージは**要求時に生成**する。全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage`（`Either` を返さない）が、`week_role_results` と設定から作り、`checksum` と `schema_version` も要求時に算出する。**表 `export_packages` は持たない**ため、最終週の確定は出力の作成に依存しない。大きい場合のキャッシュは将来の検討（未決事項） |
 
 ### 投影の更新と再構築
 
-- 投影の更新は、`Projection<Row>`（純粋）の `apply(row, event)` と、SQL への書き込み（境界）に分けます。書き込みは、**投影の行の読み込み → `apply` → 書き込み**を、同じトランザクションで行います。
-- 投影の再構築は、`app` の `rebuild-projections` モード（運用のタスク）で行います。ゲームの投影の行を削除し、`events` を版の順に畳み込み、`projection_checkpoints` を更新します。同時実行の制御は未決事項です（[データモデル](./data-model.md)）。
+- 投影の更新は、`Projection`（純粋。`Event -> List<RowChange>`）と、SQL への書き込み（境界）に分けます。`RowChange` は、行の変更（Upsert / Delete と、表・主キー・値）です。**投影は他の投影を読まず、イベントのペイロードだけから行の変更を作る**ため、再構築の順序に依存しません。1 件の `WeekCommitted` が複数の表の変更を返せます。境界は、返された `RowChange` を同じトランザクションで適用します（[ドメインモデル](./domain-model.md)）。
+- 投影の再構築は、`app` の `rebuild-projections` モード（運用のタスク）で行います。**1 ゲームを 1 トランザクション**で、排他の `pg_advisory_xact_lock(game_id)` を取り、ゲームの投影の行を削除し、`events` を版の順に畳み込んで `RowChange` を適用し、`projection_checkpoints` を更新します。コマンドは共有のロックを取るので、**再構築と同時には走りません**（待つ）。問い合わせは REPEATABLE READ なので、置き換えが終わるまで古い行を読み、途中の状態を読みません。
+- **研修中の運用**: 投影が不整合になったら、運用担当が運営者を通じて進行役に「停止」を依頼し、**停止中に再構築して再開**します。停止中でも追記を伴う操作（代理入力、資格の再発行、観察者の参加）は走りうるため、上のロールによって再構築と直列化します。これにより「研修中は再構築しない」という制約を外します（[運用要件](./operation.md) の手順 B-1 と障害パターン 13）。**暫定の決定で、人の確認が要ります。**
+
+#### 投影の行のロックの順序
+
+1 つのトランザクションで複数の投影の行を更新するときは、**デッドロックを避けるため、順序の規則に従います**。(1) ロックの順は「`pg_advisory_xact_lock_shared`（または排他）→ 投影の表を表名の辞書順 → 同じ表では主キーの昇順」。(2) 1 件のコマンドが返す `RowChange` は、適用の前にこの順に並べ替える。(3) `events` の追記は、投影の更新より前に行う（既存の順序）。それでも検出された 40P01 は、`ConcurrencyConflict` と同じく再試行します。なお、**設計判断 BD6 の `FOR UPDATE`（`game_overview` の行ロック）は、`RowChange` が行の読み込みを要さなくなったため、今のイベント構成では実際には競合を防いでいません**（`game` と `session` のイベントは別の列を更新し、行の UPDATE は暗黙の行ロックで直列化される）。実装開始時に、明示的な `FOR UPDATE` を残すか判断します（未決事項）。
 - 次の 3 つの性質を、別の名前で確認します（旧称の「再生の同値性」は使いません）。(a) **永続化往復の同値性**: コマンド実行中のメモリ上の状態と、DB から読んだイベントを再生した状態が一致する（シリアライズ、アップキャスト、版の順序を通る）。(b) **計算と事実の一致**: `fold(evolve)` の結果が、イベントのペイロード（`nextStates` など）と `simulateWeek` を直接回した結果に一致する（[ドメインモデル](./domain-model.md) D5）。(c) **投影の整合**: `fold(evolve)` の結果と投影の行が一致する（運用で日次に検査する）。
 
 ## イベントの JSON 変換
@@ -347,7 +364,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 項目 | 設計 |
 | :--- | :--- |
 | 場所 | `adapter-persistence` の `EventCodec`。**ドメインのイベントには、シリアライズの注釈を付けない**（設計判断 BD5） |
-| 形 | 永続化用の DTO（`@Serializable`、`@SerialName` で `event_type` を固定）と、ドメインイベントの相互変換。`schema_version` を持つ |
+| 形 | 永続化用の DTO（**kotlinx.serialization**。`@Serializable`、`@SerialName` で `event_type` を固定。決定済み）と、ドメインイベントの相互変換（`EventCodec`）。`schema_version` を持つ。**アップキャストは `adapter-persistence` が持つ** |
 | アップキャスト | 旧版の DTO を新版へ変換する純粋関数の列。読み込み時に、`evolve` へ渡す前に適用する（[データモデル](./data-model.md) の規則） |
 | 網羅の検査 | 変換は `when` で網羅し、イベントの追加でコンパイルが失敗する。全イベントの往復（`encode` -> `decode`）の性質テストを置く |
 | 秘匿 | DTO に、表示名・資格の値・招待コードの値のフィールドを**持たせない**（型で防ぐ） |
@@ -414,13 +431,19 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 | `Conflict` | 409 | `DecisionConflict`（`session.decision_conflict`）は、最新値と最後の保存者を本文に含める。`WeekAdvanced`（`session.week_advanced`）は、週が進んでいることを示す。`DecisionsChanged`（`session.decisions_changed`）は、現在の値と保存者を含める |
 | `RuleViolation` | 422 | `StartConditionNotMet` は不足する役割を、`IncompleteDecisions` は不足する役割を示す |
 | `ValidationError` | 422 | 複数の誤りを配列で返す |
-| `IdempotencyKeyReused` | 409 | `app.idempotency_key_reused` |
-| `RetryExhausted`、`PersistenceFailure` | 503、500 | `app.retry_exhausted`（503）。利用者へは相関 ID だけを返す |
-| `Unauthorized`（アプリ層） | 403 | `app.unauthorized`。失効・期限切れ・不明を区別しない |
+| `AppFailure.IdempotencyKeyReused` | 409 | `app.idempotency_key_reused` |
+| `AppFailure.RetryExhausted` | 503 | `app.retry_exhausted`。**`Retry-After` ヘッダーを付ける**。再試行の上限、または再構築のロックの待ちの上限を超えたとき |
+| `AppFailure.Persistence` | 500 | `type` は持つ（`/problems/app.internal`）。利用者へは相関 ID だけを返す |
+| `AppFailure.Unauthorized` | 403 | `app.unauthorized`。失効・期限切れ・不明を区別しない |
+| `AppFailure.Invalid` | 422、400 | 項目ごとの誤り（下記）。構文エラーは 400 |
+
+**アプリケーション層の失敗にも、安定した `code` を与えます。** 画面は、`type` が `/problems/app.retry_exhausted` のときだけ「もう一度お試しください」を出します（利用者が操作し直したら、新しい冪等キーを使う）。`type` を持たない 5xx（負荷分散装置の 503 など）、タイムアウト、切断は「結果が不明」として、**同じキーで再送**します（新しいキーで再送すると、ゲーム作成などが二重になる）。この区別を成り立たせるため、**バックエンド自身が返す 503 は、必ず `type` を持ちます**（[フロントエンド](./architecture-frontend.md)）。
+
+`AppFailure` の型の正本は、上の「コマンド処理の流れ」のコードです。`DomainError` は `AppFailure.Domain` に包まれ、`ConcurrencyConflict` は再試行されるだけで利用者には返らない（上限に達すると `RetryExhausted`）ため、HTTP の写像はこの 7 種を `when` で網羅します。
 
 `StaleVersion` は廃止しました。`CommitWeek` の判定の順は、「週が違う → `WeekAdvanced`」「週が同じで `basis` が現在の各役割の意思決定の版と違う → `DecisionsChanged`」です（共同担当が保存し直しただけで「すでに確定されています」と出る誤りを避けます）。
 
-エラーの識別子は、**`code` を 1 つ**に決めます。小文字のドット区切り `<領域>.<名前>`（例: `session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`、アプリ層は `app.retry_exhausted`、`app.idempotency_key_reused`、`app.unauthorized`）です。`problem+json` の `type` は `/problems/{code}`（相対 URI）、拡張メンバー `code` に同じ値を載せます。フロントエンドの辞書の鍵は `code` で、OpenAPI の契約にも載せます（[フロントエンド](./architecture-frontend.md)）。辞書の正本は [UI 設計](./ui-design.md) の「code 列つきの表」です。各 `DomainError` の `code` と分類は [ドメインモデル](./domain-model.md) が持ちます。
+エラーの識別子は、**`code` を 1 つ**に決めます。小文字のドット区切り `<領域>.<名前>`（例: `session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`、アプリ層は `app.retry_exhausted`、`app.idempotency_key_reused`、`app.unauthorized`、`app.internal`）です。失効・期限切れ・不明を区別する識別子（`invitation-expired` など）は**使いません**。どの資格の失敗かの文言は、画面が「自分が送った資格の種類」から選びます（[フロントエンド](./architecture-frontend.md)）。`problem+json` の `type` は `/problems/{code}`（相対 URI）、拡張メンバー `code` に同じ値を載せます。フロントエンドの辞書の鍵は `code` で、OpenAPI の契約にも載せます（[フロントエンド](./architecture-frontend.md)）。辞書の正本は [UI 設計](./ui-design.md) の「code 列つきの表」です。各 `DomainError` の `code` と分類は [ドメインモデル](./domain-model.md) が持ちます。
 
 ### 応答とスナップショット
 
@@ -478,7 +501,7 @@ note over L : 数秒ごとの照合で、\nNOTIFY の欠落を補う
 | 終了 | プロセスの停止（SIGTERM）時は、接続を閉じる。クライアントは再接続し、スナップショットを取得して追いつく |
 | 通知の遅延 | 追記のコミットから、SSE の送信までを測る（メトリクス） |
 
-Ktor の SSE の機能（サーバー側のプラグイン）の使用は、実装開始時に、採用する Ktor のバージョンのドキュメントで確認します。使えない場合は、`respondTextWriter` で `text/event-stream` を直接書きます（未決事項）。
+SSE は、Ktor のサーバープラグイン **`ktor-server-sse`** で実装します（[技術スタック](./tech-stack.md) で決定済み）。プラグインのバージョンごとの API の確認は、実装開始時にウォーキングスケルトンの負荷試験（SSE の接続数）と合わせて行い、使えない場合の逃げ道は、`respondTextWriter` で `text/event-stream` を直接書くことです。
 
 ## 保持削除
 
@@ -501,7 +524,7 @@ fun Ports.observed(log: (LogRecord) -> Unit, emit: (Metric) -> Unit, now: () -> 
 
 | 項目 | 設計 |
 | :--- | :--- |
-| ログ | 構造化 JSON。`LogRecord` はデータクラスで、**項目として、資格・表示名・非公開の値を持たない**（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤（SLF4J の実装）と JSON の出力形式は [技術スタック](./tech-stack.md) で決める |
+| ログ | 構造化 JSON。`LogRecord` はデータクラスで、**項目として、資格・表示名・非公開の値を持たない**（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤は **SLF4J + Logback**（決定済み。[技術スタック](./tech-stack.md)）。アプリのログは `LogRecord` の JSON、Logback は枠組みのログ用 |
 | 秘密の型 | 秘密の値は、`toString` が伏せ字になる `Secret<A>`（`value class`）で持つ。誤ってログや例外のメッセージへ出ても漏れない |
 | エラー | 予期しないエラーは、スタックと相関 ID を含めて、必ず記録する。利用者へは、相関 ID だけを返す |
 | メトリクス | 応答時間（操作・結果別）、エラー率、`ConcurrencyConflict` の件数と再試行の回数、`DecisionConflict`、確定の方式（手動 / 自動）、**再生したイベント数と再生の所要時間**（スナップショットの要否の判断材料）、投影の更新時間、SSE の接続数、通知の遅延、接続プールの使用状況、JVM のヒープと GC の停止時間、削除の経過時間。CloudWatch の Embedded Metric Format の JSON 行を標準出力へ出す（追加のサーバーを持たない。beer-game2 と同じ） |
@@ -522,7 +545,7 @@ beer-game2 の設計を引き継ぎ、Kotlin 版での実現方法を加えま�
 | レート制限 | 全体に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8） |
 | ヘッダー | CSP、HSTS、`nosniff`、Referrer-Policy を、すべての応答に付ける（Ktor のプラグインまたは自前のインターセプタ）。CloudFront のレスポンスヘッダーポリシーとの二重化は許容する |
 | 秘匿 | 表示名と資格は、イベント、ログ、出力、通知に含めない（NF-S14）。型（`Secret<A>`、`LogRecord`、イベントの DTO）で守る |
-| データベースのロール | 用途別に分ける: **書き込み**（`events` は INSERT / SELECT のみ。投影と周辺ストアの書き込み）、**読み取り**（投影の SELECT）、**観察者の読み取り**（観察用の表だけ）、**削除**（保持削除）、**所有者**（マイグレーションだけ）。生の認証情報は Secrets Manager から注入する |
+| データベースのロール | 用途別に分ける: **書き込み**（`events` は INSERT / SELECT のみ。投影と周辺ストアの書き込み）、**読み取り**（投影の SELECT）、**観察者の読み取り**（`game_overview`、`session_overview`、`week_team_totals` の SELECT だけ。`game_join_codes` は含まない）、**削除**（保持削除）、**所有者**（マイグレーションだけ）。生の認証情報は Secrets Manager から注入する |
 | 依存関係 | CI で、依存関係の脆弱性と秘密情報を検査する（ツールは [インフラストラクチャ](./architecture-infrastructure.md) に記載） |
 
 ## モジュール構成と依存の検査
@@ -537,9 +560,9 @@ apps/beer-game-kotlin/
 ├── adapter-http/                     （Ktor のルート、検証、認証、SSE、エラーの写像）
 │   └── src/main/kotlin/.../{routes,security,sse,problem}/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、マイグレーション）
-│   └── src/main/resources/db/migration/  （番号つきの SQL。001〜006）
+│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。001〜006。導入は承認待ち）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
-├── contracts/openapi.yaml            （API の契約。フロントエンドの型の源）
+├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う）
 └── infra/                            （Terraform）
 ```
@@ -591,6 +614,12 @@ apps/beer-game-kotlin/
 | 16 | 冪等記録の照合の位置・保存の範囲は明記なし | 認可の前提検査の後に照合。`request_digest` に操作者の ID。保存は成功の応答だけ | 失効した旧担当者の再送で資格の生の値が返らないように（H4） |
 | 17 | コマンドの応答に結果を含める（想定） | 応答は `versions` だけ。表示はスナップショットから | 更新の経路を 1 つに（H8） |
 | 18 | エラーは `type` の識別子（`decision-conflict` など） | `code` を `<領域>.<名前>` に統一。`type` は `/problems/{code}` | 辞書の鍵を契約にする（H9） |
+| 19 | 観察者は `game_overview` を含む表を読む（参加コードの扱いは明記なし） | `join_code` を `game_join_codes` に分け、観察者は `game_overview`・`session_overview`・`week_team_totals` の 3 表だけを読む | 観察者が参加コードから参加者として加われないように（M1。BR-17） |
+| 20 | アプリ層の失敗の識別子は明記なし | `AppFailure` を単一の正本とし、`app.retry_exhausted`（503、`Retry-After`）・`app.idempotency_key_reused`・`app.unauthorized` に `code` を与える。`type` のない 5xx は「結果が不明」として同じキーで再送 | LB の 503 と区別でき、新しいキーでの二重作成を防ぐ（M7、M14） |
+| 21 | 問い合わせの読み取りの一貫性は明記なし | 読み取り専用の REPEATABLE READ で、`projection_checkpoints` を同じトランザクションで読む | 行より新しい版を返さない（M15） |
+| 22 | 投影の再構築の同時実行制御は未決 | コマンドは `pg_advisory_xact_lock_shared(game_id)`、再構築は排他の `pg_advisory_xact_lock(game_id)`。研修中は停止して再構築 | 「研修中は再構築しない」の制約を外す（M23。暫定） |
+| 23 | 投影は `Projection<Row>` の `apply(row, event)` | `Event -> List<RowChange>`。他の投影を読まない | 再構築の順序に依存しない（M12） |
+| 24 | Fastify の JSON 処理、node-pg-migrate、Pino、Fastify の SSE | kotlinx.serialization と `EventCodec`、Flyway（導入は承認待ち）、Logback、`ktor-server-sse`、手書きの OpenAPI | 未決の取り残しの解消（M16） |
 
 ## 設計判断
 
@@ -616,7 +645,7 @@ apps/beer-game-kotlin/
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用）** | JDBC と手書きの SQL（接続プール）。`withContext(Dispatchers.IO)` で包む | 追記の一意制約、`pg_notify`、`FOR UPDATE`（投影の一部）を明示できる。beer-game2 の「ORM を使わない」を踏襲 |
+| **A（採用）** | JDBC と手書きの SQL（接続プール）。`withContext(Dispatchers.IO)` で包む | 追記の一意制約、`pg_notify`、アドバイザリロックを明示できる。beer-game2 の「ORM を使わない」を踏襲 |
 | B | SQL のビルダー、または ORM（導入には承認が要る） | 型安全な SQL。イベントストアの追記の制御が間接になる |
 | C | 非同期のドライバ（R2DBC） | ブロッキングを避けられる。ガイドの `Dispatchers.IO` の流儀から離れ、追加の依存と検証が要る |
 
@@ -640,7 +669,7 @@ apps/beer-game-kotlin/
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用）** | 追記 -> 投影の順。`game_overview` のように複数ストリームが更新する投影は、投影の行をロックして更新する | 追記で負けたコマンドは投影に触れない。投影の行のロックは短い |
+| **A（採用）** | 追記 -> 投影の順。`game_overview` のように複数ストリームが更新する投影は、行の変更（`RowChange`）を、ロックの順序の規則（表名の辞書順、主キーの昇順）に従って適用する。明示的な `FOR UPDATE` は、今のイベント構成では実際には競合を防がない（`game` と `session` が別の列を更新し、UPDATE の暗黙の行ロックで足りる）。残すかは実装時に判断する | 追記で負けたコマンドは投影に触れない。投影の行のロックは短い。デッドロックは順序の規則で避ける |
 | B | 投影を先に更新し、後で追記 | 追記に負けるとロールバックするだけだが、投影の行で無駄な待ちが生まれる |
 | C | 投影を別のワーカーで非同期に更新 | 書き込みと読み取りを分離できる。結果整合で、通知の版が投影に追いつかない窓が生まれる（[データモデル](./data-model.md) の判断） |
 
@@ -691,16 +720,19 @@ apps/beer-game-kotlin/
 
 ## 未決事項
 
-- `DomainError` の `code`（`<領域>.<名前>`）と分類が、[ドメインモデル](./domain-model.md) の一覧と一致していること（`code` の書式は決定済み。値の一覧の整合を確認する）。
-- `POST /games/:id/start` への変更（beer-game2 は `POST /sessions/:id/start`）を、API の表を持つほかの文書と整合させる。
+**決定済み（取り残しの解消。M16）**: `DomainError.code` と分類は [ドメインモデル](./domain-model.md) が持つ。マイグレーションは Flyway（[技術スタック](./tech-stack.md) T4。**導入は承認待ち**）。ログは Logback。JSON は kotlinx.serialization と `EventCodec`（アップキャストは `adapter-persistence`）。OpenAPI は `contracts/openapi.yaml` の手書きを正本とする。SSE は `ktor-server-sse`。`POST /games/:id/start` への変更は、[フロントエンド](./architecture-frontend.md) の変更表に載せた。
+
+**選定・確認が未決のもの**（「承認待ち」とは別）:
+
+- 再構築のロック（`pg_advisory_xact_lock_shared` / 排他）の待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待つか、すぐ 503 `app.retry_exhausted` を返すか）。研修中の停止・再構築・再開の手順は暫定で、人の確認が要る（M23）。
+- `game_overview` の明示的な `FOR UPDATE` を残すか（BD6。ロックの順序の規則で足りるかを実装時に確認）。
 - 再試行の上限（`ConcurrencyConflict`、40001、40P01）と、間隔（ジッター）の要否。競合の頻度を測って決める。
 - 出力（`buildExport`）が大きい場合のキャッシュの要否（将来の検討）。
 - レート制限の状態を共有する方法（BD8）。
-- Ktor の SSE のサーバー機能、レート制限、`CallId` の各プラグインの使用の可否と API の確認（採用する版のドキュメントで）。
+- `ktor-server-sse`、レート制限、`CallId` の各プラグインの、採用する版での API の確認（実装開始時）。
 - 通知の受信の接続（`LISTEN`）が、接続プーラーやプロキシを前段に置いた場合に動くか（本設計では置かない前提）。
 - detekt と ktlint の、採用する Kotlin の版への対応の確認。detekt の安定版が対応していない場合の代替（PMD のカスタムルール、または detekt の次の版の採用判断）。
 - 資格のダイジェストの方式（HMAC の方式と鍵の導出）と、応答の暗号化の方式（ADR にする）。
-- ログの基盤と JSON の出力形式の選定、JSON の変換のライブラリ（[技術スタック](./tech-stack.md) で決める）。
 - 設定の上限（数量、遅延、本文のサイズ）の値と、検査の方法（beer-game2 から継続）。
 - `events` に UPDATE / DELETE を与えないロールでも、連鎖削除が動くことの確認（[データモデル](./data-model.md) から継続）。
 

@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -58,7 +58,7 @@ package "計算" {
   component "simulateWeek\n（純粋関数）" as SIM
 }
 package "学習ビュー（CQRS の読み取り側）" {
-  component "投影\nproject: (行, イベント) -> 行" as LV
+  component "投影\nproject: Event -> List<RowChange>" as LV
 }
 package "保持と削除" {
   component "RetentionSaga\n（プロセスマネージャー）" as RT
@@ -89,7 +89,7 @@ beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game2
 | 決定 | `decide` | `(State, Command) -> Either<DomainError, List<Event>>`。純粋 |
 | 進化 | `evolve` | `(State, Event) -> State`。純粋で全域（失敗しない） |
 | 再生 | `replay` | イベント列を `fold(evolve)` で状態へ畳み込むこと。検証上の性質は「永続化往復の同値性」「計算と事実の一致」「投影の整合」の 3 つに分ける（週次計算の節） |
-| 投影 | `project` | イベントを畳み込んで読み取りモデルの行を作る純粋関数 |
+| 投影 | `project` | 1 件のイベントから、読み取りモデルの行の変更の列（`List<RowChange>`）を作る純粋関数。他の投影を読まない |
 | 意思決定の版 | `DecisionVersion` | 役割ごと・週ごとの意思決定の版。共同入力の競合検出に使う。**ストリームの版とは別** |
 | 操作者 | `Actor` | コマンドを発行した主体（進行役・参加者・観察者・匿名） |
 | 周辺ストア | — | イベントに入れない個人情報（表示名）と秘密（資格ダイジェスト）の保存先（[データモデル](./data-model.md)） |
@@ -188,12 +188,12 @@ data class RoleMap<out A>(val factory: A, val distributor: A, val wholesaler: A,
 | 確定方式（CommitMode） | `enum class` | `MANUAL`（既定）、`AUTO` |
 | 設定の種別（SettingsKind） | `sealed interface` | `Kit` または `Custom(changes: Set<SettingsField>)`。設定から**導出**して保持する |
 | ゲーム設定（GameSettings） | `data class` | 上記の組。`of` で全項目を検証し、エラーを集める |
-| 役割状態（RoleState） | `data class` | 在庫、受注残、注文・配送・生産の `Pipeline`、累積費用 |
+| 役割状態（RoleState） | `data class` | 在庫、受注残、注文・配送・生産の `Pipeline`、累積費用、**当週に処理する入荷（`arrivals`）**、**当週の受注（`orders`。小売店は当週の顧客需要）**。`arrivals` と `orders` は、前の週の確定（`simulateWeek`）が次週分まで計算して `nextStates` に入れる（M2。最初の週は `initialStates` が持つ） |
 | 役割別の週結果（RoleWeekResult） | `data class` | 受注（需要）、出荷、**発注（その週の意思決定）**、週末在庫、週末受注残、週次費用、累積費用 |
 | 表示名（DisplayName） | `value class` | 前後の空白を除いて 1〜80 文字。**イベントには入れない** |
 | 参加コード・招待コード | `JoinCode`、`InvitationCode` | 推測困難な乱数から作る（8 桁以上）。**2 つは別の型・別の値**。招待コードの値はイベントに入れない |
 | 資格の有効性（CredentialValidity） | `data class` | 発行時刻、有効期限、失効時刻。`status(now)` が有効・失効・期限切れを返す純粋関数 |
-| 保持方針（RetentionPolicy） | `data class` | 保持日数 1〜3650（既定 90）、保持開始、削除期限 |
+| 保持方針（RetentionPolicy） | `data class` | 保持日数 1〜3650（既定 90）、保持開始、削除期限。**beer-game2 にあった「方針の版」は持たない**（方針は 1 ゲームにつき 1 つで、作成後に変わらない。版を比べる相手がいないため。保持日数を変える機能を足すときに版を導入する） |
 | 操作者（Actor） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`、`Observer(id)`、`Anonymous`。認証はアダプターが行い、結果の `Actor` をコマンドに載せる |
 | ストリームの版（StreamVersion） | `value class` | 単調に増える整数。楽観的並行制御の期待値 |
 | 意思決定の版（DecisionVersion） | `value class` | 役割・週ごとに 0 から。保存のたびに 1 増える |
@@ -351,9 +351,15 @@ fun decideGame(state: GameState, command: GameCommand): Either<GameError, List<G
 fun evolveGame(state: GameState, event: GameEvent): GameState = when (event) {
     is GameCreated -> Preparing(GameData.from(event)).at(version = 1)
     is RoleAssigned -> state.updateData { it.assign(event.participantId, event.role) }.bumped()
-    is GameStarted -> (state as Preparing).let { Started(it.data) }.bumped()
-    // 全イベントを when で網羅する。evolve は失敗しない（検証は decide の責務）
+    is GameStarted -> when (state) {
+        is Preparing -> Started(state.data).bumped()
+        is NotCreated, is Started -> state.invalid(event)       // decide が作らない列。状態は変えない
+    }
+    // 全イベントを else なしの when で網羅する。evolve は全域（例外を投げない。M13）
 }
+
+/** 不正な遷移（decide が作らない列）。状態を変えずに返す（版も増えない）。検知は再生側が記録する（下記） */
+private fun GameState.invalid(@Suppress("UNUSED_PARAMETER") event: GameEvent): GameState = this
 ```
 
 #### 不変条件
@@ -363,7 +369,7 @@ fun evolveGame(state: GameState, event: GameEvent): GameState = when (event) {
 | 設定の妥当性 | 最終週 1〜50、需要系列の長さは最終週以上、各値と単価は範囲内。準拠値から変えたら「カスタム」として記録する（導出） | BR-13、BR-14 | `ValidationError`（境界で集める） |
 | 作成の一回性 | ストリームが空のときだけ作成できる | FR-01、AC1.1.1 | `AlreadyCreated`（`InvalidState`） |
 | 参加の受付 | 準備中の間だけ、参加と割り当てを受け付ける | 状態モデル | `NotPreparing`（`InvalidState`） |
-| 役割の割り当て | 1 人の参加者は高々 1 つの役割。**1 つの役割に複数の参加者を割り当てられる**。付け替えは解除と割り当ての 2 イベント | FR-16、BR-15 | — |
+| 役割の割り当て | 1 人の参加者は**同時に 2 つの役割を持たない**。**1 つの役割に複数の参加者を割り当てられる**。別の役割への割り当ては、元の役割から移す付け替え（解除と割り当ての 2 イベント）として扱い、UI で「移します」と明示する（D9。AC1.2.5 の解釈は D9 と未決事項） | FR-16、BR-15、AC1.2.5 | — |
 | 開始条件 | 4 役割のそれぞれに、1 人以上が割り当てられている | UC-04、FR-03 | `StartConditionNotMet(missing)`（`RuleViolation`） |
 | 観察用の招待 | 参加コードと別の値。失効または期限切れの招待では新しい参加ができない。観察者は役割を持てない | FR-17、BR-17 | `InvitationRevoked`、`InvitationExpired`、`InvitationNotFound` |
 | 資格の有効性 | 進行役・参加者・観察者の資格は有効期限と失効を持つ。失効済みを再度失効できない。再発行は新しい有効期限を持つ | NFR-06、NF-S4 | `CredentialAlreadyRevoked`（`InvalidState`） |
@@ -498,16 +504,23 @@ private fun Raise<SessionError>.commitEvents(data: SessionData, kind: CommitKind
 }
 
 fun evolveSession(state: SessionState, event: SessionEvent): SessionState = when (event) {
+    // 以下のイベントは、Active / Paused 以外の状態では state.invalid(event)（`updateData` は Active / Paused だけに適用する）
     is DecisionSaved -> state.updateData { it.withDecision(event) }.bumped()
     is WeekCommitted -> state.updateData {
         it.copy(roleStates = event.nextStates,                     // イベントの値をそのまま採用（再計算しない）
                 week = if (it.week == it.settings.finalWeek) it.week else it.week.next(),
                 decisions = emptyMap(), decisionVersions = RoleMap.all(DecisionVersion.ZERO))
     }.bumped()
-    is SessionEnded -> (state as? Active ?: state as Paused).let { Ended(it.data()) }.bumped()
-    // 全イベントを網羅
+    is SessionEnded -> when (state) {
+        is Active -> Ended(state.data).bumped()
+        is Paused -> Ended(state.data).bumped()
+        is NotStarted, is Ended -> state.invalid(event)          // decide が作らない列。状態は変えない
+    }
+    // 全イベントを else なしの when で網羅する。強制キャスト（as、as?）は使わない（M13、ガイド §9.6）
 }
 ```
+
+**`evolve` の全域化と `InvalidTransition`（M13）。** `evolveGame` と `evolveSession` は、`as` / `as?` の連鎖を使わず、状態とイベントの組を else なしの `when` で網羅します（`ClassCastException` でそのストリームのコマンドが止まるのを避けるため）。`decide` が作らない列（例: `NotStarted` への `DecisionSaved`）が来たときは、**状態を変えずに返し**、`InvalidTransition(streamType, stateName, eventType)` を検知として記録します（ログとメトリクス。設計上は起きないので、起きたら不具合かデータの破損として運用が調べる）。`evolve` 自体は純粋に保ちます。有効なイベントは必ずストリームの版を 1 増やすので、**再生側（`replay`、アダプターの境界）が、`evolve` の前後で版が増えていないことを不正な遷移として検出**し、記録します。「`decide` が作る列だけが `evolve` に来る」ことは、**性質テスト**（有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない）で守ります（[テスト戦略](./test-strategy.md)）。
 
 `evolveSession` は `WeekCommitted` の `nextStates` をそのまま採用し、`simulateWeek` を呼び直しません（設計判断 D5）。
 
@@ -596,10 +609,10 @@ fun simulateWeek(
 
 | 項目 | 内容 |
 | :--- | :--- |
-| 入力 → 出力 | 前週の断面、4 役割の意思決定、設定 → 次週の断面、役割別の週結果 |
+| 入力 → 出力 | 前週の断面、4 役割の意思決定、設定 → 次週の断面、役割別の週結果。**次週の断面（`nextStates`）は、次週に処理する入荷（`arrivals`）と次週の受注（`orders`。小売店は `settings.demand[week + 1]`）まで含む**。最終週では次週が無いので 0 とする（M2） |
 | 規則の正本 | 12 ステップと遅延（BR-02〜BR-09）。利用可能量 = 前週末在庫 + 当週入荷。充足対象 = 前週末受注残 + 当週受注。出荷 = 両者の小さい方。週末在庫 = `max(0, 利用可能量 - 充足対象)`、週末受注残 = `max(0, 充足対象 - 利用可能量)`。週次費用 = 週末在庫 × 在庫単価 + 週末受注残 × 受注残単価 |
 | 全域性 | 入力の型（`RoleMap`、`Quantity`、`Week`）が検証済みなので、`Either` を返さない（失敗しない） |
-| 需要 | 顧客需要は `settings.demand[week]` から小売店にだけ与える。他の役割の受注は、下流の注文が注文遅延を経て届いた値 |
+| 需要 | 顧客需要は、小売店にだけ与える。**当週の需要は、前の週の確定が `nextStates` の小売店の `orders` に入れた値**（第 1 週は `initialStates`）。小売店は自分の `role_current_states` の行から当週の需要を読み、需要系列（進行役専用の `game_settings`）は読まない（BR-11、AC2.1.1）。他の役割の受注は、下流の注文が注文遅延を経て届いた値（同じく `orders`） |
 | 検証 | 既知の系列の golden test、性質テスト（在庫・受注残が非負、出荷が利用可能量を超えない）、**計算と事実の一致**（`fold(evolve)` の結果が、イベントのペイロードと `simulateWeek` を直接回した結果の両方と一致する。D5）。[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)。再生に関する 3 つの性質の区別は下記 |
 
 規則の詳細（12 ステップの順序、待ち行列の前進）は beer-game2 と同じで、本書は新しい規則を加えません。決定論性は `simulateWeek` が乱数・時計を持たないことで保たれます（NFR-01）。
@@ -666,8 +679,8 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-S02 | `SessionPaused` | `PauseSession`。進行役、進行中 | なし |
 | EV-S03 | `SessionResumed` | `ResumeSession`。進行役、一時停止中 | なし |
 | EV-S04 | `SessionEnded` | `EndSession`（進行役）、または最終週の `WeekCommitted` と同じ `decide` | `reason`（`FINAL_WEEK` / `FACILITATOR`） |
-| EV-S05 | `DecisionSaved` | `SaveDecision`。進行中、その役割の参加者、意思決定の版が一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（`participantId`） |
-| EV-S06 | `ProxyDecisionSubmitted` | `SubmitProxyDecision`。進行役、進行中**または一時停止中**、`requestedWeek` が現在の週と一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（進行役）。入力値・操作者・時刻（封筒）を残す（FR-15） |
+| EV-S05 | `DecisionSaved` | `SaveDecision`。進行中、その役割の参加者、意思決定の版が一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（`participantId`）、`submittedRoleCount`（保存後に入力済みの役割数。投影 `SessionOverview` 用。M3） |
+| EV-S06 | `ProxyDecisionSubmitted` | `SubmitProxyDecision`。進行役、進行中**または一時停止中**、`requestedWeek` が現在の週と一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（進行役）、`submittedRoleCount`（同上）。入力値・操作者・時刻（封筒）を残す（FR-15） |
 | EV-S07 | `AutoCommitChanged` | `SetCommitMode`。進行役 | `mode`（`MANUAL` / `AUTO`） |
 | EV-S08 | `WeekCommitted` | `CommitWeek`（進行役、進行中、4 役割が揃う、週が一致し、`basis` が現在の意思決定の版と一致）、または `AUTO` の進行中に `SaveDecision` / `SubmitProxyDecision` / `ResumeSession` / `SetCommitMode` が揃った状態を作った場合（一時停止中の代理入力と `SetCommitMode` は確定しない） | `week`、`commitKind`（`MANUAL` / `AUTO`）、`decisions`（`RoleMap<Quantity>`、確定した発注）、`results`（`RoleMap<RoleWeekResult>`）、`nextStates`（`RoleMap<RoleState>`）、`contributors`（寄与者数。現在は 4 役割） |
 
@@ -679,28 +692,41 @@ beer-game2 のイベントの名称は、すべて維持しました。変更は
 
 ## 投影（読み取りモデル）
 
-投影は、イベントを畳み込んで読み取り用の行を作る**純粋関数**です。永続化（SQL）は境界の責務です。
+投影は、イベント 1 件から読み取り用の**行の変更の列**を作る**純粋関数**です（M12）。永続化（SQL）は境界の責務です。
 
 ```kotlin
-/** 投影 1 本の形。(現在の行, イベント) -> 次の行。行が無いときは null */
-fun interface Projection<Row> {
-    fun apply(row: Row?, event: EventEnvelope<DomainEvent>): Row?
+/** 行の変更。表と主キーと値だけを持つ。SQL は知らない */
+sealed interface RowChange {
+    val table: ProjectionTable
+    val key: RowKey
+    data class Upsert(override val table: ProjectionTable, override val key: RowKey, val values: Map<Column, Value>) : RowChange
+    data class Delete(override val table: ProjectionTable, override val key: RowKey) : RowChange
 }
 
-/** CQRS の読み取り側。ストリーム全体を fold して行を再構築できる（再構築・検証用） */
-fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row? =
-    events.fold(null as Row?) { row, event -> apply(row, event) }
+/** 投影 1 本の形。イベントのペイロードだけから行の変更を作る。他の投影の行を読まない */
+fun interface Projection {
+    fun project(event: EventEnvelope<DomainEvent>): List<RowChange>
+}
+
+/** CQRS の読み取り側。ストリーム全体の変更を順に集めれば、投影を作り直せる（再構築・検証用） */
+fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange> =
+    events.flatMap { project(it) }
 ```
+
+- **投影は他の投影を読みません。** イベントのペイロード（`WeekCommitted` なら `results`、`nextStates` など）だけから行の変更を作るので、再構築で表を作る順序に依存しません。
+- **1 件の `WeekCommitted` が、複数の表の変更を返せます**（`week_commits`、`week_role_results`、`week_team_totals`、`role_current_states`、`current_decisions`、`session_overview`）。
+- 変更の適用（`INSERT ... ON CONFLICT`、`DELETE`）と、複数の行を更新する順序（[データモデル](./data-model.md) のロック順序）は、境界の責務です。
 
 投影の更新は、イベントの追記と**同じトランザクション**で行います（同期投影。[データモデル](./data-model.md) の設計判断）。投影はいつでも、イベントの再生で作り直せます。
 
 | 投影 | 購読するイベント | 内容 | 閲覧できる人 |
 | :--- | :--- | :--- | :--- |
-| `GameOverview` | `GameCreated`、`GameStarted`、`SessionEnded`、`AutoCommitChanged` | ゲームの状態（準備中 / 開始済み / 終了）、参加コード、最終週、確定方式、設定の種別と変更項目 | ゲームの参加者・進行役・観察者 |
+| `GameOverview` | `GameCreated`、`GameStarted`、`SessionEnded`、`AutoCommitChanged` | ゲームの状態（準備中 / 開始済み / 終了）、最終週、確定方式、設定の種別と変更項目。**参加コードは持たない**（M1） | ゲームの参加者・進行役・観察者 |
+| `GameJoinCodes` | `GameCreated` | 参加コード（`join_code`）。`GameOverview` から分けた表 | 進行役と、参加の問い合わせ（参加コードの照合）だけ。**観察者には出さず、DB の権限でも読ませない**（BR-17。観察者が参加コードを知ると参加者として加われるため） |
 | `GameSettingsView` | `GameCreated` | 需要系列、初期条件、費用、遅延、公開範囲 | 進行役。参加者・観察者には、需要系列の将来分を出さない（開示の判定、下記） |
-| `Lobby` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned`、`ObserverInvited`、`ObserverInvitationRevoked`、`ObserverJoined`、`CredentialRevoked` | 参加者の一覧（役割、共同担当）、観察用の招待の一覧。表示名は周辺ストアから結合する | 進行役。参加者には自分の役割と同じ役割の参加者 |
-| `SessionOverview` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`WeekCommitted` | 状態、現在週、開始・終了時刻 | ゲームの参加者・進行役・観察者 |
-| `RoleCurrentState` | `SessionStarted`、`WeekCommitted` | 役割ごとの現在の在庫、受注残、待ち行列、累積費用 | 当該役割の参加者と進行役。他役割へは出さない（FR-04） |
+| `Lobby` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned`、`ObserverInvited`、`ObserverInvitationRevoked`、`ObserverJoined` | 参加者の一覧（役割、共同担当）、観察用の招待の一覧。表示名は周辺ストアから結合する。**資格の失効・再発行・復帰（`CredentialRevoked` など）は購読しない**（資格の状態の正本は周辺ストアの `credentials`。ロビーに資格の状態は出さない。L5） | 進行役。参加者には自分の役割と同じ役割の参加者 |
+| `SessionOverview` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | 状態、現在週、開始・終了時刻、**入力済みの役割数 `submitted_role_count`（0〜4。値は含めない）**（M3）。確定で 0 に戻る | ゲームの参加者・進行役・観察者 |
+| `RoleCurrentState` | `SessionStarted`、`WeekCommitted` | 役割ごとの現在の在庫、受注残、待ち行列、累積費用、**当週に処理する入荷と当週の受注（小売店は当週の需要）**（M2）。小売店は、需要系列でなくこの行から当週の需要を読む | 当該役割の参加者と進行役。他役割へは出さない（FR-04） |
 | `CurrentDecisions` | `DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | 当週の役割ごとの意思決定（値、版、最後の保存者）。確定でクリア | 当該役割の参加者（自分の値）、進行役（入力状況） |
 | `WeekRoleResults`（振り返り） | `WeekCommitted` | 週 × 役割の結果（需要、出荷、発注、在庫、受注残、費用、累積費用）。**終了後に全役割**を開示する | 終了後は全員。プレイ中は自分の役割の行だけ |
 | `WeekTeamTotals`（観察） | `WeekCommitted` | 週ごとのチーム合計（発注、在庫、受注残）と寄与者数。**役割別の値を持たない** | 観察者・進行役。公開範囲と寄与者数で抑止（下記） |
@@ -716,7 +742,7 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 | 役割別の値 | 役割別の週結果は、終了後だけ全員へ開示する。プレイ中は、自分の役割の行だけ | FR-04、FR-13 |
 | 将来の需要 | 需要系列は、プレイ中は小売店にだけ当週分を示し、将来分は取得できない | BR-11 |
 
-観察用の `WeekTeamTotals` は、確定の時点で役割別の値と別の行にしておきます。観察者向けの問い合わせが、役割別の行に**到達できない**ようにするためです（最小権限。[データモデル](./data-model.md)）。
+観察用の `WeekTeamTotals` は、確定の時点で役割別の値と別の行にしておきます。観察者向けの問い合わせが、役割別の行に**到達できない**ようにするためです（最小権限。[データモデル](./data-model.md)）。**観察者が読める投影は、`GameOverview`（参加コードなし）・`SessionOverview`・`WeekTeamTotals` の 3 表だけ**です（M1。`GameJoinCodes` は読めません）。`SessionOverview` の `submitted_role_count` は、観察画面の「完了状況」（AC4.1.1）に使います。どの役割が入力済みかまで見せるかは、BR-17 との兼ね合いで未決事項です。
 
 ## 設計判断
 
@@ -769,6 +795,8 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 
 トレードオフ: A はイベントが大きい（1 週で 4 役割分の結果と待ち行列）。1 ゲームの総量は小さい（[データモデル](./data-model.md)）。
 
+検証（M18）: `evolve` が `simulateWeek` を呼ばないことは、`simulateWeek` が出すはずの値と**意図的に違う `nextStates`** を持つ `WeekCommitted` を Given にして、状態がその値をそのまま採用することで確かめます（呼び直していれば、違う値になって失敗する）。ドメインの純粋性（時計・乱数を読まない）は、静的検査（detekt の `ForbiddenMethodCall`）で守ります（[テスト戦略](./test-strategy.md)）。
+
 ### D6: 自動確定は `decide` が複数イベントを返すことで表す
 
 前述の `SaveDecision` の `decide` を参照してください。代替案は、保存の後に購読者が確定コマンドを発行する案（結果整合で、保存と確定の間に別の人が変更できる）と、確定に猶予を設ける案（確定が遅れ、実装が複雑になる）です。ADR-008 の判断を引き継ぎます。
@@ -797,7 +825,14 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 
 ### D9: 共同担当の割り当ての付け替え
 
-`AssignRole` は、すでに別の役割にいる参加者に対して `RoleUnassigned` と `RoleAssigned` の 2 イベントを返します（[ガイド §7.4](../../reference/関数型プログラミングガイド_Kotlin編.md) の 1 コマンドから複数イベント）。同じ役割への再割り当ては、イベントを返さず（`Right(emptyList())`）、履歴に足しません。代替案は、付け替えを拒否して先に解除を要求する案です（進行役の操作が増える）。
+`AssignRole` は、すでに別の役割にいる参加者に対して `RoleUnassigned` と `RoleAssigned` の 2 イベントを返します（[ガイド §7.4](../../reference/関数型プログラミングガイド_Kotlin編.md) の 1 コマンドから複数イベント）。同じ役割への再割り当ては、イベントを返さず（`Right(emptyList())`）、履歴に足しません。
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | 付け替えを受け付け、2 イベントで残す。UI は「現在の役割から移します」と明示する | 進行役の操作が 1 回で済む。移動が履歴に残る |
+| B | 付け替えを拒否し、先に解除を要求する | 黙って移ることがない。進行役の操作が増える |
+
+**AC1.2.5 の解釈（M4）。** 要件の AC1.2.5 は「割り当てず理由を示す」とあり、字面は `B`（拒否）に近い案です。本書は、AC1.2.5 の趣旨を「**1 人が同時に 2 つの役割を持たない**」ことと解釈し、黙って付け替えるのでなく、UI が移動を明示することで満たすとします。この解釈は、要件側の AC1.2.5 の文言の改訂（「別の役割にいる参加者は、元の役割から移す旨を示して割り当てる」）を依頼する事項として、未決事項に残します。
 
 ### D10: `CommitWeek` の前提は、`session` ストリームの版でなく、週と意思決定の版
 
@@ -840,6 +875,13 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 | 15 | `ExportPackage` は `SessionEnded` の投影（`PENDING`・`COMPLETE`・`FAILED`） | 投影にせず、問い合わせ時に全域の純粋関数 `buildExport` で作る（D11） | 最終週の確定を出力の作成から切り離す |
 | 16 | `CommitWeek` は `expectedVersion`（ストリームの版）で `StaleVersion` | `CommitWeek(requestedWeek, basis)`。`WeekAdvanced` と `DecisionsChanged`。`StaleVersion` は廃止（D10） | 共同担当の保存だけで拒否しない |
 | 17 | 代理入力は進行中のみ、`requestedWeek` なし、確定しない | 一時停止中も受け付け、`requestedWeek` を持ち、進行中の `AUTO` で揃えば確定する | UC-09（停止 → 代理入力 → 再開）、AC2.4.1 |
+| 18 | `game_overview` に参加コードを含む | 参加コードを `GameJoinCodes`（表 `game_join_codes`）に分ける。観察者は読めない | BR-17（観察者が参加者として加われない） |
+| 19 | 役割状態は在庫・受注残・待ち行列・累積費用 | 当週に処理する入荷と当週の受注（小売店は当週の需要）を加え、`simulateWeek` が次週分まで返す | 小売店が需要系列を読まずに当週の需要を得る（BR-11、AC2.1.1） |
+| 20 | 観察画面の完了状況は集計で導出 | `SessionOverview` に `submitted_role_count` を持たせる | AC4.1.1 |
+| 21 | `evolve` は集約のメソッドの内部（強制キャストの有無は規定なし） | 全域な `when`（else なし、強制キャストなし）。不正な遷移は状態を変えず `InvalidTransition` を検知する | ガイド §9.6、`ClassCastException` でストリームが止まるのを避ける |
+| 22 | 投影は `(行, イベント) -> 行`（本書の初稿） | `Event -> List<RowChange>`。他の投影を読まない | 1 件の `WeekCommitted` が複数の表を書く。再構築の順序に依存しない |
+| 23 | 保持方針に「方針の版」を持つ | 持たない（方針が単一で版の比較が要らない） | 版を比べる相手がいない |
+| 24 | `Lobby` が `CredentialRevoked` を購読（初稿） | 購読しない（資格の状態は `credentials` が正本） | domain と data-model の不一致の解消（L5） |
 
 ## 未決事項
 
@@ -853,7 +895,11 @@ fun <Row> Projection<Row>.replay(events: List<EventEnvelope<DomainEvent>>): Row?
 - キット準拠の既定の需要系列（ASM-01）。JSD の値を確認するまで、`KitPreset` の `demand` は未確定です。
 - 数量の上限（既定 1000）を、固定値にするか、`GameSettings` の項目にするか。
 - 終了後の資格の扱い（NF-S4）。`Started` の規則で足りるか、終了後は `Ended` の投影で拒否するか。
-- 保持の開始の起点（作成時か、終了時か）。本書の `RetentionPolicy` は、作成時を既定とします。
+- **保持の開始の起点（M5。暫定の決定。人の確認が要る）。** 現在の配線どおり**作成時**を起点とします。ロビー・ゲーム作成後・S09 に削除予定日と「バックアップには削除後も最大 7 日残る」を表示し、終了後の振り返りと出力の猶予が短くなりうることも画面で示します。**暫定です。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決**です（事前に作成した研修の振り返りの取り出し期間が短くなる懸念があるため）。
+- AC1.2.5 の文言の改訂（D9、M4）。要件側で「別の役割にいる参加者は、元の役割から移す旨を示して割り当てる」へ改訂するかを、ユーザーストーリーの所有者に確認します（承認ゲート）。
+- `SessionOverview.submitted_role_count` に加えて、どの役割が入力済みかまで観察者に見せるか（M3。BR-17 との兼ね合い。当面は件数だけ）。
+- 不正な遷移の検知（`InvalidTransition`）の通知先と閾値（M13。ログとメトリクスは決定。アラートにするかは運用で決める）。
+- 再構築とコマンドの同時実行制御（M23）。ロック待ちの上限と、再構築中のコマンドの応答（短い待ち、または 503 `app.retry_exhausted`）は [データモデル](./data-model.md) の未決事項で決めます。
 - `WeekCommitted` の `contributors` の意味（公開範囲の拡張時に、4 役割以外を取りうるか）。
 
 ## 出典

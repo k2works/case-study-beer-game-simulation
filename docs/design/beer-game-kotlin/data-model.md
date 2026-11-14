@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:17:34Z }
 - イベントに入れない**個人情報（表示名）と秘密（資格のダイジェスト）は、周辺ストア**に置きます（NF-S14）。
 - すべての表は `game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ち、**1 回の削除で漏れなく消えます**（NFR-07、ADR-007 を引き継ぎ）。
 
-データベースは PostgreSQL で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは [技術スタック](./tech-stack.md) で決めます）。永続化の失敗は、例外のまま漏らさず境界で `Either` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
+データベースは PostgreSQL で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは Flyway を採用案とし、導入は承認待ちです。[技術スタック](./tech-stack.md) T4）。永続化の失敗は、例外のまま漏らさず境界で `Either` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 
 ### beer-game2 からの設計方針の変更
 
@@ -77,7 +77,8 @@ entity 保持削除
 | :--- | :--- | :--- |
 | `GameEvent`、`SessionEvent` | `events` | 書き込み側の正本 |
 | ストリーム `(GameId, StreamType)` | `events` の `(game_id, stream_type)` | — |
-| `GameOverview` | `game_overview` | 投影 |
+| `GameOverview` | `game_overview` | 投影（参加コードを持たない） |
+| `GameJoinCodes` | `game_join_codes` | 投影（観察者は読めない。M1） |
 | `GameSettingsView` | `game_settings` | 投影 |
 | `Lobby` | `lobby_participants`、`lobby_observer_invitations`、`lobby_observers` | 投影 |
 | `SessionOverview` | `session_overview` | 投影 |
@@ -203,7 +204,6 @@ entity "game_overview" as overview {
   * game_id : uuid <<PK, FK>>
   --
   status : text
-  join_code : text <<UK>>
   final_week : integer
   commit_mode : text
   settings_kind : text
@@ -212,6 +212,12 @@ entity "game_overview" as overview {
   created_at : timestamptz
   started_at : timestamptz
   ended_at : timestamptz
+}
+
+entity "game_join_codes" as jc {
+  * game_id : uuid <<PK, FK>>
+  --
+  join_code : text <<UK>>
 }
 
 entity "game_settings" as settings {
@@ -257,6 +263,7 @@ entity "session_overview" as so {
   --
   status : text
   week : integer
+  submitted_role_count : integer
   started_at : timestamptz
   ended_at : timestamptz
 }
@@ -271,6 +278,8 @@ entity "role_current_states" as rcs {
   shipment_pipeline : jsonb
   production_pipeline : jsonb
   cumulative_cost_minor : bigint
+  arrivals : integer（当週に処理する入荷）
+  orders : integer（当週の受注。小売店は当週の需要）
   as_of_week : integer
 }
 
@@ -329,6 +338,7 @@ entity "retention_policies" as rp {
 }
 
 roots ||--|| overview
+roots ||--|| jc
 roots ||--|| settings
 roots ||--o{ lp
 roots ||--o{ li
@@ -419,20 +429,33 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 
 1. アプリケーション層は、対象ストリームの全イベントを読み、`replay` で状態にします。**読んだときの版（`expected`）**を覚えます。
 2. `decide` が返したイベント列を、**`expected + 1` から連続する版**で、1 回のトランザクションで追記します。
-3. 同じ版が既にあれば、一意制約の違反になります。これを `ConcurrencyConflict`（`Either` の左）に変換して返します。**ロックは取りません**（beer-game2 の `SELECT ... FOR UPDATE` は不要になります）。
-4. `ConcurrencyConflict` は、**自動で再試行します**（上限は小さな固定回数。実装開始時に決める）。再読み込みで状態が進んでいるため、`decide` が再評価され、業務上の競合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は `decide` が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。
+3. 同じ版が既にあれば、一意制約の違反になります。これを `AppFailure.ConcurrencyConflict`（`Either` の左）に変換して返します。**行や版のロックは取りません**（beer-game2 の `SELECT ... FOR UPDATE` は不要になります）。ただし、**コマンドは、そのゲームのアドバイザリロックの共有ロック `pg_advisory_xact_lock_shared(game_id)` をトランザクションの先頭で取ります**。共有ロックどうしは待ち合わないので、コマンドの並行性は変わりません。投影の再構築が排他ロックを取る間だけ、コマンドが待ちます（下記「投影の再構築」）。
+4. `ConcurrencyConflict`（`AppFailure.ConcurrencyConflict`）は、**自動で再試行します**（上限は小さな固定回数。実装開始時に決める。上限に達したら `AppFailure.RetryExhausted`）。再読み込みで状態が進んでいるため、`decide` が再評価され、業務上の競合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は `decide` が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。
 5. `decide` が空のイベント列を返したとき（例: 同じ役割への再割り当て）は、追記しません。
 
 複数ストリームのコマンド（`StartGame`）は、両ストリームを読み、両方の期待する版を持って、**同じトランザクションで**追記します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 
 ```kotlin
 // 関数の束として定義し、PostgreSQL 版とインメモリ版を差し替える（ガイド §7.2、§7.6）
+// 失敗の型 AppFailure の正本は architecture-backend.md（M14）。ここは同じ形を示すスケッチ
+sealed interface AppFailure {
+    data class Domain(val error: DomainError) : AppFailure          // decide が返した業務上の失敗
+    data object ConcurrencyConflict : AppFailure                    // uq_events_stream_version の違反、SQLSTATE 40001・40P01（旧 AppendFailure を統合）
+    data object RetryExhausted : AppFailure                         // 競合の再試行が上限に達した（503 app.retry_exhausted）
+    data object IdempotencyKeyReused : AppFailure                   // 409 app.idempotency_key_reused
+    data object Unauthorized : AppFailure                           // 403 app.unauthorized
+    data class Persistence(val failure: PersistenceFailure) : AppFailure   // 例外を境界で値にしたもの
+    // 境界の入力の誤り（Invalid）の扱いは backend の定義に従う
+}
+
 data class EventStore(
     val read: suspend (Tx, GameId, StreamType) -> Either<PersistenceFailure, StreamRead>,   // events と version
-    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppendFailure, Unit>,
-    val transaction: suspend (suspend (Tx) -> Either<AppendFailure, Unit>) -> Either<AppendFailure, Unit>,
+    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, Unit>,   // ConcurrencyConflict か Persistence
+    val transaction: Transaction,
 )
-// transaction の戻り値の型は、実装では総称にする（スケッチのため Unit で示す）
+fun interface Transaction {   // 総称の関数は値のプロパティで表せないため、fun interface で表す
+    suspend fun <A> run(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A>   // Left で ROLLBACK
+}
 ```
 
 ### 共同入力の競合は、ストリームの版とは別
@@ -512,7 +535,7 @@ data class EventStore(
 | **A（採用）** | 追記と同じトランザクションで、投影の行を更新する | 追記の直後に、読み取りが必ず反映される（週確定後の画面反映 2 秒、NFR-03。SSE の版の通知を受けて取得した状態が、通知の版以上であることを保証）。投影の遅れによる障害の種類が無い |
 | B | 別のワーカーが、`seq` を購読して非同期に更新（チェックポイントあり） | 書き込みと読み取りを分離できる。結果整合で、通知の版が投影に追いつかない窓が生まれる。ワーカーの運用が増える |
 
-トレードオフ: A は、追記のトランザクションが長くなります。投影の更新は、イベント 1 件につき数行の更新で、計算は純粋で軽いため許容します。将来、読み取りの負荷が書き込みを圧迫する場合に、B へ移行できるよう、投影は `Projection<Row>`（純粋）として書き、更新の仕組みと分けます。
+トレードオフ: A は、追記のトランザクションが長くなります。投影の更新は、イベント 1 件につき数行の更新で、計算は純粋で軽いため許容します。将来、読み取りの負荷が書き込みを圧迫する場合に、B へ移行できるよう、投影は `Projection`（`Event -> List<RowChange>`。純粋で、他の投影を読まない。[ドメインモデル](./domain-model.md)）として書き、行の変更の適用と分けます。1 件のイベント（例: `WeekCommitted`）が複数の表の変更を返せます。
 
 `projection_checkpoints` は、投影が適用した最後のストリームの版を持ちます。次の目的に使います。
 
@@ -521,19 +544,40 @@ data class EventStore(
 
 ### 投影の再構築
 
-投影の行は、`events` からいつでも作り直せます。**手順**: ゲームの投影の行を削除し、`events` を `stream_version` の順に畳み込み、`projection_checkpoints` を更新する。スキーマの変更（投影の列の追加など）は、マイグレーションの後にこの再構築で埋めます。再構築の同時実行制御（そのゲームの追記を止めるか、アドバイザリロックを取るか）は、未決事項です。
+投影の行は、`events` からいつでも作り直せます。**手順**: ゲームの投影の行を削除し、`events` を `stream_version` の順に畳み込み、`projection_checkpoints` を更新する。スキーマの変更（投影の列の追加など）は、マイグレーションの後にこの再構築で埋めます。
+
+#### 再構築の同時実行制御（アドバイザリロック。M23）
+
+研修中に投影が不整合になったときの業務手順は、「運用担当が運営者を通じて進行役に**停止**を依頼し、**停止中に再構築して再開**する」です（[運用要件](./operation.md)）。停止中でも、追記を伴う操作（代理入力、資格の再発行、観察者の参加）は受け付けるため、再構築とコマンドを**同じゲームについて同時に走らせない**制御が要ります。
+
+| 役 | ロック | 取る場所 |
+| :--- | :--- | :--- |
+| コマンド（追記と投影の更新） | `pg_advisory_xact_lock_shared(game_id)`（共有） | トランザクションの先頭（読み込みの前） |
+| 再構築 | `pg_advisory_xact_lock(game_id)`（排他） | トランザクションの先頭。投影の行の削除から `projection_checkpoints` の更新までを 1 トランザクションで行う |
+
+- `game_id` は 64 ビットのキーへ写す（UUID の上位 64 ビットなど）。トランザクションの終了で自動的に解放される（`xact`）。
+- 共有ロックどうしは待ち合わないので、通常のコマンドの並行性は変わりません。再構築中は、コマンドは排他ロックが外れるまで待ちます。再構築が 1 トランザクションなので、コマンドが見るのは再構築の前後のどちらかで、途中の投影は見えません。
+- これにより、「研修中は再構築しない」という制約は不要になります（停止は業務上の運用であり、データの整合のためのものではなくなる。停止を依頼する理由は、再構築中の入力の待ちを避けるため）。
+- ロック待ちの上限（`lock_timeout`）と、待ちが上限を超えたときのコマンドの応答は、未決事項です（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。
+
+#### 複数の投影の行を更新する順序（L3）
+
+同期投影が複数の行を更新するとき、デッドロックを避けるため、**更新の順序を固定**します。表の順序は、`game_overview` → `game_join_codes` → `game_settings` → `lobby_participants` → `lobby_observer_invitations` → `lobby_observers` → `session_overview` → `role_current_states` → `current_decisions` → `week_commits` → `week_role_results` → `week_team_totals` → `retention_policies` です。同じ表の中では、主キーの昇順（`role` は FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER の順）で更新します。1 件の `WeekCommitted` の変更（`RowChange` の列）も、この順序に並べ替えてから適用します。
+
+なお、今のイベントの構成では、投影の行の更新どうしが実際に競合することはほぼありません。追記（`uq_events_stream_version`）で負けたコマンドは、投影を更新する前に失敗し、同じストリームのコマンドは追記で直列になります。`game_overview` は `game` と `session` の両方のイベントから更新されますが、`game` ストリームのコマンドで `game_overview` を変えるのは作成と開始だけで、開始は両ストリームを同時に追記するため、`session` ストリームの `SessionEnded`・`AutoCommitChanged` と同時に走りません。したがって、`architecture-backend.md` の設計判断 BD6 の投影の行の `SELECT ... FOR UPDATE` は、今の構成では実際には競合を防ぐ場面がなく、順序の規則が主な防止策です（将来、複数の投影の書き手が増えたときのための保険）。
 
 ### 投影テーブルの定義
 
 | テーブル | 主キー | 購読するイベント | 主な制約・内容 |
 | :--- | :--- | :--- | :--- |
-| `game_overview` | `game_id` | `GameCreated`、`GameStarted`、`AutoCommitChanged`、`SessionEnded` | `status` は `PREPARING`・`STARTED`・`ENDED`（`SessionEnded` で導出）。`join_code` 一意。`final_week` は 1〜50。`commit_mode` は `MANUAL`・`AUTO`。`settings_kind` は `KIT`・`CUSTOM`。`settings_changes` に準拠値から変えた項目 |
+| `game_overview` | `game_id` | `GameCreated`、`GameStarted`、`AutoCommitChanged`、`SessionEnded` | `status` は `PREPARING`・`STARTED`・`ENDED`（`SessionEnded` で導出）。`final_week` は 1〜50。`commit_mode` は `MANUAL`・`AUTO`。`settings_kind` は `KIT`・`CUSTOM`。`settings_changes` に準拠値から変えた項目。**参加コードは持たない**（観察者が読むため。M1） |
+| `game_join_codes` | `game_id` | `GameCreated` | `join_code` 一意（索引）。**進行役と、参加の問い合わせ（参加コードの照合）だけ**が読む。観察者のロールには SELECT を与えない（BR-17） |
 | `game_settings` | `game_id` | `GameCreated` | 需要系列、初期条件、費用、遅延、公開範囲。遅延と単価は 0 以上。**進行役の画面にだけ**使う（将来の需要を含むため） |
 | `lobby_participants` | `participant_id` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned` | `game_id` は外部キー。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**（共同担当、FR-16）。表示名は `display_profiles` と結合 |
 | `lobby_observer_invitations` | `invitation_id` | `ObserverInvited`、`ObserverInvitationRevoked` | 有効期限、失効。招待コードの値は持たない |
 | `lobby_observers` | `observer_id` | `ObserverJoined` | 役割を持たない |
-| `session_overview` | `game_id` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`WeekCommitted` | `status` は `ACTIVE`・`PAUSED`・`ENDED`。`week > 0` |
-| `role_current_states` | `(game_id, role)` | `SessionStarted`、`WeekCommitted` | 当該役割の在庫、受注残、待ち行列、累積費用。**当該役割の参加者と進行役だけ**が読める |
+| `session_overview` | `game_id` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | `status` は `ACTIVE`・`PAUSED`・`ENDED`。`week > 0`。**`submitted_role_count`（0〜4。入力済みの役割数。値は含めない）**。`DecisionSaved`・`ProxyDecisionSubmitted` のペイロードの `submittedRoleCount`（保存後に入力済みの役割数。`decide` が数える。投影は他の行を読まないため、増減をイベントが運ぶ）をそのまま書き、`WeekCommitted` で 0 に戻す。観察者が読める（AC4.1.1。M3） |
+| `role_current_states` | `(game_id, role)` | `SessionStarted`、`WeekCommitted` | 当該役割の在庫、受注残、待ち行列、累積費用、**`arrivals`（当週に処理する入荷）と `orders`（当週の受注。小売店は当週の需要）**（M2）。`SessionStarted` と `WeekCommitted`（`nextStates`）で更新。**当該役割の参加者と進行役だけ**が読める。小売店は、需要系列（`game_settings`、進行役専用）でなく、この行から当週の需要を読む |
 | `current_decisions` | `(game_id, role)` | `DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | 当週の意思決定。`decision_version > 0`、`quantity >= 0` と上限（検査）。`editor_*` に最後に保存した人。確定で行を削除する |
 | `week_commits` | `(game_id, week)` | `WeekCommitted` | `commit_kind` は `MANUAL`・`AUTO`。`stream_version` に、確定のイベントの版。**一度だけ確定**されることを、主キーでも守る |
 | `week_role_results` | `(game_id, week, role)` | `WeekCommitted` | **役割別の週結果**。需要（受注）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用。`(game_id, week)` は `week_commits` への外部キー（`CASCADE`） |
@@ -556,13 +600,13 @@ data class EventStore(
 
 | 利用者 | 読めるもの | 読めないもの |
 | :--- | :--- | :--- |
-| 参加者（プレイ中） | 自分の役割の `role_current_states`・`current_decisions`・`week_role_results`、共通の `game_overview`・`session_overview`、ロビー（自分の役割と共同担当） | 他役割の行、`game_settings` の将来の需要、`week_team_totals` |
-| 進行役 | 全役割の入力状況、`game_settings`、`lobby_*`、`week_team_totals`、確定した週の記録 | 参加者の資格の値 |
-| 観察者 | `game_overview`、`session_overview`、`week_team_totals`（公開範囲と寄与者数で抑止） | 役割別の値、将来の需要、`week_role_results`（終了前） |
+| 参加者（プレイ中） | 自分の役割の `role_current_states`・`current_decisions`・`week_role_results`、共通の `game_overview`・`session_overview`、ロビー（自分の役割と共同担当）。参加の問い合わせは `game_join_codes` で参加コードを照合する（値は返さない） | 他役割の行、`game_settings` の将来の需要、`week_team_totals` |
+| 進行役 | 全役割の入力状況、`game_settings`、`game_join_codes`、`lobby_*`、`week_team_totals`、確定した週の記録 | 参加者の資格の値 |
+| 観察者 | `game_overview`（参加コードなし）、`session_overview`（`submitted_role_count` を含む）、`week_team_totals`（公開範囲と寄与者数で抑止）。**この 3 表だけ**（NF-S18、backend と同じ） | **`game_join_codes`（参加コード）**、役割別の値、将来の需要、`week_role_results`（終了前） |
 | 全員（終了後） | `week_role_results`（全役割の時系列） | — |
 | 進行役（出力） | 要求時に `buildExport` が作る出力（CSV・JSON）。`week_role_results` と設定から導出する | — |
 
-観察者の問い合わせは、DB の権限でも `week_role_results`・`role_current_states`・`current_decisions` に**到達できない**ようにします（最小権限。アプリのバグでも役割別の値が漏れにくい）。寄与者数による抑止（`contributors < 2` なら合計を出さない）は、問い合わせの層（`Disclosure`）で行います。
+観察者の問い合わせは、DB の権限でも `game_join_codes`・`week_role_results`・`role_current_states`・`current_decisions` に**到達できない**ようにします（観察者のロールに SELECT を与えるのは、上の 3 表だけ）（最小権限。アプリのバグでも役割別の値が漏れにくい）。寄与者数による抑止（`contributors < 2` なら合計を出さない）は、問い合わせの層（`Disclosure`）で行います。
 
 ### 設計判断: 観察のための `week_team_totals`
 
@@ -624,7 +668,9 @@ end
 
 | テーブル | 主キー | 主な制約 | 役割 |
 | :--- | :--- | :--- | :--- |
-| `retention_policies` | `game_id` | `game_roots` への外部キー（`CASCADE`）。`delete_after > retention_starts_at` | 保持方針（`GameCreated` の投影）。期限で索引を持つ |
+| `retention_policies` | `game_id` | `game_roots` への外部キー（`CASCADE`）。`delete_after > retention_starts_at` | 保持方針（`GameCreated` の投影）。期限で索引を持つ。`retention_starts_at` は**作成時**（暫定。下記）。beer-game2 の「方針の版」は持たない（方針が単一で、版の比較が要らない） |
+
+**保持の起点（M5。暫定の決定。人の確認が要る）。** `retention_starts_at` は作成時とします（現在の配線どおり）。ロビー・ゲーム作成後・S09 に、削除予定日（`delete_after`）と「バックアップには削除後も最大 7 日残る」を表示し、終了後の振り返りと出力の猶予が短くなりうることも画面で示します。**暫定です。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決**です。
 | `deletion_runs` | `deletion_id` | `game_id` 一意（外部キーなし）。`status` は `PENDING`・`IN_PROGRESS`・`FAILED`・`COMPLETED` | 削除の進行。完了のトランザクションで行を削除 |
 | `deletion_attempts` | `(deletion_id, attempt)` | `deletion_id` は外部キー | 試行履歴。完了のトランザクションで削除 |
 | `deletion_receipts` | `deletion_id` | `game_reference_digest` は 64 文字。`expires_at > recorded_at` | 削除の証跡。1 年後に削除 |
@@ -640,7 +686,7 @@ end
 
 ## マイグレーション
 
-- スキーマの変更は、**番号つきの SQL マイグレーション**で行い、適用の履歴を DB に残します。管理ツールは [技術スタック](./tech-stack.md) で決めます。
+- スキーマの変更は、**番号つきの SQL マイグレーション**で行い、適用の履歴を DB に残します。管理ツールは Flyway を採用案とします（導入は承認待ち。[技術スタック](./tech-stack.md) T4）。
 - 変更は、**拡張 → 互換 → 縮小**の順に分け、ロールバックできる単位にします（NFR-12）。
 - **イベントは、マイグレーションで書き換えません。** イベントの形の変更は `schema_version` とアップキャストで吸収します。投影の形の変更は、マイグレーションで表を直し、**再構築**で埋めます。
 
@@ -648,7 +694,7 @@ end
 | :--- | :--- |
 | 001 | `game_roots`、`events`（一意制約、`CHECK`、追記専用のロール権限）、`projection_checkpoints` |
 | 002 | 周辺ストア: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records` |
-| 003 | 投影（準備）: `game_overview`、`game_settings`、`lobby_*` |
+| 003 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_*` |
 | 004 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | 005 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
 | 006 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
@@ -662,7 +708,7 @@ end
 | `events` | `(game_id, stream_type, stream_version)`（一意） | ストリームの読み込み、楽観的並行制御 |
 | `events` | `(seq)`（一意） | 監査と購読者の取り込み順 |
 | `events` | `(game_id, actor_kind, actor_id)` | 操作者ごとの監査の検索 |
-| `game_overview` | `(join_code)`（一意） | 参加コードでの検索 |
+| `game_join_codes` | `(join_code)`（一意） | 参加コードでの検索（観察者は読めない） |
 | `credentials` | `(game_id, kind, subject_id)`、`(expires_at)` | 主体ごとの検索、期限切れの掃除 |
 | `browser_sessions` | `(game_id, expires_at)` | 期限切れの掃除 |
 | `lobby_participants` | `(game_id)` | ロビーの一覧 |
@@ -677,7 +723,7 @@ end
 | # | 判断 | 採用 | 主な代替案 |
 | :--- | :--- | :--- | :--- |
 | 1 | ストリームの単位 | 1 ゲームにつき `GAME`・`SESSION` の 2 本（ドメインモデル D1） | 1 本、役割ごと |
-| 2 | 並行制御 | 版の一意制約 + 自動再試行（ロックなし） | `SELECT ... FOR UPDATE`（beer-game2）、アドバイザリロック |
+| 2 | 並行制御 | 版の一意制約 + 自動再試行（行・版のロックなし）。再構築との同時実行だけ、ゲーム単位のアドバイザリロック（コマンドは共有、再構築は排他） | `SELECT ... FOR UPDATE`（beer-game2）、コマンドも排他のアドバイザリロック（並行性が落ちる） |
 | 3 | スナップショット | なし。実測で必要になれば導入 | 確定ごとのスナップショット |
 | 4 | 投影の更新 | 同期（追記と同じトランザクション） | 非同期ワーカー + チェックポイント |
 | 5 | 観察の合計 | `week_team_totals` を別の投影に | `SUM` を毎回計算（beer-game2） |
@@ -706,19 +752,27 @@ end
 | 14 | 復元は DB のバックアップ | 同じ + イベントの再生で状態と投影を再構築できる（FR-12） | ES の利点 |
 | 15 | 冪等記録の照合順と保存対象の規定なし | 認証 → 認可の前提検査 → 冪等記録の照合。`request_digest` に操作者 ID を含め、成功した応答だけを保存 | 失効した資格の再送で保存済みの応答を返さない |
 | 16 | 一意制約の名前の規定なし | `uq_events_stream_version`、`uq_idempotency_create`、`pk_idempotency_records` を正本の表で定め、衝突の扱いを決める | 同時の重複を 500 にしない |
+| 17 | `games.join_code`（観察者の読み取りの範囲は規定なし） | `game_overview` から参加コードを分け、`game_join_codes` に置く。観察者のロールには SELECT を与えない。観察者が読める表は 3 表 | BR-17（M1） |
+| 18 | `session_overview` は状態・週・時刻 | `submitted_role_count` を加える（`DecisionSaved`・`ProxyDecisionSubmitted` のペイロードから） | AC4.1.1（M3） |
+| 19 | 現在の役割状態は在庫・受注残・待ち行列・累積費用 | `role_current_states` に `arrivals`・`orders`（小売店は当週の需要）を加える | 小売店が需要系列を読まずに当週の需要を得る（M2） |
+| 20 | 投影は `(行, イベント) -> 行`（初稿） | `Event -> List<RowChange>`。複数の表の変更を返せる。更新の順序を固定 | M12、L3 |
+| 21 | `EventStore` の失敗は `AppendFailure` と `PersistenceFailure` | `AppFailure`（sealed interface）に統合。`transaction` の戻りは `Either<AppFailure, A>`。正本は backend | M14 |
+| 22 | 再構築の同時実行制御は未決 | ゲーム単位のアドバイザリロック（コマンドは共有、再構築は排他）。研修中も停止して再構築できる | M23 |
+| 23 | 保持の起点は未決 | 暫定で作成時。画面に削除予定日とバックアップの残存を表示。終了時起点の案は未決 | M5 |
 
 ## 未決事項
 
-- マイグレーションの管理ツールと適用の自動化（[技術スタック](./tech-stack.md) で決める）。
+- マイグレーションの管理ツールは Flyway を採用案とします（[技術スタック](./tech-stack.md) T4。**導入は承認待ち**）。適用の自動化（起動時か CI のジョブか）は、導入の承認後に決めます。
 - 追記の `ConcurrencyConflict` の自動再試行の上限と、再試行の間隔（実装開始時に、競合の頻度を測って決める）。
 - `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認。動かない場合の代替（`SECURITY DEFINER` の関数、削除用のロール）。
-- 投影の再構築の同時実行制御（そのゲームの追記を止めるか、アドバイザリロックを取るか）。
+- 再構築の同時実行制御（解決済み: アドバイザリロック。コマンドは共有、再構築は排他。M23）。**未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。研修中の再構築の所要時間の実測。
 - 数量の上限を、`CHECK`（固定値）にするか、設定の値と照合する検査にするか（beer-game2 から継続）。
-- `retention_starts_at` の起点（作成時か、終了時か。ドメインモデルの未決事項と共通）。
+- `retention_starts_at` の起点: **暫定で作成時**（M5）。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決で、人の確認が要る（ドメインモデルの未決事項と共通）。
 - 出力（`buildExport`）の結果が大きい、または要求が多い場合のキャッシュの要否（解決済み: 表 `export_packages` は廃止し、要求時に作る。キャッシュは実測で必要になれば検討）。
 - `events` の長期の保持と、ゲーム削除前の分析の要否（beer-game2 から継続）。
 - 同期投影のトランザクション時間の実測。書き込みを圧迫する場合は、非同期投影へ移す（設計判断 4）。
-- JSON のシリアライズ方式と、アップキャストの実装の置き場所（[バックエンドアーキテクチャ](./architecture-backend.md) と [技術スタック](./tech-stack.md) で決める）。
+- JSON のシリアライズ方式とアップキャストの置き場所（解決済み: kotlinx.serialization と `EventCodec`。アップキャストは adapter-persistence。[バックエンドアーキテクチャ](./architecture-backend.md)、[技術スタック](./tech-stack.md)）。
+- 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、最初のスライドの Red のテストで確かめる（[テスト戦略](./test-strategy.md)）。
 
 ## 出典
 
