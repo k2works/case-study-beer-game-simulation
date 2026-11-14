@@ -4,7 +4,7 @@ title: "ADR-013: 技術スタックの版を、確認済みの値で固定する
 description: "Kotlin 版の実行環境と主要な依存関係の版を、2026-11-14 に公式の情報で確認した値で定める。確認できていない組み合わせは未確認と明記し、実装開始時に確認する。beer-game2 の ADR-013 を置換する。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # ADR-013: 技術スタックの版を、確認済みの値で固定する（JDK 25 LTS、Kotlin 2.4、PostgreSQL 18）
@@ -94,5 +94,5 @@ beer-game2 の ADR-013 は Node 26 LTS、PostgreSQL 18、TypeScript 6.0 を定�
 ## 備考
 
 - 著者: claude-code
-- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)。置換: beer-game2 の [ADR-013](../beer-game2/013-tech-stack-versions.md)
+- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-014](./014-h2-for-local-development.md)（ローカル開発の H2）。置換: beer-game2 の [ADR-013](../beer-game2/013-tech-stack-versions.md)
 - 参照: [技術スタック（確認した重要な事項、設計判断）](../../design/beer-game-kotlin/tech-stack.md)、[インフラストラクチャ](../../design/beer-game-kotlin/architecture-infrastructure.md)、[設計レビュー（M17）](../../review/beer-game-kotlin/design_review_20261114.md)、[リリース計画（B1〜B3）](../../development/beer-game-kotlin/release_plan.md)

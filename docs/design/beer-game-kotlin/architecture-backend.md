@@ -1,10 +1,10 @@
 ---
 type: Design
 title: "バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）"
-description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
+description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -15,10 +15,11 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 
 [beer-game2 のバックエンドアーキテクチャ](../beer-game2/architecture-backend.md) の機能・API の振る舞い・セキュリティ・運用要件を正本として引き継ぎ、次の点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
 
-- 書き込みは、`decide` / `evolve`（[ドメインモデル](./domain-model.md)）を呼ぶ**薄いコマンド処理**に集約します。ロック（`SELECT ... FOR UPDATE`）と版つき更新は、追記の一意制約と自動再試行に置き換えます（再構築との同時実行の制御にだけ、アドバイザリロックを使います）（[データモデル](./data-model.md)）。
+- 書き込みは、`decide` / `evolve`（[ドメインモデル](./domain-model.md)）を呼ぶ**薄いコマンド処理**に集約します。ロック（`SELECT ... FOR UPDATE`）と版つき更新は、追記の一意制約と自動再試行に置き換えます（再構築との同時実行の制御にだけ、ポート `ProjectionLock` を使います。PostgreSQL 版の実体はアドバイザリロックです）（[データモデル](./data-model.md)）。
 - 読み取りは、同期投影の表を SQL で読む**問い合わせ側**です。
 - 依存は、インターフェースの階層でなく**関数の型の束**で表します（[ガイド §7.2](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - 失敗は例外でなく `Either` で返し、境界で HTTP の応答へ写します（[ガイド 第 3 章](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
+- **ローカル開発（開発機での起動・動作確認）だけは、H2 の PostgreSQL モードでも動かせます**（ユーザーの決定、2026-11-14。[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)）。PostgreSQL 固有の機能（アドバイザリロック、LISTEN/NOTIFY）は**ポートの裏に隠し、PostgreSQL 版と H2 版の 2 実装**を持ちます。統合テスト、CI、ステージング、本番は PostgreSQL 18 のままです（下の「ローカル開発（H2）と実行の選択」）。
 
 技術スタックのバージョンは [技術スタック](./tech-stack.md) と [インフラストラクチャ](./architecture-infrastructure.md) の確認結果に従います。本書は、ライブラリの版を断定しません。
 
@@ -50,7 +51,7 @@ package "adapter-http（Ktor）" {
 package "application" {
   [コマンド処理\nexecute: 読む -> decide -> 追記 -> 投影] as Cmd
   [問い合わせ\nSQL の結果 + Disclosure] as Qry
-  [関数の束（Ports）\nEventStore・Clock・IdGen・CredentialIssuer\nIdempotencyStore・Notifier] as Ports
+  [関数の束（Ports）\nEventStore・Clock・IdGen・CredentialIssuer\nIdempotencyStore・ProjectionLock・ChangeNotifier] as Ports
 }
 
 package "domain（純粋）" {
@@ -63,14 +64,15 @@ package "domain（純粋）" {
   [値オブジェクト・Command・Event・DomainError] as VO
 }
 
-package "adapter-persistence（PostgreSQL / JDBC）" {
+package "adapter-persistence（JDBC。PostgreSQL 版と、ローカル用の H2 版）" {
   [EventStore の実装\n追記・版の一意制約] as ES
   [投影の書き込み（SQL）] as PW
   [問い合わせの実装（SQL・読み取り専用ロール）] as QR
-  [周辺ストア・冪等記録・NOTIFY] as Aux
+  [周辺ストア・冪等記録] as Aux
+  [ProjectionLock・ChangeNotifier\nPostgreSQL 版: アドバイザリロック・NOTIFY\nH2 版: プロセス内のロック・イベント] as Port2
 }
 
-database "PostgreSQL" as DB
+database "PostgreSQL 18\n（ローカルのみ H2）" as DB
 
 Routes --> Guard
 Routes --> Cmd
@@ -89,10 +91,12 @@ ES ..|> Ports
 PW ..|> Ports
 QR ..|> Ports
 Aux ..|> Ports
+Port2 ..|> Ports
 ES --> DB
 PW --> DB
 QR --> DB
 Aux --> DB
+Port2 --> DB
 @enduml
 ```
 
@@ -105,7 +109,7 @@ Aux --> DB
 | `domain` | 値オブジェクト、`Command`、`Event`、`DomainError`、`decide` / `evolve`、`startGame`、`simulateWeek`、`Disclosure`、`KitPreset`、投影の純粋関数、`RetentionSaga` の純粋関数。**業務ルールはここにある** | なし（Kotlin 標準ライブラリ、Arrow Core のみ） |
 | `application` | 関数の束（`Ports`）の型の定義、コマンド処理 `execute`、問い合わせ、競合の再試行、周辺ストアへの書き込み内容の導出（純粋）。トランザクションの境界を決める。**ルールは持たない** | `domain` |
 | `adapter-http` | Ktor のルート、DTO の検証（`Either` で誤りを集める）、認証、Origin 検査、レート制限、ヘッダー、SSE、エラーの写像 | `application`、`domain` |
-| `adapter-persistence` | JDBC による `EventStore`、投影の書き込み、問い合わせ、周辺ストア、冪等記録、NOTIFY、イベントの JSON 変換（`EventCodec`）、マイグレーション | `application`、`domain` |
+| `adapter-persistence` | JDBC による `EventStore`、投影の書き込み、問い合わせ、周辺ストア、冪等記録、`ProjectionLock` と `ChangeNotifier` の **PostgreSQL 版と H2 版**、イベントの JSON 変換（`EventCodec`）、マイグレーション（共通・PostgreSQL・H2 の場所） | `application`、`domain` |
 | `app` | 設定の読み込みと検証、関数の束の組み立て（ワイヤリング）、起動のモード（api、retention、migrate、rebuild-projections） | 全モジュール |
 
 この規則は、**Gradle のモジュール依存**（コンパイル時に import できない）と、**検査のルール**（detekt と PMD のカスタムルール。[ガイド §9.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）の二重で守ります。違反は、CI で失敗とします。
@@ -135,26 +139,55 @@ fun interface TransactionRunner {
 data class CommandOutcome(val versions: Versions)
 data class Versions(val game: StreamVersion?, val session: StreamVersion?)
 
-/** 追記と同じトランザクションで書く、イベント以外の行（投影、周辺ストア、冪等記録、通知） */
+/** 追記と同じトランザクションで書く、イベント以外の行（投影、周辺ストア、冪等記録） */
 data class SideStores(
     val project: suspend (Tx, GameId, List<EventEnvelope<DomainEvent>>) -> Either<PersistenceFailure, Unit>,
     val writePeripheral: suspend (Tx, List<PeripheralWrite>) -> Either<PersistenceFailure, Unit>,
     val findIdempotent: suspend (Tx, IdempotencyKey) -> Either<PersistenceFailure, StoredResponse?>,
     val saveIdempotent: suspend (Tx, IdempotencyKey, StoredResponse) -> Either<PersistenceFailure, Unit>,
-    val notify: suspend (Tx, List<VersionNotice>) -> Either<PersistenceFailure, Unit>,   // pg_notify。コミットで配信される
+)
+
+/**
+ * 投影の再構築との直列化（ゲーム単位）。PostgreSQL 固有のアドバイザリロックをポートの裏に隠す。
+ * 取るだけで、解放の関数は持たない（トランザクションの終了で、COMMIT・ROLLBACK のどちらでも自動で解放される）。
+ * 待ちが上限を超えたら Left(RetryExhausted)
+ */
+data class ProjectionLock(
+    val acquireShared: suspend (Tx, GameId) -> Either<AppFailure, Unit>,      // コマンド。共有どうしは待ち合わない
+    val acquireExclusive: suspend (Tx, GameId) -> Either<AppFailure, Unit>,   // 再構築。共有・排他のすべてを待つ
+)
+
+/**
+ * 版の通知（SSE の元）。PostgreSQL 固有の LISTEN/NOTIFY をポートの裏に隠す。
+ * publish は追記と同じトランザクションで呼び、コミットされたときだけ配信される（ロールバックでは配信されない）
+ */
+data class ChangeNotifier(
+    val publish: suspend (Tx, List<VersionNotice>) -> Either<PersistenceFailure, Unit>,
+    val subscribe: () -> Flow<VersionNotice>,        // 受信。切断からの再接続は実装が持つ
+    val isAlive: suspend () -> Boolean,              // /ready が見る（受信の接続が生きているか）
 )
 
 data class Ports(val now: Now, val newId: NewId, val issueCredential: IssueCredential,
-                 val events: EventStore, val side: SideStores)
+                 val events: EventStore, val side: SideStores,
+                 val lock: ProjectionLock, val notifier: ChangeNotifier)
 ```
+
+**`ProjectionLock` と `ChangeNotifier` は、PostgreSQL 版と H2 版の 2 実装を持ちます**（どちらも `adapter-persistence`。`app` が設定で選んで組み立てる）。
+
+| ポート | PostgreSQL 版（統合テスト・CI・ステージング・本番） | H2 版（ローカルのみ） | 契約テスト |
+| :--- | :--- | :--- | :--- |
+| `ProjectionLock` | `pg_advisory_xact_lock_shared`（共有）、`pg_advisory_xact_lock`（排他）。`lock_timeout` 超過（SQLSTATE 55P03）を `RetryExhausted` に写す | **プロセス内の読み書きロック**（ゲームごと。読み取り側が共有、書き込み側が排他）。トランザクションの終了のフックで解放。待ちには上限を置き、超えたら `RetryExhausted`。**単一プロセスでのみ有効（複数プロセスでは保証しない）** | 共有どうしは待ち合わない、排他は共有を待つ、トランザクションの終了で解放（ROLLBACK でも）、上限超過で `RetryExhausted` |
+| `ChangeNotifier` | `pg_notify` と、専用の LISTEN 接続（プールの外。1 タスクに 1 本）。NOTIFY の欠落は数秒ごとの照合で補う | **プロセス内のイベント**（`MutableSharedFlow`）。`publish` はトランザクションの COMMIT 後に配信し、ROLLBACK では捨てる。**単一プロセスでのみ有効** | コミットで配信、ロールバックでは配信されない、ゲームごとの絞り込み、購読の再接続 |
+
+契約テストは**同じ内容を両実装で実行**します（PostgreSQL 版は統合テスト、H2 版はユニットテスト。[テスト戦略](./test-strategy.md)）。契約を満たす範囲が、H2 版で保証する範囲のすべてです（H2 版は PostgreSQL の挙動の再現を目指さない）。
 
 **`EventStore.transaction` の意味論**は次のとおりです。
 
 | 項目 | 設計 |
 | :--- | :--- |
 | 原子性 | ブロックが `Left` を返したら **ROLLBACK**。追記と投影（周辺ストア・冪等記録・通知を含む）は、同じトランザクションで、全部成功か全部失敗のどちらか。投影が `Left` を返したら、追記も取り消される |
-| 分離レベル | **READ COMMITTED**。競合の検出は、分離レベルでなく `events` の一意制約（`uq_events_stream_version`）で行う |
-| ロック（再構築との同時実行） | コマンドのトランザクションは、`BEGIN` の直後に **`pg_advisory_xact_lock_shared(game_id)`** を取る（コマンドどうしは互いを待たない）。投影の再構築は排他の `pg_advisory_xact_lock(game_id)` を取り、コマンドと同時に走らない（下の「投影の更新と再構築」）。`game_id` は、UUID から導いた 64 ビット整数に写す（衝突は不要な待ちを生むだけで、整合性は損なわない）。トランザクションの終わりで自動的に解放される |
+| 分離レベル | **READ COMMITTED**。競合の検出は、分離レベルでなく `events` の一意制約（`uq_events_stream_version`）で行う。H2 版でも同じ指定をするが、H2 の PostgreSQL モードで同じ動作になるかは確認できなかった。分離レベルの検証は PostgreSQL の統合テストだけで行う |
+| ロック（再構築との同時実行） | コマンドのトランザクションは、`BEGIN` の直後に **`ProjectionLock.acquireShared(tx, gameId)`** を取る（コマンドどうしは互いを待たない）。投影の再構築は `acquireExclusive` を取り、コマンドと同時に走らない（下の「投影の更新と再構築」）。PostgreSQL 版の実体は `pg_advisory_xact_lock_shared(game_id)` / `pg_advisory_xact_lock(game_id)` で、`game_id` は UUID から導いた 64 ビット整数に写す（衝突は不要な待ちを生むだけで、整合性は損なわない）。H2 版はプロセス内の読み書きロック（単一プロセスのみ）。どちらも、トランザクションの終わりで自動的に解放される |
 | 再試行の対象 | `AppFailure.ConcurrencyConflict`。アダプターは、`uq_events_stream_version` の違反、SQLSTATE **40001**（直列化失敗）、**40P01**（デッドロック）をすべて `ConcurrencyConflict` に写す。`execute` が、読み込みからやり直す（上限つき） |
 | キャンセル | COMMIT と ROLLBACK は **`NonCancellable`** で行う。`CancellationException` は握りつぶさず、**再送出**する（`PersistenceFailure` に変えない）。クライアントの切断でコルーチンがキャンセルされても、トランザクションは必ず閉じる |
 
@@ -180,7 +213,8 @@ database "PostgreSQL" as DB
 P -> R : PUT /sessions/:id/decisions\n（Idempotency-Key、If-Match = 意思決定の版）
 R -> R : 認証（操作者・資格の有効性）-> Actor\n本文の検証（誤りを集める）-> SaveDecision
 R -> X : execute(command, key)
-X -> DB : BEGIN（READ COMMITTED）\npg_advisory_xact_lock_shared(game_id)
+X -> DB : BEGIN（READ COMMITTED）
+X -> X : ProjectionLock.acquireShared(tx, game_id)\n（PostgreSQL 版: アドバイザリロック。H2 版: プロセス内）
 X -> X : 認可の前提検査（ゲームの一致、資格の種別）
 X -> DB : 冪等記録を照合（同じキー・対象・操作者）
 alt 記録あり、要求のダイジェスト（本文・対象・操作者）が同じ
@@ -199,7 +233,8 @@ else 記録なし
     alt 違反（別のコマンドが先に追記）
       ES --> X : ConcurrencyConflict -> ROLLBACK し再試行
     else 成功
-      X -> DB : 投影を更新（追記の後）\n周辺ストア、冪等記録（成功の応答だけ）、pg_notify
+      X -> DB : 投影を更新（追記の後）\n周辺ストア、冪等記録（成功の応答だけ）
+      X -> X : ChangeNotifier.publish(tx, 版の通知)\n（コミットで配信。PostgreSQL 版: pg_notify）
       X -> DB : COMMIT
     end
   end
@@ -231,6 +266,7 @@ suspend fun <S, C, E> Ports.execute(
         events.transaction { tx ->
             either {
                 // 順序: 認証（ルートで済み）-> 認可の前提検査 -> 冪等記録の照合 -> 読み込み -> decide -> 追記・投影
+                lock.acquireShared(tx, stream.gameId).bind()                  // 再構築との直列化（ポート。待ちの上限超過は RetryExhausted）
                 ctx.authorizePrecheck(tx).bind()                              // 資格の有効性、ゲームの一致。無効なら Unauthorized（403）
                 side.findIdempotent(tx, ctx.key).mapLeft(AppFailure::Persistence).bind()
                     ?.let { return@either ctx.replayStored(it).bind() }       // 成功の応答だけが保存されている。digest（本文・対象・操作者）が違えば IdempotencyKeyReused
@@ -239,7 +275,7 @@ suspend fun <S, C, E> Ports.execute(
                 val decided = decide(state, command).mapLeft(AppFailure::Domain).bind()
                 events.append(tx, mapOf(stream.type to read.version), decided.toNew(ctx, read.version)).bind()
                 side.project(tx, stream.gameId, decided.enveloped(ctx, read.version)).mapLeft(AppFailure::Persistence).bind()
-                // 周辺ストアと通知も、同じ tx で書く（省略）。冪等記録は、成功の応答（versions）だけを保存する
+                // 周辺ストアも同じ tx で書き、通知は notifier.publish(tx, …) で積む（省略）。冪等記録は、成功の応答（versions）だけを保存する
                 // decide が Left のときは、冪等記録を書かない。ブロックが Left を返すので transaction が ROLLBACK する
                 val outcome = CommandOutcome(Versions(/* 追記したストリームの追記後の版 */))
                 side.saveIdempotent(tx, ctx.key, outcome.toStored()).mapLeft(AppFailure::Persistence).bind()
@@ -272,7 +308,7 @@ tailrec suspend fun <A> withAppendRetry(
 - 追記は **`decide` が空の列を返したときは行いません**（同じ役割への再割り当てなど）。冪等記録だけを書きます（このとき、同時の重複は `pk_idempotency_records` で検出します。下の冪等性の節）。
 - **自動確定のための特別な処理はありません。** `decideSession` が `DecisionSaved`（または `ProxyDecisionSubmitted`）と `WeekCommitted`（と `SessionEnded`）を 1 回の戻り値で返すため、`execute` から見ると、複数イベントの追記が 1 回あるだけです。手動と自動の確定が同時に起きても、2 回目は追記が版の違反となり、再試行後の `decide` が `WeekAdvanced` または `AlreadyEnded` を返します（確定は一度だけ）。
 - **投影は追記の後に更新します**（同じトランザクション）。追記で一意制約に負けたコマンドは、投影を更新する前に失敗するので、投影の書き込みどうしが競合しません。`game_overview` は `game` と `session` の両方のイベントから更新されるため、複数の投影の行を書くコマンドが並びうる点は、**ロックの順序の規則**で守ります（下の「投影の行のロックの順序」、設計判断 BD6）。イベントストアにはロックを使いません。
-- **コマンドは、トランザクションの先頭で `pg_advisory_xact_lock_shared(game_id)` を取ります**（再構築との同時実行の制御。M23）。取れるまでの待ちには上限（`lock_timeout`）を置き、超えたら `AppFailure.RetryExhausted`（503、`Retry-After`）を返します。上限の値と、再構築中のコマンドの応答（短く待つか、すぐ 503 を返すか）は未決事項です。
+- **コマンドは、トランザクションの先頭でポート `ProjectionLock.acquireShared` を取ります**（再構築との同時実行の制御。M23。PostgreSQL 版は `pg_advisory_xact_lock_shared(game_id)`）。取れるまでの待ちには上限（PostgreSQL 版は `lock_timeout`）を置き、超えたら `AppFailure.RetryExhausted`（503、`Retry-After`）を返します。上限の値と、再構築中のコマンドの応答（短く待つか、すぐ 503 を返すか）は未決事項です。
 
 ### 周辺ストアへの書き込み
 
@@ -318,6 +354,8 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 
 上の 3 つ以外の一意制約違反は、設計上起きないはずなので、**500 と相関 ID（ログ）**とします。
 
+**H2 版（ローカルのみ）では、`uq_idempotency_create`（部分一意索引）を省略します**（H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため）。代わりに、アプリケーション側で、挿入の前に `(scope, key_digest)` を検索して再照合します。ローカルでは、ゲーム作成の同時の重複は制約で守られません（[データモデル](./data-model.md)）。
+
 | 種類 | 発生源 | 扱い |
 | :--- | :--- | :--- |
 | `ConcurrencyConflict`（追記の版の違反）、SQLSTATE 40001・40P01 | `events` の一意制約、直列化失敗、デッドロック | **`execute` が自動で再試行する**（再読み込み -> 再評価）。上限は小さな固定回数で、実装開始時に競合の頻度を測って決める（[データモデル](./data-model.md)）。上限に達したら `AppFailure.RetryExhausted`（`code` = `app.retry_exhausted`、**503 と `Retry-After`**。利用者に操作し直しを促す） |
@@ -330,7 +368,7 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 
 ### 永続化の境界
 
-JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version` は `AppFailure.ConcurrencyConflict`、`uq_idempotency_create` と `pk_idempotency_records` は冪等記録の再照合、それ以外は `AppFailure.Persistence`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `AppFailure.ConcurrencyConflict` に写し、同じ再試行の対象にします。アドバイザリロックの待ちが `lock_timeout` を超えたとき（SQLSTATE 55P03）は `AppFailure.RetryExhausted` に写します。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `Persistence` に変えない）。
+JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version` は `AppFailure.ConcurrencyConflict`、`uq_idempotency_create` と `pk_idempotency_records` は冪等記録の再照合、それ以外は `AppFailure.Persistence`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `AppFailure.ConcurrencyConflict` に写し、同じ再試行の対象にします。アドバイザリロックの待ちが `lock_timeout` を超えたとき（SQLSTATE 55P03）は `AppFailure.RetryExhausted` に写します（これらの写像は PostgreSQL 版のアダプターのもの。H2 版は、SQLSTATE と制約名の取り出しを B1 の最初に実測して確定する。未確認）。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `Persistence` に変えない）。
 
 ## 問い合わせ側
 
@@ -351,7 +389,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 ### 投影の更新と再構築
 
 - 投影の更新は、`Projection`（純粋。`Event -> List<RowChange>`）と、SQL への書き込み（境界）に分けます。`RowChange` は、行の変更（Upsert / Delete と、表・主キー・値）です。**投影は他の投影を読まず、イベントのペイロードだけから行の変更を作る**ため、再構築の順序に依存しません。1 件の `WeekCommitted` が複数の表の変更を返せます。境界は、返された `RowChange` を同じトランザクションで適用します（[ドメインモデル](./domain-model.md)）。
-- 投影の再構築は、`app` の `rebuild-projections` モード（運用のタスク）で行います。**1 ゲームを 1 トランザクション**で、排他の `pg_advisory_xact_lock(game_id)` を取り、ゲームの投影の行を削除し、`events` を版の順に畳み込んで `RowChange` を適用し、`projection_checkpoints` を更新します。コマンドは共有のロックを取るので、**再構築と同時には走りません**（待つ）。問い合わせは REPEATABLE READ なので、置き換えが終わるまで古い行を読み、途中の状態を読みません。
+- 投影の再構築は、`app` の `rebuild-projections` モード（運用のタスク）で行います。**1 ゲームを 1 トランザクション**で、排他のロック（`ProjectionLock.acquireExclusive`。PostgreSQL 版は `pg_advisory_xact_lock(game_id)`）を取り、ゲームの投影の行を削除し、`events` を版の順に畳み込んで `RowChange` を適用し、`projection_checkpoints` を更新します。コマンドは共有のロックを取るので、**再構築と同時には走りません**（待つ）。問い合わせは REPEATABLE READ なので、置き換えが終わるまで古い行を読み、途中の状態を読みません（PostgreSQL の場合。H2 版では分離の動作を検証しない）。**H2 版のロックはプロセス内なので、`rebuild-projections` を API と別のプロセスで動かすと直列になりません**（ローカルでは API を止めてから再構築する）。
 - **研修中の運用**: 投影が不整合になったら、運用担当が運営者を通じて進行役に「停止」を依頼し、**停止中に再構築して再開**します。停止中でも追記を伴う操作（代理入力、資格の再発行、観察者の参加）は走りうるため、上のロールによって再構築と直列化します。これにより「研修中は再構築しない」という制約を外します（[運用要件](./operation.md) の手順 B-1 と障害パターン 13）。**暫定の決定で、人の確認が要ります。**
 
 #### 投影の行のロックの順序
@@ -467,7 +505,7 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 - SSE は、**版の通知だけ**を送ります（`state-version`。ストリームの種別 `game` / `session` と版）。内容は運びません。beer-game2 の設計（ADR-006）を引き継ぎます。
 - SSE は、**他の人の変更の通知**（と取得の補助）です。自分の保存の表示は、コマンドの応答の `versions` を受けて取得するスナップショットで行うため、SSE が切れていても出ます。
 - **再生（`Last-Event-ID`）は行いません。** 接続の開始と再接続のたびに、クライアントが現在のスナップショットを取得します。
-- 発信は、追記と**同じトランザクション**の `pg_notify`（ペイロードはゲーム ID、ストリームの種別、版だけ）。コミットされたときだけ配信されるため、**ロールバックされた通知は出ません**。
+- 発信は、追記と**同じトランザクション**で、ポート `ChangeNotifier.publish`（ペイロードはゲーム ID、ストリームの種別、版だけ）を呼びます。PostgreSQL 版の実体は `pg_notify` です。コミットされたときだけ配信されるため、**ロールバックされた通知は出ません**。H2 版（ローカルのみ）は**プロセス内のイベント**で、単一のプロセスでだけ有効です（複数のプロセスには届かない）。
 
 ```plantuml
 @startuml
@@ -475,14 +513,14 @@ title SSE の通知経路
 
 participant "execute\n（tx）" as X
 database "PostgreSQL" as DB
-participant "通知の受信\n（専用の接続・1 タスクに 1 本）" as L
+participant "ChangeNotifier.subscribe\n（PostgreSQL 版: 専用の接続・1 タスクに 1 本）" as L
 participant "SharedFlow\n（タスク内）" as F
 participant "SSE ルート\n（接続ごと）" as S
 actor "ブラウザ" as B
 
-X -> DB : pg_notify('game_events', {game, stream, version})
+X -> DB : ChangeNotifier.publish（PostgreSQL 版: pg_notify('game_events', {game, stream, version})）
 X -> DB : COMMIT
-DB -> L : 通知（コミット後）
+DB -> L : 通知（コミット後。H2 版はプロセス内のイベント）
 L -> F : emit(VersionNotice)
 F -> S : gameId で絞り込んで collect
 S -> B : event: state-version\ndata: {stream, version}
@@ -493,7 +531,7 @@ note over L : 数秒ごとの照合で、\nNOTIFY の欠落を補う
 
 | 項目 | 設計 |
 | :--- | :--- |
-| 受信 | `LISTEN` 専用の JDBC 接続を、1 タスクにつき 1 本、接続プールの外に持つ。受信ループは `Dispatchers.IO` 上のコルーチンで動かし、切断したら再接続して購読し直す |
+| 受信 | PostgreSQL 版: `LISTEN` 専用の JDBC 接続を、1 タスクにつき 1 本、接続プールの外に持つ。受信ループは `Dispatchers.IO` 上のコルーチンで動かし、切断したら再接続して購読し直す。H2 版: プロセス内の `SharedFlow` を購読する（接続を持たない） |
 | 配信 | 受信した通知を `MutableSharedFlow` へ流し、SSE の接続ごとに `gameId` で絞って送る（`Flow` は [ガイド §4.5](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**遅い接続のために全体を止めない**（バッファの上限と、あふれた接続の切断） |
 | 補完 | 購読中のゲームについて、数秒ごとに `projection_checkpoints` の版を照会し、通知より新しければ通知を出す。`NOTIFY` が失われても、また接続の切断中の追記があっても、収束する |
 | 認可 | 接続時に、ゲームに属する操作者であることを検査する。資格の失効・期限切れは、定期の照合で検出して切断する |
@@ -529,7 +567,7 @@ fun Ports.observed(log: (LogRecord) -> Unit, emit: (Metric) -> Unit, now: () -> 
 | エラー | 予期しないエラーは、スタックと相関 ID を含めて、必ず記録する。利用者へは、相関 ID だけを返す |
 | メトリクス | 応答時間（操作・結果別）、エラー率、`ConcurrencyConflict` の件数と再試行の回数、`DecisionConflict`、確定の方式（手動 / 自動）、**再生したイベント数と再生の所要時間**（スナップショットの要否の判断材料）、投影の更新時間、SSE の接続数、通知の遅延、接続プールの使用状況、JVM のヒープと GC の停止時間、削除の経過時間。CloudWatch の Embedded Metric Format の JSON 行を標準出力へ出す（追加のサーバーを持たない。beer-game2 と同じ） |
 | 追跡 | 相関 ID を、HTTP、コマンド（`correlationId`）、イベントの封筒、SSE の通知、ログに伝える。コルーチンをまたぐ伝播は、コルーチンのコンテキストで行う |
-| ヘルスチェック | `GET /health`（生存）と `GET /ready`（`SELECT 1`、接続プールの取得、**通知の受信の接続が生きていること**）。負荷分散には `/ready` を使う |
+| ヘルスチェック | `GET /health`（生存）と `GET /ready`（`SELECT 1`、接続プールの取得、**通知の受信が生きていること**＝`ChangeNotifier.isAlive`。PostgreSQL 版は LISTEN の接続）。負荷分散には `/ready` を使う |
 | 不変条件の監視 | `projection_checkpoints.projected_version` と `MAX(stream_version)` の不一致、週確定の重複、`credentials` と資格のイベントの不一致、**投影の整合**（`fold(evolve)` の結果と投影の行の一致。日次）を、定期の検査でメトリクスとアラートにする |
 
 ## セキュリティ
@@ -545,8 +583,50 @@ beer-game2 の設計を引き継ぎ、Kotlin 版での実現方法を加えま�
 | レート制限 | 全体に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8） |
 | ヘッダー | CSP、HSTS、`nosniff`、Referrer-Policy を、すべての応答に付ける（Ktor のプラグインまたは自前のインターセプタ）。CloudFront のレスポンスヘッダーポリシーとの二重化は許容する |
 | 秘匿 | 表示名と資格は、イベント、ログ、出力、通知に含めない（NF-S14）。型（`Secret<A>`、`LogRecord`、イベントの DTO）で守る |
-| データベースのロール | 用途別に分ける: **書き込み**（`events` は INSERT / SELECT のみ。投影と周辺ストアの書き込み）、**読み取り**（投影の SELECT）、**観察者の読み取り**（`game_overview`、`session_overview`、`week_team_totals` の SELECT だけ。`game_join_codes` は含まない）、**削除**（保持削除）、**所有者**（マイグレーションだけ）。生の認証情報は Secrets Manager から注入する |
+| データベースのロール | 用途別に分ける: **書き込み**（`events` は INSERT / SELECT のみ。投影と周辺ストアの書き込み）、**読み取り**（投影の SELECT）、**観察者の読み取り**（`game_overview`、`session_overview`、`week_team_totals` の SELECT だけ。`game_join_codes` は含まない）、**削除**（保持削除）、**所有者**（マイグレーションだけ）。生の認証情報は Secrets Manager から注入する。**ロールと GRANT は PostgreSQL の統合テストでだけ検証する。H2 版（ローカル）は単一の接続ユーザーで、ロールの分離・追記専用・プールの分離は守られない** |
 | 依存関係 | CI で、依存関係の脆弱性と秘密情報を検査する（ツールは [インフラストラクチャ](./architecture-infrastructure.md) に記載） |
+
+## ローカル開発（H2）と実行の選択
+
+ユーザーの決定（2026-11-14）により、**開発機でのローカル開発（起動と動作確認）だけ**、H2 の PostgreSQL モードで動かせます（[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、提案中）。Docker や PostgreSQL がなくても起動できることが目的で、**設計の検証や性能の計測には使いません**。統合テスト、受け入れ（Cucumber の `@api`）、CI、ステージング、本番は PostgreSQL 18 です。方言の差分と、H2 版で省略する制約の一覧は [データモデル](./data-model.md) が正本です。
+
+**2 つのポートで、PostgreSQL 固有の機能を隠します。**
+
+| PostgreSQL 固有の機能 | ポート | H2 版の実体 |
+| :--- | :--- | :--- |
+| アドバイザリロック（投影の再構築との直列化） | `ProjectionLock` | プロセス内の読み書きロック（単一プロセスのみ） |
+| LISTEN/NOTIFY（SSE の版の通知） | `ChangeNotifier` | プロセス内のイベント（単一プロセスのみ） |
+
+部分一意索引 `uq_idempotency_create`、DB ロールと GRANT（追記専用、`TRUNCATE` の拒否）、接続プールの分離、`jsonb` などは、ポートにせず、**PostgreSQL の統合テストでだけ検証**します。H2 版では、H2 で表せる形（通常の一意制約、アプリケーション側の検査）に置き換えるか、省略します。**省略した制約は、ローカルでは守られません。**
+
+**実行の選択は、設定（プロファイル）で行います。**
+
+| 設定 | 値 | 意味 |
+| :--- | :--- | :--- |
+| `DB_KIND` | `postgres`（既定）、`h2` | `app` がワイヤリングで、`EventStore` の接続、`ProjectionLock`、`ChangeNotifier`、マイグレーションの場所（共通 + 各方言）を選ぶ |
+| `APP_ENV` | `local`、`test`、`staging`、`production` | 実行の環境。必須（未設定は起動の失敗） |
+
+名前は提案です（環境変数の正本は [インフラストラクチャ](./architecture-infrastructure.md)）。
+
+**本番・ステージングで H2 が選ばれないようにします（起動時の検査）。** `AppConfig.load` が、他の項目の検査と一緒に誤りを集めます（[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。**許可リスト方式**で、`DB_KIND=h2` を許すのは `APP_ENV=local` のときだけです（`test`・`staging`・`production` と、未設定・未知の値は拒否）。拒否のときは `Left`（例 `ConfigError.H2NotAllowed(env)`）を返し、プロセスは**起動に失敗して終了**します。
+
+```kotlin
+/** 純粋な検証。H2 は APP_ENV=local のときだけ許す（拒否は起動の失敗） */
+fun validateDbKind(env: AppEnv?, kind: DbKind): Either<ConfigError, DbKind> = when (kind) {
+    DbKind.Postgres -> kind.right()
+    DbKind.H2 -> if (env == AppEnv.Local) kind.right() else ConfigError.H2NotAllowed(env).left()
+}
+```
+
+- 検査は、`AppConfig.load` の単体テスト（`APP_ENV` × `DB_KIND` の全組み合わせ）で守ります。
+- 多層の防御として、ステージング・本番の配備の定義（インフラストラクチャ）では `DB_KIND=postgres` を固定し、本番のイメージには H2 のドライバを含めない案を検討します（[インフラストラクチャ](./architecture-infrastructure.md)、[技術スタック](./tech-stack.md)。H2 は `com.h2database:h2`、開発用の依存。導入は承認待ち）。
+- 起動時に、選ばれた `DB_KIND` と `APP_ENV` をログに出します（H2 のときは警告のレベル）。
+
+**単一プロセスの制約。** H2 版の `ProjectionLock` と `ChangeNotifier` は、1 つのプロセスの中でだけ有効です。複数のプロセス（API を 2 つ、API と `rebuild-projections` など）では、再構築との直列化も SSE の通知も保証しません。ローカルは 1 プロセスで使う前提です。
+
+**乖離のリスクと対策。** ローカルで通っても、CI で落ちる乖離が起きえます。(a) **H2 でしか通らない記述を禁止**する（PostgreSQL の統合テストが正。H2 のために共通の DDL や SQL を曲げず、通らない文は方言ごとの場所へ分ける）。(b) **ポートの契約テストを両実装で実行**する（PostgreSQL 版は統合テスト、H2 版はユニットテスト）。(c) **受け入れ（Cucumber の `@api`）は PostgreSQL で実行**する。
+
+**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**（「非対応」と断定するものではありません）。実際の動作は、**B1 の最初に実測して確定します（未確認）**。H2 の版は実装開始時に確認します。
 
 ## モジュール構成と依存の検査
 
@@ -559,8 +639,8 @@ apps/beer-game-kotlin/
 ├── application/                      （Ports、execute、問い合わせ、再試行）
 ├── adapter-http/                     （Ktor のルート、検証、認証、SSE、エラーの写像）
 │   └── src/main/kotlin/.../{routes,security,sse,problem}/
-├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、マイグレーション）
-│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。001〜006。導入は承認待ち）
+├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
+│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。common/001〜006、postgres/101〜、h2/201〜。配置は B1 で確定。導入は承認待ち）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
 ├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う）
@@ -586,11 +666,11 @@ apps/beer-game-kotlin/
 | 性能 | 1 ストリームの再生は千件前後。スナップショットなしで足りるかを、再生時間のメトリクスと負荷試験で確認する（NFR-03） |
 | 保守性 | モジュールの依存と関数型の規約を CI で守る。ルールは `decide` に集める。ルートを機能別に分ける |
 | 観測性 | 合成による構造化ログとメトリクス、相関 ID、準備のヘルスチェック、不変条件の監視 |
-| テスト容易性 | ドメインは純粋で、入力と出力だけでテストする。`Ports` を同じ型の関数に差し替え、インメモリの `EventStore` でアプリケーション層をテストする。永続化と並行性は実際の PostgreSQL で検証する（[ガイド 第 8 章](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| テスト容易性 | ドメインは純粋で、入力と出力だけでテストする。`Ports` を同じ型の関数に差し替え、インメモリの `EventStore` でアプリケーション層をテストする。永続化と並行性は実際の PostgreSQL で検証する（ローカルの H2 は検証に使わない。ポートの契約テストは両実装で実行する）（[ガイド 第 8 章](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 
 ## テスト戦略との対応
 
-ドメインは、既知の系列の golden test と性質テスト（在庫・受注残が非負、計算と事実の一致、イベントの往復）で網羅します（[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。コマンド処理は、インメモリの `EventStore` と固定の時計・ID で、ルートは Ktor のテスト用のホスト、永続化と並行性（共同担当の競合、自動確定と手動確定の競合、複数プロセス、`events` の追記専用の権限と否定テスト、永続化往復の同値性、観察者の接続プールの配線、連鎖削除の網羅）は、PostgreSQL 18 の実物で確認します。詳細は [テスト戦略](./test-strategy.md) を参照してください。
+ドメインは、既知の系列の golden test と性質テスト（在庫・受注残が非負、計算と事実の一致、イベントの往復）で網羅します（[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。コマンド処理は、インメモリの `EventStore` と固定の時計・ID で、ルートは Ktor のテスト用のホスト、永続化と並行性（共同担当の競合、自動確定と手動確定の競合、複数プロセス、`events` の追記専用の権限と否定テスト、永続化往復の同値性、観察者の接続プールの配線、連鎖削除の網羅）は、PostgreSQL 18 の実物で確認します（H2 は使いません）。`ProjectionLock` と `ChangeNotifier` の契約テストは、PostgreSQL 版（統合テスト）と H2 版（ユニットテスト）の両方で実行します。受け入れ（Cucumber の `@api`）と CI は PostgreSQL です。詳細は [テスト戦略](./test-strategy.md) を参照してください。
 
 ## beer-game2 からの変更
 
@@ -620,6 +700,9 @@ apps/beer-game-kotlin/
 | 22 | 投影の再構築の同時実行制御は未決 | コマンドは `pg_advisory_xact_lock_shared(game_id)`、再構築は排他の `pg_advisory_xact_lock(game_id)`。研修中は停止して再構築 | 「研修中は再構築しない」の制約を外す（M23。暫定） |
 | 23 | 投影は `Projection<Row>` の `apply(row, event)` | `Event -> List<RowChange>`。他の投影を読まない | 再構築の順序に依存しない（M12） |
 | 24 | Fastify の JSON 処理、node-pg-migrate、Pino、Fastify の SSE | kotlinx.serialization と `EventCodec`、Flyway（導入は承認待ち）、Logback、`ktor-server-sse`、手書きの OpenAPI | 未決の取り残しの解消（M16） |
+| 25 | PostgreSQL 固有の機能（アドバイザリロック、`pg_notify`）を直接使う | ポート `ProjectionLock`・`ChangeNotifier` の裏に隠し、PostgreSQL 版と H2 版の 2 実装。契約テストは両実装で実行 | ローカル開発に H2 を使えるようにする（ユーザーの決定、2026-11-14。ADR-014） |
+| 26 | データベースは PostgreSQL だけ。実行の選択の設定なし | `DB_KIND=postgres\|h2`（`APP_ENV` と合わせて）。H2 は `APP_ENV=local` のときだけ許し、それ以外は起動に失敗する | 本番・ステージングで H2 が選ばれないようにする |
+| 27 | DB のロール、追記専用、部分一意索引は常に効く | PostgreSQL の統合テストでだけ検証。H2 版（ローカル）では省略し、守られない | H2 で確認できない機能の扱い |
 
 ## 設計判断
 
@@ -711,6 +794,18 @@ apps/beer-game-kotlin/
 | **A（採用）** | 認可の前提検査の後に照合。digest に操作者の ID を含める。保存は成功の応答だけ | 失効した資格の再送は 403。失敗は再計算するため、状態の変化に追随する。失敗の再計算のコストは小さい |
 | B | 照合を最初に行い、失敗も保存する | 同じ応答を返せる。失効した旧担当者に、保存済みの応答（資格の生の値）が返りうる |
 
+### BD12: ローカル開発のデータベースと、PostgreSQL 固有機能の扱い
+
+ユーザーの決定（2026-11-14）です。代替案は、決定の前提となる比較として記録します（[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)）。
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用、ユーザーの決定）** | ローカル開発だけ H2 の PostgreSQL モード。PostgreSQL 固有の機能（アドバイザリロック、LISTEN/NOTIFY）はポートの裏に隠して 2 実装。それ以外（部分一意索引、ロール、プール分離、`jsonb`）は PostgreSQL の統合テストでだけ検証し、H2 版では置き換えか省略 | Docker 不要で起動できる。ポートの契約テストを両実装で実行できる。ローカルでは省略した制約が守られず、CI で初めて落ちる乖離がありうる（対策は上の節） |
+| B | ローカルも PostgreSQL（Docker で起動） | 本番と同じで乖離がない。Docker が必要で、起動が重い |
+| C | H2 を統合テストにも使う | 速い。並行性・権限・部分一意索引・連鎖削除を検証できず、設計の検証が弱くなる（採用しない） |
+
+トレードオフ: A は、開発の手軽さと引き換えに、ローカルで守られない制約を持ちます。H2 を検証に使わない規則と、PostgreSQL の統合テスト・CI・受け入れが正であることで、リスクを抑えます。
+
 ## 前提と見直しの条件
 
 - スナップショットを導入する条件: 再生の所要時間が NFR-03（入力確定の 95 パーセンタイルを 1 秒以内）の予算を圧迫すると、**実測で分かった場合**だけ（[データモデル](./data-model.md)）。
@@ -735,6 +830,8 @@ apps/beer-game-kotlin/
 - 資格のダイジェストの方式（HMAC の方式と鍵の導出）と、応答の暗号化の方式（ADR にする）。
 - 設定の上限（数量、遅延、本文のサイズ）の値と、検査の方法（beer-game2 から継続）。
 - `events` に UPDATE / DELETE を与えないロールでも、連鎖削除が動くことの確認（[データモデル](./data-model.md) から継続）。
+- **H2 の PostgreSQL モードで動く範囲の実測（B1 の最初）**: 共通の DDL、`jsonb` 相当の型、制約名の取り出し、SQLSTATE、分離レベル、`ON DELETE CASCADE`、部分インデックスの可否。結果で、H2 版の省略の一覧とマイグレーションの配置を確定する（[データモデル](./data-model.md)）。H2 の版の確認と `com.h2database:h2` の導入は承認待ち。
+- `APP_ENV`・`DB_KIND` の名前と、ステージング・本番の配備での固定の方法、本番のイメージに H2 のドライバを含めない構成（[インフラストラクチャ](./architecture-infrastructure.md)、[技術スタック](./tech-stack.md) の担当と整合する）。
 
 ## 出典
 
@@ -742,4 +839,5 @@ apps/beer-game-kotlin/
 - [beer-game2 のバックエンドアーキテクチャ](../beer-game2/architecture-backend.md)
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 3 章（型で表すエラー）、第 4 章（副作用の管理）、第 7 章（アーキテクチャ）、第 8 章（テスト戦略）、第 9 章（静的解析）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
+- [ADR-014 ローカル開発に H2（PostgreSQL モード）を使う](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、[H2 公式ドキュメント（features）](https://h2database.com/html/features.html)（2026-11-14 確認）
 - [ADR-003](../../adr/beer-game2/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game2/006-sse-version-only.md)、[007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game2/009-credential-key-versions.md)

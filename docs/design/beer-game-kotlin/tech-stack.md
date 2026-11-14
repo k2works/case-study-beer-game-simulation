@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -20,6 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 - **バージョンとサポート期限は、2026-11-14 に公式の情報源で確認できた値だけ**を書く。確認できなかったものは「実装開始時に確認」とする。
 - 版は、実装の開始時に、最新の安定版へ更新して固定する（Gradle の依存関係ロックまたはバージョンカタログ）。
 - 新しく導入する依存関係は、**導入時に承認を得る**（プロジェクトの規約）。
+- **ローカル開発（開発機での起動・動作確認）だけ H2 の PostgreSQL モードを使う**（ユーザーの決定、2026-11-14。設計判断 T7）。統合テスト、CI、ステージング、本番は PostgreSQL 18 のままにする。
 
 ### 確認の方法と範囲
 
@@ -30,6 +31,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 | Cucumber-JVM、PMD の最新の安定版 | Maven Central の `maven-metadata.xml`（`io.cucumber:cucumber-java`、`cucumber-junit-platform-engine`、`net.sourceforge.pmd:pmd-core`、`pmd-kotlin`） | 2026-11-14 |
 | Cucumber-JS（`@cucumber/cucumber`）の最新の安定版と要求する Node | npm レジストリ（`registry.npmjs.org/@cucumber/cucumber`） | 2026-11-14 |
 | PMD の公開日 | GitHub の PMD のリリース（`pmd/pmd`。`pmd_releases/7.29.0`） | 2026-11-14 |
+| H2 の最新の版と公開日、ライセンス | Maven Central の `com/h2database/h2/maven-metadata.xml`（`<release>`、`lastUpdated`）、ディレクトリ一覧の更新日、`h2-2.5.252.pom` の `<licenses>` | 2026-11-14 |
+| H2 の PostgreSQL モードの記述 | H2 公式ドキュメントの features の PostgreSQL 互換モード（`h2database.com/html/features.html`） | 2026-11-14 |
 | Ktor の SSE とレート制限のプラグイン名 | Ktor 公式ドキュメント（`ktor.io/docs`。Ktor 3.6.1 の版を表示） | 2026-11-14 |
 | フロントエンド・インフラ・CI | beer-game2 の技術スタックが 2026-11-09 に確認した値を**そのまま引き継ぐ**。本書では再確認していない | 2026-11-09（beer-game2） |
 
@@ -67,6 +70,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 | 17 | PMD（XPath のカスタムルール。CI のツール） | `net.sourceforge.pmd:pmd-core` と `pmd-kotlin` の最新は **7.29.0**（Maven Central の更新は 2026-10-30。GitHub のリリース `pmd_releases/7.29.0` の公開は 2026-10-30）。サポート期限は、公式に公表された表を確認できていない | **7.29.0**（ガイド §9.6 が確認した版と同じ。fixture で 17 件になる）。Kotlin 2.4 の構文の解析の可否は**未確認**で、B2 の受入条件。**導入は承認待ち**（設計判断 T5。補完として採用） |
 | 18 | Cucumber-JVM | `io.cucumber:cucumber-java` と `cucumber-junit-platform-engine` の最新は **8.0.4**（Maven Central の更新は 2026-10-02）。サポート期限は、公式に公表された表を確認できていない | **8.0.4**。導入は決定済み。**版の確認と依存関係の承認が要る**。Kotlin のステップ定義を `cucumber-java` で書けるか、JUnit Platform（Kotest 6.2.7 が要求する版。`junit-platform-suite` の最新は 6.1.3）との組み合わせは、**実装開始時（B1）にビルドで確認** |
 | 19 | Cucumber-JS（`@cucumber/cucumber`） | 最新は **13.3.0**（npm の公開は 2026-10-05）。要求する Node は `22 \|\| 24 \|\| >=26` で、**Node 26 LTS（事項 16）を満たす**。サポート期限は、公式に公表された表を確認できていない | **13.3.0**。導入は決定済み。**版の確認と依存関係の承認が要る**。パッケージは `@cucumber/cucumber`（旧 `cucumber` ではない）。Playwright（1.65.0。beer-game2 の確認値）との組み合わせは、B1 で確認 |
+| 20 | H2（ローカル開発用の DB。`com.h2database:h2`） | 最新の安定版は **2.5.252**（Maven Central の `<release>`。ファイルの公開は 2026-09-26）。ライセンスは pom に **MPL 2.0 と EPL 1.0** の記載。**サポート期限（EOL）は、公式に公表された表を確認できていない**。H2 公式ドキュメント（features）の PostgreSQL 互換モードの節は、接続 URL（`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH`）と、挙動の差（別名の列名、浮動小数点から整数への丸め、`ctid`・`oid` など）を記す。**アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベルの差異は、この節で確認できなかった**（「非対応」とは断定しない）。実際の動作は **B1 の最初に実測して確定する**（未確認） | **2.5.252** を第一候補（**ローカル開発だけ**。設計判断 T7）。JDK 25 での動作と Flyway 13.12.2 との組み合わせは、実装開始時（B1 の最初）に確認。**導入は承認待ち** |
 
 ## バックエンド
 
@@ -82,6 +86,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 | シリアライズ | kotlinx.serialization（`kotlinx-serialization-json`） | **1.13.0** | zod（検証） | API の JSON と、イベントの `payload`（`event_type` を判別子にした sealed の多相）。**変換は `EventCodec`、アップキャストは `adapter-persistence`**（決定済み） | - |
 | 入力検証 | 自前のスマートコンストラクタ + Arrow の `zipOrAccumulate` | Arrow に含む | zod 4.6.7 | 境界の検証、誤りを集める（[ドメインモデル](./domain-model.md)） | - |
 | DB ドライバ | PostgreSQL JDBC（`org.postgresql:postgresql`） | **42.7.14** | pg 8.23.1 | PostgreSQL への接続 | - |
+| DB ドライバ（ローカル開発のみ） | H2（`com.h2database:h2`）。**開発用。導入は承認待ち** | **2.5.252**（第一候補。確認日 2026-11-14） | なし | 開発機で Docker なしに起動するための DB（PostgreSQL モード）。本番・ステージング・CI・統合テストでは使わない（設計判断 T7）。実行時の依存関係は開発用の構成に限り、本番のイメージに含めない | 公式の期限は確認できていない |
 | 接続プール | HikariCP | **7.1.0** | pg の Pool | 接続の再利用、上限、待ち時間の計測 | - |
 | マイグレーション | Flyway（`flyway-core`、PostgreSQL 用モジュール）。**選定済み、導入は承認待ち** | **13.12.2** | node-pg-migrate 9.0.0 | 番号つきの SQL マイグレーションと履歴 | - |
 | ログ | SLF4J + Logback Classic（**選定済み、導入は承認待ち**）、アプリのログは `LogRecord` の JSON を標準出力へ | Logback **1.6.6** | Pino | 構造化ログ。`LogRecord` に表示名・資格の項目を**持たせない**（型で漏れを防ぐ。[ガイド §7.7](../../reference/関数型プログラミングガイド_Kotlin編.md)） | - |
@@ -104,12 +109,13 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 
 | カテゴリ | 技術 | 版 | beer-game2 | 用途 | サポート期限 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| RDBMS | PostgreSQL | **18**（RDS、Docker、CI を統一） | 18 | **イベントストア**、投影、周辺ストア、保持削除の状態 | 2030-11-14（RDS の標準サポートは 2031-02-28。beer-game2 の確認値） |
+| RDBMS | PostgreSQL | **18**（RDS、CI、統合テスト、ステージング、本番。ローカル開発だけ下の H2 を選べる） | 18 | **イベントストア**、投影、周辺ストア、保持削除の状態 | 2030-11-14（RDS の標準サポートは 2031-02-28。beer-game2 の確認値） |
 | スキーマ管理 | Flyway | 13.12.2 | node-pg-migrate | 履歴テーブルで管理。拡張 → 互換 → 縮小 | - |
 | ORM | なし | - | なし | 直接の SQL（JDBC） | - |
 | イベントのペイロード | `jsonb` + kotlinx.serialization | - | `jsonb` | `schema_version` とアップキャスト（[データモデル](./data-model.md)） | - |
+| ローカル開発用 DB | H2（PostgreSQL モード） | **2.5.252**（第一候補） | なし | **開発機での起動・動作確認だけ**。PostgreSQL 固有の機能は、ポート（`ProjectionLock`、`ChangeNotifier`）の H2 版で代える。省略した制約はローカルで守られない（[データモデル](./data-model.md)、[バックエンド](./architecture-backend.md)） | 公式の期限は確認できていない |
 
-イベントストアの専用製品（EventStoreDB など）は、**導入しません**（設計判断 T1）。
+イベントストアの専用製品（EventStoreDB など）は、**導入しません**（設計判断 T1）。**H2 は、統合テスト・CI・ステージング・本番に使いません**（設計判断 T7）。
 
 ## フロントエンド
 
@@ -161,7 +167,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 | カテゴリ | 技術 | Kotlin 版での扱い |
 | :--- | :--- | :--- |
 | クラウド | AWS（ap-northeast-1） | 同左 |
-| コンテナ | Docker | ビルドは Gradle の**マルチステージ**。実行イメージは JDK 25 の JRE を含むもの（イメージの名前とタグは**実装開始時に確認**）。ローカルの DB は `postgres:18-alpine`（beer-game2 の確認値） |
+| コンテナ | Docker | ビルドは Gradle の**マルチステージ**。実行イメージは JDK 25 の JRE を含むもの（イメージの名前とタグは**実装開始時に確認**）。ローカルの DB は **H2 の PostgreSQL モード（Docker 不要。設計判断 T7）**。PostgreSQL を使うローカルの確認（統合テスト、受け入れ）は `postgres:18-alpine`（beer-game2 の確認値）か Testcontainers |
 | 実行基盤 | ECS Fargate | JVM のヒープと、タスクのメモリの割り当ては [非機能要件](./non-functional.md) の NF-P17 で実測して決める |
 | データベース | RDS for PostgreSQL 18（Multi-AZ、PITR） | 同左 |
 | 配信・観測・IaC・CI | CloudFront、S3、ALB、CloudWatch、Terraform、GitHub Actions | 同左。CI のビルドは Gradle（`./gradlew check`）。詳細は [インフラ](./architecture-infrastructure.md)、[運用要件](./operation.md) |
@@ -170,7 +176,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 
 ## 新しく導入する依存関係（導入時に承認を得る）
 
-beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）に、**Cucumber（導入は決定済み。版の確認と承認が要る）と PMD（承認待ち）**を加えた行は、承認待ちです。
+beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）に、**Cucumber（導入は決定済み。版の確認と承認が要る）と PMD（承認待ち）**に、**H2（ローカル開発用。次表の最終行近く）**を加えた行は、承認待ちです。
 
 | 依存関係 | 用途 | 代替（導入しない場合） | 導入の判断 |
 | :--- | :--- | :--- | :--- |
@@ -188,6 +194,7 @@ beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き
 | PMD（`pmd-core`、`pmd-kotlin` 7.29.0。XPath のカスタムルール） | detekt に無い関数型の規約の補完（14 個の関数型ルール）。CI のツールで、実行時の依存関係ではない | 自作の検査、detekt のカスタムルール（別途ビルドが要る） | **承認待ち**（開発戦略が採用を提案）。承認までは detekt と ktlint で進め、B2 で fixture のテストと合わせて導入する |
 | Cucumber-JVM（`cucumber-java`、`cucumber-junit-platform-engine` 8.0.4） | `@api` の受入条件の自動実行（日本語 Gherkin） | Kotest だけで受入条件を表す（導入しないという案は、ユーザーが 2026-11-14 に却下） | **導入は決定済み。版の確認は済み（8.0.4）。依存関係の導入の承認が要る**（B1）。開発依存のみ |
 | Cucumber-JS（`@cucumber/cucumber` 13.3.0） | `@ui` の受入条件の自動実行（Playwright と組み合わせる） | 同上 | **導入は決定済み。版の確認は済み（13.3.0）。依存関係の導入の承認が要る**（B1）。開発依存のみ。プロジェクトの依存として入れる（グローバルにインストールしない） |
+| H2（`com.h2database:h2` 2.5.252。ローカル開発用） | 開発機で Docker なしに起動する DB（PostgreSQL モード）。**開発用の構成だけ**に含め、本番のイメージに入れない | ローカルも Docker の PostgreSQL 18 を使う（beer-game2 と同じ。Docker が要る） | **承認待ち**（ユーザーの決定。導入の承認が要る。ライセンスは pom に MPL 2.0 と EPL 1.0 の記載。実装開始時にプロジェクトの方針と照合する）。**統合テスト・CI・受け入れ・ステージング・本番には使わない**（設計判断 T7）。B1 の最初に、PostgreSQL モードで動く範囲を実測する |
 | 変異テストの道具、Gradle の依存関係の検査 | テストの強さ、脆弱性 | なし（**選定未決**） | **実装開始時に選定し、あらためて承認を得る** |
 
 ## 設計判断
@@ -261,6 +268,18 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 
 トレードオフ: 計測できる指標が beer-game2 の 4 種（行・関数・文・分岐）と異なるため、ゲートの指標を見直した（[テスト戦略](./test-strategy.md)）。
 
+### T7: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-14）
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | **ローカル開発（開発機での起動・動作確認）だけ**、H2 の PostgreSQL モード。統合テスト、CI、ステージング、本番は PostgreSQL 18（Testcontainers、RDS）のまま。PostgreSQL 固有の機能（アドバイザリロック、LISTEN/NOTIFY）はポート（`ProjectionLock`、`ChangeNotifier`）の裏に置き、PostgreSQL 版と H2 版を持つ。部分一意索引、DB ロールと GRANT、接続プールの分離、`jsonb` は PostgreSQL の統合テストでだけ検証する。H2 版のマイグレーションは Flyway のベンダー別の場所で、共通部分を最大化し差分だけを分ける（配置は B1 で確定） | Docker なしで起動でき、開発の初動が軽い。ただし、**H2 版では、省略した制約がローカルで守られず、単一プロセスの制約（プロセス内のロックとイベント）がある**。ローカルで通っても CI で落ちる乖離が起きうる |
+| B | ローカルも Docker の PostgreSQL 18（beer-game2 と同じ） | 環境が本番と同じで乖離がない。Docker が要る |
+| C | H2 を統合テストにも使う | テストが速い。並行性・権限・部分一意索引・連鎖削除という設計の中核を検証できない。**却下**（設計の検証に H2 を使わない） |
+
+トレードオフ: A は、開発の手軽さと引き換えに、ローカルと CI の乖離のリスクを持つ。対策は、(a) H2 でしか通らない記述を禁止し、PostgreSQL の統合テストを正とする、(b) ポートの契約テストを両実装で実行する（PostgreSQL 版は統合テスト、H2 版はユニット）、(c) 受け入れ（Cucumber の `@api`）は PostgreSQL で実行する。
+
+**選択と安全策**: 実行する DB は、設定（プロファイル。例: `DB_KIND=postgres|h2`）で選ぶ。**本番・ステージングで H2 が選ばれないよう、起動時の検査で、本番・ステージングの環境では H2 を拒否し、起動に失敗する**（[インフラ](./architecture-infrastructure.md)）。H2 の版（2.5.252）は 2026-11-14 に Maven Central で確認した値で、公式のサポート期限は確認できていない。PostgreSQL モードで動く機能の範囲は、公式ドキュメントでは確認できなかったため、**B1 の最初に実測して確定する**。
+
 ## beer-game2 からの変更
 
 | # | beer-game2 | beer-game-kotlin | 理由 |
@@ -282,6 +301,7 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 15 | （該当なし。Node の期限を使っていた） | JDK 25 の EOL は Temurin の値（2031-09-30）に統一 | 使う配布の値（M17） |
 | 16 | 受入は、Vitest と Playwright のテスト | 受入条件・デモ項目は日本語 Gherkin。バックエンドは Cucumber-JVM（`@api`）、画面は Cucumber-JS + Playwright（`@ui`）。純粋関数・性質・DB/HTTP の細部は Kotest の Given/When/Then | 2026-11-14 の決定。チームの規約（Given/When/Then を先に定義）を、業務の言葉の契約として実行できる形にする。生きたドキュメントは CI で自動公開 |
 | 17 | ESLint の警告は許容する運用もありうる | 静的解析は厳格に適用（違反 0 件、ベースラインなし、`@Suppress` なし）。PMD の XPath を補完として採用（導入は承認待ち）。層ごとにルールセットを分ける | 2026-11-14 の決定。AI が大量にコードを生成するため、規約違反を機械で守らせる（開発戦略） |
+| 18 | ローカルの DB は Docker の PostgreSQL 18 | ローカル開発（起動・動作確認）だけ H2 の PostgreSQL モード（2.5.252 を第一候補。導入は承認待ち）。統合テスト・CI・ステージング・本番は PostgreSQL 18 のまま。PostgreSQL 固有の機能はポートの裏に置き、H2 版を持つ。本番・ステージングでは H2 を拒否 | ユーザーの決定（2026-11-14）。設計判断 T7 |
 
 ## アップグレード計画
 
@@ -305,6 +325,7 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 - フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）と、Cucumber のステップ定義の置き場（B1）。
 - Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
 - **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。
+- **H2（設計判断 T7）**: 導入の承認待ち。H2 の PostgreSQL モードで動く範囲（アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベル）は公式ドキュメントで確認できなかったため、**B1 の最初に実測して確定**する。H2 2.5.252 と JDK 25、Flyway 13.12.2 との組み合わせ、公式のサポート期限、Flyway の H2 用の扱い（`flyway-core` に含まれるかを含む）は、実装開始時に確認する。
 - Ktor のエンジン（Netty か CIO）の最終確認（設計判断 T2）。
 - `ktor-server-rate-limit` の状態を共有する方法（参加・復帰の専用の制限。beer-game2 から継続）。
 - フレームワークのログ（Ktor、Hikari、Flyway）を JSON にするか（追加の依存関係が要る）。
@@ -313,6 +334,7 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 
 - endoflife.date の API（`kotlin`、`eclipse-temurin`、`gradle`、`postgresql`）、2026-11-14
 - Maven Central の `maven-metadata.xml`（`io.ktor:ktor-server-core`、`io.arrow-kt:arrow-core`、`org.jetbrains.kotlinx:kotlinx-coroutines-core`、`kotlinx-serialization-json`、`org.postgresql:postgresql`、`com.zaxxer:HikariCP`、`org.flywaydb:flyway-core`、`io.kotest:kotest-runner-junit5`、`kotest-property`、`org.junit.jupiter:junit-jupiter`、`org.testcontainers:testcontainers-postgresql`、`io.gitlab.arturbosch.detekt:detekt-cli`、`dev.detekt:detekt-cli`、`com.pinterest.ktlint:ktlint-cli`、`ch.qos.logback:logback-classic`、`io.cucumber:cucumber-java`、`io.cucumber:cucumber-junit-platform-engine`、`org.junit.platform:junit-platform-suite`、`net.sourceforge.pmd:pmd-core`、`net.sourceforge.pmd:pmd-kotlin`）、npm レジストリ（`@cucumber/cucumber`）、GitHub の PMD のリリース（`pmd/pmd`）、Gradle プラグインポータル（`org.jetbrains.kotlinx:kover-gradle-plugin`）、2026-11-14
+- Maven Central の `com/h2database/h2/maven-metadata.xml` と `2.5.252/` の一覧・pom、H2 公式ドキュメント `https://h2database.com/html/features.html`（PostgreSQL 互換モード）、2026-11-14
 - Ktor 公式ドキュメント（`https://ktor.io/docs/server-server-sent-events.html`、`https://ktor.io/docs/server-rate-limit.html`）、2026-11-14
 - [開発戦略（Kotlin 版）](../../development/beer-game-kotlin/development_strategy.md)（静的解析の厳格な適用、BDD と Cucumber の導入）
 - [beer-game2 の技術スタック](../beer-game2/tech-stack.md)（フロントエンド・インフラの版。2026-11-09 の確認値）

@@ -1,10 +1,10 @@
 ---
 type: Design
 title: "データモデル設計 - ビールゲームシミュレーション（Kotlin 版）"
-description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション、インデックスを整理した正本。"
+description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 - イベントに入れない**個人情報（表示名）と秘密（資格のダイジェスト）は、周辺ストア**に置きます（NF-S14）。
 - すべての表は `game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ち、**1 回の削除で漏れなく消えます**（NFR-07、ADR-007 を引き継ぎ）。
 
-データベースは PostgreSQL で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは Flyway を採用案とし、導入は承認待ちです。[技術スタック](./tech-stack.md) T4）。永続化の失敗は、例外のまま漏らさず境界で `Either` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
+データベースは PostgreSQL 18 で、スキーマは番号つきの SQL マイグレーションで管理します（ツールは Flyway を採用案とし、導入は承認待ちです。[技術スタック](./tech-stack.md) T4）。**ただし、開発機でのローカル開発（起動と動作確認）だけは、H2 の PostgreSQL モードで動かせるようにします**（ユーザーの決定、2026-11-14。[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)）。統合テスト、CI、ステージング、本番は PostgreSQL 18 のままです。PostgreSQL 固有の機能（アドバイザリロック、LISTEN/NOTIFY）はポートの裏に隠し、H2 版では守られない制約があります（「[ローカル開発（H2 の PostgreSQL モード）](#ローカル開発h2-の-postgresql-モード)」）。永続化の失敗は、例外のまま漏らさず境界で `Either` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 
 ### beer-game2 からの設計方針の変更
 
@@ -429,7 +429,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 
 1. アプリケーション層は、対象ストリームの全イベントを読み、`replay` で状態にします。**読んだときの版（`expected`）**を覚えます。
 2. `decide` が返したイベント列を、**`expected + 1` から連続する版**で、1 回のトランザクションで追記します。
-3. 同じ版が既にあれば、一意制約の違反になります。これを `AppFailure.ConcurrencyConflict`（`Either` の左）に変換して返します。**行や版のロックは取りません**（beer-game2 の `SELECT ... FOR UPDATE` は不要になります）。ただし、**コマンドは、そのゲームのアドバイザリロックの共有ロック `pg_advisory_xact_lock_shared(game_id)` をトランザクションの先頭で取ります**。共有ロックどうしは待ち合わないので、コマンドの並行性は変わりません。投影の再構築が排他ロックを取る間だけ、コマンドが待ちます（下記「投影の再構築」）。
+3. 同じ版が既にあれば、一意制約の違反になります。これを `AppFailure.ConcurrencyConflict`（`Either` の左）に変換して返します。**行や版のロックは取りません**（beer-game2 の `SELECT ... FOR UPDATE` は不要になります）。ただし、**コマンドは、そのゲームの共有ロックを、ポート `ProjectionLock` を通してトランザクションの先頭で取ります**（PostgreSQL 版の実体は `pg_advisory_xact_lock_shared(game_id)`。H2 版はプロセス内の読み書きロック）。共有ロックどうしは待ち合わないので、コマンドの並行性は変わりません。投影の再構築が排他ロックを取る間だけ、コマンドが待ちます（下記「投影の再構築」）。
 4. `ConcurrencyConflict`（`AppFailure.ConcurrencyConflict`）は、**自動で再試行します**（上限は小さな固定回数。実装開始時に決める。上限に達したら `AppFailure.RetryExhausted`）。再読み込みで状態が進んでいるため、`decide` が再評価され、業務上の競合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は `decide` が正しく返します。再試行で結果が変わらない失敗は、そのまま利用者へ返します。
 5. `decide` が空のイベント列を返したとき（例: 同じ役割への再割り当て）は、追記しません。
 
@@ -493,6 +493,8 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 
 上の 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID（ログ）で返します。制約には、この名前を明示して付けます（マイグレーション 001・002）。
 
+**H2 版（ローカルのみ）の扱い。** `uq_events_stream_version` と `pk_idempotency_records` は、通常の一意制約・主キーなので、共通のマイグレーションに同じ名前で置きます（H2 で違反時に制約名を取り出せるかは、B1 の最初の実測で確認する未確認事項です）。**`uq_idempotency_create`（`scope = 'create'` の部分一意索引）は、H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため、H2 版では省略し、アプリケーション側の検査（挿入の前に `(scope, key_digest)` を検索して再照合）に置き換えます。**ゲーム作成の同時の重複は、ローカルでは制約で守られません（単一プロセスで 1 人が使う前提で許容。検証は PostgreSQL の統合テストだけで行う）。
+
 イベントの封筒の `command_id` は、同じコマンドから生まれたイベントを束ねるための識別子で、冪等キーとは別です（冪等キーのダイジェストはイベントに入れません）。
 
 ### イベントのスキーマ
@@ -505,6 +507,7 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 
 - アプリケーションが使う DB ロールには、`events` の **INSERT と SELECT だけ**を与え、UPDATE と DELETE を与えません。
 - 保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。連鎖削除が、`events` に DELETE 権限を持たないロールでも動くことは、実装開始時に確認します（未決事項）。
+- **この保護（ロール、GRANT、`TRUNCATE` の拒否）は PostgreSQL の統合テストでだけ検証します。H2 版（ローカル）では省略し、単一の接続ユーザーで動かします。ローカルでは追記専用は守られません**（下記「ローカル開発（H2 の PostgreSQL モード）」）。
 
 ### スナップショット
 
@@ -550,12 +553,15 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 
 研修中に投影が不整合になったときの業務手順は、「運用担当が運営者を通じて進行役に**停止**を依頼し、**停止中に再構築して再開**する」です（[運用要件](./operation.md)）。停止中でも、追記を伴う操作（代理入力、資格の再発行、観察者の参加）は受け付けるため、再構築とコマンドを**同じゲームについて同時に走らせない**制御が要ります。
 
-| 役 | ロック | 取る場所 |
-| :--- | :--- | :--- |
-| コマンド（追記と投影の更新） | `pg_advisory_xact_lock_shared(game_id)`（共有） | トランザクションの先頭（読み込みの前） |
-| 再構築 | `pg_advisory_xact_lock(game_id)`（排他） | トランザクションの先頭。投影の行の削除から `projection_checkpoints` の更新までを 1 トランザクションで行う |
+ロックは、**ポート `ProjectionLock`**（関数の束。定義は [バックエンドアーキテクチャ](./architecture-backend.md)）の裏に隠し、2 つの実装を持ちます。
 
-- `game_id` は 64 ビットのキーへ写す（UUID の上位 64 ビットなど）。トランザクションの終了で自動的に解放される（`xact`）。
+| 役 | ポートの関数 | PostgreSQL 版（統合テスト・CI・ステージング・本番） | H2 版（ローカルのみ） | 取る場所 |
+| :--- | :--- | :--- | :--- | :--- |
+| コマンド（追記と投影の更新） | `acquireShared(tx, gameId)` | `pg_advisory_xact_lock_shared(game_id)` | プロセス内の読み書きロックの読み取り側（ゲームごと） | トランザクションの先頭（読み込みの前） |
+| 再構築 | `acquireExclusive(tx, gameId)` | `pg_advisory_xact_lock(game_id)` | 同じ読み書きロックの書き込み側 | トランザクションの先頭。投影の行の削除から `projection_checkpoints` の更新までを 1 トランザクションで行う |
+
+- PostgreSQL 版の `game_id` は 64 ビットのキーへ写す（UUID の上位 64 ビットなど）。トランザクションの終了で自動的に解放される（`xact`）。H2 版は、トランザクションの終了（COMMIT / ROLLBACK）のフックで解放する。
+- **H2 版のロックは単一のプロセスでだけ有効です。複数のプロセスでは保証しません**（`rebuild-projections` を API と別のプロセスで動かすと、再構築とコマンドは直列にならない。ローカルでは API を止めてから再構築する）。
 - 共有ロックどうしは待ち合わないので、通常のコマンドの並行性は変わりません。再構築中は、コマンドは排他ロックが外れるまで待ちます。再構築が 1 トランザクションなので、コマンドが見るのは再構築の前後のどちらかで、途中の投影は見えません。
 - これにより、「研修中は再構築しない」という制約は不要になります（停止は業務上の運用であり、データの整合のためのものではなくなる。停止を依頼する理由は、再構築中の入力の待ちを避けるため）。
 - ロック待ちの上限（`lock_timeout`）と、待ちが上限を超えたときのコマンドの応答は、未決事項です（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。
@@ -606,7 +612,7 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 | 全員（終了後） | `week_role_results`（全役割の時系列） | — |
 | 進行役（出力） | 要求時に `buildExport` が作る出力（CSV・JSON）。`week_role_results` と設定から導出する | — |
 
-観察者の問い合わせは、DB の権限でも `game_join_codes`・`week_role_results`・`role_current_states`・`current_decisions` に**到達できない**ようにします（観察者のロールに SELECT を与えるのは、上の 3 表だけ）（最小権限。アプリのバグでも役割別の値が漏れにくい）。寄与者数による抑止（`contributors < 2` なら合計を出さない）は、問い合わせの層（`Disclosure`）で行います。
+観察者の問い合わせは、DB の権限でも `game_join_codes`・`week_role_results`・`role_current_states`・`current_decisions` に**到達できない**ようにします（観察者のロールに SELECT を与えるのは、上の 3 表だけ）（最小権限。アプリのバグでも役割別の値が漏れにくい。**H2 版（ローカル）にはロールがなく、この DB の権限は守られない**。権限の否定テストは PostgreSQL の統合テストでだけ行う）。寄与者数による抑止（`contributors < 2` なら合計を出さない）は、問い合わせの層（`Disclosure`）で行います。
 
 ### 設計判断: 観察のための `week_team_totals`
 
@@ -687,19 +693,84 @@ end
 ## マイグレーション
 
 - スキーマの変更は、**番号つきの SQL マイグレーション**で行い、適用の履歴を DB に残します。管理ツールは Flyway を採用案とします（導入は承認待ち。[技術スタック](./tech-stack.md) T4）。
+- **PostgreSQL 用と H2 用で、共通の部分を最大化し、差分だけを分けます**（Flyway のベンダー別の場所。配置の案は下表。詳細は B1 の最初の実測の後に確定します）。
 - 変更は、**拡張 → 互換 → 縮小**の順に分け、ロールバックできる単位にします（NFR-12）。
 - **イベントは、マイグレーションで書き換えません。** イベントの形の変更は `schema_version` とアップキャストで吸収します。投影の形の変更は、マイグレーションで表を直し、**再構築**で埋めます。
 
-| 番号（予定） | 内容 |
-| :--- | :--- |
-| 001 | `game_roots`、`events`（一意制約、`CHECK`、追記専用のロール権限）、`projection_checkpoints` |
-| 002 | 周辺ストア: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records` |
-| 003 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_*` |
-| 004 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
-| 005 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
-| 006 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
+| 番号（予定） | 場所 | 内容 |
+| :--- | :--- | :--- |
+| 001 | 共通 | `game_roots`、`events`（名前つきの一意制約、`CHECK`）、`projection_checkpoints` |
+| 002 | 共通 | 周辺ストア: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records`（主キー `pk_idempotency_records`） |
+| 003 | 共通 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_*` |
+| 004 | 共通 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
+| 005 | 共通 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
+| 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
+| 101 | PostgreSQL | DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限 |
+| 102 | PostgreSQL | 部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
+| 201 | H2 | H2 で表せる形への置き換え（あれば）。PostgreSQL 固有の制約を省略した旨のコメント |
 
-追記専用の保護（`events` への UPDATE/DELETE の禁止）、投影の `CHECK`（数量の上限）、観察者向けの権限は、001〜005 に含めます。
+```text
+db/migration/
+├── common/      001〜006（両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダで切り替える案）
+├── postgres/    101〜（PostgreSQL 固有。ロール、GRANT、部分一意索引、jsonb）
+└── h2/          201〜（H2 固有。置き換えがあるときだけ）
+# Flyway の場所: PostgreSQL = common + postgres、H2 = common + h2
+```
+
+- 追記専用の保護、観察者向けの権限、部分一意索引は PostgreSQL の場所（101・102）にだけ置きます。投影の `CHECK`（数量の上限）は、共通（001〜005）に含めます。
+- `events.payload` の型は、PostgreSQL は `jsonb` です。H2 の PostgreSQL モードで `jsonb` が使えることは公式ドキュメントで確認できなかったため、共通の DDL ではプレースホルダ（例 `${json_type}`）にし、H2 側の型は B1 の最初の実測で決めます（仮置き）。
+- 共通の DDL を H2 で通せることは**未確認**です。通らない文は、共通から PostgreSQL 側と H2 側へ分けます（共通を最大化する方針は変えない）。
+
+## ローカル開発（H2 の PostgreSQL モード）
+
+ユーザーの決定（2026-11-14）により、**開発機でのローカル開発（起動と動作確認）だけ**、H2 の PostgreSQL モードで動かせるようにします（[ADR-014](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、提案中）。Docker や PostgreSQL がなくても起動できることが目的です。
+
+**範囲の線引き。**
+
+| 用途 | データベース |
+| :--- | :--- |
+| ローカル開発（開発機での起動・動作確認） | **H2（PostgreSQL モード）** または PostgreSQL。設定 `DB_KIND=h2\|postgres` で選ぶ（[バックエンドアーキテクチャ](./architecture-backend.md)） |
+| 統合テスト、受け入れ（Cucumber の `@api`）、CI | **PostgreSQL 18**（Testcontainers） |
+| ステージング、本番 | **PostgreSQL 18**（RDS）。起動時の検査で H2 を拒否する |
+
+**H2 を、設計の検証（並行性、権限、部分一意索引、連鎖削除）や性能の計測には使いません。** それらの正は PostgreSQL の統合テストです。
+
+**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**（「非対応」と断定するものではありません）。実際の動作は、**B1 の最初に実測して確定します（未確認）**。H2 の版も実装開始時に確認します（[技術スタック](./tech-stack.md)）。
+
+### 方言の差分
+
+| 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ） | 扱い |
+| :--- | :--- | :--- | :--- |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)` | 確認できなかった | ポート `ProjectionLock` の裏に隠す。H2 版は**プロセス内の読み書きロック**（単一プロセスでのみ有効） |
+| SSE の版の通知（LISTEN/NOTIFY） | `pg_notify` と専用の LISTEN 接続 | 確認できなかった | ポート `ChangeNotifier` の裏に隠す。H2 版は**プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） |
+| 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 確認できなかった | H2 版は**省略**し、アプリケーション側の再照合に置き換える |
+| DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、追記専用、`TRUNCATE` の拒否 | あり | 確認できなかった | H2 版は**省略**（単一の接続ユーザー） |
+| 接続プールの分離（観察者用など） | 用途別 | 単一のプール | H2 版は**省略** |
+| `jsonb` | `events.payload` | 確認できなかった | 型はプレースホルダで切り替える。H2 側の型は B1 の実測で決める |
+| 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | 動作の同一性は確認できなかった | H2 では検証しない（PostgreSQL の統合テストが正） |
+| SQLSTATE（40001、40P01、55P03、23505 の制約名） | アダプターが `AppFailure` に写す | 確認できなかった | H2 版の写像は B1 の実測で確定。写せない場合は H2 では再試行を行わない |
+| 名前つきの一意制約、`ON DELETE CASCADE`、`CHECK` | あり | 標準の SQL だが、H2 での動作は未確認 | 共通の DDL に置き、B1 の実測で確認 |
+
+### H2 版で省略する制約（ローカルでは守られない）
+
+次の制約は、H2 版では**守られません**。ローカルで動いたことは、これらの制約が正しいことを意味しません。
+
+1. `uq_idempotency_create`（同じキーのゲーム作成の同時の重複。アプリ側の再照合だけ）。
+2. `events` の追記専用（UPDATE・DELETE・`TRUNCATE` の拒否）。
+3. DB ロールの分離と、観察者のロールが `game_join_codes` などへ到達できないこと（NF-S18）。アプリのバグによる漏えいを DB が止めない。
+4. 接続プールの分離（観察者用のプールの配線）。
+5. 複数のプロセスにまたがる、再構築との直列化と SSE の通知（`ProjectionLock`・`ChangeNotifier` は単一のプロセスでだけ有効）。
+6. 削除用のロールの限定（`game_roots` 以外を直接削除できないこと）。
+7. 分離レベルによる一貫した読み取り（REPEATABLE READ）の保証。
+
+### 乖離のリスクと対策
+
+ローカル（H2）で通っても、CI（PostgreSQL）で落ちる乖離が起きえます。対策は次のとおりです。
+
+1. **H2 でしか通らない記述を禁止する。** PostgreSQL の統合テストが正で、H2 のために共通の DDL や SQL を曲げない（通らない文は PostgreSQL 側と H2 側に分ける）。
+2. **ポートの契約テストを両実装で実行する。** `ProjectionLock`・`ChangeNotifier` の契約テストを、PostgreSQL 版は統合テスト、H2 版はユニットテストで実行する。
+3. **受け入れ（Cucumber の `@api`）は PostgreSQL で実行する。**
+4. 本番・ステージングでの H2 の拒否（起動時の検査。[バックエンドアーキテクチャ](./architecture-backend.md)）。
 
 ## インデックス（主なもの）
 
@@ -712,7 +783,7 @@ end
 | `credentials` | `(game_id, kind, subject_id)`、`(expires_at)` | 主体ごとの検索、期限切れの掃除 |
 | `browser_sessions` | `(game_id, expires_at)` | 期限切れの掃除 |
 | `lobby_participants` | `(game_id)` | ロビーの一覧 |
-| `idempotency_records` | `(expires_at)`、`(scope, key_digest)`（部分一意、`WHERE scope = 'create'`） | 期限切れの掃除、作成の再送の検索 |
+| `idempotency_records` | `(expires_at)`、`(scope, key_digest)`（部分一意、`WHERE scope = 'create'`。**PostgreSQL のみ。H2 版は省略**） | 期限切れの掃除、作成の再送の検索 |
 | `retention_policies` | `(delete_after, game_id)` | 期限到来の検出 |
 | `deletion_runs` | 再試行の予定（`next_attempt_at`）の部分索引 | 再試行 |
 
@@ -731,6 +802,7 @@ end
 | 7 | 保持削除 | `game_roots` の連鎖削除 + 状態の行 | 表ごとの削除、`retention` ストリーム |
 | 8 | 冪等性 | 冪等記録（24 時間、成功した応答だけを暗号化して保存）を追記と同じトランザクションで。認可の後に照合 | `command_id` の一意制約だけ（資格の再返却ができない） |
 | 9 | 出力 | 問い合わせ時に純粋関数 `buildExport` で作る（`export_packages` 廃止） | 同期投影、`SessionEnded` 後の非同期投影 |
+| 10 | ローカル開発の DB | H2 の PostgreSQL モード（ローカルだけ。ユーザーの決定）。PostgreSQL 固有の機能はポート（`ProjectionLock`・`ChangeNotifier`）の裏に隠し、2 実装を持つ。部分一意索引・ロール・プール分離などは PostgreSQL の統合テストでだけ検証し、H2 版では省略する | ローカルも PostgreSQL（Docker）、H2 を統合テストにも使う（検証が弱くなるため不採用） |
 
 ## beer-game2 からの変更
 
@@ -759,6 +831,8 @@ end
 | 21 | `EventStore` の失敗は `AppendFailure` と `PersistenceFailure` | `AppFailure`（sealed interface）に統合。`transaction` の戻りは `Either<AppFailure, A>`。正本は backend | M14 |
 | 22 | 再構築の同時実行制御は未決 | ゲーム単位のアドバイザリロック（コマンドは共有、再構築は排他）。研修中も停止して再構築できる | M23 |
 | 23 | 保持の起点は未決 | 暫定で作成時。画面に削除予定日とバックアップの残存を表示。終了時起点の案は未決 | M5 |
+| 24 | データベースは PostgreSQL だけ | ローカル開発だけ H2（PostgreSQL モード）も使えるようにする。再構築のロックと SSE の通知はポートの裏で 2 実装。H2 版で省略する制約を明記 | ユーザーの決定（2026-11-14。ADR-014） |
+| 25 | マイグレーションは 1 系統 | 共通（001〜006）・PostgreSQL（101〜）・H2（201〜）の場所に分ける案。配置は B1 で確定 | 共通を最大化し、差分だけを分ける |
 
 ## 未決事項
 
@@ -772,11 +846,14 @@ end
 - `events` の長期の保持と、ゲーム削除前の分析の要否（beer-game2 から継続）。
 - 同期投影のトランザクション時間の実測。書き込みを圧迫する場合は、非同期投影へ移す（設計判断 4）。
 - JSON のシリアライズ方式とアップキャストの置き場所（解決済み: kotlinx.serialization と `EventCodec`。アップキャストは adapter-persistence。[バックエンドアーキテクチャ](./architecture-backend.md)、[技術スタック](./tech-stack.md)）。
+- **H2 の PostgreSQL モードで動く範囲の実測（B1 の最初）**: 共通の DDL が通るか、`jsonb` に相当する型、名前つき制約の違反時に制約名を取れるか、`ON DELETE CASCADE` の動作、SQLSTATE、分離レベル、部分インデックスの可否。結果で、共通と H2 の場所の配分、省略する制約の一覧、プレースホルダを確定する。H2 の版の確認と導入は承認待ち（[技術スタック](./tech-stack.md)）。
+- H2 版の `ProjectionLock` が `lock_timeout` 相当の待ちの上限をどう扱うか（PostgreSQL 版は SQLSTATE 55P03 を `RetryExhausted` に写す。H2 版は待ちの上限つきの取得で同じ契約を満たす）。
 - 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、最初のスライドの Red のテストで確かめる（[テスト戦略](./test-strategy.md)）。
 
 ## 出典
 
 - [ドメインモデル設計（Kotlin 版）](./domain-model.md)
+- [ADR-014 ローカル開発に H2（PostgreSQL モード）を使う](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、[H2 公式ドキュメント（features）](https://h2database.com/html/features.html)（2026-11-14 確認）
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（イベントソーシング、CQRS、永続化とトランザクション境界）
 - [beer-game2 データモデル設計](../beer-game2/data-model.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)
 - [ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)

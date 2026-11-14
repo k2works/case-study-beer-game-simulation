@@ -4,7 +4,7 @@ title: "ADR-010: events を追記専用にし、保持削除を game_roots の�
 description: "events はアプリ用ロールに INSERT と SELECT だけを与えて追記専用とし、保持削除は削除用ロールによる game_roots の 1 回の DELETE（ON DELETE CASCADE）で行う。RetentionSaga は状態の行で持つ。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # ADR-010: events を追記専用にし、保持削除を game_roots の連鎖削除 1 回で行う
@@ -64,5 +64,5 @@ beer-game2 は、`games` を根にした連鎖削除（beer-game2 の ADR-007）
 ## 備考
 
 - 著者: claude-code
-- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-009](./009-observer-access-control.md)、[ADR-006](./006-event-schema-evolution.md)、beer-game2 の [ADR-007](../beer-game2/007-cascade-deletion-without-queues.md)
+- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-009](./009-observer-access-control.md)、[ADR-006](./006-event-schema-evolution.md)、beer-game2 の [ADR-007](../beer-game2/007-cascade-deletion-without-queues.md)、[ADR-014](./014-h2-for-local-development.md)（権限と連鎖削除は PostgreSQL の統合テストで検証する）
 - 参照: [データモデル（保持削除、追記専用の保護、変更 7・8・9）](../../design/beer-game-kotlin/data-model.md)、[非機能要件（NF-S16、NF-S20、NF-R11、NF-R12）](../../design/beer-game-kotlin/non-functional.md)、[バックエンド（保持削除、DB ロール）](../../design/beer-game-kotlin/architecture-backend.md)、[リリース計画（B2、B11、R6）](../../development/beer-game-kotlin/release_plan.md)

@@ -219,6 +219,7 @@ nav:
           - ADR-011: adr/beer-game-kotlin/011-strict-static-analysis.md
           - ADR-012: adr/beer-game-kotlin/012-gherkin-and-cucumber.md
           - ADR-013: adr/beer-game-kotlin/013-tech-stack-versions.md
+          - ADR-014: adr/beer-game-kotlin/014-h2-for-local-development.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:

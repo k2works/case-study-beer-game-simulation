@@ -19,6 +19,7 @@ beer-game-kotlin プロジェクトの ADR ドキュメントです。
 | [ADR-011](./011-strict-static-analysis.md) | 静的解析とルール設定を厳格に適用する（detekt を中心に PMD で補完） | 提案中 |
 | [ADR-012](./012-gherkin-and-cucumber.md) | 受入条件を日本語 Gherkin と Cucumber で表し、細部は Kotest で書く | 承認済み |
 | [ADR-013](./013-tech-stack-versions.md) | 技術スタックの版を、確認済みの値で固定する（JDK 25 LTS、Kotlin 2.4、PostgreSQL 18） | 提案中 |
+| [ADR-014](./014-h2-for-local-development.md) | ローカル開発だけ H2（PostgreSQL モード）を使い、PostgreSQL 固有の機能をポートで抽象化する | 提案中 |
 
 ## 補足
 

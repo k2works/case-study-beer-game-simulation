@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "Kotlin 版のインフラアーキテクチャ。beer-game2 の ECS Fargate、CloudFront、RDS、Terraform、CI/CD を踏襲し、JVM のコンテナ、起動と終了、メモリ、Gradle のビルド、データベースのロール、確認したバージョンなど JVM 固有の変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -41,6 +41,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 | ログ | Logback（`logback-classic`） | **1.6.6** | Maven Central。**選定済み**（アプリのログは自前の `LogRecord` の JSON、Logback は枠組みのログ用）。導入は承認待ち |
 | 静的解析 | detekt（`io.gitlab.arturbosch.detekt`） | **1.23.8**（安定版の最新、2025-02-21）。`dev.detekt` の 2.0.0 は alpha | Maven Central。**採用する Kotlin 2.4 に 1.23.8 が対応するかは未確認。ウォーキングスケルトンの最初のビルドの受入条件**（規約違反のコードを 1 つ置き、CI が落ちること。[テスト戦略](./test-strategy.md)）。代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）は、最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中で選ぶ |
 | 整形 | ktlint | **1.8.0** | Maven Central |
+| ローカル開発用 DB | H2（`com.h2database:h2`） | **2.5.252**（確認日 2026-11-14） | Maven Central の `maven-metadata.xml`（`<release>`。ファイルの公開は 2026-09-26）。**ローカル開発だけ**（本番・ステージング・CI・統合テストでは使わない。[技術スタック](./tech-stack.md) T7）。公式のサポート期限は確認できていない。**導入は承認待ち** |
 | コンテナのイメージ | Eclipse Temurin | タグ `25-jre`、`25-jre-noble` を確認 | Docker Hub。軽量な派生（Alpine など）の有無は確認していない |
 
 | 確認できていない事項 | 扱い |
@@ -48,6 +49,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 | Kotlin 2.4.21 と Gradle 9.9.1 の互換性、Kotlin が JDK 25 を対象にできること | 実装開始時に、Gradle と Kotlin の互換性の表で確認する |
 | Ktor 3.6.1、Arrow 2.3.0 が要求する Kotlin の版 | 実装開始時に、各ドキュメントで確認する |
 | Micrometer | 最新は 1.18.0 の RC のみ確認した。採用しない案（バックエンドの BD9）のため、確認は不要 |
+| H2 の PostgreSQL モードで動く範囲、H2 と JDK 25・Flyway の組み合わせ | 公式ドキュメント（features）では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベルの差異を**確認できなかった**。**B1 の最初に実測して確定する** |
 
 **beer-game2 から変えないバージョン**（beer-game2 の [技術スタック](../beer-game2/tech-stack.md) が 2026-11-09 に確認した値を引き継ぐ）: PostgreSQL 18（RDS の標準サポートは 2031-02-28 まで）、Node.js 26（フロントエンドのビルド用。Active LTS、EOL 2029-04-30）、Terraform 1.17 以上、AWS プロバイダー `~> 6.0`、`postgres:18-alpine`（ローカルの DB）。この日付の確認結果を、本書は再確認していません。
 
@@ -60,7 +62,7 @@ beer-game2 から**変更する点を太字**で示します。
 | クラウド | AWS（`ap-northeast-1`） | 変更なし |
 | デプロイ形態 | コンテナ（ECS Fargate） | 変更なし |
 | 配信 | CloudFront の単一オリジン（静的ファイルは S3、`/api/*` は ALB）。独自ドメインと ACM、TLS 1.2 以上、レスポンスヘッダーポリシー | 変更なし |
-| データベース | RDS for PostgreSQL 18（Multi-AZ、暗号化、PITR、バックアップ 7 日） | 変更なし。**データベースのロールを用途別に分ける** |
+| データベース | RDS for PostgreSQL 18（Multi-AZ、暗号化、PITR、バックアップ 7 日） | 変更なし。**データベースのロールを用途別に分ける**。**ローカル開発だけ H2 の PostgreSQL モード**（設計判断 ID6。ステージング・本番は PostgreSQL のまま） |
 | 非同期・キュー | 使わない | 変更なし（SQS と所有者別ワーカーは作らない） |
 | 定期処理 | EventBridge による ECS タスク（保持の期限検出・削除） | 変更なし。**同じイメージの別の起動引数**で起動する |
 | **イメージ** | **ECR。JRE のイメージ（Temurin 25）の上に、Gradle のビルド成果物を載せる。マルチステージ** | Node 26 のイメージから変更 |
@@ -146,16 +148,25 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 | 削除 | retention | `game_roots` の DELETE、`deletion_*` の読み書き。連鎖削除が、`events` に DELETE を持たないロールでも動くかは、実装開始時に確認する（[データモデル](./data-model.md) の未決事項） | 接続プール（小さく） |
 | 所有者 | migrate | スキーマの変更（DDL）、ロールと権限の定義 | 1 回限りの接続 |
 
+**ローカルの H2 では**、上のロールの分離、接続プールの分離、`LISTEN` の専用接続は**再現しない**（PostgreSQL の統合テストでだけ検証する）。通知の受信は、ポート `ChangeNotifier` の H2 版（プロセス内のイベント）に置き換わる。本番・ステージングは、この表のとおり PostgreSQL のロールで動く。
+
 **接続数の見積もり**: タスク数 × （書き込み + 読み取り + 観察者の各プールの最大 + 通知 1 本）+ 運用のタスク。この合計が、RDS のインスタンスの接続数の上限を超えないことを、タスクの最大数（4）で確認します。プールの大きさは、負荷試験で決めます（未決事項）。接続を集約するプロキシや接続プーラーは、`LISTEN` が動かない可能性があるため、**本設計では置きません**。
 
 ## 環境
 
 | 環境 | 用途 | デプロイ | Terraform の状態 |
 | :--- | :--- | :--- | :--- |
-| ローカル | 開発・確認 | バックエンドは Gradle で起動、フロントエンドは Vite（`/api` をプロキシ）。DB は Docker の PostgreSQL 18 | — |
-| CI | 検証 | GitHub Actions（PostgreSQL 18 のサービスコンテナ） | — |
-| ステージング | 本番前の確認 | main へのマージで自動（ローリング） | 専用 |
-| 本番 | 運用 | 手動の承認後（ブルー/グリーン） | 専用 |
+| ローカル | 開発・確認（起動・動作確認） | バックエンドは Gradle で起動、フロントエンドは Vite（`/api` をプロキシ）。**DB は H2 の PostgreSQL モード（既定。Docker 不要。`DB_KIND=h2`）**。PostgreSQL 18 で確認したい場合は `DB_KIND=postgres`（Docker）。H2 では、アドバイザリロックとイベント通知はプロセス内の実装（単一プロセスのみ）、ロール・部分一意索引などは省略される（**省略した制約はローカルで守られない**。[データモデル](./data-model.md)） | — |
+| CI | 検証 | GitHub Actions（**PostgreSQL 18** のサービスコンテナと Testcontainers）。統合テストと受け入れ（`@api`）は PostgreSQL で実行し、**H2 は使わない** | — |
+| ステージング | 本番前の確認 | main へのマージで自動（ローリング）。**PostgreSQL（RDS）のみ。H2 は起動時に拒否** | 専用 |
+| 本番 | 運用 | 手動の承認後（ブルー/グリーン）。**PostgreSQL（RDS）のみ。H2 は起動時に拒否** | 専用 |
+
+### ローカルの開発環境と H2 の拒否
+
+- **Docker なしで起動できる**: ローカルの既定は、プロセス内の H2（PostgreSQL モード）。マイグレーションは Flyway のベンダー別の場所の H2 用を適用する（共通の部分を最大化し、差分だけを分ける。配置は B1 で確定）。
+- **選択は設定で行う**: `DB_KIND=postgres|h2`。`AppConfig.load` が、環境の種別（`APP_ENV=local|ci|staging|production` など。名前は B1 で確定）と合わせて検証する。
+- **本番・ステージングで H2 を拒否する検査**: `APP_ENV` が `staging` または `production` のとき、`DB_KIND=h2`、または JDBC の URL が `jdbc:h2:` で始まる設定は、`AppConfig.load` が**起動前に失敗**させる（起動しない。通知の受信や接続の準備に進まない）。この検査は、設定の単体テストで、**環境ごとの全組み合わせ**を確かめる。Terraform のタスク定義も `DB_KIND=postgres` を固定で渡し、H2 の依存関係は本番のイメージに含めない（二重の防御）。
+- **ローカルの乖離の防止**: CI の統合テスト・受け入れは PostgreSQL が正で、H2 でしか通らない記述は禁止する（[テスト戦略](./test-strategy.md)）。
 
 各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（beer-game2 と同じ）。
 
@@ -189,7 +200,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 
 | 局面 | 設計 |
 | :--- | :--- |
-| 起動 | 設定を読み込み、検証する（`AppConfig.load`。失敗なら起動しない）-> 接続プールを作る -> 通知の受信を始める -> HTTP の受付を始める。`/ready` は、**データベースの接続、通知の受信の接続の生存**が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない。**起動時間の測る区間（L4）**: [NF-P16](./non-functional.md) と [運用要件](./operation.md) と同じく、**コンテナのプロセスの開始から `/ready` が成功するまで**（マイグレーションの適用を除く。p95 30 秒以下は提案）。サービスのヘルスチェックの猶予期間は、この実測の p95 より長く取る。RTO 15 分（NF-R4）は、この起動時間と、必要な場合の再構築（NF-P18）を含めて見積もる |
+| 起動 | 設定を読み込み、検証する（`AppConfig.load`。失敗なら起動しない。**本番・ステージングで `DB_KIND=h2` なら失敗する**）-> 接続プールを作る -> 通知の受信を始める -> HTTP の受付を始める。`/ready` は、**データベースの接続、通知の受信の接続の生存**が確認できるまで、準備できていない（503）を返す。起動のたびに投影の再構築はしない。**起動時間の測る区間（L4）**: [NF-P16](./non-functional.md) と [運用要件](./operation.md) と同じく、**コンテナのプロセスの開始から `/ready` が成功するまで**（マイグレーションの適用を除く。p95 30 秒以下は提案）。サービスのヘルスチェックの猶予期間は、この実測の p95 より長く取る。RTO 15 分（NF-R4）は、この起動時間と、必要な場合の再構築（NF-P18）を含めて見積もる |
 | マイグレーションとの順序 | マイグレーションのタスクが完了してから、アプリのタスクを起動する（デプロイの手順で保証）。アプリは起動時に、**期待するスキーマの版が適用済みか**を確認し、未適用なら準備できていない |
 | 終了 | ECS は、タスクの停止時に SIGTERM を送り、一定の時間の後に強制終了する（停止の猶予時間は、サービスの設定で調整できる）。アプリは SIGTERM で、**新しい要求の受付を止め、処理中の要求を完了させ、SSE の接続を閉じ、接続プールを閉じる**。クライアントは、SSE が切れても再接続し、スナップショットを取得して追いつく（再生なしの設計） |
 | 負荷分散との整合 | ALB のターゲットの登録解除の遅延（deregistration delay）と、アプリの終了の猶予を整合させる。長い SSE の接続は、猶予の後に切られてよい（クライアントが再接続する） |
@@ -284,6 +295,7 @@ stop
 | 9 | マイグレーションは node-pg-migrate | **Flyway**（番号つきの SQL。選定済み。導入は承認待ち。設計判断 ID4） | JVM のエコシステム |
 | 10 | 再構築の概念が無い | 研修中は、停止を依頼して停止中に再構築する。アドバイザリロックで排他（M23）。観察者のロールは参加コードを持つ表に到達できない（M1） | ES + CQRS |
 | 11 | CI に新旧の互換の検査は無い | N-1 互換のジョブを加える。JDK の期限は Temurin の値（2031-09-30）に統一 | M22、M17 |
+| 12 | ローカルの DB は Docker の PostgreSQL 18 | ローカル開発だけ H2 の PostgreSQL モード（Docker 不要）。CI・ステージング・本番は PostgreSQL のまま。本番・ステージングでは起動時の検査で H2 を拒否 | ユーザーの決定（2026-11-14）。設計判断 ID6 |
 
 ## 設計判断
 
@@ -330,6 +342,16 @@ stop
 | **A（採用）** | 用途別のロール（書き込み、読み取り、観察者、削除、所有者） | `events` の追記専用と、観察者の最小権限が、アプリのバグでも守られる。秘密と接続プールが増える |
 | B | 1 つのロールで、アプリが規約で守る | 構成が単純。バグが直接の漏えいと、イベントの書き換えにつながる |
 
+### ID6: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-14）
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用）** | ローカル開発だけ H2 の PostgreSQL モード。CI・統合テスト・ステージング・本番は PostgreSQL 18。実行は `DB_KIND` で選び、本番・ステージングでは起動時に H2 を拒否する | Docker なしで起動できる。単一プロセスの制約と省略した制約があり、ローカルと CI の乖離が起きうる（対策は [技術スタック](./tech-stack.md) T7） |
+| B | ローカルも Docker の PostgreSQL 18 | 乖離がない。Docker が要る |
+| C | H2 を CI・ステージングにも使う | 環境が軽くなる。RDS の本番と離れ、並行性・権限の検証が空になる。却下 |
+
+トレードオフ: A は、拒否の検査（設定の単体テストと、Terraform の固定値）で、H2 の本番混入を防ぐ。H2 でしか通らない記述は禁止し、PostgreSQL の統合テストを正とする。
+
 ## 前提と見直しの条件
 
 - 常時 2 タスクで足りる前提: 同時に進行するゲームが少数（学習セッション単位）。負荷試験で、JVM の起動とヒープを含めて確認する。
@@ -350,13 +372,14 @@ stop
 - ブルー/グリーンの実装（CodeDeploy）と、ステージングのローリングの差の許容。
 - 合成監視（CloudWatch Synthetics）の費用と、頻度（1 分ごと）の妥当性。
 - アカウントの分離（環境ごと）の方針。
+- **H2（設計判断 ID6）**: 導入は承認待ち。PostgreSQL モードで動く範囲は公式ドキュメントで確認できなかったため、B1 の最初に実測する。環境の種別の設定名（`APP_ENV` など）と、Flyway のベンダー別の場所の配置は B1 で確定する。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせ、公式のサポート期限は実装開始時に確認する。
 - 投影の再構築のタスクを、デプロイの標準の手順に含める条件。再構築中の追記の扱いは、アドバイザリロックで決定済み（M23）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（[データモデル](./data-model.md) の未決事項）。
 
 ## 出典
 
 - [バックエンドアーキテクチャ（Kotlin 版）](./architecture-backend.md)、[データモデル（Kotlin 版）](./data-model.md)、[運用要件](./operation.md)、[非機能要件](./non-functional.md)
 - [beer-game2 のインフラストラクチャアーキテクチャ](../beer-game2/architecture-infrastructure.md)、[beer-game2 の技術スタック](../beer-game2/tech-stack.md)
-- バージョンの確認元（2026-11-14）: Maven Central のメタデータ（Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（`services.gradle.org/versions/current`）、endoflife.date（`eclipse-temurin`）、Docker Hub（`eclipse-temurin` のタグ）
+- バージョンの確認元（2026-11-14）: Maven Central のメタデータ（H2、Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（`services.gradle.org/versions/current`）、endoflife.date（`eclipse-temurin`）、Docker Hub（`eclipse-temurin` のタグ）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
 - [ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 9 章（静的解析）
 - [ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)

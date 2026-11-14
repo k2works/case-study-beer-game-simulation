@@ -4,7 +4,7 @@ title: "ADR-005: 楽観的並行制御と自動再試行を基本とし、投影
 description: "書き込みは events の版の一意制約と上限つきの自動再試行で制御し、アドバイザリロック（コマンドは共有、再構築は排他）は研修中の投影の再構築のためだけに使う。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 ---
 
 # ADR-005: 楽観的並行制御と自動再試行を基本とし、投影の再構築との直列化にだけアドバイザリロックを使う
@@ -85,5 +85,5 @@ ES + CQRS では、状態はイベントの列であり、集約の行がない�
 
 - 著者: claude-code
 - 再試行の上限の値、ジッターの要否、`lock_timeout` の値は未確認（実装開始時に計測して決める）。
-- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)
+- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-014](./014-h2-for-local-development.md)（ローカル開発の H2 版では、アドバイザリロックをプロセス内のロックに置き換える）
 - 参照: [バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[データモデル](../../design/beer-game-kotlin/data-model.md)、[運用要件](../../design/beer-game-kotlin/operation.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[設計レビュー（2026-11-14）](../../review/beer-game-kotlin/design_review_20261114.md) の H5・H7・M23、[リリース計画](../../development/beer-game-kotlin/release_plan.md)

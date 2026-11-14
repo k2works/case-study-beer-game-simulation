@@ -1,6 +1,17 @@
 # Docs Update Log
 
 ## 2026-11-14
+* **Update**: [development_strategy](/development/beer-game-kotlin/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [release_plan](/development/beer-game-kotlin/release_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [test-strategy](/design/beer-game-kotlin/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-kotlin/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [data-model](/design/beer-game-kotlin/data-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-kotlin/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-kotlin/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [014-h2-for-local-development](/adr/beer-game-kotlin/014-h2-for-local-development.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [013-tech-stack-versions](/adr/beer-game-kotlin/013-tech-stack-versions.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [010-retention-deletion-with-append-only](/adr/beer-game-kotlin/010-retention-deletion-with-append-only.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [005-optimistic-concurrency-and-advisory-lock](/adr/beer-game-kotlin/005-optimistic-concurrency-and-advisory-lock.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [013-tech-stack-versions](/adr/beer-game-kotlin/013-tech-stack-versions.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [012-gherkin-and-cucumber](/adr/beer-game-kotlin/012-gherkin-and-cucumber.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [011-strict-static-analysis](/adr/beer-game-kotlin/011-strict-static-analysis.md) を更新（claude-code/claude-sonnet-5-5）
