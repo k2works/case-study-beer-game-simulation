@@ -10,6 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# develop 版と同じ gh-pages ブランチへ push するため、同時に実行しない（競合の防止）
+concurrency:
+  group: mkdocs-gh-pages
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -37,3 +42,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
+          # develop 版の公開（develop/）を消さない
+          keep_files: true
