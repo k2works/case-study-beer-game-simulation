@@ -1,6 +1,13 @@
 # Docs Update Log
 
 ## 2026-11-14
+* **Verification**: [bolt_1_plan](/development/beer-game-kotlin/bolt_1_plan.md) を human:kakimomokuri が検証
+* **Verification**: [development_strategy](/development/beer-game-kotlin/development_strategy.md) を human:kakimomokuri が検証
+* **Verification**: [release_plan](/development/beer-game-kotlin/release_plan.md) を human:kakimomokuri が検証
+* **Update**: [tech-stack](/design/beer-game-kotlin/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_1_plan](/development/beer-game-kotlin/bolt_1_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [development_strategy](/development/beer-game-kotlin/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [release_plan](/development/beer-game-kotlin/release_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_1_plan](/development/beer-game-kotlin/bolt_1_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [008-api-contract-and-error-codes](/adr/beer-game-kotlin/008-api-contract-and-error-codes.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [development_strategy](/development/beer-game-kotlin/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）

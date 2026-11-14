@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:52:23Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -175,6 +175,8 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 | ドキュメント | MkDocs、PlantUML、Mermaid | 同左 |
 
 ## 新しく導入する依存関係（導入時に承認を得る）
+
+**承認の状況（2026-11-14）**: **B1 で使う依存関係**（Ktor、Arrow、kotlinx.coroutines・serialization・coroutines-test、PostgreSQL JDBC、HikariCP、Flyway、Logback、Kotest、Testcontainers、Kover、detekt、ktlint、Cucumber-JVM、Cucumber-JS、H2）の導入は、ユーザーが承認した（[Bolt 1 計画](../../development/beer-game-kotlin/bolt_1_plan.md) の判断項目 1。版は導入の直前に公式の情報で確認する）。**PMD と、API の契約テストの道具は、B2 で承認を求める**（未承認）。下の表の「承認待ち」は、この区別で読む。
 
 beer-game2 に無く、Kotlin 版で新しく導入するものです。**書き分け**: 「**承認待ち**」は、選定は済んでいて、導入の承認が未了のもの。「**選定未決**」は、道具そのものが決まっていないもの（変異テストの道具、依存関係の検査）で、選定した後に、あらためて承認を得ます。下表の上 11 行（Ktor から detekt、ktlint まで）に、**Cucumber（導入は決定済み。版の確認と承認が要る）と PMD（承認待ち）**に、**H2（ローカル開発用。次表の最終行近く）**を加えた行は、承認待ちです。
 

@@ -1,10 +1,12 @@
 ---
 type: Plan
 title: "開発戦略 - ビールゲームシミュレーション（Kotlin 版）"
-description: "beer-game-kotlin の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）の局面に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認待ち。"
+description: "beer-game-kotlin の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）の局面に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認済み（2026-11-14）。"
 tags: [plan]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:52:23Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-14T08:52:24Z }
 ---
 
 # 開発戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -515,5 +517,6 @@ US6.1・6.2（完成）、横断の受入条件 X-1〜X-5、NFR の検証表（8
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-14 | **開発戦略の承認**（ユーザーの明示的な承認。リリース計画の承認と同時） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 初版作成（承認待ち） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18 とする決定（ユーザー）を反映。B1 の最初に H2 の実測を加えた | claude-code/claude-sonnet-5-5 |

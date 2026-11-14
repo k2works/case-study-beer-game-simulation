@@ -1,17 +1,19 @@
 ---
 type: Plan
 title: "リリース計画 - ビールゲームシミュレーション（Kotlin 版）"
-description: "beer-game2 の Kotlin 版のリリース計画。Intent、Unit、Bolt 計画（B1〜B15、予備 B16）、リリース 0.1 / 0.2 / 1.0、バッファ、リスク台帳、進捗管理。承認待ち。"
+description: "beer-game2 の Kotlin 版のリリース計画。Intent、Unit、Bolt 計画（B1〜B15、予備 B16）、リリース 0.1 / 0.2 / 1.0、バッファ、リスク台帳、進捗管理。承認済み（2026-11-14）。"
 tags: [plan]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:52:23Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-14T08:52:24Z }
 ---
 
 # リリース計画 - ビールゲームシミュレーション（Kotlin 版）
 
 ## 概要
 
-本書は、beer-game-kotlin（beer-game2 の Kotlin 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が計画を提案し、人が承認ゲートで検証・承認します。本書は承認待ちです。**
+本書は、beer-game-kotlin（beer-game2 の Kotlin 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が計画を提案し、人が承認ゲートで検証・承認します。本書は 2026-11-14 に、ユーザーが承認しました。**
 
 - 機能・振る舞いは beer-game2 を引き継ぎます。要件・ユースケース・ストーリー・Unit の定義・ADR は、新規に作らず beer-game2 のものを参照します（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)）。
 - 設計は [beer-game-kotlin の設計](../../design/beer-game-kotlin/index.md)（イベントソーシング + CQRS、Ktor + Arrow）です。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。
@@ -96,11 +98,12 @@ beer-game2 と同じ範囲（Unit U1〜U6、Release 0.1 / 0.2 / 1.0）です。K
 - [x] 要件・ストーリー・Unit 定義・ADR: beer-game2 のものを流用する
 - [ ] **設計の暫定の決定の確認**（保持の起点、研修中の再構築の運用。[レビュー](../../review/beer-game-kotlin/design_review_20261114.md) の M5・M23）
 - [ ] 設計書の `draft` から `stable` への確認（人）
-- [ ] **リリース計画の承認（本書）**
-- [ ] **H2 の導入の承認**（`com.h2database:h2`、ローカル開発専用の新規依存。ユーザーの決定 2026-11-14: ローカル開発は H2 の PostgreSQL モード。統合・受け入れ・CI・ステージング・本番は PostgreSQL 18）。版は公式の情報で確認してから確定する。**B1 の最初に実測して、動く範囲を確定する**
-- [ ] **PMD と Cucumber の導入の承認**（いずれも新規の依存関係。PMD は CI のツール、Cucumber-JVM と Cucumber-JS はテストの依存関係。版は公式の情報で確認してから確定する。[開発戦略](./development_strategy.md) の未決事項）
-- [ ] Kotlin 版の ADR の作成（ES+CQRS、同期投影、冪等記録と認可の順序、detekt・PMD の判断、Cucumber の導入と Kotest との使い分け）
-- [ ] Bolt 1 の計画（ステップ計画）の作成と承認
+- [x] **リリース計画の承認（本書）**（2026-11-14、ユーザーの承認）
+- [x] **H2 の導入の承認**（`com.h2database:h2`、ローカル開発専用の新規依存。ユーザーの決定 2026-11-14: ローカル開発は H2 の PostgreSQL モード。統合・受け入れ・CI・ステージング・本番は PostgreSQL 18）。版は公式の情報で確認してから確定する。**B1 の最初に実測して、動く範囲を確定する**（**承認済み**: 2026-11-14、[Bolt 1 計画](./bolt_1_plan.md) の判断項目 1）
+- [x] **Cucumber（Cucumber-JVM・Cucumber-JS）の導入の承認**（2026-11-14、[Bolt 1 計画](./bolt_1_plan.md) の判断項目 1）
+- [ ] **PMD の導入の承認**（新規の CI ツール。**B2 で求める**。版は公式の情報で確認してから確定する。[開発戦略](./development_strategy.md)）
+- [x] Kotlin 版の ADR の作成（14 本。[ADR](../../adr/beer-game-kotlin/index.md)。承認済み 3、提案中 11）
+- [x] Bolt 1 の計画（ステップ計画）の作成と承認（[Bolt 1 計画](./bolt_1_plan.md)、2026-11-14）
 - [ ] Bolt の実行（Mob Construction）。各 Bolt の終わりに、Bolt 終了報告と、計画の更新
 - [ ] Release 0.1 → 0.2 → 1.0
 
@@ -348,7 +351,7 @@ gantt
 
 | Bolt | Unit | 状態 | 完了日 | 備考 |
 | :--- | :--- | :--- | :--- | :--- |
-| B1〜B15 | — | 未着手 | - | 計画の承認待ち |
+| B1〜B15 | — | 未着手 | - | 計画は承認済み（2026-11-14）。B1 は着手可能（[Bolt 1 計画](./bolt_1_plan.md)は承認済み） |
 | B16 | — | 予備 | - | |
 
 ### 計画の更新
@@ -360,12 +363,12 @@ gantt
 
 ## 次のステップ
 
-1. **本書の承認**（人）。あわせて、設計の暫定の決定（保持の起点、研修中の再構築の運用）を確認する。
-2. **H2 の導入の承認**（人。ローカル開発専用の新規依存。版は公式の情報で確認してから確定する）。あわせて、**PMD と Cucumber の導入の承認**（人。新規の依存関係。PMD は CI のツール、Cucumber-JVM と Cucumber-JS はテストの依存関係）。版は公式の情報で確認してから確定する。承認までは、静的解析は detekt と ktlint で進め、PMD のルールセットは B2 で fixture のテストと合わせて導入する（[開発戦略](./development_strategy.md) の未決事項）。
-3. 設計書（`draft`）を人が確認し、`stable` にする。技術スタック・テスト戦略を、開発戦略（Cucumber の依存関係、CI の工程、タグによるトレーサビリティ、PMD）に合わせて更新する。
-4. Kotlin 版の ADR を作成する（ES+CQRS、同期投影、冪等記録と認可の順序、detekt・PMD の判断、Cucumber の導入と Kotest との使い分け）。
-5. `apps/beer-game-kotlin/` を作成する（**新規ディレクトリのため、承認ゲート**）。フロントエンドの配置（beer-game2 の再利用か、新規か）と、フィーチャーファイルの配置を B1 で決める。
-6. Bolt 1 の計画（ステップ計画）を作成し、承認を受ける。最初のシナリオ（日本語 Gherkin）は、実装の前に Mob Elaboration で合意する。
+1. **Bolt 1 の Step 1（H2 の実測）から着手する**（[Bolt 1 計画](./bolt_1_plan.md)。承認済み）。ゲートごとに人が検証する。
+2. **設計の暫定の決定の確認**（人。保持の起点＝作成時、研修中の再構築の運用＝停止して再構築。B11・B12 の着手前までに）。
+3. **B2 で求める承認**: PMD の導入、API の契約テストの道具の選定と導入（Bolt 1 計画の判断項目 1 は、B1 で使う依存関係だけを承認している）。
+4. 設計書（`draft`）を人が確認し、`stable` にする。ADR（提案中 11 本）を人がレビューし、承認する。
+5. `apps/beer-game-kotlin/` は作成済み（`.gitkeep` のみ）。
+6. 最初のシナリオ（日本語 Gherkin）は、実装の前に Mob Elaboration で合意する（Bolt 1 の Step 3 のゲート）。
 
 ---
 
@@ -373,6 +376,7 @@ gantt
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-14 | **リリース計画の承認**（ユーザーの明示的な承認）。Bolt 1 の計画を承認（ユーザー）。H2・Cucumber の導入の承認を反映（PMD は B2）。ADR の作成済み、`apps/beer-game-kotlin/` の作成済みを反映 | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 契約テスト（OpenAPI）を反映: B1 に仕様を書く作業、B2 に契約テストと型の生成の CI への組み込みを追加。リスク R21、Release 0.1 の条件を追加。Bolt の所要と日程は変えない（B2 の 3 日に含める。超過は予備 B16 で吸収） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 初版作成（承認待ち） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | ユーザーの決定（ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18）を反映: B1 の最初に H2 の実測、ポート `ProjectionLock`・`ChangeNotifier` の 2 実装と契約テスト、リスク R20、H2 の導入の承認を追加。Bolt の所要と日程は変更しない | claude-code/claude-sonnet-5-5 |
