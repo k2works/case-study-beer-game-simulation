@@ -1,0 +1,225 @@
+# beer-game-kotlin の本番へのデプロイ（手動起動のみ。確認必須）。
+# ステージングで検証したイメージを、ビルドせずに**同じダイジェスト**で本番の ECR へ昇格して展開する。
+#
+# 状態: **AWS で実行していない・検証していない定義。** 書いただけで、一度も動かしていない（YAML の構文検証のみ）。
+# 承認: GitHub の `production` 環境の保護ルール（必須のレビュアー）で、人が承認してから実行される。
+#       保護ルールが未設定の環境で起動すると、承認なしで本番に展開されるため、**環境の保護を設定するまで起動しない**。
+# 自動で起動しない（`workflow_dispatch` のみ。`push`・`schedule` は置かない）。
+# 設計: docs/design/beer-game-kotlin/architecture-infrastructure.md「CI/CD」。
+#
+# 設計との食い違い（未決）: 設計書は本番を「ブルー/グリーン（CodeDeploy）」とするが、Step 2 の Terraform は
+#   ECS のローリング更新（サーキットブレーカー付き）で定義している。本ワークフローはそれに合わせたローリング更新。
+#   ブルー/グリーンへの切り替えは、AWS 適用のゲートで判断する。
+# 前提（未確認）: ステージングと本番の ECR が同じアカウント・同じリージョンにあり、本番のデプロイロールが
+#   ステージングの ECR を読める（昇格のため）。アカウントを分ける場合は、昇格の手順の見直しが要る。
+# イベントの形を変えるリリース: 2 段階（読む版 → 書く版）。書く版を上げた後は旧イメージへ戻せないことがある。rollback.md を参照。
+#
+# 必要な変数（Settings > Environments > production の Variables。terraform output から。値は書かない）:
+#   AWS_ROLE_ARN  AWS_REGION  ECR_REPOSITORY  STAGING_ECR_REPOSITORY（昇格元）  ECS_CLUSTER  ECS_SERVICE
+#   API_TASK_FAMILY  MIGRATE_TASK_FAMILY  WEB_BUCKET  DISTRIBUTION_ID  TASK_SG  TASK_SUBNETS（カンマ区切り）  PRODUCTION_URL
+name: beer-game-kotlin-deploy-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'ステージングで検証したイメージのダイジェスト（sha256:...）'
+        required: true
+        type: string
+      release:
+        description: 'そのイメージのコミット SHA（静的ファイルを同じコミットからビルドする）'
+        required: true
+        type: string
+
+concurrency:
+  group: beer-game-kotlin-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC（長期のアクセスキーは使わない）
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # 保護ルール（必須のレビュアー）で承認される。OIDC の信頼の条件（environment:production）とも対応する
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      API_TASK_FAMILY: ${{ vars.API_TASK_FAMILY }}
+      MIGRATE_TASK_FAMILY: ${{ vars.MIGRATE_TASK_FAMILY }}
+      WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
+      TASK_SUBNETS: ${{ vars.TASK_SUBNETS }}
+      TASK_SG: ${{ vars.TASK_SG }}
+      BASE_URL: ${{ vars.PRODUCTION_URL }}
+      RELEASE_ID: ${{ inputs.release }}
+      DIGEST: ${{ inputs.digest }}
+    steps:
+      - name: 入力の検査
+        working-directory: .
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "ダイジェストの形式が違います" >&2; exit 1; }
+          [[ "$RELEASE_ID" =~ ^[0-9a-f]{40}$ ]] || { echo "コミット SHA の形式が違います" >&2; exit 1; }
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: 直前の版を記録
+        id: previous
+        run: |
+          PREV_TD="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)"
+          PREV_KEY="$(aws s3api list-objects-v2 --bucket "$WEB_BUCKET" --prefix deployments/ \
+            --query 'reverse(sort_by(Contents, &Key))[0].Key' --output text 2>/dev/null || true)"
+          PREV_RELEASE=""
+          if [ -n "$PREV_KEY" ] && [ "$PREV_KEY" != "None" ]; then
+            PREV_RELEASE="$(aws s3 cp "s3://$WEB_BUCKET/$PREV_KEY" - --only-show-errors | jq -r .release)"
+          fi
+          echo "直前の api タスク定義: $PREV_TD / 直前の静的ファイルの版: ${PREV_RELEASE:-なし}"
+          echo "task_definition=$PREV_TD" >> "$GITHUB_OUTPUT"
+          echo "release=$PREV_RELEASE" >> "$GITHUB_OUTPUT"
+
+      # ステージングの ECR から本番の ECR へ、マニフェストを変えずに写す（ダイジェストは変わらない）
+      - name: 同じダイジェストのイメージを本番の ECR へ昇格
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          SOURCE_REPOSITORY: ${{ vars.STAGING_ECR_REPOSITORY }}
+        run: |
+          if ! aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" >/dev/null 2>&1; then
+            docker buildx imagetools create \
+              --tag "$REGISTRY/$REPOSITORY:$RELEASE_ID" "$REGISTRY/$SOURCE_REPOSITORY@$DIGEST"
+          fi
+          PROMOTED="$(aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" \
+            --query 'imageDetails[0].imageDigest' --output text)"
+          if [ "$PROMOTED" != "$DIGEST" ]; then
+            echo "::error::昇格したイメージのダイジェストが違います（$PROMOTED）。中止します。"
+            exit 1
+          fi
+          echo "image=$REGISTRY/$REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: タスク定義の登録
+        id: taskdef
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          register() {
+            local family="$1" tmp
+            tmp="$(mktemp)"
+            aws ecs describe-task-definition --task-definition "$family" --query taskDefinition --output json \
+              | jq --arg image "$IMAGE" '
+                  del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+                  | .containerDefinitions[0].image = $image' > "$tmp"
+            aws ecs register-task-definition --cli-input-json "file://$tmp" \
+              --query taskDefinition.taskDefinitionArn --output text
+          }
+          echo "api=$(register "$API_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+          echo "migrate=$(register "$MIGRATE_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+
+      - name: マイグレーション（migrate タスク）
+        env:
+          MIGRATE_TD: ${{ steps.taskdef.outputs.migrate }}
+        run: |
+          TASK_ARN="$(aws ecs run-task --cluster "$ECS_CLUSTER" --launch-type FARGATE --task-definition "$MIGRATE_TD" \
+            --network-configuration "awsvpcConfiguration={subnets=[$TASK_SUBNETS],securityGroups=[$TASK_SG],assignPublicIp=ENABLED}" \
+            --query 'tasks[0].taskArn' --output text)"
+          echo "migrate タスク: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN"
+          EXIT_CODE="$(aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::マイグレーションに失敗しました（終了コード: $EXIT_CODE）。デプロイを中止します。ログ: CloudWatch Logs の /ecs/<名前>/migrate"
+            exit 1
+          fi
+          echo "マイグレーションが完了しました（終了コード 0）"
+
+      - name: api サービスの更新
+        id: update
+        env:
+          API_TD: ${{ steps.taskdef.outputs.api }}
+        run: |
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$API_TD" >/dev/null
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          ROLLOUT="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query "services[0].deployments[?status=='PRIMARY'].rolloutState | [0]" --output text)"
+          if [ "$ROLLOUT" != "COMPLETED" ]; then
+            echo "::error::ローリング更新が完了しませんでした（rolloutState: $ROLLOUT）"
+            exit 1
+          fi
+
+      - name: 静的ファイルの公開
+        id: web
+        working-directory: apps/beer-game-kotlin/web
+        run: |
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          npm ci
+          npm run build
+          aws s3 sync dist "s3://$WEB_BUCKET/releases/$RELEASE_ID/" --delete --only-show-errors
+          aws s3 sync "s3://$WEB_BUCKET/releases/$RELEASE_ID/" "s3://$WEB_BUCKET/current/" --delete --only-show-errors
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' >/dev/null
+
+      # 自動確定を含む業務のスモークテストは未実装（未確認）。本番では、ready と health の確認のみ
+      - name: スモークテスト
+        run: |
+          [ -n "$BASE_URL" ] || { echo "::error::PRODUCTION_URL が未設定です"; exit 1; }
+          check() {
+            local path="$1" i code
+            for i in $(seq 1 30); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$BASE_URL$path" || true)"
+              if [ "$code" = "200" ]; then echo "ok: $path"; return 0; fi
+              echo "待機 $i/30: $path -> $code"; sleep 5
+            done
+            echo "::error::$path が 200 になりません（最後: $code）"; return 1
+          }
+          check /api/v1/ready
+          check /api/v1/health
+
+      - name: デプロイの履歴を記録（ロールバックの候補）
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+          API_TD: ${{ steps.taskdef.outputs.api }}
+          MIGRATE_TD: ${{ steps.taskdef.outputs.migrate }}
+        run: |
+          jq -n --arg release "$RELEASE_ID" --arg image "$IMAGE" --arg api "$API_TD" --arg migrate "$MIGRATE_TD" \
+            --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{release: $release, image: $image, apiTaskDefinition: $api, migrateTaskDefinition: $migrate, deployedAt: $at}' \
+            | aws s3 cp - "s3://$WEB_BUCKET/deployments/$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_ID.json" --only-show-errors
+
+      # 失敗時の自動ロールバック。マイグレーションは戻さない。新しい schema_version のイベントが書かれていると、旧版で読めないことがある
+      - name: 失敗時のロールバック（直前の版へ）
+        if: failure() && steps.update.outputs.updated == 'true'
+        env:
+          PREV_TD: ${{ steps.previous.outputs.task_definition }}
+          PREV_RELEASE: ${{ steps.previous.outputs.release }}
+        run: |
+          echo "::warning::失敗したため、直前の版へ戻します（マイグレーションは戻しません）"
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$PREV_TD" >/dev/null
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          if [ "${{ steps.web.outputs.published }}" = "true" ] && [ -n "$PREV_RELEASE" ]; then
+            aws s3 sync "s3://$WEB_BUCKET/releases/$PREV_RELEASE/" "s3://$WEB_BUCKET/current/" --delete --only-show-errors
+            aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' >/dev/null
+          fi
+          echo "直前の版（$PREV_TD）へ戻しました。実行自体は失敗のままです。原因を調べてください"

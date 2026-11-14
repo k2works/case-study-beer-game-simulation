@@ -10,6 +10,7 @@ name: beer-game-kotlin
 #   pmd     : fixture のテスト → 層ごとの検査
 #   web     : フロントエンド（format・lint・typecheck・コンポーネント・build）と、Cucumber-JS の Undefined 検査
 #   ui      : 受け入れ @ui（Cucumber-JS + Playwright。H2 のバックエンドを起動する）
+#   container: コンテナのスモークテスト（docker build と scripts/container-smoke.sh。Bolt 3 Step 3。検証のみ・AWS 無関係）
 #   n1      : N-1 互換（雛形。直前のリリースのタグが無い間は、中身を実行しない）
 #
 # actions の版: checkout・setup-node・upload-artifact は、beer-game3.yml と同じ SHA 固定（コメントの版）。
@@ -207,6 +208,18 @@ jobs:
       - name: バックエンドの停止
         if: always()
         run: pkill -f 'beergame.app.MainKt' || true
+
+  container:
+    name: コンテナのスモークテスト（docker build・api・migrate）
+    runs-on: ubuntu-24.04
+    # ローカルの実測: 初回のビルド約 6 分、スモークテスト数分（起動時間の計測 3 回を含む）。runner の初回の取得を見込んで 30 分。
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # scripts/container-smoke.sh が、docker build と、postgres:18-alpine のコンテナの起動までを行う（AWS には接続しない）。
+      # 確かめること: api の /api/v1/ready が 200、migrate が終了コード 0、秘密が無ければ 78 で起動失敗、H2 の拒否、非 root、起動時間
+      - name: docker build とスモークテスト
+        run: ./scripts/container-smoke.sh
 
   n1:
     name: N-1 互換（雛形）

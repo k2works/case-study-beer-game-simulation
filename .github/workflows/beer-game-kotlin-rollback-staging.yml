@@ -1,0 +1,111 @@
+# beer-game-kotlin のステージングを、直前（または指定）の版へ戻す（手動起動のみ）。
+#
+# 状態: **AWS で実行していない・検証していない定義。** 書いただけで、一度も動かしていない（YAML の構文検証のみ）。
+# 戻すもの: api サービスのタスク定義（イメージのダイジェスト）と、静的ファイルの版。
+# 戻さないもの: **マイグレーション（スキーマ）とイベント**。スキーマは拡張 → 互換 → 縮小で、旧アプリと互換にしてある。
+#
+# マイグレーションの前方互換の注意（NF-O11、N-1 互換。operation.md「変更管理」）:
+#   新しい schema_version・新しいイベントの種類は、2 段階（読む版 → 書く版）でリリースする。
+#   **書く版を上げて、新しい版のイベントが events に書かれた後は、旧イメージへ戻せないことがある**
+#   （旧アプリが新しいイベントを読めず、イベントの読み込み失敗になる）。その場合は戻さずに、新しい版を直して前進する。
+#   戻してよいかの確認を、入力の confirm_compatible で人に求める（rollback.md「戻せないケース」）。
+#
+# 必要な変数（Environment: staging）: AWS_ROLE_ARN  AWS_REGION  ECS_CLUSTER  ECS_SERVICE  WEB_BUCKET  DISTRIBUTION_ID  STAGING_URL
+name: beer-game-kotlin-rollback-staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_release:
+        description: '戻す先のコミット SHA（省略すると、現在と違う直近の成功した版）'
+        required: false
+        type: string
+      confirm_compatible:
+        description: '旧イメージが、現在のイベントを読めることを確認した（読む版のリリース済み、または書く版を上げていない）'
+        required: true
+        type: boolean
+
+# デプロイと同じグループ。同時に実行しない
+concurrency:
+  group: beer-game-kotlin-deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
+      BASE_URL: ${{ vars.STAGING_URL }}
+      TARGET_RELEASE: ${{ inputs.target_release }}
+      CONFIRMED: ${{ inputs.confirm_compatible }}
+    steps:
+      - name: 互換性の確認
+        run: |
+          if [ "$CONFIRMED" != "true" ]; then
+            echo "::error::旧イメージが現在のイベントを読めることを確認してください（rollback.md「戻せないケース」）。中止します"
+            exit 1
+          fi
+          [[ -z "$TARGET_RELEASE" || "$TARGET_RELEASE" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::コミット SHA の形式が違います"; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: 戻す先を選んで、ロールバック
+        run: |
+          CURRENT_TD="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)"
+          echo "現在のタスク定義: $CURRENT_TD"
+
+          # デプロイの履歴（新しい順）から、戻す先を選ぶ
+          KEYS="$(aws s3api list-objects-v2 --bucket "$WEB_BUCKET" --prefix deployments/ \
+            --query 'reverse(sort_by(Contents, &Key))[].Key' --output text | tr '\t' '\n')"
+          TARGET_JSON=""
+          for key in $KEYS; do
+            entry="$(aws s3 cp "s3://$WEB_BUCKET/$key" - --only-show-errors)"
+            release="$(jq -r .release <<<"$entry")"
+            td="$(jq -r .apiTaskDefinition <<<"$entry")"
+            if [ -n "$TARGET_RELEASE" ]; then
+              [ "$release" = "$TARGET_RELEASE" ] && { TARGET_JSON="$entry"; break; }
+            elif [ "$td" != "$CURRENT_TD" ]; then
+              TARGET_JSON="$entry"; break
+            fi
+          done
+          [ -n "$TARGET_JSON" ] || { echo "::error::戻す先の履歴が見つかりません"; exit 1; }
+
+          RELEASE="$(jq -r .release <<<"$TARGET_JSON")"
+          API_TD="$(jq -r .apiTaskDefinition <<<"$TARGET_JSON")"
+          echo "戻す先: $RELEASE（$(jq -r .image <<<"$TARGET_JSON")）"
+
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$API_TD" >/dev/null
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+
+          aws s3 sync "s3://$WEB_BUCKET/releases/$RELEASE/" "s3://$WEB_BUCKET/current/" --delete --only-show-errors
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' >/dev/null
+          echo "$RELEASE に戻しました（マイグレーションは戻していません）"
+
+      - name: スモークテスト（戻した後の確認）
+        run: |
+          [ -n "$BASE_URL" ] || { echo "::error::STAGING_URL が未設定です"; exit 1; }
+          check() {
+            local path="$1" i code
+            for i in $(seq 1 30); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$BASE_URL$path" || true)"
+              if [ "$code" = "200" ]; then echo "ok: $path"; return 0; fi
+              echo "待機 $i/30: $path -> $code"; sleep 5
+            done
+            echo "::error::$path が 200 になりません（最後: $code）"; return 1
+          }
+          check /api/v1/ready
+          check /api/v1/health

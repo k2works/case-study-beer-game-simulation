@@ -172,6 +172,11 @@ nav:
           - アプリケーション開発環境セットアップ: operation/beer-game2/application_dev_setup.md
           - AWS ステージング環境セットアップ: operation/beer-game2/aws_staging_setup.md
           - AWS プロダクション環境セットアップ・運用: operation/beer-game2/aws_production_setup.md
+      - beer-game-kotlin:
+          - 概要: operation/beer-game-kotlin/index.md
+          - デプロイ: operation/beer-game-kotlin/deploy.md
+          - ロールバック: operation/beer-game-kotlin/rollback.md
+          - コンテナのローカル実行: operation/beer-game-kotlin/container_local.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:

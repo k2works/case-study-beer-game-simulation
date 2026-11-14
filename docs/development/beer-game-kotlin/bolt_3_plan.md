@@ -163,10 +163,53 @@ AWS への適用、独自ドメイン・ACM・CloudFront の本番設定の完�
 
 ### Step 3: デプロイ・ロールバックの定義とスモークテスト（🟢）
 
-- [ ] 3.1 CI/CD の定義（ビルド → ECR への push → マイグレーション → ECS の更新 → スモークテスト → 失敗時のロールバック）。**`workflow_dispatch` のみ**（自動で起動しない）。AWS の資格は OIDC（秘密を持たない）。**実行しない**
-- [ ] 3.2 スモークテストの手順（ローカルのコンテナで実行できるもの）と、ロールバックの手順（直前のタスク定義へ戻す。マイグレーションの前方互換の注意: 読む版 → 書く版の 2 段階リリース）を、運用の文書にまとめる
+- [x] 3.1 CI/CD の定義（ビルド → ECR への push → マイグレーション → ECS の更新 → スモークテスト → 失敗時のロールバック）。**`workflow_dispatch` のみ**（自動で起動しない）。AWS の資格は OIDC（秘密を持たない）。**実行しない**
+- [x] 3.2 スモークテストの手順（ローカルのコンテナで実行できるもの）と、ロールバックの手順（直前のタスク定義へ戻す。マイグレーションの前方互換の注意: 読む版 → 書く版の 2 段階リリース）を、運用の文書にまとめる
 
-**ゲート 3**: デプロイ・ロールバックの定義を、人が確認する。
+**ゲート 3**: デプロイ・ロールバックの定義を、人が確認する（**本番環境・デプロイ設定は確認必須**）。**状態: 人の確認待ち（未承認）。**
+
+#### Step 3 の結果（2026-11-15。AWS には接続・実行していない。ワークフローは一度も起動していない）
+
+**成果物**
+
+| 種別 | ファイル |
+| :--- | :--- |
+| ワークフロー（新規 4 本。`workflow_dispatch` のみ） | `.github/workflows/beer-game-kotlin-deploy-staging.yml`、`-deploy-production.yml`、`-rollback-staging.yml`、`-rollback-production.yml` |
+| ワークフロー（既存に追加） | `.github/workflows/beer-game-kotlin.yml` に `container` ジョブ（`docker build` と `scripts/container-smoke.sh`。自動で起動。検証のみ・AWS 無関係。`timeout-minutes: 30`） |
+| 運用の手順書（新規） | `docs/operation/beer-game-kotlin/deploy.md`、`rollback.md`、`container_local.md`（`index.md` と `mkdocs.yml` の nav に登録） |
+
+**設計**: デプロイは、ビルド → ECR（不変タグ、以降ダイジェスト固定）→ タスク定義の登録（api と migrate）→ **migrate（1 回限りの ECS タスク。終了コード 0 でなければ中止）** → api の更新（ローリング + サーキットブレーカー）→ 静的ファイル（`web/dist` を S3 の `releases/<SHA>/` から `current/`）→ スモークテスト → 履歴の記録。失敗時は、直前のタスク定義と静的ファイルの版へ自動で戻す（マイグレーションは戻さない）。本番はステージングのダイジェストを昇格（ビルドしない）。ロールバックは、履歴（S3 の `deployments/`）から選び、`confirm_compatible`（旧イメージが現在のイベントを読めることの確認）を必須入力にした。2 段階リリース（NF-O11、N-1 互換）と戻せないケースは、ワークフローのコメントと `rollback.md` に記載。値（ロール ARN・リージョン・クラスタ名など）はすべて `vars` から取り、ワークフローに書いていない。
+
+**検証の結果（実測）**
+
+| 検証 | 結果 |
+| :--- | :--- |
+| 5 本の YAML の構文（`ruby -ryaml`） | すべて成功 |
+| トリガー | デプロイ 2 本・ロールバック 2 本は **`workflow_dispatch` のみ**（`push`・`pull_request`・`schedule` なし。`push` はデプロイ（staging）にコメントアウトで残した）。`beer-game-kotlin.yml` は `pull_request`・`push`・`workflow_dispatch`（`container` ジョブを追加） |
+| コンテナのスモークテスト | `SKIP_BUILD=1 RUNS=1 IMAGE=beer-game-kotlin:smoke ./scripts/container-smoke.sh` を実行: **全項目成功**（api の `/api/v1/ready`・`/api/v1/health` が 200、HEALTHCHECK が healthy、migrate が終了コード 0、秘密なし・H2 の拒否は 78、未実装モードは 69、非 root、SIGTERM は 143）。起動時間 5775 ms（1 回） |
+| `actionlint`・`shellcheck` | ローカルに無く**未実行** |
+| `apps/beer-game-kotlin/` | 変更なし（スクリプトの修正は不要だった） |
+
+**AWS で実行していない**: デプロイ・ロールバックのワークフローは、AWS・ECR・GitHub Actions のいずれでも実行していない。OIDC、`aws ecs`、`aws s3` の呼び出しの動作は未確認。
+
+**人が AWS 適用時に設定するもの**
+
+- GitHub Environment: `staging`、`production`（名前は OIDC の信頼の条件と一致させる）。**`production` には必須のレビュアー（保護ルール）**。
+- Variables（両環境）: `AWS_ROLE_ARN`（`deploy_role_arn`）、`AWS_REGION`、`ECR_REPOSITORY`、`ECS_CLUSTER`、`ECS_SERVICE`、`API_TASK_FAMILY`、`MIGRATE_TASK_FAMILY`、`WEB_BUCKET`、`DISTRIBUTION_ID`、`TASK_SG`（`task_security_group_id`）、`TASK_SUBNETS`（`task_subnet_ids` をカンマ区切り）、`STAGING_URL`（staging）・`PRODUCTION_URL`（production）。本番はさらに `STAGING_ECR_REPOSITORY`。Secrets は使わない。
+- 本番のデプロイロールに、ステージングの ECR の読み取りを許可（昇格のため。**Step 2 の `github_oidc` の権限は、自環境の ECR のみで、未対応**）。
+- 前提の AWS 準備（アカウント、OIDC プロバイダー、状態用 S3、ドメイン、Terraform の適用順）は、Step 2 の「AWS への適用の前に、人が確認すべき項目」を参照。手順書には創作していない。
+
+**設計書との食い違い・未決・未確認**
+
+1. 設計書は本番を「ブルー/グリーン（CodeDeploy）」とするが、Step 2 の Terraform はローリング更新（サーキットブレーカー）で、ワークフローも合わせた。**どちらにするかは未決**。
+2. 設計のスモークテストは「作成・参加・SSE・ポーリング・自動確定」だが、デプロイ後は **`/api/v1/ready` と `/api/v1/health` の確認だけ**。業務のスモークは**未実装**。
+3. Step 2 のデプロイロールの権限と、ワークフローの呼び出しの**突合は未実施**（例: 昇格に要る `ecr:BatchGetImage` の他環境への許可、`ecs:RunTask` の `iam:PassRole`、`ecs:DescribeTasks`、ログの読み取り）。権限不足は AWS での実行で初めて分かる。
+4. 初回のデプロイ: `image` は ECR のダイジェスト固定が必須だが、ECR は同じ Terraform が作る（Step 2 の未決 8）。先に ECR だけを作る手順は、**まだ手順書に書いていない**（Step 2 の項目を参照するにとどめた）。
+5. ステージングと本番の ECR が同一アカウントであること（昇格）は**未確認の前提**。
+6. 2 段階リリースの「書く版」を設定で切り替える仕組み（設計の未決）は未実装。N-1 互換の CI ジョブは雛形のまま。
+7. `aws-actions/configure-aws-credentials@v5`、`amazon-ecr-login@v2`、`setup-java`、`gradle/actions` は SHA を確認できておらず**版のタグ（未固定）**。`checkout`・`setup-node` は既存の固定済みの SHA を再利用。
+8. CI の `container` ジョブの所要は、ローカルの実測（初回ビルド約 6 分、スモークテスト数分）からの見積もりで、GitHub Actions 上の実行は**未確認**。
+9. 履歴を S3 の Web バケットの `deployments/` に置く設計（beer-game2 の踏襲）は、Step 2 の IAM（`WebBucket` の権限）で足りる見込みだが、バケットポリシーとの突合は未確認。静的ファイルの公開先は、CloudFront のオリジンの設定（`current/`）との整合が未確認。
 
 ### Step 4: 検証と終了（✅）
 
