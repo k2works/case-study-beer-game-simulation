@@ -201,6 +201,7 @@ class PostgresPersistenceSpec :
         idempotencyContract { fx }
         projectionLockContract { fx }
         changeNotifierContract { fx }
+        applicationFlowContract { fx }
 
         test("[7.1] 確認: テスト用の PostgreSQL は postgres:18 である") {
             fx.query("SHOW server_version") { it.getString(1) }.single().substringBefore('.') shouldBe "18"

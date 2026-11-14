@@ -3,8 +3,11 @@ package beergame.persistence
 import beergame.application.ChangeNotifier
 import beergame.application.EventStore
 import beergame.application.IdempotencyStore
+import beergame.application.PeripheralStore
 import beergame.application.ProjectionLock
+import beergame.application.ProjectionReader
 import beergame.application.ProjectionWriter
+import beergame.application.Stores
 import java.sql.Connection
 import javax.sql.DataSource
 
@@ -29,12 +32,15 @@ class Coordination(
 /** 永続化のポートの束。方言ごとの実装を、設定（[Dialect]）で選んで組み立てる。 */
 class Persistence internal constructor(
     val dialect: Dialect,
-    val events: EventStore,
-    val projections: ProjectionWriter,
-    val idempotency: IdempotencyStore,
+    val stores: Stores,
     private val coordination: Coordination,
     private val onClose: () -> Unit,
 ) : AutoCloseable {
+    val events: EventStore get() = stores.events
+    val projections: ProjectionWriter get() = stores.project
+    val idempotency: IdempotencyStore get() = stores.idempotency
+    val peripheral: PeripheralStore get() = stores.peripheral
+    val reader: ProjectionReader get() = stores.reader
     val lock: ProjectionLock get() = coordination.lock
     val notifier: ChangeNotifier get() = coordination.notifier
 
@@ -54,34 +60,26 @@ class Persistence internal constructor(
             config: PersistenceConfig,
             listenConnection: (() -> Connection)? = null,
         ): Persistence {
-            val events = JdbcEventStore(dialect, JdbcTransactionRunner(dataSource)).port()
-            val idempotency = JdbcIdempotencyStore(dialect, ResponseCipher(config.responseKey)).port()
-            val projections = JdbcProjectionWriter(dialect)
+            val stores =
+                Stores(
+                    events = JdbcEventStore(dialect, JdbcTransactionRunner(dataSource)).port(),
+                    project = JdbcProjectionWriter(dialect),
+                    idempotency = JdbcIdempotencyStore(dialect, ResponseCipher(config.responseKey)).port(),
+                    peripheral = JdbcPeripheralStore().port(),
+                    reader = JdbcProjectionReader(dataSource),
+                )
             return when (dialect) {
                 Dialect.POSTGRES -> {
                     val connect = requireNotNull(listenConnection) { "PostgreSQL では、LISTEN 用の接続の作り方が要る" }
                     val notifier = PostgresChangeNotifier(connect, config.listenReconnectMillis)
                     notifier.start(LISTEN_READY_TIMEOUT_MILLIS)
                     val lock = PostgresProjectionLock(config.lockTimeoutMillis).port()
-                    Persistence(
-                        dialect,
-                        events,
-                        projections,
-                        idempotency,
-                        Coordination(lock, notifier.port()),
-                        notifier::close,
-                    )
+                    Persistence(dialect, stores, Coordination(lock, notifier.port()), notifier::close)
                 }
 
                 Dialect.H2 -> {
                     val lock = LocalProjectionLock(config.lockTimeoutMillis).port()
-                    Persistence(
-                        dialect,
-                        events,
-                        projections,
-                        idempotency,
-                        Coordination(lock, LocalChangeNotifier().port()),
-                    ) {}
+                    Persistence(dialect, stores, Coordination(lock, LocalChangeNotifier().port())) {}
                 }
             }
         }

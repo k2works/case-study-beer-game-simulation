@@ -50,4 +50,5 @@ class H2PersistenceSpec :
         idempotencyContract { fx }
         projectionLockContract { fx }
         changeNotifierContract { fx }
+        applicationFlowContract { fx }
     })

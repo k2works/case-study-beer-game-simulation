@@ -830,11 +830,65 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 8: アプリケーション（🔴🟢🟡）
 
-- [ ] 8.1 🔴 関数の束（`Ports` をスタブに差し替え）のテスト: 「認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影」の順序。成功した応答だけを保存。失効した資格の再送は 403。`AppFailure`
-- [ ] 8.2 🟢 `execute` と、認可、冪等、再試行（`ConcurrencyConflict` の上限つき）の実装
-- [ ] 8.3 🟡 Refactor
+- [x] 8.1 🔴 関数の束（`Ports` をスタブに差し替え）のテスト: 「認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影」の順序。成功した応答だけを保存。失効した資格の再送は 403。`AppFailure`
+- [x] 8.2 🟢 `execute` と、認可、冪等、再試行（`ConcurrencyConflict` の上限つき）の実装
+- [x] 8.3 🟡 Refactor
 
-**ゲート 8**: 処理の順序（[ADR-004](../../adr/beer-game-kotlin/004-idempotency-after-authorization.md)）と、業務ルールが関数の束に漏れていないことを確認する。
+**ゲート 8**: 処理の順序（[ADR-004](../../adr/beer-game-kotlin/004-idempotency-after-authorization.md)）と、業務ルールが関数の束に漏れていないことを確認する。**人の確認待ち（未承認）**。
+
+#### Step 8 の結果（2026-11-14、AI の実施。**ゲート 8 は人の確認待ち（未承認）**。コミットは未実施）
+
+**作ったもの**（`apps/beer-game-kotlin/`）:
+
+- `application/src/main/kotlin/beergame/application/`: `Execute.kt`（`runCommand`、`withAppendRetry`、認証と認可の前提検査、冪等の照合）、`StreamDef.kt`（1 本・2 本のストリームへの読み込み → `decide` → 追記 → 投影 → 周辺ストア → 通知）、`Commands.kt`（B1 のユースケース 6 つ: `createGame`、`joinGame`、`assignRole`、`startGame`、`saveDecision`、`commitWeek`）、`Validation.kt`（入力の形の検証。誤りを集める）、`Query.kt`（`snapshot`）、`Disclosure.kt`（開示の規則）、`ReadModel.kt`（投影から読んだ行と、呼び出した人ごとの投影の型）、`Credentials.kt`（資格、周辺ストアのポートと書き込みの導出）、`Outcome.kt`（応答 `CommandOutcome`、冪等記録に保存する本文の符号化）、`AppPorts.kt`（`Ports`、`AppSettings`）、`Hmac.kt`、`SecureTokens.kt`。`IdempotencyDigest.kt` は `Hmac` を使うよう直しただけ。
+- `adapter-persistence/src/main/kotlin/beergame/persistence/`: `JdbcPeripheralStore.kt`（`display_profiles`・`credentials`・`browser_sessions` の書き込み、資格の認証、参加コードからのゲームの照合）、`JdbcProjectionReader.kt`（投影の読み取り。読み取り専用・REPEATABLE READ の 1 トランザクションで、`projection_checkpoints` も読む）。`Persistence.kt` は、`Stores`（application の束）を持つ形にし、`peripheral`・`reader` を公開した。
+- `domain`: `GameError.InvitationInvalid`（`game.invitation_invalid`、Forbidden）を 1 つ足した（下の食い違い 5）。`DomainFoundationSpec` の code 一覧に 1 行足した。
+- 試験: `application/src/test/`（`World.kt`＝メモリ上の `Ports`。COMMIT / ROLLBACK を本物と同じ意味で持つ、`Scenarios.kt`、`ExecuteSpec`、`GameCommandsSpec`、`SessionCommandsSpec`、`SnapshotSpec`、`SupportSpec`）、`adapter-persistence/src/test/.../ApplicationFlowContract.kt`（H2 と PostgreSQL の両方で、実物の永続化を通す契約。7 件）。`app/`・ルートの依存カタログ・各 `build.gradle.kts` は触っていない（新しい依存なし）。`app` での配線（`Ports` の組み立て、`SecureTokens` の差し込み）は Step 9。
+
+**実行したコマンドと結果（実測）**:
+
+| コマンド | 結果 |
+| :--- | :--- |
+| Red（試験だけがある状態）`./gradlew :application:test`（JDK 25） | **`compileTestKotlin` 失敗**（`Unresolved reference` など 456 件。`saveDecision`、`CreateGameInput`、`Ports` の新しい形など） |
+| `./gradlew build integrationTest -x :app:acceptanceTest koverXmlReport`（JDK 25） | **成功**（約 1 分 42 秒。ktlint、警告のエラー化、`verifyDomainDependencies`、Kover を含む）。`:app:acceptanceTest` は Step 3 から意図した Red のまま除外 |
+| `./gradlew detektMain detektTest`（JDK 21） | **成功**（違反 0 件。`@Suppress`・ベースライン・設定の緩和なし） |
+| テスト件数 | domain 201（+1）、application 86（既存 6 + 新規 80）、adapter-persistence `test`（H2）46（+7）、`integrationTest`（PostgreSQL 18）44（+7）、app 7、adapter-http 1。すべて成功 |
+| Kover（行 / 分岐） | application 563/576（97.8%）/ 90/127（70.9%）、adapter-persistence 1076/1098（98.0%）/ 194/297（65.3%）、domain 784/804（97.5%）/ 160/163（98.2%）。Kover が `integrationTest` を含めるかは未確認（`test` の分だけと見ている） |
+| 禁止事項の確認 `grep -E 'var\|!!\|throw\|mutable\|Instant.now\|randomUUID'`（`application/src/main`） | 該当なし |
+
+**処理の順序（実装と試験で固定）**: `ロック（共有）→ 認証（操作者・資格の有効性）→ 認可の前提検査（資格のゲームと対象のゲームの一致）→ 冪等記録の照合 → 読み込み → decide → 追記 → 投影 → 周辺ストア → 通知 → 冪等記録の保存`。全体が 1 つのトランザクションで、`Left` なら ROLLBACK。`ExecuteSpec` が、ポートの呼び出しの順を文字列の列で比べる。成功した応答だけを保存し（業務の失敗は保存せず、再送は再計算）、`request_digest` は本文・対象（scope）・操作者の ID から作る。再試行は `ConcurrencyConflict` だけで、上限は `AppSettings.maxAttempts`（設定から注入。上限に達したら `RetryExhausted`）。再試行のたびに、認証から評価し直す。
+
+**TDD の順序の証跡**:
+
+1. `application` は、試験（上の 6 ファイル）を **本番コードより先に**書き、`:application:test` が 456 件のコンパイル失敗で Red になることを確認してから実装した（Green）。実装後の 1 回目の実行で 86 件が通った。
+2. 常に通る試験になっていないことを、実装を意図的に壊して確かめ、戻した: (a) 冪等記録の検索を認証より前に置く → 4 件失敗（順序、再送、失効した資格、無効な資格）。(b) 要求の digest から操作者を除く ＋ 再試行の境界を 1 ずらす ＋ 顧客需要を全役割に開示 ＋ `requestedRole` の判定を反転（4 つを同時）→ 6 件失敗。(c) 資格のゲームの一致の検査を除く → 3 件失敗。(d) 認証 SQL から `revoked_at IS NULL` を除く → H2 の流れの試験 1 件失敗。(e) 読み取りの版の `game` と `session` を入れ替える → 1 件失敗。いずれも戻して全件成功を確認した。
+3. **順序を守れなかった点（正直な記録）**: (i) `adapter-persistence` の `JdbcPeripheralStore`・`JdbcProjectionReader` は、`ApplicationFlowContract` より**先に**書いた（本番コードが先）。試験を書いたあとの 1 回目の実行で落ちた 1 件は、試験側の誤り（ロビーの並びを固定の時計のもとで順序比較した）で、実装の誤りではなかった。実装の規則は上の (d)(e) の変異で確かめた。(ii) `bash` の `sed` でファイルを書き換えようとしたが、権限の判定で拒否され、実行されなかった（`Edit` に切り替えた）。(iii) `ktlintFormat`（プロジェクトの整形ツール）を実行し、自分が作ったファイルの整形をツールに任せた（内容の一括置換ではない）。(iv) `Streams.kt` を `StreamDef.kt` へ `mv` で改名した（detekt の `MatchingDeclarationName` のため）。heredoc・`python`・`perl`・`awk` でファイルを書いていない。
+
+**判断項目 #14（`browser_sessions` を B1 のどの処理が書くか）の決定（仮置き）**: **資格を発行する 2 つのコマンド（`createGame`、`joinGame`）が、追記と同じトランザクションで、`credentials` と `browser_sessions` を、同じダイジェストで書く**。生の資格は 1 つ（256 ビットの乱数。応答だけが運び、冪等記録には暗号化して保存される）で、DB・イベントにはダイジェストだけを保存する（鍵付き HMAC-SHA256。鍵の版は 1。冪等キーの digest とは別の鍵で、部分の並びも違う）。認証は、ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功し、不明・失効・期限切れを区別しない（`app.unauthorized`）。表示名は `display_profiles` にだけ書く（イベントに入れない）。**設計書との差**: 設計書は、ブラウザセッション（24 時間）と復帰資格（30 日）を別の値と読めるが、B1 は復帰（B5）が無いので、1 つの値で兼ねた。期限は、進行役が `retentionDays` 日、参加者が `participantCredentialTtl`（試験では 30 日）で、**ブラウザセッションの期限は資格と同じ**にした（24 時間にすると、B5 の復帰が無い B1 では、1 日後に誰も使えなくなるため）。B5 で、復帰の資格とブラウザセッションを別のダイジェストに分け、セッションを 24 時間にする想定。
+
+**設計書との食い違い・判断（人の確認が要る）**:
+
+1. **認証は `execute` の中（トランザクションの中）で行う**。設計書のスケッチは「認証（ルートで済み）」だが、ADR-004 の順序（認証 → 認可の前提検査 → 冪等記録の照合）を、再試行のたびに、同じトランザクションの中で守るため。ルートは、生の資格（Cookie の値）を `RequestMeta.credential` に入れて渡し、`Actor` を作らない。コマンドの `actor` は、認証の結果から `execute` の中で作る。
+2. **ロックは認証より前、`game_id` は呼び出し側が決める**。設計書どおり、トランザクションの先頭で共有ロックを取る。参加（`joinGame`）だけは、参加コードからゲームを引く必要があるので、別の短いトランザクションで `findGameByJoinCode` を先に行う（読み取りだけで、結果は変わらない）。
+3. **`Ports` の形**: 設計書は 8 項目（`now`、`newId`、`issueCredential`、`events`、`side`、`lock`、`notifier`）。実装は、`Generators`（`now`・`newId`・`newCredential`・`newJoinCode`）と `Stores`（`events`・`project`・`idempotency`・`peripheral`・`reader`）に束ね、`Ports` の項目を 5 つにした（detekt の引数の数の規則を、設定を緩めずに守るため）。同じ名前のプロパティでも読める。`SideStores`（設計書）は、Step 7 の分割（`ProjectionWriter`、`IdempotencyStore`）に、`PeripheralStore` を足した形になった。`PeripheralWrite` は設計書どおりの純粋な導出（`peripheralWrites`）。
+4. **`CommandOutcome` は `gameId` と資格（`issued`）も持つ**（設計書は `versions` だけ）。ゲーム作成の再送が同じゲームと同じ資格を返すために、冪等記録に保存する応答へ、`gameId` と資格の生の値を含める（暗号化は永続化の層）。HTTP が応答に何を載せるかは Step 9（OpenAPI は、作成の応答に `gameId` を含めるか未決のまま）。`Versions` は、**追記したストリームの版だけ**を持ち、追記しなかったストリームは `null`（追記が空の列だったときは、そのストリームの現在の版）。
+5. **`GameError.InvitationInvalid`（`game.invitation_invalid`）を `domain` に足した**。参加コードの不明・形式不正は、OpenAPI と設計書が、区別せず同じ 403 とする。`DomainError` は封印されたインターフェースで、`application` から実装できないため、`domain` に最小限で足した（`decide` は返さない。ゲームを引くのは境界）。**設計書との食い違い**: 受付終了（開始済み）のゲームの参加は、設計書の表（「無効・終了済み・不明・失効は区別しない」）と OpenAPI は同じ 403 だが、Gherkin（AC1.2.2 の 2 つ目）は「受付が終了しているという理由」を求め、`decideGame` は `game.not_preparing`（409）を返す。**後者に従った**（シナリオが別の理由を示せる）。HTTP の写像（Step 9）で確定する。
+6. **開示の規則（`Disclosure`）は `application` に置いた**。設計書は `domain`。読み取りの型（`ProjectedGame`）が `application` にあり、純粋関数で `Ports` に依存しないので、`domain` へ移すのは機械的にできる。観察者の規則（公開範囲、寄与者数での抑止）は B9。
+7. **スナップショットの項目名は仮置き**（OpenAPI が「未決」）。参加者には、自分の役割の在庫・受注残・入荷・受注・入力（数量と版）と、小売店だけの当週の顧客需要（`customerDemand`）、`session`（状態・週・入力済みの役割数）、`versions` を返し、他の役割の値・参加コード・他の参加者の表示名・将来の需要・`finalWeek` を返さない（将来の需要は、読み取りの型に項目が無い）。進行役には、全役割の状況と入力、参加コード、ロビー（表示名つき）、確定した週の結果、`finalWeek`。**`requestedRole`（他の役割の状況の取得、AC2.1.2）は、OpenAPI にパラメータが無いので、`snapshot` の引数にした**（自分の役割と違えば `game.forbidden`。経路への写像は Step 9）。参加者への週結果（自分の役割の過去の結果）、`game_settings`（進行役向け）は B1 では返さない。
+8. **`AppSettings.maxAttempts` は、設定から注入し、既定値を決めていない**（設計書は「実装開始時に計測して決める」）。競合の再試行時の遅延も未決のまま（遅延なし）。`lock_timeout` の既定（5 秒）は Step 7 のまま。値の決定には、実際の競合の頻度の計測が要る（未実施）。
+9. **Step 7 の「冪等記録の重複を `ConcurrencyConflict` にして、`execute` の再試行で記録を見つける」を確かめた**（`ExecuteSpec`: 同じキーのゲーム作成が保存で重複を検出 → 再試行で先の応答を返し、後のゲームは残らない）。実 DB の並行（同時に 2 つの要求）では未確認（逐次の 2 回目の契約まで。PostgreSQL の `uq_idempotency_create` の実際の並行は未実施）。
+10. **試験の補助関数は `runBlocking` で同期的に書いた**。`RedundantSuspendModifier`（detekt 1.23.8 が、別のモジュールの suspend 関数の呼び出しを検出できない。Step 7 の #10 と同じ原因）が、試験の補助関数に出たため、場面づくりの補助は `runBlocking` で同期的に書いた（メモリ上の世界と、実 DB の待ち）。`@Suppress` は使っていない。
+11. **ロビーの並び**: 参加者の一覧は `joined_at`、`participant_id` の順で、同じ時刻なら ID の順（乱数）になる。参加の順を保つ規則は未決（B1 の受入条件には無い）。
+12. **参加コードの重複**（`uq_game_join_codes_code`）は、12 文字（約 60 ビット）の乱数で実際には起きないとして、再試行しない（`Persistence` の失敗、500）。
+
+**未決・未確認・未実施**:
+
+- 競合の再試行の上限の値、遅延、`lock_timeout` の調整（8）。実 DB の並行の検証（9）。
+- `app` での `Ports` の組み立て（Step 9）。HTTP の写像（`AppFailure` と `DomainError` の分類 → HTTP の状態）、Cookie の名前と属性、応答の項目、`/ready`（Step 9）。
+- 読み取り専用のデータベースロール、観察者用の別の接続プール（B2・B9）。`projection_checkpoints` と行の同時点の読み取りが、PostgreSQL の REPEATABLE READ で実際に守られることの、並行下の検証は未実施（直列の実行で、版が `MAX(stream_version)` と一致することだけを確かめた）。H2 での分離の動作の同一性は未確認。
+- 資格の失効の書き込み（`revoked_at`）、役割の入れ替えでの失効、復帰は B5。本 Step の失効の試験は、`credentials.revoked_at` を直接更新して確かめた。観察者の書き込みの拒否は B9（B1 に観察者の操作者が無い）。
+- 通知（`notifier.publish`）は、追記したストリームの最後の版だけを積む。SSE への配信（`subscribe` の使い方）は Step 9。
+- コミットは未実施。
 
 ### Step 9: HTTP と観測性（🔴🟢🟡）
 

@@ -169,6 +169,15 @@ sealed interface GameError : DomainError {
         override val category: ErrorCategory = ErrorCategory.InvalidState
     }
 
+    /**
+     * 参加コードが無効（不明、または形式が不正）。区別せず、同じ応答にする（列挙の防止。AC1.2.2）。
+     * 参加コードからゲームを引くのは境界（Step 8 のアプリケーション層）なので、decide は返さない。
+     */
+    data object InvitationInvalid : GameError {
+        override val code: String = "game.invitation_invalid"
+        override val category: ErrorCategory = ErrorCategory.Forbidden
+    }
+
     /** 準備中でない（未作成、または開始済み）。 */
     data object NotPreparing : GameError {
         override val code: String = "game.not_preparing"
