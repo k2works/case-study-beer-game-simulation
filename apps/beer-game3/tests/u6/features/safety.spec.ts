@@ -2,6 +2,7 @@ import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { buildChildEnv, UnsafeEnvError } from '../../../verification/shared/child-env.js';
 import { Secret, containsSecret } from '../../../verification/shared/secret.js';
+import { allowsProgrammaticSelect } from '../../../verification/shared/platform.js';
 import { checkTarget, isLocalHost } from '../../../verification/shared/target-guard.js';
 
 // 機能: 検証の仕組みが、本番や staging を傷つけず、資格情報を漏らさない（NFR6.1、NFR6.3、NFR7.2）
@@ -110,6 +111,64 @@ describe('シナリオ: 子プロセスの環境は空から組み立てる', ()
 
   it('Given PG* を明示で渡そうとする When 組み立てる Then 拒否する', () => {
     expect(() => buildChildEnv(parent, { PGHOST: 'localhost' })).toThrow(UnsafeEnvError);
+  });
+});
+
+describe('シナリオ: ホストのない接続文字列と実行環境の PG* による外部への接続（レビューの Major 1）', () => {
+  it.each(['postgres:///bg3_verify_1', 'postgres://postgres:pw@/bg3_verify_1'])(
+    'Given ホストも host= もない %s When 検査する Then 拒否する（実行環境の PGHOST に向きうるため）',
+    (databaseUrl) => {
+      const result = checkTarget({ databaseUrl });
+      expect(result).toMatchObject({ ok: false, exitCode: 2, item: 'databaseHost' });
+      expect(JSON.stringify(result)).not.toContain('pw');
+    },
+  );
+
+  it('Given 実行環境の PGHOST が外部を指す When localhost の接続文字列を検査する Then 拒否する', () => {
+    const env = { PGHOST: 'evil.example.com' };
+    expect(checkTarget({ databaseUrl: 'postgres://postgres@localhost/db', env })).toMatchObject({
+      ok: false,
+      exitCode: 2,
+      item: 'databaseHost',
+    });
+    expect(
+      JSON.stringify(checkTarget({ databaseUrl: 'postgres://u@localhost/db', env })),
+    ).not.toContain('evil.example.com');
+  });
+
+  it.each([{ PGHOSTADDR: '203.0.113.9' }, { PGSERVICE: 'prod' }])(
+    'Given 実行環境に %j When 検査する Then 拒否する',
+    (env) => {
+      expect(checkTarget({ databaseUrl: 'postgres://u@localhost/db', env })).toMatchObject({
+        ok: false,
+        exitCode: 2,
+        item: 'databaseHost',
+      });
+    },
+  );
+
+  it('Given 実行環境の PGHOST が localhost When 検査する Then 通る', () => {
+    expect(
+      checkTarget({ databaseUrl: 'postgres://u@localhost/db', env: { PGHOST: 'localhost' } }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it('Given 実行環境の PGHOST が外部 When 許可して検査する Then 通り、外部接続として成果物の保存が無効', () => {
+    expect(
+      checkTarget({
+        databaseUrl: 'postgres://u@localhost/db',
+        env: { PGHOST: 'evil.example.com' },
+        allowRemote: true,
+      }),
+    ).toMatchObject({ ok: true, external: true, artifactsEnabled: false });
+  });
+});
+
+describe('シナリオ: キーボード試験の代替の選択（レビューの Major 2）', () => {
+  it('macOS でだけ、プログラムによる選択を許す', () => {
+    expect(allowsProgrammaticSelect('darwin')).toBe(true);
+    expect(allowsProgrammaticSelect('linux')).toBe(false);
+    expect(allowsProgrammaticSelect('win32')).toBe(false);
   });
 });
 

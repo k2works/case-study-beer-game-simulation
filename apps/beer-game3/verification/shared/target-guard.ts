@@ -13,6 +13,8 @@ export interface GuardInput {
   databaseUrl?: string | undefined;
   /** 許可の設定（VERIFY_ALLOW_REMOTE=1） */
   allowRemote?: boolean | undefined;
+  /** 検査と接続を行う親のプロセスの環境（PGHOST、PGHOSTADDR、PGSERVICE を検査する）。呼び出しは process.env を渡す */
+  env?: Record<string, string | undefined> | undefined;
 }
 
 export type GuardResult =
@@ -72,7 +74,10 @@ function databaseHostsOf(connectionString: string): string[] | null {
   }
   let hosts: string[];
   try {
-    hosts = [decodeURIComponent(host)];
+    // URL の host が空（`postgres:///db`）のとき、接続先は実行環境の PGHOST で決まりうるため、
+    // host= または hostaddr= の明示がなければ最終の接続先を決められず、拒否する（null）
+    const urlHost = decodeURIComponent(host);
+    hosts = urlHost === '' ? [] : [urlHost];
     // host= と hostaddr= の指定は、URL の host を上書きするため、すべて検査する
     const params = new URLSearchParams(match[3] ?? '');
     for (const name of ['host', 'hostaddr']) {
@@ -86,7 +91,24 @@ function databaseHostsOf(connectionString: string): string[] | null {
   } catch {
     return null;
   }
-  return hosts;
+  return hosts.length === 0 ? null : hosts;
+}
+
+/**
+ * 検査と接続を行う親のプロセスの環境の PG*（pg は接続文字列に無い項目を環境から補う）が、
+ * 外部を指さないか。PGSERVICE は接続先を設定ファイルから決めるため、指定があれば拒否する。
+ */
+function environmentIsLocal(env: Record<string, string | undefined>): boolean {
+  const host = env['PGHOST'];
+  if (host !== undefined && host !== '' && !isLocalDatabaseHost(host)) {
+    return false;
+  }
+  const hostaddr = env['PGHOSTADDR'];
+  if (hostaddr !== undefined && hostaddr !== '' && !isLocalHost(hostaddr)) {
+    return false;
+  }
+  const service = env['PGSERVICE'];
+  return service === undefined || service === '';
 }
 
 const FAILED_APP: GuardResult = {
@@ -125,7 +147,8 @@ export function checkTarget(input: GuardInput): GuardResult {
   if (input.databaseUrl !== undefined) {
     checked.push('databaseHost');
     const hosts = databaseHostsOf(input.databaseUrl);
-    if (hosts === null || !hosts.every(isLocalDatabaseHost)) {
+    const env = input.env ?? {};
+    if (hosts === null || !hosts.every(isLocalDatabaseHost) || !environmentIsLocal(env)) {
       if (!input.allowRemote) {
         return FAILED_DB;
       }

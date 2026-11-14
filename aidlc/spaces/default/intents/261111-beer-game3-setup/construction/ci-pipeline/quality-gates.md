@@ -22,12 +22,13 @@ merge と昇格を止める条件と、その強制の仕組みです。強制�
 - 必須のチェックの設定（リポジトリの設定）は、あなたの承認を得てから行う。設定するまでは、PR の表示と手元の `npm run verify` で確認する運用になる。
 - デプロイの昇格のゲート（staging の自動反映、production の手動承認）は Deployment Pipeline で決める。
 
-## 未解決の指摘（CI の最初の実行の前に直すことを勧める）
+## U6 のレビューの指摘と対応
 
-| 指摘 | 重大度 | 内容 |
+| 指摘 | 重大度 | 状態 |
 | :--- | :--- | :--- |
-| 接続先の検査の穴 | Major | ホストのない接続文字列は、実行環境の `PGHOST` で外部へ向き得る。検査をスクリプトが組み立てた最終の接続設定に対して行い、`PGHOST`、`PGHOSTADDR`、`PGSERVICE` を拒否する |
-| キーボード試験の抜け道 | Major | 矢印キーが効かないとき OS を問わず代替の選択に切り替わる。macOS に限り、Linux と Windows では失敗させる。最初の PR の CI の結果を確かめる |
+| 接続先の検査の穴（ホストのない接続文字列と実行環境の `PGHOST`） | Major | **修正済み**。ホストも `host=` もない接続文字列を拒否し、親のプロセスの `PGHOST`、`PGHOSTADDR`、`PGSERVICE` が外部を指すとき拒否する（`verification/shared/target-guard.ts`、試験 `tests/u6/features/safety.spec.ts`）。`PGHOST=evil.example.com` の実行が、接続前に終了コード 2 で拒否されることを確認 |
+| キーボード試験の抜け道 | Major | **修正済み**。代替の選択（`selectOption`）を macOS に限り、Linux と Windows では矢印キーで値が変わらなければ失敗させる（`verification/shared/platform.ts`）。Linux での実際の動作は、最初の PR の CI（`e2e (chromium / firefox / webkit / edge)`）で確かめる |
+| 残りの指摘 | Minor | 下の表のとおり未解決 |
 | Playwright の実行器の環境 | Minor | 親の環境（`DATABASE_URL`、`PG*`）を引き継ぐ。許可リストの環境を渡すか、設計に記録する |
 | `color-contrast` の判定 | Minor | `incomplete` だけでも通る。`passes` を要求する |
 | 英語の検出 | Minor | 3 語以上の並びだけ。限界を明記し、2 語以上も検出する |

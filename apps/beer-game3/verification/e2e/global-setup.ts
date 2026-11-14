@@ -36,6 +36,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   const guard = checkTarget({
     databaseUrl: adminUrl,
     allowRemote: process.env.VERIFY_ALLOW_REMOTE === '1',
+    env: process.env,
   });
   if (!guard.ok) {
     throw new Error(`接続先の検査に失敗しました（${guard.item}）`);

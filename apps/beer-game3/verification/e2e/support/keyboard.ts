@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { allowsProgrammaticSelect } from '../../shared/platform.js';
 
 /** 対象の要素が、いまフォーカスを持っているか。 */
 async function isFocused(target: Locator): Promise<boolean> {
@@ -75,8 +76,12 @@ export async function chooseOption(page: Page, select: Locator, label: string): 
     }
     return;
   }
-  // 矢印キーで OS 標準の一覧が開く環境（macOS）: 一覧は OS の部品で、自動操作のキー入力が届かない。
-  // Tab でフォーカスを当てたこの欄に限り、選択の確定だけを selectOption で代える（Linux の CI では上の分岐で、キーだけで通る）
+  // 矢印キーで値が変わらなかった。macOS に限り、OS 標準の一覧が開いて自動操作のキー入力が届かないため、
+  // Tab でフォーカスを当てたこの欄の選択の確定だけを selectOption で代える。Linux と Windows では代えず失敗させる
+  // （キー操作の退行を隠さない。AC5.5.1、NFR8.1）
+  if (!allowsProgrammaticSelect(process.platform)) {
+    throw new Error('矢印キーで選択欄の値が変わりませんでした（キーボードだけでは選べません）');
+  }
   await page.keyboard.press('Escape');
   await select.selectOption({ label });
   await expect.poll(selectedLabel).toBe(label);

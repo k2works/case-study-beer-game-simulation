@@ -119,6 +119,7 @@ export async function runVerification(options: RunOptions): Promise<RunResult> {
   const guard = checkTarget({
     databaseUrl: options.adminDatabaseUrl,
     allowRemote: options.allowRemote ?? false,
+    env: process.env,
   });
   if (!guard.ok) {
     log({ event: 'verify_end', verdict: 'invalid', exitCode: 2, reason: 'target_not_allowed' });

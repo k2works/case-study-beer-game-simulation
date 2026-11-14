@@ -22,7 +22,8 @@
 | HTTPS、HSTS、プロキシの段数 | 稼働環境の設定 | environment-provisioning、deployment-pipeline |
 | SAST / DAST | 稼働環境に対する走査 | Operation |
 
-## 既知の未解決（U6 のレビューの指摘）
+## U6 のレビューの指摘と対応
 
-- 接続先の検査が、ホストのない接続文字列と実行環境の `PGHOST` の組み合わせで外部へ向き得る（Major）。
-- Playwright の実行器が親の環境（`DATABASE_URL`、`PG*`）を引き継ぐ（Minor）。
+- 接続先の検査と `PGHOST` の穴（Major）: 修正済み。ホストのない接続文字列と、親の環境の `PGHOST`、`PGHOSTADDR`、`PGSERVICE` が外部を指す場合を拒否する（`tests/u6/features/safety.spec.ts`）。
+- キーボード試験の代替の選択（Major）: 修正済み。macOS に限る。Linux の CI での動作は最初の PR で確かめる。
+- Playwright の実行器が親の環境（`DATABASE_URL`、`PG*`）を引き継ぐ（Minor）: 未解決。
