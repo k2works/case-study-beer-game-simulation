@@ -152,10 +152,12 @@ class WeeklyPlaySteps {
     }
 
     @When("進行役が第 {int} 週の結果を取得する")
-    fun facilitatorFetchesWeekResults(
-        @Suppress("UNUSED_PARAMETER") week: Int,
-    ) {
-        ctx.last = ctx.sessionState(ctx.game)
+    fun facilitatorFetchesWeekResults(week: Int) {
+        val fetched = ctx.sessionState(ctx.game)
+        ctx.last = fetched
+        expect(resultsOf(fetched.json, week).isNotEmpty()) {
+            "第 $week 週の結果を取得できない: ${fetched.status} ${fetched.text}"
+        }
     }
 
     // ---- 確定の結果（Then） ----
@@ -210,13 +212,13 @@ class WeeklyPlaySteps {
     }
 
     @Then("第 {int} 週はすでに確定されているという理由で拒否される")
-    fun rejectedBecauseWeekAdvanced(
-        @Suppress("UNUSED_PARAMETER") week: Int,
-    ) {
+    fun rejectedBecauseWeekAdvanced(week: Int) {
         val response = ctx.response()
         expect(response.status == HTTP_CONFLICT && response.code() == "session.week_advanced") {
             "確定済みの理由で拒否されていない: ${response.status} ${response.text}"
         }
+        val current = facilitatorState().number("week")
+        expect(current > week) { "第 $week 週は確定済みのはずが、現在の週は第 $current 週" }
     }
 
     @Then("2 つのゲームの全役割の状態と費用が一致する")
