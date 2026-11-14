@@ -161,6 +161,8 @@ nav:
           - 開発戦略: development/beer-game-kotlin/development_strategy.md
           - Bolt 1 計画: development/beer-game-kotlin/bolt_1_plan.md
           - Bolt 1 終了報告: development/beer-game-kotlin/bolt_1_report.md
+          - Bolt 2 計画: development/beer-game-kotlin/bolt_2_plan.md
+          - Bolt 2 終了報告: development/beer-game-kotlin/bolt_2_report.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
@@ -232,6 +234,7 @@ nav:
       - beer-game-kotlin:
           - 概要: journal/beer-game-kotlin/index.md
           - 2026-11-14: journal/beer-game-kotlin/20261114.md
+          - 2026-11-15: journal/beer-game-kotlin/20261115.md
   - 記事:
       - 概要: article/index.md
   - リファレンス:

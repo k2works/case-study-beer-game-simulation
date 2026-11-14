@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-14
+* **Update**: [20261115](/journal/beer-game-kotlin/20261115.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_3_plan](/development/beer-game-kotlin/bolt_3_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_2_plan](/development/beer-game-kotlin/bolt_2_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_2_report](/development/beer-game-kotlin/bolt_2_report.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_1_plan](/development/beer-game-kotlin/bolt_1_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [20261114](/journal/beer-game-kotlin/20261114.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_1_report](/development/beer-game-kotlin/bolt_1_report.md) を更新（claude-code/claude-sonnet-5-5）
