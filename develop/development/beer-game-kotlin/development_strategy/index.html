@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game-kotlin の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）の局面に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認待ち。">
+        <meta name="description" content="beer-game-kotlin の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）の局面に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認済み（2026-11-14）。">
       
       
         <meta name="author" content="Project Team">
@@ -16,7 +16,7 @@
         <link rel="prev" href="../release_plan/">
       
       
-        <link rel="next" href="../../../operation/">
+        <link rel="next" href="../bolt_1_plan/">
       
       
         
@@ -3862,7 +3862,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3906,7 +3906,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3931,7 +3931,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -4594,6 +4594,41 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_1_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 1 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
     </li>
   
 
@@ -9777,6 +9812,11 @@
 <td style="text-align: left;">マージしない</td>
 </tr>
 <tr>
+<td style="text-align: left;">API の契約（OpenAPI）</td>
+<td style="text-align: left;">仕様（<code>contracts/openapi.yaml</code>）の検証 → 型の生成 → 型の検査 → 契約テスト（応答・リクエストの適合、<code>code</code> の一覧の一致、ルートの網羅、型の生成物の差分 0）。仕様が先（B1 以降のすべての Bolt）</td>
+<td style="text-align: left;">マージしない</td>
+</tr>
+<tr>
 <td style="text-align: left;">受け入れ（Cucumber）</td>
 <td style="text-align: left;"><code>@api</code>（Cucumber-JVM、Gradle のタスク）と <code>@ui</code>（Cucumber-JS + Playwright）。Undefined・Pending のステップがあれば失敗</td>
 <td style="text-align: left;">マージしない</td>
@@ -10024,6 +10064,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>PMD が Kotlin 2.4 の構文を解析できる</strong>（未確認）。fixture の期待件数と一致する</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>maxIssues: 0</code>、ベースラインなし、<code>@Suppress</code> なしで、全コードが緑</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> ktlint の <code>.editorconfig</code> の調整（日本語のテスト名など）が、実際の版で動く</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>API の契約テストと型の生成が CI に組み込まれ、仕様と実装を意図的にずらすと CI が落ちる</strong>（<a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> の API の契約テスト。道具の選定と導入の承認を含む）</li>
 </ul>
 <h3 id="_12">守り続けるために<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <ul>
@@ -10055,7 +10096,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">B2</td>
-<td style="text-align: left;">規約違反コードを 1 つ置くと CI が落ちる。追記専用権限の否定テスト。domain の行 100% のゲート</td>
+<td style="text-align: left;">規約違反コードを 1 つ置くと CI が落ちる。追記専用権限の否定テスト。domain の行 100% のゲート。API の契約テスト（仕様と実装のずれで CI が落ちる）と型の生成物の差分 0</td>
 </tr>
 <tr>
 <td style="text-align: left;">B3</td>
@@ -10263,7 +10304,7 @@
 <ol>
 <li><strong>B1 の最初（H2 の実測）</strong>: <strong>H2 の PostgreSQL モードの実測を最初に行う</strong>。アドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルのどれが H2 で動くかを短い試験で確かめ、結果を B1 の記録に残して、H2 版で置き換える・省略する制約の一覧を確定する（H2 の導入は承認後。B1 の 4 日に含め、超過したら予備 B16 で吸収する）。</li>
 <li><strong>B1</strong>: <strong>Cucumber の基盤（Cucumber-JVM と Cucumber-JS、E2E）を最初に作る</strong>。キット準拠のゲームを通す 1 本の日本語 Gherkin のシナリオから入り、<code>decideGame</code>/<code>decideSession</code>/<code>simulateWeek</code> の最小、<code>EventStore.append</code>、同期投影、Ktor、React の最小の順に内側へ下りる。共通の土台の最初のスライドでは、後続の振る舞いのテストも先に書く。</li>
-<li><strong>B2</strong>: Kotlin 固有の不確実性を、<strong>テストで</strong>解消する。<strong>静的解析とルール設定の厳格な適用の受入条件</strong>（<a href="#静的解析とルール設定厳格に適用">静的解析とルール設定</a>。fixture によるルールの確認、規約違反コードで CI が落ちること、detekt・PMD と Kotlin 2.4 の互換）、Kover が 2 つのソースセットを合算すること、追記専用権限の否定テストと連鎖削除の Red を確かめる。<strong>悪ければ B3 以降を止める</strong>（<a href="../release_plan/">リリース計画</a>）。</li>
+<li><strong>B2</strong>: Kotlin 固有の不確実性を、<strong>テストで</strong>解消する。<strong>静的解析とルール設定の厳格な適用の受入条件</strong>（<a href="#静的解析とルール設定厳格に適用">静的解析とルール設定</a>。fixture によるルールの確認、規約違反コードで CI が落ちること、detekt・PMD と Kotlin 2.4 の互換）、Kover が 2 つのソースセットを合算すること、追記専用権限の否定テストと連鎖削除の Red を確かめる。<strong>API の契約テストと型の生成も、CI に組み込む</strong>（仕様が先の進め方は B3 以降のすべての Bolt の完了条件になる）。<strong>悪ければ B3 以降を止める</strong>（<a href="../release_plan/">リリース計画</a>）。</li>
 <li><strong>B3</strong>: デプロイの定義（コンテナ、Terraform）を、適用せずに <code>validate</code>・<code>plan</code> とスモークテストで検証する。</li>
 <li><strong>B4</strong>: 振り返りの画面を、役割別の週結果の行から、E2E のシナリオ起点で作る。</li>
 </ol>
@@ -10293,6 +10334,7 @@
 <h3 id="_30">完了条件<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 各 Bolt の受け入れ基準のテストが green（デモ項目の Gherkin シナリオ（Cucumber）を含む）。シナリオは実装前に書いて合意済み</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> API を追加・変更した Bolt は、<strong>仕様（<code>contracts/openapi.yaml</code>）が先</strong>で、契約テストが green、型の生成物の差分が 0</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 各層のテスト（ドメイン・永続化・アプリ・HTTP）が green。domain の行 100%</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 否定テスト・並行テストが green</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Release 0.2（B8）のリリース条件を満たす</li>
@@ -10398,6 +10440,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;"><strong>開発戦略の承認</strong>（ユーザーの明示的な承認。リリース計画の承認と同時）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;">初版作成（承認待ち）</td>
