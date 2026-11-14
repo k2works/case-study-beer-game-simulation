@@ -26,8 +26,9 @@ class CollidingStore extends MemoryStore {
 
 function sessionOn(store: CollidingStore): GameSession {
   const random = new SequenceRandom();
-  const access = new AccessControl({ store, keyRing: loadKeyRing(TEST_ENV), random });
-  return new GameSession({ store, access, clock: new FixedClock(), random });
+  const clock = new FixedClock();
+  const access = new AccessControl({ store, keyRing: loadKeyRing(TEST_ENV), random, clock });
+  return new GameSession({ store, access, clock, random });
 }
 
 describe('コードの重なり（BR1.4）', () => {

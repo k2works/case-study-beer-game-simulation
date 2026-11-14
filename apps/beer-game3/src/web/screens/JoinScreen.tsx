@@ -1,11 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { ApiError, type ApiClient, type Credential } from '../api.js';
 import { FieldError } from '../components.js';
+import { DISPLAY_NAME_RULE } from '../messages.js';
 
 interface Props {
   api: ApiClient;
+  /** 保存した資格情報が使えなかったときの案内（BR17.3） */
+  notice?: string | null;
   onJoined: (credential: Credential) => void;
   onFacilitator: (credential: Credential) => void;
+  /** 観察者用コードで入る（BR15.4） */
+  onObserver: (credential: Credential) => void;
   onCreate: () => void;
 }
 
@@ -36,7 +41,10 @@ function messageOf(error: unknown): { general?: string; fields: Record<string, s
 }
 
 /** S0 参加入口: 参加コードと表示名で参加する。進行役用コードで入り直すこともできる。 */
-export function JoinScreen({ api, onJoined, onFacilitator, onCreate }: Props) {
+export function JoinScreen({ api, notice, onJoined, onFacilitator, onObserver, onCreate }: Props) {
+  const [observerCode, setObserverCode] = useState('');
+  const [observerError, setObserverError] = useState<string | null>(null);
+
   const [joinCode, setJoinCode] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -75,15 +83,48 @@ export function JoinScreen({ api, onJoined, onFacilitator, onCreate }: Props) {
     setFacilitatorError(null);
     try {
       const me = await api.me(secret);
+      if (me.kind !== 'facilitator') {
+        setFacilitatorError('進行役用コードを確かめてください');
+        return;
+      }
       onFacilitator({ kind: 'facilitator', secret, gameId: me.gameId });
     } catch (e) {
       setFacilitatorError(messageOf(e).general ?? '進行役用コードを確かめてください');
     }
   };
 
+  const enterAsObserver = async (event: FormEvent) => {
+    event.preventDefault();
+    const secret = observerCode.trim();
+    if (!secret) {
+      return;
+    }
+    setObserverError(null);
+    try {
+      const me = await api.me(secret);
+      if (me.kind !== 'observer') {
+        // 別の種類のコードは、観察者の入口では受け付けない
+        setObserverError('観察者用コードが正しくありません');
+        return;
+      }
+      onObserver({ kind: 'observer', secret, gameId: me.gameId });
+    } catch (e) {
+      setObserverError(
+        e instanceof ApiError && e.kind === 'forbidden'
+          ? '観察者用コードが正しくありません'
+          : (messageOf(e).general ?? '観察者用コードを確かめてください'),
+      );
+    }
+  };
+
   return (
     <main>
       <h1>ビールゲーム</h1>
+      {notice ? (
+        <p role="alert" data-testid="credential-notice" className="banner">
+          {notice}
+        </p>
+      ) : null}
       <section aria-labelledby="join-heading">
         <h2 id="join-heading">ゲームに参加する</h2>
         <form onSubmit={(e) => void submit(e)} noValidate>
@@ -109,8 +150,13 @@ export function JoinScreen({ api, onJoined, onFacilitator, onCreate }: Props) {
               onChange={(e) => setDisplayName(e.target.value)}
               autoComplete="off"
               aria-invalid={error?.fields.displayName ? true : undefined}
-              aria-describedby="join-name-error"
+              aria-describedby={
+                error?.fields.displayName ? 'join-name-rule join-name-error' : 'join-name-rule'
+              }
             />
+            <p id="join-name-rule" data-testid="join-name-rule" className="hint">
+              {DISPLAY_NAME_RULE}
+            </p>
             <FieldError id="join-name-error" message={error?.fields.displayName} />
           </div>
           {error?.general ? (
@@ -126,6 +172,37 @@ export function JoinScreen({ api, onJoined, onFacilitator, onCreate }: Props) {
             aria-describedby={!ready ? 'join-hint' : undefined}
           >
             {busy ? '参加しています' : '参加する'}
+          </button>
+        </form>
+      </section>
+
+      <section aria-labelledby="observer-heading">
+        <h2 id="observer-heading">観察者として見る</h2>
+        <form onSubmit={(e) => void enterAsObserver(e)} noValidate>
+          <div className="field">
+            <label htmlFor="observer-code">観察者用コード</label>
+            <input
+              id="observer-code"
+              data-testid="observer-code-input"
+              value={observerCode}
+              onChange={(e) => setObserverCode(e.target.value)}
+              autoComplete="off"
+              aria-invalid={observerError ? true : undefined}
+              aria-describedby="observer-code-error"
+            />
+            {observerError ? (
+              <p
+                id="observer-code-error"
+                role="alert"
+                data-testid="observer-error"
+                className="field-error"
+              >
+                {observerError}
+              </p>
+            ) : null}
+          </div>
+          <button type="submit" data-testid="observer-enter">
+            観察者として入る
           </button>
         </form>
       </section>

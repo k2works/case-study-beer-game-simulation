@@ -269,7 +269,8 @@ describe('一時停止・再開・終了（US2.5）', () => {
     it('Given 準備中のゲーム / When 自動終了（内部の呼び出し）が走る / Then ended・autoEnd で、履歴の end は system', async () => {
       const world = createWorld();
       const game = await world.createGame();
-      await world.session.autoEnd(game.gameId);
+      // U5: 占有の中で期限（最後の操作が staleBefore 以前）を再検査する。ここでは作成の時刻が期限以前
+      expect(await world.session.autoEnd(game.gameId, world.clock.now())).toBe('ended');
       const snapshot = await world.store.readSnapshot(game.gameId);
       expect(snapshot?.game).toMatchObject({ status: 'ended', endReason: 'autoEnd' });
       const { entries } = await world.session.getHistory(game.facilitator, game.gameId);
@@ -279,7 +280,7 @@ describe('一時停止・再開・終了（US2.5）', () => {
         detail: { reason: 'autoEnd' },
       });
       // 終了済みへの再実行は何もしない
-      await world.session.autoEnd(game.gameId);
+      expect(await world.session.autoEnd(game.gameId, world.clock.now())).toBe('already-ended');
       const again = await world.session.getHistory(game.facilitator, game.gameId);
       expect(again.entries).toHaveLength(entries.length);
     });

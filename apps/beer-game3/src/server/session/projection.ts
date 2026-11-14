@@ -1,6 +1,11 @@
 import { ordersReceivedOf, receiptOf } from '../domain/engine.js';
 import { ROLES, type GameStatus, type Role, type SetupKind } from '../domain/types.js';
-import type { Principal } from '../access/access-control.js';
+import type {
+  FacilitatorPrincipal,
+  ObserverPrincipal,
+  ParticipantPrincipal,
+  Principal,
+} from '../access/access-control.js';
 import { participantLabel } from './history.js';
 import type { Snapshot, WeekRecordRow } from './store.js';
 import { engineStateAtWeekStart } from './week-state.js';
@@ -79,6 +84,30 @@ export interface FacilitatorRoleOverview {
   cumulativeCost: number;
 }
 
+/**
+ * 観察者に返す投影（BR15.3、entities.md の ObserverView）。チーム全体の集計値と現在週だけを持つ。
+ * 役割別の項目、意思決定値、参加者の表示名、コード、token を持たない。型に項目が無いため、含められない。
+ * 費用・在庫・受注残の合計は、最新の確定済みの週の週末の値（確定済みの週がなければ初期状態）。
+ */
+export interface ObserverView {
+  viewerKind: 'observer';
+  gameId: string;
+  name: string;
+  status: GameStatus;
+  currentWeek: number;
+  weekCount: number;
+  /** 契約 C1 の GameStateView の必須項目（セットアップの種類）。役割別の値ではない */
+  setupKind: SetupKind;
+  /** 保存のたびに 1 増える。画面は版が変わったときだけ描画し直す */
+  version: number;
+  /** 入力済みの役割の数だけ。どの役割かは返さない */
+  inputsDone: number;
+  teamWeeklyCost: number;
+  teamCumulativeCost: number;
+  teamInventory: number;
+  teamBacklog: number;
+}
+
 /** 呼び出した人ごとの投影（contract-summary.md の GameStateView）。 */
 export interface GameStateView {
   gameId: string;
@@ -97,6 +126,11 @@ export interface GameStateView {
   role?: Role;
   self?: { participantId: string; displayName: string; joinOrder: number };
   mine?: MineView;
+  /**
+   * 小売店の参加者だけ: 第 1 週から currentWeek までの顧客需要（BR16.1）。currentWeek より後の週は含めない。
+   * 準備中は空。小売店以外の参加者、進行役、観察者の投影には項目が無い（BR16.2）。
+   */
+  customerDemand?: number[];
   /** 進行役だけ: 割当て、役割ごとの状況、未割当ての役割、未入力の役割 */
   assignments?: Array<{ participantId: string; role: Role }>;
   /** 進行役だけ: 各役割の現在の担当者（ラベルと役割、BR14.1）。交代済みの人は含まない */
@@ -152,8 +186,76 @@ function overviewOf(snapshot: Snapshot, role: Role): RoleOverview {
   };
 }
 
+/** チーム全体の合計。最新の確定済みの週の週末の値。確定済みの週がなければ初期状態（費用は 0）。 */
+function teamTotals(
+  snapshot: Snapshot,
+): Pick<ObserverView, 'teamWeeklyCost' | 'teamCumulativeCost' | 'teamInventory' | 'teamBacklog'> {
+  const confirmed = snapshot.weekRecords.filter((r) => r.isConfirmed);
+  if (confirmed.length === 0) {
+    return {
+      teamWeeklyCost: 0,
+      teamCumulativeCost: 0,
+      teamInventory: ROLES.length * snapshot.settings.initialInventory,
+      teamBacklog: 0,
+    };
+  }
+  const latest = confirmed.reduce((max, r) => Math.max(max, r.week), 0);
+  const rows = confirmed.filter((r) => r.week === latest);
+  const sum = (pick: (r: WeekRecordRow) => number | null): number =>
+    rows.reduce((total, r) => total + (pick(r) ?? 0), 0);
+  return {
+    teamWeeklyCost: sum((r) => r.weeklyCost),
+    teamCumulativeCost: sum((r) => r.cumulativeCost),
+    teamInventory: sum((r) => r.inventory),
+    teamBacklog: sum((r) => r.backlog),
+  };
+}
+
+/** 観察者の投影。役割別の値は、合計にしてから渡す（型に役割別の項目が無い）。 */
+function projectObserver(snapshot: Snapshot): ObserverView {
+  const { game, weekRecords } = snapshot;
+  const started = game.status !== 'preparing';
+  const inputsDone = started
+    ? weekRecords.filter((r) => r.week === game.currentWeek && r.decision !== null).length
+    : 0;
+  return {
+    viewerKind: 'observer',
+    gameId: game.gameId,
+    name: game.name,
+    status: game.status,
+    currentWeek: game.currentWeek,
+    weekCount: game.weekCount,
+    setupKind: game.setupKind,
+    version: game.version,
+    inputsDone,
+    ...teamTotals(snapshot),
+  };
+}
+
 /** 呼び出した人の投影だけを作る（ADR-002）。GameSession の内部の状態をそのまま返す経路は作らない。 */
-export function projectState(snapshot: Snapshot, principal: Principal): GameStateView {
+export function projectState(snapshot: Snapshot, principal: ObserverPrincipal): ObserverView;
+export function projectState(
+  snapshot: Snapshot,
+  principal: ParticipantPrincipal | FacilitatorPrincipal,
+): GameStateView;
+export function projectState(
+  snapshot: Snapshot,
+  principal: Principal,
+): GameStateView | ObserverView;
+export function projectState(
+  snapshot: Snapshot,
+  principal: Principal,
+): GameStateView | ObserverView {
+  if (principal.kind === 'observer') {
+    return projectObserver(snapshot);
+  }
+  return projectParticipantOrFacilitator(snapshot, principal);
+}
+
+function projectParticipantOrFacilitator(
+  snapshot: Snapshot,
+  principal: ParticipantPrincipal | FacilitatorPrincipal,
+): GameStateView {
   const { game, weekRecords, participants, assignments } = snapshot;
   const started = game.status !== 'preparing';
   const currentRecords = started ? weekRecords.filter((r) => r.week === game.currentWeek) : [];
@@ -253,6 +355,12 @@ export function projectState(snapshot: Snapshot, principal: Principal): GameStat
         decidedBy: decidedByOf(record, participants),
         history: historyOf(weekRecords, role),
       };
+    }
+    if (role === 'retailer') {
+      // 第 1 週から currentWeek まで（当週を含む）。準備中は空（BR16.1）
+      view.customerDemand = started
+        ? snapshot.settings.demandSeries.slice(0, game.currentWeek)
+        : [];
     }
   }
   return view;

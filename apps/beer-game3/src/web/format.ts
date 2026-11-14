@@ -8,6 +8,9 @@ export function formatMoney(cents: number): string {
   return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
 }
 
+/** 結果画面の金額（BR22.5）。整数のセントを $ と小数 2 桁の形にする。formatMoney と同じ（整数の割り算と剰余だけ）。 */
+export const formatCents = formatMoney;
+
 /** 「0.5」「1」「1.25」のようなドルの入力を、最小単位（セント）の整数にする。形式が違えば null。 */
 export function parseDollarsToCents(text: string): number | null {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text.trim());

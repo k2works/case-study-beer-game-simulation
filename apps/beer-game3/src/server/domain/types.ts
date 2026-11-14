@@ -33,6 +33,9 @@ export type EndReason = 'facilitator' | 'finalWeek' | 'autoEnd';
 export type SlotKind = 'delivery' | 'order' | 'production';
 export type SetupKind = 'kit' | 'custom';
 
+/** 参加者の表示名の最大の文字数（BR2.5）。入力の検証と、画面の説明の両方が使う。 */
+export const DISPLAY_NAME_MAX = 40;
+
 /** 発注数（工場は生産要請数）の上限（Functional Design Q1）。 */
 export const MAX_DECISION = 9999;
 export const MIN_WEEK_COUNT = 1;

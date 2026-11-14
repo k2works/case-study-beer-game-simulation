@@ -12,6 +12,11 @@ export interface GameRow {
   setupKind: SetupKind;
   version: number;
   createdAt: Date;
+  /**
+   * 状態を変えた最後の操作の時刻（BR25.2）。作成時は createdAt と同じ。
+   * 状態を変える操作の保存と同じ保存の中で更新し、閲覧・再送・拒否では変えない。放置の判定に使う。
+   */
+  lastOperationAt: Date;
   endedAt: Date | null;
   /** status が ended のときだけ持つ（BR9.4） */
   endReason: EndReason | null;
@@ -129,10 +134,36 @@ export interface Snapshot {
 }
 
 export interface ResolvedToken {
+  /** 最後の操作の時刻の更新（touchToken）に使う */
+  tokenId: string;
   gameId: string;
   participantId: string;
   role: Role | null;
+  /** 最後の操作の時刻。期限の判定に使う（BR17.1）。失効していない token だけが返る */
+  lastUsedAt: Date;
 }
+
+/** 資格情報として使える、ゲームのコード（参加コードは含まない）。 */
+export interface CredentialCode {
+  gameId: string;
+  kind: 'facilitator' | 'observer';
+}
+
+/** 参加の窓の 1 回の試行（BR18.1）。 */
+export interface JoinAttemptInput {
+  /** 接続元の鍵付きの要約。生のアドレスは渡さない */
+  sourceKey: string;
+  now: Date;
+  /** 窓の長さ（ミリ秒） */
+  windowMs: number;
+  /** 窓に許す件数。すでにこの件数あれば、コードを検証せずに拒否する */
+  maxAttempts: number;
+  /** 参加コードの照合用の値の候補（鍵の入れ替えの間は複数） */
+  codeHashes: string[];
+}
+
+export type JoinAttemptOutcome =
+  { result: 'limited' } | { result: 'invalid' } | { result: 'valid'; gameId: string };
 
 export interface GameUpdate {
   status?: GameStatus;
@@ -152,8 +183,16 @@ export interface ConfirmedRecord {
   cumulativeCost: number;
 }
 
+/** runExclusive の結果。ロックを取れなかったときは、処理を呼ばずに acquired が false。 */
+export type ExclusiveResult<T> = { acquired: true; value: T } | { acquired: false };
+
 /** ゲームの行を占有している間だけ使える操作。 */
 export interface GameTx {
+  /**
+   * 状態を変える書き込み（参加、割当て、入力、確定、入れ替え、updateGame など）が呼ばれたか（NFR2.5）。
+   * GameSession.write が、立っていれば touchOperation を 1 回呼んでからコミットする。
+   */
+  readonly mutated: boolean;
   game(): GameRow;
   settings(): Promise<SettingsRow>;
   participants(): Promise<ParticipantRow[]>;
@@ -188,6 +227,16 @@ export interface GameTx {
     expectedVersion: number,
     logs: readonly NewLogEntry[],
   ): Promise<GameRow>;
+  /**
+   * 最後の操作の時刻を at まで進める（減らさない）。版を変えず、履歴に書かない（BR25.2）。
+   * 呼ぶのは GameSession.write だけで、状態を変える操作の保存と同じ保存の中で 1 回。
+   */
+  touchOperation(at: Date): Promise<void>;
+  /**
+   * ゲームと、紐づくすべてのデータを削除する（BR24.3、C5）。終了したゲームだけ。
+   * 外部キーの連鎖で 1 文の中で消え、途中で失敗したらすべて元に戻る。
+   */
+  deleteGame(): Promise<void>;
 }
 
 export interface Store {
@@ -198,6 +247,22 @@ export interface Store {
     kind: AccessCodeKind,
   ): Promise<{ gameId: string; kind: AccessCodeKind } | null>;
   findTokenByHash(hash: string): Promise<ResolvedToken | null>;
+  /** 進行役用コードまたは観察者用コードの照合用の値から引く（参加コードは対象外）。資格情報の種類は一致した行で決める。 */
+  findCredentialCode(hashes: string[]): Promise<CredentialCode | null>;
+  /**
+   * 最後の操作の時刻を延ばす。最後の書き込みが minIntervalMs 以上前のときだけ書く条件付きの更新で、
+   * 書いたら true。集約の版を変えず、履歴に書かない（BR17.2）。
+   */
+  touchToken(tokenId: string, now: Date, minIntervalMs: number): Promise<boolean>;
+  /**
+   * 参加の試行を数える（BR18）。接続元ごとの排他の中で、古い行の削除、件数の検査、
+   * 件数が上限未満ならコードの検証、必要な追加を行う。保存に失敗したら、通さずに例外にする。
+   */
+  attemptJoin(input: JoinAttemptInput): Promise<JoinAttemptOutcome>;
+  /** olderThan より古い窓の行を、他の処理を待たずに削除する（ロック中の行は飛ばす）。削除した件数を返す。 */
+  sweepJoinAttempts(olderThan: Date): Promise<number>;
+  /** 窓の行の数（接続元を指定しなければ全体）。試験と観測用。 */
+  countJoinAttempts(sourceKey?: string): Promise<number>;
   getAccessCode(gameId: string, kind: AccessCodeKind): Promise<AccessCodeRow | null>;
   /** 行を占有しない読み取り。ゲームが無ければ null。 */
   readSnapshot(gameId: string): Promise<Snapshot | null>;
@@ -205,6 +270,21 @@ export interface Store {
   transact<T>(gameId: string, fn: (tx: GameTx) => Promise<T>): Promise<T>;
   /** 履歴を sequence の昇順で全件読む（BR13.2）。行を占有しない 1 回の読み取り。 */
   readHistory(gameId: string): Promise<LogEntryRow[]>;
+  /**
+   * 放置されたゲーム（終了しておらず、最後の操作が before 以前）を、最後の操作の古い順に limit 件まで返す（BR25.1）。
+   * exclude のゲームは、順序と上限の前に除く（失敗が続くゲームが後ろの正常なゲームを塞がない、BR26.3）。
+   */
+  findStaleGames(before: Date, limit: number, exclude: readonly string[]): Promise<string[]>;
+  /**
+   * 保持期間を過ぎたゲーム（終了済みで、終了が before 以前）を、終了の古い順に limit 件まで返す（BR24.2）。
+   * exclude の扱いは findStaleGames と同じ。
+   */
+  findExpiredGames(before: Date, limit: number, exclude: readonly string[]): Promise<string[]>;
+  /**
+   * key の排他ロックを待たずに試み、取れたときだけ fn を呼ぶ（BR26.2）。fn が終わったら（失敗でも）解放する。
+   * PostgreSQL の保存では、ロックを持つ専用の接続を使い、ゲームの処理（fn の中）にはほかの接続を使う。
+   */
+  runExclusive<T>(key: string, fn: () => Promise<T>): Promise<ExclusiveResult<T>>;
   /** 保存先に接続できるか（ヘルスチェック）。 */
   ping(): Promise<void>;
   close(): Promise<void>;

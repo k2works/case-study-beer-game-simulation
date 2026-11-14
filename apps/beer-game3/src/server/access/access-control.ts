@@ -1,8 +1,15 @@
-import type { RandomSource } from '../clock.js';
-import { forbiddenError, internalError } from '../errors.js';
-import type { Role } from '../domain/types.js';
-import { projectState, type GameStateView } from '../session/projection.js';
-import type { AccessCodeKind, AccessCodeRow, Snapshot, Store } from '../session/store.js';
+import type { Clock, RandomSource } from '../clock.js';
+import { forbiddenError, internalError, invalidCredentialError } from '../errors.js';
+import { ROLES, type Role } from '../domain/types.js';
+import { projectState, type GameStateView, type ObserverView } from '../session/projection.js';
+import type {
+  AccessCodeKind,
+  AccessCodeRow,
+  JoinAttemptOutcome,
+  ResolvedToken,
+  Snapshot,
+  Store,
+} from '../session/store.js';
 import {
   PREFIX_FACILITATOR,
   PREFIX_OBSERVER,
@@ -13,6 +20,8 @@ import {
   sha256Hex,
 } from './codes.js';
 import { hmacCandidates, hmacForStorage, keyedDigest, seal, unseal, type KeyRing } from './keys.js';
+import { withDefaults, type AccessPolicy } from './policy.js';
+import { normalizeSource } from './source.js';
 
 export interface ParticipantPrincipal {
   kind: 'participant';
@@ -26,11 +35,53 @@ export interface FacilitatorPrincipal {
   gameId: string;
 }
 
+/** 観察者（BR15.1）。特定できるのは観察者だけで、参加者や進行役の権限は持たない。 */
+export interface ObserverPrincipal {
+  kind: 'observer';
+  gameId: string;
+}
+
+/** 呼び出した人。 */
+export type Principal = ParticipantPrincipal | FacilitatorPrincipal | ObserverPrincipal;
+
 /**
- * 呼び出した人。観察者（kind: observer）は U4 が足す。
- * U1 は観察者用コードの発行と保存までを持ち、資格情報としては受け付けない。
+ * 権限を判定する操作の一覧（操作の表、NFR6.1）。経路の表（routeCatalog）の各行が 1 つを指す。
+ * - identify: 自分が誰かの確認。有効な資格情報ならゲームを問わない
  */
-export type Principal = ParticipantPrincipal | FacilitatorPrincipal;
+export const ACTIONS = [
+  'identify',
+  'viewState',
+  'getCodes',
+  'assignRole',
+  'startGame',
+  'submitDecision',
+  'confirmWeek',
+  'pauseGame',
+  'resumeGame',
+  'endGame',
+  'replaceAssignee',
+  'getHistory',
+  'viewResults',
+  'exportGame',
+] as const;
+
+export type Action = (typeof ACTIONS)[number];
+
+/** 参加者に許す操作（状態の取得、自分の役割の入力、終了後の結果の閲覧だけ）。 */
+const PARTICIPANT_ACTIONS: ReadonlySet<Action> = new Set([
+  'viewState',
+  'submitDecision',
+  'viewResults',
+]);
+
+/** 観察者に許す操作は、状態の取得だけ（BR15.2）。 */
+const OBSERVER_ACTIONS: ReadonlySet<Action> = new Set(['viewState']);
+
+/** 権限の判定に使う、要求のゲームと役割。 */
+export interface ActionScope {
+  gameId?: string;
+  role?: string;
+}
 
 export interface IssuedCodes {
   rows: AccessCodeRow[];
@@ -42,29 +93,50 @@ export interface IssuedToken {
   hash: string;
 }
 
+/** 認証に成功した参加者の token。応答のあとの最後の操作の時刻の更新に使う。 */
+export interface TokenTouch {
+  tokenId: string;
+}
+
+export interface Authenticated {
+  principal: Principal | null;
+  touch: TokenTouch | null;
+}
+
 export interface AccessControlDeps {
   store: Store;
   keyRing: KeyRing;
   random: RandomSource;
+  clock: Clock;
+  policy?: Partial<AccessPolicy>;
 }
 
 const sha256Stored = (value: string): string => `sha256:${sha256Hex(value)}`;
 
+/** 復帰用 token の期限の判定（BR17.1）。最後の操作から有効期間を過ぎたら期限切れ。行は変えない。 */
+export function isExpired(lastUsedAt: Date, now: Date, ttlMs: number): boolean {
+  return now.getTime() > lastUsedAt.getTime() + ttlMs;
+}
+
 /**
  * AccessControl（C4）。資格情報の判定、権限の判定、役割別の投影、コードと token の発行を持つ。
- * - 資格情報は種類の印で判別する: `fac_`（進行役用コード）、`tok_`（参加者の token）。
- *   参加コードは参加の入口にだけ使い、資格情報（Authorization）としては使えない。
+ * - 資格情報の種類は、ヘッダの形ではなく照合の結果で決める。参加者の token（return_tokens）と
+ *   進行役用・観察者用のコード（access_codes）を、ハッシュの索引で引く。参加コードは資格情報にならない。
  * - 失敗の形はすべて同じ（forbidden）。コードの推測に手がかりを与えない。
  */
 export class AccessControl {
   private readonly store: Store;
   private readonly keyRing: KeyRing;
   private readonly random: RandomSource;
+  private readonly clock: Clock;
+  readonly policy: AccessPolicy;
 
   constructor(deps: AccessControlDeps) {
     this.store = deps.store;
     this.keyRing = deps.keyRing;
     this.random = deps.random;
+    this.clock = deps.clock;
+    this.policy = withDefaults(deps.policy);
   }
 
   /** 作成時に 3 種類のコードを発行する。照合用の値と、再表示のための暗号化した値を作る。 */
@@ -104,29 +176,56 @@ export class AccessControl {
     return { plain, hash: sha256Stored(plain) };
   }
 
-  /** Authorization の資格情報から Principal を求める。無効なら null。 */
-  async authenticate(credential: string | null | undefined): Promise<Principal | null> {
-    const value = credential?.trim();
-    if (!value) {
+  /**
+   * 参加者の token の判定を 1 か所に集める（NFR6.4）。不明、失効、期限切れは、同じ結果（null）を返す。
+   * 失効した token は保存の層が返さないので、ここでは不明と期限切れを区別しない。
+   */
+  resolveParticipant(found: ResolvedToken | null): Authenticated | null {
+    if (!found || isExpired(found.lastUsedAt, this.clock.now(), this.policy.tokenTtlMs)) {
       return null;
     }
-    if (value.startsWith(PREFIX_FACILITATOR)) {
-      const found = await this.store.findCodeByHash([sha256Stored(value)], 'facilitator');
-      return found ? { kind: 'facilitator', gameId: found.gameId } : null;
+    return {
+      principal: {
+        kind: 'participant',
+        gameId: found.gameId,
+        participantId: found.participantId,
+        role: found.role,
+      },
+      touch: { tokenId: found.tokenId },
+    };
+  }
+
+  /** Authorization の資格情報から呼び出した人を求め、最後の操作の時刻を延ばす対象も返す。無効なら principal が null。 */
+  async authenticateWithTouch(credential: string | null | undefined): Promise<Authenticated> {
+    const value = credential?.trim();
+    if (!value) {
+      return { principal: null, touch: null };
     }
-    if (value.startsWith(PREFIX_TOKEN)) {
-      const found = await this.store.findTokenByHash(sha256Stored(value));
-      return found
-        ? {
-            kind: 'participant',
-            gameId: found.gameId,
-            participantId: found.participantId,
-            role: found.role,
-          }
-        : null;
+    const stored = sha256Stored(value);
+    const [token, code] = await Promise.all([
+      this.store.findTokenByHash(stored),
+      this.store.findCredentialCode([stored, ...hmacCandidates(this.keyRing, value)]),
+    ]);
+    if (token) {
+      return this.resolveParticipant(token) ?? { principal: null, touch: null };
     }
-    // 観察者用コード（PREFIX_OBSERVER）は U4 が入口を足す。U1 では資格情報として受け付けない
-    return null;
+    if (code) {
+      return {
+        principal: { kind: code.kind, gameId: code.gameId },
+        touch: null,
+      };
+    }
+    return { principal: null, touch: null };
+  }
+
+  /** Authorization の資格情報から Principal を求める。無効なら null。 */
+  async authenticate(credential: string | null | undefined): Promise<Principal | null> {
+    return (await this.authenticateWithTouch(credential)).principal;
+  }
+
+  /** 認証に成功した要求の、最後の操作の時刻を延ばす（1 分に 1 回まで、BR17.2）。書いたら true。 */
+  async touch(target: TokenTouch): Promise<boolean> {
+    return this.store.touchToken(target.tokenId, this.clock.now(), this.policy.touchIntervalMs);
   }
 
   /** 参加コードからゲームを特定する。無効なら null。 */
@@ -137,6 +236,70 @@ export class AccessControl {
     }
     const found = await this.store.findCodeByHash(hmacCandidates(this.keyRing, normalized), 'join');
     return found?.gameId ?? null;
+  }
+
+  /**
+   * 参加コードによる参加の試行を数える（BR18）。窓の検査、コードの検証、記録を原子的に行う。
+   * 窓が満杯なら limited（コードは検証しない）、無効なら invalid、有効なら valid とゲームの識別子。
+   */
+  async attemptJoin(address: string, rawCode: string): Promise<JoinAttemptOutcome> {
+    const normalized = normalizeJoinCode(rawCode);
+    const codeHashes =
+      normalized.length === 0 || normalized.length > 64
+        ? []
+        : hmacCandidates(this.keyRing, normalized);
+    return this.store.attemptJoin({
+      sourceKey: this.sourceDigest(address),
+      now: this.clock.now(),
+      windowMs: this.policy.joinWindowMs,
+      maxAttempts: this.policy.joinMaxAttempts,
+      codeHashes,
+    });
+  }
+
+  /**
+   * 操作の表（NFR6.1、BR19.1）。資格情報の種類と、要求のゲーム・役割への権限を検証する。
+   * 存在しないゲームも別のゲームも同じ 403 で、存在を明かさない。
+   * - 進行役: 自分のゲームのすべての操作（代理入力を含む）
+   * - 参加者: 状態の取得と、自分の役割の入力
+   * - 観察者: 状態の取得だけ
+   */
+  authorize(principal: Principal | null, action: Action, scope: ActionScope): Principal {
+    const denied = invalidCredentialError();
+    if (!principal) {
+      throw denied;
+    }
+    if (action === 'identify') {
+      return principal;
+    }
+    if (scope.gameId === undefined || principal.gameId !== scope.gameId) {
+      throw denied;
+    }
+    switch (principal.kind) {
+      case 'facilitator':
+        return principal;
+      case 'observer':
+        if (OBSERVER_ACTIONS.has(action)) {
+          return principal;
+        }
+        throw denied;
+      case 'participant': {
+        if (!PARTICIPANT_ACTIONS.has(action)) {
+          throw denied;
+        }
+        if (action === 'submitDecision') {
+          const role = ROLES.find((candidate) => candidate === scope.role);
+          if (!role || principal.role !== role) {
+            throw denied;
+          }
+        }
+        // 結果を見られる参加者は、役割が割り当てられている人（BR21.2）
+        if (action === 'viewResults' && principal.role === null) {
+          throw denied;
+        }
+        return principal;
+      }
+    }
   }
 
   /** 進行役の操作は、そのゲームの進行役用コードを持つ人だけができる（BR1.5）。 */
@@ -184,7 +347,7 @@ export class AccessControl {
     return this.requireParticipantOfRole(principal, gameId, role);
   }
 
-  /** 状態を見られるのは、そのゲームの進行役と参加者。 */
+  /** 状態を見られるのは、そのゲームの進行役と参加者と観察者。 */
   requireViewer(principal: Principal | null, gameId: string): Principal {
     if (!principal || principal.gameId !== gameId) {
       throw forbiddenError(
@@ -195,8 +358,38 @@ export class AccessControl {
     return principal;
   }
 
-  /** 呼び出した人の投影だけを作る（NFR6.2）。 */
-  project(snapshot: Snapshot, principal: Principal): GameStateView {
+  /**
+   * 結果を見られるのは、そのゲームの参加者（役割が割り当てられた人）と進行役だけ（BR21.2）。
+   * 観察者、資格情報なし、別のゲームは、資格情報の無効と区別できない同じ 403 で拒否する。
+   */
+  requireResultsViewer(
+    principal: Principal | null,
+    gameId: string,
+  ): ParticipantPrincipal | FacilitatorPrincipal {
+    const allowed = this.authorize(principal, 'viewResults', { gameId });
+    if (allowed.kind === 'observer') {
+      throw invalidCredentialError();
+    }
+    return allowed;
+  }
+
+  /** 出力ができるのは、そのゲームの進行役だけ（BR23.1）。参加者と観察者も、同じ 403 で拒否する。 */
+  requireExporter(principal: Principal | null, gameId: string): FacilitatorPrincipal {
+    const allowed = this.authorize(principal, 'exportGame', { gameId });
+    if (allowed.kind !== 'facilitator') {
+      throw invalidCredentialError();
+    }
+    return allowed;
+  }
+
+  /** 呼び出した人の投影だけを作る（NFR6.2）。観察者にはチーム全体の合計だけの専用の型を返す。 */
+  project(snapshot: Snapshot, principal: ObserverPrincipal): ObserverView;
+  project(
+    snapshot: Snapshot,
+    principal: ParticipantPrincipal | FacilitatorPrincipal,
+  ): GameStateView;
+  project(snapshot: Snapshot, principal: Principal): GameStateView | ObserverView;
+  project(snapshot: Snapshot, principal: Principal): GameStateView | ObserverView {
     return projectState(snapshot, principal);
   }
 
@@ -214,9 +407,9 @@ export class AccessControl {
     }
   }
 
-  /** 接続元を鍵付きで要約する（無効なコードの試行の記録用。生の接続元は残さない）。 */
+  /** 接続元を正規化して鍵付きで要約する（窓の鍵とログ用。生の接続元は残さない）。 */
   sourceDigest(address: string): string {
-    return keyedDigest(this.keyRing, address);
+    return keyedDigest(this.keyRing, normalizeSource(address));
   }
 }
 

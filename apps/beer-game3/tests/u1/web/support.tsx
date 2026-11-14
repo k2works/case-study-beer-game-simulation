@@ -51,6 +51,12 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): ApiClient & {
       throw new Error('replaceAssignee は未設定です');
     }),
     getHistory: vi.fn(async () => ({ entries: [] })),
+    getResults: vi.fn(async () => {
+      throw new Error('getResults は未設定です');
+    }),
+    exportGame: vi.fn(async () => {
+      throw new Error('exportGame は未設定です');
+    }),
   };
   // 上書きした関数も spy にして、呼び出しを検査できるようにする
   for (const [name, fn] of Object.entries(overrides)) {

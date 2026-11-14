@@ -395,7 +395,8 @@ describe('移行（U3）と逆の移行', () => {
   it('逆の移行で履歴の表と追加の列が消え、再び進めると復元できる。一時停止中の行は進行中に戻る', async () => {
     const game = await world.startedGame();
     await world.session.pauseGame(game.facilitator, game.gameId);
-    await runMigrations(databaseUrl(), 'down', 1);
+    // 新しい順に戻す: U5 の移行、U4 の移行、続いて U3 の移行
+    await runMigrations(databaseUrl(), 'down', 3);
     try {
       const table = await pool.query(`select to_regclass('operation_log_entries') as t`);
       expect(table.rows[0].t).toBeNull();
@@ -415,7 +416,8 @@ describe('移行（U3）と逆の移行', () => {
   });
 
   it('移行の前に ended だった行は finalWeek を補われ、入力済みの値は版 1 になる', async () => {
-    await runMigrations(databaseUrl(), 'down', 1);
+    // 新しい順に戻す: U5 の移行、U4 の移行、続いて U3 の移行
+    await runMigrations(databaseUrl(), 'down', 3);
     const gameId = '00000000-0000-4000-8000-0000000000c1';
     try {
       await pool.query(

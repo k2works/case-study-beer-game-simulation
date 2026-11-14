@@ -165,10 +165,33 @@ export function PlayScreen({ api, credential, state, refresh }: Props) {
         </p>
       </section>
 
+      {state.customerDemand && state.customerDemand.length > 0 ? (
+        <section aria-labelledby="demand-heading" data-testid="customer-demand">
+          <h2 id="demand-heading">顧客需要</h2>
+          <table aria-label="顧客需要">
+            <thead>
+              <tr>
+                <th scope="col">週</th>
+                <th scope="col">顧客需要</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.customerDemand.map((demand, index) => (
+                <tr key={index}>
+                  <td>第 {index + 1} 週</td>
+                  <td>{demand}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="hint">当週までの値です。先の週の需要は見えません。</p>
+        </section>
+      ) : null}
+
       {ended ? (
         <section>
           <p role="status">ゲームは終了しました</p>
-          <p>結果の比較は、あとの版で追加されます。</p>
+          <p>「結果を見る」から、全役割の時系列を比べられます。</p>
         </section>
       ) : (
         <section aria-labelledby="input-heading">

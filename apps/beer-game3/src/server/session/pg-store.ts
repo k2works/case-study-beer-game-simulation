@@ -14,12 +14,16 @@ import type {
   AccessCodeRow,
   AssignmentRow,
   ConfirmedRecord,
+  CredentialCode,
   DecidedByKind,
   DecisionBy,
+  ExclusiveResult,
   GameRow,
   GameTx,
   GameUpdate,
   IdempotencyRow,
+  JoinAttemptInput,
+  JoinAttemptOutcome,
   NewGame,
   ParticipantRow,
   ResolvedToken,
@@ -33,6 +37,12 @@ import type {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LOCK_NOT_AVAILABLE = '55P03';
 const UNIQUE_VIOLATION = '23505';
+
+/**
+ * 参加の窓のアドバイザリロックの classid（2 つの整数の形の第 1 引数）。
+ * ゲームの書き込みは行の占有で、鍵の空間が交わらない（logical-components.md）。
+ */
+export const JOIN_WINDOW_LOCK_CLASS = 4200101;
 
 export interface PgStoreOptions {
   connectionString: string;
@@ -58,6 +68,7 @@ function mapGame(row: Row): GameRow {
     setupKind: row.setup_kind as SetupKind,
     version: num(row.version),
     createdAt: row.created_at as Date,
+    lastOperationAt: row.last_operation_at as Date,
     endedAt: (row.ended_at as Date | null) ?? null,
     endReason: (row.end_reason as EndReason | null) ?? null,
     nextLogSequence: num(row.next_log_sequence),
@@ -126,7 +137,7 @@ async function insertLog(
 }
 
 const GAME_COLUMNS =
-  'game_id, name, status, week_count, current_week, setup_kind, version, created_at, ended_at, end_reason, next_log_sequence';
+  'game_id, name, status, week_count, current_week, setup_kind, version, created_at, last_operation_at, ended_at, end_reason, next_log_sequence';
 
 /**
  * PostgreSQL の保存（C3）。
@@ -156,8 +167,8 @@ export class PgStore implements Store {
       await client.query('BEGIN');
       const { game, settings } = input;
       await client.query(
-        `insert into games (game_id, name, status, week_count, current_week, setup_kind, version, created_at, ended_at, end_reason, next_log_sequence)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        `insert into games (game_id, name, status, week_count, current_week, setup_kind, version, created_at, last_operation_at, ended_at, end_reason, next_log_sequence)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           game.gameId,
           game.name,
@@ -167,6 +178,7 @@ export class PgStore implements Store {
           game.setupKind,
           game.version,
           game.createdAt,
+          game.lastOperationAt,
           game.endedAt,
           game.endReason,
           input.logs.length + 1,
@@ -228,7 +240,7 @@ export class PgStore implements Store {
 
   async findTokenByHash(hash: string): Promise<ResolvedToken | null> {
     const result = await this.query(
-      `select p.game_id, p.participant_id, a.role
+      `select t.token_id, t.last_used_at, p.game_id, p.participant_id, a.role
          from return_tokens t
          join participants p on p.participant_id = t.participant_id
          left join role_assignments a on a.participant_id = p.participant_id
@@ -238,11 +250,117 @@ export class PgStore implements Store {
     const row = result.rows[0];
     return row
       ? {
+          tokenId: row.token_id as string,
           gameId: row.game_id as string,
           participantId: row.participant_id as string,
           role: (row.role as Role | null) ?? null,
+          lastUsedAt: row.last_used_at as Date,
         }
       : null;
+  }
+
+  async findCredentialCode(hashes: string[]): Promise<CredentialCode | null> {
+    const result = await this.query(
+      `select game_id, kind from access_codes
+        where kind in ('facilitator', 'observer') and code_hash = any($1::text[]) and revoked_at is null`,
+      [hashes],
+    );
+    const row = result.rows[0];
+    return row ? { gameId: row.game_id as string, kind: row.kind as CredentialCode['kind'] } : null;
+  }
+
+  async touchToken(tokenId: string, now: Date, minIntervalMs: number): Promise<boolean> {
+    const result = await this.query(
+      `update return_tokens set last_used_at = $2
+        where token_id = $1 and revoked_at is null and last_used_at <= $3`,
+      [tokenId, now, new Date(now.getTime() - minIntervalMs)],
+    );
+    return result.rowCount === 1;
+  }
+
+  async attemptJoin(input: JoinAttemptInput): Promise<JoinAttemptOutcome> {
+    const client = await this.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("select set_config('lock_timeout', $1, true)", [
+        `${this.lockTimeoutMs}ms`,
+      ]);
+      // 接続元ごとの排他。窓が空でも効く。ロックはコミットで解放される。別の接続元は待たない
+      await client.query('select pg_advisory_xact_lock($1::int, hashtext($2))', [
+        JOIN_WINDOW_LOCK_CLASS,
+        input.sourceKey,
+      ]);
+      await client.query('delete from join_attempts where source_key = $1 and attempted_at < $2', [
+        input.sourceKey,
+        new Date(input.now.getTime() - input.windowMs),
+      ]);
+      const counted = await client.query(
+        'select count(*)::int as n from join_attempts where source_key = $1',
+        [input.sourceKey],
+      );
+      const record = async (): Promise<void> => {
+        await client.query('insert into join_attempts (source_key, attempted_at) values ($1, $2)', [
+          input.sourceKey,
+          input.now,
+        ]);
+      };
+      let outcome: JoinAttemptOutcome;
+      if ((counted.rows[0]?.n as number) >= input.maxAttempts) {
+        // コードは検証しない。この試行も窓に加え、接続元ごとに最新の maxAttempts + 1 件だけ残す
+        await record();
+        await client.query(
+          `delete from join_attempts
+            where source_key = $1
+              and id not in (select id from join_attempts where source_key = $1
+                              order by attempted_at desc, id desc limit $2)`,
+          [input.sourceKey, input.maxAttempts + 1],
+        );
+        outcome = { result: 'limited' };
+      } else {
+        const found = await client.query(
+          `select game_id from access_codes
+            where kind = 'join' and code_hash = any($1::text[]) and revoked_at is null`,
+          [input.codeHashes],
+        );
+        const row = found.rows[0];
+        if (row) {
+          outcome = { result: 'valid', gameId: row.game_id as string };
+        } else {
+          await record();
+          outcome = { result: 'invalid' };
+        }
+      }
+      await client.query('COMMIT');
+      return outcome;
+    } catch (error) {
+      await this.rollback(client);
+      if (isPgError(error, LOCK_NOT_AVAILABLE)) {
+        throw unavailableError();
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async sweepJoinAttempts(olderThan: Date): Promise<number> {
+    // ロック中の行は飛ばす。参加の要求の処理と行を奪い合わず、待たない
+    const result = await this.query(
+      `delete from join_attempts
+        where ctid in (select ctid from join_attempts where attempted_at < $1 for update skip locked)`,
+      [olderThan],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async countJoinAttempts(sourceKey?: string): Promise<number> {
+    const result =
+      sourceKey === undefined
+        ? await this.query('select count(*)::int as n from join_attempts', [])
+        : await this.query('select count(*)::int as n from join_attempts where source_key = $1', [
+            sourceKey,
+          ]);
+    return result.rows[0]?.n as number;
   }
 
   async getAccessCode(gameId: string, kind: AccessCodeKind): Promise<AccessCodeRow | null> {
@@ -325,6 +443,72 @@ export class PgStore implements Store {
       throw error;
     } finally {
       client.release();
+    }
+  }
+
+  async findStaleGames(before: Date, limit: number, exclude: readonly string[]): Promise<string[]> {
+    // 述語は部分索引 games_stale_idx と同じ（status <> 'ended'）。除外は順序と上限の前に行う
+    const result = await this.query(
+      `select game_id from games
+        where status <> 'ended' and last_operation_at <= $1 and game_id <> all($3::uuid[])
+        order by last_operation_at asc, game_id asc
+        limit $2`,
+      [before, limit, [...exclude]],
+    );
+    return result.rows.map((row) => row.game_id as string);
+  }
+
+  async findExpiredGames(
+    before: Date,
+    limit: number,
+    exclude: readonly string[],
+  ): Promise<string[]> {
+    // 述語は部分索引 games_expired_idx と同じ（status = 'ended'）
+    const result = await this.query(
+      `select game_id from games
+        where status = 'ended' and ended_at <= $1 and game_id <> all($3::uuid[])
+        order by ended_at asc, game_id asc
+        limit $2`,
+      [before, limit, [...exclude]],
+    );
+    return result.rows.map((row) => row.game_id as string);
+  }
+
+  async runExclusive<T>(key: string, fn: () => Promise<T>): Promise<ExclusiveResult<T>> {
+    // ロックを保つためだけの専用の接続。ゲームの処理（fn の中）は、プールのほかの接続を使う
+    const client = await this.connect();
+    let discard = false;
+    try {
+      let locked: boolean;
+      try {
+        const attempt = await client.query<Row>(
+          'select pg_try_advisory_lock(hashtextextended($1, 0)) as locked',
+          [key],
+        );
+        locked = attempt.rows[0]?.locked === true;
+      } catch (error) {
+        discard = true;
+        throw error;
+      }
+      if (!locked) {
+        return { acquired: false };
+      }
+      try {
+        return { acquired: true, value: await fn() };
+      } finally {
+        try {
+          const released = await client.query<Row>(
+            'select pg_advisory_unlock(hashtextextended($1, 0)) as unlocked',
+            [key],
+          );
+          // 解放できなかった接続は、ロックを持ったまま戻さず、破棄する（接続の終了とともにロックも消える）
+          discard = released.rows[0]?.unlocked !== true;
+        } catch {
+          discard = true;
+        }
+      }
+    } finally {
+      client.release(discard);
     }
   }
 
@@ -471,6 +655,8 @@ async function readSlots(client: pg.ClientBase, gameId: string): Promise<SlotRow
 }
 
 class PgTx implements GameTx {
+  mutated = false;
+
   constructor(
     private readonly client: pg.PoolClient,
     private readonly gameId: string,
@@ -514,6 +700,7 @@ class PgTx implements GameTx {
     tokenHash: string,
     issuedAt: Date,
   ): Promise<void> {
+    this.mutated = true;
     await this.client.query(
       `insert into participants (participant_id, game_id, display_name, join_order, joined_at, replaced_at, created_by_facilitator)
        values ($1, $2, $3, $4, $5, $6, $7)`,
@@ -528,7 +715,8 @@ class PgTx implements GameTx {
       ],
     );
     await this.client.query(
-      'insert into return_tokens (token_id, participant_id, token_hash, issued_at) values ($1, $2, $3, $4)',
+      // last_used_at は発行の時刻から始める（BR17.6）
+      'insert into return_tokens (token_id, participant_id, token_hash, issued_at, last_used_at) values ($1, $2, $3, $4, $4)',
       [randomUUID(), participant.participantId, tokenHash, issuedAt],
     );
   }
@@ -538,6 +726,7 @@ class PgTx implements GameTx {
     role: Role | null,
     assignmentId: string,
   ): Promise<void> {
+    this.mutated = true;
     await this.client.query('delete from role_assignments where participant_id = $1', [
       participantId,
     ]);
@@ -550,6 +739,7 @@ class PgTx implements GameTx {
   }
 
   async insertWeekRecords(rows: WeekRecordRow[]): Promise<void> {
+    this.mutated = true;
     await this.client.query(
       `insert into week_records (week_record_id, game_id, week, role, decision)
        select * from unnest($1::uuid[], $2::uuid[], $3::int[], $4::text[], $5::int[])`,
@@ -570,6 +760,7 @@ class PgTx implements GameTx {
     by: DecisionBy,
     at: Date,
   ): Promise<void> {
+    this.mutated = true;
     const result = await this.client.query(
       `update week_records
           set decision = $4, decided_by_kind = $5, decided_by_participant_id = $6,
@@ -591,6 +782,7 @@ class PgTx implements GameTx {
   }
 
   async replaceParticipant(participantId: string, at: Date): Promise<void> {
+    this.mutated = true;
     const updated = await this.client.query(
       'update participants set replaced_at = $2 where participant_id = $1 and game_id = $3',
       [participantId, at, this.gameId],
@@ -605,6 +797,7 @@ class PgTx implements GameTx {
   }
 
   async confirmRecords(week: number, records: ConfirmedRecord[]): Promise<void> {
+    this.mutated = true;
     for (const record of records) {
       const result = await this.client.query(
         `update week_records
@@ -631,6 +824,7 @@ class PgTx implements GameTx {
   }
 
   async replaceSlots(rows: SlotRow[]): Promise<void> {
+    this.mutated = true;
     await this.client.query('delete from pipeline_slots where game_id = $1', [this.gameId]);
     await this.client.query(
       `insert into pipeline_slots (pipeline_slot_id, game_id, kind, role, remaining_weeks, quantity)
@@ -694,6 +888,7 @@ class PgTx implements GameTx {
     expectedVersion: number,
     logs: readonly NewLogEntry[],
   ): Promise<GameRow> {
+    this.mutated = true;
     const firstSequence = this.current.nextLogSequence;
     const result = await this.client.query<Row>(
       `update games
@@ -727,5 +922,24 @@ class PgTx implements GameTx {
     }
     this.current = mapGame(row);
     return { ...this.current };
+  }
+
+  async touchOperation(at: Date): Promise<void> {
+    // 減らさない（greatest）。版は変えず、履歴にも書かない
+    await this.client.query(
+      'update games set last_operation_at = greatest(last_operation_at, $2) where game_id = $1',
+      [this.gameId, at],
+    );
+  }
+
+  async deleteGame(): Promise<void> {
+    // 子の表は外部キーの on delete cascade で、この 1 文の中で消える。status の条件で二重に守る（NFR6.7）
+    const result = await this.client.query(
+      "delete from games where game_id = $1 and status = 'ended'",
+      [this.gameId],
+    );
+    if (result.rowCount !== 1) {
+      throw new Error('終了していないゲームは削除できません');
+    }
   }
 }

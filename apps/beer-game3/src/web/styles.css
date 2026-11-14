@@ -165,3 +165,92 @@ tr.missing td {
   font-weight: bold;
   border-left: 0.25rem solid var(--error);
 }
+
+/* 結果画面（US4.1）: 系列の色は補助。線種と印と凡例で区別する（BR22.2）。白い背景で 3:1 以上の色を既定にし、
+   ダークテーマでは明るい色に替える */
+:root {
+  --series-factory: #0b5cad;
+  --series-wholesaler1: #b04a00;
+  --series-wholesaler2: #1b7f3b;
+  --series-retailer: #8a2c7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --series-factory: #5aa9f0;
+    --series-wholesaler1: #ff9a52;
+    --series-wholesaler2: #4fd07a;
+    --series-retailer: #e68ad6;
+  }
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin-block: 0.75rem;
+}
+
+.choice {
+  display: inline-block;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* 選択中の状態を、色だけでなく太字と下線でも示す */
+.choice.selected {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.25rem;
+}
+
+.choice input {
+  min-width: 0;
+}
+
+.chart {
+  width: 100%;
+  max-width: 44rem;
+  height: auto;
+  background: var(--bg);
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 0.5;
+}
+
+.chart-text {
+  fill: var(--text);
+  font-size: 12px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  list-style: none;
+  padding: 0;
+  margin-block: 0.5rem;
+}
+
+.legend svg {
+  vertical-align: middle;
+}
+
+caption {
+  text-align: left;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.export-panel .notice {
+  border-bottom: 0;
+  border-left: 0.35rem solid var(--accent);
+}
+
+.results-link {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0.5rem 1.5rem 0;
+}

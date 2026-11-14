@@ -20,6 +20,8 @@ import {
   roleLabel,
   roleList,
 } from '../format.js';
+import { DISPLAY_NAME_RULE } from '../messages.js';
+import { ExportPanel } from './ExportPanel.js';
 
 interface Props {
   api: ApiClient;
@@ -169,7 +171,11 @@ export function FacilitatorBoard({ api, credential, state, refresh }: Props) {
       />
 
       {ended ? (
-        <p role="status">ゲームは終了しました</p>
+        <>
+          <p role="status">ゲームは終了しました</p>
+          {/* 出力は進行役だけ、終了後だけ（BR23.1）。注意と列名の説明をボタンの近くに常に示す（BR23.9） */}
+          <ExportPanel api={api} credential={credential} />
+        </>
       ) : (
         <section aria-labelledby="confirm-heading">
           <h2 id="confirm-heading">週の確定</h2>
@@ -444,7 +450,11 @@ function ReplacePanel({
               autoComplete="off"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              aria-describedby="replace-name-rule"
             />
+            <p id="replace-name-rule" data-testid="replace-name-rule" className="hint">
+              {DISPLAY_NAME_RULE}
+            </p>
           </div>
           <button type="submit" data-testid="replace-submit" disabled={busy}>
             {busy ? '入れ替えています' : '入れ替える'}

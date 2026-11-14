@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import type { AccessControl, Principal } from '../access/access-control.js';
+import type {
+  AccessControl,
+  FacilitatorPrincipal,
+  ParticipantPrincipal,
+  Principal,
+} from '../access/access-control.js';
 import { normalizeJoinCode } from '../access/codes.js';
 import type { Clock, RandomSource } from '../clock.js';
 import { uuidFrom } from '../clock.js';
@@ -42,7 +47,7 @@ import {
   type LogKind,
   type NewLogEntry,
 } from './history.js';
-import type { GameStateView } from './projection.js';
+import type { GameStateView, ObserverView } from './projection.js';
 import type {
   ConfirmedRecord,
   GameRow,
@@ -126,6 +131,15 @@ export interface WeekResult {
   version: number;
 }
 
+/** 自動終了の再検査の結果（BR25.4）。 */
+export type AutoEndResult = 'ended' | 'not-stale' | 'already-ended' | 'not-found';
+
+/** 削除の再検査の結果（BR24.5）。 */
+export type DeleteResult = 'deleted' | 'not-expired' | 'not-found';
+
+const isNotFound = (error: unknown): boolean =>
+  error instanceof AppError && error.problem.kind === 'not_found';
+
 const CODE_ISSUE_ATTEMPTS = 5;
 
 const digestOf = (value: unknown): string =>
@@ -189,9 +203,20 @@ export class GameSession {
     return internalError();
   }
 
+  /**
+   * ゲームの行を占有して書き込む唯一の入口。状態を変える書き込みがあったときだけ、コミットの前に
+   * 同じ保存の中で最後の操作の時刻を 1 回更新する（BR25.2、NFR2.5）。
+   * 再送（前回と同じ結果を返すだけ）や拒否（例外）では書き込みが起きないため、更新されない。
+   */
   private async write<T>(gameId: string, fn: (tx: GameTx) => Promise<T>): Promise<T> {
     try {
-      return await this.store.transact(gameId, fn);
+      return await this.store.transact(gameId, async (tx) => {
+        const result = await fn(tx);
+        if (tx.mutated) {
+          await tx.touchOperation(this.clock.now());
+        }
+        return result;
+      });
     } catch (error) {
       throw this.translate(error);
     }
@@ -238,6 +263,8 @@ export class GameSession {
             setupKind,
             version: 0,
             createdAt: now,
+            // 作成時の最後の操作の時刻は、作成の時刻と同じ（BR25.2）
+            lastOperationAt: now,
             endedAt: null,
             endReason: null,
             nextLogSequence: 1,
@@ -284,7 +311,7 @@ export class GameSession {
   }
 
   /** 参加する（BR2.1〜BR2.6）。コード → 状態 → 表示名 の順に判定する。 */
-  async joinGame(body: unknown): Promise<JoinResult> {
+  async joinGame(body: unknown, verifiedGameId?: string): Promise<JoinResult> {
     const rawCode =
       typeof body === 'object' && body !== null
         ? (body as { joinCode?: unknown }).joinCode
@@ -293,13 +320,17 @@ export class GameSession {
     if (typeof rawCode !== 'string' || rawCode.length === 0) {
       parseJoin(body);
     }
-    const gameId = await this.access.resolveJoinCode(normalizeJoinCode(String(rawCode)));
+    // 入口が参加の窓（BR18）の中でコードを検証済みなら、そのゲームを使う。直接呼ぶときは、ここで検証する
+    const gameId =
+      verifiedGameId ?? (await this.access.resolveJoinCode(normalizeJoinCode(String(rawCode))));
     if (!gameId) {
       throw forbiddenError(
         '参加コードが無効です',
         '参加コードを確かめて、もう一度入力してください',
       );
     }
+    // 表示名の形式の検証（先頭が式になる文字を含む）は、副作用がないので占有の前に行う（BR23.10、NFR6.8）
+    const input = parseJoin(body);
     return this.write(gameId, async (tx) => {
       const game = tx.game();
       if (game.status === 'ended') {
@@ -314,7 +345,6 @@ export class GameSession {
           '次のゲームの開始前に参加してください',
         );
       }
-      const input = parseJoin(body);
       const participants = await tx.participants();
       const joinOrder = participants.reduce((max, p) => Math.max(max, p.joinOrder), 0) + 1;
       const participantId = this.id();
@@ -714,17 +744,62 @@ export class GameSession {
   }
 
   /**
-   * 放置されたゲームの自動終了（BR9.4、BR9.8）。U5 の定期処理が内部から呼ぶ。HTTP の入口は持たない。
-   * 準備中からも終了できる唯一の経路。終了済みなら何もしない。
+   * 放置されたゲームの自動終了（BR9.4、BR9.8、BR25.3、BR25.4）。U5 の定期処理が内部から呼ぶ。HTTP の入口は持たない。
+   * 準備中からも終了できる唯一の経路。ゲームの行を占有した中で、期限（最後の操作が staleBefore 以前）を再検査する。
+   * - ended: 終了した
+   * - not-stale: 選んだあとに操作があり、期限を過ぎていなくなった（終了しない）
+   * - already-ended: すでに終了していた（何もしない。冪等）
+   * - not-found: ほかの処理が先に削除した（何もしない）
    */
-  async autoEnd(gameId: string): Promise<void> {
-    await this.write(gameId, async (tx) => {
-      const game = tx.game();
-      if (game.status === 'ended') {
-        return;
+  async autoEnd(gameId: string, staleBefore: Date): Promise<AutoEndResult> {
+    try {
+      return await this.write(gameId, async (tx): Promise<AutoEndResult> => {
+        const game = tx.game();
+        if (game.status === 'ended') {
+          return 'already-ended';
+        }
+        if (game.lastOperationAt.getTime() > staleBefore.getTime()) {
+          return 'not-stale';
+        }
+        await this.finish(tx, game, 'autoEnd', 'system');
+        return 'ended';
+      });
+    } catch (error) {
+      if (isNotFound(error)) {
+        return 'not-found';
       }
-      await this.finish(tx, game, 'autoEnd', 'system');
-    });
+      throw error;
+    }
+  }
+
+  /**
+   * 保持期間を過ぎたゲームの削除（BR24.3、BR24.5）。U5 の定期処理が内部から呼ぶ。HTTP の入口は持たない。
+   * ゲームの行を占有した中で、終了済みで終了が expiredBefore 以前であることを再検査し、紐づくすべてのデータを
+   * 1 回の保存で削除する。途中で失敗したらすべて元に戻る（例外を返す）。
+   * - deleted: 削除した
+   * - not-expired: 終了していない、または期限を過ぎていなくなった（削除しない）
+   * - not-found: すでに削除されている（何もしない。冪等）
+   */
+  async deleteIfExpired(gameId: string, expiredBefore: Date): Promise<DeleteResult> {
+    try {
+      return await this.write(gameId, async (tx): Promise<DeleteResult> => {
+        const game = tx.game();
+        if (
+          game.status !== 'ended' ||
+          game.endedAt === null ||
+          game.endedAt.getTime() > expiredBefore.getTime()
+        ) {
+          return 'not-expired';
+        }
+        await tx.deleteGame();
+        return 'deleted';
+      });
+    } catch (error) {
+      if (isNotFound(error)) {
+        return 'not-found';
+      }
+      throw error;
+    }
   }
 
   private async finish(
@@ -849,7 +924,15 @@ export class GameSession {
   }
 
   /** 呼び出した人ごとの投影を返す。行を占有しない読み取り（NFR4.4）。 */
-  async getState(principal: Principal | null, gameId: string): Promise<GameStateView> {
+  getState(
+    principal: ParticipantPrincipal | FacilitatorPrincipal | null,
+    gameId: string,
+  ): Promise<GameStateView>;
+  getState(principal: Principal | null, gameId: string): Promise<GameStateView | ObserverView>;
+  async getState(
+    principal: Principal | null,
+    gameId: string,
+  ): Promise<GameStateView | ObserverView> {
     const viewer = this.access.requireViewer(principal, gameId);
     let snapshot: Snapshot | null;
     try {

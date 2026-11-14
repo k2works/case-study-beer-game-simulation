@@ -69,6 +69,24 @@ export const conflictError = (reason: string, hint: string): AppError =>
 export const stateError = (reason: string, hint: string, missingRoles?: Role[]): AppError =>
   new AppError({ kind: 'state', reason, hint, ...(missingRoles ? { missingRoles } : {}) });
 
+/** 参加の無効な試行が多すぎる（BR18.2）。参加の可否は判定しない。 */
+export const rateLimitedError = (
+  reason = '参加の試行が続いたため、いったん受け付けられません',
+  hint = 'しばらく待ってからやり直してください',
+): AppError => new AppError({ kind: 'rate_limited', reason, hint });
+
+/**
+ * 権限の判定の拒否と、無効な資格情報（不明・失効・期限切れ）への固定の応答（NFR6.4）。
+ * 理由を区別しない 1 つの本文で、種類の違いや、ゲームと役割の存在を応答から推測させない。
+ * 資格情報なしの要求の応答とも同じ形にする。
+ */
+export const invalidCredentialError = (): AppError =>
+  new AppError({
+    kind: 'forbidden',
+    reason: 'この操作を行う権限がありません',
+    hint: '正しいコードで操作してください',
+  });
+
 export const unavailableError = (
   reason = '同じゲームへの操作が重なっています',
   hint = 'しばらくして、もう一度操作してください',

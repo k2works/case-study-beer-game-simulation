@@ -27,7 +27,8 @@ export async function resetDatabase(): Promise<void> {
   }
   const pool = new pg.Pool({ connectionString: url, max: 1 });
   try {
-    await pool.query('truncate games cascade');
+    // join_attempts（U4 の参加の窓）はゲームに紐づかないので、別に空にする
+    await pool.query('truncate games, join_attempts cascade');
   } finally {
     await pool.end();
   }

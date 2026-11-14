@@ -7,8 +7,9 @@ import type {
   ReplacementResult,
   WeekResult,
 } from '../server/session/game-session.js';
+import type { ResultsView } from '../server/reporting/results.js';
 import type { HistoryEntryView, HistoryView } from '../server/session/history.js';
-import type { GameStateView } from '../server/session/projection.js';
+import type { GameStateView, ObserverView } from '../server/session/projection.js';
 
 export type {
   CreatedGame,
@@ -17,19 +18,29 @@ export type {
   HistoryEntryView,
   HistoryView,
   JoinResult,
+  ObserverView,
   ReplacementResult,
+  ResultsView,
   WeekResult,
 };
 
-/** 資格情報。参加者の token か、進行役用コード。 */
+export type ExportFormat = 'csv' | 'json';
+
+/** 出力のファイル。画面が Blob としてダウンロードする（資格情報は URL に載せない、NFR6.6）。 */
+export interface ExportedFile {
+  blob: Blob;
+  filename: string;
+}
+
+/** 資格情報。参加者の token、進行役用コード、観察者用コード。 */
 export interface Credential {
-  kind: 'participant' | 'facilitator';
+  kind: 'participant' | 'facilitator' | 'observer';
   secret: string;
   gameId: string;
 }
 
 export interface Me {
-  kind: 'participant' | 'facilitator';
+  kind: 'participant' | 'facilitator' | 'observer';
   gameId: string;
   participantId?: string;
   role?: Role | null;
@@ -57,7 +68,8 @@ export interface ApiClient {
   createGame(body: Record<string, unknown>): Promise<CreatedGame>;
   join(body: { joinCode: string; displayName: string }): Promise<JoinResult>;
   me(secret: string): Promise<Me>;
-  getState(credential: Credential): Promise<GameStateView>;
+  /** 観察者には ObserverView（viewerKind が observer）が返る */
+  getState(credential: Credential): Promise<GameStateView | ObserverView>;
   getCodes(credential: Credential): Promise<{ joinCode: string; observerCode: string }>;
   assign(credential: Credential, participantId: string, role: Role | null): Promise<void>;
   start(credential: Credential): Promise<void>;
@@ -80,6 +92,10 @@ export interface ApiClient {
     displayName: string,
   ): Promise<ReplacementResult>;
   getHistory(credential: Credential): Promise<HistoryView>;
+  /** 終了後の結果（参加者と進行役）。終了前は 403 */
+  getResults(credential: Credential): Promise<ResultsView>;
+  /** 結果の出力（進行役だけ）。ヘッダ付きで取得して Blob にする */
+  exportGame(credential: Credential, format: ExportFormat): Promise<ExportedFile>;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -113,14 +129,33 @@ export function createApi(fetchImpl: FetchLike = (input, init) => fetch(input, i
     }
     const payload = await readJson(response);
     if (!response.ok) {
-      const problem = isProblem(payload) ? payload : null;
-      throw new ApiError(
-        problem?.kind ?? 'internal',
-        problem,
-        problem?.reason ?? '想定外の応答です',
-      );
+      throw problemError(payload);
     }
     return payload as T;
+  }
+
+  /** 出力: JSON ではなくファイルとして受け取る。失敗は他の API と同じ Problem で返る。 */
+  async function download(
+    url: string,
+    secret: string,
+    fallbackName: string,
+  ): Promise<ExportedFile> {
+    let response: Response;
+    try {
+      response = await fetchImpl(url, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${secret}` },
+      });
+    } catch {
+      throw new ApiError('network', null, '通信できませんでした');
+    }
+    if (!response.ok) {
+      throw problemError(await readJson(response));
+    }
+    return {
+      blob: await response.blob(),
+      filename: filenameOf(response.headers.get('content-disposition')) ?? fallbackName,
+    };
   }
 
   const base = (gameId: string): string => `/api/games/${encodeURIComponent(gameId)}`;
@@ -157,7 +192,22 @@ export function createApi(fetchImpl: FetchLike = (input, init) => fetch(input, i
         body: { participantId, displayName },
       }),
     getHistory: (c) => call('GET', `${base(c.gameId)}/history`, { secret: c.secret }),
+    getResults: (c) => call('GET', `${base(c.gameId)}/results`, { secret: c.secret }),
+    exportGame: (c, format) =>
+      download(`${base(c.gameId)}/export?format=${format}`, c.secret, `beer-game.${format}`),
   };
+}
+
+/** 失敗の応答から ApiError を作る。Problem の形でなければ、想定外の応答として扱う。 */
+function problemError(payload: unknown): ApiError {
+  const problem = isProblem(payload) ? payload : null;
+  return new ApiError(problem?.kind ?? 'internal', problem, problem?.reason ?? '想定外の応答です');
+}
+
+/** Content-Disposition のファイル名（attachment; filename="..."）。無ければ null。 */
+function filenameOf(header: string | null): string | null {
+  const match = header ? /filename="([^"]+)"/.exec(header) : null;
+  return match?.[1] ?? null;
 }
 
 async function readJson(response: Response): Promise<unknown> {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  DISPLAY_NAME_MAX,
   MAX_DECISION,
   MAX_DEMAND_VALUE,
   MAX_INITIAL_QUANTITY,
@@ -20,7 +21,6 @@ export const DEFAULTS = {
 } as const;
 
 export const NAME_MAX = 60;
-export const DISPLAY_NAME_MAX = 40;
 export const IDEMPOTENCY_KEY_MIN = 16;
 export const IDEMPOTENCY_KEY_MAX = 128;
 
@@ -71,18 +71,37 @@ const createGameSchema = z
 
 export type CreateGameInput = z.infer<typeof createGameSchema>;
 
+/**
+ * 表示名の先頭に使えない文字（BR23.10、NFR6.8）。表計算ソフトが式として実行しうる = + - @ と、
+ * 正規化（前後の空白の除去）の定義が将来変わっても防ぎが外れないよう、タブと復帰も含める。
+ */
+export const FORBIDDEN_DISPLAY_NAME_STARTS: readonly string[] = ['=', '+', '-', '@', '\t', '\r'];
+
+export const DISPLAY_NAME_FORBIDDEN_START_REASON = '表示名の先頭に使えない文字があります';
+export const DISPLAY_NAME_FORBIDDEN_START_HINT = '= + - @ 以外の文字で始まる名前にしてください';
+
+/**
+ * 参加者の表示名（1〜40 文字）。参加（join）と担当者の入れ替え（replace）が、この 1 つの定義を使う。
+ * 先頭の判定は、保存する値と同じ正規化（前後の空白の除去）をしたあとの値に対して行う。したがって
+ * 「 =1+1」や「\t=1」も、正規化後に = で始まるため拒否される。
+ */
+export const displayName = z
+  .string({ error: '表示名を入力してください' })
+  .trim()
+  .refine((v) => codePointLength(v) >= 1, { error: '表示名を入力してください' })
+  .refine((v) => codePointLength(v) <= DISPLAY_NAME_MAX, {
+    error: `表示名は ${DISPLAY_NAME_MAX} 文字以内で入力してください`,
+  })
+  .refine((v) => !FORBIDDEN_DISPLAY_NAME_STARTS.some((start) => v.startsWith(start)), {
+    error: DISPLAY_NAME_FORBIDDEN_START_REASON,
+  });
+
 const joinSchema = z.strictObject(
   {
     joinCode: z
       .string({ error: '参加コードを入力してください' })
       .min(1, { error: '参加コードを入力してください' }),
-    displayName: z
-      .string({ error: '表示名を入力してください' })
-      .trim()
-      .refine((v) => codePointLength(v) >= 1, { error: '表示名を入力してください' })
-      .refine((v) => codePointLength(v) <= DISPLAY_NAME_MAX, {
-        error: `表示名は ${DISPLAY_NAME_MAX} 文字以内で入力してください`,
-      }),
+    displayName,
   },
   { error: '参加コードと表示名を入力してください' },
 );
@@ -90,13 +109,7 @@ const joinSchema = z.strictObject(
 const replacementSchema = z.strictObject(
   {
     participantId: z.uuid({ error: '入れ替える担当者を指定してください' }),
-    displayName: z
-      .string({ error: '表示名を入力してください' })
-      .trim()
-      .refine((v) => codePointLength(v) >= 1, { error: '表示名を入力してください' })
-      .refine((v) => codePointLength(v) <= DISPLAY_NAME_MAX, {
-        error: `表示名は ${DISPLAY_NAME_MAX} 文字以内で入力してください`,
-      }),
+    displayName,
   },
   { error: '入れ替える担当者と新しい担当者の表示名を指定してください' },
 );
@@ -133,7 +146,13 @@ function parse<T>(schema: z.ZodType<T>, body: unknown, reason: string, hint: str
   const result = schema.safeParse(body);
   if (!result.success) {
     const fields = toFields(result.error);
-    throw validationError(`${reason}（${fields.map((f) => f.message).join('、')}）`, hint, fields);
+    // 表示名の先頭の文字の拒否は、直し方を具体的に示す（BR23.10）
+    const forbiddenStart = fields.some((f) => f.message === DISPLAY_NAME_FORBIDDEN_START_REASON);
+    throw validationError(
+      `${reason}（${fields.map((f) => f.message).join('、')}）`,
+      forbiddenStart ? DISPLAY_NAME_FORBIDDEN_START_HINT : hint,
+      fields,
+    );
   }
   return result.data;
 }

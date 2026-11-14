@@ -180,9 +180,10 @@ describe('S2 ロビー', () => {
     expect(await screen.findByText('太郎 #1')).toBeInTheDocument();
     expect(await screen.findByText('花子 #2')).toBeInTheDocument();
     fail = true;
-    expect(await screen.findByText(/通信が切れています/)).toBeInTheDocument();
+    // U4（BR20.3）: 文言は「接続が切れています。自動で再接続を試みます」
+    expect(await screen.findByText(/接続が切れています/)).toBeInTheDocument();
     fail = false;
-    await waitFor(() => expect(screen.queryByText(/通信が切れています/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/接続が切れています/)).toBeNull());
   });
 });
 

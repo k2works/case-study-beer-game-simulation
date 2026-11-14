@@ -69,8 +69,8 @@ describe('BR8.2 費用の列は 64 ビット整数', () => {
       'select role, weekly_cost::text as w, cumulative_cost::text as c from week_records where game_id = $1 and week = 1 order by role',
       [game.gameId],
     );
-    // 新しい順に戻す: U3 の移行、続いて U2 の移行（費用の列）
-    await runMigrations(databaseUrl(), 'down', 2);
+    // 新しい順に戻す: U5 の移行、U4 の移行、U3 の移行、続いて U2 の移行（費用の列）
+    await runMigrations(databaseUrl(), 'down', 4);
     try {
       const narrowed = await pool.query(
         `select data_type from information_schema.columns

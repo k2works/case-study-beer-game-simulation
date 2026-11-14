@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { AccessControl, type Principal } from '../../../src/server/access/access-control.js';
+import {
+  AccessControl,
+  type FacilitatorPrincipal,
+  type ParticipantPrincipal,
+} from '../../../src/server/access/access-control.js';
+
+/** 試験の組み立てで使う呼び出した人（観察者は含めない。観察者は access.authenticate で直接求める）。 */
+type Principal = FacilitatorPrincipal | ParticipantPrincipal;
 import { loadKeyRing } from '../../../src/server/access/keys.js';
 import type { Clock, RandomSource } from '../../../src/server/clock.js';
 import { ROLES, type Role } from '../../../src/server/domain/types.js';
@@ -100,7 +107,7 @@ export function createWorld(
   const random = new SequenceRandom();
   const keyRing = loadKeyRing(TEST_ENV);
   const store = options.store ?? new MemoryStore({ lockTimeoutMs: options.lockTimeoutMs ?? 3000 });
-  const access = new AccessControl({ store, keyRing, random });
+  const access = new AccessControl({ store, keyRing, random, clock });
   const session = new GameSession({
     store,
     access,
@@ -117,7 +124,7 @@ export function createWorld(
     random,
     async as(credential) {
       const principal = await access.authenticate(credential);
-      if (!principal) {
+      if (!principal || principal.kind === 'observer') {
         throw new Error('資格情報が無効です（試験の組み立ての誤り）');
       }
       return principal;
