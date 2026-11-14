@@ -69,5 +69,6 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
 ## 備考
 
 - 著者: claude-code
+- **B1 の実装の結果（2026-11-14）**: **detekt 1.23.8 は JDK 25 で動かない**（`IllegalArgumentException: 25.0.2`）。JDK 21 では、Kotlin 2.4.21 のコードを解析でき、`ForbiddenMethodCall`（`domain` での `Instant.now`・`UUID.randomUUID`）が効き、違反 0 件（`@Suppress`・ベースライン・設定の緩和なし）。`jvmTarget = "22"` を指定し、JDK 22 以下のときだけ detekt を有効にする（CI は JDK 21 の専用ジョブ）。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）と、PMD の導入・14 ルール・fixture は **B2 で判断する**。`RedundantSuspendModifier` の誤検知（Kotlin 2.4 でビルドされたライブラリの `suspend` を検出できない）は、コードの形で回避した（原因は未調査）。`mutableListOf` はインライン関数のため `ForbiddenMethodCall` で報告されない（PMD に任せる）。
 - 関連 ADR: [ADR-007](./007-functional-core-with-arrow.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-013](./013-tech-stack-versions.md)
 - 参照: [開発戦略（静的解析とルール設定）](../../development/beer-game-kotlin/development_strategy.md)、[技術スタック（T5、確認した重要な事項 13・14・17）](../../design/beer-game-kotlin/tech-stack.md)、[リリース計画（B2、R1、R16、R17）](../../development/beer-game-kotlin/release_plan.md)、[設計レビュー（M17、M18）](../../review/beer-game-kotlin/design_review_20261114.md)、[関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md)

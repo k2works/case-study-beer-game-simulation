@@ -4,7 +4,7 @@ title: "テスト戦略 - ビールゲームシミュレーション（Kotlin �
 description: "Kotlin 版のテスト戦略。BDD（受入条件は日本語 Gherkin と Cucumber、ドメインは Kotest の Given/When/Then）、decide/evolve/simulateWeek の純粋関数テスト、プロパティベーステスト、イベントストアと投影の統合テスト、冪等性・競合・復元・再構築、カバレッジ目標の判断、静的解析の厳格な適用（detekt・PMD・ktlint）、CI、タグからのトレーサビリティを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # テスト戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -74,7 +74,7 @@ UI -[hidden]down-> UNIT
 | ユニット（性質） | **どんな入力でも成り立つ性質**を検証する（下記） | 上記すべて、投影、シリアライズ | 同上。`Arb` で入力を生成する |
 | ユニット（投影） | イベントから**行の変更の列**（`Event -> List<RowChange>`。Upsert / Delete と表・主キー・値）を作る純粋関数 `Projection` を検証する。**投影は他の投影を読まず、イベントのペイロードだけから作る**ため、再構築の順序に依存しないこと、1 件の `WeekCommitted` が複数の表の変更を返すことを確かめる。開示の判定も含む | `Projection.apply` / `replay`、`Disclosure` | 純粋 |
 | ユニット（アプリケーション） | 「読む → `decide` → 追記 → 再試行 → 冪等記録」の手順を検証する | コマンドハンドラ、問い合わせ | `EventStore` などの**関数の束**を、メモリ上の実装または失敗を返す関数に差し替える（[ガイド §8.2](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
-| UI コンポーネント | 画面の表示、入力、エラー、フォーカス、共同入力の競合、ルーティング | `ui/src/features/` | beer-game2 と同じ（`ApiClient` を差し替える） |
+| UI コンポーネント | 画面の表示、入力、エラー、フォーカス、共同入力の競合、ルーティング | `ui/src/features/`（**B1 の実装は `web/src/features/`**。70 件） | beer-game2 と同じ（`ApiClient` を差し替える） |
 | HTTP の統合 | 境界（認証、Origin 検査、冪等キー、版、エラー形式、セキュリティヘッダー、相関 ID、レート制限、SSE）の契約を検証する | Ktor のアダプター（`testApplication`） | ハンドラはメモリ上の関数の束、または実 DB |
 | DB の統合 | 永続化、**ストリームの版の競合と自動再試行**、同一トランザクションでの追記・投影・冪等記録・周辺ストア、**複数ストリームの原子的な追記（`StartGame`）**、**再生・再構築・復元**、**追記専用の権限**、連鎖削除の網羅、マイグレーションを、実際の PostgreSQL 18 で検証する | `EventStore`、投影の更新、周辺ストア、`RetentionSaga` の実行、2 つの API プロセス | Testcontainers の PostgreSQL 18（専用のコンテナ。誤った DB への接続を、接続先の検査で防ぐ）。**H2 は使わない** |
 | **受け入れ（Cucumber）** | **受入条件とデモ項目**を、日本語 Gherkin のシナリオとして、実サーバー・実 DB を通して検証する。シナリオが人と AI の契約で、Cucumber の実行結果が承認ゲートの検証材料になる。**1 つのシナリオは 1 つの層だけで実行する**（`@api` か `@ui`） | `@api`: ストーリーの受入条件（アプリケーション・HTTP・永続化を通す）。`@ui`: 画面を通す必要のある業務（振り返りの表示など） | `@api`: Cucumber-JVM、Ktor のテスト用アプリケーション、Testcontainers の PostgreSQL 18。`@ui`: Cucumber-JS、Playwright、実際の Ktor サーバー、実 DB |
@@ -139,7 +139,7 @@ UI -[hidden]down-> UNIT
 | 整理 | 機能領域ごとにフォルダを切る。領域は [ユーザーストーリー](../../requirements/beer-game2/user_story.md) の Epic（ゲーム準備と参加、1 週の意思決定、継続と復旧、観察と振り返り、保持、運用と観測性）に合わせる。1 ファイルに 3〜15 シナリオを目安にする |
 | タグ | ストーリーと受入条件の ID（`@US2.4`、`@AC2.4.1`）、層（`@api`、`@ui`）、重要度（`@acceptance-criteria`、`@happy-path`、`@negative`、`@core`）。`@wip` は作業中の一時的なもので、完了時に削除する。**タグの一覧と意味を、フィーチャーファイルと同じ場所のテキストファイルに文書化する** |
 | 層の分担 | `@api`: Cucumber-JVM（Gradle のソースセット `acceptanceTest` を想定）。Ktor のテスト用アプリケーションと実 PostgreSQL（Testcontainers）を通す。`@ui`: Cucumber-JS（`@cucumber/cucumber`、プロジェクトの依存として導入し、依存ツリーに複数の版を混在させない）と Playwright。実 Ktor サーバーを通す。画面を通す必要のある業務（振り返りの表示など）だけを `@ui` にし、ほかは `@api` にする |
-| 配置（B1 で確定） | フィーチャーファイルは `apps/beer-game-kotlin/features/<機能領域>/` に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の `acceptanceTest`、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所と合わせられるかを B1 で確認する。テストのレベルは、Gradle のソースセットで分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合、`acceptanceTest` = Cucumber-JVM）。コンポーネントと E2E は、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない |
+| 配置（**B1 で確定。2026-11-14**） | フィーチャーファイルは `apps/beer-game-kotlin/features/<機能領域>/` に 1 か所にまとめ、両処理系から参照する（**仮説 4 は成立した**: Cucumber-JVM は `@SelectDirectories("../features")`（JUnit Platform Suite）、Cucumber-JS は `web/cucumber.mjs` の `paths: ['../features/**/*.feature']`。日本語 Gherkin は両方で解釈でき、タグで処理系ごとに実行を分ける。JVM は `junit-platform.properties` の `cucumber.filter.tags=@api`、JS は `tags: '@ui'`）。**領域のフォルダ名は ASCII**（`game-setup`、`weekly-play`、`operations`。Epic 3〜5 は B1 の範囲外）。ステップ定義は、Cucumber-JVM は **`app/src/acceptanceTest/kotlin/beergame/acceptance/`**（`app` のソースセット `acceptanceTest`。`RunningApp`＝シナリオごとに Ktor を本番と同じ組み立てで起動、`GamePlayApi`＝HTTP を呼ぶだけの窓口、`ScenarioContext`、`*Steps.kt`）、Cucumber-JS は `web/steps/`・`web/support/`。**`acceptanceTest` は `test` のクラスパスを継承しない**（Cucumber-JVM 8.0.4 が JUnit 6.1.3 を要求し、Kotest 6.2.7 は JUnit 5.13.4 を引くため、混ぜない）。タスクは 2 つ: `acceptanceTest`（PostgreSQL。受け入れの正）と `acceptanceTestH2`（H2）。DB はシステムプロパティ `acceptance.db`。テストのレベルは、Gradle のソースセットで分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合、`acceptanceTest` = Cucumber-JVM）。コンポーネントと E2E は、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない |
 | 実行 | `@api` は Gradle のタスク、`@ui` は `npx cucumber-js`。CI の毎回の工程に含める。**Undefined・Pending のステップがあれば失敗** |
 
 ### ステップ定義の責務
@@ -192,7 +192,7 @@ test("[US3.1/AC3.1.2] Given 第 N 週が確定された後 When 古い requested
 | `evolveSession`（D5、M18） | **`simulateWeek` が出すはずの値と意図的に違う `nextStates`**（たとえば在庫を 1 ずらした値）を持つ `WeekCommitted` を Given にし、`evolveSession` の結果の状態が**その違う値をそのまま採用**していることを確かめる（再計算していれば、`simulateWeek` の値になって落ちる）。`WeekCommitted` の `nextStates` には、当週に処理する入荷と当週の受注（小売店は需要）も含めて同様に確かめる | 再計算しないこと（D5） |
 | `evolveGame` / `evolveSession`（M13） | `decide` が作らない列（たとえば `SessionStarted` の前の `DecisionSaved`）を与えても、**状態を変えず、例外を投げず、`InvalidTransition` の検知（ログとメトリクス）を 1 件記録する**。強制キャスト（`as`、`as?` の連鎖）が無く、`when` が else なしで全域であること | 不正な遷移の扱い |
 | `startGame` | 開始条件（各役割に 1 人以上）、二重の開始（`AlreadyStarted`）、両ストリームのイベントの内容（`SessionStarted` が設定と割り当ての写しを運ぶ） | 2 ストリームにまたがる判断 |
-| `simulateWeek` | **既知の系列と期待値の組（golden）**。12 ステップ、遅延 0 を含むカスタムの遅延、在庫不足と受注残 | 決定論性（NFR-01） |
+| `simulateWeek` | **既知の系列と期待値の組（golden）**。12 ステップ、**遅延 1 週（待ち行列が空）を含むカスタムの遅延**、在庫不足と受注残。**遅延 0 は B1 では表せない**（待ち行列の長さが「遅延 − 1」で −1 になる。遅延 0 を許すかは [ドメインモデル](./domain-model.md) の未決事項）。B1 の golden は 5 系列（定常、需要の増加、受注残、遅延、4 役割が変化する 3 週）で、期待値は BR-02〜BR-09 から手で導き、各テストのコメントに途中の計算を書いた | 決定論性（NFR-01） |
 | `GameSettings.of`、値オブジェクト | 範囲外の値を**すべて集めて**返す（`NonEmptyList<ValidationError>`）。最終週 1〜50、需要系列の長さ、対象週の表示（AC1.1.2） | 誤りを集めること（[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | `KitPreset.classify` | キット準拠か、カスタムか、変更項目の列挙（BR-14） | 導出の正しさ |
 | `Disclosure` | 寄与者が 2 未満なら合計を出さない。終了前は役割別の値を出さない。将来の需要を出さない | BR-17、FR-04 |
@@ -417,7 +417,9 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 
 ### Kover の計測の範囲（H14）
 
-**Kover は `test` と `integrationTest` を合算して計測する設定にする**。`adapters/persistence` の行 90% は、DB の統合を含めないと到達できないためである。合算されないと、判定が意図とずれる。合算の設定がビルドで動くことは、**実装開始時にビルドで確認する未確認事項**とする。
+**Kover は `test` と `integrationTest` を合算して計測する設定にする**。`adapters/persistence` の行 90% は、DB の統合を含めないと到達できないためである。合算されないと、判定が意図とずれる。合算の設定がビルドで動くことは、**B1 の時点でも未確認**（Step 8 の記録: Kover が `integrationTest` を計測に含めるかは未確認で、`test` の分だけと見ている。2 つのソースセットの合算は B2）。
+
+**B1 の実測（2026-11-14）と、`domain` の行 100% のゲート。** Kover 0.9.11 は `test` を計測し、`koverXmlReport`・`koverVerify` が動く（閾値は未設定）。`domain` の行は 570/581（98.1%。Step 5・6）、のちに 784/804（97.5%。Step 8）。**行 100% には届かない**: 未到達の行は、`value class` のプライマリコンストラクタの行（`val value: Int,` など）に対応する**コンパイラ生成のメンバー**（ボックス化したクラスの `getValue`、`Comparable` の橋渡し）で、通常のコードからは呼ばれない。手で書いたコードの未到達の分岐は 2 つだけ（最終週の上限 50 のフォールバック `week.next() ?: week`、無名クラスの `simpleName ?: "anonymous"`）。**「`domain` の行 100%」のゲートは、この生成コードの扱い（除外の設定、または閾値の見直し）を、B1 の終了までに決める**（未決事項）。application は 97.8%、adapter-persistence は 98.0%（`test` の分だけ）。
 
 ### 層ごとの目標
 
@@ -425,7 +427,7 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 
 | 層 | 行 | 分岐 | 判定 | 方針 |
 | :--- | ---: | ---: | :--- | :--- |
-| `domain`（集約、`simulateWeek`、値オブジェクト、`Disclosure`、`RetentionSaga`） | 100% | 90% | 行 100% は**ゲート**。分岐は目安 | 中核。例と性質のテストで網羅する。`sealed` の網羅が生む到達不能な分岐は、除外ではなく分岐の目標を 100% にしないことで扱う |
+| `domain`（集約、`simulateWeek`、値オブジェクト、`RetentionSaga`。**`Disclosure` は B1 の実装では `application`**） | 100% | 90% | 行 100% は**ゲート**。分岐は目安 | 中核。例と性質のテストで網羅する。`sealed` の網羅が生む到達不能な分岐は、除外ではなく分岐の目標を 100% にしないことで扱う |
 | 投影（`Projection`） | 100% | 90% | 目安 | 純粋。投影の整合（性質 (c)）も含める |
 | `application`（ハンドラ） | 95% | 85% | 目安 | 手順の分岐（冪等、競合、再試行、権限）を網羅する |
 | `adapters/persistence`（イベントストア、投影の更新、周辺ストア） | 90% | 75% | 目安 | 分岐は DB の統合で確認する（合算が前提） |
@@ -605,7 +607,7 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | **PMD の 14 個の関数型ルール** | `NoVarProperty`、`NoVarClassParameter`、`NoMutableCollectionInSignature`、`NoMutableCollectionFactory`、`NoReduce`、`NoNotNullAssertion`、`NoThrow`、`NoGenericCatch`、`SideEffectInNonSuspendFunction`、`NoRunBlocking`、`NoGlobalScope`、`NoRawConcurrency`、`NoThreadSleep`、`NoNestedFlatMap`（ガイド §9.6）。最初から全て有効にする。Kotlin 2.4 の構文を解析できるかは、**未確認**（B2 の受入条件） | 毎回（違反 0。導入の承認後） |
 | **ルールの fixture テスト** | 違反するコードと違反しないコードを並べた fixture で、**期待する行だけが報告される**ことを確かめる（テストファースト）。ローカルな `var`、`private` 関数、`suspend` 関数の中、`buildList` の内側、純粋関数は報告されないことも確かめる。ガイドの例は PMD 7.29.0 で 17 件。**使う版で fixture を実行して件数を確かめる**（他の版は保証されない）。ルールの変更は、fixture のテストで回帰を防ぐ。ルールの `message` に `{` と `}` を書かない（PMD の `MessageFormat` で失敗する） | 毎回（ルールの変更時は必須） |
 | **純粋性の静的検査（M18）** | detekt の `ForbiddenMethodCall` で、**ドメインのモジュール**での `Instant.now`、`Clock.system*`（`systemUTC`、`systemDefaultZone` など）、`UUID.randomUUID`、`Random`（`kotlin.random.Random`、`java.util.Random`、`SecureRandom`）を禁止する。時刻・ID・乱数はコマンドの値で受け取る。**純粋性の主たる保証はこの検査**で、「同じ入力から同じ出力」の性質テストは補助とする。`ForbiddenMethodCall` が型解決を要する設定は、実際の版で確認する | 毎回（違反は失敗） |
-| **detekt と Kotlin 2.4 の互換（M17）** | **ウォーキングスケルトンの最初のビルドの受入条件**: 規約違反のコードを 1 つ置き（ドメインのモジュールで `Instant.now()` を呼ぶ、または `var`）、**CI が落ちること**を確認する。detekt 1.23.8 が Kotlin 2.4 を解析できない、または規則が効かない場合の代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）を選ぶ期限は、**最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中**。選択は ADR に記録する（[技術スタック](./tech-stack.md) 設計判断 T5） | 最初のビルド（受入条件）。以降は毎回 |
+| **detekt と Kotlin 2.4 の互換（M17）。B1 の結果（2026-11-14）** | **detekt 1.23.8 は JDK 25 で動かない**（`IllegalArgumentException: 25.0.2`、`--jvm-target` が 22 まで）。**JDK 21 では、Kotlin 2.4.21 の `domain`・`application`・テストのコードを解析でき、`ForbiddenMethodCall`（`Instant.now`・`UUID.randomUUID` を `domain` に置くと失敗。`mutableListOf` はインライン関数のため報告されない）も効き、違反 0 件**。回避: `jvmTarget = "22"` を指定し、JDK 22 以下のときだけ detekt を有効にする。CI は detekt を JDK 21 の専用ジョブで実行する。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断する。**`RedundantSuspendModifier`** は、Kotlin 2.4 でビルドされたライブラリの suspend の呼び出しを検出できず誤検知する（原因は未調査）。`@Suppress`・設定の緩和は使わず、非 `suspend` のブロッキング関数にする／`suspend` の関数型の値にして回避。以下は元の設計: **ウォーキングスケルトンの最初のビルドの受入条件**: 規約違反のコードを 1 つ置き（ドメインのモジュールで `Instant.now()` を呼ぶ、または `var`）、**CI が落ちること**を確認する。detekt 1.23.8 が Kotlin 2.4 を解析できない、または規則が効かない場合の代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）を選ぶ期限は、**最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中**。選択は ADR に記録する（[技術スタック](./tech-stack.md) 設計判断 T5） | 最初のビルド（受入条件）。以降は毎回 |
 | ktlint | 書式。**整形の副作用が出るルールだけを `.editorconfig` で調整する**: 関数名の camelCase の強制は、**テストで外す**（日本語のバッククォートのテスト名を妨げない）。ファイル名のルールを外すかは導入時に判断（外すなら ADR）。引数が 2 つ以上の関数シグネチャの分割などの中核の整形は、外さずに受け入れる | 毎回 |
 | 層の依存 | ドメインのモジュールは、Kotlin の標準と Arrow だけに依存する（Ktor、JDBC に依存しない）。Gradle のモジュール分割で強制する（[バックエンドアーキテクチャ](./architecture-backend.md)） | 毎回（ビルドで失敗） |
 | `var`、可変コレクション | PMD の `NoVarProperty`・`NoVarClassParameter`・`NoMutableCollection*` と、detekt の `ForbiddenMethodCall` で禁止する（上記の PMD のルール） | 毎回 |
@@ -736,6 +738,11 @@ stop
 | 21 | トレーサビリティは、テスト名の ID から抽出 | **タグ（`@US`・`@AC`）と Kotest のテスト名の ID の両方**から自動抽出する。生きたドキュメントを CI で自動公開する | 同上 |
 | 22 | （H2 は使わない） | **ローカル開発は H2 の PostgreSQL モード**（`DB_KIND`）。検証・CI は PostgreSQL 18 のまま。ポート `ProjectionLock`・`ChangeNotifier` の契約テストを両実装で実行。H2 で省略した制約は PostgreSQL の統合だけで検証 | ユーザーの決定（2026-11-14）。Docker 無しでの起動と、検証の確かさを両立する（T-5） |
 | 23 | 契約テスト（OpenAPI）の位置づけが、テスト戦略とリリース計画に無かった | **API の契約テストを独立した節にした**（仕様の検証、応答・リクエストの適合、`code` の一覧の一致、ルートの網羅、型の生成物の差分 0）。仕様が先の進め方、B1（仕様を書く）と B2（契約テストと型の生成を CI に組み込む）の導入の時期を決めた | ADR-008 が頼る手段が、計画に無かったため |
+| 24（以降は B1 の実装で変わった点。2026-11-14。左は設計書の初稿） | Cucumber の配置は「共有の `features/` を第一案」、ステップ定義の場所は案 | **確定**: `features/` を 1 か所（ASCII のフォルダ名）、`app/src/acceptanceTest/`（JVM。`test` のクラスパスを継承しない）と `web/steps/`（JS）。タスクは `acceptanceTest`（PostgreSQL）と `acceptanceTestH2` | 仮説 4 が成立。JUnit の版の衝突（6.1.3 と 5.13.4）を避ける |
+| 25 | 受入条件はすべて Gherkin で表す（想定） | **AC2.3.3（障害時の原子性）と AC6.1.2（予期しないエラーの記録）は Gherkin にしない**（障害の注入が要る。Kotest と統合テストが担う）。**AC2.3.1 の値の計算と「一度の取引」**も Gherkin に書かず、`simulateWeek` の golden と統合テストが担う（ADR-012）。AC2.2.2 の「入力を保持」は画面の関心で、`@api` では「保存されない」と「修正方法が示される」だけを確かめる。**AC1.2.5 は原文（割り当てず）と異なり、付け替え（D9）を確かめる**（ゲート 3 の人の確認が未決）。シナリオ 27 件（`@api`）と 1 件（`@ui`）。Undefined・Pending は 0 | 二重に書かない。層の分担 |
+| 26 | 受け入れの `@api` は PostgreSQL | PostgreSQL（正）と H2 の両方で 27 シナリオ・209 ステップが緑。PostgreSQL 18.7 を `postgres:18-alpine`（Testcontainers）で確認。受け入れは `startApi`（`Main` の起動経路）でなく、`appPorts`・`beerGameModule` を直接組み立てる（DB 切断のためにデータソースを持つ）。起動経路は `MainSpec`・`ServerConfigSpec`・`PostgresHttpSpec` が担う | DB 切断の注入 |
+| 27 | detekt を CI の毎回の工程で実行（JDK 25 を想定） | detekt は JDK 21 の専用ジョブ。JDK 25 では無効にして警告 | detekt 1.23.8 が JDK 25 で動かない |
+| 28 | Kover は `test` と `integrationTest` を合算 | B1 は `test` の分だけを計測（合算は未確認で B2）。`domain` の行 100% は、コンパイラ生成のメンバーのため届かない（ゲートの扱いは未決） | Step 4・5・6・8 の実測 |
 
 ## 設計判断
 
@@ -780,7 +787,8 @@ stop
 ## 未決事項
 
 - **API の契約テストの道具**（OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成）の選定と、導入の承認（B2。公式の情報で確認して選ぶ。本書では確認していない）。`problem+json` の `code` の列挙や SSE が、OpenAPI で表せる範囲（SSE は表せない部分を自前のテストで補う想定）。
-- **H2 の PostgreSQL モードの実測**（**実測済み（2026-11-14、B1 の Step 1）。結果は [データモデル](./data-model.md) の「ローカル開発」節**。以下は実測前の項目で、Flyway の適用だけ未確認）: アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルがどこまで動くかを実測する（公式ドキュメントで確認できなかった。非対応とは断定しない）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、H2 のスモークの範囲を確定する。H2 の版と導入は承認待ち（[技術スタック](./tech-stack.md)）。
+- **B1 の実装で出た未決（2026-11-14）**: (1) **`domain` の行 100% のゲート**の扱い（コンパイラ生成のメンバーの除外か、閾値の見直し）を B1 の終了までに決める。(2) **`acceptanceTest` を `check` に組み込むか**（Step 12 の判断）。受け入れの実行時間（H2 が約 20 秒、PostgreSQL が約 50 秒。コンテナの起動を含む）の CI での実測は未実施。(3) AC1.2.5 の原文との差（付け替え）と、AC2.3.3・AC6.1.2 を Gherkin にしない判断の、人の確認（ゲート 3）。(4) AC2.2.2 の「修正方法」の範囲（アプリケーションは小数・空白に「整数で指定してください。」と返し、範囲を含まない）。(5) AC1.2.5「移したことが示される」: API が付け替えを明示しないため、割り当ての前後のロビーの差で確かめた。(6) AC2.2.1 の「発注／生産要請」の種類は、API の状況に出ないため、結果の `order` に数量が反映されることまでを確かめ、種類のラベルはステップの中で役割から導いている。(7) Cucumber がグルーのパッケージにステップ以外のクラスがあると警告する（無害。パッケージを分ければ消える）。Netty のネイティブアクセスの警告（JDK 25）。(8) `features/TAGS.md` が `acceptanceTest` のリソースに含まれる（無害）。(9) 生きたドキュメントの公開、Cucumber のメッセージ形式の選定（トレーサビリティの抽出）、`@US`・`@AC` タグの整合検査の自動化、フロントエンドの lint で握りつぶし（`.catch(() => {})`）を検出する規則は未実施（B1〜B2）。`@ui` のステップの `{int}` が `{float}` の候補も出す（スニペットの提案のみ）。(10) 受け入れ用の需要系列（第 1 週 4、第 2〜12 週が 901〜911）は手で選んだ値で、JSD の値ではない（ASM-01）。
+- **H2 の PostgreSQL モードの実測**（**実測済み（2026-11-14、B1 の Step 1・7）。結果は [データモデル](./data-model.md) の「ローカル開発」節。Flyway の適用も Step 7 で確認済み**。以下は実測前の項目: アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルがどこまで動くかを実測する（公式ドキュメントで確認できなかった。非対応とは断定しない）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、H2 のスモークの範囲を確定する。H2 の版と導入は承認待ち（[技術スタック](./tech-stack.md)）。
 - 変異テストの導入の要否（ウォーキングスケルトンの最初の実測で判断）と、Kotlin 向けの道具（Pitest の対応は本書では確認していない）。
 - Kotest Property に、状態に応じて操作を選ぶ操作列の機能があるか（なければ自前）。生成列の分布の下限（提案: `WeekCommitted` 10%、`SessionEnded` 2%）の値。
 - detekt 1.23.8 と Kotlin 2.4 の互換（最初のビルドの受入条件。落ちる場合の代替の選択は最初の Bolt の中）。`ForbiddenMethodCall` が効く設定。

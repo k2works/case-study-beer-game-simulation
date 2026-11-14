@@ -70,6 +70,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
 ## 備考
 
 - 著者: claude-code
+- **B1 の実装の結果（2026-11-14）**: 処理順は、ロック（共有）→ 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影 → 周辺ストア → 通知 → 冪等記録の保存。**認証は、ルートでなく `execute` の中（トランザクションの中）で、再試行のたびに評価し直す**（この順序を守るため）。冪等記録の同時の重複（`pk_idempotency_records`・`uq_idempotency_create`）は、PostgreSQL では一意違反の後のトランザクションが使えないため、**同じトランザクションでの再照合でなく、`ConcurrencyConflict` に写して `execute` の再試行の `find` で記録を見つける**。資格のダイジェストは鍵付き HMAC-SHA256（鍵の版 1、冪等キーとは別の鍵）、冪等記録の応答は AES-256-GCM（実装済み。別の ADR は未作成）。実 DB の並行（同時の 2 要求）での検証は未実施。
 - 本 ADR の対象は処理順と保存の範囲である。資格のダイジェストの方式（HMAC と鍵の導出）と、応答の暗号化の方式は、設計書の未決事項であり、別の ADR で決める（未確認）。
 - 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-008](./008-api-contract-and-error-codes.md)
 - 参照: [バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[データモデル](../../design/beer-game-kotlin/data-model.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[設計レビュー（2026-11-14）](../../review/beer-game-kotlin/design_review_20261114.md) の H4、[リリース計画](../../development/beer-game-kotlin/release_plan.md)

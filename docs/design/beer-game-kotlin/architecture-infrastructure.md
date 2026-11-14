@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "Kotlin 版のインフラアーキテクチャ。beer-game2 の ECS Fargate、CloudFront、RDS、Terraform、CI/CD を踏襲し、JVM のコンテナ、起動と終了、メモリ、Gradle のビルド、データベースのロール、確認したバージョンなど JVM 固有の変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -128,7 +128,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 | 要素 | 設定 |
 | :--- | :--- |
 | CloudFront | beer-game2 と同じ。SSE（`/api/v1/games/:id/events`）は、キャッシュなしで、オリジンの応答を待つ時間の上限を超えない心拍を送る（バックエンドの設計）。オリジンの応答の待ち時間の設定は、実装開始時に確認する |
-| ALB | HTTPS、アイドルタイムアウト 60 秒、ヘルスチェックは `/ready`。**JVM の起動に時間がかかるため、サービスのヘルスチェックの猶予期間を設ける**（値は起動時間の実測で決める） |
+| ALB | HTTPS、アイドルタイムアウト 60 秒、ヘルスチェックは `/ready`（**B1 の実装のパスは `/api/v1/ready`**。下の未決事項）。**JVM の起動に時間がかかるため、サービスのヘルスチェックの猶予期間を設ける**（値は起動時間の実測で決める） |
 | API サービス | Fargate、常時 2 タスク、CPU 60% で 2〜4 に自動増減。ステートレス。本番はブルー/グリーン（CodeDeploy）、ステージングはローリング。**タスクのサイズの初期案: 1 vCPU / 2 GiB。ヒープ、再生の所要時間、GC の測定の後に決める**（設計判断 ID2） |
 | 保持・マイグレーション・再構築のタスク | **同じイメージ**を、起動引数（`retention`、`migrate`、`rebuild-projections`）で切り替える。保持は EventBridge で 5 分ごと、マイグレーションはデプロイの一部（アプリの起動前）に 1 回限り、再構築は運用者が必要なときに起動する（**研修中は、運営者を通じて進行役に「停止」を依頼し、停止中に再構築して再開**する。停止中でも追記を伴う操作は走るため、再構築は `pg_advisory_xact_lock(game_id)`（排他）を取り、コマンド側は `pg_advisory_xact_lock_shared(game_id)` を取る。[データモデル](./data-model.md)、[運用要件](./operation.md)） |
 | RDS | beer-game2 と同じ。**ロールを用途別に作る**（下の表） |
@@ -164,7 +164,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 ### ローカルの開発環境と H2 の拒否
 
 - **Docker なしで起動できる**: ローカルの既定は、プロセス内の H2（PostgreSQL モード）。マイグレーションは Flyway のベンダー別の場所の H2 用を適用する（共通の部分を最大化し、差分だけを分ける。配置は B1 で確定）。
-- **選択は設定で行う**: `DB_KIND=postgres|h2`。`AppConfig.load` が、環境の種別（`APP_ENV=local|ci|staging|production` など。名前は B1 で確定）と合わせて検証する。
+- **選択は設定で行う**: `DB_KIND=postgres|h2`。`AppConfig.load` が、環境の種別（**B1 で確定: `APP_ENV=local|test|staging|production` の 4 値**。`ci` でなく `test`。H2 を許すのは `local` だけで、`test` でも拒否する）と合わせて検証する。**B1 の実装の環境変数（B1 の実装の提案。名前はここで正本にするが、人の承認が要る）**: `APP_ENV`、`DB_KIND`、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`（Base64 の 32 バイト。3 つは別の値。`local` 以外で必須）、`DB_URL`・`DB_USER`・`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`（`local` 以外で必須。Origin の検査の許可リスト）、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`。鍵は Secrets Manager から注入する。設定の誤りは、足りない設定の**名前だけ**をログに出して終了コード 78 で終わる（値は出さない）。
 - **本番・ステージングで H2 を拒否する検査**: `APP_ENV` が `staging` または `production` のとき、`DB_KIND=h2`、または JDBC の URL が `jdbc:h2:` で始まる設定は、`AppConfig.load` が**起動前に失敗**させる（起動しない。通知の受信や接続の準備に進まない）。この検査は、設定の単体テストで、**環境ごとの全組み合わせ**を確かめる。Terraform のタスク定義も `DB_KIND=postgres` を固定で渡し、H2 の依存関係は本番のイメージに含めない（二重の防御）。
 - **ローカルの乖離の防止**: CI の統合テスト・受け入れは PostgreSQL が正で、H2 でしか通らない記述は禁止する（[テスト戦略](./test-strategy.md)）。
 
@@ -372,7 +372,8 @@ stop
 - ブルー/グリーンの実装（CodeDeploy）と、ステージングのローリングの差の許容。
 - 合成監視（CloudWatch Synthetics）の費用と、頻度（1 分ごと）の妥当性。
 - アカウントの分離（環境ごと）の方針。
-- **H2（設計判断 ID6）**: 導入は承認待ち。PostgreSQL モードで動く範囲は公式ドキュメントで確認できなかったため、B1 の最初に実測する。環境の種別の設定名（`APP_ENV` など）と、Flyway のベンダー別の場所の配置は B1 で確定する。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせ、公式のサポート期限は実装開始時に確認する。
+- **H2（設計判断 ID6）**: B1 で実測し確定した（[データモデル](./data-model.md)）。環境の種別は `APP_ENV=local|test|staging|production`、Flyway の配置は共通 `V001〜V005`・PostgreSQL `V102`（H2 専用なし）。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせは動作した。公式のサポート期限は未確認。**本番のイメージに H2 を含めない案は未実施**（H2 は `adapter-persistence` の `runtimeOnly`）。
+- **B1 の実装で出た、インフラの確認事項（2026-11-14）**: (1) **ヘルスチェックのパスは `/api/v1/ready`・`/api/v1/health`**（`/ready` でなく。ALB のヘルスチェックの設定に反映する）。`/ready` が失敗したときの 503 は problem+json（`app.not_ready`）。(2) **Origin の検査**（`ALLOWED_ORIGINS`）に、CloudFront のオリジンを設定する。ALB の背後では接続元が ALB になり、レート制限（接続元ごと 600 件/分の仮置き）の実効の単位が変わる。`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。(3) ログは標準出力へ 1 行の JSON（CloudWatch での収集は未確認）。(4) マイグレーションは PostgreSQL の `api` では適用せず、`migrate` モード（1 回限りのタスク）で適用する。(5) 起動時間（NF-P16）は未計測。
 - 投影の再構築のタスクを、デプロイの標準の手順に含める条件。再構築中の追記の扱いは、アドバイザリロックで決定済み（M23）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（[データモデル](./data-model.md) の未決事項）。
 
 ## 出典

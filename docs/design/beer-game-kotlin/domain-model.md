@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -176,19 +176,20 @@ data class RoleMap<out A>(val factory: A, val distributor: A, val wholesaler: A,
 | 識別子 | `GameId`、`ParticipantId`、`ObserverId`、`InvitationId` | UUID を包む `value class`。**セッションの識別子は `GameId` と同じ**（1 ゲーム 1 セッション。`SessionId` は導入しない） |
 | 役割（Role） | `enum class Role` | FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER。上流から下流の順序を持つ |
 | 役割ごとの値 | `RoleMap<A>` | 4 役割すべての値。意思決定が揃った状態、役割状態、週結果に使う |
-| 数量（Quantity） | `value class Quantity` | 0 以上の整数、上限あり（既定 1000）。発注数・生産要請数 |
+| 数量（Quantity） | `value class Quantity` | 0 以上の整数、上限あり（既定 1000）。**発注数・生産要請数だけ**（入力の値） |
+| 流れの数量（Units） | `value class Units` | 上限のない非負の整数。在庫・受注残・出荷・待ち行列の中身・入荷・受注など、**流れの数量**。1000 を超えうるため `Quantity` と分ける。`Quantity.toUnits()` で変換する（B1 の実装で追加。変更 #25） |
 | 週（Week） | `value class Week` | 1 から最終週まで（1〜50） |
 | 金額（Money） | `value class Money` | 最小単位（整数）。在庫単価・受注残単価・週次費用。小数を持たない |
-| 需要系列（DemandSeries） | `value class DemandSeries` | 各週の顧客需要。0 以上の整数で、長さは最終週以上 |
-| 遅延（Delay） | `value class Delay` | 週数（0 以上の整数）。注文、配送、生産ごと。キットの既定は 2（生産は 2 段階） |
-| 待ち行列（Pipeline） | `value class Pipeline` | 長さが遅延に等しい `List<Quantity>`。先頭が次週に到着する |
+| 需要系列（DemandSeries） | `value class DemandSeries` | 各週の顧客需要。長さは最終週以上。**B1 の実装は、各週を 0〜1000 の整数で検証する**（需要の上限は未決。未決事項） |
+| 遅延（Delay） | （B1 では値オブジェクトを作らない） | 週数。注文、配送、生産ごと。キットの既定は 2。**B1 は遅延を待ち行列の長さで表し、`Delay` 型は作らない**（カスタムの遅延は B7。遅延 0 を許すかは未決。未決事項） |
+| 待ち行列（Pipeline） | `value class Pipeline` | `List<Units>`。**長さは「遅延 − 1」**（キットの 2 週遅延なら 1 段。遅延 1 週なら空）。当週に到着する分は待ち行列でなく `RoleState.arrivals` に別に持つ（実効の遅延が 1 週長くならないように。B1 の実装で確定。変更 #26） |
 | 初期条件（InitialConditions） | `data class` | 各役割の初期在庫、初期の注文・配送・生産の待ち行列。既定はキット準拠（在庫 12、各段 4） |
 | 費用方針（CostPolicy） | `data class` | 在庫単価、受注残単価。既定は 0.50 と 1.00（最小単位で保持） |
 | 公開範囲（DisclosurePolicy） | `enum class` | プレイ中に観察者へ見せる範囲。既定はチーム合計（寄与者が 2 未満なら非表示） |
 | 確定方式（CommitMode） | `enum class` | `MANUAL`（既定）、`AUTO` |
 | 設定の種別（SettingsKind） | `sealed interface` | `Kit` または `Custom(changes: Set<SettingsField>)`。設定から**導出**して保持する |
-| ゲーム設定（GameSettings） | `data class` | 上記の組。`of` で全項目を検証し、エラーを集める |
-| 役割状態（RoleState） | `data class` | 在庫、受注残、注文・配送・生産の `Pipeline`、累積費用、**当週に処理する入荷（`arrivals`）**、**当週の受注（`orders`。小売店は当週の顧客需要）**。`arrivals` と `orders` は、前の週の確定（`simulateWeek`）が次週分まで計算して `nextStates` に入れる（M2。最初の週は `initialStates` が持つ） |
+| ゲーム設定（GameSettings） | `data class` | 上記の組。`of` で全項目を検証し、エラーを集める。**B1 の実装は、キット準拠の項目だけ**（`finalWeek`、`demand`、`costPolicy`、`commitMode`）を持ち、生成は `GameSettings.kit(...)`。初期条件・遅延・公開範囲・`SettingsKind`・`KitPreset.classify` は B7（変更 #27）。`simulateWeek` が使う最小の設定（最終週、需要系列、費用方針）は `SimulationSettings` で、`GameSettings.simulation()` が作る |
+| 役割状態（RoleState） | `data class` | 在庫、受注残、**2 つの `Pipeline`（`orderPipeline`＝上流へ送った注文のうち未着の分。工場は常に空。`deliveryPipeline`＝上流から（工場は自分の生産から）未着の品物）**、累積費用、**当週に処理する入荷（`arrivals`）**、**当週の受注（`orders`。小売店は当週の顧客需要）**。`arrivals` と `orders` は、前の週の確定（`simulateWeek`）が次週分まで計算して `nextStates` に入れる（M2。最初の週は `initialStates` が持つ） |
 | 役割別の週結果（RoleWeekResult） | `data class` | 受注（需要）、出荷、**発注（その週の意思決定）**、週末在庫、週末受注残、週次費用、累積費用 |
 | 表示名（DisplayName） | `value class` | 前後の空白を除いて 1〜80 文字。**イベントには入れない** |
 | 参加コード・招待コード | `JoinCode`、`InvitationCode` | 推測困難な乱数から作る（8 桁以上）。**2 つは別の型・別の値**。招待コードの値はイベントに入れない |
@@ -265,6 +266,27 @@ enum class ErrorCategory { Forbidden, NotFound, InvalidState, Conflict, RuleViol
 
 `WeekAdvanced` は「確定で週が進んだ後の要求」を表します。`SaveDecision`、`SubmitProxyDecision`、`CommitWeek` が `requestedWeek` を持ち、現在の週と違えば返します。`DecisionConflict`（同じ週で他の人が先に保存した）、`DecisionsChanged`（確定の根拠にした入力が、確定の前に変わった）とは別の分類で、画面の文言も別です（[UI 設計](./ui-design.md)）。`StaleVersion`（`session` ストリームの版による確定の検査）は廃止しました（設計判断 D10）。
 
+**`DomainError` の `code` の一覧（B1 の実装で確定した分。2026-11-14）。** `DomainFoundationSpec` が一覧を固定しています。HTTP の層（アプリケーション・アダプター）が返す `code` と、`ValidationError` の `validation.invalid_input` は `DomainError` ではなく、[バックエンドアーキテクチャ](./architecture-backend.md) の表が持ちます。
+
+| `code` | 型 | 分類 | 状態 |
+| :--- | :--- | :--- | :--- |
+| `game.already_created` | `GameError.AlreadyCreated` | `InvalidState` | 409 |
+| `game.not_preparing` | `GameError.NotPreparing` | `InvalidState` | 409。**受付終了（開始済み）後の参加はこの `code`**（下記） |
+| `game.forbidden` | `GameError.Forbidden` | `Forbidden` | 403（HTTP では `app.unauthorized` の同じ本文に写す） |
+| `game.participant_not_found` | `GameError.ParticipantNotFound` | `NotFound` | 404 |
+| `game.start_condition_not_met` | `GameError.StartConditionNotMet` | `RuleViolation` | 422（`missingRoles` を添える） |
+| `game.invitation_invalid` | `GameError.InvitationInvalid` | `Forbidden` | 403。**参加コードの不明・形式不正を区別しない**。`decide` は返さず、境界が参加コードからゲームを引けなかったときに使う。`DomainError` が封印されているため `domain` に置く |
+| `session.not_active` | `SessionError.NotActive` | `InvalidState` | 409（B1 は **未開始 → `NotActive`**。停止中の `NotActive` は B5） |
+| `session.already_ended` | `SessionError.AlreadyEnded` | `InvalidState` | 409 |
+| `session.already_started` | `SessionError.AlreadyStarted` | `InvalidState` | 409（開始済みのゲームの再開始） |
+| `session.forbidden` | `SessionError.Forbidden` | `Forbidden` | 403（HTTP では `app.unauthorized` と同じ本文） |
+| `session.week_advanced` | `SessionError.WeekAdvanced` | `Conflict` | 409 |
+| `session.decision_conflict` | `SessionError.DecisionConflict` | `Conflict` | 409 |
+| `session.decisions_changed` | `SessionError.DecisionsChanged` | `Conflict` | 409 |
+| `session.incomplete_decisions` | `SessionError.IncompleteDecisions` | `RuleViolation` | 422（`missingRoles` を添える） |
+
+`NotStarted` の `SessionError` は作りません（B1 は未開始を `NotActive` で表す）。**受付終了後の参加は、設計の表（無効・終了済み・不明・失効を区別しない 403）でなく、409 `game.not_preparing` とします**。AC1.2.2 のシナリオが「受付が終了している」という理由を示すことを求めるためです（実装が正しいと判断して設計を直した。B1 計画 Step 8 の食い違い 5）。参加コードの不明・形式不正は、403 `game.invitation_invalid` の同じ本文です。
+
 ### Game 集約（準備）
 
 ストリームは `game`。1 ゲームにつき 1 本です。集約は、設定、参加者、役割の割り当て、観察用の招待、資格の有効性を所有します。トランザクション境界は 1 回のコマンドです。
@@ -276,7 +298,7 @@ sealed interface GameState {
     val version: StreamVersion
 
     data object NotCreated : GameState                       // ストリームが空
-    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける
+    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（B1 の実装の `GameData` は設定・参加者・割り当てだけ。招待・観察者・資格は B5・B9）
     data class Started(val data: GameData) : GameState       // 設定と割り当てを固定
 }
 
@@ -520,7 +542,7 @@ fun evolveSession(state: SessionState, event: SessionEvent): SessionState = when
 }
 ```
 
-**`evolve` の全域化と `InvalidTransition`（M13）。** `evolveGame` と `evolveSession` は、`as` / `as?` の連鎖を使わず、状態とイベントの組を else なしの `when` で網羅します（`ClassCastException` でそのストリームのコマンドが止まるのを避けるため）。`decide` が作らない列（例: `NotStarted` への `DecisionSaved`）が来たときは、**状態を変えずに返し**、`InvalidTransition(streamType, stateName, eventType)` を検知として記録します（ログとメトリクス。設計上は起きないので、起きたら不具合かデータの破損として運用が調べる）。`evolve` 自体は純粋に保ちます。有効なイベントは必ずストリームの版を 1 増やすので、**再生側（`replay`、アダプターの境界）が、`evolve` の前後で版が増えていないことを不正な遷移として検出**し、記録します。「`decide` が作る列だけが `evolve` に来る」ことは、**性質テスト**（有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない）で守ります（[テスト戦略](./test-strategy.md)）。
+**`evolve` の全域化と `InvalidTransition`（M13）。** `evolveGame` と `evolveSession` は、`as` / `as?` の連鎖を使わず、状態とイベントの組を else なしの `when` で網羅します（`ClassCastException` でそのストリームのコマンドが止まるのを避けるため）。`decide` が作らない列（例: `NotStarted` への `DecisionSaved`）が来たときは、**状態を変えずに返し**、`InvalidTransition(streamType, stateName, eventType)` を検知として記録します（ログとメトリクス。設計上は起きないので、起きたら不具合かデータの破損として運用が調べる）。`evolve` 自体は純粋に保ちます。有効なイベントは必ずストリームの版を 1 増やすので、**再生側（`replayGame`・`replaySession`）が、`evolve` の前後で版が増えていないことを不正な遷移として検出**し、記録します（`InvalidTransition(streamType, stateName, eventType)` を `Replayed` に集める。**B1 の実装では、純粋関数なので `domain` に置き、永続化のアダプターが呼ぶ**。状態名・イベント名はクラスの単純名。変更 #28）。「`decide` が作る列だけが `evolve` に来る」ことは、**性質テスト**（有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない）で守ります（[テスト戦略](./test-strategy.md)）。
 
 `evolveSession` は `WeekCommitted` の `nextStates` をそのまま採用し、`simulateWeek` を呼び直しません（設計判断 D5）。
 
@@ -576,21 +598,22 @@ S3 --> [*]
 ```kotlin
 data class StartDecision(val game: List<GameEvent>, val session: List<SessionEvent>)
 
-fun startGame(game: GameState, session: SessionState, command: StartGame): Either<StartError, StartDecision> = either {
-    val data = game.preparing().bind()
-    ensure(command.actor.isFacilitator(data.gameId)) { Forbidden("開始は進行役のみ") }
-    ensure(session is SessionState.NotStarted) { AlreadyStarted }
+// B1 の実装: StartError は作らず、既存の GameError / SessionError を Either<DomainError, StartDecision> で返す（型の重複を避ける）
+fun startGame(game: GameState, session: SessionState, command: StartGame): Either<DomainError, StartDecision> = either {
+    val data = game.dataOrNull() ?: raise(GameError.NotPreparing)         // 未作成だけ NotPreparing（開始済みは下の AlreadyStarted）
+    ensure(command.actor.isFacilitatorOf(data.gameId)) { GameError.Forbidden("開始は進行役のみ") }   // 権限を開始済みの検査より先に
+    ensure(game is GameState.Preparing && session is SessionState.NotStarted) { SessionError.AlreadyStarted }
     val assignments = data.roleAssignments()                       // RoleMap<Set<ParticipantId>>
     val missing = Role.entries.filter { assignments[it].isEmpty() }
-    ensure(missing.isEmpty()) { StartConditionNotMet(missing) }
+    ensure(missing.isEmpty()) { GameError.StartConditionNotMet(missing) }
     StartDecision(
         game = listOf(GameStarted(data.gameId)),
-        session = listOf(SessionStarted(data.settings, assignments, initialStates(data.settings), data.settings.commitMode)),
+        session = listOf(SessionStarted(data.gameId, data.settings, assignments, KitPreset.initialStates(data.settings.demand), data.settings.commitMode)),
     )
 }
 ```
 
-二重の開始は、`session` ストリームの版 1 への追記が重複するため、片方が必ず失敗します（開始の一回性）。失敗側は再読み込みして `AlreadyStarted`（`session.already_started`、`InvalidState`）を得ます。
+二重の開始は、`session` ストリームの版 1 への追記が重複するため、片方が必ず失敗します（開始の一回性）。失敗側は再読み込みして `AlreadyStarted`（`session.already_started`、`InvalidState`）を得ます。**判定順は、権限 → 開始済み → 開始条件です**（B1 の実装。権限のない人に、開始済みかどうかを知らせない）。「準備中でなければ先に `NotPreparing`」とはせず、未作成のゲームだけが `NotPreparing`、開始済みのゲームは `AlreadyStarted` を返します。
 
 ### 週次計算（simulateWeek）
 
@@ -600,7 +623,7 @@ fun startGame(game: GameState, session: SessionState, command: StartGame): Eithe
 data class WeekOutcome(val results: RoleMap<RoleWeekResult>, val nextStates: RoleMap<RoleState>)
 
 fun simulateWeek(
-    settings: GameSettings,          // 遅延、費用方針、需要系列
+    settings: SimulationSettings,    // 最終週、需要系列、費用方針（B1。`GameSettings.simulation()` が作る。遅延は待ち行列の長さで表す）
     week: Week,
     states: RoleMap<RoleState>,      // 前週末の断面
     decisions: RoleMap<Quantity>,    // 4 役割の当週の発注数または生産要請数
@@ -675,7 +698,7 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 
 | ID | イベント | 発生条件（コマンド） | ペイロード |
 | :--- | :--- | :--- | :--- |
-| EV-S01 | `SessionStarted` | `StartGame`（`game` ストリームの `GameStarted` と同一トランザクション） | `settings`（設定の写し）、`assignments`（`RoleMap<Set<ParticipantId>>` の写し）、`initialStates`（`RoleMap<RoleState>`）、`commitMode` |
+| EV-S01 | `SessionStarted` | `StartGame`（`game` ストリームの `GameStarted` と同一トランザクション） | **`gameId`**（`session` の識別子でもある。`SessionData.gameId` を `evolve` が作るために必要。封筒の `gameId` は `evolve` に渡らない）、`settings`（設定の写し）、`assignments`（`RoleMap<Set<ParticipantId>>` の写し）、`initialStates`（`RoleMap<RoleState>`）、`commitMode` |
 | EV-S02 | `SessionPaused` | `PauseSession`。進行役、進行中 | なし |
 | EV-S03 | `SessionResumed` | `ResumeSession`。進行役、一時停止中 | なし |
 | EV-S04 | `SessionEnded` | `EndSession`（進行役）、または最終週の `WeekCommitted` と同じ `decide` | `reason`（`FINAL_WEEK` / `FACILITATOR`） |
@@ -734,7 +757,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 
 **出力（`ExportPackage`）は投影にしません。** 問い合わせの時に、全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage`（`Either` を返さない）で、`WeekRoleResults` と設定から作ります。`checksum` と `schema_version` も要求時に算出します。設定と全週記録の CSV・JSON で、設定の種別（カスタムの識別）を含みます。閲覧できるのは進行役です。出力は読み取りの導出であり、最終週の確定（`WeekCommitted` と `SessionEnded` の追記）は出力の作成に依存しません（設計判断 D11）。
 
-**開示の判定（`Disclosure`）** は、投影の読み取りに掛ける純粋関数です。
+**開示の判定（`Disclosure`）** は、投影の読み取りに掛ける純粋関数です。**B1 の実装は `application` に置きます**（読み取りの型 `ProjectedGame` が `application` にあり、`Ports` に依存しない純粋関数。`domain` へ移すのは機械的にできる。変更 #29）。観察者の規則（公開範囲、寄与者数での抑止）は B9 です。
 
 | ルール | 内容 | 根拠 |
 | :--- | :--- | :--- |
@@ -856,6 +879,8 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 
 ## beer-game2 からの変更
 
+#25 以降は、**B1 の実装（2026-11-14）で、設計書の初稿から変わった点**です（左の列は beer-game2 でなく、この設計書の初稿の記述）。
+
 | # | beer-game2 | beer-game-kotlin | 理由 |
 | :--- | :--- | :--- | :--- |
 | 1 | 集約は、状態を直接更新し、イベントは監査用に別に残す | 集約は `decide` / `evolve` の純粋関数。状態はイベントの列 | ES（ガイド §7.3〜§7.4） |
@@ -882,17 +907,31 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 22 | 投影は `(行, イベント) -> 行`（本書の初稿） | `Event -> List<RowChange>`。他の投影を読まない | 1 件の `WeekCommitted` が複数の表を書く。再構築の順序に依存しない |
 | 23 | 保持方針に「方針の版」を持つ | 持たない（方針が単一で版の比較が要らない） | 版を比べる相手がいない |
 | 24 | `Lobby` が `CredentialRevoked` を購読（初稿） | 購読しない（資格の状態は `credentials` が正本） | domain と data-model の不一致の解消（L5） |
+| 25 | 流れの数量にも `Quantity`（0〜1000）を使う書き方（B1 の設計時） | 上限のない非負の `Units` を足す。`Quantity` は発注・生産要請だけ（2026-11-14、B1） | 在庫・受注残・出荷は 1000 を超えうる（Step 4） |
+| 26 | `Pipeline` は長さが遅延に等しく、先頭が次週に到着する。注文・配送・生産の 3 種類 | **長さは「遅延 − 1」**。当週の入荷は `arrivals` に別に持つ。**待ち行列は `orderPipeline` と `deliveryPipeline`（工場では生産）の 2 つ**。`Delay` の値オブジェクトは作らない（2026-11-14、B1） | `arrivals` と `orders` を別に持つため、長さを遅延に等しくすると実効の遅延が 1 週長くなる。beer-game2 の挙動（2 週遅延）と一致させる（Step 4） |
+| 27 | `GameSettings` が初期条件・遅延・公開範囲・設定の種別を含む | B1 は**キット準拠の項目だけ**（最終週、需要系列、費用方針、確定方式）。`simulateWeek` は最小の `SimulationSettings` を受ける。`CommitMode` ほか `CommitKind`・`EndReason`・`Editor` は B1 で使う値だけの enum / sealed（B5・B8 で足す）（2026-11-14、B1） | カスタムの設定は B7（Step 5・6） |
+| 28 | `replay` は再生側（アダプターの境界）が持つ | `replayGame`・`replaySession` と `InvalidTransition`・`Replayed` は `domain`（2026-11-14、B1） | 純粋関数なので `domain` に置ける（Step 5・6） |
+| 29 | `Disclosure` は `domain` | `application` に置く（2026-11-14、B1） | 読み取りの型が `application` にある（Step 8）。移すのは機械的 |
+| 30 | `SessionStarted` のペイロードに `gameId` が無い | `gameId` を足す（2026-11-14、B1） | `evolve` が `SessionData.gameId` を作れない。封筒の `gameId` は `evolve` に渡らない（Step 5・6） |
+| 31 | `startGame` は `Either<StartError, StartDecision>`。判定順は、準備中でなければ `NotPreparing` が先 | `StartError` を作らず `Either<DomainError, StartDecision>`。判定順は 権限 → 開始済み（`AlreadyStarted`）→ 開始条件。`SessionError` は `NotActive`・`AlreadyEnded` で、`NotStarted` は作らない（2026-11-14、B1） | 型の重複を避ける。権限のない人に開始済みかを知らせない（Step 5・6） |
+| 32 | `DomainError` の `code` に一覧が無い | 14 件の一覧と、受付終了後の参加は 409 `game.not_preparing`、参加コードの不明・形式不正は 403 `game.invitation_invalid`（`GameError.InvitationInvalid` を追加）（2026-11-14、B1） | AC1.2.2 は受付終了の理由を示す。`DomainError` は封印されている（Step 8・9） |
 
 ## 未決事項
 
 - 開始後に、共同担当の参加者を**追加**できるか。できる場合、写しを更新するイベントが要ります（D4）。当面は、準備中だけとします（beer-game2 と同じ）。
 - 観察用の招待の有効期間の既定値、観察者の人数の上限、参加者数の上限、観察者の復帰の要否（beer-game2 の未決事項を引き継ぎ）。
-- 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。`Pipeline` の長さが遅延に等しいという前提の確認。
+- 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。**遅延 0 を許すか（B1 で判明）**: 待ち行列の長さが「遅延 − 1」のため、遅延 0 は長さ −1 になり表せない（beer-game2 も遅延は 1 週以上）。テスト戦略の「遅延 0 を含むカスタムの遅延」の golden は、遅延 0 を許すと決めるまで書けない。遅延 1（待ち行列が空）の golden は書いた。実装は、遅延 0 を許さない前提です。
+- **需要の上限（B1 で判明）。** 実装は `DemandSeries` の各週を `Quantity` の範囲（0〜1000）で検証する。設計書に需要の上限の規定は無く、「0 以上の整数」だけだった。実装が正しいかは未決（根拠は `Quantity` の 0〜1000 と需要系列の「0 以上」の組）。
+- **単独の `UnassignRole`（判断項目 #13）。** B1 は実装していない（付け替えの内部の `RoleUnassigned` だけ。`evolveGame` は処理できる）。B1 に含めるかは未決。含めない場合は、UI 設計の S04 から「外す」を除く。
+- **同じ役割に別の参加者を割り当てる（共同担当）を、B1 で拒否するか。** 実装は、不変条件（1 つの役割に複数の参加者を割り当てられる）に従い拒否しない。計画の「B1 は 1 役割 1 人（共同担当は B6）」の制限を課すかは未決（課すなら、設計書にない `DomainError` が要る）。
+- `ParticipantJoined` の重複（同じ参加者の ID が再び来る）。`decideGame` は ID の重複を検査せず、`evolveGame` が不正な遷移として扱う（ID は境界が生成する前提）。重複の `DomainError` が要るかは未決。
+- `JoinCode` の検証は 8 桁以上の長さだけ（文字の種類は未決）。`RetentionDays` は 1〜3650。`DisplayName` の長さは Unicode のコードポイント数で数える（1〜80。UI の `maxLength` との一致は未確認）。
+- `Forbidden` の理由の文言（日本語）は仮置き。試験は型だけを確かめる。
 - 自動確定の猶予（beer-game2 は設けない）。設けるなら `decide` に時間の入力が要ります。
 - `SetCommitMode(AUTO)` で、進行中にすでに 4 役割が揃っている場合に、ただちに確定するか（本書は確定する案。一時停止中は確定せず再開時に判定）。ユーザーストーリー AC2.4.x と照合します。
 - 代理入力に意思決定の版を要求しない（進行役の最終決定。版は 1 増やす）扱いが、AC3.1.x と整合するか。
 - 出力（`buildExport`）が大きい場合のキャッシュの要否（D11。要求時に作るため、当面は不要）。
-- キット準拠の既定の需要系列（ASM-01）。JSD の値を確認するまで、`KitPreset` の `demand` は未確定です。
+- キット準拠の既定の需要系列（ASM-01）。JSD の値を確認するまで、`KitPreset` の `demand` は未確定です（B1 は、作成の入力で `finalWeek` と `demand` を必須とし、受け入れは手で選んだ系列を使う。JSD 準拠の受入判定は保留）。
 - 数量の上限（既定 1000）を、固定値にするか、`GameSettings` の項目にするか。
 - 終了後の資格の扱い（NF-S4）。`Started` の規則で足りるか、終了後は `Ended` の投影で拒否するか。
 - **保持の開始の起点（M5。暫定の決定。人の確認が要る）。** 現在の配線どおり**作成時**を起点とします。ロビー・ゲーム作成後・S09 に削除予定日と「バックアップには削除後も最大 7 日残る」を表示し、終了後の振り返りと出力の猶予が短くなりうることも画面で示します。**暫定です。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決**です（事前に作成した研修の振り返りの取り出し期間が短くなる懸念があるため）。

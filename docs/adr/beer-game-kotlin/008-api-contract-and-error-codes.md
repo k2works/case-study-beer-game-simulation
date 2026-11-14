@@ -68,5 +68,6 @@ beer-game2 は、バックエンドとフロントエンドが TypeScript の型
 
 - 著者: claude-code
 - 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-007](./007-functional-core-with-arrow.md)、[ADR-012](./012-gherkin-and-cucumber.md)
+- **B1 の実装の結果（2026-11-14）**: `contracts/openapi.yaml` に B1 の経路（11 本）を書き、実装に合わせて直した（契約テストの自動化は B2。照合は目と HTTP の試験）。`code` は、設計の例に加え、`game.not_preparing`（受付終了後の参加は 409）、`game.already_created`、`game.participant_not_found`、`game.start_condition_not_met`、`session.not_active`、`session.already_ended`、`session.incomplete_decisions`、`validation.invalid_input`、`app.not_ready`、`app.rate_limited`、`request.too_large`・`not_found`・`method_not_allowed` を確定した（HTTP の層の名前は仮置き）。業務の権限不足も `app.unauthorized` の同じ本文で返す（資格の失敗と区別しない）。TypeScript の型の生成は B1 では行わず、`web/src/api/types.ts` を手書きした（B2 で生成に置き換える）。コマンドの応答は `versions` だけで、作成のゲーム ID は `Location`、参加の応答は `gameId` を含まない（参加者が参加後に進めない。未決）。
 - 設計書の指摘（解決済み）: 契約テストの項目が、テスト戦略とリリース計画に無かった。2026-11-14 に、テスト戦略（API の契約テストの節）とリリース計画（B1 の仕様、B2 の契約テストと型の生成、リスク R21）に反映した。
 - 参照: [フロントエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-frontend.md)、[バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[設計レビュー](../../review/beer-game-kotlin/design_review_20261114.md)

@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Kotlin 版の技術スタック。公式の情報で確認した版とサポート期限、確認できなかった項目、beer-game2 からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:52:23Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Kotlin 版）
@@ -306,6 +306,20 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 17 | ESLint の警告は許容する運用もありうる | 静的解析は厳格に適用（違反 0 件、ベースラインなし、`@Suppress` なし）。PMD の XPath を補完として採用（導入は承認待ち）。層ごとにルールセットを分ける | 2026-11-14 の決定。AI が大量にコードを生成するため、規約違反を機械で守らせる（開発戦略） |
 | 18 | ローカルの DB は Docker の PostgreSQL 18 | ローカル開発（起動・動作確認）だけ H2 の PostgreSQL モード（2.5.252 を第一候補。導入は承認待ち）。統合テスト・CI・ステージング・本番は PostgreSQL 18 のまま。PostgreSQL 固有の機能はポートの裏に置き、H2 版を持つ。本番・ステージングでは H2 を拒否 | ユーザーの決定（2026-11-14）。設計判断 T7 |
 
+**B1 の実装で確認できた・変わった点（2026-11-14）。** 左の列は、この設計書の初稿の記述。
+
+| # | 初稿 | B1 の実装で確認した結果 | 理由・扱い |
+| :--- | :--- | :--- | :--- |
+| 19 | Kotlin 2.4.21 と Gradle 9.9.1 は未確認（テスト済みの範囲の上限は 2.4.20-Beta1） | **ビルドは成功**（JDK 25.0.2 と 21.0.12） | Step 2 |
+| 20 | detekt 1.23.8 の Kotlin 2.4 の解析は未確認 | **JDK 25 では動かない**（`IllegalArgumentException: 25.0.2`。`--jvm-target` は 22 まで）。**JDK 21 では動く**（Kotlin 2.4.21 のドメイン・application・テストの解析に成功、`ForbiddenMethodCall` が効く、違反 0）。`jvmTarget = "22"` を指定し、JDK 22 以下のときだけ detekt を有効にする。CI は JDK 21 の専用ジョブ。JDK 25 での代替は B2 | Step 2・4・5・6 |
+| 21 | 「Gradle プラグインは `org.jlleitschuh.gradle.ktlint`」の版は未記載 | `org.jlleitschuh.gradle.ktlint` **14.2.0**（ktlint 本体は 1.8.0 を指定）、`org.jetbrains.kotlinx.kover` 0.9.11、`io.gitlab.arturbosch.detekt` 1.23.8、`org.jetbrains.kotlin.jvm` と `kotlin-serialization` 2.4.21 | Step 2・7 |
+| 22 | Cucumber-JVM 8.0.4 は JUnit 5 系と想定 | `cucumber-junit-platform-engine` 8.0.4 が **JUnit 6.1.3** を要求（Kotest 6.2.7 は JUnit 5.13.4）。**`acceptanceTest` は `test` のクラスパスを継承しない独立したクラスパス**にし、カタログに `junit-bom`（6.1.3）、`junit-platform-suite`、`junit-platform-launcher` を `acceptanceTest` だけに足した（承認済みの範囲の周辺。要確認） | Step 3 |
+| 23 | Ktor 3.6.1 の部品 | `ktor-server-status-pages`、`ktor-server-test-host` をカタログに足した。**`slf4j-api` 2.0.19**（logback 1.6.6 の前提の版）を足した | Step 9 |
+| 24 | Node 26 LTS を、フロントエンドのビルドと E2E に使う | **B1 は Node 24.11.0 で実行した**（Node 26 は未導入。`.nvmrc` は未作成。`engines` は `^24 \|\| >=26`。`@cucumber/cucumber` 13.3.0 の要求 `22 \|\| 24 \|\| >=26` の範囲内） | Step 3・10 |
+| 25 | フロントエンドの版は未記載（beer-game2 の確認値） | react 19.3.1、react-dom 19.3.1、react-router 8.5.1、vite 8.3.6、@vitejs/plugin-react 6.3.0、**typescript 6.0.3**（最新は 7.0.2 だが採らない）、vitest 5.1.0、@testing-library/react 16.3.3・jest-dom 7.0.1・user-event 14.6.8、jsdom 31.0.0、eslint 10.14.0、typescript-eslint 8.72.1、prettier 3.9.10、**playwright 1.65.1**（beer-game2 の確認値 1.65.0 でなく `npm view` の最新）、@cucumber/cucumber 13.3.0。すべて `npm view` で実在を確認。**OpenAPI の型の生成ツール、契約テストの道具、PMD は入れていない**。`npm install` が「中程度の脆弱性 8 件」と表示した（未調査） | Step 3・10 |
+| 26 | HikariCP 7.1.0 と JDK 25 の組み合わせは未確認 | **ビルドとテスト（PostgreSQL 18.7、H2）で動作した** | Step 7〜11 |
+| 27 | H2 の導入は承認待ち。Flyway の H2 への適用は未確認 | **導入した**（2.5.252。Flyway 13.12.2 の H2 への適用は共通の V001〜V005 で確認）。H2 の依存は `adapter-persistence` の `runtimeOnly`。本番のイメージに含めない案は未実施 | Step 2・7・9 |
+
 ## アップグレード計画
 
 | 時期 | 対象 | 内容 |
@@ -320,15 +334,16 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 
 ## 未決事項
 
+- **B1 の結果（2026-11-14。上の変更表 19〜27）**: Kotlin 2.4.21 と Gradle 9.9.1、Kotest 6.2.7、HikariCP 7.1.0、Flyway 13.12.2、H2 の適用、Cucumber-JVM 8.0.4（独立したクラスパス）と Cucumber-JS 13.3.0 + Playwright 1.65.1 はビルドと実行で確認した。**未確認のまま**: PMD の Kotlin 2.4 の構文の解析（B2）、detekt の JDK 25 での代替（B2）、Arrow の `arrow-fx-coroutines`・`arrow-resilience` の版（B1 は Arrow core のみ使用）、Ktor のエンジン（B1 は Netty）。**依存関係の導入の承認の記録**: Cucumber・H2 を含む B1 の依存は、ユーザーが承認済み（上の「承認の状況」）。`junit-bom`・`junit-platform-suite`・`junit-platform-launcher`・`slf4j-api` の追加は、承認の範囲の周辺で、Gate の確認が要る。
 - **確認できていない項目**（受入条件: 最初のビルド。detekt と PMD は「規約違反のコードを置き、CI が落ちること」）: Kotlin 2.4.21 と Gradle 9.9.1、detekt 1.23.8、PMD 7.29.0 の Kotlin 2.4 の構文の解析、Arrow 2.3.0（`arrow-fx-coroutines`、`arrow-resilience` の版）、Kover、Kotest 6.2.7 と JUnit の組み合わせ、HikariCP 7.1.0 と JDK 25、Cucumber-JVM 8.0.4 と JUnit Platform・Kotlin の組み合わせ、Cucumber-JS 13.3.0 と Playwright の組み合わせ。実装開始時にビルドで確認する。
 - **承認待ち**: PMD の導入（新規の CI ツール）、Cucumber-JVM と Cucumber-JS の依存関係の導入（導入は決定済み。版は確認済み）。承認の後、開発戦略の未決事項（技術スタックへの Cucumber の追加）は解消する。
 - **公式のサポート期限を確認できていない**: Cucumber-JVM、Cucumber-JS、PMD（Maven Central と npm の最新の版と更新日だけを確認した）。
 - **選定未決**: 生きたドキュメントの公開の道具（Pickles、Cucumber Reports など。B1〜B2 で選び、版を確認）、変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
 - PMD の Gradle での実行方法（プラグインか、CLI の実行か）。detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認する。
-- フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）と、Cucumber のステップ定義の置き場（B1）。
+- フィーチャーファイルの配置は **B1 で確定**（共有の `features/`。[テスト戦略](./test-strategy.md)）。
 - Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
 - **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。
-- **H2（設計判断 T7）**: 導入の承認待ち。H2 の PostgreSQL モードで動く範囲（アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベル）は公式ドキュメントで確認できなかったため、**B1 の最初に実測して確定**する。H2 2.5.252 と JDK 25、Flyway 13.12.2 との組み合わせ、公式のサポート期限、Flyway の H2 用の扱い（`flyway-core` に含まれるかを含む）は、実装開始時に確認する。
+- **H2（設計判断 T7）**: **B1 で実測して確定した**（Step 1・7。結果は [データモデル](./data-model.md)）。H2 2.5.252 と JDK 25、Flyway 13.12.2 との組み合わせは動作した。**公式のサポート期限は確認できていない**（未確認のまま）。
 - Ktor のエンジン（Netty か CIO）の最終確認（設計判断 T2）。
 - `ktor-server-rate-limit` の状態を共有する方法（参加・復帰の専用の制限。beer-game2 から継続）。
 - フレームワークのログ（Ktor、Hikari、Flyway）を JSON にするか（追加の依存関係が要る）。

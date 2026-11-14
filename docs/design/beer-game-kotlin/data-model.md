@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T09:13:35Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -449,13 +449,16 @@ sealed interface AppFailure {
 }
 
 data class EventStore(
-    val read: suspend (Tx, GameId, StreamType) -> Either<PersistenceFailure, StreamRead>,   // events と version
-    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, Unit>,   // ConcurrencyConflict か Persistence
-    val transaction: Transaction,
+    val read: suspend (Tx, GameId, StreamType) -> Either<AppFailure, StreamRead>,   // events と version（B1 の実装は Left を AppFailure で返す）
+    // B1 の実装: 追記後の封筒の列（版つき）を返す。同期投影が版つきの封筒を要するため。ConcurrencyConflict か Persistence
+    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, List<EventEnvelope<DomainEvent>>>,
+    val transaction: TransactionRunner,
 )
-fun interface Transaction {   // 総称の関数は値のプロパティで表せないため、fun interface で表す
-    suspend fun <A> run(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A>   // Left で ROLLBACK
+// B1 の実装: 総称のメソッドは fun interface にできない（コンパイルエラーを確認）ので、通常の interface
+interface TransactionRunner {
+    suspend operator fun <A> invoke(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A>   // Left で ROLLBACK
 }
+// `GameCreated` を含む追記は、同じトランザクションで game_roots を作る（B1 の実装。append の中）
 ```
 
 ### 共同入力の競合は、ストリームの版とは別
@@ -473,7 +476,7 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 
 `idempotency_records` の行は、**追記と同じトランザクション**で書きます。これにより、「追記は成功したが記録が無い」状態を作りません。応答が資格の生の値を含む操作（ゲームの作成、参加、復帰）の再送も、同じ値を返せます（応答を暗号化して保存するため）。
 
-**コマンド処理の順**は、「認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影」です。冪等記録の照合を認可より先に置きません。入れ替えで失効した旧担当者が以前のキーを再送しても、保存済みの応答（参加・復帰では資格の生の値）を返さず、403 にするためです。
+**コマンド処理の順**は、「ロック（共有）→ 認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影」です（B1 の実装では、認証は `execute` の中、同じトランザクションの中で行う。[バックエンドアーキテクチャ](./architecture-backend.md)）。冪等記録の照合を認可より先に置きません。入れ替えで失効した旧担当者が以前のキーを再送しても、保存済みの応答（参加・復帰では資格の生の値）を返さず、403 にするためです。
 
 - `request_digest` は、**本文・対象・操作者の ID** の鍵付き HMAC です。同じキーでも操作者が違えば `app.idempotency_key_reused`（409）になります。
 - 保存するのは**成功した応答だけ**です。業務の失敗（`Left`）は保存しません。再送は、同じ失敗を再計算して返します（状態が変わっていれば結果も変わりうる）。
@@ -488,12 +491,12 @@ fun interface Transaction {   // 総称の関数は値のプロパティで表�
 | 制約名 | 表 | 衝突の意味 | 扱い |
 | :--- | :--- | :--- | :--- |
 | `uq_events_stream_version` | `events` | 同じストリームへの同時の追記 | 読み直して `decide` からやり直す（`ConcurrencyConflict`、上限つき） |
-| `uq_idempotency_create` | `idempotency_records`（`scope = 'create'` の部分一意索引） | 同じキーのゲーム作成の同時の重複 | 記録を再照合し、保存済みの応答を返す（500 にしない） |
-| `pk_idempotency_records` | `idempotency_records` | 同じキー・同じ対象の同時の重複（空の列を返す操作を含む） | 記録を再照合し、本文の digest が同じなら保存済みの応答、違えば `app.idempotency_key_reused`（409） |
+| `uq_idempotency_create` | `idempotency_records`（`scope = 'create'` の部分一意索引） | 同じキーのゲーム作成の同時の重複 | **`ConcurrencyConflict` に写し**、`execute` の再試行の `find` が記録を見つけて、保存済みの応答を返す（500 にしない）。PostgreSQL は一意違反の後のトランザクションが使えず、同じトランザクションで再照合できないため（B1 の実装） |
+| `pk_idempotency_records` | `idempotency_records` | 同じキー・同じ対象の同時の重複（空の列を返す操作を含む） | 同上。再試行の `find` が、本文の digest が同じなら保存済みの応答、違えば `app.idempotency_key_reused`（409）を返す |
 
-上の 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID（ログ）で返します。制約には、この名前を明示して付けます（マイグレーション 001・002）。
+上の 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID（ログ）で返します。制約には、この名前を明示して付けます（マイグレーション 001・002）。参加コードの重複（`uq_game_join_codes_code`）は、12 文字（約 60 ビット）の乱数で実際には起きないとして再試行しません（`Persistence`、500。B1 の実装）。
 
-**H2 版（ローカルのみ）の扱い。** `uq_events_stream_version` と `pk_idempotency_records` は、通常の一意制約・主キーなので、共通のマイグレーションに同じ名前で置きます（H2 で違反時に制約名を取り出せるかは、B1 の最初の実測で確認する未確認事項です）。**`uq_idempotency_create`（`scope = 'create'` の部分一意索引）は、H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため、H2 版では省略し、アプリケーション側の検査（挿入の前に `(scope, key_digest)` を検索して再照合）に置き換えます。**ゲーム作成の同時の重複は、ローカルでは制約で守られません（単一プロセスで 1 人が使う前提で許容。検証は PostgreSQL の統合テストだけで行う）。
+**H2 版（ローカルのみ）の扱い。** `uq_events_stream_version` と `pk_idempotency_records` は、通常の一意制約・主キーなので、共通のマイグレーションに同じ名前で置きます（**B1 で確認済み**: H2 は違反時の制約名をメッセージに含む。小文字（`DATABASE_TO_LOWER=TRUE`）で、大文字小文字を区別せず探す。「方言の差分」）。**`uq_idempotency_create`（`scope = 'create'` の部分一意索引）は、H2 の PostgreSQL モードで動かないことを B1 で実測したため（`CREATE UNIQUE INDEX … WHERE` は構文エラー）、H2 版では省略し、アプリケーション側の検査（挿入の前に `(scope, key_digest)` を検索し、重複が見つかれば `ConcurrencyConflict`）に置き換えます。**ゲーム作成の同時の重複は、ローカルでは制約で守られません（単一プロセスで 1 人が使う前提で許容。検証は PostgreSQL の統合テストだけで行う）。
 
 イベントの封筒の `command_id` は、同じコマンドから生まれたイベントを束ねるための識別子で、冪等キーとは別です（冪等キーのダイジェストはイベントに入れません）。
 
@@ -693,7 +696,7 @@ end
 ## マイグレーション
 
 - スキーマの変更は、**番号つきの SQL マイグレーション**で行い、適用の履歴を DB に残します。管理ツールは Flyway を採用案とします（導入は承認待ち。[技術スタック](./tech-stack.md) T4）。
-- **PostgreSQL 用と H2 用で、共通の部分を最大化し、差分だけを分けます**（Flyway のベンダー別の場所。配置の案は下表。詳細は B1 の最初の実測の後に確定します）。
+- **PostgreSQL 用と H2 用で、共通の部分を最大化し、差分だけを分けます**（Flyway のベンダー別の場所。**配置は B1 の Step 7 で確定しました（2026-11-14）**: 共通 `V001〜V005`、PostgreSQL `V102`。H2 専用は不要。下表の「確定」の列。V001〜V005 はマイグレーションの承認待ち（B1 の Gate 7）。導入した版は [技術スタック](./tech-stack.md)）。
 - 変更は、**拡張 → 互換 → 縮小**の順に分け、ロールバックできる単位にします（NFR-12）。
 - **イベントは、マイグレーションで書き換えません。** イベントの形の変更は `schema_version` とアップキャストで吸収します。投影の形の変更は、マイグレーションで表を直し、**再構築**で埋めます。
 
@@ -707,19 +710,22 @@ end
 | 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
 | 101 | PostgreSQL | DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限 |
 | 102 | PostgreSQL | 部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
-| 201 | H2 | H2 で表せる形への置き換え（あれば）。PostgreSQL 固有の制約を省略した旨のコメント |
+| 201 | H2 | **作らない**（B1 の Step 7 で、共通の V001〜V005 が H2 にそのまま適用できたため）。省略した制約は、ローカルでは守られない |
+
+**確定（B1。2026-11-14）**: ファイル名は `V001__event_store.sql`、`V002__peripheral_stores.sql`、`V003__projections_lobby.sql`、`V004__projections_session.sql`、`V005__projections_results.sql`（共通）、`V102__idempotency_create_unique_index.sql`（PostgreSQL）。**006（保持）は B11、101（DB ロールと GRANT）は B2**で、B1 では作りません（V101 は空けてある）。
 
 ```text
 db/migration/
-├── common/      001〜006（両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダで切り替える案）
-├── postgres/    101〜（PostgreSQL 固有。ロール、GRANT、部分一意索引、jsonb）
-└── h2/          201〜（H2 固有。置き換えがあるときだけ）
-# Flyway の場所: PostgreSQL = common + postgres、H2 = common + h2
+├── common/      V001〜V005（B1。両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダ ${json_type} で切り替える）。V006（保持）は B11
+├── postgres/    V102（B1）。V101（ロール、GRANT）は B2
+└── h2/          作らない
+# Flyway の場所: PostgreSQL = common + postgres、H2 = common
 ```
 
 - 追記専用の保護、観察者向けの権限、部分一意索引は PostgreSQL の場所（101・102）にだけ置きます。投影の `CHECK`（数量の上限）は、共通（001〜005）に含めます。
-- `events.payload` の型は、PostgreSQL は `jsonb` です。H2 の PostgreSQL モードで `jsonb` が使えることは公式ドキュメントで確認できなかったため、共通の DDL ではプレースホルダ（例 `${json_type}`）にし、H2 側の型は B1 の最初の実測で決めます（仮置き）。
-- 共通の DDL を H2 で通せることは**未確認**です。通らない文は、共通から PostgreSQL 側と H2 側へ分けます（共通を最大化する方針は変えない）。
+- `events.payload` の型は、PostgreSQL は `jsonb`、H2 は `json` です（プレースホルダ `${json_type}`。**B1 で確定**）。書き込みは方言ごとに分けます（PostgreSQL は `CAST(? AS jsonb)`、H2 は `? FORMAT JSON`）。読み込みは両方 `CAST(payload AS VARCHAR)`。
+- 共通の DDL は H2 で通ることを B1 の Step 7 で確認しました（`text` 型の主キー・一意制約、`GENERATED ALWAYS AS IDENTITY`、`timestamp with time zone`、`bytea`、`ON DELETE CASCADE`、`CHECK`）。再適用は 0 件です。
+- **B1 の投影の実装で、設計と違う点**（2026-11-14）。(1) `role_current_states.production_pipeline` は **NULL を許し、B1 では書かない**（キットでは配送の待ち行列と同じ。`shipment_pipeline` に `RoleState.deliveryPipeline`、`order_pipeline` に `orderPipeline` を書く）。(2) `game_settings` の初期条件・遅延・公開範囲は B1 では書かない（キット準拠のイベントに載らない。カスタムは B7）。(3) 観察者向けの 3 表（`lobby_observer_invitations`・`lobby_observers`・`week_team_totals`）は、003・005 の中に**表を作るが、書き込みは B9 まで省く**（判断項目 #12 の決定。試験は「確定後も、観察者向けの 3 表に行が無い」ことを固定している。B9 で書き始めるときに、この試験を直す）。
 
 ## ローカル開発（H2 の PostgreSQL モード）
 
@@ -735,9 +741,9 @@ db/migration/
 
 **H2 を、設計の検証（並行性、権限、部分一意索引、連鎖削除）や性能の計測には使いません。** それらの正は PostgreSQL の統合テストです。
 
-**実測（B1 の Step 1。2026-11-14）。** 公式ドキュメントで確認できなかった項目を、H2 2.5.252（PostgreSQL モード。`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`）で実際に動かして確かめた。結果は下の「方言の差分」の表のとおり。**結論: アドバイザリロック、`LISTEN`/`NOTIFY`、部分一意索引、`GRANT TRUNCATE` は動かず、設計どおり、ポートの裏に隠す・省略するのが妥当。権限の強制（SELECT のみのロールの拒否）、分離レベル、`ON DELETE CASCADE`、SQLSTATE（23505・23513・40001）は動いた。** 設計が H2 で成り立たなくなる項目は無く、**ローカル構成は成立する**。実測の手順は、使い捨てのコード（リポジトリに残さない）で、29 項目を実行した。Flyway の適用は、Step 2 のビルドで確かめる（未確認）。
+**実測（B1 の Step 1。2026-11-14）。** 公式ドキュメントで確認できなかった項目を、H2 2.5.252（PostgreSQL モード。`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`）で実際に動かして確かめた。結果は下の「方言の差分」の表のとおり。**結論: アドバイザリロック、`LISTEN`/`NOTIFY`、部分一意索引、`GRANT TRUNCATE` は動かず、設計どおり、ポートの裏に隠す・省略するのが妥当。権限の強制（SELECT のみのロールの拒否）、分離レベル、`ON DELETE CASCADE`、SQLSTATE（23505・23513・40001）は動いた。** 設計が H2 で成り立たなくなる項目は無く、**ローカル構成は成立する**。実測の手順は、使い捨てのコード（リポジトリに残さない）で、29 項目を実行した。**Flyway の H2 への適用は、Step 7 で確認した**（共通の V001〜V005 がそのまま適用でき、再適用は 0 件。`${json_type}` のプレースホルダだけで方言を切り替える。H2 専用のマイグレーションは不要）。
 
-**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**（「非対応」と断定するものではありません）。実際の動作は、**B1 の最初に実測して確定します（未確認）**。H2 の版も実装開始時に確認します（[技術スタック](./tech-stack.md)）。
+**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**。**これらは B1 の Step 1・7 で実測して確定しました**（H2 2.5.252。結果は下の「方言の差分」の表）。**未確認のまま残るもの**: H2 での性能、分離レベルの動作の同一性、表の所有者の扱い（`GRANT` まわり）、2 つの API プロセスでの動作。
 
 ### 方言の差分
 
@@ -748,9 +754,10 @@ db/migration/
 | 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | **動かない**（実測: `CREATE UNIQUE INDEX … WHERE` は構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える |
 | DB ロールと GRANT（書き込み・読み取り・観察者・削除・所有者）、追記専用、`TRUNCATE` の拒否 | あり | **一部動く**（実測: `CREATE ROLE`・`GRANT SELECT`・`REVOKE`・`CREATE USER` は動き、SELECT のみのロールは INSERT・UPDATE・DELETE・`TRUNCATE`・DROP・CREATE を拒否した（SQLState 90096）。**`GRANT TRUNCATE` は構文エラー**。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。H2 でも権限の一部は強制されるが、**権限の検証の正は PostgreSQL の統合テスト**（`GRANT TRUNCATE` と所有者の挙動が検証できないため） |
 | 接続プールの分離（観察者用など） | 用途別 | 単一のプール | H2 版は**省略** |
-| `jsonb` | `events.payload` | **型は通るが挙動が違う**（実測: `jsonb` は H2 では `json`。**`setString` で入れた文字列は、JSON の文字列値になる**（`"{\"a\":1}"`）。`FORMAT JSON` を付けて初めて JSON のオブジェクトになる） | **H2 版の `events.payload` は、`FORMAT JSON` で書くか、`text` 列にする**。型と書き込みの SQL は、方言ごとの場所（またはプレースホルダ）で分ける。`timestamptz` は H2 の PostgreSQL モードで不明なデータ型のため、**共通の DDL は `timestamp with time zone` と書く**（実測） |
+| `jsonb` | `events.payload` | **型は通るが挙動が違う**（実測: `jsonb` は H2 では `json`。**`setString` で入れた文字列は、JSON の文字列値になる**（`"{\"a\":1}"`）。`FORMAT JSON` を付けて初めて JSON のオブジェクトになる） | **H2 版の `events.payload` は `json` 型で、`FORMAT JSON` で書く（B1 で確定。PostgreSQL は `jsonb` と `CAST(? AS jsonb)`、読み込みは両方 `CAST(payload AS VARCHAR)`）**。型は Flyway のプレースホルダ `${json_type}`、書き込みの SQL は `Dialect.jsonParam` で分ける。`timestamptz` は H2 の PostgreSQL モードで不明なデータ型のため、**共通の DDL は `timestamp with time zone` と書く**（実測） |
 | 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | **設定は通る**（実測: READ COMMITTED・REPEATABLE READ・SERIALIZABLE の設定が通る。動作の同一性は未確認） | H2 では検証しない（PostgreSQL の統合テストが正） |
-| SQLSTATE（40001、40P01、55P03、23505 の制約名） | アダプターが `AppFailure` に写す | **一部動く**（実測: 一意違反は 23505、`CHECK` 違反は 23513、REPEATABLE READ の同時更新は **40001**。**違反した制約の名前は、メッセージに大文字で含まれる**（`UQ_EVENTS_STREAM_VERSION`）。PostgreSQL のような制約名の専用フィールドは未確認） | H2 版の写像: 23505 はメッセージ中の制約名（**大文字小文字を区別せず**）で `uq_events_stream_version` などに写す。40001 は `ConcurrencyConflict` として再試行する |
+| SQLSTATE（40001、40P01、55P03、23505 の制約名） | アダプターが `AppFailure` に写す | **一部動く**（実測: 一意違反は 23505、`CHECK` 違反は 23513、REPEATABLE READ の同時更新は **40001**。**違反した制約の名前は、メッセージに大文字で含まれる**（`UQ_EVENTS_STREAM_VERSION`）。PostgreSQL のような制約名の専用フィールドは無い。`DATABASE_TO_LOWER=TRUE` では小文字（例: `public.pk_idempotency_records INDEX ...`）。**メッセージには行の値（`VALUES (...)`）も含まれ、日本語のロケールで出る**） | H2 版の写像: 23505 はメッセージ中の制約名（**大文字小文字を区別せず**）で `uq_events_stream_version` などに写す。40001 は `ConcurrencyConflict` として再試行する。**`PersistenceFailure` にメッセージを載せない**（SQLSTATE と制約名だけ。PostgreSQL は `PSQLException.serverErrorMessage.constraint` と、詳細を除く主メッセージだけ）。B1 で実装済み |
+| Flyway の適用（B1 の Step 7 で確認） | `common` + `postgres` | **共通の V001〜V005 がそのまま適用できた**（`text` 型の主キー・一意制約、`GENERATED ALWAYS AS IDENTITY`、`timestamp with time zone`、`bytea` を含む。再適用は 0 件） | H2 専用のマイグレーションは作らない |
 | 名前つきの一意制約、`ON DELETE CASCADE`、`CHECK` | あり | **動く**（実測: 名前つきの一意制約、`ON DELETE CASCADE`（親の削除で子が 0 件になる）、名前つきの `CHECK`、`uuid`・`bytea`・`information_schema`・`pg_catalog.pg_class` の参照） | 共通の DDL に置く |
 
 ### H2 版で省略する制約（ローカルでは守られない）
@@ -835,10 +842,16 @@ db/migration/
 | 23 | 保持の起点は未決 | 暫定で作成時。画面に削除予定日とバックアップの残存を表示。終了時起点の案は未決 | M5 |
 | 24 | データベースは PostgreSQL だけ | ローカル開発だけ H2（PostgreSQL モード）も使えるようにする。再構築のロックと SSE の通知はポートの裏で 2 実装。H2 版で省略する制約を明記 | ユーザーの決定（2026-11-14。ADR-014） |
 | 25 | マイグレーションは 1 系統 | 共通（001〜006）・PostgreSQL（101〜）・H2（201〜）の場所に分ける案。配置は B1 で確定 | 共通を最大化し、差分だけを分ける |
+| 26（以降は B1 の実装で変わった点。2026-11-14） | 共通 001〜006、PostgreSQL 101〜、H2 201〜 の配置案 | **共通 `V001〜V005`、PostgreSQL `V102` に確定。H2 専用は作らない**。006 は B11、101 は B2 | 共通の DDL が H2 にそのまま適用できた（Step 7） |
+| 27 | `events.payload` の H2 の型は未定（仮置き） | PostgreSQL は `jsonb`（`CAST(? AS jsonb)`）、H2 は `json`（`? FORMAT JSON`）。型はプレースホルダ `${json_type}` | `setString` で入れた文字列が H2 では JSON の文字列値になる（Step 1・7） |
+| 28 | 冪等記録の重複は、記録を再照合する | `ConcurrencyConflict` に写し、再試行の `find` で見つける | PostgreSQL は、一意違反の後のトランザクションが使えない（Step 7） |
+| 29 | `EventStore.read` の失敗は `PersistenceFailure`、`append` は `Unit`、`transaction` は `fun interface Transaction` | `read` は `AppFailure`、`append` は封筒の列、`TransactionRunner` は通常の `interface`。`GameCreated` の追記は `game_roots` を同じトランザクションで作る | 同期投影が版つきの封筒を要する。総称のメソッドは `fun interface` にできない |
+| 30 | `role_current_states.production_pipeline` は必須の想定 | NULL を許し、B1 では書かない。`shipment_pipeline` に `deliveryPipeline`、`order_pipeline` に `orderPipeline` | キットでは生産の待ち行列が配送と同じ。B1 のイベントに初期条件が載らない |
+| 31 | 観察者向けの 3 表（003・005 の中）は B1 で作り、書く | 表は作るが、**書き込みは B9 まで省く** | B1 に観察者のイベントが無く、公開範囲の規則（`Disclosure`）は B9 |
 
 ## 未決事項
 
-- マイグレーションの管理ツールは Flyway を採用案とします（[技術スタック](./tech-stack.md) T4。**導入は承認待ち**）。適用の自動化（起動時か CI のジョブか）は、導入の承認後に決めます。
+- マイグレーションの管理ツールは Flyway です（[技術スタック](./tech-stack.md) T4。B1 で導入。マイグレーション 001〜005 は B1 の Gate 7 の承認待ち）。適用の自動化は、B1 の実装で **H2（local）の起動時は自動、PostgreSQL の `api` は適用せず `migrate` モード**とした（本番での運用の最終決定は、導入の承認後）。
 - 追記の `ConcurrencyConflict` の自動再試行の上限と、再試行の間隔（実装開始時に、競合の頻度を測って決める）。
 - `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認。動かない場合の代替（`SECURITY DEFINER` の関数、削除用のロール）。
 - 再構築の同時実行制御（解決済み: アドバイザリロック。コマンドは共有、再構築は排他。M23）。**未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。研修中の再構築の所要時間の実測。
@@ -848,7 +861,10 @@ db/migration/
 - `events` の長期の保持と、ゲーム削除前の分析の要否（beer-game2 から継続）。
 - 同期投影のトランザクション時間の実測。書き込みを圧迫する場合は、非同期投影へ移す（設計判断 4）。
 - JSON のシリアライズ方式とアップキャストの置き場所（解決済み: kotlinx.serialization と `EventCodec`。アップキャストは adapter-persistence。[バックエンドアーキテクチャ](./architecture-backend.md)、[技術スタック](./tech-stack.md)）。
-- **H2 の PostgreSQL モードで動く範囲の実測（B1 の最初）**: 共通の DDL が通るか、`jsonb` に相当する型、名前つき制約の違反時に制約名を取れるか、`ON DELETE CASCADE` の動作、SQLSTATE、分離レベル、部分インデックスの可否。結果で、共通と H2 の場所の配分、省略する制約の一覧、プレースホルダを確定する。H2 の版の確認と導入は承認待ち（[技術スタック](./tech-stack.md)）。
+- **H2 の PostgreSQL モードで動く範囲の実測: B1 の Step 1・7 で完了**（結果は「方言の差分」。共通の DDL と省略の一覧、プレースホルダを確定した）。残り: H2 での性能、分離レベルの動作の同一性、表の所有者の扱い（`GRANT` まわり）。**H2 の版の確認と導入の承認は、B1 の Gate 2 の記録**（[技術スタック](./tech-stack.md)）。
+- **`session_overview.week` が最終週 + 1 になる（B1 で判明。未解決）。** 確定で週を「次の週」へ進めるが、最終週（`finalWeek`）が `WeekCommitted` の封筒にもペイロードにも無いため、最終週が 50 未満のゲームが最終週を確定すると `week` が最終週 + 1 になる（`SessionEnded` は週を持たない）。確定のイベントか投影が最終週を知る手段（`SessionStarted` の設定を投影が覚える、`WeekCommitted` に最終週を載せる、など）の決定が要る。ENDED の表示は `status` で判断できるので、B1 の受入条件には影響しない。
+- **投影の整合性の検査**（`projected_version` と `MAX(stream_version)` の照合の運用）、投影の再構築（B12）、`LISTEN` の切断中の欠落を `projection_checkpoints` の数秒ごとの照合で補う処理、冪等記録の掃除の定期タスクは、B1 では**未実装**。
+- 参加者のロビーの並び（`joined_at`、同時刻なら `participant_id` の順）。参加の順を保つ規則は未決（B1 の受入条件に無い）。
 - H2 版の `ProjectionLock` が `lock_timeout` 相当の待ちの上限をどう扱うか（PostgreSQL 版は SQLSTATE 55P03 を `RetryExhausted` に写す。H2 版は待ちの上限つきの取得で同じ契約を満たす）。
 - 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、最初のスライドの Red のテストで確かめる（[テスト戦略](./test-strategy.md)）。
 

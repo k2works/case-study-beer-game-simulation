@@ -73,6 +73,6 @@ Kotlin 版は、開発機での起動と動作確認に限り、H2 の PostgreSQ
 ## 備考
 
 - 著者: claude-code
-- H2 の版、H2 の PostgreSQL モードで動く範囲、マイグレーションの配置は未確認（B1 の最初に実測して確定する）。
+- **B1 の実装の結果（2026-11-14。実測して確定）**: H2 2.5.252 の PostgreSQL モードで 29 項目を実測し、設計が H2 で成り立たなくなる項目は無かった。アドバイザリロック・`LISTEN`/`NOTIFY`・部分一意索引・`GRANT TRUNCATE` は動かず、ポート（`ProjectionLock`・`ChangeNotifier`。H2 版は `StampedLock` と `MutableSharedFlow`）と省略で置き換えた。`jsonb` は H2 では `json` で、書き込みを方言ごとに分けた。共通のマイグレーション V001〜V005 は H2 にそのまま適用でき、H2 専用は不要（PostgreSQL 専用は V102）。ポートの契約テストは両実装で緑。`@api` の受け入れも H2 と PostgreSQL の両方で緑。H2 のメッセージには行の値が含まれるため、永続化の失敗にメッセージを載せない。本番・ステージングでの H2 の拒否は、起動時の検査で実装・確認済み（`APP_ENV=production DB_KIND=h2` は終了コード 78）。未確認: H2 での性能、分離レベルの動作の同一性、2 つの API プロセスでの動作、本番のイメージから H2 を除く案。
 - 関連 ADR: [ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-009](./009-observer-access-control.md)、[ADR-010](./010-retention-deletion-with-append-only.md)、[ADR-013](./013-tech-stack-versions.md)
 - 参照: [データモデル](../../design/beer-game-kotlin/data-model.md)、[バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[技術スタック](../../design/beer-game-kotlin/tech-stack.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[リリース計画](../../development/beer-game-kotlin/release_plan.md)

@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -106,8 +106,8 @@ Port2 --> DB
 
 | 層（Gradle モジュール） | 責務 | 依存してよい先 |
 | :--- | :--- | :--- |
-| `domain` | 値オブジェクト、`Command`、`Event`、`DomainError`、`decide` / `evolve`、`startGame`、`simulateWeek`、`Disclosure`、`KitPreset`、投影の純粋関数、`RetentionSaga` の純粋関数。**業務ルールはここにある** | なし（Kotlin 標準ライブラリ、Arrow Core のみ） |
-| `application` | 関数の束（`Ports`）の型の定義、コマンド処理 `execute`、問い合わせ、競合の再試行、周辺ストアへの書き込み内容の導出（純粋）。トランザクションの境界を決める。**ルールは持たない** | `domain` |
+| `domain` | 値オブジェクト、`Command`、`Event`、`DomainError`、`decide` / `evolve`、`replayGame` / `replaySession`、`startGame`、`simulateWeek`、`KitPreset`、投影の純粋関数、`RetentionSaga` の純粋関数。**業務ルールはここにある**（`Disclosure` は B1 の実装では `application`。下の層の表の `application` を参照） | なし（Kotlin 標準ライブラリ、Arrow Core のみ） |
+| `application` | 関数の束（`Ports`）の型の定義、コマンド処理 `execute`（B1 の実装では `runCommand`）、問い合わせ、競合の再試行、周辺ストアへの書き込み内容の導出（純粋）、**開示の判定 `Disclosure`（純粋。読み取りの型 `ProjectedGame` と同じ層に置く。B1 の実装。変更 #37）**。トランザクションの境界を決める。**ルールは持たない** | `domain` |
 | `adapter-http` | Ktor のルート、DTO の検証（`Either` で誤りを集める）、認証、Origin 検査、レート制限、ヘッダー、SSE、エラーの写像 | `application`、`domain` |
 | `adapter-persistence` | JDBC による `EventStore`、投影の書き込み、問い合わせ、周辺ストア、冪等記録、`ProjectionLock` と `ChangeNotifier` の **PostgreSQL 版と H2 版**、イベントの JSON 変換（`EventCodec`）、マイグレーション（共通・PostgreSQL・H2 の場所） | `application`、`domain` |
 | `app` | 設定の読み込みと検証、関数の束の組み立て（ワイヤリング）、起動のモード（api、retention、migrate、rebuild-projections） | 全モジュール |
@@ -126,26 +126,37 @@ typealias IssueCredential = suspend (CredentialKind, ExpiresAt) -> IssuedCredent
 /** イベントストア。PostgreSQL 版とインメモリ版を差し替える（データモデルのスケッチと同じ形） */
 data class EventStore(
     val read: suspend (Tx, GameId, StreamType) -> Either<AppFailure, StreamRead>,                    // Left は Persistence
-    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, Unit>, // Left は ConcurrencyConflict か Persistence
+    // B1 の実装: 追記後の封筒の列（版つき）を返す。同期投影が版つきの封筒を要するため（Unit ではない）。Left は ConcurrencyConflict か Persistence
+    val append: suspend (Tx, Map<StreamType, StreamVersion>, List<NewEvent>) -> Either<AppFailure, List<EventEnvelope<DomainEvent>>>,
     val transaction: TransactionRunner,
 )
 
-/** 失敗の型は AppFailure（正本。下の「コマンド処理の流れ」）。追記の競合は AppFailure.ConcurrencyConflict で、独立した AppendFailure の型は持たない。データモデルの署名もこれに合わせる */
-fun interface TransactionRunner {
+/**
+ * 失敗の型は AppFailure（正本。下の「コマンド処理の流れ」）。追記の競合は AppFailure.ConcurrencyConflict で、独立した AppendFailure の型は持たない。データモデルの署名もこれに合わせる。
+ * B1 の実装: 総称のメソッド（`<A>`）を持つので `fun interface` にできない（コンパイルエラーを確認）。通常の `interface`。
+ */
+interface TransactionRunner {
     suspend operator fun <A> invoke(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A>
 }
 
-/** コマンドの応答。画面の表示に使う内容は持たない（ストリームごとの追記後の版だけ） */
-data class CommandOutcome(val versions: Versions)
+/**
+ * コマンドの応答。画面の表示に使う内容は持たない（ストリームごとの追記後の版だけ）。
+ * B1 の実装: `gameId`（作成の再送が同じゲームを返すため）と、資格を発行した操作（作成・参加）の `issued`（資格の生の値。冪等記録は暗号化して保存）を持つ。
+ * HTTP が応答の本文に載せるのは `versions` だけ（`gameId` は Location、資格は Set-Cookie）。
+ */
+data class CommandOutcome(val gameId: GameId, val versions: Versions, val issued: IssuedCredential? = null)
+/** 追記したストリームの版だけを持ち、追記しなかったストリームは null（追記が空の列だったときは、そのストリームの現在の版） */
 data class Versions(val game: StreamVersion?, val session: StreamVersion?)
 
-/** 追記と同じトランザクションで書く、イベント以外の行（投影、周辺ストア、冪等記録） */
-data class SideStores(
-    val project: suspend (Tx, GameId, List<EventEnvelope<DomainEvent>>) -> Either<PersistenceFailure, Unit>,
-    val writePeripheral: suspend (Tx, List<PeripheralWrite>) -> Either<PersistenceFailure, Unit>,
-    val findIdempotent: suspend (Tx, IdempotencyKey) -> Either<PersistenceFailure, StoredResponse?>,
-    val saveIdempotent: suspend (Tx, IdempotencyKey, StoredResponse) -> Either<PersistenceFailure, Unit>,
-)
+/**
+ * 追記と同じトランザクションで書く、イベント以外の行。B1 の実装は、設計の `SideStores` を 3 つのポートに分けた
+ * （投影の書き込み `ProjectionWriter`、冪等記録 `IdempotencyStore(find, save)`。`save` は期限切れの置き換えのため時刻 `now` を受け取る、
+ * 周辺ストア `PeripheralStore`）。周辺ストアの書き込み内容は、純粋な導出 `peripheralWrites` のまま。
+ */
+fun interface ProjectionWriter {
+    suspend fun write(tx: Tx, gameId: GameId, events: List<EventEnvelope<DomainEvent>>): Either<AppFailure, Unit>
+}
+// IdempotencyStore(find, save)、PeripheralStore（display_profiles・credentials・browser_sessions の書き込み、資格の認証、参加コードからのゲームの照合）は application/Ports.kt・Credentials.kt
 
 /**
  * 投影の再構築との直列化（ゲーム単位）。PostgreSQL 固有のアドバイザリロックをポートの裏に隠す。
@@ -167,9 +178,14 @@ data class ChangeNotifier(
     val isAlive: suspend () -> Boolean,              // /ready が見る（受信の接続が生きているか）
 )
 
-data class Ports(val now: Now, val newId: NewId, val issueCredential: IssueCredential,
-                 val events: EventStore, val side: SideStores,
-                 val lock: ProjectionLock, val notifier: ChangeNotifier)
+/**
+ * B1 の実装: detekt の引数の数の規則を、設定を緩めずに守るため、束ねた 5 項目にした（`now` などは同じ名前のプロパティでも読める）。
+ * `Generators(now, newId, newCredential, newJoinCode)`（資格の生の値と参加コードの乱数を含む。旧 `IssueCredential`）、
+ * `Stores(events, project, idempotency, peripheral, reader)`（`reader` は投影の読み取り専用のトランザクション）、
+ * `AppSettings`（再試行の上限、冪等記録の期限、資格の期限、鍵の版と鍵）
+ */
+class Ports(val generators: Generators, val stores: Stores,
+            val lock: ProjectionLock, val notifier: ChangeNotifier, val settings: AppSettings)
 ```
 
 **`ProjectionLock` と `ChangeNotifier` は、PostgreSQL 版と H2 版の 2 実装を持ちます**（どちらも `adapter-persistence`。`app` が設定で選んで組み立てる）。
@@ -211,11 +227,11 @@ participant "EventStore\n（JDBC）" as ES
 database "PostgreSQL" as DB
 
 P -> R : PUT /sessions/:id/decisions\n（Idempotency-Key、If-Match = 意思決定の版）
-R -> R : 認証（操作者・資格の有効性）-> Actor\n本文の検証（誤りを集める）-> SaveDecision
+R -> R : 本文の検証（誤りを集める）-> SaveDecision\n生の資格（Cookie の値）を RequestMeta.credential に入れる（Actor は作らない）
 R -> X : execute(command, key)
 X -> DB : BEGIN（READ COMMITTED）
 X -> X : ProjectionLock.acquireShared(tx, game_id)\n（PostgreSQL 版: アドバイザリロック。H2 版: プロセス内）
-X -> X : 認可の前提検査（ゲームの一致、資格の種別）
+X -> X : 認証（操作者・資格の有効性）-> Actor（B1 の実装: トランザクションの中。再試行のたびに評価し直す）\n認可の前提検査（ゲームの一致、資格の種別）
 X -> DB : 冪等記録を照合（同じキー・対象・操作者）
 alt 記録あり、要求のダイジェスト（本文・対象・操作者）が同じ
   X --> R : 保存した成功の応答をそのまま返す
@@ -265,9 +281,10 @@ suspend fun <S, C, E> Ports.execute(
     withAppendRetry(ctx.maxAttempts) {
         events.transaction { tx ->
             either {
-                // 順序: 認証（ルートで済み）-> 認可の前提検査 -> 冪等記録の照合 -> 読み込み -> decide -> 追記・投影
+                // 順序: ロック -> 認証 -> 認可の前提検査 -> 冪等記録の照合 -> 読み込み -> decide -> 追記・投影
+                // （B1 の実装: 認証は execute の中。ADR-004 の順序を、再試行のたびに、同じトランザクションの中で守るため）
                 lock.acquireShared(tx, stream.gameId).bind()                  // 再構築との直列化（ポート。待ちの上限超過は RetryExhausted）
-                ctx.authorizePrecheck(tx).bind()                              // 資格の有効性、ゲームの一致。無効なら Unauthorized（403）
+                ctx.authorizePrecheck(tx).bind()                              // 認証（資格の有効性）と、ゲームの一致。無効なら Unauthorized（403）
                 side.findIdempotent(tx, ctx.key).mapLeft(AppFailure::Persistence).bind()
                     ?.let { return@either ctx.replayStored(it).bind() }       // 成功の応答だけが保存されている。digest（本文・対象・操作者）が違えば IdempotencyKeyReused
                 val read = events.read(tx, stream.gameId, stream.type).bind()
@@ -302,8 +319,8 @@ tailrec suspend fun <A> withAppendRetry(
 要点は次のとおりです。
 
 - **`execute` はストリームの種類に依存しません。** `GameState` と `SessionState` の違いは、渡す `initial`、`evolve`、`decide` だけです。ルートが「どのコマンドをどのストリームへ流すか」の表を持ちます（下の API の表）。
-- **`StartGame` だけ**は、`game` と `session` の両ストリームを読み、`startGame` の結果を、両方の期待する版を持って 1 回の追記で書く別の関数（`executeStart`）にします（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md) の複数ストリームのコマンド）。
-- **処理の順は固定**です。認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影。認可を冪等記録の照合より**先**に置くため、入れ替えで失効した旧担当者が過去のキーを再送しても 403 になり、保存済みの応答（参加・復帰では資格の生の値）は返りません。
+- **`StartGame` だけ**は、`game` と `session` の両ストリームを読み、`startGame` の結果を、両方の期待する版を持って 1 回の追記で書く別の関数（B1 の実装では `applyStart`。1 本のストリームは `applySingle`）にします（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md) の複数ストリームのコマンド）。
+- **処理の順は固定**です。ロック（共有）→ 認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → 追記・投影 → 周辺ストア → 通知 → 冪等記録の保存。**認証は `execute`（B1 の実装では `runCommand`）の中で、同じトランザクションの中で行います**（ルートは生の資格を渡すだけで、`Actor` を作らない。コマンドの `actor` は、認証の結果から `execute` の中で作る）。ロックは認証より前に取り、`game_id` は呼び出し側が決めます。**参加（`joinGame`）だけ**は、参加コードからゲームを引く必要があるので、別の短いトランザクション（読み取りだけ）で参加コードの照合を先に行います。ポートの呼び出しの順は `ExecuteSpec` が固定します。認可を冪等記録の照合より**先**に置くため、入れ替えで失効した旧担当者が過去のキーを再送しても 403 になり、保存済みの応答（参加・復帰では資格の生の値）は返りません。
 - **冪等記録に保存するのは、成功した応答だけ**です。業務の失敗（`Left`）は保存せず、再送は同じ失敗を再計算して返します。保存する応答は `versions`（追記後の版）だけです（H8）。
 - 追記は **`decide` が空の列を返したときは行いません**（同じ役割への再割り当てなど）。冪等記録だけを書きます（このとき、同時の重複は `pk_idempotency_records` で検出します。下の冪等性の節）。
 - **自動確定のための特別な処理はありません。** `decideSession` が `DecisionSaved`（または `ProxyDecisionSubmitted`）と `WeekCommitted`（と `SessionEnded`）を 1 回の戻り値で返すため、`execute` から見ると、複数イベントの追記が 1 回あるだけです。手動と自動の確定が同時に起きても、2 回目は追記が版の違反となり、再試行後の `decide` が `WeekAdvanced` または `AlreadyEnded` を返します（確定は一度だけ）。
@@ -337,8 +354,8 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 | 照合の位置 | **認証と認可の前提検査の後**、読み込みの前。失効した資格が過去のキーを再送しても 403 で、保存済みの応答は返さない |
 | 保存する内容 | **成功した応答（`versions`）だけ**。業務の失敗（`Left`）は保存しない。再送は同じ失敗を再計算して返す |
 | 書き込み | 追記と同じトランザクション。検索は、認可の前提検査の直後（再試行のたびに行う） |
-| 同時の重複 | 同じキーの 2 つの要求が同時に来ても、追記の版の違反（`uq_events_stream_version`）で一方が負け、**再試行で記録を見つけて**同じ応答を返す。**空の列を返す操作**の同時の重複は、`pk_idempotency_records` の違反を、記録の再照合に写す（下の競合の再試行の表） |
-| ゲーム作成 | 新しい `game_id` を採り、`scope = 'create'` の部分一意索引（`uq_idempotency_create`）で重複を検出する。違反時は記録を再照合し、保存済みの応答を返す（500 にしない） |
+| 同時の重複 | 同じキーの 2 つの要求が同時に来ても、追記の版の違反（`uq_events_stream_version`）で一方が負け、**再試行で記録を見つけて**同じ応答を返す。**空の列を返す操作**の同時の重複は、`pk_idempotency_records` の違反を `ConcurrencyConflict` に写し、`execute` の再試行が `find` で記録を見つける（B1 の実装。PostgreSQL では一意違反の後のトランザクションが使えず、同じトランザクションで再照合できないため。下の競合の再試行の表。実 DB の並行での検証は未実施） |
+| ゲーム作成 | 新しい `game_id` を採り、`scope = 'create'` の部分一意索引（`uq_idempotency_create`）で重複を検出する。違反は同じく `ConcurrencyConflict` に写し、再試行で記録を見つけて保存済みの応答を返す（500 にしない） |
 | 応答 | 資格の生の値を含む操作（作成、参加、復帰）の応答は、鍵付きで暗号化して保存する。暗号化と復号は境界（`adapter-persistence`）が行い、鍵は Secrets Manager から注入する |
 | 掃除 | `expires_at` を過ぎた行を、定期のタスクで削除する（ゲームの保持削除とは別） |
 
@@ -349,12 +366,12 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 | 制約名 | 表 | 衝突の意味 | 扱い |
 | :--- | :--- | :--- | :--- |
 | `uq_events_stream_version` | `events` | 同じストリームへの同時の追記 | 読み直して `decide` からやり直す（`ConcurrencyConflict`、上限つき） |
-| `uq_idempotency_create` | `idempotency_records`（`scope='create'` の部分一意索引） | 同じキーのゲーム作成の同時の重複 | 記録を再照合し、保存済みの応答を返す（500 にしない） |
-| `pk_idempotency_records` | `idempotency_records` | 同じキー・同じ対象の同時の重複（空の列を返す操作を含む） | 記録を再照合し、本文の digest が同じなら保存済みの応答、違えば `app.idempotency_key_reused`（409） |
+| `uq_idempotency_create` | `idempotency_records`（`scope='create'` の部分一意索引） | 同じキーのゲーム作成の同時の重複 | `ConcurrencyConflict` に写し、`execute` の再試行で記録を見つけて、保存済みの応答を返す（500 にしない。B1 の実装） |
+| `pk_idempotency_records` | `idempotency_records` | 同じキー・同じ対象の同時の重複（空の列を返す操作を含む） | 同上。再試行の `find` が、本文の digest が同じなら保存済みの応答、違えば `app.idempotency_key_reused`（409）を返す |
 
 上の 3 つ以外の一意制約違反は、設計上起きないはずなので、**500 と相関 ID（ログ）**とします。
 
-**H2 版（ローカルのみ）では、`uq_idempotency_create`（部分一意索引）を省略します**（H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため）。代わりに、アプリケーション側で、挿入の前に `(scope, key_digest)` を検索して再照合します。ローカルでは、ゲーム作成の同時の重複は制約で守られません（[データモデル](./data-model.md)）。
+**H2 版（ローカルのみ）では、`uq_idempotency_create`（部分一意索引）を省略します**（H2 の PostgreSQL モードで使えることを公式ドキュメントで確認できなかったため）。代わりに、アプリケーション側で、挿入の前に `(scope, key_digest)` を検索し、重複が見つかれば `ConcurrencyConflict` を返します（B1 の実装。同じ契約の試験が両方で通った）。ローカルでは、ゲーム作成の同時の重複は制約で守られません（[データモデル](./data-model.md)）。
 
 | 種類 | 発生源 | 扱い |
 | :--- | :--- | :--- |
@@ -368,7 +385,7 @@ fun peripheralWrites(command: GameCommand, issued: IssuedCredentials, events: Li
 
 ### 永続化の境界
 
-JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version` は `AppFailure.ConcurrencyConflict`、`uq_idempotency_create` と `pk_idempotency_records` は冪等記録の再照合、それ以外は `AppFailure.Persistence`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `AppFailure.ConcurrencyConflict` に写し、同じ再試行の対象にします。アドバイザリロックの待ちが `lock_timeout` を超えたとき（SQLSTATE 55P03）は `AppFailure.RetryExhausted` に写します（これらの写像は PostgreSQL 版のアダプターのもの。H2 版は、SQLSTATE と制約名の取り出しを B1 の最初に実測して確定する。未確認）。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `Persistence` に変えない）。
+JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込め、例外は `Either.catch` で `PersistenceFailure` に変換します（[ガイド §7.6](../../reference/関数型プログラミングガイド_Kotlin編.md)）。一意制約の違反（SQLSTATE `23505`）は、**制約の名前**で見分けます。`uq_events_stream_version`・`uq_idempotency_create`・`pk_idempotency_records` は `AppFailure.ConcurrencyConflict`（冪等記録の重複は、再試行の `find` が見つける）、それ以外は `AppFailure.Persistence`（500 と相関 ID）です（上の表）。SQLSTATE 40001 と 40P01 も `AppFailure.ConcurrencyConflict` に写し、同じ再試行の対象にします。アドバイザリロックの待ちが `lock_timeout` を超えたとき（SQLSTATE 55P03）は `AppFailure.RetryExhausted` に写します（これらの写像は PostgreSQL 版のアダプターのもの。**H2 版は B1 で実測して確定した**: PostgreSQL は `PSQLException.serverErrorMessage.constraint`（部分一意索引も索引名で取れる）、H2 は専用のフィールドが無く、メッセージに制約名が含まれる（`DATABASE_TO_LOWER=TRUE` では小文字）ので、大文字小文字を区別せず探す。**H2 のメッセージには行の値（`VALUES (...)`）も含まれるため、`PersistenceFailure` にメッセージを載せない**（SQLSTATE と制約名だけ。PostgreSQL も詳細を除く主メッセージだけ）。詳細は [データモデル](./data-model.md) のローカル開発）。キャンセルの扱いは、`EventStore.transaction` の意味論に従います（`CancellationException` を `Persistence` に変えない）。
 
 ## 問い合わせ側
 
@@ -422,7 +439,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 
 - コマンドの**応答**は、`{ versions: { game, session } }`（追記後のストリームごとの版）だけを返します。画面の表示は応答から作りません（下の「応答とスナップショット」）。
 
-- 認証は、Cookie（`HttpOnly`、`Secure`、`SameSite=Strict`）の資格。**資格には有効期限と失効があり、鍵は版を持つ。**
+- 認証は、Cookie（`HttpOnly`、`Secure`、`SameSite=Strict`）の資格。**資格には有効期限と失効があり、鍵は版を持つ。** B1 の実装: Cookie の名前は `bg_session`（`HttpOnly`、`SameSite=Strict`、`Path=/`、`Max-Age`。**`Secure` は HTTPS の環境だけ**）。`Max-Age` は、B1 では進行役も参加者も 30 日（参加者の資格の期限。進行役の保持日数 90 日より短い。復帰が無い B1 は、ブラウザセッションと復帰資格を 1 つの値で兼ねた。B5 で別のダイジェストに分け、セッションを 24 時間にする想定）。
 - 変更系は、Origin（または Referer）を検査する。セキュリティヘッダー（CSP、HSTS、`nosniff`、Referrer-Policy）をすべての応答に付ける。
 - すべての応答に `x-correlation-id` を付ける。
 
@@ -433,7 +450,8 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 区分 | エンドポイントの例 | コマンド（ストリーム） | 認可 |
 | :--- | :--- | :--- | :--- |
 | ゲーム | `POST /games` | `CreateGame`（`game`） | 誰でも可 |
-| | `GET /games/:id/lobby` | （問い合わせ。`lobby_*`） | 進行役、参加者 |
+| | `GET /games/:id/lobby` | （問い合わせ。`lobby_*`） | 進行役、参加者（**B1 の実装は進行役だけ**。参加者向けのロビーは、投影の型に項目が無く未実装で、参加者には 403。未決事項） |
+| | `GET /games/:id/state` | （問い合わせ。呼び出した人ごとの投影。**B1 の実装で追加**） | 進行役（準備中の参加コード・ロビー・開始後の全役割）、参加者（自分の役割と `participantId`）。無資格・別のゲームは 403。`sessionId` は `gameId` と同じ（ドメインモデル） |
 | | `PUT /games/:id/participants/:pid/role` | `AssignRole`（`game`） | 進行役 |
 | | `DELETE /games/:id/participants/:pid/role` | `UnassignRole`（`game`） | 進行役 |
 | 参加 | `POST /participations/join` | `JoinGame`（`game`） | 参加コード |
@@ -452,7 +470,9 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 学習 | `GET /games/:id/{observation,review}`、`GET /games/:id/exports` | （問い合わせ。出力は要求時に `buildExport` で生成） | 観察は参加者・進行役・観察者、振り返りと出力は終了後 |
 | 資格 | `POST /games/:id/credentials/revoke`、`POST …/reissue` | `RevokeCredential`、`ReissueCredential`（`game`） | 進行役 |
 | 保持 | `GET /games/:id/retention`、`POST …/retry` | （問い合わせ。`retry` は保持の手続きへ） | 進行役 |
-| 運用 | `GET /health`、`GET /ready` | — | なし |
+| 運用 | `GET /health`、`GET /ready` | — | なし。**B1 の実装は `/api/v1` の配下**（`/api/v1/health`、`/api/v1/ready`。OpenAPI の servers のとおり）。負荷分散のヘルスチェックのパスの設定が要る（[インフラストラクチャ](./architecture-infrastructure.md)） |
+
+**B1 の実装で確定した、経路の補足（2026-11-14）。** (1) `SaveDecision` の `role` は本文に持たせず、**認証つきの `snapshot` で参加者の役割を引いてから** `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) `GET /sessions/:id/state` の `?role=`（他の役割の取得。AC2.1.2）は、自分の役割と違えば `game.forbidden`（HTTP では `app.unauthorized`）。(3) `POST /games` の応答は `versions` だけで、ゲームの ID は `Location`（`/api/v1/games/{id}/state`）、資格は `Set-Cookie`。参加の応答は `versions` だけで、`gameId` を含まない（**参加者が、参加後に `gameId` を知る手段が無い。未決事項**）。(4) 作成の入力は `finalWeek` と `demand` を必須とし、`retentionDays` は未指定で 90。(5) `UnassignRole`（`DELETE …/role`）は B1 に実装していない。
 
 beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしていました。本書は、**開始が 2 つのストリームにまたがる**ため、ゲームの資源として `POST /games/:id/start` にします（beer-game2 からの変更。API の表を持つ他文書への影響として、呼び出し元で確認してください）。
 
@@ -463,9 +483,9 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 
 | 分類（[ドメインモデル](./domain-model.md)） | HTTP | 備考 |
 | :--- | :--- | :--- |
-| `Forbidden` | 403 | 無効な資格と、権限の不足は、同じ形で返す（列挙の防止）。招待コードの失効・期限切れ・不明は区別せず、同じ `game.invitation_invalid` を返す |
+| `Forbidden` | 403 | 無効な資格と、権限の不足は、同じ形（`app.unauthorized`）で返す（列挙の防止）。**参加コードの不明・形式不正だけ**は、別の `code` `game.invitation_invalid`（同じ本文）。B1 の実装では、業務の権限不足（`game.forbidden`・`session.forbidden`）も `app.unauthorized` の本文にする（資格の失敗と区別しない）。招待コードの失効・期限切れ・不明は区別せず（B9）、同じ `game.invitation_invalid` を返す |
 | `NotFound` | 404 | 存在を明かしてはならない対象は、`403` と同じ応答にする |
-| `InvalidState` | 409 | 現在の状態を `detail` に示す |
+| `InvalidState` | 409 | 現在の状態を `detail` に示す。**受付終了（開始済み）後の参加は 409 `game.not_preparing`**（B1 の実装。AC1.2.2 が理由を示すため） |
 | `Conflict` | 409 | `DecisionConflict`（`session.decision_conflict`）は、最新値と最後の保存者を本文に含める。`WeekAdvanced`（`session.week_advanced`）は、週が進んでいることを示す。`DecisionsChanged`（`session.decisions_changed`）は、現在の値と保存者を含める |
 | `RuleViolation` | 422 | `StartConditionNotMet` は不足する役割を、`IncompleteDecisions` は不足する役割を示す |
 | `ValidationError` | 422 | 複数の誤りを配列で返す |
@@ -473,7 +493,8 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 | `AppFailure.RetryExhausted` | 503 | `app.retry_exhausted`。**`Retry-After` ヘッダーを付ける**。再試行の上限、または再構築のロックの待ちの上限を超えたとき |
 | `AppFailure.Persistence` | 500 | `type` は持つ（`/problems/app.internal`）。利用者へは相関 ID だけを返す |
 | `AppFailure.Unauthorized` | 403 | `app.unauthorized`。失効・期限切れ・不明を区別しない |
-| `AppFailure.Invalid` | 422、400 | 項目ごとの誤り（下記）。構文エラーは 400 |
+| `AppFailure.Invalid` | 422、400 | 項目ごとの誤り（下記）。構文エラーは 400。`code` は `validation.invalid_input` |
+| HTTP の層の失敗（B1 の実装で追加） | 400、404、405、413、429、503 | `request.not_found`（経路なし）、`request.method_not_allowed`、`request.too_large`（本文 64 KB 超）、`app.rate_limited`（429、`Retry-After`）、`app.not_ready`（`/ready` が失敗したときの 503。**バックエンド自身の 503 は `type` を持つ規則に合わせ、problem+json（`/problems/app.not_ready`、`checks`）**）。名前は仮置き（HTTP の層の `code`） |
 
 **アプリケーション層の失敗にも、安定した `code` を与えます。** 画面は、`type` が `/problems/app.retry_exhausted` のときだけ「もう一度お試しください」を出します（利用者が操作し直したら、新しい冪等キーを使う）。`type` を持たない 5xx（負荷分散装置の 503 など）、タイムアウト、切断は「結果が不明」として、**同じキーで再送**します（新しいキーで再送すると、ゲーム作成などが二重になる）。この区別を成り立たせるため、**バックエンド自身が返す 503 は、必ず `type` を持ちます**（[フロントエンド](./architecture-frontend.md)）。
 
@@ -481,7 +502,7 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 
 `StaleVersion` は廃止しました。`CommitWeek` の判定の順は、「週が違う → `WeekAdvanced`」「週が同じで `basis` が現在の各役割の意思決定の版と違う → `DecisionsChanged`」です（共同担当が保存し直しただけで「すでに確定されています」と出る誤りを避けます）。
 
-エラーの識別子は、**`code` を 1 つ**に決めます。小文字のドット区切り `<領域>.<名前>`（例: `session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`、アプリ層は `app.retry_exhausted`、`app.idempotency_key_reused`、`app.unauthorized`、`app.internal`）です。失効・期限切れ・不明を区別する識別子（`invitation-expired` など）は**使いません**。どの資格の失敗かの文言は、画面が「自分が送った資格の種類」から選びます（[フロントエンド](./architecture-frontend.md)）。`problem+json` の `type` は `/problems/{code}`（相対 URI）、拡張メンバー `code` に同じ値を載せます。フロントエンドの辞書の鍵は `code` で、OpenAPI の契約にも載せます（[フロントエンド](./architecture-frontend.md)）。辞書の正本は [UI 設計](./ui-design.md) の「code 列つきの表」です。各 `DomainError` の `code` と分類は [ドメインモデル](./domain-model.md) が持ちます。
+エラーの識別子は、**`code` を 1 つ**に決めます。小文字のドット区切り `<領域>.<名前>`（例: `session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`、アプリ層は `app.retry_exhausted`、`app.idempotency_key_reused`、`app.unauthorized`、`app.internal`、`app.not_ready`、`app.rate_limited`、入力検証は `validation.invalid_input`、HTTP の層は `request.not_found`・`request.method_not_allowed`・`request.too_large`）です。失効・期限切れ・不明を区別する識別子（`invitation-expired` など）は**使いません**。どの資格の失敗かの文言は、画面が「自分が送った資格の種類」から選びます（[フロントエンド](./architecture-frontend.md)）。`problem+json` の `type` は `/problems/{code}`（相対 URI）、拡張メンバー `code` に同じ値を載せます。フロントエンドの辞書の鍵は `code` で、OpenAPI の契約にも載せます（[フロントエンド](./architecture-frontend.md)）。辞書の正本は [UI 設計](./ui-design.md) の「code 列つきの表」です。各 `DomainError` の `code` と分類は [ドメインモデル](./domain-model.md) が持ちます。
 
 ### 応答とスナップショット
 
@@ -576,9 +597,9 @@ beer-game2 の設計を引き継ぎ、Kotlin 版での実現方法を加えま�
 
 | 項目 | 設計 |
 | :--- | :--- |
-| 資格 | 256 ビットの乱数（`SecureRandom`）。保存はダイジェスト（HMAC-SHA256 を想定。方式は確定時に ADR）と**鍵の版**。鍵は複数の版を同時に持つ（`KeyRing`）。**本番では鍵の設定を必須にし、未設定なら起動に失敗する**（`AppConfig.load` が `Either` で全項目の誤りを集め、失敗なら終了する。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| 資格 | 256 ビットの乱数（`SecureRandom`）。保存はダイジェスト（**B1 の実装は鍵付き HMAC-SHA256、鍵の版は 1**。冪等キーの digest とは別の鍵で、部分の並びも違う。ADR は B2 で確認）と**鍵の版**。鍵は複数の版を同時に持つ（`KeyRing`）。**本番では鍵の設定を必須にし、未設定なら起動に失敗する**（`AppConfig.load` が `Either` で全項目の誤りを集め、失敗なら終了する。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | 有効期限と失効 | 進行役の資格、復帰資格、観察用の招待、ブラウザセッションのすべてが、有効期限と失効を持つ。判定は純粋関数 `CredentialValidity.status(now)` |
-| 認証と認可 | 認証は Ktor のプラグインで Cookie から `Actor` を決める（`credentials` / `browser_sessions` を引く）。**認可はドメインの `decide` が行う**（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる |
+| 認証と認可 | 認証は、Cookie の生の値から `Actor` を決める（`credentials` / `browser_sessions` を引く）。**B1 の実装では、Ktor のプラグインでなく `application` の `execute` の中（トランザクションの中）で行う**（ルートは生の資格を `RequestMeta.credential` に入れて渡す）。ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功し、不明・失効・期限切れを区別しない（`app.unauthorized`）。**認可はドメインの `decide` が行う**（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる |
 | 入力 | DTO のスキーマと、スマートコンストラクタの範囲検査。本文のサイズ上限と数量の上限を設ける |
 | レート制限 | 全体に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8） |
 | ヘッダー | CSP、HSTS、`nosniff`、Referrer-Policy を、すべての応答に付ける（Ktor のプラグインまたは自前のインターセプタ）。CloudFront のレスポンスヘッダーポリシーとの二重化は許容する |
@@ -626,7 +647,9 @@ fun validateDbKind(env: AppEnv?, kind: DbKind): Either<ConfigError, DbKind> = wh
 
 **乖離のリスクと対策。** ローカルで通っても、CI で落ちる乖離が起きえます。(a) **H2 でしか通らない記述を禁止**する（PostgreSQL の統合テストが正。H2 のために共通の DDL や SQL を曲げず、通らない文は方言ごとの場所へ分ける）。(b) **ポートの契約テストを両実装で実行**する（PostgreSQL 版は統合テスト、H2 版はユニットテスト）。(c) **受け入れ（Cucumber の `@api`）は PostgreSQL で実行**する。
 
-**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**（「非対応」と断定するものではありません）。実際の動作は、**B1 の最初に実測して確定します（未確認）**。H2 の版は実装開始時に確認します。
+**確認できた事実と、できなかった事実。** 2026-11-14 に H2 の公式ドキュメント（[features](https://h2database.com/html/features.html) の PostgreSQL 互換モード）を確認した範囲では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロールと GRANT、JSONB、SQLSTATE、分離レベルの差異は、**ドキュメントで確認できませんでした**。**B1 の Step 1・7 で実測して確定しました**（H2 2.5.252、`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`）。結果は [データモデル](./data-model.md) のローカル開発の方言の差分の表が正本です。要点: アドバイザリロック、`LISTEN`/`NOTIFY`、部分一意索引、`GRANT TRUNCATE` は動かない（上のポートと省略で置き換え）。`jsonb` は挙動が違う（書き込みは方言ごとに分ける）。共通のマイグレーション V001〜V005 は、H2 にそのまま適用できた（`${json_type}` のプレースホルダだけで方言を切り替え）。H2 専用のマイグレーションは不要。H2 での性能・分離レベルの動作の同一性は未確認です。
+
+**B1 の実装で確定した、設定の補足。** `AppConfig` / `ServerConfig` は、誤りを集めて返し、`local` 以外では鍵（`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`。Base64 の 32 バイトで、3 つは別の値）を必須にします。`DB_KIND` は未設定なら `postgres`、`h2` の大文字小文字は区別しません。`DB_KIND=postgres` でも JDBC の URL が `jdbc:h2:` なら、`local` 以外を拒否します。終了コードは 0・64・70・78（設定の誤りは 78）。環境変数の名前（鍵、`DB_URL`・`DB_USER`・`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）は B1 の提案で、[インフラストラクチャ](./architecture-infrastructure.md) の正本と未照合です。マイグレーションは、H2（local）の起動時に自動で適用し、PostgreSQL の `api` は適用しません（`migrate` モード）。`retention`・`rebuild-projections` のモードは B11・B12 で、未実装です。
 
 ## モジュール構成と依存の検査
 
@@ -640,10 +663,11 @@ apps/beer-game-kotlin/
 ├── adapter-http/                     （Ktor のルート、検証、認証、SSE、エラーの写像）
 │   └── src/main/kotlin/.../{routes,security,sse,problem}/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
-│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。common/001〜006、postgres/101〜、h2/201〜。配置は B1 で確定。導入は承認待ち）
+│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`**。V101 は DB ロール用に空け、006（保持）は B11。h2/ は作らない）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
 ├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
-├── ui/                               （フロントエンド。別のパッケージとして扱う）
+├── ui/                               （フロントエンド。別のパッケージとして扱う。**B1 の実装の場所は `web/`**）
+├── features/                         （日本語 Gherkin。B1 で追加。両処理系が参照する）
 └── infra/                            （Terraform）
 ```
 
@@ -655,7 +679,9 @@ apps/beer-game-kotlin/
 | 静的解析 | detekt（複雑度、潜在的なバグ、例外の握りつぶし）、ktlint（整形。`.editorconfig` で調整。[ガイド §9.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。コンパイラの警告をエラーにする | CI が失敗 |
 | 契約 | OpenAPI と実装の一致を、契約テストで確認する（[フロントエンド](./architecture-frontend.md)） | CI が失敗 |
 
-ツールの版と、採用する Kotlin の版との互換性は、実装開始時に確認します（未決事項。detekt の安定版が採用する Kotlin の版に対応しているかの確認を含む）。
+ツールの版と、採用する Kotlin の版との互換性は、B1 で確認しました（2026-11-14）。**detekt 1.23.8 は JDK 25 で動きません**（`Execution failed for task ':domain:detekt'` / `java.lang.IllegalArgumentException: 25.0.2`。同梱の Kotlin コンパイラの `JavaVersion.parse`。既定の `--jvm-target` も 22 までしか受け付けない）。回避として `jvmTarget = "22"` を指定し、**JDK 22 以下で動かしたときだけ detekt を有効にします**（JDK 25 では無効にして警告）。CI は detekt を JDK 21 の専用ジョブで実行します。JDK 21 上では、Kotlin 2.4.21 のドメインとテストのコードの解析に成功し、違反は 0 件です。JDK 25 での代替（detekt 2 alpha、ktlint のカスタムルール、PMD の拡充）は B2 で判断します（B2 の受入条件「detekt が Kotlin 2.4 を解析できる」は、JDK 21 上では確認済み）。detekt 1.23.8 は、Kotlin 2.4 でビルドされたライブラリの `suspend` の呼び出しを検出できず、`RedundantSuspendModifier` が誤検知します（原因は未調査）。`@Suppress`・設定の緩和は使わず、ライブラリの suspend を呼ぶだけの関数を非 `suspend` のブロッキング関数にする、または `suspend` の関数型の値にして回避しました。`ForbiddenMethodCall`（`domain` の時計・乱数・UUID の禁止）は JDK 21 上で動きます（`mutableListOf` はインライン関数のため検出されず、可変コレクションの禁止は PMD の `NoMutableCollectionFactory` に任せる。B2）。厳格な適用（PMD の 14 ルール、fixture、ベースラインなし）は B2 です。
+
+B1 の実装のパッケージは、設計のサブパッケージ（`{shared,game,session,…}`）に分けず、各モジュールの 1 つのパッケージにまとめています（`beergame.domain`、`beergame.application`、`beergame.http`、`beergame.persistence`）。ファイルの単位（`Game.kt`、`Session.kt`、`SimulateWeek.kt` など）で分けています。Flyway は `common/V001〜V005`、`postgres/V102`（部分一意索引 `uq_idempotency_create`）で、V101（DB ロールと GRANT）は B2 のために空けています。H2 専用のマイグレーション（201〜）は作りません。
 
 ## 品質属性への対応
 
@@ -703,6 +729,17 @@ apps/beer-game-kotlin/
 | 25 | PostgreSQL 固有の機能（アドバイザリロック、`pg_notify`）を直接使う | ポート `ProjectionLock`・`ChangeNotifier` の裏に隠し、PostgreSQL 版と H2 版の 2 実装。契約テストは両実装で実行 | ローカル開発に H2 を使えるようにする（ユーザーの決定、2026-11-14。ADR-014） |
 | 26 | データベースは PostgreSQL だけ。実行の選択の設定なし | `DB_KIND=postgres\|h2`（`APP_ENV` と合わせて）。H2 は `APP_ENV=local` のときだけ許し、それ以外は起動に失敗する | 本番・ステージングで H2 が選ばれないようにする |
 | 27 | DB のロール、追記専用、部分一意索引は常に効く | PostgreSQL の統合テストでだけ検証。H2 版（ローカル）では省略し、守られない | H2 で確認できない機能の扱い |
+| 28（以降は B1 の実装で変わった点。左は設計書の初稿） | `TransactionRunner` は `fun interface`（B1 の設計時） | 通常の `interface`（2026-11-14、B1） | 総称のメソッドは `fun interface` にできない（コンパイルエラーを確認） |
+| 29 | `EventStore.append` は `Either<AppFailure, Unit>` | 追記後の封筒の列 `List<EventEnvelope<DomainEvent>>` を返す（2026-11-14、B1） | 同期投影が版つきの封筒を要する |
+| 30 | `SideStores`（`project`・`writePeripheral`・`findIdempotent`・`saveIdempotent`）。`Ports` は 8 項目 | `ProjectionWriter`・`IdempotencyStore(find, save(now))`・`PeripheralStore` に分け、`Ports` は `Generators`・`Stores`・`lock`・`notifier`・`settings` の 5 項目に束ねる（2026-11-14、B1）。`PeripheralWrite` は設計どおりの純粋な導出 | detekt の引数の数の規則を、設定を緩めずに守る。期限切れの置き換えのため `save` が時刻を受け取る |
+| 31 | 認証は、ルートで済み（Ktor のプラグイン）、`execute` へ `Actor` を渡す | `execute` の中（トランザクションの中、ロックの後）で認証し、再試行のたびに評価し直す。ルートは生の資格を渡す。参加だけは参加コードの照合を先に別の読み取りで行う（2026-11-14、B1） | ADR-004 の順序（認証 → 認可の前提検査 → 冪等記録の照合）を、同じトランザクションの中で守る |
+| 32 | `CommandOutcome(versions)` | `CommandOutcome(gameId, versions, issued?)`。`Versions` は追記したストリームだけ（追記しなければ null）。HTTP が応答に載せるのは `versions` だけ（2026-11-14、B1） | 作成の再送が同じゲームと同じ資格を返す |
+| 33 | 冪等記録の重複は、同じトランザクションで再照合する | `ConcurrencyConflict` に写し、`execute` の再試行の `find` で見つける。H2 版は挿入前の検索で `ConcurrencyConflict`（2026-11-14、B1） | PostgreSQL は、一意違反の後のトランザクションが使えない |
+| 34 | 受付終了後の参加は、無効な参加コードと同じ 403 | 409 `game.not_preparing`。参加コードの不明・形式不正は 403 `game.invitation_invalid`（2026-11-14、B1） | AC1.2.2 は受付終了の理由を示す |
+| 35 | `GET /games/:id/state` は無い | 進行役・参加者ごとの投影を返す入口を追加。`GET /games/:id/lobby` は B1 では進行役だけ（2026-11-14、B1） | 開始後に、画面が `sessionId` と状態を得る経路が要る |
+| 36 | `/health`・`/ready` はルート直下を想定 | `/api/v1` の配下。`/ready` の 503 は problem+json（`app.not_ready`）。413（`request.too_large`）・429（`app.rate_limited`）を追加（2026-11-14、B1） | OpenAPI の servers に合わせる。バックエンド自身の 503 は `type` を持つ規則 |
+| 37 | `Disclosure` は `domain` | `application`（2026-11-14、B1） | [ドメインモデル](./domain-model.md) 変更 #29 |
+| 38 | detekt・PMD で関数型の規約を CI で検査（JDK 25 を想定） | detekt 1.23.8 は JDK 25 で動かず、JDK 21 の専用ジョブで実行する。厳格な適用（PMD）は B2（2026-11-14、B1） | detekt 1.23.8 が `jvmTarget` 22 までしか受け付けない |
 
 ## 設計判断
 
@@ -826,11 +863,25 @@ apps/beer-game-kotlin/
 - レート制限の状態を共有する方法（BD8）。
 - `ktor-server-sse`、レート制限、`CallId` の各プラグインの、採用する版での API の確認（実装開始時）。
 - 通知の受信の接続（`LISTEN`）が、接続プーラーやプロキシを前段に置いた場合に動くか（本設計では置かない前提）。
-- detekt と ktlint の、採用する Kotlin の版への対応の確認。detekt の安定版が対応していない場合の代替（PMD のカスタムルール、または detekt の次の版の採用判断）。
-- 資格のダイジェストの方式（HMAC の方式と鍵の導出）と、応答の暗号化の方式（ADR にする）。
+- detekt と ktlint の、採用する Kotlin の版への対応の確認。**B1 の結果: ktlint 1.8.0 は動く。detekt 1.23.8 は JDK 25 で動かず、JDK 21 で動く。** JDK 25 での代替（PMD のカスタムルール、detekt の次の版の採用判断、ktlint のカスタムルール）は B2 で判断する。`RedundantSuspendModifier` の誤検知の原因は未調査。
+- 資格のダイジェストの方式（HMAC の方式と鍵の導出）と、応答の暗号化の方式（ADR にする）。**B1 の実装は、資格が鍵付き HMAC-SHA256（鍵の版 1）、冪等記録の応答が AES-256-GCM。ADR は未作成。**
+
+**B1 の実装で出た未決（2026-11-14。人の判断が要る）:**
+
+- **参加者が、参加後に `gameId` を知る手段が無い。** 参加の応答は `versions` だけで、`gameId` も `Location` も返さない。参加者の画面が、ロビー・プレイの画面へ進めない。対応案は、参加の応答に `gameId`（と `Location`）を足すこと（バックエンドと仕様の変更。決めるまで、API は変えない）。
+- **参加者向けのロビー**（`GET /games/:id/lobby` の参加者への開放）。投影の型に項目が無く、B1 は進行役だけ。
+- **レート制限の値と範囲。** 接続元（`remoteHost`）ごとの固定窓、既定 600 件/分は**根拠なし（未計測）**の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5。
+- **競合の再試行の上限 `maxAttempts`**は 5 を仮置き（`AppSettings` に既定を置かず、`COMMAND_MAX_ATTEMPTS` で注入。未計測）。競合の再試行の遅延は無し。`lock_timeout` の既定 5 秒も仮置き。
+- **Origin の検査。** 許可リスト（`ALLOWED_ORIGINS`。`local` 以外は必須）か、Host と同じ権限。Origin も Referer も無い要求は許す（ブラウザの外のクライアントのため）。拒否は `app.unauthorized`（専用の `code` は置かなかった）。Vite の開発用の中継は Host と Origin が一致しないため、`ALLOWED_ORIGINS` の指定が要る（開発手順書への反映は未実施）。
+- **ログ。** `LogRecord` は項目の許可リスト（試験で固定）。`message` はコードの固定文だけ。予期しない例外はクラス名とスタックの各行を記録し、**メッセージは書かない**（接続文字列などが入りうる）。CloudWatch での収集、EMF のメトリクスは未確認・未実装。
+- **`Persistence.open` のブロッキング**（PostgreSQL では最初の LISTEN まで最大 10 秒。起動時に 1 回）が、Ktor の起動で問題にならないかは未確認。
+- **本番の ECS のイメージに H2 を含めない案**は未実施（H2 は `adapter-persistence` の `runtimeOnly`）。
+- **実 DB の並行の検証。** `uq_idempotency_create`・`pk_idempotency_records` の同時の重複、`projection_checkpoints` と行の同時点の読み取り（REPEATABLE READ）は、直列の実行で確かめた範囲。**`LISTEN` の切断中の欠落を補う照合、冪等記録の掃除の定期タスク、投影の整合性の検査は未実装。**
+- **ロビーの並び**（同じ時刻なら参加者 ID の順）と、参加コードの重複（`uq_game_join_codes_code`、12 文字の乱数なので再試行しない）。
+- **`session_overview.week` が最終週 + 1 になる**（最終週が 50 未満のゲームが最終週を確定すると。[データモデル](./data-model.md) の未決事項）。
 - 設定の上限（数量、遅延、本文のサイズ）の値と、検査の方法（beer-game2 から継続）。
 - `events` に UPDATE / DELETE を与えないロールでも、連鎖削除が動くことの確認（[データモデル](./data-model.md) から継続）。
-- **H2 の PostgreSQL モードで動く範囲の実測（B1 の最初）**: 共通の DDL、`jsonb` 相当の型、制約名の取り出し、SQLSTATE、分離レベル、`ON DELETE CASCADE`、部分インデックスの可否。結果で、H2 版の省略の一覧とマイグレーションの配置を確定する（[データモデル](./data-model.md)）。H2 の版の確認と `com.h2database:h2` の導入は承認待ち。
+- **H2 の PostgreSQL モードで動く範囲の実測: B1 で完了**（Step 1・7。結果と配置は [データモデル](./data-model.md)）。残りは、H2 での性能・分離レベルの動作の同一性（未確認）。`com.h2database:h2` の導入の承認は、B1 の Gate 2 の記録を参照。
 - `APP_ENV`・`DB_KIND` の名前と、ステージング・本番の配備での固定の方法、本番のイメージに H2 のドライバを含めない構成（[インフラストラクチャ](./architecture-infrastructure.md)、[技術スタック](./tech-stack.md) の担当と整合する）。
 
 ## 出典

@@ -64,5 +64,6 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
 ## 備考
 
 - 著者: claude-code
+- **B1 の実装の結果（2026-11-14）**: 仮説（2 つの処理系から `features/` を 1 か所で参照できる）は成立した。Cucumber-JVM 8.0.4（`cucumber-junit-platform-engine` が JUnit 6.1.3 を要求するため、`acceptanceTest` は `test` のクラスパスを継承しない独立したソースセット）と Cucumber-JS 13.3.0 + Playwright 1.65.1。`@api` は 27 シナリオ・209 ステップが PostgreSQL 18.7 と H2 の両方で緑、`@ui` は 1 シナリオ・8 ステップが緑。Undefined・Pending は 0（Cucumber 8 は既定で厳格）。AC2.3.3・AC6.1.2 は Gherkin にせず Kotest と統合テストが担う。AC1.2.5 は原文と異なる（付け替え。人の確認が未決）。
 - 関連 ADR: [ADR-011](./011-strict-static-analysis.md)、[ADR-013](./013-tech-stack-versions.md)、[ADR-001](./001-kotlin-version-of-beer-game2.md)
 - 参照: [開発戦略（アウトサイドインの入口を BDD で定義する）](../../development/beer-game-kotlin/development_strategy.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[技術スタック（確認した重要な事項 18・19、新しく導入する依存関係）](../../design/beer-game-kotlin/tech-stack.md)、[リリース計画（B1、B2）](../../development/beer-game-kotlin/release_plan.md)、[BDD 導入ガイド](../../reference/BDD導入ガイド.md)
