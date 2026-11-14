@@ -204,6 +204,21 @@ nav:
           - ADR-011 ドメイン・TLS・ヘッダー: adr/beer-game2/011-cloudfront-domain-tls-headers.md
           - ADR-012 デリバリーと Terraform: adr/beer-game2/012-delivery-pipeline-and-terraform.md
           - ADR-013 技術スタックの版: adr/beer-game2/013-tech-stack-versions.md
+      - beer-game-kotlin:
+          - 概要: adr/beer-game-kotlin/index.md
+          - ADR-001: adr/beer-game-kotlin/001-kotlin-version-of-beer-game2.md
+          - ADR-002: adr/beer-game-kotlin/002-event-sourcing-and-cqrs.md
+          - ADR-003: adr/beer-game-kotlin/003-synchronous-projections.md
+          - ADR-004: adr/beer-game-kotlin/004-idempotency-after-authorization.md
+          - ADR-005: adr/beer-game-kotlin/005-optimistic-concurrency-and-advisory-lock.md
+          - ADR-006: adr/beer-game-kotlin/006-event-schema-evolution.md
+          - ADR-007: adr/beer-game-kotlin/007-functional-core-with-arrow.md
+          - ADR-008: adr/beer-game-kotlin/008-api-contract-and-error-codes.md
+          - ADR-009: adr/beer-game-kotlin/009-observer-access-control.md
+          - ADR-010: adr/beer-game-kotlin/010-retention-deletion-with-append-only.md
+          - ADR-011: adr/beer-game-kotlin/011-strict-static-analysis.md
+          - ADR-012: adr/beer-game-kotlin/012-gherkin-and-cucumber.md
+          - ADR-013: adr/beer-game-kotlin/013-tech-stack-versions.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:
