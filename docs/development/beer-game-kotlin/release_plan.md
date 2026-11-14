@@ -4,7 +4,7 @@ title: "リリース計画 - ビールゲームシミュレーション（Kotlin
 description: "beer-game2 の Kotlin 版のリリース計画。Intent、Unit、Bolt 計画（B1〜B15、予備 B16）、リリース 0.1 / 0.2 / 1.0、バッファ、リスク台帳、進捗管理。承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
 ---
 
 # リリース計画 - ビールゲームシミュレーション（Kotlin 版）
@@ -128,8 +128,8 @@ Bolt は、時間〜日単位の構築の単位です。各 Bolt は**確認し�
 
 | Bolt | Unit | ゴール | 確認したい仮説 | 完了条件（DoD の要点） | 所要 |
 | :---: | :--- | :--- | :--- | :--- | :---: |
-| B1 | U1 | **基盤と縦の最小（ES）**: **最初に、H2 の PostgreSQL モードの実測**（アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルのどれが動くか。結果を記録し、H2 版で置き換える・省略する制約を確定）。**ポート `ProjectionLock`・`ChangeNotifier` の PostgreSQL 版と H2 版、実行の選択（`DB_KIND`）と本番での H2 の拒否**。Gradle のマルチモジュール（domain・application・adapters）、**Cucumber の基盤（Cucumber-JVM の `@api` と Cucumber-JS + Playwright の `@ui`、フィーチャーファイルの配置、日本語 Gherkin の最初のシナリオ、タグ（ストーリー・受入条件の ID、`@api`/`@ui`、重要度）の文書化、生きたドキュメントの公開の最小の導線）**、`events`・`game_roots`・`idempotency_records`（Flyway 001）、`EventStore.append`（版の一意制約）、`decideGame`/`decideSession`/`simulateWeek` の最小、同期投影、Ktor API、React の最小。キット準拠のゲームを、作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで、ローカル（H2）と PostgreSQL の両方で通す（受け入れの正は PostgreSQL）。入口は、このウォーキングスケルトンの日本語 Gherkin のシナリオにする | 2 ストリームと `startGame` の原子的な追記は妥当か。Kotlin 2.4・JDK 25・Gradle・Ktor・Arrow の組み合わせは動くか。**Cucumber-JVM と Cucumber-JS の 2 つの処理系で、フィーチャーファイルを 1 か所から参照できるか。日本語 Gherkin のシナリオを、Undefined → Pending → Failing → Passing の順に回せるか**。AI の出力の質は、どの密度のゲートが要るか | ローカル（H2）で E2E が通り、PostgreSQL（Testcontainers）でも同じシナリオが通る（**Gherkin のシナリオが green。Undefined・Pending のステップがない**）。`simulateWeek` と `decide`/`evolve` のプロパティテスト。DB 統合（PostgreSQL。版・冪等・原子性）。ポートの契約テストが両実装で green。H2 の実測の記録がある。golden テスト。**タグの一覧と意味が文書化され、依存関係の導入の承認と版の確認の記録がある** | 4 日 |
-| B2 | U1 | **規約検査・CI・テスト基盤（Kotlin 固有）**: **静的解析の厳格な適用**（detekt を中心に、PMD の XPath の 14 個の関数型ルール（ガイド §9.6）を補完として導入。ktlint は `.editorconfig` で調整（日本語のテスト名など）。層ごとにルールセットを分ける。ドメインでの `Instant.now` ほかを `ForbiddenMethodCall` で禁止。**PMD のルールを、違反するコードとしないコードを並べた fixture で、使い始める前に期待件数と行を確かめ、そのテストを CI に組み込む**。違反 0 件・ベースラインなし・`@Suppress` なし）、Kover（`test` と `integrationTest` と受入の合算の確認）、Testcontainers、追記専用権限の否定テストと連鎖削除の Red（最初のスライド）、`InvalidTransition` の性質テスト、N-1 互換ジョブの雛形、Cucumber の CI への組み込みの確認（Undefined・Pending で失敗） | detekt 1.23.8 は Kotlin 2.4 を解析できるか（できなければ代替: detekt 2 alpha、PMD の XPath の拡充、ktlint のカスタムルール。選択は ADR）。**PMD は Kotlin 2.4 の構文を解析でき、fixture の期待件数（ガイドの例は PMD 7.29.0 で 17 件）と一致するか（使う版で実測する）。detekt と PMD は、Gradle で実行でき、層ごとのルールセットの分割と両立するか**。Kover は 2 つのソースセットを合算できるか。連鎖削除は、`events` に DELETE 権限が無いロールで動くか | **規約違反コードを 1 つ置くと CI が落ちる（detekt と PMD のそれぞれで確認）。PMD の fixture のテストが期待どおり。detekt・PMD が Kotlin 2.4 を解析できる。違反 0 件・ベースラインなし・`@Suppress` なしで全コードが緑。ktlint の `.editorconfig` の調整が実際の版で動く**。権限の否定テストが通る。CI で domain の行 100% のゲートが有効 | 3 日 |
+| B1 | U1 | **基盤と縦の最小（ES）**: **最初に、H2 の PostgreSQL モードの実測**（アドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルのどれが動くか。結果を記録し、H2 版で置き換える・省略する制約を確定）。**ポート `ProjectionLock`・`ChangeNotifier` の PostgreSQL 版と H2 版、実行の選択（`DB_KIND`）と本番での H2 の拒否**。Gradle のマルチモジュール（domain・application・adapters）、**Cucumber の基盤（Cucumber-JVM の `@api` と Cucumber-JS + Playwright の `@ui`、フィーチャーファイルの配置、日本語 Gherkin の最初のシナリオ、タグ（ストーリー・受入条件の ID、`@api`/`@ui`、重要度）の文書化、生きたドキュメントの公開の最小の導線）**、`events`・`game_roots`・`idempotency_records`（Flyway 001）、`EventStore.append`（版の一意制約）、`decideGame`/`decideSession`/`simulateWeek` の最小、同期投影、Ktor API、React の最小。キット準拠のゲームを、作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで、ローカル（H2）と PostgreSQL の両方で通す（受け入れの正は PostgreSQL）。**`contracts/openapi.yaml` に、ウォーキングスケルトンの経路の API の仕様を書く**（仕様が先）。入口は、このウォーキングスケルトンの日本語 Gherkin のシナリオにする | 2 ストリームと `startGame` の原子的な追記は妥当か。Kotlin 2.4・JDK 25・Gradle・Ktor・Arrow の組み合わせは動くか。**Cucumber-JVM と Cucumber-JS の 2 つの処理系で、フィーチャーファイルを 1 か所から参照できるか。日本語 Gherkin のシナリオを、Undefined → Pending → Failing → Passing の順に回せるか**。AI の出力の質は、どの密度のゲートが要るか | ローカル（H2）で E2E が通り、PostgreSQL（Testcontainers）でも同じシナリオが通る（**Gherkin のシナリオが green。Undefined・Pending のステップがない**）。`simulateWeek` と `decide`/`evolve` のプロパティテスト。DB 統合（PostgreSQL。版・冪等・原子性）。ポートの契約テストが両実装で green。H2 の実測の記録がある。golden テスト。**タグの一覧と意味が文書化され、依存関係の導入の承認と版の確認の記録がある**。`contracts/openapi.yaml` に、ウォーキングスケルトンの経路が書かれ、`@api` のシナリオと一致している | 4 日 |
+| B2 | U1 | **規約検査・CI・テスト基盤（Kotlin 固有）**: **静的解析の厳格な適用**（detekt を中心に、PMD の XPath の 14 個の関数型ルール（ガイド §9.6）を補完として導入。ktlint は `.editorconfig` で調整（日本語のテスト名など）。層ごとにルールセットを分ける。ドメインでの `Instant.now` ほかを `ForbiddenMethodCall` で禁止。**PMD のルールを、違反するコードとしないコードを並べた fixture で、使い始める前に期待件数と行を確かめ、そのテストを CI に組み込む**。違反 0 件・ベースラインなし・`@Suppress` なし）、Kover（`test` と `integrationTest` と受入の合算の確認）、Testcontainers、追記専用権限の否定テストと連鎖削除の Red（最初のスライド）、`InvalidTransition` の性質テスト、N-1 互換ジョブの雛形、Cucumber の CI への組み込みの確認（Undefined・Pending で失敗）、**API の契約テスト（仕様の検証、応答・リクエストの適合、`code` の一覧の一致、ルートの網羅、型の生成物の差分 0）と TypeScript の型の生成を CI に組み込む（仕様の検証 → 型の生成 → 型の検査 → テストの順）。道具の選定と導入の承認** | detekt 1.23.8 は Kotlin 2.4 を解析できるか（できなければ代替: detekt 2 alpha、PMD の XPath の拡充、ktlint のカスタムルール。選択は ADR）。**PMD は Kotlin 2.4 の構文を解析でき、fixture の期待件数（ガイドの例は PMD 7.29.0 で 17 件）と一致するか（使う版で実測する）。detekt と PMD は、Gradle で実行でき、層ごとのルールセットの分割と両立するか**。Kover は 2 つのソースセットを合算できるか。連鎖削除は、`events` に DELETE 権限が無いロールで動くか。**OpenAPI の表現力（`problem+json` の `code` の列挙、SSE）で、契約テストが成り立つか** | **規約違反コードを 1 つ置くと CI が落ちる（detekt と PMD のそれぞれで確認）。PMD の fixture のテストが期待どおり。detekt・PMD が Kotlin 2.4 を解析できる。違反 0 件・ベースラインなし・`@Suppress` なしで全コードが緑。ktlint の `.editorconfig` の調整が実際の版で動く**。権限の否定テストが通る。CI で domain の行 100% のゲートが有効。**仕様と実装を意図的にずらすと CI が落ちる（契約テスト）** | 3 日 |
 | B3 | U1 | **CI/CD とデプロイの定義**: JVM のコンテナ（マルチステージ、`25-jre-noble`）、起動モード（api・retention・migrate・rebuild-projections）、Terraform の最小構成（ネットワーク、RDS、ECS、ALB、CloudFront、S3）の**定義**、マイグレーションの自動適用、スモークテスト、ロールバックの手順。**AWS への適用はしない**（別ゲート） | コンテナと起動モードが再現でき、戻せるか。JVM の起動時間は目標（p95 30 秒）に収まるか | `terraform validate`・`plan` が通る（適用はしない）。ローカルのコンテナでスモークテストが通る | 2 日 |
 | B4 | U4 | **役割別の振り返り**: 役割別の時系列（指標・役割の切り替え、グラフと表）。ブルウィップ効果が見える | 役割別の週結果の行で、振り返りが単純に実現できるか | AC4.2.1〜4.2.4。終了前は開示しない。**Release 0.1** | 2 日 |
 | B5 | U2 | **進行の継続と資格**: 停止・再開・代理入力（停止中の代理入力、`requestedWeek`）、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、**冪等記録の照合を認可の後に置く** | 資格の設計は漏洩時に被害を止められるか。失効した資格の再送は 403 か | AC3.1.*、AC3.2.*。鍵のローテーションの否定テスト。失効後の再送の否定テスト | 2 日 |
@@ -147,6 +147,7 @@ Bolt は、時間〜日単位の構築の単位です。各 Bolt は**確認し�
 
 ### 順序と並列
 
+- **API を追加・変更する Bolt（B1 以降のすべて）は、仕様（`contracts/openapi.yaml`）→ 契約テスト（Red）→ 実装 → 型の再生成 → 画面の順に進める**（契約テストの基盤は B2 で CI に組み込む）。
 - B1 → B2 → B3 → B4 は、順序が固定される（土台、Kotlin 固有の不確実性の解消、最優先の価値）。**B2 の結果（detekt の互換、Kover、連鎖削除）が悪ければ、B3 以降を止めて設計を見直す。**
 - B5〜B8（U2、U3）と B9〜B10（U4）、B11〜B14（U5）は、互いに依存せず、並列に回せる。体制が人 1 名の間は、上の順に直列で進める。
 - B12（再構築）は B11（削除）と同じ `game_roots`・ロックの設計に依存する。B14（本番の定義）は B11・B13 の完了が前提。
@@ -239,6 +240,7 @@ gantt
 - [ ] 静的解析の違反が 0 件（ベースラインなし、`@Suppress` なし）。PMD の 14 個の関数型ルールが、fixture の期待件数と一致し、そのテストが CI で実行されている
 - [ ] detekt・PMD が Kotlin 2.4 のコードを解析できる（できない場合は、代替の選択が ADR に記録され、人が承認している）
 - [ ] 追記専用権限の否定テストがパス
+- [ ] API の契約テスト（仕様と実装のずれで CI が落ちる）と、型の生成物の差分 0 が CI で通る
 - [ ] ローカルで E2E（作成 → 振り返り）がパス。受入条件・デモ項目の日本語 Gherkin のシナリオ（`@api` は Cucumber-JVM、`@ui` は Cucumber-JS + Playwright）が green で、Undefined・Pending のステップがない
 - [ ] 全シナリオにストーリー・受入条件のタグがあり、タグの一覧と意味が文書化されている。生きたドキュメントが CI で自動公開されている
 - [ ] PMD と Cucumber の導入が承認され、使った版が出典つきで記録されている
@@ -323,6 +325,7 @@ gantt
 | R18 | Cucumber の導入で、受入条件が Gherkin と Kotest に二重に書かれ、保守の負担が増える。2 つの処理系（Cucumber-JVM と Cucumber-JS）でステップ定義が重複し、フィーチャーファイルの配置が崩れる | 全体 | 中 | 中 | 受入条件・デモ項目は Gherkin、ドメインの純粋関数・性質・DB/HTTP の細部は Kotest と、書く場所を分ける。1 つのシナリオは 1 つの層（`@api` か `@ui`）だけで実行する。ステップ定義は薄く保つ。フィーチャーファイルは 1 か所にまとめる案を第一とし、B1 で確定する。承認ゲートで二重の記述がないことを確認する |
 | R19 | Cucumber-JVM・Cucumber-JS の版、Kotlin 2.4 や JDK 25 との互換、依存関係の混在（Cucumber-JS の複数の版）が未確認で、導入が遅れる。導入の承認が遅れる | U1 | 中 | 中 | 版は公式の情報で確認してから確定する（確認できなければ「実装開始時に確認」）。B1 の最初に、最小のシナリオで両処理系の動作を確かめる。導入の承認を計画の承認と同時に依頼する |
 | R20 | **ローカル（H2）で通っても、CI（PostgreSQL）で落ちる乖離**。H2 の PostgreSQL モードでアドバイザリロック、`LISTEN` / `NOTIFY`、部分インデックス、ロール / GRANT、`jsonb`、SQLSTATE、分離レベルが動く範囲は、公式ドキュメントで確認できなかった（2026-11-14。非対応とは断定しない）。H2 版で省略した制約は、ローカルでは守られない。H2 版のロックと通知は単一プロセスでのみ有効 | 全体 | 中 | 中 | (a) H2 でしか通らない記述を禁止する（PostgreSQL の統合テストが正）。(b) ポートの契約テストを両実装で実行する（PostgreSQL 版は統合、H2 版はユニット）。(c) 受け入れ（Cucumber `@api`）は PostgreSQL で実行する。B1 の最初に H2 の動く範囲を実測して確定する。本番・ステージングで H2 を選べないよう、起動時の検査で拒否する。B1 の 4 日に含め、超過したら予備 B16 で吸収する |
+| R21 | OpenAPI の表現力（`problem+json` の `code` の列挙、SSE）や、道具の選定・導入の承認が遅れ、契約テストが成り立たない、または B2 が膨らむ | U1 | 中 | 中 | B2 の仮説として確かめる。表せない部分（SSE など）は自前のテストで補う。道具の選定と承認を B1 の終わりまでに依頼する。膨らんだら B16（予備）で吸収し、契約テストを最小（応答の適合と `code` の一致）から入れる |
 
 ---
 
@@ -370,6 +373,7 @@ gantt
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-14 | 契約テスト（OpenAPI）を反映: B1 に仕様を書く作業、B2 に契約テストと型の生成の CI への組み込みを追加。リスク R21、Release 0.1 の条件を追加。Bolt の所要と日程は変えない（B2 の 3 日に含める。超過は予備 B16 で吸収） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 初版作成（承認待ち） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | ユーザーの決定（ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18）を反映: B1 の最初に H2 の実測、ポート `ProjectionLock`・`ChangeNotifier` の 2 実装と契約テスト、リスク R20、H2 の導入の承認を追加。Bolt の所要と日程は変更しない | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 開発戦略の決定を反映: B1 に Cucumber の基盤、B2 に PMD の 14 ルール・fixture・厳格な適用を追加。B1 を 4 日、B2 を 3 日に変更し、日程を再計算（Release 0.1 は 11-30、0.2 は 12-09、1.0 は 12-30、バッファ込みで 2027-01-06）。リスク R16〜R19、測定基準、リリース 0.1 の条件、次のステップを更新 | claude-code/claude-sonnet-5-5 |

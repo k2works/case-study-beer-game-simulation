@@ -4,7 +4,7 @@ title: "ADR-008: API の契約を OpenAPI の手書きの仕様で持ち、エ�
 description: "contracts/openapi.yaml を手書きの正本にして TypeScript の型を生成し、契約テストで一致を守る。エラーは problem+json の code を鍵にし、コマンドの応答は versions だけを返す。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:15:50Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:47:37Z }
 ---
 
 # ADR-008: API の契約を OpenAPI の手書きの仕様で持ち、エラーを problem+json の code で識別する
@@ -60,7 +60,7 @@ beer-game2 は、バックエンドとフロントエンドが TypeScript の型
 ## コンプライアンス
 
 - B1: `contracts/openapi.yaml` に、ウォーキングスケルトンの経路（作成、参加、割り当て、開始、入力、確定、状態の表示）を書く。開始は `POST /games/:id/start` とする。Gherkin の `@api` シナリオが、この経路を通す（[ADR-012](./012-gherkin-and-cucumber.md)）。
-- 契約テスト（応答が仕様のスキーマに適合すること）と、型の生成を CI の順序に組み込む Bolt は、リリース計画に明記がなく、**未確認**（設計書の指摘事項。下の備考）。B1 の承認ゲートで、導入の Bolt を決める。
+- **B2**: 契約テスト（仕様の検証、応答・リクエストの適合、`code` の一覧の一致、ルートの網羅、型の生成物の差分 0）と、型の生成を、CI の順序（仕様の検証 → 型の生成 → 型の検査 → テスト）に組み込む（[リリース計画](../../development/beer-game-kotlin/release_plan.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) の API の契約テスト）。**仕様と実装を意図的にずらすと CI が落ちる**ことを確認する。道具の選定と導入の承認は B2。B3 以降は、API を足すたびに仕様 → 契約テスト → 実装の順に進める。
 - HTTP の統合テスト（`testApplication`）: エラー形式（`type` が `/problems/{code}`）、`If-Match` が `SaveDecision` にだけ付くこと、`CommitWeek` が `requestedWeek` と `basis` を使うことを確認する（[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) の境界の契約。H6）。B5、B6 で、`WeekAdvanced` と `DecisionsChanged` の区別を並行の統合テストで確認する（AC2.1.4、AC2.2.3、AC2.2.4）。
 - `EventCodec` の golden とあわせて、設計書とコードの食い違い（`code` の一覧）を守る（[開発戦略](../../development/beer-game-kotlin/development_strategy.md) の重複させる知識の検証）。
 
@@ -68,5 +68,5 @@ beer-game2 は、バックエンドとフロントエンドが TypeScript の型
 
 - 著者: claude-code
 - 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-007](./007-functional-core-with-arrow.md)、[ADR-012](./012-gherkin-and-cucumber.md)
-- 設計書との食い違いの指摘: 契約テストは、バックエンド・フロントエンド・開発戦略が「守る手段」としているが、テスト戦略の文書とリリース計画の Bolt に、契約テストの項目がない。テスト戦略の HTTP の統合の行にあるのは、境界の契約（ステータス、ヘッダー、エラー形式）だけである。
+- 設計書の指摘（解決済み）: 契約テストの項目が、テスト戦略とリリース計画に無かった。2026-11-14 に、テスト戦略（API の契約テストの節）とリリース計画（B1 の仕様、B2 の契約テストと型の生成、リスク R21）に反映した。
 - 参照: [フロントエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-frontend.md)、[バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[設計レビュー](../../review/beer-game-kotlin/design_review_20261114.md)
