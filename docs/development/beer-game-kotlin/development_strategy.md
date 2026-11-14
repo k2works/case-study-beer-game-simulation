@@ -4,7 +4,7 @@ title: "開発戦略 - ビールゲームシミュレーション（Kotlin 版�
 description: "beer-game-kotlin の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）の局面に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:58:15Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:09:55Z }
 ---
 
 # 開発戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -479,16 +479,16 @@ US6.1・6.2（完成）、横断の受入条件 X-1〜X-5、NFR の検証表（8
 
 ## 未決事項
 
-- **PMD の導入の承認**（新規の CI ツール。技術スタックでは「補完として使う（未決事項）」。承認までは detekt と ktlint で進める）。承認後は、[技術スタック](../../design/beer-game-kotlin/tech-stack.md)（T5）と [テスト戦略](../../design/beer-game-kotlin/test-strategy.md)（静的解析の節）、[リリース計画](./release_plan.md) の B2 の記述を、本書に合わせて更新する。
+- **PMD の導入の承認**（新規の CI ツール。承認までは detekt と ktlint で進める）。技術スタック（T5）、テスト戦略（静的解析の節）、リリース計画（B2）は、本書に合わせて更新済み（2026-11-14）。
 - PMD の Gradle での実行方法と、Kotlin 2.4 の構文の解析の可否（未確認。B2 の受入条件）。
 - detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認して確定する（ガイドの例は未確認）。
 - ktlint の `.editorconfig` で、ファイル名のルールを外すか（導入時に判断。外すなら ADR）。
 - テストの層ごとのルールセットで、外すルールの範囲（Kotest の検証での `NoThrow` の扱いなど）。
 - 注釈の語彙と、ドキュメントの生成の仕組み（B1〜B2 で決める）。
-- Cucumber-JVM・Cucumber-JS の具体的な成果物と版、依存関係の導入の承認（導入は決定済み。B1）。
+- Cucumber-JVM・Cucumber-JS の依存関係の導入の承認（導入は決定済み。版は 2026-11-14 に確認済み: Cucumber-JVM 8.0.4、`@cucumber/cucumber` 13.3.0。詳細は [技術スタック](../../design/beer-game-kotlin/tech-stack.md)）。JUnit の版との組み合わせは、B1 で確認する。
 - フィーチャーファイルの配置（共有の `features/` か、処理系ごとか）と、ステップ定義の置き場（B1 で確定）。
 - 生きたドキュメントの公開ツール（Pickles、Cucumber Reports など）と公開先（B1〜B2）。
-- **他の文書の更新**: 技術スタックに Cucumber の依存関係を加える。テスト戦略の「開発の進め方」（現在は Kotest の日本語のテスト名だけで受入条件を表す記述）と CI の工程、トレーサビリティ（タグ）を、本書に合わせる。リリース計画の B1 に Cucumber の基盤を加える。
+- **他の文書の更新**: 解決済み（2026-11-14）。技術スタック（Cucumber・PMD の依存関係、T5）、テスト戦略（開発の進め方、静的解析、CI、トレーサビリティ）、リリース計画（B1 に Cucumber の基盤、B2 に PMD と fixture。B1 を 4 日、B2 を 3 日に変更し、日程を再計算）を反映した。
 - 品質チェックの Gradle タスク名と、`apps/beer-game-kotlin/` のディレクトリ構成（B1 で確定）。
 - フロントエンドの E2E の配置（beer-game2 の再利用か、新規か）。B1 で決める。
 - 局面への Bolt の割り当ては、B1 の実績（所要、AI の出力の質）で見直す。特に、B9・B10 を中盤とするか、終盤に回すか。
