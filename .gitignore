@@ -37,3 +37,4 @@ playwright-report/
 # Generated and harness-local files
 __pycache__/
 apps/beer-game3/aidlc/.aidlc-sessions/
+.idea/
