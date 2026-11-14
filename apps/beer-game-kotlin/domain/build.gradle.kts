@@ -3,6 +3,8 @@ import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 // domain は Kotlin 標準ライブラリと Arrow Core だけに依存する。他のモジュールにも依存しない。
 dependencies {
     api(libs.arrow.core)
+    // プロパティベーステスト用（テストだけ。本番の依存の検査の対象外。版は kotest に揃える）。
+    testImplementation("io.kotest:kotest-property:${libs.versions.kotest.get()}")
 }
 
 extensions.configure<DetektExtension> {

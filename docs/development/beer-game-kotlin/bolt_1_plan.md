@@ -591,22 +591,118 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 3: 契約と受け入れの入口（🔵🔴）
 
-- [ ] 3.1 `contracts/openapi.yaml` に、ウォーキングスケルトンの経路（作成、参加、割り当て、開始（`POST /games/:id/start`）、入力、確定、状態の表示）と、`problem+json` の `code` の一覧を書く（**仕様が先**。契約テストの CI への組み込みは B2）
-- [ ] 3.2 `features/<機能領域>/` と、タグの文書化（`TAGS.md`）。**最初のシナリオを、日本語 Gherkin で書く**（例: 4 役割が揃ったゲームで、1 週を確定すると、役割別の状況が更新される。`@US2.3 @AC2.3.1 @api @acceptance-criteria`。画面を通す 1 本は `@ui`）
-- [ ] 3.3 Cucumber-JVM（`@api`。`acceptanceTest` を想定）と Cucumber-JS + Playwright（`@ui`）の基盤。2 つの処理系から `features/` を参照できるか確かめる
-- [ ] 3.4 🔴 シナリオを実行し、**Undefined** になることを確認する（ステップ定義を書いて Pending → Failing を確認する）
+- [x] 3.1 `contracts/openapi.yaml` に、ウォーキングスケルトンの経路（作成、参加、割り当て、開始（`POST /games/:id/start`）、入力、確定、状態の表示）と、`problem+json` の `code` の一覧を書く（**仕様が先**。契約テストの CI への組み込みは B2）
+- [x] 3.2 `features/<機能領域>/` と、タグの文書化（`TAGS.md`）。**最初のシナリオを、日本語 Gherkin で書く**（例: 4 役割が揃ったゲームで、1 週を確定すると、役割別の状況が更新される。`@US2.3 @AC2.3.1 @api @acceptance-criteria`。画面を通す 1 本は `@ui`）
+- [x] 3.3 Cucumber-JVM（`@api`。`acceptanceTest` を想定）と Cucumber-JS + Playwright（`@ui`）の基盤。2 つの処理系から `features/` を参照できるか確かめる
+- [x] 3.4 🔴 シナリオを実行し、**Undefined** になることを確認する（ステップ定義を書いて Pending → Failing を確認する）
 
 **ゲート 3**: **シナリオ（業務の言葉）と仕様**を、人が確認し、契約として承認する。**タグ（`@US`・`@AC`）の一致だけでなく、シナリオの期待値が、受入条件の原文と一致していること**を確認する（beer-game2 の B1 で、AI が付けたタグと実際の定義が食い違っていた。[B1 終了報告](../beer-game2/bolt_1_report.md) の学び #1）。受入条件は、テストを書く前に原文を読み、期待値を貼る。処理系の構成（仮説 4）を確認する。
 
+**ゲート 3 の状態: 人の確認待ち（未承認）。** 下の「Step 3 の結果」は AI の自己申告で、承認ではない。コミットは未実施。
+
+#### Step 3 の結果（2026-11-14、AI の実施。人の確認待ち）
+
+**作成したもの**: `apps/beer-game-kotlin/contracts/openapi.yaml`、`features/`（`TAGS.md` と 3 領域 7 ファイル）、`app/src/acceptanceTest/`（Cucumber-JVM の入口・窓口・ステップ定義）、`web/`（`package.json`、`cucumber.mjs`、`steps/walking-skeleton.steps.mjs`、`package-lock.json`）。変更: `gradle/libs.versions.toml`、`app/build.gradle.kts`。
+
+**実行したコマンドと結果**:
+
+| 確認 | コマンド | 結果 |
+| :--- | :--- | :--- |
+| OpenAPI の構文 | `ruby -ryaml -e 'YAML.load_file(ARGV[0])' contracts/openapi.yaml` | 成功（YAML の構文のみ。OpenAPI としての検証は B2） |
+| JVM の Undefined | `./gradlew :app:acceptanceTest`（ステップ定義なし） | `@api` の全シナリオが `UndefinedStepException` で失敗（Undefined で失敗する設定を確認）。`@ui` は除外 |
+| JVM の Pending | 同上（ウォーキングスケルトンのステップ定義を `PendingException` で追加） | `PendingException` で失敗 |
+| JVM の Failing（Red） | 同上（窓口 `GamePlayApi` の何もしない実装 `UnwiredGamePlayApi` に対するアサーション） | ウォーキングスケルトンが `AssertionError: 現在の週は第 2 週のはずが、第 1 週` で失敗。結果は 28 件中 27 件失敗（26 件が Undefined、1 件が Failing）、1 件（`@ui`）が除外 |
+| JVM の静的解析 | `./gradlew :app:ktlintCheck` | 成功（`acceptanceTest` のソースセットを含む） |
+| JS の導入 | `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install`（Node 24.11.0、`web/`） | 成功（89 パッケージ。脆弱性 0 件）。ブラウザのダウンロードはしていない |
+| JS の Undefined | `npx cucumber-js`（ステップ定義なし） | `@ui` の 1 シナリオが Undefined（6 ステップ）、終了コード 1。`--dry-run` は終了コード 0（実行しないため） |
+| JS の Pending | 同上（`return 'pending'`） | 1 シナリオが Pending、終了コード 1 |
+| JS の Failing（Red） | 同上（アサーション） | `AssertionError`（コンソールに「第 2 週」が無い）で失敗、終了コード 1 |
+
+**仮説 4（2 つの処理系から `features/` を 1 か所で参照できるか）: 成立した。** `features/` を `apps/beer-game-kotlin/` の直下に 1 か所だけ置き、Cucumber-JVM は `@SelectDirectories("../features")`（JUnit Platform Suite）、Cucumber-JS は `web/cucumber.mjs` の `paths: ['../features/**/*.feature']` で読む。日本語 Gherkin（`# language: ja`）は両方で解釈でき、タグ（`@api` と `@ui`）で処理系ごとに実行を分ける（JVM は `junit-platform.properties` の `cucumber.filter.tags=@api`、JS は `tags: '@ui'`）。Undefined → Pending → Failing の順は、両方で確認した。処理系ごとに分ける案は不要。
+
+**構成の判断（人の確認が要る）**:
+
+1. **依存関係の追加（承認済みの範囲の周辺）**: Cucumber-JVM 8.0.4 の `cucumber-junit-platform-engine` が JUnit 6.1.3 を要求する（POM の `junit-jupiter.version`）。一方、Kotest 6.2.7 は JUnit 5.13.4 を引く。混ぜないため、`acceptanceTest` は `test` のクラスパスを継承せず、独立したクラスパスにした。カタログに `junit-bom`（6.1.3）、`junit-platform-suite`、`junit-platform-launcher` を足した（`acceptanceTest` だけ。Cucumber 公式の Gradle の使い方の Suite 方式のため）。Maven Central で 6.1.3 と Cucumber 8.0.4 の POM の実在は確認した。`playwright`（npm）1.65.1 を `web/` に入れた（`@cucumber/cucumber` 13.3.0 と合わせ、ブラウザは Step 10・11）。Playwright の版は、beer-game2 の確認値（1.65.0）ではなく、`npm view` の最新（1.65.1）にした。
+2. **`acceptanceTest` は `app/` 内のソースセット**（`app/build.gradle.kts`）。まだ `main`（全モジュールの組み立て）に依存させていない。ステップ定義は窓口 `GamePlayApi`（インターフェース）だけを呼び、実物は Step 9〜11 で差し替える。理由: 内側がまだ無いことと、`domain/` を別の作業が編集中でコンパイルが通らない時期があったため。差し替えのときの手順は `app/build.gradle.kts` のコメントに書いた。
+3. **ステップ定義は、ウォーキングスケルトン（AC2.3.1）の 1 シナリオ分だけ**（Background の共通のステップを含む）。ほかのシナリオは Undefined のまま（Red）。Step 4〜11 で、実装の進行に合わせて定義する。
+4. **`@ui` のステップ定義**は、ブラウザを起動せず、何もしないスタブに対して書いた（Step 10・11 で Playwright に差し替える）。Node は 24.11.0 で実行した。設計の Node 26 は未導入（判断項目 2）のため、`.nvmrc` は作っていない。`engines` は `^24 || >=26`（`@cucumber/cucumber` の要求 `22 || 24 || >=26` の範囲内）。
+5. 領域のフォルダ名は ASCII（`game-setup`、`weekly-play`、`operations`）。Epic 3〜5（継続と復旧、観察と振り返り、保持）は B1 の範囲外のため作っていない。
+
+**シナリオと受入条件の原文の対応**（原文は [ユーザーストーリー](../../requirements/beer-game2/user_story.md)）:
+
+| ID | 原文の要点 | シナリオ（ファイル） | 一致の評価 |
+| :--- | :--- | :--- | :--- |
+| AC1.1.1 | 有効なキット準拠設定で作成すると、参加コード付きの準備中ゲームが一度だけ作成される | 有効なキット準拠の設定で作成すると、…一度だけ作成される（`game-setup/game-creation`）。同じ要求の再送でゲームは 1 つのまま | 一致 |
+| AC1.1.2 | 無効な需要系列では、作成せず、対象週と修正内容を表示する | 無効な需要系列では作成せず、対象の週と修正内容を示す（同上）。第 5 週の需要が 1001 | 一致。「修正内容」の文言（0 以上 1000 以下の整数）は、設計書（需要は 0〜1000）から取った。原文に値は無い |
+| AC1.2.1 | 有効な参加コードで表示名を入力すると、ロビーに参加し、復帰資格が保存される | 有効な参加コードで表示名を入力すると、…復帰資格が保存される（`game-setup/joining`） | 一致 |
+| AC1.2.2 | 無効または終了済みのコードで参加しようとすると、参加せず、理由を表示する | 無効な参加コード、受付が終了したゲーム（開始済み）の 2 本（同上） | 一致。「終了済み」は「受付が終了」（開始済み）と解釈した。理由の `code` は設計書に無い（下記） |
+| AC1.2.3 | 4 役割のいずれかに参加者がいない状態で開始すると、開始を拒否し、不足している役割を示す | 4 役割のいずれかに参加者がいないまま開始しようとすると、…（同上）。一次卸が不足 | 一致 |
+| AC1.2.5 | 1 人に複数の役割を割り当てようとすると、割り当てず理由を示す | すでに小売店にいる参加者を二次卸に割り当てると、小売店から外れ、移したことが示される（同上） | **原文と異なる（意図的）**。ドメインモデル D9 の解釈（付け替え）に従った。原文は「割り当てず」。要件側の改訂の確認が未決（ドメインモデル D9・M4）。ゲート 3 で人が判断する |
+| AC2.1.1 | 自役割の在庫・受注残・入荷・受注だけを表示する | 自分の役割の画面では、…だけが表示される（`weekly-play/situation`） | 一致 |
+| AC2.1.2 | 他の役割のリソース ID を UI または API で取得しようとすると、権限エラーとして、値を返さない | 他の役割の状況を取得しようとすると、権限エラーになり、値を返さない（同上） | 一致（API のみ。UI の経路は B1 の `@ui` に含めない） |
+| AC2.1.3 | 小売店以外が、将来の需要または当週の需要を取得しようとすると、開示しない | 小売店以外には顧客の需要を開示しない。小売店には当週の需要だけを示す（同上） | 一致。後者（小売店に当週の需要を示す）は B1 の計画とドメインモデル（BR-11）から追加した |
+| AC2.2.1 | 未確定の当週に非負整数を入力すると、流通役は発注、生産役は生産要請として保存できる | 発注（一次卸）と生産要請（工場）のシナリオアウトライン（`weekly-play/decision`） | 一致 |
+| AC2.2.2 | 負数・小数・空白を確定しようとすると、入力を保持し、修正方法を示す | 負数・小数・空白のシナリオアウトライン。数量の境界（0、1000、1001）は別に追加 | 部分一致。「入力を保持」は画面の関心で、`@api` では「保存されない」と「修正方法が示される」だけを確かめる。境界の 0〜1000 は設計書由来（コメントに明記） |
+| AC2.3.1 | 4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される | 4 役割の入力がそろった週を確定すると、役割別の状況が更新される（`weekly-play/week-commit`）。ウォーキングスケルトン。画面を通す 1 本は `walking-skeleton-ui` の `@ui` | 部分一致。計算の値と「一度の取引」（原子性）は、`simulateWeek` の golden テストと統合テスト（Kotest）が担い、Gherkin に書かない（ADR-012）。シナリオは、週が進み、4 役割の結果が記録され、各役割の状況が更新されることを確かめる |
+| AC2.3.2 | 同じ確定要求が重複または同時に届くと、結果と費用は一度だけ計上される | 同じ確定の要求の重複、すでに確定された週を別の要求で確定 の 2 本（同上） | 一致（「同時」は並行の統合テスト） |
+| AC2.3.3 | 確定中に障害で中断すると、部分更新を残さず、再試行できる | **Gherkin にしない** | 障害の注入が要るため、Step 6・7 の Kotest と統合テストで確かめる（二重に書かない）。ゲート 3 で人が確認 |
+| AC2.3.4 | 同一の初期状態と意思決定から再計算すると、全状態と費用が一致する | 同じ初期状態と意思決定から再計算すると、全状態と費用が一致する（同上） | 一致（同じ設定の 2 つのゲームで比べる。性質は Step 4 のプロパティテスト） |
+| AC2.3.5 | 確定の結果に、役割別の値（注文、在庫、受注残、出荷、費用）が含まれる | 確定の結果に、役割別の注文・在庫・受注残・出荷・費用が含まれる（同上） | 一致 |
+| （US2.3） | 「4 役割の入力後に」 | 入力がそろっていない週は確定せず、不足している役割を示す（同上） | AC の ID を持たない（原文の否定から導いた）。`@US2.3 @api @negative` |
+| AC6.1.1 | 構造化ログ（相関 ID、操作、結果、所要時間）が出力され、資格・表示名・非公開の値を含まない | リクエストを処理すると、構造化ログが出力され、…含まない（`operations/observability`） | 一致 |
+| AC6.1.4 | 準備のヘルスチェックが、データベースに接続できないタスクを、負荷分散の対象から外す | データベースに接続できないとき、準備のヘルスチェックは失敗する（同上） | 部分一致。「負荷分散の対象から外す」は ALB の動作で、`@api` では `/ready` が準備できていないことを示すところまで。生存の `/health` は成功のまま |
+| AC6.1.2 | 予期しないエラーが起きると、相関 ID つきで記録される | **シナリオなし** | 予期しないエラーの注入が要るため、Step 9 の HTTP の統合テスト（Kotest）で確かめる |
+
+**`contracts/openapi.yaml`**: 経路は設計書の API の表のとおり（`POST /games`、`PUT /games/:id/participants/:pid/role`、`POST /participations/join`、`POST /games/:id/start`、`PUT /sessions/:id/decisions`（`If-Match`）、`POST /sessions/:id/weeks/:week/commit`（本文に `requestedWeek` と `basis`）、`GET /sessions/:id/state`、`GET /games/:id/lobby`、`GET /health`、`GET /ready`）。`code` の一覧と、エラーの写像（403・404・409・422・503 と `Retry-After`）は、バックエンド設計の表と UI 設計の辞書のとおり。**コマンドの応答は `versions` だけ。**
+
+**設計書との食い違い・未確認事項**:
+
+1. **`code` の名前が設計書に無いもの（仮の名前を置いた。未決）**: `game.start_condition_not_met`（開始条件の不足）、`session.incomplete_decisions`（入力が揃わない確定）、`validation.invalid_input`（入力検証の誤り）。ドメインモデルは `code` の例を 4 つ（`session.week_advanced`、`session.decision_conflict`、`session.decisions_changed`、`game.invitation_invalid`）だけ載せ、一覧表を持たない。ui-design は「入力検証の誤りなどは辞書に足す」と述べるだけ。受付終了の参加の拒否の `code` も未決（シナリオは「理由が示される」までで、`code` を固定していない）。
+2. **リクエスト・レスポンスの本文の項目が設計書に無い**: 作成の設定の項目名、`SessionState`・`Lobby`・結果の項目名、`SaveDecision` の本文、Cookie の名前、`gameId` と `sessionId` の対応（同じか別か）、作成の応答に `gameId` を含めるか（設計書は `versions` だけ）、`If-Match` の初回の値。最小の形を置き、description に「未決」と書いた。**Step 4〜9 の実装で確定して更新する。**
+3. **ゲームの状態の問い合わせ（`GET /games/:id/state`）が、設計書のエンドポイント表に無い**: 画面が、開始後に `sessionId` を得る経路が要るため仮に置いた。設計書への反映が要る（backend の API の表）。
+4. **キット準拠の既定の需要系列**: JSD の値は未確認（ASM-01）。シナリオの期待値に数値の計算結果を書かなかった（入力 4 だけ）。JSD 準拠の受入判定は保留（既存の判断）。
+5. **AC1.2.5 の原文との差（上の表）と、AC2.3.3・AC6.1.2 を Gherkin にしない判断**は、ゲート 3 で人が確認する。
+6. 生きたドキュメントの公開、Cucumber のメッセージ形式の選定（トレーサビリティの抽出）、`@US`・`@AC` タグの整合検査の自動化は、未実施（B1〜B2）。
+7. `@ui` のシナリオは 1 本だけ。ステップの `{int}` が `{float}` の候補も出す（スニペットの提案のみで、実行には影響しない）。
+8. `features/TAGS.md` が、`acceptanceTest` のリソースに含まれる（無害）。除外は未実施。
+
 ### Step 4: ドメイン — 値オブジェクトと週次計算（🔴🟢🟡）
 
-- [ ] 4.1 🔴 値オブジェクト（`value class`）のテスト: `Role`、`Quantity`（0〜1000）、`Week`（1〜50）、`Money`、`DisplayName`、`StreamVersion`、`DecisionVersion`。誤りを集めて返す検証（`Either` と `zipOrAccumulate`）
-- [ ] 4.2 🟢 値オブジェクトの実装
-- [ ] 4.3 🔴 `simulateWeek` の **golden テスト**（既知の系列。2 週遅延）と、**プロパティテスト**（決定論、非負、保存、費用、遅延、役割別の合計 = チームの合計）。次週の入荷・受注（小売店は当週の需要）も返す
-- [ ] 4.4 🟢 `simulateWeek` の実装（純粋関数）。**役割別の週結果**を返す
-- [ ] 4.5 🟡 Refactor
+- [x] 4.1 🔴 値オブジェクト（`value class`）のテスト: `Role`、`Quantity`（0〜1000）、`Week`（1〜50）、`Money`、`DisplayName`、`StreamVersion`、`DecisionVersion`。誤りを集めて返す検証（`Either` と `zipOrAccumulate`）
+- [x] 4.2 🟢 値オブジェクトの実装
+- [x] 4.3 🔴 `simulateWeek` の **golden テスト**（既知の系列。2 週遅延）と、**プロパティテスト**（決定論、非負、保存、費用、遅延、役割別の合計 = チームの合計）。次週の入荷・受注（小売店は当週の需要）も返す
+- [x] 4.4 🟢 `simulateWeek` の実装（純粋関数）。**役割別の週結果**を返す
+- [x] 4.5 🟡 Refactor
 
 **ゲート 4**: golden の期待値が教材（要件定義の BR-02〜BR-09）と一致することを、人が確認する。ドメインの `var`・可変コレクション・`!!`・`throw` が無いことを確認する。
+
+#### Step 4 の結果（2026-11-14、AI の実施。**ゲート 4 は人の確認待ち**）
+
+**実装**（`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/`）: `ValidationError.kt`、`Role.kt`（`Role`、`RoleMap`）、`Quantities.kt`（`Quantity`、`Units`）、`Values.kt`（`GameId`、`ParticipantId`、`Week`、`Money`、`DisplayName`、`StreamVersion`、`DecisionVersion`）、`Settings.kt`（`CostPolicy`、`DemandSeries`）、`SimulateWeek.kt`（`Pipeline`、`RoleState`、`RoleWeekResult`、`WeekOutcome`、`SimulationSettings`、`simulateWeek`、チーム合計）、`KitPreset.kt`。**テスト**（`src/test/kotlin/beergame/domain/`）: `ValueObjectsSpec`、`SimulateWeekGoldenSpec`、`SimulateWeekPropertySpec`、`TestSupport`。`domain/build.gradle.kts` に `testImplementation("io.kotest:kotest-property:<kotest の版>")` を 1 行足した（本番の依存の検査の対象外）。
+
+**TDD の順序**: テスト 3 ファイルを先に書き、`./gradlew :domain:test` が「Unresolved reference（`KitPreset`、`Role`、`Pipeline` など）」でコンパイルに失敗することを確認（Red）してから、実装を書いた（Green）。Green の後に、実装を意図的に壊して、テストが落ちることを 4 通り確認し、戻した（`shipped` を `maxOf` に、在庫と受注残の単価の取り違え、注文の遅延の除去、利用可能量から入荷を除く。それぞれ 11・9・7・11 件が失敗）。
+
+| 項目 | 結果 |
+| :--- | :--- |
+| `./gradlew :domain:build`（JDK 25.0.2） | **成功**（ktlint、コンパイラ警告のエラー化、`verifyDomainDependencies`、Kover の各タスクが緑。detekt は JDK 25 では無効） |
+| `./gradlew :domain:build`（JDK 21.0.12。`detektMain`・`detektTest` を含む） | **成功**（違反 0。途中で、テストの分割代入が 4 要素で `DestructuringDeclarationWithTooManyEntries` に該当し、添字の参照に直した） |
+| テスト件数（`:domain:test`） | 計 74 件、失敗 0（`ValueObjectsSpec` 47、`SimulateWeekGoldenSpec` 14、`SimulateWeekPropertySpec` 11、`ToolchainSpec` 2）。プロパティテストは 1 件につき 300 回 |
+| Kover（domain） | 行 196/203（96.6%）、分岐 50/50（100%）、クラス 39/39。**行 100% には届かない**: 未到達の 7 行は、`value class` のプライマリコンストラクタの行（`val value: Int,` など）に対応するコンパイラ生成のメンバー（ボックス化したクラスの `getValue`、`Comparable` の橋渡し）で、通常のコードからは呼ばれない。手で書いたコードの未到達はなし。**Step 12.1 の「domain の行 100%」は、この生成コードの扱い（除外の設定、または閾値の見直し）を B1 の終了までに決める** |
+| `var`・可変コレクション・`!!`・`throw`・時計・乱数・UUID の生成 | `domain/src/main` に無いことを `grep` で確認（`mutableListOf` なども無い） |
+
+**golden の期待値の根拠**: 期待値は、要件定義の BR-05〜BR-09（利用可能量 = 前週末在庫 + 当週入荷、充足対象 = 前週末受注残 + 当週受注、出荷 = 両者の小さい方、週末在庫・受注残 = `max(0, 差)`、週次費用 = 在庫 × $0.50 + 受注残 × $1.00）と、BR-02〜BR-04（注文・配送・生産の 2 週遅延）、BR-13（キット準拠の初期値: 在庫 12、各段 4）から**手で導き**、各テストのコメントに途中の計算を書いた。実装の出力を貼っていない。系列は次の 5 つ。(1) 需要 4・発注 4 の定常（在庫 12、費用 600）、(2) 需要が 4 → 8 に増える（小売店の在庫 12 → 8 → 4 → 0、累積費用 600・1000・1200・1200）、(3) 在庫不足で受注残（需要 20: 出荷 16、受注残 4、費用 400、翌週も受注残 4 で累積 800）、(4) 遅延（小売店の発注 10 が 2 週後に卸の受注、卸の出荷 10 が 2 週後に小売店の入荷、工場の生産要請 10 が 2 週後に工場在庫 18）、(5) 4 役割が変化する 3 週（需要 8・4・4、第 1 週の発注 6・5・7・9。第 3 週の費用は 400・350・450・650、チームの累積 6250）。(2)〜(4) は beer-game2 の golden と同じ値になる（beer-game2 の `simulate-week.test.ts` を参考に系列を選び、期待値は BR から導き直した）。**ゲート 4 で、人が BR との一致を確認する**。
+
+**設計書との食い違い・未確認事項**（いずれもドメインモデル設計書を直すか、判断が必要なもの）:
+
+1. **待ち行列（`Pipeline`）の長さ**: 設計書は「長さが遅延に等しい。先頭が次週に到着する」だが、`RoleState` が当週の入荷（`arrivals`）を別に持つため、そのままだと実効の遅延が 1 週長くなる。実装は、`arrivals` を別に持ち、待ち行列の長さを **`遅延 - 1`**（キットの 2 週なら 1 段、遅延 1 週なら空）にして、beer-game2 の挙動（2 週遅延）と一致させた。`Delay` の値オブジェクトは作らず、遅延は待ち行列の長さで表す（beer-game2 と同じ）。**設計書の記述を直すか、`Pipeline` の定義を決める必要がある**。
+2. **遅延 0 の golden**: テスト戦略は「遅延 0 を含むカスタムの遅延」の golden を挙げているが、遅延 0 は表せない（待ち行列の長さが `-1` になる。beer-game2 も遅延は 1 週以上）。遅延 1（待ち行列が空）の golden は書いた。**遅延 0 を許すかは未決（設計書の `Delay` は「0 以上」）**。
+3. **配送と生産の待ち行列**: 設計書は「注文・配送・生産の `Pipeline`」と 3 種類だが、1 役割が持つのは、注文（工場以外）と、配送（工場では生産）の 2 つ。実装は `orderPipeline` と `deliveryPipeline`（工場では生産の待ち行列）にした。
+4. **`Units` の追加**: 設計書は流れの数量にも `Quantity`（0〜1000）を使う書き方だが、在庫・受注残・出荷は 1000 を超えうるため、上限のない非負の `Units` を足した（`Quantity` は発注・生産要請だけ。`Quantity.toUnits()` で変換）。`DemandSeries` の各週は `Quantity` の範囲（0〜1000）で検証する（根拠は設計書の「`Quantity` 0〜1000」と需要系列の「0 以上の整数」の組で、需要の上限は**設計書に無く、未確認**）。
+5. **`RoleWeekResult` の項目**: 設計書の列（受注、出荷、発注、週末在庫、週末受注残、週次費用、累積費用）のとおり。入荷は含めない（保存則の検査は、前の状態の `arrivals` で行う）。
+6. **`SimulationSettings`**: `GameSettings`（Step 5 で作る）の代わりに、`simulateWeek` に必要な最小の設定（最終週、需要系列、費用方針）を `SimulationSettings` にした。Step 5 で `GameSettings` から作る関数を足すか、`GameSettings` に置き換える。`initialStates(settings)` は未実装で、キット準拠の初期状態を作る `KitPreset.initialStates(demand)` だけを足した（Step 6 の `startGame` が使う）。
+7. **`DemandSeries.of` の誤りの集め方**: 範囲外の週は全部集める（`mapOrAccumulate`）。長さの不足は、各週が正しいときだけ検査する（1 回の呼び出しで両方を返さない）。`CostPolicy.of` は `zipOrAccumulate`。
+8. **キット準拠の既定の需要系列（ASM-01）は未確定**のため、golden の需要系列はカスタム（手で選んだ値）。キット準拠の受入判定は保留（テスト戦略のとおり）。
+9. **表示名の長さの単位**: 設計書は「1〜80 文字」。Unicode のコードポイント数で数えた（絵文字を 1 文字とする）。UI 側（`maxLength`）との一致は未確認。
 
 ### Step 5: ドメイン — Game（🔴🟢🟡）
 
@@ -773,6 +869,7 @@ Lobby --> Console : 進行役: 「開始する」
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-14 | **Step 3（契約と受け入れの入口）を実施**（3.1〜3.4 を [x]。結果は Step 3 の末尾。**ゲート 3 は人の確認待ち**） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **#1（レイヤーを貫く順序）をユーザーが案 A と判断**。本書の順序を維持し、開発戦略の B1 の説明を直した。Step 4 以降に着手できる（#12〜#14 は各 Step で決める） | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **`validating-design` の実施結果を反映**（承認済みの計画への修正。上の表の #2・#3・#5〜#11）。**人に再確認を求める**。#1（レイヤーを貫く順序）は人の判断待ち | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | **承認**（ユーザー。着手前の判断項目 1〜9 を含む。判断項目 1 は B1 で使う依存関係のみで、PMD と契約テストの道具は B2） | claude-code/claude-sonnet-5-5 |
