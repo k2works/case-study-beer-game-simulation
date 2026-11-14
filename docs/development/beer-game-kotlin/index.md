@@ -9,7 +9,7 @@ beer-game-kotlin プロジェクトの開発ドキュメントです。
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |
 | [リリース計画](./release_plan.md) | Intent、Bolt 計画（B1〜B15、予備 B16）、Release 0.1 / 0.2 / 1.0、バッファ、リスク台帳 | Draft（承認待ち） |
-| 開発戦略 | 局面別の TDD アプローチ、ウォーキングスケルトン、デモ項目 | 未作成 |
+| [開発戦略](./development_strategy.md) | 局面別の TDD アプローチ（序盤・終盤はアウトサイドイン、中盤はインサイドアウト）、デモ項目の受け入れ基準、BDD と Living Documentation の方針 | Draft（承認待ち） |
 
 ### Bolt 計画
 
