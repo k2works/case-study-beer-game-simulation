@@ -9,7 +9,7 @@ import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 
 /** 検証済みの値を作るテスト補助。検証に失敗したらテストを失敗させる（`!!` や例外は使わない）。 */
-private fun <E, A> Either<E, A>.valid(what: String): A = getOrElse { fail("$what が不正: $it") }
+internal fun <E, A> Either<E, A>.valid(what: String): A = getOrElse { fail("$what が不正: $it") }
 
 fun q(n: Int): Quantity = Quantity.of(n).valid("Quantity($n)")
 

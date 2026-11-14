@@ -706,21 +706,63 @@ Lobby --> Console : 進行役: 「開始する」
 
 ### Step 5: ドメイン — Game（🔴🟢🟡）
 
-- [ ] 5.0 🔴 **共通の土台（`decide`・`evolve` の型、`Command`・`Event`・`DomainError` の基底）を作る最初のスライドでは、後続の振る舞いのテスト（Session、`startGame`）も先に書き、失敗を確認してから実装する**（プロジェクトの規約。順序を守れなかったときは、規則を壊すとテストが落ちることを個別に確かめて記録する）
-- [ ] 5.1 🔴 `decideGame` のテスト（Given = 過去のイベント、When = コマンド、Then = イベントまたはエラー）: キット準拠の作成（`KitPreset`）、設定の検証（無効な需要系列は対象週と修正内容）、参加、役割の割り当て（1 人 1 役割。別の役割から移す場合の扱い）、不足している役割の通知
-- [ ] 5.2 🟢 `decideGame` / `evolveGame` の実装。`evolve` は全域（強制キャストなし）
-- [ ] 5.3 🟡 Refactor
+- [x] 5.0 🔴 **共通の土台（`decide`・`evolve` の型、`Command`・`Event`・`DomainError` の基底）を作る最初のスライドでは、後続の振る舞いのテスト（Session、`startGame`）も先に書き、失敗を確認してから実装する**（プロジェクトの規約。順序を守れなかったときは、規則を壊すとテストが落ちることを個別に確かめて記録する）
+- [x] 5.1 🔴 `decideGame` のテスト（Given = 過去のイベント、When = コマンド、Then = イベントまたはエラー）: キット準拠の作成（`KitPreset`）、設定の検証（無効な需要系列は対象週と修正内容）、参加、役割の割り当て（1 人 1 役割。別の役割から移す場合の扱い）、不足している役割の通知
+- [x] 5.2 🟢 `decideGame` / `evolveGame` の実装。`evolve` は全域（強制キャストなし）
+- [x] 5.3 🟡 Refactor
 
 **ゲート 5**: ルールが `decide` に集まり、`evolve` が計算をしていないことを確認する。
 
 ### Step 6: ドメイン — Session と `startGame`（🔴🟢🟡）
 
-- [ ] 6.1 🔴 `decideSession` のテスト: 入力の保存、手動の確定（週と `basis` の一致）、一回性、最終週の終了、`WeekAdvanced`。`startGame`（2 ストリームへ原子的に追記する唯一のコマンド）
-- [ ] 6.2 🟢 `decideSession` / `evolveSession` と `startGame` の実装。`WeekCommitted` に結果と `nextStates` を含める（D5）
-- [ ] 6.3 🔴🟢 D5 の検証（違う `nextStates` を持つ `WeekCommitted` を Given にして、状態がその値を採用する）。`InvalidTransition` の検知
-- [ ] 6.4 🟡 Refactor
+- [x] 6.1 🔴 `decideSession` のテスト: 入力の保存、手動の確定（週と `basis` の一致）、一回性、最終週の終了、`WeekAdvanced`。`startGame`（2 ストリームへ原子的に追記する唯一のコマンド）
+- [x] 6.2 🟢 `decideSession` / `evolveSession` と `startGame` の実装。`WeekCommitted` に結果と `nextStates` を含める（D5）
+- [x] 6.3 🔴🟢 D5 の検証（違う `nextStates` を持つ `WeekCommitted` を Given にして、状態がその値を採用する）。`InvalidTransition` の検知
+- [x] 6.4 🟡 Refactor
 
 **ゲート 6**: 集約の粒度と、`startGame` の原子性の設計（仮説 1）を確認する。誤りが分かれば、ここで止めて設計を見直す。
+
+#### Step 5・6 の結果（2026-11-14、AI の実施。**ゲート 5・ゲート 6 は人の確認待ち（未承認）**。コミットは未実施）
+
+**実装**（`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/`）: `Foundation.kt`（`Decide`・`Evolve` の型、`StreamType`、`DomainError`・`ErrorCategory`、`Actor`・`ActorRef`、`Command`、`DomainEvent`、`EventEnvelope`、`InvalidTransition`・`Replayed`・`replayGame`・`replaySession`）、`Game.kt`（`CommitMode`、`GameSettings`（`kit`）、`GameData`、`GameState`、`GameCommand`、`GameEvent`、`GameError`、`decideGame`、`evolveGame`）、`Session.kt`（`SessionData`、`SessionState`、`SessionCommand`、`SessionEvent`、`SessionError`、`decideSession`、`evolveSession`）、`StartGame.kt`（`StartGame`、`StartDecision`、`startGame`）。既存の `Values.kt`（`Week.FIRST`、`JoinCode`、`RetentionDays` を追加）と `ValidationError.kt`（`JoinCodeInvalid`、`RetentionOutOfRange` を追加）を最小限に拡張した。`domain/build.gradle.kts` は変更していない。
+
+**テスト**（`src/test/kotlin/beergame/domain/`）: `DomainFixtures.kt`（Given のビルダー）、`GameSettingsSpec`、`DomainFoundationSpec`、`GameDecideSpec`、`GameEvolveSpec`、`SessionDecideSpec`、`SessionEvolveSpec`、`StartGameSpec`、`GameFlowSpec`（作成から最終週の確定までを decide / evolve だけで通す。決定論・計算と事実の一致・InvalidTransition が 0 件、各 100 回の性質テスト）。`TestSupport.kt` は `valid` を `internal` にしただけ。
+
+**実行したコマンドと結果**:
+
+| 確認 | コマンド | 結果 |
+| :--- | :--- | :--- |
+| Red（テストだけがある状態） | `./gradlew :domain:test`（JDK 25.0.2。本番コードを書く前） | **コンパイル失敗**（`Unresolved reference` 734 件。`Actor`、`GameSettings`、`GameCommand`、`SessionEvent` など） |
+| Green 後の全体（JDK 25.0.2） | `./gradlew :domain:build :domain:koverXmlReport` | **成功**（ktlint、警告のエラー化、`verifyDomainDependencies`、テスト、Kover） |
+| detekt を含む全体（JDK 21.0.12） | `./gradlew :domain:build`（`:domain:detekt`、`detektMain`、`detektTest` を含む） | **成功**（違反 0。途中で `ComplexCondition` に 1 件該当し、`completeDecisions` を `nullable` で書き直した） |
+| テスト件数（`:domain:test`） | 同上 | **計 192 件、失敗 0**（Step 4 までの 74 件 + 本 Step の新規 118 件。`GameSettingsSpec` 17、`DomainFoundationSpec` 17、`GameDecideSpec` 16、`GameEvolveSpec` 14、`SessionDecideSpec` 25、`SessionEvolveSpec` 13、`StartGameSpec` 11、`GameFlowSpec` 5） |
+| Kover（domain 全体） | `koverXmlReport` | 行 570/581（**98.1%**）、分岐 137/139（98.6%）、メソッド 170/181、クラス 105/106 |
+| 禁止事項の確認 | `grep -E 'var\|!!\|throw\|mutable\|Instant.now\|randomUUID'`（`domain/src/main`） | 該当なし（`else ->` は、Step 4 の `Quantities.kt` と、式の `when { }` の 1 件（`AssignRole` の付け替えの分岐）だけで、`evolve` の網羅的な `when` には無い） |
+
+**Kover の未到達（行 11、分岐 2）の理由**: 手で書いたコードの未到達の**分岐**は 2 つだけ。(1) `Session.kt` の `week.next() ?: week`（最終週の上限 50 でのフォールバック。`finalWeek` ≤ 50 の不変条件により到達しない）。(2) `Foundation.kt` の `simpleName ?: "anonymous"`（無名クラスのときだけ）。未到達の**行**は、レポートの行単位の一覧で確認できた 10 行（`value class` のプライマリコンストラクタ行に対応するコンパイラ生成のメンバーが `Quantities.kt` に 2、`Values.kt` に 7。`JoinCode`、`RetentionDays` の追加で Values は 5 行 → 7 行。`Foundation.kt` の `Actor.toRef` の宣言行が 1）。カウンターの 11 行のうち、残り 1 行は一覧から特定できていない（未確認）。Step 4 から持ち越した「行 100% の扱い（生成コードの除外か閾値の見直し）」は、B1 の終了までに決める。
+
+**TDD の順序（先に書いて失敗を確認した証跡）**:
+
+1. 5.0 の規約どおり、Game だけでなく Session・`startGame`・共通の土台の振る舞いの試験（上記 8 ファイル）を**すべて先に書き**、本番コードが無い状態で `:domain:test` を実行し、`Unresolved reference` 734 件のコンパイル失敗を確認した（Red）。その後、本番コードを書いた（Green）。1 回目の実行で全件成功した。
+2. 常に通る試験になっていないことを、実装を意図的に壊して個別に確かめ、戻した: (a) `evolveSession` が `WeekCommitted` で `simulateWeek` を呼び直す → D5 の試験が 1 件失敗。(b) `CommitWeek` の判定順を入れ替え（入力の版を週より先）＋ (c) 付け替えから `RoleUnassigned` を除く → 3 件失敗（週の優先、1 週目の再確定、付け替え）。(d) `startGame` の不足役割の検査を除く ＋ (e) 終了後の `DecisionSaved` を採用する → 4 件失敗（不足役割 3 件、終了後の不正な遷移 1 件）。(b)(c)、(d)(e) は 1 回の実行に 2 つの変更を入れたため、失敗した試験の名前で原因を対応づけた。いずれも戻して全件成功を確認した。
+3. 順序を守れなかった点: **本番コードを書いている途中で、設計書の食い違い（下記 1: `SessionStarted` に `gameId` が無い）に気づき、試験 2 か所（`DomainFixtures.kt` の `sessionStarted`、`StartGameSpec` の期待値）に `gameId` を足した**。試験を先に書いたあとの修正で、先に失敗を確認した順序とは異なる。
+
+**設計書との食い違い・判断（人の確認が要る）**:
+
+1. **`SessionStarted`（EV-S01）のペイロードに `gameId` を足した**。設計書のペイロード（設定・割り当て・初期状態・確定方式）には無いが、`SessionData.gameId`（進行役の確認に使う）を `evolve` が作れない。封筒の `gameId` は `evolve` に渡らない。設計書への反映が要る。
+2. **`StartError` を導入せず、`startGame` は `Either<DomainError, StartDecision>` を返す**（`GameError.Forbidden`・`NotPreparing`・`StartConditionNotMet`、`SessionError.AlreadyStarted`）。設計書の `StartError` は 3 種類（`StartConditionNotMet`、`AlreadyStarted`、`Forbidden`）で、重複する型を避けた。判定順は、設計書のスケッチ（準備中でなければ先に `NotPreparing`）と違い、**未作成だけ `NotPreparing`、開始済みのゲームは `AlreadyStarted`（再読み込みで得る側の失敗、`session.already_started`）**、権限の検査を開始済みの検査より先にした（権限のない人に開始済みかを知らせない）。
+3. **`SessionError` の状態の失敗**: 設計書は `NotActive`・`AlreadyEnded`・`NotStarted` を挙げるが、B1 は **未開始 → `NotActive`、終了 → `AlreadyEnded`** とし、`NotStarted` は作っていない（停止中の `NotActive` は B5）。
+4. **`DomainError.code` の仮置き（未決。設計書に一覧が無い）**: `game.already_created`、`game.not_preparing`、`game.forbidden`、`game.participant_not_found`、`game.start_condition_not_met`（OpenAPI の仮置きと同じ）、`session.not_active`、`session.already_ended`、`session.already_started`（設計書の記述）、`session.forbidden`、`session.week_advanced`・`session.decision_conflict`・`session.decisions_changed`（設計書の例）、`session.incomplete_decisions`（OpenAPI の仮置きと同じ）。`DomainFoundationSpec` が一覧を固定している。`ValidationError` は `DomainError` ではない（OpenAPI の `validation.invalid_input` は境界で付ける）。
+5. **判断項目 #13（単独の `UnassignRole`）**: **実装していない**（Step 5.1 とスコープ表に無い）。`RoleUnassigned` は付け替えの内部のイベントとしてだけ使い、`evolveGame` は処理できる。B1 に含めるかは**未決のまま**で、含めない場合は UI 設計の S04 から「外す」を除く（人の判断）。
+6. **同じ役割への別の参加者の割り当て（共同担当）は、拒否しない**（設計書の不変条件「1 つの役割に複数の参加者を割り当てられる」に従った。計画の「B1 は 1 役割 1 人（共同担当は B6）」の制限を課すかは**未決**。拒否するなら、設計書にない `DomainError` が要る）。試験は設計書に従う挙動を固定している（`GameDecideSpec`）。
+7. **`GameSettings` と `SimulationSettings`**: 設計書は `GameSettings`（初期条件・遅延・公開範囲を含む）だが、B1 は**キット準拠の項目だけ**（`finalWeek`、`demand`、`costPolicy`、`commitMode`）にし、`simulation()` で `SimulationSettings` を作る。初期条件・遅延は `KitPreset` の値で、カスタムは B7。`KitPreset.classify`（設定の種別）と `SettingsKind` は作っていない（B7）。`CommitMode`・`CommitKind`・`EndReason`・`Editor` は、B1 で使う値だけの enum / sealed（B5・B8 で足す）。
+8. **`GameSettings.kit` の誤りの集め方**: 最終週が不正でも、需要系列の各週の範囲の誤りも一緒に返す（最終週が不正なときは、系列の長さの検査は第 1 週を仮の最終週にして行う）。`DemandSeries.of` の理由の文言（`需要は 0〜1000 の整数`）は Step 4 のまま。
+9. **`GameCreated` の `retentionDays`・`facilitatorCredentialExpiresAt`、`JoinCode`**: 設計書のペイロードに従って運ぶが、B11（保持）・B5（資格）の規則は無い。`RetentionDays` は 1〜3650（設計書の範囲）、`JoinCode` は 8 桁以上の長さだけを検証する（文字の種類は未決）。`GameData` に参加コードと保持日数は持たない（投影の責務）。
+10. **`ParticipantJoined` の重複**（同じ参加者の ID が再び来る）は、`evolveGame` で不正な遷移として扱う（`decideGame` は ID の重複を検査しない。ID は境界が生成する前提。重複の `DomainError` は未決）。
+11. **`replayGame`・`replaySession`** をドメインに置いた（設計書は「再生側（アダプターの境界）」だが、純粋関数なので `domain` に置き、Step 7 のアダプターから使う）。`InvalidTransition` の状態名・イベント名はクラスの単純名。通知先と閾値は設計書のとおり未決。
+12. 各 `Forbidden` の理由の文言（日本語）は仮置きで、試験は型だけを確かめる。
+
+**未確認**: Gherkin（Cucumber）のシナリオとの実行上の突き合わせは Step 9〜11（シナリオの語彙とドメインの対応は、意味の整合を目で確認した範囲）。AC1.1.2 のシナリオの「0 以上 1000 以下の整数にする」という修正内容は、ドメインでは `DemandSeriesInvalid(週, "需要は 0〜1000 の整数")` で返す（文言の最終形は UI の辞書で決める）。キット準拠の既定の需要系列（ASM-01）は未確定のまま（試験は手で選んだ系列）。変異テスト（Pitest）は未導入。
 
 ### Step 7: イベントストア・投影・ポート（🔴🟢🟡）
 

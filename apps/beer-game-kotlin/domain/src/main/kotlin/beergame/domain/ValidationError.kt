@@ -29,6 +29,16 @@ sealed interface ValidationError {
         val length: Int,
     ) : ValidationError
 
+    /** 参加コードが 8 桁に満たない（推測困難な乱数から作る）。 */
+    data class JoinCodeInvalid(
+        val length: Int,
+    ) : ValidationError
+
+    /** 保持日数が 1〜3650 でない。 */
+    data class RetentionOutOfRange(
+        val actual: Int,
+    ) : ValidationError
+
     /** 需要系列の誤り。[weekIndex] は対象の週（1 始まり）で、利用者に修正すべき週を示す（AC1.1.2）。 */
     data class DemandSeriesInvalid(
         val weekIndex: Int,

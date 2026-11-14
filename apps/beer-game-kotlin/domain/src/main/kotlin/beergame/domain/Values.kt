@@ -30,6 +30,9 @@ value class Week internal constructor(
         const val MIN = 1
         const val MAX = 50
 
+        /** 第 1 週。 */
+        val FIRST: Week = Week(MIN)
+
         fun of(n: Int): Either<ValidationError.WeekOutOfRange, Week> =
             if (n in MIN..MAX) Week(n).right() else ValidationError.WeekOutOfRange(n, MAX).left()
     }
@@ -71,6 +74,33 @@ value class DisplayName private constructor(
                 ValidationError.DisplayNameInvalid(length).left()
             }
         }
+    }
+}
+
+/** 参加コード。推測困難な乱数から作る 8 桁以上の文字列（生成は境界が行い、ドメインは受け取った値の長さだけを検証する）。 */
+@JvmInline
+value class JoinCode private constructor(
+    val value: String,
+) {
+    companion object {
+        const val MIN_LENGTH = 8
+
+        fun of(raw: String): Either<ValidationError.JoinCodeInvalid, JoinCode> =
+            if (raw.length >= MIN_LENGTH) JoinCode(raw).right() else ValidationError.JoinCodeInvalid(raw.length).left()
+    }
+}
+
+/** 保持日数。1〜3650。 */
+@JvmInline
+value class RetentionDays private constructor(
+    val value: Int,
+) {
+    companion object {
+        const val MIN = 1
+        const val MAX = 3650
+
+        fun of(n: Int): Either<ValidationError.RetentionOutOfRange, RetentionDays> =
+            if (n in MIN..MAX) RetentionDays(n).right() else ValidationError.RetentionOutOfRange(n).left()
     }
 }
 
