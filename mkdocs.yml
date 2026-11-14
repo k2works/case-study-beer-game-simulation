@@ -160,6 +160,8 @@ nav:
           - 概要: review/beer-game/index.md
       - beer-game2:
           - 概要: review/beer-game2/index.md
+      - beer-game-kotlin:
+          - 概要: review/beer-game-kotlin/index.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
