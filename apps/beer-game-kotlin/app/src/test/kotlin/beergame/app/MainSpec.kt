@@ -78,6 +78,30 @@ class MainSpec :
             runMain(listOf("unknown"), local(), Logs()) shouldBe 64
         }
 
+        listOf("retention", "rebuild-projections").forEach { mode ->
+            test("[B3-1] Given 未実装の起動モード「$mode」 When 起動する Then 未実装の旨を記録し、終了コード 69 で終わる（設定を読む前に断る）") {
+                val logs = Logs()
+
+                val exit = runMain(listOf(mode), emptyMap(), logs)
+
+                exit shouldBe 69
+                val text = logs.text()
+                text shouldContain mode
+                text shouldContain "未実装"
+                logs.records.single().result shouldBe "unimplemented"
+                logs.records.single().level shouldBe "ERROR"
+            }
+        }
+
+        test("Given 不明な起動モード When 起動する Then 使えるモードを全て案内する") {
+            val logs = Logs()
+
+            runMain(listOf("unknown"), local(), logs) shouldBe 64
+
+            val text = logs.text()
+            listOf("api", "migrate", "retention", "rebuild-projections").forEach { text shouldContain it }
+        }
+
         test("[US6.1] Given local の migrate モード When 実行する Then マイグレーションを適用して 0 で終わる") {
             val logs = Logs()
 

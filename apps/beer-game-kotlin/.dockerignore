@@ -1,0 +1,16 @@
+# ビルドの文脈に入れない（イメージの再現性とビルドの速さ。秘密・生成物・別の成果物を含めない）
+**/build/
+.gradle/
+.kotlin/
+.idea/
+*.iml
+local.properties
+.env
+.env.*
+# Gradle のビルドに要らないもの
+web/
+infra/
+scripts/
+Dockerfile
+.dockerignore
+**/node_modules/

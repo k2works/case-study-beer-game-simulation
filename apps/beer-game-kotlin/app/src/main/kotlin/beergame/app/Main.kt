@@ -9,11 +9,12 @@ import beergame.http.Slf4jLogSink
 import kotlin.system.exitProcess
 
 /*
- * 起動モード: `api`（既定）と `migrate`。`retention`、`rebuild-projections` は B1 の範囲外（B11、B12）。
- * 終了コード: 0 正常、64 使い方の誤り、70 起動の失敗（接続できないなど）、78 設定の誤り（BSD の sysexits に倣う）。
+ * 起動モード: `api`（既定）と `migrate`。`retention`、`rebuild-projections` は名前だけ定義（実装は B11、B12）。
+ * 終了コード: 0 正常、64 使い方の誤り、69 未実装のモード、70 起動の失敗（接続できないなど）、78 設定の誤り（BSD の sysexits に倣う）。
  */
 
 private const val EXIT_USAGE = 64
+private const val EXIT_UNIMPLEMENTED = 69
 private const val EXIT_SOFTWARE = 70
 private const val EXIT_CONFIG = 78
 private const val MAX_STACK_FRAMES = 40
@@ -30,8 +31,12 @@ fun runMain(
 ): Int {
     val mode = args.firstOrNull() ?: "api"
     return when {
-        mode !in MODES -> {
+        mode !in MODES + UNIMPLEMENTED_MODES -> {
             usage(mode, logs)
+        }
+
+        mode in UNIMPLEMENTED_MODES -> {
+            unimplemented(mode, logs)
         }
 
         else -> {
@@ -45,14 +50,34 @@ fun runMain(
 
 private val MODES = setOf("api", "migrate")
 
+/** 名前だけ定義した、未実装のモード（`retention` は B11、`rebuild-projections` は B12 で実装する）。 */
+private val UNIMPLEMENTED_MODES = setOf("retention", "rebuild-projections")
+
 private fun usage(
     mode: String,
     logs: LogSink,
 ): Int {
+    val available = (MODES + UNIMPLEMENTED_MODES).joinToString("、")
     logs.emit(
-        operationalRecord(LEVEL_ERROR, "startup", "usage", "起動モード「$mode」は使えません。api または migrate を指定してください。"),
+        operationalRecord(
+            LEVEL_ERROR,
+            "startup",
+            "usage",
+            "起動モード「$mode」は使えません。$available のいずれかを指定してください（retention、rebuild-projections は未実装）。",
+        ),
     )
     return EXIT_USAGE
+}
+
+/** 設定を読む前に断る（未実装のモードのために、本番の秘密情報や DB を要求しない）。 */
+private fun unimplemented(
+    mode: String,
+    logs: LogSink,
+): Int {
+    logs.emit(
+        operationalRecord(LEVEL_ERROR, "startup", "unimplemented", "起動モード「$mode」は未実装です（モード名の定義のみ）。何も実行しません。"),
+    )
+    return EXIT_UNIMPLEMENTED
 }
 
 private fun configInvalid(

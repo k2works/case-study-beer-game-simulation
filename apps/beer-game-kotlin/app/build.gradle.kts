@@ -7,6 +7,20 @@ application {
     mainClass.set("beergame.app.MainKt")
 }
 
+// 配布（installDist・distZip）から H2 のドライバを外す。H2 はローカル開発専用（ADR-014）で、本番のイメージに含めない
+// （architecture-infrastructure.md「二重の防御」。起動時の検査と合わせる）。`:app:run` と各テストの実行時の依存には残る。
+val excludedFromDistribution = Regex("^h2-.*\\.jar$")
+tasks.named<CreateStartScripts>("startScripts") {
+    classpath = classpath?.filter { !excludedFromDistribution.matches(it.name) }
+}
+distributions {
+    main {
+        contents {
+            exclude("h2-*.jar")
+        }
+    }
+}
+
 // 組み立てと起動。全モジュールに依存する。
 dependencies {
     implementation(project(":domain"))
