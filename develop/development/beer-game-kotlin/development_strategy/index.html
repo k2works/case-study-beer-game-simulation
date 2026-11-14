@@ -4387,6 +4387,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#b1-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B1 の進め方（序盤の例外。2026-11-14 の判断）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_24" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4547,18 +4558,79 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bolt_1" class="md-nav__link">
+  <a href="#validating-design" class="md-nav__link">
     <span class="md-ellipsis">
       
-        イテレーション（Bolt）ごとの設計ドキュメント整合
+        設計整合性の検証（validating-design の実施）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="設計整合性の検証（validating-design の実施）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_35" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        いつ実施するか（必須）
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3 軸の検証（本プロジェクトでの読み替え）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_36" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        不整合の扱い
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_37" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        結果の記録
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_38" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        補助の検査
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#_35" class="md-nav__link">
+  <a href="#_39" class="md-nav__link">
     <span class="md-ellipsis">
       
         局面移行時の一貫性維持
@@ -4569,7 +4641,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_36" class="md-nav__link">
+  <a href="#_40" class="md-nav__link">
     <span class="md-ellipsis">
       
         未決事項
@@ -4580,7 +4652,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_37" class="md-nav__link">
+  <a href="#_41" class="md-nav__link">
     <span class="md-ellipsis">
       
         更新履歴
@@ -9662,6 +9734,7 @@
 <li>アプローチの選択フローとサイクル: <a href="../../../reference/%E3%82%B3%E3%83%BC%E3%83%87%E3%82%A3%E3%83%B3%E3%82%B0%E3%81%A8%E3%83%86%E3%82%B9%E3%83%88%E3%82%AC%E3%82%A4%E3%83%89_AI-DLC%E7%89%88/">コーディングとテストガイド（AI-DLC 版）</a></li>
 <li>コーディング規約: <a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">関数型プログラミングガイド（Kotlin 編）</a></li>
 <li>テストの種類・カバレッジ・CI: <a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a></li>
+<li>設計整合性の検証: <code>validating-design</code>（本書の「<a href="#設計整合性の検証validating-design-の実施">設計整合性の検証</a>」）</li>
 <li>振る舞いの先行定義（Gherkin と Cucumber を導入する）: <a href="../../../reference/BDD%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/">BDD 導入ガイド</a></li>
 <li>ドキュメントとコードの同期: <a href="../../../reference/LivingDocumentation%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/">Living Documentation 導入ガイド</a></li>
 <li>本書は draft です。<strong>計画は B1〜B15 の範囲が確定済み</strong>ですが、各 Bolt のデモ項目は、Bolt ごとのステップ計画を作るときに具体化します（ここでは、リリース計画の「完了条件」を、受け入れ基準の元にします）。</li>
@@ -10300,10 +10373,18 @@
 <p>US1.1・1.2・2.1・2.2・2.3（基本）、US4.2、US6.1・6.2（基本）（<a href="../release_plan/">リリース計画</a>）。</p>
 <h3 id="_23">ワークフロー<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
 <p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJBQ1RJVklUWSIgc3R5bGU9IndpZHRoOjU5MnB4O2hlaWdodDo3MDhweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNTkycHgiIGhlaWdodD0iNzA4cHgiIHZpZXdCb3g9IjAgMCA1OTIgNzA4IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjE4OC4xMjEiIHk9IjMyLjk5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjE0LjQxNSIgZm9udC13ZWlnaHQ9IjcwMCI+44Ki44Km44OI44K144Kk44OJ44Kk44Oz77yIRVMrQ1FSU++8iTwvdGV4dD48L2c+PGVsbGlwc2UgY3g9IjI4MC44MjkiIGN5PSI2Mi4yOTciIHJ4PSIxMCIgcnk9IjEwIiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PHJlY3QgeD0iODMuNzI5IiB5PSI5Mi4yOTciIHdpZHRoPSIzOTQuMTk5IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSI5My43MjkiIHk9IjExMy40MzYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjM3NC4xOTkiPuODh+ODoumgheebruOCkiBHaXZlbi9XaGVuL1RoZW4g44Gu44K344OK44Oq44Kq44Gr44GZ44KL77yI5Lq644GoIEFJIOOBp+WQiOaEj++8iTwvdGV4dD48cmVjdCB4PSIxNjQuNTU3IiB5PSIxNDYuMjY2IiB3aWR0aD0iMjMyLjU0NCIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTc0LjU1NyIgeT0iMTY3LjQwNCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjEyLjU0NCI+RTJFIC8gSFRUUCDjga7jgrfjg4rjg6rjgqrjgpLmm7jjgY/vvIhSZWTvvIk8L3RleHQ+PHJlY3QgeD0iMTYiIHk9IjI0NC4yMzQiIHdpZHRoPSI1MjkuNjU3IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyNiIgeT0iMjY1LjM3MyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNTA5LjY1NyI+5LiA5q615YaF5YG044G45LiL44KK44KL77yI55S76Z2iIOKGkiBIVFRQIOKGkiDjgqLjg5fjg6rjgrHjg7zjgrfjg6fjg7Mg4oaSIOODieODoeOCpOODsyDihpIg44Kk44OZ44Oz44OI44K544OI44Ki44O75oqV5b2x77yJPC90ZXh0PjxyZWN0IHg9IjY3LjE1OCIgeT0iMjk4LjIwMyIgd2lkdGg9IjQyNy4zNDEiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9Ijc3LjE1OCIgeT0iMzE5LjM0MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNDA3LjM0MSI+44Gd44Gu5bGk44Gu44OG44K544OI44KS5pu444GP77yIUmVk77yJ44CC44G+44Gg54Sh44GE5YaF5YG044Gv44CB6Zai5pWw44Gu5p2f44Gu44K544K/44OW44Gn572u44GPPC90ZXh0PjxyZWN0IHg9IjE5Mi41MjYiIHk9IjM1Mi4xNzIiIHdpZHRoPSIxNzYuNjA0IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyMDIuNTI2IiB5PSIzNzMuMzExIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIxNTYuNjA0Ij7mnIDlsI/jga7lrp/oo4XjgafpgJrjgZnvvIhHcmVlbu+8iTwvdGV4dD48cmVjdCB4PSIyMjIuODI4IiB5PSI0MDYuMTQxIiB3aWR0aD0iMTE2LjAwMSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMjMyLjgyOCIgeT0iNDI3LjI3OSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iOTYuMDAxIj7jg6rjg5XjgqHjgq/jgr/jg6rjg7PjgrA8L3RleHQ+PHJlY3QgeD0iMTUxLjA1NCIgeT0iNDYwLjEwOSIgd2lkdGg9IjI1OS41NSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTYxLjA1NCIgeT0iNDgxLjI0OCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjM5LjU1Ij7mib/oqo3jgrLjg7zjg4jvvIhCMeOAnEIzIOOBr+OCueODhuODg+ODl+OBlOOBqOOBq+Wvhu+8iTwvdGV4dD48cG9seWdvbiBwb2ludHM9IjI4MC44MjksMjAwLjIzNCwyOTIuODI5LDIxMi4yMzQsMjgwLjgyOSwyMjQuMjM0LDI2OC44MjksMjEyLjIzNCwyODAuODI5LDIwMC4yMzQiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41O3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48cG9seWdvbiBwb2ludHM9IjIzMy45MSw1MTQuMDc4LDMyNy43NDgsNTE0LjA3OCwzMzkuNzQ4LDUyNi4wNzgsMzI3Ljc0OCw1MzguMDc4LDIzMy45MSw1MzguMDc4LDIyMS45MSw1MjYuMDc4LDIzMy45MSw1MTQuMDc4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PHRleHQgeD0iMjMzLjkxIiB5PSI1MjkuODg2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjExIiB0ZXh0TGVuZ3RoPSI5My44MzgiPuacgOOCguWGheWBtOOBvuOBp+WIsOmBlD88L3RleHQ+PHRleHQgeD0iMzM5Ljc0OCIgeT0iNTIzLjQ4NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMSIgdGV4dExlbmd0aD0iMzMiPuOBhOOBhOOBiDwvdGV4dD48cmVjdCB4PSIxOTguODI4IiB5PSI1NTguMDc4IiB3aWR0aD0iMTY0LjAwMSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMjA4LjgyOCIgeT0iNTc5LjIxNyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMTQ0LjAwMSI+44K544K/44OW44KS5a6f6KOF44Gr572u44GN5o+b44GI44KLPC90ZXh0PjxyZWN0IHg9IjE3MS41NTMiIHk9IjYxMi4wNDciIHdpZHRoPSIyMTguNTUyIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxODEuNTUzIiB5PSI2MzMuMTg2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIxOTguNTUyIj7jgrfjg4rjg6rjgqrjgYwgZ3JlZW4g44Gr44Gq44KL44GT44Go44KS56K66KqNPC90ZXh0PjxlbGxpcHNlIGN4PSIyODAuODI5IiBjeT0iNjc3LjAxNiIgcng9IjExIiByeT0iMTEiIGZpbGw9Im5vbmUiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48ZWxsaXBzZSBjeD0iMjgwLjgyOSIgY3k9IjY3Ny4wMTYiIHJ4PSI2IiByeT0iNiIgZmlsbD0iIzIyMiIgc3R5bGU9InN0cm9rZTojMjIyO3N0cm9rZS13aWR0aDoxOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iNzIuMjk3IiB4Mj0iMjgwLjgyOSIgeTI9IjkyLjI5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw4Mi4yOTcsMjgwLjgyOSw5Mi4yOTcsMjg0LjgyOSw4Mi4yOTcsMjgwLjgyOSw4Ni4yOTciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSIxMjYuMjY2IiB4Mj0iMjgwLjgyOSIgeTI9IjE0Ni4yNjYiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksMTM2LjI2NiwyODAuODI5LDE0Ni4yNjYsMjg0LjgyOSwxMzYuMjY2LDI4MC44MjksMTQwLjI2NiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjI3OC4yMDMiIHgyPSIyODAuODI5IiB5Mj0iMjk4LjIwMyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSwyODguMjAzLDI4MC44MjksMjk4LjIwMywyODQuODI5LDI4OC4yMDMsMjgwLjgyOSwyOTIuMjAzIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iMzMyLjE3MiIgeDI9IjI4MC44MjkiIHkyPSIzNTIuMTcyIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDM0Mi4xNzIsMjgwLjgyOSwzNTIuMTcyLDI4NC44MjksMzQyLjE3MiwyODAuODI5LDM0Ni4xNzIiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSIzODYuMTQxIiB4Mj0iMjgwLjgyOSIgeTI9IjQwNi4xNDEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksMzk2LjE0MSwyODAuODI5LDQwNi4xNDEsMjg0LjgyOSwzOTYuMTQxLDI4MC44MjksNDAwLjE0MSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjQ0MC4xMDkiIHgyPSIyODAuODI5IiB5Mj0iNDYwLjEwOSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw0NTAuMTA5LDI4MC44MjksNDYwLjEwOSwyODQuODI5LDQ1MC4xMDksMjgwLjgyOSw0NTQuMTA5IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iMjI0LjIzNCIgeDI9IjI4MC44MjkiIHkyPSIyNDQuMjM0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDIzNC4yMzQsMjgwLjgyOSwyNDQuMjM0LDI4NC44MjksMjM0LjIzNCwyODAuODI5LDIzOC4yMzQiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjMzOS43NDgiIHkxPSI1MjYuMDc4IiB4Mj0iNTU3LjY1NyIgeTI9IjUyNi4wNzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjU1My42NTcsMzc5LjE1Niw1NTcuNjU3LDM2OS4xNTYsNTYxLjY1NywzNzkuMTU2LDU1Ny42NTcsMzc1LjE1NiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iNTU3LjY1NyIgeTE9IjIxMi4yMzQiIHgyPSI1NTcuNjU3IiB5Mj0iNTI2LjA3OCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxsaW5lIHgxPSI1NTcuNjU3IiB5MT0iMjEyLjIzNCIgeDI9IjI5Mi44MjkiIHkyPSIyMTIuMjM0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIzMDIuODI5LDIwOC4yMzQsMjkyLjgyOSwyMTIuMjM0LDMwMi44MjksMjE2LjIzNCwyOTguODI5LDIxMi4yMzQiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSI0OTQuMDc4IiB4Mj0iMjgwLjgyOSIgeTI9IjUxNC4wNzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksNTA0LjA3OCwyODAuODI5LDUxNC4wNzgsMjg0LjgyOSw1MDQuMDc4LDI4MC44MjksNTA4LjA3OCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjE4MC4yMzQiIHgyPSIyODAuODI5IiB5Mj0iMjAwLjIzNCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSwxOTAuMjM0LDI4MC44MjksMjAwLjIzNCwyODQuODI5LDE5MC4yMzQsMjgwLjgyOSwxOTQuMjM0IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyODAuODI5IiB5MT0iNTM4LjA3OCIgeDI9IjI4MC44MjkiIHkyPSI1NTguMDc4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNzYuODI5LDU0OC4wNzgsMjgwLjgyOSw1NTguMDc4LDI4NC44MjksNTQ4LjA3OCwyODAuODI5LDU1Mi4wNzgiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI4MC44MjkiIHkxPSI1OTIuMDQ3IiB4Mj0iMjgwLjgyOSIgeTI9IjYxMi4wNDciIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI3Ni44MjksNjAyLjA0NywyODAuODI5LDYxMi4wNDcsMjg0LjgyOSw2MDIuMDQ3LDI4MC44MjksNjA2LjA0NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjgwLjgyOSIgeTE9IjY0Ni4wMTYiIHgyPSIyODAuODI5IiB5Mj0iNjY2LjAxNiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjc2LjgyOSw2NTYuMDE2LDI4MC44MjksNjY2LjAxNiwyODQuODI5LDY1Ni4wMTYsMjgwLjgyOSw2NjAuMDE2IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjw/cGxhbnR1bWwtc3JjIFBQOUJJbmpINUNWdC1ISHRnUllHc2Zxa0lZdDFUa1NacUJOR2VHUUFJV3BqVGt3dm9OSUlMNUFjWVNONmU0d2JiV1h2czhlbkhscWtkaW9DaV84aHo3X2xjRDg3MzhTeHp2eDd4dF9Fb01WcFJvcDF2M0R6Ty1Lb2RKNFRpSWVQLS1ELXdBUE5mZnVqQlFfUzNxa2ZoVm5nQmYtUVBWTVViSHlWNUFENmN5YUoyemN0cmxocW9wTU8zOG5XWVVqcExjTE1CUU9Nb25FTWtxbUw5MWlEMVlvX1l3U2x1N0dTVjdKM0dYTTl2ckFwd1BjcWMxUkZDdmQ1X3lCOTJuanpiZDFxYndyTm5acmRSTGdoODFkcnhSMXo1Wlo1R0Z2YXNIX3JBcXBiZjU5S2t1b1JsaFhybDJJaEZjWUx3aEQ5c3NDckQ1TUVlSjl2WDZQcmNDWC15Q1BuNXQtY0JIVjY4bHVvQkRVM2dydzJwUjg5dEExdGZBNkxDdFJ4YnZYak9kZER5WTBnN0I4aVo4NHhSQ2p1bm1faE5PSTdwTnNaXzhCZlhqS0UtWERUalA0NExTOHpFLVhNVFE3c19qdE44ZnZZLW1qd1lsbUJFU2pRVnMyMUJiTGRXZVFFb1Q3SXhESkwyS2V0VHdyamZiRWpNaGM4Y3RfNHpqeHlPdzRYREJKM0lrZFVvMWhjV3VhNTdVVUZKZWp0UXJiaW9HSDBjNllDVndyZHc3UFpNTmlvQVI5Uk9XQklwRVRFV2tRdDRGQjZzMlQ2cU5QT1JTMDdPekJHVm90QTFfNVF3bjVjUE4xTE9WYjl5djBOLUdDZWNDQ0FSY3AtMFcwMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
+<h3 id="b1-2026-11-14">B1 の進め方（序盤の例外。2026-11-14 の判断）<a class="headerlink" href="#b1-2026-11-14" title="Permanent link">&para;</a></h3>
+<p>序盤のワークフロー図は、外側から内側へ下りる順を示しますが、<strong>B1 は、ウォーキングスケルトンの土台を作る Bolt</strong> で、ドメイン・イベントストア・ポートの型と契約がまだ無く、スタブの置き場となる型が定まりません。そのため、次の順で進めます（<a href="../bolt_1_plan/">Bolt 1 計画</a>）。</p>
+<ol>
+<li><strong>入口（外側）</strong>: 日本語 Gherkin のシナリオと API の仕様を先に書き、Undefined を確認する（Step 3）。</li>
+<li><strong>土台（内側から）</strong>: ドメイン、イベントストアと投影、ポートを、Red → Green → Refactor で固める（Step 4〜7）。「共通の土台の最初のスライドでは、後続の振る舞いのテストも先に書く」規約で、先に失敗を確かめる。</li>
+<li><strong>結合（外側）</strong>: アプリケーション → HTTP → UI の順に結合し、シナリオを green にする（Step 8〜11）。</li>
+</ol>
+<p>B3、B4 は、土台が揃っているため、図のとおり、外側から内側へ下りる（アウトサイドイン）。</p>
 <h3 id="_24">手順の要点<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
 <ol>
 <li><strong>B1 の最初（H2 の実測）</strong>: <strong>H2 の PostgreSQL モードの実測を最初に行う</strong>。アドバイザリロック、<code>LISTEN</code> / <code>NOTIFY</code>、部分インデックス、ロール / GRANT、<code>jsonb</code>、SQLSTATE、分離レベルのどれが H2 で動くかを短い試験で確かめ、結果を B1 の記録に残して、H2 版で置き換える・省略する制約の一覧を確定する（H2 の導入は承認後。B1 の 4 日に含め、超過したら予備 B16 で吸収する）。</li>
-<li><strong>B1</strong>: <strong>Cucumber の基盤（Cucumber-JVM と Cucumber-JS、E2E）を最初に作る</strong>。キット準拠のゲームを通す 1 本の日本語 Gherkin のシナリオから入り、<code>decideGame</code>/<code>decideSession</code>/<code>simulateWeek</code> の最小、<code>EventStore.append</code>、同期投影、Ktor、React の最小の順に内側へ下りる。共通の土台の最初のスライドでは、後続の振る舞いのテストも先に書く。</li>
+<li><strong>B1</strong>: <strong>Cucumber の基盤（Cucumber-JVM と Cucumber-JS、E2E）を最初に作る</strong>。キット準拠のゲームを通す 1 本の日本語 Gherkin のシナリオと、API の仕様（<code>contracts/openapi.yaml</code>）から入る（<strong>入口は外側</strong>）。そのうえで、<strong>ウォーキングスケルトンの土台（ドメインの <code>decide</code>・<code>evolve</code>・<code>simulateWeek</code>、<code>EventStore</code>・投影、ポート）を、内側から固める</strong>。土台ができたら、<strong>アプリケーション → HTTP → UI の外側で結合し、シナリオを green にする</strong>（Bolt 1 計画の Step 3〜11）。共通の土台の最初のスライドでは、後続の振る舞いのテストも先に書く。<strong>B1 だけは、この「入口は外側、土台は内側から、結合は外側」の進め方</strong>で、レイヤーを貫く順序は、上の図（外側から内側へ下りる）とは異なる（2026-11-14 の判断。下の「B1 の進め方」）。</li>
 <li><strong>B2</strong>: Kotlin 固有の不確実性を、<strong>テストで</strong>解消する。<strong>静的解析とルール設定の厳格な適用の受入条件</strong>（<a href="#静的解析とルール設定厳格に適用">静的解析とルール設定</a>。fixture によるルールの確認、規約違反コードで CI が落ちること、detekt・PMD と Kotlin 2.4 の互換）、Kover が 2 つのソースセットを合算すること、追記専用権限の否定テストと連鎖削除の Red を確かめる。<strong>API の契約テストと型の生成も、CI に組み込む</strong>（仕様が先の進め方は B3 以降のすべての Bolt の完了条件になる）。<strong>悪ければ B3 以降を止める</strong>（<a href="../release_plan/">リリース計画</a>）。</li>
 <li><strong>B3</strong>: デプロイの定義（コンテナ、Terraform）を、適用せずに <code>validate</code>・<code>plan</code> とスモークテストで検証する。</li>
 <li><strong>B4</strong>: 振り返りの画面を、役割別の週結果の行から、E2E のシナリオ起点で作る。</li>
@@ -10315,6 +10396,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>静的解析とルール設定の受入条件（B2）を満たす</strong>: 規約違反コードで CI が落ちる。fixture のテストで、全ルールが期待どおり。違反 0 件、ベースラインなし、<code>@Suppress</code> なし</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Release 0.1 のリリース条件を満たす（<a href="../release_plan/">リリース計画</a>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 人による実操作の申告が Bolt 終了報告にある</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>着手前と完了時に <code>validating-design</code> を実施し、不整合が 0 件（または人が判断済み）。結果が Bolt の計画か終了報告に記録されている</strong></li>
 </ul>
 <hr />
 <h2 id="b5b12">中盤: インサイドアウト（B5〜B12）<a class="headerlink" href="#b5b12" title="Permanent link">&para;</a></h2>
@@ -10339,6 +10421,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 否定テスト・並行テストが green</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Release 0.2（B8）のリリース条件を満たす</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 設計判断が ADR に記録され、<code>docs/design/</code> が更新されている</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>着手前と完了時に <code>validating-design</code> を実施し、不整合が 0 件（または人が判断済み）</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 静的解析の違反が 0 件（ベースラインなし、<code>@Suppress</code> なし）。ルールの緩和・除外を足した場合は、ADR と承認がある</li>
 </ul>
 <hr />
@@ -10358,19 +10441,102 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 横断の受入条件と NFR の検証表の全件が実施済み</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Release 1.0 のリリース条件を満たす（AWS への適用は別ゲートで、未実施であることを明記する）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 生成するドキュメントが CI で成功している</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>着手前と完了時に <code>validating-design</code> を実施し、不整合が 0 件（または人が判断済み）</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 静的解析の違反が 0 件（ベースラインなし、<code>@Suppress</code> なし）</li>
 </ul>
 <hr />
-<h2 id="bolt_1">イテレーション（Bolt）ごとの設計ドキュメント整合<a class="headerlink" href="#bolt_1" title="Permanent link">&para;</a></h2>
-<p>各 Bolt で、ステップ計画の設計トピックと <code>docs/design/beer-game-kotlin/</code> の整合を、<strong>着手時・実装中・完了時</strong>に確認します。Bolt 計画は局所ビュー、設計書は全体の「正」です。実装で設計判断が変わったら、その場で設計書を更新します（計画だけに書いて放置しない）。</p>
+<h2 id="validating-design">設計整合性の検証（<code>validating-design</code> の実施）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
+<p>各 Bolt で、<strong>設計トピック（集約名、イベント名、テーブル名、制約名、<code>code</code>、URL、アプローチ、ユビキタス言語）が、開発戦略・Bolt 計画・設計書・過去の Bolt 計画の間でずれていないか</strong>を、<code>validating-design</code> で横断的に検証します。ずれは実装の不整合に直結するため、<strong>Bolt 計画を作成・更新した直後に、着手前に検証して解消します</strong>。設計書のレビューでも、同じ論点が複数の文書に分かれて現れ、取り残しが多く見つかりました（<a href="../../../review/beer-game-kotlin/design_review_20261114/">設計書レビュー</a>）。</p>
+<p>Bolt 計画は局所ビュー、設計書は全体の「正」です。実装で設計判断が変わったら、<strong>その場で設計書を更新します</strong>（計画だけに書いて放置しない）。</p>
+<h3 id="_35">いつ実施するか（必須）<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">時点</th>
+<th style="text-align: left;">実施すること</th>
+<th style="text-align: left;">対象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>着手前</strong>（Bolt 計画の作成・更新の直後）</td>
+<td style="text-align: left;"><code>validating-design</code> の 3 軸を実施し、不整合を解消する。<strong>NG が 0 件、または、残る項目を人が判断済みであること</strong>を、着手の条件にする</td>
+<td style="text-align: left;">当該 Bolt の計画</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>実装中</strong></td>
+<td style="text-align: left;">設計判断が変わったら、その場で設計書（と、必要なら ADR）を更新する。設計書を変えたときは、他の文書への影響を grep で確認する</td>
+<td style="text-align: left;">設計書、ADR</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>完了時</strong></td>
+<td style="text-align: left;">設計書への反映を確認し、<code>validating-design</code> をもう一度実施する。結果を Bolt 終了報告に記録する</td>
+<td style="text-align: left;">当該 Bolt の計画・設計書</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>設計書・開発戦略を更新したとき</strong></td>
+<td style="text-align: left;">影響する Bolt 計画（着手前のもの）に、<code>validating-design</code> を再度実施する</td>
+<td style="text-align: left;">後続の Bolt 計画</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3">3 軸の検証（本プロジェクトでの読み替え）<a class="headerlink" href="#3" title="Permanent link">&para;</a></h3>
+<p><code>validating-design</code> の「イテレーション計画」は、本プロジェクトでは <strong>Bolt 計画（<code>bolt_N_plan.md</code>）</strong> に読み替えます。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">軸</th>
+<th style="text-align: left;">検証対象</th>
+<th style="text-align: left;">正となる文書</th>
+<th style="text-align: left;">主眼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>A</strong></td>
+<td style="text-align: left;">開発戦略 ↔ Bolt 計画</td>
+<td style="text-align: left;">本書</td>
+<td style="text-align: left;">Bolt が属する局面（序盤・中盤・終盤）と、そのアプローチ（アウトサイドイン・インサイドアウト）に、計画の進め方（テストの入口、レイヤーを貫く順序）が一致しているか。対象ストーリー、受け入れ基準、「設計ドキュメント整合」のフロー（着手時・実装中・完了時）、局面移行の確認事項が反映されているか</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>B</strong></td>
+<td style="text-align: left;">Bolt 計画 ↔ 設計書（<code>docs/design/beer-game-kotlin/</code>）・ADR</td>
+<td style="text-align: left;">設計書、ADR</td>
+<td style="text-align: left;">計画に現れる設計トピック（集約、イベント、ポート、テーブルとマイグレーションの番号、エンドポイント、画面）が設計書に存在するか。逆に、対象ストーリーが要する設計の要素が計画に取り込まれているか。<strong>当該 Bolt のスコープの 4 図（ドメインモデル図、状態遷移図、ER 図、画面遷移図）が、計画の「設計」節にあるか</strong>（状態を持つ集約が無い Bolt では状態遷移図を、画面を伴わない Bolt では画面遷移図を省略してよく、その旨を書く）。ADR が要る設計判断が挙がっているか</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>C</strong></td>
+<td style="text-align: left;">今回の Bolt 計画 ↔ 過去の Bolt 計画・終了報告</td>
+<td style="text-align: left;">このプロジェクトの過去の Bolt 計画と終了報告。<strong>beer-game2 の Bolt 計画と終了報告</strong>（流用元。学びと持ち越し事項を含む）</td>
+<td style="text-align: left;">命名、ユビキタス言語、確立したパターンが連続しているか。過去の「学び」「持ち越し事項」「次のステップ」で、今回対応と明記された事項が、計画に反映されているか</td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li>着手時は <code>validating-design</code>（設計書と計画・過去の Bolt の整合）で検証する。</li>
+<li><strong>軸 B のフィールド単位の詳細突合</strong>（名前・型・遷移）は、<code>validating-iteration-plan</code> に委譲する。<code>validating-design</code> の軸 B は、設計トピックの過不足（カバレッジ）に絞る。</li>
+<li>3 軸は、独立に実行でき、並列に走らせてよい。</li>
+<li>本プロジェクトの設計書のファイル名は <code>domain-model.md</code>、<code>data-model.md</code>、<code>architecture-backend.md</code>、<code>architecture-frontend.md</code>、<code>ui-design.md</code> など（<code>validating-design</code> の記述の <code>ui_design.md</code> などは、これらに読み替える）。</li>
+</ul>
+<h3 id="_36">不整合の扱い<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>正の優先順位</strong>: 設計書・開発戦略・ADR &gt; 過去の Bolt 計画 &gt; 今回の Bolt 計画。不整合は、<strong>今回の Bolt 計画側を直す</strong>。ただし、設計書に未反映の設計判断が過去の計画にのみ残っている場合は、その判断を正として扱い、設計書への反映を促す。</li>
+<li><strong>戦略や設計そのものの見直しが要る重大なずれ</strong>（例: 局面のアプローチと、計画の進め方が食い違い、どちらが正しいか判断が要る）は、<strong>勝手に直さず、報告して人の判断を仰ぐ</strong>。</li>
+<li><strong>承認済みの Bolt 計画を、検証の結果で修正したとき</strong>は、更新履歴に「検証による修正」と記録し、<strong>人に再確認を求める</strong>（承認は、計画の内容に対するもので、修正後の内容への承認ではないため）。</li>
+</ul>
+<h3 id="_37">結果の記録<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h3>
+<p>検証の結果は、次の形で、Bolt 計画の更新履歴、または Bolt 終了報告に記録します（<code>validating-design</code> の報告形式）。</p>
+<ul>
+<li>軸ごとの結果（OK / NG）と不整合の件数、不整合の一覧（不整合の内容、計画の記述、正しい記述と出典、修正の要否）。</li>
+<li>人の判断を仰いだ項目と、その結論。</li>
+</ul>
+<h3 id="_38">補助の検査<a class="headerlink" href="#_38" title="Permanent link">&para;</a></h3>
+<ul>
 <li>構造の変更（モジュール、テーブル、イベント）は、アーキテクチャの検査（Gradle のモジュール境界、detekt）とフルテストで裏取りする。</li>
-<li><strong>設計書を変えたときは、他の文書への影響を grep で確認する</strong>（イベント名、<code>code</code>、テーブル名、制約名は、複数の文書に現れる。設計書のレビューで、この種の取り残しが多く見つかった）。</li>
+<li><strong>設計書を変えたときは、他の文書への影響を grep で確認する</strong>（イベント名、<code>code</code>、テーブル名、制約名は、複数の文書に現れる）。<code>validating-design</code> は、この確認を、Bolt 計画との突合まで広げたものである。</li>
 <li>設計書の暫定の決定（保持の起点、研修中の再構築の運用）は、B11・B12 の着手前に人が確定する（<a href="../release_plan/">リリース計画</a> の Level 1 計画）。</li>
 </ul>
 <hr />
-<h2 id="_35">局面移行時の一貫性維持<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h2>
+<h2 id="_39">局面移行時の一貫性維持<a class="headerlink" href="#_39" title="Permanent link">&para;</a></h2>
 <p>局面が変わっても、次は変えません。</p>
 <table>
 <thead>
@@ -10401,6 +10567,10 @@
 <td style="text-align: left;">モジュール境界（ドメインは Kotlin 標準と Arrow だけに依存）、<code>ForbiddenMethodCall</code>、関数型ルール（PMD）、ルールの fixture のテスト</td>
 </tr>
 <tr>
+<td style="text-align: left;">設計整合性の検証</td>
+<td style="text-align: left;"><strong>各 Bolt の着手前と完了時に <code>validating-design</code></strong>（3 軸）。設計書を変えたときは grep で影響を確認する</td>
+</tr>
+<tr>
 <td style="text-align: left;">ユビキタス言語</td>
 <td style="text-align: left;">イベント名・コマンド名・<code>code</code> は、設計書とコードで同じ。生成する用語集で一本化する</td>
 </tr>
@@ -10412,7 +10582,7 @@
 </table>
 <p><strong>局面の移行は、移行の前に確認する</strong>: 序盤 → 中盤の前に、B2 の判定（detekt の互換、Kover、連鎖削除）と、B1 の実績による所要の再調整を行う。中盤 → 終盤の前に、Release 0.2 のリリース条件と、未決の設計項目（保持の起点、再構築の運用）の確定を確認する。</p>
 <hr />
-<h2 id="_36">未決事項<a class="headerlink" href="#_36" title="Permanent link">&para;</a></h2>
+<h2 id="_40">未決事項<a class="headerlink" href="#_40" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>H2 の導入の承認</strong>（<code>com.h2database:h2</code>、開発用の新規依存）と、H2 の版の確認。<strong>H2 の PostgreSQL モードで動く範囲の実測</strong>（B1 の最初）。結果に合わせて、H2 版で置き換える・省略する制約の一覧と、Flyway のベンダー別の配置（共通の部分を最大化し、差分だけ分ける）を確定する。</li>
 <li><strong>PMD の導入の承認</strong>（新規の CI ツール。承認までは detekt と ktlint で進める）。技術スタック（T5）、テスト戦略（静的解析の節）、リリース計画（B2）は、本書に合わせて更新済み（2026-11-14）。</li>
@@ -10430,7 +10600,7 @@
 <li>局面への Bolt の割り当ては、B1 の実績（所要、AI の出力の質）で見直す。特に、B9・B10 を中盤とするか、終盤に回すか。</li>
 </ul>
 <hr />
-<h2 id="_37">更新履歴<a class="headerlink" href="#_37" title="Permanent link">&para;</a></h2>
+<h2 id="_41">更新履歴<a class="headerlink" href="#_41" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10440,6 +10610,16 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;"><strong>B1 の進め方を明確化</strong>（ユーザーの判断: 案 A）。B1 の手順の文を、入口は外側、土台は内側から、結合は外側、に直し、「B1 の進め方（序盤の例外）」を追加。<code>validating-design</code> の軸 A の不整合（図と文の食い違い）の解消</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;"><strong><code>validating-design</code> の実施を明記</strong>（ユーザーの指示）: 「設計整合性の検証」の節を追加（実施の時点、3 軸の読み替え、不整合の扱い、結果の記録）。局面ごとの完了条件と不変の規律に追加。<strong>承認済みの文書への追記のため、人に再確認を求める</strong></td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;"><strong>開発戦略の承認</strong>（ユーザーの明示的な承認。リリース計画の承認と同時）</td>
