@@ -5,9 +5,13 @@ import type {
     CreateGameRequest,
     CreateGameResult,
     GameState,
+    CreateGameResponse,
     JoinGameRequest,
+    JoinResponse,
     Lobby,
     ProblemBody,
+    RecoverRequest,
+    RecoverResponse,
     Role,
     SaveDecisionRequest,
     SessionState,
@@ -19,8 +23,13 @@ export interface ApiClient {
     getGameState(gameId: string): Promise<GameState>;
     getLobby(gameId: string): Promise<Lobby>;
     assignRole(gameId: string, participantId: string, role: Role): Promise<CommandResponse>;
-    joinGame(request: JoinGameRequest): Promise<CommandResponse>;
+    joinGame(request: JoinGameRequest): Promise<JoinResponse>;
+    /** 復帰。復帰コードを省くと、Cookie の復帰資格で復帰する。新しいブラウザセッションは Set-Cookie で発行される。 */
+    recoverParticipation(request: RecoverRequest): Promise<RecoverResponse>;
     startGame(gameId: string): Promise<CommandResponse>;
+    /** 進行役だけ。停止中は、参加者の保存と週の確定を受け付けない。 */
+    pauseSession(sessionId: string): Promise<CommandResponse>;
+    resumeSession(sessionId: string): Promise<CommandResponse>;
     getSessionState(sessionId: string): Promise<SessionState>;
     /** expectedVersion は、画面が見ている意思決定の版（If-Match）。 */
     saveDecision(
@@ -113,8 +122,10 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         }
     }
 
-    async function commandResponse(response: Response): Promise<CommandResponse> {
-        return (await response.json()) as CommandResponse;
+    async function commandResponse<T extends CommandResponse = CommandResponse>(
+        response: Response,
+    ): Promise<T> {
+        return (await response.json()) as T;
     }
 
     return {
@@ -127,7 +138,7 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
                     detail: '応答の Location からゲームの ID を得られません',
                 });
             }
-            return { ...(await commandResponse(response)), gameId };
+            return { ...(await commandResponse<CreateGameResponse>(response)), gameId };
         },
         getGameState: (gameId) => query<GameState>(`/games/${gameId}/state`),
         getLobby: (gameId) => query<Lobby>(`/games/${gameId}/lobby`),
@@ -139,7 +150,24 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
             );
         },
         async joinGame(request) {
-            return commandResponse(await command('POST', '/participations/join', request));
+            return commandResponse<JoinResponse>(
+                await command('POST', '/participations/join', request),
+            );
+        },
+        async recoverParticipation(request) {
+            return commandResponse<RecoverResponse>(
+                await command('POST', '/participations/recover', request),
+            );
+        },
+        async pauseSession(sessionId) {
+            return commandResponse(
+                await command('POST', `/sessions/${sessionId}/pause`, undefined),
+            );
+        },
+        async resumeSession(sessionId) {
+            return commandResponse(
+                await command('POST', `/sessions/${sessionId}/resume`, undefined),
+            );
         },
         async startGame(gameId) {
             return commandResponse(await command('POST', `/games/${gameId}/start`, undefined));

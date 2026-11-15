@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../api/errors';
 import type { Role, RoleStatus, RoleWeekResult, SessionState } from '../../api/types';
+import { expectNoStructuralA11yViolations } from '../../testing/a11y';
 import { GAME_ID, fakeApi, gameState, roleStatus, versions } from '../../testing/fakeApi';
 import { renderApp } from '../../testing/render';
 
@@ -338,6 +339,242 @@ describe('S06 進行役のコンソール', () => {
         });
         renderApp(api, PATH);
         expect(await screen.findByText('この画面を開く権限がありません。')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '参加の画面へ' })).toHaveAttribute('href', '/join');
+        // 復帰できるように、いまのゲームの ID を導線に持たせる
+        expect(screen.getByRole('link', { name: '参加・復帰の画面へ' })).toHaveAttribute(
+            'href',
+            `/join?gameId=${GAME_ID}`,
+        );
+    });
+
+    describe('停止・再開', () => {
+        it('進行中は「停止する」を示し、押すと、対象と影響を示す確認ダイアログを開く（送らない）', async () => {
+            const user = userEvent.setup();
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () => Promise.resolve(consoleState()),
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '停止する' }));
+
+            const dialog = await screen.findByRole('dialog', { name: '第 1 週を一時停止' });
+            expect(dialog).toHaveTextContent(
+                '停止すると、参加者は入力できなくなり、週を確定できなくなります。再開するまで、第 1 週のままです。',
+            );
+            expect(dialog).toHaveTextContent('入力済みの値は、失われません。');
+            expect(api.pauseSession).not.toHaveBeenCalled();
+            expect(screen.queryByRole('button', { name: '再開する' })).not.toBeInTheDocument();
+            await user.click(within(dialog).getByRole('button', { name: '戻る' }));
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+            expect(api.pauseSession).not.toHaveBeenCalled();
+        });
+
+        it('停止を確定すると、取得し直した状態から「停止中」を示し、「再開する」に切り替わり、週の確定を出さない', async () => {
+            const user = userEvent.setup();
+            let paused = false;
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () =>
+                    Promise.resolve(
+                        paused
+                            ? consoleState({ status: 'PAUSED', versions: versions(6, 10) })
+                            : consoleState(),
+                    ),
+                pauseSession: () => {
+                    paused = true;
+                    return Promise.resolve({ versions: versions(6) });
+                },
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '停止する' }));
+            await user.click(
+                within(await screen.findByRole('dialog')).getByRole('button', {
+                    name: '一時停止する',
+                }),
+            );
+
+            expect(await screen.findByText(/^第 1 週\s+停止中$/)).toBeInTheDocument();
+            expect(api.pauseSession).toHaveBeenCalledWith(GAME_ID);
+            expect(screen.getByRole('button', { name: '再開する' })).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '停止する' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '週を確定' })).not.toBeInTheDocument();
+            expect(
+                screen.getByText('停止中です。再開するまで、週を確定できません。'),
+            ).toBeVisible();
+            // 停止中でも、各役割の入力状況（進行役だけが見られる値）は見える
+            expect(
+                within(screen.getByRole('listitem', { name: '小売店' })).getByText('入力済み: 4'),
+            ).toBeInTheDocument();
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        });
+
+        it('停止中は「再開する」を示し、確認ダイアログを経て再開すると、「進行中」に戻り、「週を確定」が戻る', async () => {
+            const user = userEvent.setup();
+            let paused = true;
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () =>
+                    Promise.resolve(
+                        paused
+                            ? consoleState({ status: 'PAUSED', versions: versions(6, 10) })
+                            : consoleState({ versions: versions(7, 10) }),
+                    ),
+                resumeSession: () => {
+                    paused = false;
+                    return Promise.resolve({ versions: versions(7) });
+                },
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '再開する' }));
+            const dialog = await screen.findByRole('dialog', { name: '第 1 週を再開' });
+            expect(dialog).toHaveTextContent('再開すると、参加者は第 1 週の入力を再開できます。');
+            await user.click(within(dialog).getByRole('button', { name: '再開する' }));
+
+            expect(await screen.findByText(/^第 1 週\s+進行中$/)).toBeInTheDocument();
+            expect(api.resumeSession).toHaveBeenCalledWith(GAME_ID);
+            expect(screen.getByRole('button', { name: '週を確定' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '停止する' })).toBeInTheDocument();
+        });
+
+        it('停止の操作の確定中は、ボタンを無効にし「停止中」でなく「確定中」と示す（二重の送信をしない）', async () => {
+            const user = userEvent.setup();
+            let release: () => void = () => undefined;
+            const gate = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () => Promise.resolve(consoleState()),
+                pauseSession: async () => {
+                    await gate;
+                    return { versions: versions(5) };
+                },
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '停止する' }));
+            await user.click(
+                within(await screen.findByRole('dialog')).getByRole('button', {
+                    name: '一時停止する',
+                }),
+            );
+            expect(await screen.findByRole('button', { name: '確定中' })).toBeDisabled();
+            release();
+            await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        });
+
+        it('すでに停止されていた（session.paused）ときは、その文言を示し、最新の状態（停止中）に切り替える', async () => {
+            const user = userEvent.setup();
+            let paused = false;
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () =>
+                    Promise.resolve(
+                        paused
+                            ? consoleState({ status: 'PAUSED', versions: versions(6, 10) })
+                            : consoleState(),
+                    ),
+                pauseSession: () => {
+                    paused = true;
+                    return Promise.reject(
+                        new ApiError(409, {
+                            type: '/problems/session.paused',
+                            code: 'session.paused',
+                            correlationId: 'c-pp',
+                        }),
+                    );
+                },
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '停止する' }));
+            await user.click(
+                within(await screen.findByRole('dialog')).getByRole('button', {
+                    name: '一時停止する',
+                }),
+            );
+            expect(await screen.findByRole('alert')).toHaveTextContent(
+                '停止中です。進行役の再開を待ってください。',
+            );
+            expect(await screen.findByText(/^第 1 週\s+停止中$/)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: '再開する' })).toBeInTheDocument();
+        });
+
+        it('停止中でなかった（session.not_paused）ときは、その文言を示し、最新の状態（進行中）に切り替える', async () => {
+            const user = userEvent.setup();
+            let paused = true;
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () =>
+                    Promise.resolve(
+                        paused
+                            ? consoleState({ status: 'PAUSED' })
+                            : consoleState({ versions: versions(7, 10) }),
+                    ),
+                resumeSession: () => {
+                    paused = false;
+                    return Promise.reject(
+                        new ApiError(409, {
+                            type: '/problems/session.not_paused',
+                            code: 'session.not_paused',
+                        }),
+                    );
+                },
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '再開する' }));
+            await user.click(
+                within(await screen.findByRole('dialog')).getByRole('button', {
+                    name: '再開する',
+                }),
+            );
+            expect(await screen.findByRole('alert')).toHaveTextContent('停止中ではありません。');
+            expect(await screen.findByText(/^第 1 週\s+進行中$/)).toBeInTheDocument();
+        });
+
+        it('権限の失敗（403）は、権限の文言と導線を示す', async () => {
+            const user = userEvent.setup();
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () => Promise.resolve(consoleState()),
+                pauseSession: () =>
+                    Promise.reject(
+                        new ApiError(403, {
+                            type: '/problems/app.unauthorized',
+                            code: 'app.unauthorized',
+                        }),
+                    ),
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '停止する' }));
+            await user.click(
+                within(await screen.findByRole('dialog')).getByRole('button', {
+                    name: '一時停止する',
+                }),
+            );
+            expect(await screen.findByRole('alert')).toHaveTextContent(
+                'この画面を開く権限がありません。',
+            );
+        });
+
+        it('開始前（セッションなし）と終了後は、停止・再開の操作を出さない', async () => {
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState({ status: 'ENDED' })),
+                getSessionState: () => Promise.resolve(consoleState({ status: 'ENDED', week: 12 })),
+            });
+            renderApp(api, PATH);
+            await screen.findByText(/^第 12 週\s+終了$/);
+            expect(screen.queryByRole('button', { name: '停止する' })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: '再開する' })).not.toBeInTheDocument();
+        });
+
+        it('構造のアクセシビリティ（名前・参照先・見出し・題名・ダイアログ）に違反が無い（進行中・停止中・ダイアログ）', async () => {
+            const user = userEvent.setup();
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState()),
+                getSessionState: () => Promise.resolve(consoleState({ status: 'PAUSED' })),
+            });
+            renderApp(api, PATH);
+            await user.click(await screen.findByRole('button', { name: '再開する' }));
+            await screen.findByRole('dialog');
+            expectNoStructuralA11yViolations();
+        });
     });
 });

@@ -44,9 +44,12 @@ const sortedResults = (results: RoleWeekResult[]) =>
         (a, b) => b.week - a.week || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role),
     );
 
+/** 停止・再開の確認ダイアログが開いているときの操作。 */
+type Control = 'pause' | 'resume';
+
 /**
- * S06 進行役のコンソール。B1 の範囲: 各役割の入力状況、「週を確定」と確認ダイアログ、状態の表示。
- * 停止・再開・終了、代理入力、資格の失効は B5 以降。
+ * S06 進行役のコンソール。範囲: 各役割の入力状況、「週を確定」と確認ダイアログ、状態の表示、停止・再開（B5 Step 7）。
+ * 終了、代理入力、資格の失効・再発行は、B5 の範囲外（判断項目 13。B6 以降）。
  */
 export function ConsolePage() {
     const { gameId = '' } = useParams();
@@ -63,9 +66,18 @@ export function ConsolePage() {
     const [busy, setBusy] = useState(false);
     const [failure, setFailure] = useState<unknown>(null);
     const [advancedText, setAdvancedText] = useState<string | null>(null);
+    const [control, setControl] = useState<Control | null>(null);
     const titleId = useId();
+    const controlTitleId = useId();
     const titleRef = useRef<HTMLHeadingElement>(null);
     const noticeRef = useRef<HTMLHeadingElement>(null);
+    const controlTitleRef = useRef<HTMLHeadingElement>(null);
+
+    // 停止・再開の確認ダイアログを開いたときは、見出しへフォーカスを移す
+    const controlOpened = control !== null;
+    useEffect(() => {
+        if (controlOpened) controlTitleRef.current?.focus();
+    }, [controlOpened]);
 
     // 確認ダイアログを開いたときは見出しへ、更新した値で開き直したときは通知の見出しへ、フォーカスを移す
     const opened = confirm !== null;
@@ -121,6 +133,43 @@ export function ConsolePage() {
         } catch (error) {
             await handleCommitFailure(error, target);
         } finally {
+            setBusy(false);
+        }
+    }
+
+    /**
+     * 停止・再開。応答は versions だけ。状態は、追いついた取得の結果から表示する。
+     * すでに停止中・停止中でなかった（session.paused・session.not_paused）ときは、その文言を示し、最新の状態へ切り替える。
+     */
+    async function changeSessionStatus(target: Control) {
+        setBusy(true);
+        setFailure(null);
+        setAdvancedText(null);
+        try {
+            const result =
+                target === 'pause'
+                    ? await api.pauseSession(sessionId)
+                    : await api.resumeSession(sessionId);
+            const { snapshot } = await fetchCaughtUp(
+                () => api.getSessionState(sessionId),
+                result.versions,
+                catchUp,
+            );
+            setData({ game, session: snapshot });
+        } catch (error) {
+            setFailure(error);
+            if (
+                error instanceof ApiError &&
+                (error.code === 'session.paused' || error.code === 'session.not_paused')
+            ) {
+                try {
+                    setData({ game, session: await api.getSessionState(sessionId) });
+                } catch (reloadError) {
+                    setFailure(reloadError);
+                }
+            }
+        } finally {
+            setControl(null);
             setBusy(false);
         }
     }
@@ -187,6 +236,17 @@ export function ConsolePage() {
                         週を確定
                     </button>
                     {!canCommit ? <p>4 役割の入力が揃うと、週を確定できます。</p> : null}
+                    <button type="button" disabled={busy} onClick={() => setControl('pause')}>
+                        停止する
+                    </button>
+                </>
+            ) : null}
+            {session.status === 'PAUSED' ? (
+                <>
+                    <p role="status">停止中です。再開するまで、週を確定できません。</p>
+                    <button type="button" disabled={busy} onClick={() => setControl('resume')}>
+                        再開する
+                    </button>
                 </>
             ) : null}
 
@@ -199,6 +259,38 @@ export function ConsolePage() {
                         ))}
                     </ul>
                 </section>
+            ) : null}
+
+            {control ? (
+                <Dialog labelledBy={controlTitleId} onClose={() => setControl(null)}>
+                    <h2 id={controlTitleId} ref={controlTitleRef} tabIndex={-1}>
+                        {control === 'pause'
+                            ? `第 ${session.week} 週を一時停止`
+                            : `第 ${session.week} 週を再開`}
+                    </h2>
+                    {control === 'pause' ? (
+                        <>
+                            <p>
+                                {`停止すると、参加者は入力できなくなり、週を確定できなくなります。再開するまで、第 ${session.week} 週のままです。`}
+                            </p>
+                            <p>入力済みの値は、失われません。</p>
+                        </>
+                    ) : (
+                        <p>{`再開すると、参加者は第 ${session.week} 週の入力を再開できます。`}</p>
+                    )}
+                    <div className="actions">
+                        <button type="button" disabled={busy} onClick={() => setControl(null)}>
+                            戻る
+                        </button>
+                        <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void changeSessionStatus(control)}
+                        >
+                            {busy ? '確定中' : control === 'pause' ? '一時停止する' : '再開する'}
+                        </button>
+                    </div>
+                </Dialog>
             ) : null}
 
             {confirm ? (

@@ -133,6 +133,14 @@ export function PlayPage() {
             } catch (reloadError) {
                 setFailure(reloadError);
             }
+        } else if (error instanceof ApiError && error.code === 'session.paused') {
+            // 保存の直前に停止された。文言を示し、最新の状態（停止中）へ切り替える。入力中の値は保持する
+            setFailure(error);
+            try {
+                applySession(await api.getSessionState(at.sessionId));
+            } catch (reloadError) {
+                setFailure(reloadError);
+            }
         } else {
             setFailure(error);
         }
@@ -216,6 +224,9 @@ export function PlayPage() {
                                 ) : null}
                             </dl>
                             <h2>{role === 'FACTORY' ? '生産要請' : '発注'}</h2>
+                            {status === 'PAUSED' ? (
+                                <p role="status">停止中です。進行役の再開を待ってください。</p>
+                            ) : null}
                             <p>{`現在の入力: ${roleStatus.decision ?? '未入力'}`}</p>
                             {carried ? (
                                 <p>{`第 ${carried.week} 週に入力していた値: ${carried.value}（未保存）`}</p>
@@ -227,6 +238,7 @@ export function PlayPage() {
                                         id="quantity"
                                         inputMode="numeric"
                                         value={draft}
+                                        disabled={status === 'PAUSED'}
                                         onChange={(event) => setDraft(event.target.value)}
                                         aria-invalid={fieldError ? true : undefined}
                                         aria-describedby={fieldError ? 'quantity-error' : undefined}
@@ -237,7 +249,7 @@ export function PlayPage() {
                                         </p>
                                     ) : null}
                                 </div>
-                                <button type="submit" disabled={busy}>
+                                <button type="submit" disabled={busy || status === 'PAUSED'}>
                                     発注を保存
                                 </button>
                             </form>

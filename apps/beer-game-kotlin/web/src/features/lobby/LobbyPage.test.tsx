@@ -188,6 +188,9 @@ describe('S04 ロビー（進行役）', () => {
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
         expect(await screen.findByText('この画面を開く権限がありません。')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '参加の画面へ' })).toHaveAttribute('href', '/join');
+        expect(screen.getByRole('link', { name: '参加・復帰の画面へ' })).toHaveAttribute(
+            'href',
+            `/join?gameId=${GAME_ID}`,
+        );
     });
 });

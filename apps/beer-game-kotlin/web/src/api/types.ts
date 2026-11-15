@@ -27,8 +27,19 @@ export type StreamVersions = Schemas['StreamVersions'];
 
 export type CommandResponse = Schemas['CommandResponse'];
 
-/** 作成の応答は、versions に加えて、Location から得たゲームの ID を持つ（クライアントが組み立てる）。 */
-export interface CreateGameResult extends CommandResponse {
+/** 作成の応答。versions に加えて、進行役の復帰コード（recoveryCode）を一度だけ示す（B5 の例外。ADR-015）。 */
+export type CreateGameResponse = Schemas['CreateGameResponse'];
+
+/** 参加の応答。versions に加えて、参加したゲームの ID（gameId）を返す（B5 の判断項目 7）。 */
+export type JoinResponse = Schemas['JoinResponse'];
+
+export type RecoverRequest = Schemas['RecoverRequest'];
+
+/** 復帰の応答。復帰したゲームの ID と、復帰した操作者の種別（進行役か参加者）、参加者の担当の役割。 */
+export type RecoverResponse = Schemas['RecoverResponse'];
+
+/** 作成の結果は、応答に加えて、Location から得たゲームの ID を持つ（クライアントが組み立てる）。 */
+export interface CreateGameResult extends CreateGameResponse {
     gameId: string;
 }
 

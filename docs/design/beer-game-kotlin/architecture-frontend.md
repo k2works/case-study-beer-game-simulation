@@ -4,7 +4,7 @@ title: "フロントエンドアーキテクチャ - ビールゲームシミュ
 description: "Kotlin 版のフロントエンドアーキテクチャ。React/TypeScript は beer-game2 を踏襲し、Kotlin バックエンドとの API 契約（OpenAPI からの型生成）、ストリームごとの版によるリアルタイム更新、エラーの識別子と表示名の対応など、変更点を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T08:13:26Z }
 ---
 
 # フロントエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -252,6 +252,7 @@ beer-game2 から変更しません（画面の位置は URL、サーバー状�
 | 16 | 参加者向けロビー（S04）が参加後に見える | B1 の API はロビーが進行役だけで、参加の応答が `gameId` を返さない。参加者は参加後に進めない（未決事項） | API の欠け |
 | 17 | `.catch(() => {})` などの握りつぶしの検出（lint の方針は未決） | B1 は、テストがエラーを握りつぶさない運用。lint の規則は入れていない。**B2 でも入れていない（未実施。B3 以降で決める）**。ESLint は `steps/`・`support/`（.mjs）の対象外 | 実バグを隠した beer-game2 の B1 の学び #2 |
 | 18（B2 の実装。2026-11-15） | 型は OpenAPI から生成し、**生成物はコミットしない**。B1 は `web/src/api/types.ts` に手書き | **`openapi-typescript` 7.13.0 で生成し、生成物 `src/api/generated/schema.d.ts` をコミットする**（`api:check` が差分 0 を検査。ビルドの前の生成ではなく、コミット済みの生成物と一致させる運用）。`types.ts` は生成物からの写しに置き換え、手書きは画面だけの型（`CreateGameResult`、`ProblemBody`、整数以外も受ける `CreateGameRequest`）と実行時の値（`ROLES`）に絞った。`CreateGameRequest` が仕様より狭くならないこと、`ROLES` が `Role` を網羅することは、型の検査で守る。仕様の `GameState.sessionId` の `required` 化（`string \| null`）で、画面の型が正しくなった | B2 の Step 5。「コミットしない」とした設計と異なる（人の確認が要る） |
+| 19（B5 Step 7 の実装。2026-11-15） | `ApiClient` は B1 の操作だけ。参加の応答は `versions` だけ（変更表 16 の「参加者は参加後に進めない」） | `ApiClient` に `pauseSession`・`resumeSession`・`recoverParticipation` を足し、`createGame` の結果に `recoveryCode`、`joinGame` の結果に `gameId` を持たせた（型は生成物の `CreateGameResponse`・`JoinResponse`・`RecoverResponse`）。S03 は、参加後に `gameId` でプレイの画面へ進み、復帰（ゲーム ID と任意の復帰コード。復帰のあとに `getGameState` で行き先を決める）を持つ。`ErrorNotice` の権限の導線は「参加・復帰の画面へ」で、URL のゲームの ID を `?gameId=` に持たせる。`problems.ts` の `describeProblem` は、資格を送った操作（`context.credential`）の 403 を、`app.unauthorized`（復帰）でも `game.invitation_invalid`（参加）でも、送った資格の種類から選ぶ。`Record<ErrorCode, ...>` の辞書の B5 の `code`（`session.paused` ほか 8 件）に文言を加えた。**`features/` の新しいディレクトリ・コンポーネントは作らず**、S03 は `participation/JoinPage.tsx` に収めた。構造のアクセシビリティの自前の検査 `src/testing/a11y.ts`（コンポーネントのテスト用。axe の代わりではない） | B5 の判断項目 7・13。範囲外: 代理入力・資格の失効と再発行・終了の画面（B6 以降）、自動更新（SSE） |
 
 ## 設計判断
 
@@ -304,11 +305,11 @@ beer-game2 から変更しません（画面の位置は URL、サーバー状�
 
 **B1 の実装で出た未決（2026-11-14。人の判断が要る）:**
 
-- **参加者が、参加の後に進めない（API の欠け）。** 参加の応答は `versions` だけで、`gameId` も `Location` も返さないため、参加者は `gameId` を知る手段が無く、S03 は「参加しました。進行役が開始するまでお待ちください。」で止まる。S05 は `/games/:id/play` を直接開けば動く（コンポーネントのテストで確認）が、実ブラウザの E2E では確かめていない（`@ui` は進行役の 1 本）。対応案は、参加の応答に `gameId`（`Location`）を足すこと（バックエンド・仕様の変更）。S04 の参加者向けの表示は、ロビーの取得が進行役専用のため作れていない。
+- **【解消。B5 Step 6・7】参加者が、参加の後に進めない（API の欠け）。** B5 で参加の応答に `gameId` を足し、Step 7 で、参加後にプレイの画面へ自動で進むようにした（以下は B1 当時の記述）。 参加の応答は `versions` だけで、`gameId` も `Location` も返さないため、参加者は `gameId` を知る手段が無く、S03 は「参加しました。進行役が開始するまでお待ちください。」で止まる。S05 は `/games/:id/play` を直接開けば動く（コンポーネントのテストで確認）が、実ブラウザの E2E では確かめていない（`@ui` は進行役の 1 本）。対応案は、参加の応答に `gameId`（`Location`）を足すこと（バックエンド・仕様の変更）。S04 の参加者向けの表示は、ロビーの取得が進行役専用のため作れていない。
 - Gherkin の「「週を確定」を押す」は、確認ダイアログを書いていない（UI 設計は確認ダイアログを必須とするため、窓口が「第 N 週を確定」まで押す）。シナリオに 1 ステップ足すか。
 - SSE と自動更新、古い応答を適用しない規則、「結果が不明」の表示、反映中の表示、参加コードのコピー、S01 のヘルプへの導線、オフライン。Dialog の Tab の循環・Escape・フォーカスの復帰は実装したが、**試験していない**。
-- アクセシビリティ: ラベル、`aria-invalid`・`aria-describedby`、`aria-live`・`role="status"`・`role="alert"`、見出しへのフォーカス、`document.title`、スキップリンクは実装し一部試験した。**axe の自動検査、コントラスト比、200% 拡大、スクリーンリーダーは未実施**。
-- 進行役のコンソールは、各役割の入力値を出すが、担当者の名前と保存者は出さない（状態の API に項目が無い）。4 分割・週ごとの履歴・停止/再開/終了・代理入力・資格の失効は B5 以降。
+- アクセシビリティ: ラベル、`aria-invalid`・`aria-describedby`、`aria-live`・`role="status"`・`role="alert"`、見出しへのフォーカス、`document.title`、スキップリンクは実装し一部試験した。**axe の自動検査、コントラスト比、200% 拡大、スクリーンリーダーは未実施**（B5 Step 7 で、S03・S05 の停止中・S06 の停止・再開のダイアログについて、自前の DOM 構造の検査 `src/testing/a11y.ts` を足したが、axe は未導入）。
+- 進行役のコンソールは、各役割の入力値を出すが、担当者の名前と保存者は出さない（状態の API に項目が無い）。4 分割・週ごとの履歴・終了・代理入力・資格の失効と再発行は B6 以降（**停止・再開は B5 Step 7 で実装**）。
 - 仮置きの文言・値（`game.not_preparing`「参加の受付は終了しています。」、付け替えの確認のボタン「移す」「戻って確認」、「確定した週の結果」の 1 行の形式、一般の文言、未知の `code` の扱い）。作成画面の初期値（最終週 12、需要系列 4 を 12 週）は画面イメージの例で、キットの既定は ASM-01 のとおり未確定。費用は最小単位の整数のまま表示している（単位は未決）。`npm install` が「中程度の脆弱性 8 件」と表示した（未調査）。Node は 24.11.0 で実行した（設計の Node 26 は未導入。`.nvmrc` は未作成）。
 
 ## 出典

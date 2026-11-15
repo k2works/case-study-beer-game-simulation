@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: [architecture-frontend](/design/beer-game-kotlin/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [ui-design](/design/beer-game-kotlin/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）
 * **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）

@@ -16,7 +16,7 @@ export function WelcomePage() {
                     </li>
                     <li>
                         <Link to="/join" className="button">
-                            参加
+                            参加・復帰
                         </Link>
                     </li>
                 </ul>

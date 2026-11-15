@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../api/errors';
 import type { Role, SessionState } from '../../api/types';
+import { expectNoStructuralA11yViolations } from '../../testing/a11y';
 import { GAME_ID, fakeApi, gameState, roleStatus, versions } from '../../testing/fakeApi';
 import { renderApp } from '../../testing/render';
 
@@ -281,7 +282,104 @@ describe('S05 プレイ', () => {
         });
         renderApp(api, PATH);
         expect(await screen.findByText('この画面を開く権限がありません。')).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: '参加の画面へ' })).toHaveAttribute('href', '/join');
+        // 復帰できるように、いまのゲームの ID を導線に持たせる
+        expect(screen.getByRole('link', { name: '参加・復帰の画面へ' })).toHaveAttribute(
+            'href',
+            `/join?gameId=${GAME_ID}`,
+        );
+    });
+
+    it('停止中は、停止中の旨と再開を待つ旨を示し、入力と保存を無効にし、入力中の値は保持する', async () => {
+        const user = userEvent.setup();
+        let paused = false;
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ role: 'RETAILER' })),
+            getSessionState: () =>
+                Promise.resolve(
+                    playerState(
+                        'RETAILER',
+                        paused ? { status: 'PAUSED', versions: versions(6) } : {},
+                    ),
+                ),
+        });
+        renderApp(api, PATH);
+        await user.type(await screen.findByLabelText('発注数'), '7');
+
+        paused = true;
+        await user.click(screen.getByRole('button', { name: '手動更新' }));
+
+        expect(await screen.findByRole('status')).toHaveTextContent(
+            '停止中です。進行役の再開を待ってください。',
+        );
+        expect(screen.getByLabelText('発注数')).toBeDisabled();
+        expect(screen.getByLabelText('発注数')).toHaveValue('7');
+        expect(screen.getByRole('button', { name: '発注を保存' })).toBeDisabled();
+        expect(api.saveDecision).not.toHaveBeenCalled();
+    });
+
+    it('停止が解けると（再開）、入力欄が有効に戻り、入力中の値は残っている', async () => {
+        const user = userEvent.setup();
+        let status: SessionState['status'] = 'PAUSED';
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ role: 'RETAILER' })),
+            getSessionState: () => Promise.resolve(playerState('RETAILER', { status })),
+        });
+        renderApp(api, PATH);
+        expect(await screen.findByLabelText('発注数')).toBeDisabled();
+        status = 'ACTIVE';
+        await user.click(screen.getByRole('button', { name: '手動更新' }));
+        await waitFor(() => expect(screen.getByLabelText('発注数')).toBeEnabled());
+        expect(screen.queryByText('停止中です。進行役の再開を待ってください。')).toBeNull();
+    });
+
+    it('保存した瞬間に停止されていた（session.paused）ときは、停止中の文言を示し、入力を保持し、最新の状態で停止中に切り替える', async () => {
+        const user = userEvent.setup();
+        let paused = false;
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ role: 'RETAILER' })),
+            getSessionState: () =>
+                Promise.resolve(
+                    playerState(
+                        'RETAILER',
+                        paused ? { status: 'PAUSED', versions: versions(6) } : {},
+                    ),
+                ),
+            saveDecision: () => {
+                paused = true;
+                return Promise.reject(
+                    new ApiError(409, {
+                        type: '/problems/session.paused',
+                        code: 'session.paused',
+                        correlationId: 'c-p',
+                    }),
+                );
+            },
+        });
+        renderApp(api, PATH);
+        await user.type(await screen.findByLabelText('発注数'), '9');
+        await user.click(screen.getByRole('button', { name: '発注を保存' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+            '停止中です。進行役の再開を待ってください。',
+        );
+        await waitFor(() => expect(screen.getByLabelText('発注数')).toBeDisabled());
+        expect(screen.getByLabelText('発注数')).toHaveValue('9');
+    });
+
+    it('構造のアクセシビリティ（名前・参照先・見出し・題名）に違反が無い（入力中・停止中）', async () => {
+        const user = userEvent.setup();
+        let status: SessionState['status'] = 'ACTIVE';
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ role: 'RETAILER' })),
+            getSessionState: () => Promise.resolve(playerState('RETAILER', { status })),
+        });
+        renderApp(api, PATH);
+        await screen.findByLabelText('発注数');
+        expectNoStructuralA11yViolations();
+        status = 'PAUSED';
+        await user.click(screen.getByRole('button', { name: '手動更新' }));
+        await screen.findByText('停止中です。進行役の再開を待ってください。');
+        expectNoStructuralA11yViolations();
     });
 
     it('取得の失敗は、区分と相関 ID を role="alert" で示す', async () => {

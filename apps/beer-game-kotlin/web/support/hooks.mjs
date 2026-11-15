@@ -59,6 +59,7 @@ Before(async function () {
     this.console = new ConsoleWindow({
         page: this.page,
         browserContext: this.browserContext,
+        browser,
         baseURL: uiUrl,
     });
 });

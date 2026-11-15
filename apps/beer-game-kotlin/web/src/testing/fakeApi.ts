@@ -20,6 +20,9 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): Spied {
         getSessionState: unexpected('getSessionState'),
         saveDecision: unexpected('saveDecision'),
         commitWeek: unexpected('commitWeek'),
+        pauseSession: unexpected('pauseSession'),
+        resumeSession: unexpected('resumeSession'),
+        recoverParticipation: unexpected('recoverParticipation'),
     };
     const merged: Record<string, unknown> = { ...base };
     for (const [name, impl] of Object.entries(overrides)) {

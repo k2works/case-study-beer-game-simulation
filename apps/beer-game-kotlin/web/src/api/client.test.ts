@@ -195,6 +195,77 @@ describe('ApiClient（fetch の薄い包み）', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    it('createGame は、応答の復帰コード（recoveryCode）を、結果に含める', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(
+                json(
+                    201,
+                    { versions: { game: 1, session: null }, recoveryCode: 'RC-FACILITATOR-1' },
+                    { location: '/api/v1/games/g-1/state' },
+                ),
+            );
+        const result = await clientWith(fetchMock).createGame({
+            kind: 'KIT',
+            finalWeek: 12,
+            demand: [4],
+        });
+        expect(result.recoveryCode).toBe('RC-FACILITATOR-1');
+    });
+
+    it('joinGame は、応答のゲームの ID（gameId）を、結果に含める', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(json(200, { versions: { game: 2, session: null }, gameId: 'g-7' }));
+        const result = await clientWith(fetchMock).joinGame({
+            joinCode: 'ABCDEFGH2345',
+            displayName: '田中',
+        });
+        expect(result.gameId).toBe('g-7');
+    });
+
+    it('pauseSession・resumeSession は、本文なしで POST し、冪等キーを付ける', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementation(() =>
+                Promise.resolve(json(200, { versions: { game: null, session: 4 } })),
+            );
+        const client = clientWith(fetchMock);
+        await client.pauseSession('s-1');
+        await client.resumeSession('s-1');
+        const pause = fetchMock.mock.calls[0]!;
+        const resume = fetchMock.mock.calls[1]!;
+        expect(pause[0]).toBe('/api/v1/sessions/s-1/pause');
+        expect(resume[0]).toBe('/api/v1/sessions/s-1/resume');
+        expect((pause[1] as RequestInit).method).toBe('POST');
+        expect((pause[1] as RequestInit).body).toBeUndefined();
+        expect(headerOf(pause, 'Idempotency-Key')).toBe('key-1');
+        expect(headerOf(resume, 'Idempotency-Key')).toBe('key-2');
+    });
+
+    it('recoverParticipation は、ゲームの ID と復帰コードを POST し、復帰先（gameId・kind・role）を返す', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            json(200, {
+                versions: { game: 3, session: 2 },
+                gameId: 'g-1',
+                kind: 'PARTICIPANT',
+                role: 'FACTORY',
+            }),
+        );
+        const result = await clientWith(fetchMock).recoverParticipation({
+            gameId: 'g-1',
+            recoveryCode: 'RC-1',
+        });
+        const call = fetchMock.mock.calls[0]!;
+        expect(call[0]).toBe('/api/v1/participations/recover');
+        expect((call[1] as RequestInit).method).toBe('POST');
+        expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual({
+            gameId: 'g-1',
+            recoveryCode: 'RC-1',
+        });
+        expect(result).toMatchObject({ gameId: 'g-1', kind: 'PARTICIPANT', role: 'FACTORY' });
+    });
+
     it('利用者が操作し直したときは、新しいキーを使う', async () => {
         // Response の本文は一度しか読めないので、呼ばれるたびに新しい応答を返す
         const fetchMock = vi

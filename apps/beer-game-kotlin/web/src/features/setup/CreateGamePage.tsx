@@ -30,6 +30,8 @@ export function CreateGamePage() {
     const [errors, setErrors] = useState<FieldError[]>([]);
     const [failure, setFailure] = useState<unknown>(null);
     const [created, setCreated] = useState<GameState | null>(null);
+    /** 作成の応答で、一度だけ示される復帰コード。この画面の状態にだけ持ち、保存しない（再表示しない）。 */
+    const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
@@ -50,6 +52,7 @@ export function CreateGamePage() {
                 catchUp,
             );
             setCreated(snapshot);
+            setRecoveryCode(result.recoveryCode);
         } catch (error) {
             if (error instanceof ApiError && error.status === 422 && error.errors.length > 0) {
                 setErrors(error.errors);
@@ -69,6 +72,20 @@ export function CreateGamePage() {
                 <p className="join-code">
                     参加コード: <strong>{created.joinCode}</strong>
                 </p>
+                {recoveryCode ? (
+                    <section aria-labelledby="recovery-code-heading">
+                        <h2 id="recovery-code-heading">復帰コード</h2>
+                        <p>
+                            復帰コード: <strong>{recoveryCode}</strong>
+                        </p>
+                        <p>ゲーム ID: {created.gameId}</p>
+                        <p>この画面でだけ表示します。控えてください。</p>
+                        <p>
+                            端末を替えたときなどに、ゲーム ID
+                            と復帰コードで、進行役のコンソールへ戻れます。
+                        </p>
+                    </section>
+                ) : null}
                 <Link to={`/games/${created.gameId}/lobby`} className="button">
                     ロビーへ
                 </Link>

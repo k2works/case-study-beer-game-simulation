@@ -5,9 +5,39 @@ import { ApiError } from '../../api/errors';
 import { GAME_ID, fakeApi, gameState, versions } from '../../testing/fakeApi';
 import { renderApp } from '../../testing/render';
 
-const created = { gameId: GAME_ID, versions: versions(null, 1) };
+const created = {
+    gameId: GAME_ID,
+    versions: versions(null, 1),
+    recoveryCode: 'RC-FACILITATOR-1',
+};
 
 describe('S02 ゲーム作成', () => {
+    it('作成の応答の復帰コードを、一度だけ示し、控える促しと、再表示しない旨を添える', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            createGame: () => Promise.resolve(created),
+            getGameState: () =>
+                Promise.resolve(
+                    gameState({
+                        status: 'PREPARING',
+                        sessionId: null,
+                        joinCode: 'A1B2C3D4',
+                        versions: versions(null, 1),
+                    }),
+                ),
+        });
+        renderApp(api, '/new');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+
+        const region = await screen.findByRole('region', { name: '復帰コード' });
+        expect(region).toHaveTextContent('RC-FACILITATOR-1');
+        expect(region).toHaveTextContent('この画面でだけ表示します。控えてください。');
+        expect(region).toHaveTextContent(
+            '端末を替えたときなどに、ゲーム ID と復帰コードで、進行役のコンソールへ戻れます。',
+        );
+        expect(region).toHaveTextContent(`ゲーム ID: ${GAME_ID}`);
+    });
+
     it('キット準拠の入力でゲームを作成し、参加コードを大きく表示して、ロビーへの導線を出す', async () => {
         const user = userEvent.setup();
         const api = fakeApi({

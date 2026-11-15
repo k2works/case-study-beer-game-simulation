@@ -53,6 +53,59 @@ describe('describeProblem（code から表示の文言を引く。ui-design.md �
         expect(shown.text).toBe('参加コードが無効です。進行役に確認してください。');
     });
 
+    it('復帰の失敗（app.unauthorized）は、送った資格の種類（復帰用の資格）から文言を選ぶ', () => {
+        const shown = describeProblem(problem(403, 'app.unauthorized'), {
+            credential: 'returnCredential',
+        });
+        expect(shown.text).toBe('復帰用の資格が無効です。進行役に確認してください。');
+    });
+
+    it('復帰の失敗は、不明・失効・期限切れを区別しない（失効と期限切れを示す語を使わない）', () => {
+        const shown = describeProblem(problem(403, 'app.unauthorized'), {
+            credential: 'returnCredential',
+        });
+        expect(shown.text).not.toMatch(/失効|期限切れ|不明|存在しない|削除/);
+    });
+
+    it('停止中（session.paused）は、停止中である旨と再開を待つ旨を示す（UI 設計の競合の表）', () => {
+        expect(describeProblem(problem(409, 'session.paused')).text).toBe(
+            '停止中です。進行役の再開を待ってください。',
+        );
+    });
+
+    it('session.not_paused は、停止中でない旨を示す（提案の文言）', () => {
+        expect(describeProblem(problem(409, 'session.not_paused')).text).toBe(
+            '停止中ではありません。',
+        );
+    });
+
+    it('session.not_active は、まだ開始されていない旨を示す（停止中とは区別する）', () => {
+        const shown = describeProblem(problem(409, 'session.not_active'));
+        expect(shown.text).toBe('ゲームはまだ開始されていません。');
+        expect(shown.text).not.toContain('停止');
+    });
+
+    it('session.save_limit_reached は、保存回数の上限に達した旨を示す（提案の文言）', () => {
+        expect(describeProblem(problem(409, 'session.save_limit_reached')).text).toBe(
+            'この週の保存回数の上限に達しました。進行役に確認してください。',
+        );
+    });
+
+    it('資格の失効・再発行の code は、一般の文言でなく、理由を示す（提案の文言）', () => {
+        expect(describeProblem(problem(409, 'game.credential_already_revoked')).text).toBe(
+            'この資格はすでに失効しています。',
+        );
+        expect(describeProblem(problem(409, 'game.credential_not_revoked')).text).toBe(
+            '失効していない資格は再発行できません。',
+        );
+    });
+
+    it('app.rate_limited は、少し待ってやり直す旨を示す（提案の文言）', () => {
+        expect(describeProblem(problem(429, 'app.rate_limited')).text).toBe(
+            '試行が多すぎます。しばらく待って、もう一度お試しください。',
+        );
+    });
+
     it('資格の種類が分からない game.invitation_invalid は、原因を推測しない文言になる', () => {
         const shown = describeProblem(problem(403, 'game.invitation_invalid'));
         expect(shown.text).not.toMatch(/失効|期限切れ/);
