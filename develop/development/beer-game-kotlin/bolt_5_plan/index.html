@@ -9576,12 +9576,12 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<code>validating-design</code> は Step 0.2 で実施する</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜7 は、2026-11-15 にユーザーが承認した（更新履歴）。ゲート 8（Bolt の承認）は人の確認待ち（未承認）。</strong> Step 0〜8 は実施済み（Step 8 の結果は「<a href="#step-8-の実施結果2026-11-15">Step 8 の実施結果</a>」、終了報告は <a href="../bolt_5_report/">bolt_5_report</a>）。B6 には進んでいない</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>承認の状態について</strong>: ステップ計画の承認と判断項目 16 件の決定は、2026-11-15 にユーザーが行いました（更新履歴）。<strong>各ゲート（0〜8）は承認を受けていません。</strong> 承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。下の判断項目表の「提案」列は、決定の前の記述で、決定の内容は更新履歴にあります。</p>
+<p><strong>承認の状態について</strong>: ステップ計画の承認と判断項目 16 件の決定は、2026-11-15 にユーザーが行いました（更新履歴）。<strong>ゲート 0〜7 は、更新履歴のとおり、ユーザーが承認しました。ゲート 8 は承認を受けていません。</strong> 承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。下の判断項目表の「提案」列は、決定の前の記述で、決定の内容は更新履歴にあります。</p>
 </blockquote>
 <h3 id="_2">ゴール<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <p>進行役が、停止・代理入力・再開で、不在者や中断があっても学習を継続でき、参加者・進行役が、切断後に同じ役割・同じ進行のコンソールへ復帰できるようにする。同時に、<strong>漏洩した資格の被害を止められる設計</strong>（期限・失効・再発行・鍵の複数の版・専用のレート制限）にし、<strong>失効した資格の再送が 403 になる順序</strong>（認証 → 認可の前提検査 → 冪等記録の照合。<a href="../../../adr/beer-game-kotlin/004-idempotency-after-authorization/">ADR-004</a>）を、否定テストで守る。</p>
@@ -11009,17 +11009,146 @@
 </ol>
 <h3 id="step-8-green">Step 8: 受け入れの green と検証・終了（✅）<a class="headerlink" href="#step-8-green" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.1 <code>@api</code> の AC3.1.<em>、AC3.2.</em> が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.2 全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、<code>web</code> の検証が緑。CI で、GitHub Actions 上の実行を確認する（<strong>push は人の判断</strong>。ローカルだけの結果を「CI で動く」と書かない）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.3 設計書・ADR の更新（変更表）と、<code>validating-design</code>（完了時）。新しい ADR（判断項目 3・4）は<strong>提案として記録し、承認は人</strong></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4 🟢 <strong>Living Documentation の用語集・イベント一覧の生成（H1）</strong>。H1 を B5 に含める決定（2026-11-15）で追加した。<a href="../development_strategy/">開発戦略</a>が「B1〜B2 で決める」とした未決（<strong>注釈の語彙と生成の仕組み</strong>）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、<strong>ADR を提案として書く</strong>（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の <code>EventCodec</code> の種別の一覧、<code>@SerialName</code>、ドメインモデルの EV 表を突き合わせる検査を含める。<strong>生成物と設計書の ID（EV-G<em>、EV-S</em>）の不一致で CI が落ちる</strong>形を目指す）。(c) 生成物を <code>docs/</code> に置く導線を作る（新規ファイルの作成は確認必須）。<strong>B5 で足す 6 種類のイベントが、一覧に載る</strong>ことを、完了条件とする。<strong>未確認</strong>: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4b 🔴🟢 <strong>実 DB（PostgreSQL 18）の並行テスト</strong>: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4c 🟡 <strong>不安定な試験の修正</strong>: 「応答に <code>998</code> が含まれない」を <code>shouldNotContain "998"</code> で確かめる 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.5 Bolt 終了報告（<code>bolt_5_report.md</code>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。<strong>承認を捏造しない</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.1 <code>@api</code> の AC3.1.<em>、AC3.2.</em> が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403（<strong>自動の受け入れは実施した。人の実操作の申告欄は空のまま</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.2（<strong>ローカルの実行は済み。GitHub Actions 上の実行は未確認</strong>）全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、<code>web</code> の検証が緑。CI で、GitHub Actions 上の実行を確認する（<strong>push は人の判断</strong>。ローカルだけの結果を「CI で動く」と書かない）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.3 設計書・ADR の更新（変更表）と、<code>validating-design</code>（完了時）。新しい ADR（判断項目 3・4）は<strong>提案として記録し、承認は人</strong>（<strong><code>validating-design</code> は 3 軸に沿って、機械で確認できる項目を中心に自分で確認した。スキルの全手順の再実行ではない</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.4 🟢 <strong>Living Documentation の用語集・イベント一覧の生成（H1）</strong>。H1 を B5 に含める決定（2026-11-15）で追加した。<a href="../development_strategy/">開発戦略</a>が「B1〜B2 で決める」とした未決（<strong>注釈の語彙と生成の仕組み</strong>）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、<strong>ADR を提案として書く</strong>（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の <code>EventCodec</code> の種別の一覧、<code>@SerialName</code>、ドメインモデルの EV 表を突き合わせる検査を含める。<strong>生成物と設計書の ID（EV-G<em>、EV-S</em>）の不一致で CI が落ちる</strong>形を目指す）。(c) 生成物を <code>docs/</code> に置く導線を作る（新規ファイルの作成は確認必須）。<strong>B5 で足す 6 種類のイベントが、一覧に載る</strong>ことを、完了条件とする。<strong>未確認</strong>: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.4b 🔴🟢 <strong>実 DB（PostgreSQL 18）の並行テスト</strong>: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.4c 🟡 <strong>不安定な試験の修正</strong>: 「応答に <code>998</code> が含まれない」を <code>shouldNotContain "998"</code> で確かめる 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.5 Bolt 終了報告（<a href="../bolt_5_report/"><code>bolt_5_report.md</code></a>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う。空のまま）、未達・未実施、人の判断項目、B6 への申し送り。<strong>承認を捏造しない</strong></li>
 </ul>
 <p><strong>ゲート 8</strong>（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<h4 id="step-8-2026-11-15">Step 8 の実施結果（2026-11-15）<a class="headerlink" href="#step-8-2026-11-15" title="Permanent link">&para;</a></h4>
+<p>実施者: claude-code/claude-sonnet-5-5。<strong>実測の事実だけを書く。ゲート 8 の承認と「U2 が完了」は記録していない。B6 には進んでいない。</strong> 詳細（デモ項目の実操作の申告欄、未達・未実施、人の判断項目、B6 への申し送り、仮説の検証結果、Release 0.2 への影響）は <a href="../bolt_5_report/">Bolt 5 終了報告</a>。</p>
+<p><strong>8.4c（不安定な試験）</strong>: <code>shouldNotContain "998"</code> の 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を項目単位の検査に直した。HTTP は <code>JsonElement.leafValues()</code>（<code>AppTestKit</code> に追加）で JSON の葉の値を、永続化は <code>Snapshot.integerValues()</code> で投影の整数の項目を、それぞれ平らにして「998 が無い」を確かめる。<code>HttpFlowSpec</code> に「UUID の一部の 998 には一致せず、項目の値が 998 のときだけ一致する」試験を足した。<strong>直した検査が正しく失敗することの確認</strong>: 検査を「999 が無い」へ変えると、<code>HttpFlowSpec</code>（1 件）と永続化（1 件）が失敗した（戻して緑）。<code>PostgresHttpSpec</code> は同じ補助を使う（その検査の変異は個別に行っていない）。</p>
+<p><strong>8.4b（実 DB の並行）</strong>: <code>credentialConcurrencyContract</code>（<code>ApplicationFlowContract.kt</code>）を足し、<code>PostgresPersistenceSpec</code> だけが実行する（H2 では実行しない）。失効（進行役）と復帰（参加者）を、追記の直前で待ち合わせて同じ版から 8 回同時に追記させる。毎回ちょうど 1 回の競合が起き、失効は成功、復帰は成功するか失効後に再評価されて <code>Unauthorized</code>、版は連続し、復帰で得たセッションも失効後は認証できない（どちらが勝つかは実行ごとに決まらず、両方の順の不変条件を確かめる）。<strong>TDD の順序の注記</strong>: 試験は最初の実行で緑だった（実装が既に正しかったため。失敗の Red は観察していない）。代わりに、失効のセッション削除の SQL を壊す変異で、PostgreSQL の統合試験が 4 件失敗することを確認した（新しい試験が、その 4 件に含まれるかは個別に確かめていない）。設計書: <a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> の変更の表 35・36。</p>
+<p><strong>8.4（Living Documentation。H1）</strong>: 提案の方式（<a href="../../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>。人の承認待ち）。</p>
+<ul>
+<li><code>domain/src/main/kotlin/beergame/domain/Documentation.kt</code>（新規）: 標準ライブラリだけの注釈 <code>@Term</code>（用語・定義・出典）と <code>@EventSpec</code>（設計書の ID・発生する条件）。</li>
+<li>型に付けた: 全 17 種類のイベントに <code>@EventSpec</code>、13 項目に <code>@Term</code>（役割、発注量、週、ストリームの版、意思決定の版、一時停止、代理入力、資格の主体、資格の有効性、資格の失効、資格の再発行、復帰、役割の入れ替え）。</li>
+<li><code>domain/src/test/.../LivingDocumentation.kt</code>・<code>LivingDocumentationSpec.kt</code>（新規）: sealed の部分型（<code>permittedSubclasses</code>）とフィールド、<code>Projection.kt</code> の走査（購読する投影）、設計書の EV 表の突き合わせ、生成物の本文とコミット済みの本文の比較。<code>./gradlew :domain:generateLivingDocs</code>（同じ試験を <code>-Dbeergame.docs.update=true</code> で実行）で再生成。koverVerify の依存に入らないよう、<code>disabledForTestTasks</code> に追加した。</li>
+<li>生成物: <a href="../../../design/beer-game-kotlin/generated/events/"><code>docs/design/beer-game-kotlin/generated/events.md</code></a>（実装済みの 17 種類。<strong>B5 で足した 8 種類を含む</strong>。設計書にあって未実装の 4 種類 EV-G05〜G07・EV-S07 も別に列挙）、<a href="../../../design/beer-game-kotlin/generated/glossary/"><code>glossary.md</code></a>（13 項目）。</li>
+<li><strong>Red の確認</strong>: 試験を先に書き、注釈を付ける前に 7 件中 6 件が失敗することを確認してから注釈を付けた。<strong>変異</strong>: <code>EV-G08</code> を <code>EV-G88</code> に変えると 2 件が失敗した（戻して緑）。</li>
+<li><code>@Term</code> の付与は、B5 で足した概念と核だけ（既存コードへの一括適用はしない）。公開（サイトへの掲載）の導線、CI のパスフィルター（<code>apps/beer-game-kotlin/**</code> のため、設計書だけの変更では走らない）は未実装・未変更。</li>
+</ul>
+<p><strong>8.1（受け入れ）</strong>: 結果は下の 8.2 の表。<code>@api</code> の AC3.1.1〜3.1.3・AC3.2.1〜3.2.5 は、PostgreSQL 18 と H2 の両方で、<strong>70 シナリオ（Examples を含む。<code>@api</code>）が成功、失敗 0、Undefined・Pending なし</strong>（JVM の実行は <code>@ui</code> の 7 件を skipped に数える）。<code>@ui</code> は 7 シナリオ・53 ステップすべて passed（H2 のバックエンド。PostgreSQL のバックエンドでの <code>@ui</code> は未実施）。デモ項目の対応（自動で通る範囲。<strong>人の実操作は未実施</strong>）:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">デモ項目</th>
+<th style="text-align: left;">自動の確認</th>
+<th style="text-align: left;">範囲外・未実施</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">進行役が停止 → 代理入力 → 再開</td>
+<td style="text-align: left;"><code>pause-resume.feature</code>「停止して代理入力し、再開して確定すると、週が進む」（<code>@api</code>）、<code>pause-resume-ui.feature</code>（<code>@ui</code>。停止 → 参加者の画面は停止中 → 再開）</td>
+<td style="text-align: left;"><strong>代理入力の画面は無い</strong>（B6 以降。UI は API のみ）。人の実操作は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">参加者が切断 → 復帰</td>
+<td style="text-align: left;"><code>recovery.feature</code>（AC3.2.1。<code>@api</code>）、<code>recovery-ui.feature</code>（AC3.2.1・AC3.2.4。<code>@ui</code>）</td>
+<td style="text-align: left;">人の実操作は未実施。SSE は未実装（切断中の自動更新は無い）</td>
+</tr>
+<tr>
+<td style="text-align: left;">漏れた資格の失効 → 再発行 → 旧資格の再送が 403</td>
+<td style="text-align: left;"><code>credentials.feature</code>（失効、再発行、失効した資格の再送が 403 になる 2 シナリオ）</td>
+<td style="text-align: left;"><strong>失効・再発行の画面は無い</strong>（API のみ）。人の実操作は未実施</td>
+</tr>
+</tbody>
+</table>
+<p><strong>8.2（全テスト・静的解析・カバレッジ。ローカル）</strong>: <code>apps/beer-game-kotlin</code>、既定の JDK 25（detekt だけ JDK 21 = Corretto 21.0.12）。<code>--rerun-tasks</code> で、全テストを実際に再実行した。<strong>GitHub Actions 上の実行は未確認</strong>（push していない。直近の CI の成功は、Step 7 のコミット <code>646c23a</code> の 8 ジョブ）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">検査</th>
+<th style="text-align: left;">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>./gradlew check -x pmd --continue --rerun-tasks</code></td>
+<td style="text-align: left;"><strong>成功</strong>（約 7 分）。ただし<strong>初回の実行は、自分が書いた試験の ktlint 違反（行の長さ・引数の改行）で失敗し、<code>ktlintFormat</code> で直した</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:domain:test</code></td>
+<td style="text-align: left;"><strong>402 件、失敗 0</strong>（395 件から 7 件増: <code>LivingDocumentationSpec</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:application:test</code></td>
+<td style="text-align: left;">149 件、失敗 0（変更なし）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:adapter-http:test</code></td>
+<td style="text-align: left;">80 件、失敗 0（変更なし）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:adapter-persistence:test</code>（H2。契約を含む）</td>
+<td style="text-align: left;">92 件、失敗 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:adapter-persistence:integrationTest</code>（PostgreSQL 18）</td>
+<td style="text-align: left;"><strong>80 件、失敗 0</strong>（79 件から 1 件増: 並行の契約。<code>PostgresPersistenceSpec</code> 67 + <code>RolePrivilegesSpec</code> 13）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:app:test</code>（契約テスト <code>ApiContractSpec</code> 13 件を含む）</td>
+<td style="text-align: left;"><strong>98 件、失敗 0</strong>（97 件から 1 件増: 項目単位の検査の試験）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:app:integrationTest</code></td>
+<td style="text-align: left;">1 件、失敗 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>:app:acceptanceTest</code>（PostgreSQL 18）・<code>:app:acceptanceTestH2</code></td>
+<td style="text-align: left;">どちらも <strong>77 テスト、失敗 0、skipped 7</strong>（<code>@ui</code> の 7 シナリオを JVM の実行が除外。<code>@api</code> は 70 件が成功）</td>
+</tr>
+<tr>
+<td style="text-align: left;">Kover（<code>koverVerify</code>。test・integrationTest・acceptanceTest・acceptanceTestH2 の合算）</td>
+<td style="text-align: left;"><strong>合格</strong>。<strong>全体: 行 98.1%（4174 / 4253）、分岐 81.6%（1133 / 1389）</strong>（閾値は行 85%・分岐 75%）。<strong>domain: 行 100%（1038 / 1038）</strong>、分岐 98.1%（258 / 263）。除外・閾値の引き下げなし</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ktlintCheck</code></td>
+<td style="text-align: left;">違反 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>detekt</code>・<code>detektMain</code>・<code>detektTest</code>（JDK 21）</td>
+<td style="text-align: left;">違反 0（<code>@Suppress</code> なし、ベースラインなし）。<strong>初回は、自分が書いた試験の違反 4 件（行の長さ 1、<code>InjectDispatcher</code> 2、<code>RedundantSuspendModifier</code> 1）で失敗し、設定を変えずにコードを直した</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pmdFixtureTest</code>・<code>pmdDomainApplication</code>・<code>pmdAdapter</code>・<code>pmdMain</code>・<code>pmdTest</code></td>
+<td style="text-align: left;">違反 0（fixture は期待どおりの 17 件）</td>
+</tr>
+<tr>
+<td style="text-align: left;">契約テスト・型の生成物</td>
+<td style="text-align: left;"><code>npm run api:lint</code> 有効、<code>npm run api:check</code> 差分 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>web</code>: <code>npm run verify</code>（format:check・lint・typecheck・vitest・build）</td>
+<td style="text-align: left;"><strong>緑</strong>。vitest 109 件、失敗 0</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>web</code>: <code>npm run acceptance:dry-run</code> / <code>npm run acceptance</code>（<code>@ui</code>。H2 のバックエンド、ポート 3100・5273）</td>
+<td style="text-align: left;">dry-run は 7 シナリオ・53 ステップ（Undefined なし）。実行は <strong>7 シナリオ・53 ステップすべて passed</strong>。起動した 3100 のプロセスだけを止めた（人の開発サーバー 3000・5173 は使わず、止めていない）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>8.3（設計書・ADR の更新と <code>validating-design</code>）</strong>:</p>
+<ul>
+<li>ADR を 3 件、<strong>提案</strong>として追加した（<a href="../../../adr/beer-game-kotlin/016-credential-key-versions/">ADR-016</a> 鍵の版、<a href="../../../adr/beer-game-kotlin/017-attempt-window-in-database/">ADR-017</a> 失効の窓、<a href="../../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a> 注釈と生成）。<strong>承認は書いていない</strong>。<a href="../../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation/">ADR-015</a> も提案中のまま。ADR の一覧を更新した。</li>
+<li>設計書の変更表: <a href="../../../design/beer-game-kotlin/domain-model/">ドメインモデル</a> の 40、<a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> の 35〜37。<a href="../../../design/beer-game-kotlin/">設計の一覧</a> に生成物を追加。</li>
+<li><code>validating-design</code>（完了時。<strong>機械で確認できる項目を中心に自分で確認した。スキルの全手順の再実行ではない</strong>）:</li>
+<li>軸 A（開発戦略とのずれ）: 中盤のインサイドアウト・BDD（先に Gherkin）・デモ項目の受け入れ基準は守った。Living Documentation の中盤の重点（用語集・イベント一覧の生成）は本ステップで実装（ADR-018 は提案中）。<strong>生成と公開の自動化のうち、公開（サイトへの掲載）は未実装</strong>。開発戦略は注釈の定義を「別モジュール」としたが、本ステップは <strong>domain 内の標準ライブラリだけの注釈</strong>にした（逸脱。ADR-018 に記録）。</li>
+<li>軸 B（設計書との整合）: 実装済みの 17 イベントの ID・名前は、設計書の EV 表と<strong>試験で一致を確認</strong>。6 つの <code>code</code>（<code>session.paused</code>、<code>session.not_paused</code>、<code>session.save_limit_reached</code>、<code>game.credential_already_revoked</code>、<code>game.credential_not_revoked</code>、<code>app.rate_limited</code>）が仕様・ドメインモデル・UI 設計に載ることを確認（<code>ErrorCodeInventory</code> の契約テストは緑）。6 経路が仕様とアーキテクチャ設計に載ることを確認。V007・V008 がデータモデルに載ることを確認。未検証: UI 設計の文言の「提案」（ゲート 7 で確定済みの範囲を除く）の全件突き合わせ。</li>
+<li>軸 C（過去の Bolt との連続性）: 既存のイベント名・<code>code</code> を変えていない（golden と契約テストが緑）。U1 総括の持ち越し（#18・#19: <code>@US</code>・<code>@AC</code> タグの整合検査、<code>@Suppress</code>・ベースラインの機械検査、生きたドキュメントの公開の導線、Kover の残り、SSE の契約テスト）は、<strong>本 Bolt でも未実施</strong>（B16 へ送る決定の記録は、判断項目の H5）。</li>
+</ul>
+<p><strong>ゲート 8 で人が確認すること</strong>: <a href="../bolt_5_report/">Bolt 5 終了報告</a>の「人の判断が要る項目」と「デモ項目の実操作の申告欄」。</p>
+<p><strong>実施中の逸脱</strong>（正直に記録する）: (1) ファイルの編集は、Write・Edit と、書式の自動修正の <code>./gradlew ktlintFormat</code>、生成物の再生成 <code>./gradlew :domain:generateLivingDocs</code>、自分が作った生成物の削除（<code>rm</code>。書式の誤りの再生成のため）だけで行った。heredoc・python・sed・perl・awk は使っていない（件数の集計に <code>grep</code>・<code>paste</code>・<code>bc</code> を読み取りだけに使った）。(2) 8.4b の試験は、最初から緑で、Red を観察していない（上の注記）。(3) 初回の <code>check</code> で ktlint の違反、detekt の違反（自分の試験）があり、直した。(4) <code>koverVerify</code> が <code>generateLivingDocs</code>（<code>Test</code> 型）を先に実行し、<code>docs/</code> を書き換える副作用があった（差分は無かった）。<code>disabledForTestTasks</code> で依存から外した。(5) 新規ファイル（確認必須。判断項目 15 の範囲外のものを含む）: <code>Documentation.kt</code>、<code>LivingDocumentation.kt</code>、<code>LivingDocumentationSpec.kt</code>、<code>generated/events.md</code>、<code>generated/glossary.md</code>、ADR-016〜018、<code>bolt_5_report.md</code>。人が確認する。</p>
 <hr />
 <h2 id="definition-of-done">完了条件（Definition of Done）<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p>チェックは、人がゲート 8 で確認してから付ける。<strong>各項目の実測の達成状況は、<a href="../bolt_5_report/">Bolt 5 終了報告</a>の「完了条件の達成状況」</strong>（AI の自己申告ではなく、実測の根拠つき）。</p>
+</blockquote>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> AC3.1.1〜3.1.3、AC3.2.1〜3.2.5 の Gherkin シナリオが green（PostgreSQL 18 と H2。Undefined・Pending なし）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>鍵のローテーションの否定テスト</strong>が通る（旧版の資格は期限まで有効。旧版の鍵を外すと 403）</li>
@@ -11450,6 +11579,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>Step 8（8.1〜8.5、8.4b、8.4c）を実施</strong>（<strong>ゲート 8 は人の確認待ち。承認と「U2 が完了」は記録していない</strong>。B6 には進んでいない）。8.4c: <code>998</code> の検査 3 箇所を項目単位に直し、変異で正しく失敗することを確認。8.4b: PostgreSQL 18 で、失効と復帰を追記の直前で待ち合わせて 8 回同時に実行する並行の契約を足した（毎回 1 回の競合で直列化。試験は最初から緑で、Red は未観察。変異で統合試験が 4 件失敗）。8.4: 注釈 <code>@Term</code>・<code>@EventSpec</code> と、domain の試験による用語集・イベント一覧の生成（17 イベント、13 用語。ADR-018 は提案）。<strong>実測（ローカル）</strong>: <code>check</code>・統合・受け入れ（PostgreSQL・H2 とも <code>@api</code> 70 件成功）・Kover（全体の行 98.1%・分岐 81.6%、domain の行 100%）・ktlint・detekt（JDK 21）・PMD・<code>web</code> の検証と <code>@ui</code> 7 シナリオが緑。<strong>GitHub Actions 上は未確認</strong>。ADR-016〜018 を提案として追加（ADR-015 とあわせて承認は人）。設計書の変更表（domain-model 40、test-strategy 35〜37）。<a href="../bolt_5_report/">終了報告</a>を作成（デモ項目の実操作の申告欄は空）。<strong>逸脱</strong>: 8.4b の試験が最初から緑、初回の <code>check</code>・detekt で自分の試験の違反（修正済み）、新規ファイルの追加、開発戦略の「注釈は別モジュール」からの逸脱（domain 内の注釈）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 7（UI 最小。7.1〜7.3）を実施</strong>（ゲート 7 は人の確認待ち。<strong>承認は記録していない</strong>。Step 8 は未着手。バックエンド・仕様・スキーマの変更なし）。判断項目 13 の最小の UI: S03 の復帰（ゲーム ID と任意の復帰コード。Cookie の復帰資格）と、参加後のプレイ画面への遷移（応答の <code>gameId</code>）、S06 の停止・再開（確認ダイアログ）、S05 の停止中の表示、S02 の復帰コード表示。<strong>代理入力・資格の失効・再発行・終了の画面は範囲外</strong>（理由は「Step 7 の実施結果」）。テストを先に書き、<strong>vitest 39 件・<code>@ui</code> 6 シナリオの Red を確認</strong>してから実装。<strong>実測</strong>: <code>web</code> の <code>verify</code> 緑、vitest 109 件・失敗 0（70 件から 39 件増）、<code>@ui</code> は 7 シナリオ・53 ステップすべて passed（H2 のバックエンド。2 回）。アクセシビリティの自動確認は自前の DOM 構造の検査のみ（axe は未導入）。<strong>逸脱: heredoc を何も書かない確認で 1 回誤って起動（ファイルの変更なし）。自分のテスト 2 件が不安定で修正。計画に明示のない足し（S02 の復帰コード表示ほか）。新規ファイル 5 点</strong>。人が確認する点は「Step 7 の実施結果」</td>

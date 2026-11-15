@@ -9809,6 +9809,28 @@
 </table>
 <h3 id="living-documentation">コードの案内（Living Documentation）<a class="headerlink" href="#living-documentation" title="Permanent link">&para;</a></h3>
 <p>サイトシーイング・マップとガイドツアーは、コードの注釈から自動生成する成果物です。<strong>実装後に生成します</strong>（現時点では作りません）。</p>
+<p>用語集とイベント一覧は、B5 Step 8.4 から、コードの注釈（<code>@Term</code>・<code>@EventSpec</code>）から生成しています（手で編集しません。再生成は <code>./gradlew :domain:generateLivingDocs</code>。方式は <a href="../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>、提案）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ドキュメント</th>
+<th style="text-align: left;">概要</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><a href="generated/events/">イベント一覧（生成）</a></td>
+<td style="text-align: left;">実装済みのドメインイベントの ID・ストリーム・発生条件・ペイロードの項目・購読する投影。設計書の EV 表との不一致は試験が検出する</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/glossary/">用語集（生成）</a></td>
+<td style="text-align: left;">注釈 <code>@Term</code> を付けた型の用語・定義・出典（これから書くコードと B5 の概念から）</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_6">補足<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <ul>
 <li>実ドキュメントを追加したら、この一覧を更新します。</li>
