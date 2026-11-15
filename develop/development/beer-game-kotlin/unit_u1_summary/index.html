@@ -16,7 +16,7 @@
         <link rel="prev" href="../bolt_3_report/">
       
       
-        <link rel="next" href="../../../operation/">
+        <link rel="next" href="../unit_u1_review_guide/">
       
       
         
@@ -4002,7 +4002,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -4072,7 +4072,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -4197,6 +4197,17 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#2026-11-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        追記（2026-11-15。この総括と各終了報告の作成後に、状況が変わった点）
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#1" class="md-nav__link">
@@ -4474,6 +4485,41 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit_u1_review_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit U1 ゲート確認手順
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
     </li>
   
 
@@ -9872,6 +9918,13 @@
 </tbody>
 </table>
 <p>この総括は、事実と、人が判断・検証すべき点を示すものです。<strong>承認の記録ではありません。「U1 が承認された」とは書けません。</strong></p>
+<h3 id="2026-11-15">追記（2026-11-15。この総括と各終了報告の作成後に、状況が変わった点）<a class="headerlink" href="#2026-11-15" title="Permanent link">&para;</a></h3>
+<p>各終了報告と、本総括の本文は、<strong>作成時点の事実</strong>を記録したものです。作成後に、次の 3 点が変わりました（本文は、当時の記録として書き換えていません）。</p>
+<ol>
+<li><strong>GitHub Actions 上の実行（本文の「未実行・未確認」は古い）</strong>: <code>develop</code> を push し、<code>beer-game-kotlin</code> の CI が実際に動きました。初回（<code>907c206</code>）は <strong>failure</strong> でした。原因は、<code>web</code> の <code>package-lock.json</code> を、ローカルの Node 24 の npm で作ったために、CI の Node 26 の npm の <code>npm ci</code> が <code>@emnapi/core</code>・<code>@emnapi/runtime</code> の不足で失敗したことです。Node 26.13.1 の npm でロックを更新して解消し（<code>6d9625a</code>）、続く 2 回（<code>6d9625a</code>・<code>d0f36d2</code>）は、<strong>8 ジョブすべて success</strong>（contract、test、detekt（JDK 21）、pmd、web、ui、container、n1）でした。<strong>ローカルでは見えなかった不具合を、CI が見つけた</strong>例です。<code>n1</code> は雛形（直前のリリースのタグが無い間は実行しない）で、本実装は未です。デプロイ・ロールバックのワークフローは、手動起動のみで、実行していません。</li>
+<li><strong>domain の行カバレッジ 100%（本文の「未達（97.5%）」は古い）</strong>: 除外・閾値の引き下げ・<code>@Suppress</code> を使わず、54 件のテストで未到達の行を実際に実行して到達させました。<strong>802/802 = 100%</strong>（分岐 98.2%）。Kover のゲートも 100% に上げました（<code>d0f36d2</code>）。<code>-jvm-default=no-compatibility</code> というビルド設定を 1 つ加えた点は、人の確認待ちです。</li>
+<li><strong>B2・B3 のステップ計画の承認</strong>: 2026-11-15 に、ユーザーが承認しました（事後の承認）。<strong>ゲート（B1 の 1〜12、B2 の 1〜6、B3 の 1〜4）は、承認の対象に含まれず、人の確認待ちのままです。</strong> 確認の手順は <a href="../unit_u1_review_guide/">U1 ゲート確認の手順</a> にあります。</li>
+</ol>
 <h2 id="1">1. 達成の全体像<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

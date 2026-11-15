@@ -4143,7 +4143,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -4213,7 +4213,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -4274,6 +4274,41 @@
     
   
     Unit U1 総括
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="unit_u1_review_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit U1 ゲート確認手順
   
 
     
@@ -9709,14 +9744,14 @@
 <td style="text-align: left;"><a href="bolt_2_plan/">計画</a></td>
 <td style="text-align: left;"><a href="bolt_2_report/">終了報告</a></td>
 <td style="text-align: left;">2026-11-20〜11-24（仮定。リリース計画の稼働日による目安。実績は 2026-11-14〜15 の連続セッション）</td>
-<td style="text-align: left;">計画は人の承認待ち。実装は完了。<strong>ゲート 1〜6 は人の確認待ち（未承認）。domain の行 100% は未達（暫定 97%）。GitHub Actions 上は未確認</strong></td>
+<td style="text-align: left;">計画は承認済み（2026-11-15、ユーザー）。実装は完了。<strong>ゲート 1〜6 は人の確認待ち（未承認）。domain の行は 100% に到達。GitHub Actions 上は CI 8 ジョブが成功</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">B3 CI/CD とデプロイの定義</td>
 <td style="text-align: left;"><a href="bolt_3_plan/">計画</a></td>
 <td style="text-align: left;"><a href="bolt_3_report/">終了報告</a></td>
 <td style="text-align: left;">2026-11-25〜11-26（仮定。実績は 2026-11-15）</td>
-<td style="text-align: left;">計画は人の承認待ち。定義と記録は完了。<strong>AWS には適用していない。ゲート 1〜4・5 は人の確認待ち（未承認）。<code>terraform plan</code> は未実行。ワークフローは AWS・GitHub Actions で未実行</strong></td>
+<td style="text-align: left;">計画は承認済み（2026-11-15、ユーザー）。定義と記録は完了。<strong>AWS には適用していない。ゲート 1〜4・5 は人の確認待ち（未承認）。<code>terraform plan</code> は未実行。デプロイ・ロールバックのワークフローは AWS で未実行（手動起動のみ）</strong></td>
 </tr>
 </tbody>
 </table>
@@ -9735,6 +9770,20 @@
 <td style="text-align: left;">U1 ウォーキングスケルトン（B1〜B3）</td>
 <td style="text-align: left;"><a href="unit_u1_summary/">Unit U1 総括</a></td>
 <td style="text-align: left;">実装と記録は完了。<strong>人のゲートはすべて未承認。「承認された」とは言えない</strong>。未達・未実施・人の判断が要る項目を統合して記録</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ドキュメント</th>
+<th style="text-align: left;">概要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><a href="unit_u1_review_guide/">Unit U1 人のゲート確認手順</a></td>
+<td style="text-align: left;">ユーザーが B1〜B3 のゲートを確認するための手順（再現コマンド、ゲートごとの確認表、判断項目、AWS 適用前の確認、承認の記録の依頼例）。承認の記録ではない</td>
 </tr>
 </tbody>
 </table>
