@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T02:59:45Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:00:01Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -229,7 +229,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [x] 2.4 イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。新しいイベントの種別の一覧を記録（N-1 互換の影響。B12）
 - [x] 2.5 🔴🟢 **代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回。判断項目 10 の決定）**。`SessionData` に、役割ごとの当週の保存回数を持たせる（現状は持たない）。確定でクリアする。超えたときの `code`・文言は未決（ゲート 1 で決める）。**B6 の共同入力（`DecisionConflict` の拡張）と同じ `SaveDecision` に触れるため、B6 の前提を壊さないことを確認する**。更新履歴の決定が、ステップに反映されていなかったため追加した（`validating-design` 軸 B の B8）
 
-**ゲート 2**: Session の停止・再開・代理入力の振る舞いと、domain の行 100% を、人が確認する。**状態: 人の確認待ち（未承認）。**
+**ゲート 2**: Session の停止・再開・代理入力の振る舞いと、domain の行 100% を、人が確認する。**状態: 2026-11-15 にユーザーが承認し、確認点 1〜6 を報告どおりに確定した（選択: 「承認し、報告どおりで確定」）。**
 
 #### Step 2 の実施結果（2026-11-15）
 
