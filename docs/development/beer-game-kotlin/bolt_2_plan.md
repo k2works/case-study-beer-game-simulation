@@ -4,7 +4,7 @@ title: "Bolt 2 計画 - 規約検査・CI・テスト基盤（Kotlin 固有、Ko
 description: "beer-game-kotlin の Bolt 2 のステップ計画。静的解析の厳格な適用（PMD の 14 ルールと fixture）、Kover、追記専用権限の否定テストと連鎖削除、CI の組み込み、API の契約テストの道具の選定。承認済み（2026-11-15。ステップ計画のみ。ゲートは人の確認待ち）。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:51:46Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:56:59Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T00:30:44Z }
   - { by: human:kakimomokuri, at: 2026-11-15T00:51:48Z }
@@ -402,7 +402,7 @@ B2 は、規約検査・CI・テスト基盤が主で、**新しい集約・イ�
 - [ ] ktlint の `.editorconfig` の調整が実際の版で動く（戦略・リリース計画の受入条件。**B2 で個別に確認していない。未確認**）
 - [x] `validating-design` を実施し、結果を [終了報告](./bolt_2_report.md) に記録した
 - [ ] `validating-design` の不整合が 0 件、または人が判断済み（**判断待ちが残る**）
-- [ ] コードを、人が全行理解して承認した（**未実施。人の確認待ち**）
+- [x] コードを、人が全行理解して承認した（2026-11-15 にユーザーが承認。ユーザーの選択: 「U1 コード全行理解」）
 
 ## リスクと対策
 

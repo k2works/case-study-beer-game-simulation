@@ -4,7 +4,7 @@ title: "Bolt 3 計画 - CI/CD とデプロイの定義（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 3 のステップ計画。JVM のコンテナ、起動モード、Terraform の最小構成の定義、マイグレーションの自動適用、スモークテスト、ロールバックの手順。AWS への適用はしない。承認済み（2026-11-15。ステップ計画のみ。ゲートと AWS 適用は別）。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:51:46Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:56:59Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T00:30:44Z }
   - { by: human:kakimomokuri, at: 2026-11-15T00:51:48Z }
@@ -249,7 +249,7 @@ Step 1 は、単体テストとスモークテストを先に書いた（Red を
 - [x] Terraform の定義があり、`terraform fmt -check` と `validate` が通る。**`plan` は未実行（認証情報が無い）と記録**されている（**リリース計画の受入条件「`plan` が通る」は未達。この項目は「未実行と記録」に弱めた記述で、達成の意味が異なる**。終了報告の軸 A の A1・#8）
 - [x] デプロイ・ロールバックの定義があり、**自動で起動しない**（`workflow_dispatch` のみ）。**AWS には適用していない**ことが明記されている（定義のみ。AWS・GitHub Actions で未実行）
 - [x] `validating-design` を実施済み（**不整合は 0 件ではない。人の判断待ちが残る**）
-- [ ] コードを、人が全行理解して承認した（**未実施。人の確認待ち**）。AWS への適用は、**別の承認ゲート**で判断する
+- [x] コードを、人が全行理解して承認した（2026-11-15 にユーザーが承認。ユーザーの選択: 「U1 コード全行理解」）。AWS への適用は、**別の承認ゲート**で判断する
 
 ## リスクと対策
 
