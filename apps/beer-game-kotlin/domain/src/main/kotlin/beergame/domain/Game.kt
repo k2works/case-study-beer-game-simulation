@@ -13,7 +13,7 @@ import java.time.Instant
 
 /*
  * Game 集約（準備。ストリーム `game`）。B1 の範囲: 作成、参加、役割の割り当て、開始（startGame が GameStarted を作る）。
- * 観察者・資格・単独の解除（UnassignRole）は後続の Bolt。
+ * B5 の範囲: 資格の失効・再発行・復帰（規則は Credential.kt）。観察者・単独の解除（UnassignRole）は後続の Bolt。
  */
 
 /** 確定方式。B1 は手動だけ。自動（AUTO）は B8 で足す。 */
@@ -60,6 +60,8 @@ data class GameData(
     val gameId: GameId,
     val settings: GameSettings,
     val participants: Map<ParticipantId, ParticipantEntry>,
+    /** 資格の有効性（進行役は作成時、参加者は参加時に発行。失効・再発行・復帰で変わる）。観察者は B9。 */
+    val credentials: Map<CredentialSubject, CredentialValidity>,
 ) {
     /** 役割ごとの参加者（開始時に、Session へ写しとして渡す）。 */
     fun roleAssignments(): RoleMap<Set<ParticipantId>> =
@@ -131,6 +133,29 @@ sealed interface GameCommand : Command {
         val participantId: ParticipantId,
         val role: Role,
     ) : GameCommand
+
+    /** 進行役が、参加者の資格を失効させる（漏れた資格の被害を止める。AC3.2.5）。準備中と開始後の両方で受け付ける。 */
+    data class RevokeCredential(
+        override val actor: Actor,
+        override val at: Instant,
+        val subject: CredentialSubject,
+    ) : GameCommand
+
+    /** 進行役が、失効した参加者の資格を、新しい有効期限で再発行する。資格の値（復帰コード）は境界が作る。 */
+    data class ReissueCredential(
+        override val actor: Actor,
+        override val at: Instant,
+        val subject: CredentialSubject,
+        val expiresAt: Instant,
+    ) : GameCommand
+
+    /** 有効な復帰資格の持ち主（[actor] は [subject] 自身）が復帰する。復帰資格の期限を [credentialExpiresAt] へ更新する。 */
+    data class RecoverParticipation(
+        override val actor: Actor,
+        override val at: Instant,
+        val subject: CredentialSubject,
+        val credentialExpiresAt: Instant,
+    ) : GameCommand
 }
 
 sealed interface GameEvent : DomainEvent {
@@ -160,6 +185,23 @@ sealed interface GameEvent : DomainEvent {
 
     data class GameStarted(
         val gameId: GameId,
+    ) : GameEvent
+
+    /** 資格を失効させた。資格の値・表示名は含めない（ADR-002）。 */
+    data class CredentialRevoked(
+        val subject: CredentialSubject,
+    ) : GameEvent
+
+    /** 失効した資格を再発行した。新しい有効期限だけを持つ（資格の値は周辺ストアへ、同じトランザクションで書く）。 */
+    data class CredentialReissued(
+        val subject: CredentialSubject,
+        val expiresAt: Instant,
+    ) : GameEvent
+
+    /** 復帰した。復帰資格の期限を更新した新しい期限を持つ。 */
+    data class ParticipationRecovered(
+        val subject: CredentialSubject,
+        val credentialExpiresAt: Instant,
     ) : GameEvent
 }
 
@@ -204,6 +246,18 @@ sealed interface GameError : DomainError {
     ) : GameError {
         override val code: String = "game.start_condition_not_met"
         override val category: ErrorCategory = ErrorCategory.RuleViolation
+    }
+
+    /** すでに失効した資格を、もう一度失効させようとした。 */
+    data object CredentialAlreadyRevoked : GameError {
+        override val code: String = "game.credential_already_revoked"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
+    }
+
+    /** 失効していない資格を再発行しようとした（有効な資格は置き換えない。先に失効させる）。 */
+    data object CredentialNotRevoked : GameError {
+        override val code: String = "game.credential_not_revoked"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
     }
 }
 
@@ -265,7 +319,27 @@ fun decideGame(
                     }
                 }
             }
+
+            is GameCommand.RevokeCredential -> {
+                decideRevoke(state, command).bind()
+            }
+
+            is GameCommand.ReissueCredential -> {
+                decideReissue(state, command).bind()
+            }
+
+            is GameCommand.RecoverParticipation -> {
+                decideRecover(state, command).bind()
+            }
         }
+    }
+
+/** 準備中と開始後に、データを更新して版を進める（資格は両方で変わる）。decide が作らない列（null）は、状態を変えずに返す。 */
+private fun GameState.updateData(update: (GameData) -> GameData?): GameState =
+    when (this) {
+        is GameState.Preparing -> update(data)?.let { GameState.Preparing(it, version.next()) } ?: this
+        is GameState.Started -> update(data)?.let { GameState.Started(it, version.next()) } ?: this
+        is GameState.NotCreated -> this
     }
 
 /** 準備中のときだけデータを更新して版を進める。decide が作らない列（更新できない）は、状態を変えずに返す。 */
@@ -287,7 +361,11 @@ fun evolveGame(
         is GameEvent.GameCreated -> {
             when (state) {
                 is GameState.NotCreated -> {
-                    GameState.Preparing(GameData(event.gameId, event.settings, emptyMap()), state.version.next())
+                    val facilitator = CredentialSubject.Facilitator(event.gameId)
+                    val data =
+                        GameData(event.gameId, event.settings, emptyMap(), emptyMap())
+                            .withIssued(facilitator, event.facilitatorCredentialExpiresAt)
+                    GameState.Preparing(data, state.version.next())
                 }
 
                 is GameState.Preparing, is GameState.Started -> {
@@ -301,7 +379,9 @@ fun evolveGame(
                 if (event.participantId in data.participants) {
                     null
                 } else {
-                    data.copy(participants = data.participants + (event.participantId to ParticipantEntry(null)))
+                    data
+                        .copy(participants = data.participants + (event.participantId to ParticipantEntry(null)))
+                        .withIssued(CredentialSubject.Participant(event.participantId), event.credentialExpiresAt)
                 }
             }
         }
@@ -319,5 +399,17 @@ fun evolveGame(
                 is GameState.Preparing -> GameState.Started(state.data, state.version.next())
                 is GameState.NotCreated, is GameState.Started -> state
             }
+        }
+
+        is GameEvent.CredentialRevoked -> {
+            state.updateData { it.revoked(event.subject) }
+        }
+
+        is GameEvent.CredentialReissued -> {
+            state.updateData { it.reissued(event.subject, event.expiresAt) }
+        }
+
+        is GameEvent.ParticipationRecovered -> {
+            state.updateData { it.recovered(event.subject, event.credentialExpiresAt) }
         }
     }

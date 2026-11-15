@@ -46,10 +46,20 @@ object EventCodec {
                 .flatMap { it }
         }
 
+    /** game ストリームの種別なら復号し、そうでなければ session ストリームの種別を試す。どちらでもなければ Left。 */
     private fun decodeByType(
         eventType: String,
         payloadJson: String,
     ): Either<String, DomainEvent> =
+        decodeGameEvent(eventType, payloadJson)
+            ?: decodeSessionEvent(eventType, payloadJson)
+            ?: "未知の event_type: $eventType".left()
+
+    /** game ストリームのイベント。game の種別でなければ null。 */
+    private fun decodeGameEvent(
+        eventType: String,
+        payloadJson: String,
+    ): Either<String, DomainEvent>? =
         when (eventType) {
             "GameCreated" -> {
                 json.decodeFromString(GameCreatedDto.serializer(), payloadJson).toGameCreated()
@@ -75,6 +85,31 @@ object EventCodec {
                 json.decodeFromString(GameStartedDto.serializer(), payloadJson).toGameStarted()
             }
 
+            "CredentialRevoked" -> {
+                json.decodeFromString(CredentialRevokedDto.serializer(), payloadJson).toCredentialRevoked()
+            }
+
+            "CredentialReissued" -> {
+                json.decodeFromString(CredentialReissuedDto.serializer(), payloadJson).toCredentialReissued()
+            }
+
+            "ParticipationRecovered" -> {
+                json
+                    .decodeFromString(ParticipationRecoveredDto.serializer(), payloadJson)
+                    .toParticipationRecovered()
+            }
+
+            else -> {
+                null
+            }
+        }
+
+    /** session ストリームのイベント。session の種別でなければ null。 */
+    private fun decodeSessionEvent(
+        eventType: String,
+        payloadJson: String,
+    ): Either<String, DomainEvent>? =
+        when (eventType) {
             "SessionStarted" -> {
                 json.decodeFromString(SessionStartedDto.serializer(), payloadJson).toSessionStarted()
             }
@@ -108,7 +143,7 @@ object EventCodec {
             }
 
             else -> {
-                "未知の event_type: $eventType".left()
+                null
             }
         }
 }

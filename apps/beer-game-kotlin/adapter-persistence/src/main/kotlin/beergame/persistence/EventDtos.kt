@@ -91,6 +91,33 @@ internal data class GameStartedDto(
     val gameId: String,
 )
 
+/** 資格の主体。`kind` は FACILITATOR（`id` はゲーム）または PARTICIPANT（`id` は参加者）。資格の値は持たない。 */
+@Serializable
+internal data class CredentialSubjectDto(
+    val kind: String,
+    val id: String,
+)
+
+@Serializable
+@SerialName("CredentialRevoked")
+internal data class CredentialRevokedDto(
+    val subject: CredentialSubjectDto,
+)
+
+@Serializable
+@SerialName("CredentialReissued")
+internal data class CredentialReissuedDto(
+    val subject: CredentialSubjectDto,
+    val expiresAt: String,
+)
+
+@Serializable
+@SerialName("ParticipationRecovered")
+internal data class ParticipationRecoveredDto(
+    val subject: CredentialSubjectDto,
+    val credentialExpiresAt: String,
+)
+
 @Serializable
 @SerialName("SessionStarted")
 internal data class SessionStartedDto(

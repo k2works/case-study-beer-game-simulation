@@ -1,5 +1,6 @@
 package beergame.persistence
 
+import beergame.domain.CredentialSubject
 import beergame.domain.Editor
 import beergame.domain.GameEvent
 import beergame.domain.GameSettings
@@ -53,6 +54,20 @@ internal fun encodeGameEvent(event: GameEvent): EventCodec.Encoded =
 
         is GameEvent.GameStarted -> {
             enc(GameStartedDto.serializer(), GameStartedDto(event.gameId.value.toString()))
+        }
+
+        is GameEvent.CredentialRevoked -> {
+            enc(CredentialRevokedDto.serializer(), CredentialRevokedDto(event.subject.toDto()))
+        }
+
+        is GameEvent.CredentialReissued -> {
+            val dto = CredentialReissuedDto(event.subject.toDto(), event.expiresAt.toString())
+            enc(CredentialReissuedDto.serializer(), dto)
+        }
+
+        is GameEvent.ParticipationRecovered -> {
+            val dto = ParticipationRecoveredDto(event.subject.toDto(), event.credentialExpiresAt.toString())
+            enc(ParticipationRecoveredDto.serializer(), dto)
         }
     }
 
@@ -148,6 +163,12 @@ private fun RoleWeekResult.toDto() =
         weeklyCost.minor,
         cumulativeCost.minor,
     )
+
+private fun CredentialSubject.toDto(): CredentialSubjectDto =
+    when (this) {
+        is CredentialSubject.Facilitator -> CredentialSubjectDto("FACILITATOR", gameId.value.toString())
+        is CredentialSubject.Participant -> CredentialSubjectDto("PARTICIPANT", id.value.toString())
+    }
 
 private fun Editor.toDto(): EditorDto =
     when (this) {

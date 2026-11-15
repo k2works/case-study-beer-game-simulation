@@ -20,6 +20,7 @@ const TEXTS: Record<ErrorCode, string | null> = {
     'session.not_paused': null,
     'session.save_limit_reached': null,
     'game.credential_already_revoked': null,
+    'game.credential_not_revoked': null,
     'session.incomplete_decisions': null,
     'game.invitation_invalid': null, // 送った資格の種類から選ぶので、下で組み立てる
     // 設計書に文言が無い。受付の終了という理由（Gherkin AC1.2.2）を示す仮置き

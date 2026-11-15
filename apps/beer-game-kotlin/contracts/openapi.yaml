@@ -407,7 +407,7 @@ paths:
         認可は進行役。新しい復帰資格を発行し、**新しい復帰コードを、この応答で一度だけ示す**（保存は鍵付きダイジェストだけ。再表示しない。
         提案: H3 の案 A）。進行役が、参加者へ口頭などで渡す。参加者は `recoverParticipation` の本文の `recoveryCode` で復帰する。
         新しい有効期限（`expiresAt`）を持つ。失効した古い資格は、使えないままである。準備中と開始後の両方で受け付ける。
-        失効していない資格の再発行の扱い（拒否するか、置き換えるか）は未決（ゲート 1 の項目 6）。
+        失効していない資格の再発行は拒否する（`game.credential_not_revoked`。409。ゲート 1 の決定。有効な資格は置き換えない。期限切れの資格は、先に失効させてから再発行する）。
       parameters:
         - $ref: "#/components/parameters/GameId"
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -680,6 +680,7 @@ components:
         - game.participant_not_found
         - game.start_condition_not_met
         - game.credential_already_revoked
+        - game.credential_not_revoked
         - validation.invalid_input
         - app.retry_exhausted
         - app.idempotency_key_reused

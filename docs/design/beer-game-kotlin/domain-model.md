@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T02:17:41Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:21:02Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -193,7 +193,8 @@ data class RoleMap<out A>(val factory: A, val distributor: A, val wholesaler: A,
 | 役割別の週結果（RoleWeekResult） | `data class` | 受注（需要）、出荷、**発注（その週の意思決定）**、週末在庫、週末受注残、週次費用、累積費用 |
 | 表示名（DisplayName） | `value class` | 前後の空白を除いて 1〜80 文字。**イベントには入れない** |
 | 参加コード・招待コード | `JoinCode`、`InvitationCode` | 推測困難な乱数から作る（8 桁以上）。**2 つは別の型・別の値**。招待コードの値はイベントに入れない |
-| 資格の有効性（CredentialValidity） | `data class` | 発行時刻、有効期限、失効時刻。`status(now)` が有効・失効・期限切れを返す純粋関数 |
+| 資格の有効性（CredentialValidity） | `data class` | **有効期限と、失効したか（`revoked`）**。`status(now)` が有効（VALID）・失効（REVOKED）・期限切れ（EXPIRED）を返す純粋関数。失効は期限より優先し、期限の瞬間から使えない。**発行・失効の時刻は、`evolve` が時刻を読まないので状態に持たない**（イベントの封筒の `occurredAt` と、周辺ストアの `credentials.revoked_at` が持つ。B5 Step 3） |
+| 資格の主体（CredentialSubject） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`。観察者（`Observer`）は B9 で足す。失効・再発行の対象は参加者だけ（ゲート 1 の決定）。 |
 | 保持方針（RetentionPolicy） | `data class` | 保持日数 1〜3650（既定 90）、保持開始、削除期限。**beer-game2 にあった「方針の版」は持たない**（方針は 1 ゲームにつき 1 つで、作成後に変わらない。版を比べる相手がいないため。保持日数を変える機能を足すときに版を導入する） |
 | 操作者（Actor） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`、`Observer(id)`、`Anonymous`。認証はアダプターが行い、結果の `Actor` をコマンドに載せる |
 | ストリームの版（StreamVersion） | `value class` | 単調に増える整数。楽観的並行制御の期待値 |
@@ -276,6 +277,8 @@ enum class ErrorCategory { Forbidden, NotFound, InvalidState, Conflict, RuleViol
 | `game.participant_not_found` | `GameError.ParticipantNotFound` | `NotFound` | 404 |
 | `game.start_condition_not_met` | `GameError.StartConditionNotMet` | `RuleViolation` | 422（`missingRoles` を添える） |
 | `game.invitation_invalid` | `GameError.InvitationInvalid` | `Forbidden` | 403。**参加コードの不明・形式不正を区別しない**。`decide` は返さず、境界が参加コードからゲームを引けなかったときに使う。`DomainError` が封印されているため `domain` に置く |
+| `game.credential_already_revoked` | `GameError.CredentialAlreadyRevoked` | `InvalidState` | 409（B5。すでに失効した資格をもう一度失効させる。ゲート 1 の決定） |
+| `game.credential_not_revoked` | `GameError.CredentialNotRevoked` | `InvalidState` | 409（B5。失効していない資格の再発行を拒否する。ゲート 1 の決定。期限切れで未失効の資格も、先に失効させてから再発行する） |
 | `session.not_active` | `SessionError.NotActive` | `InvalidState` | 409（**未開始**だけ。B5 で、停止中は下の `session.paused` に分けた） |
 | `session.paused` | `SessionError.Paused` | `InvalidState` | 409（B5。一時停止中の保存・確定、二重の停止。ゲート 1 の決定で新設） |
 | `session.not_paused` | `SessionError.NotPaused` | `InvalidState` | 409（B5。一時停止中でない再開。冪等な 200 にしない決定） |
@@ -301,7 +304,7 @@ sealed interface GameState {
     val version: StreamVersion
 
     data object NotCreated : GameState                       // ストリームが空
-    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（B1 の実装の `GameData` は設定・参加者・割り当てだけ。招待・観察者・資格は B5・B9）
+    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`。招待・観察者は B9。保持方針 `retention` は未実装）
     data class Started(val data: GameData) : GameState       // 設定と割り当てを固定
 }
 
@@ -397,7 +400,7 @@ private fun GameState.invalid(@Suppress("UNUSED_PARAMETER") event: GameEvent): G
 | 役割の割り当て | 1 人の参加者は**同時に 2 つの役割を持たない**。**1 つの役割に複数の参加者を割り当てられる**。別の役割への割り当ては、元の役割から移す付け替え（解除と割り当ての 2 イベント）として扱い、UI で「移します」と明示する（D9。AC1.2.5 の解釈は D9 と未決事項） | FR-16、BR-15、AC1.2.5 | — |
 | 開始条件 | 4 役割のそれぞれに、1 人以上が割り当てられている | UC-04、FR-03 | `StartConditionNotMet(missing)`（`RuleViolation`） |
 | 観察用の招待 | 参加コードと別の値。失効または期限切れの招待では新しい参加ができない。観察者は役割を持てない | FR-17、BR-17 | `InvitationRevoked`、`InvitationExpired`、`InvitationNotFound` |
-| 資格の有効性 | 進行役・参加者・観察者の資格は有効期限と失効を持つ。失効済みを再度失効できない。再発行は新しい有効期限を持つ | NFR-06、NF-S4 | `CredentialAlreadyRevoked`（`InvalidState`） |
+| 資格の有効性 | 進行役・参加者・観察者の資格は有効期限と失効を持つ。失効済みを再度失効できない。**失効していない資格は再発行しない**（先に失効させる）。再発行は新しい有効期限を持つ。**失効・再発行の対象は参加者だけ**（進行役自身は対象外）。**復帰は、有効（未失効・期限内）な復帰資格の持ち主自身だけができ、不明・失効・期限切れ・別の主体は、区別しない同じ `Forbidden`**（NF-S12）。資格のコマンドは、準備中と開始後の両方で受け付ける（B5 Step 3） | NFR-06、NF-S4、NF-S12 | `CredentialAlreadyRevoked`・`CredentialNotRevoked`（`InvalidState`）、`Forbidden` |
 | 設定の固定 | 開始後は、設定と役割の割り当てを変更しない | — | `NotPreparing` |
 | 権限 | 割り当て、招待、失効・再発行、開始は進行役だけ | — | `Forbidden` |
 
@@ -693,8 +696,8 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-G05 | `ObserverInvited` | `InviteObserver`。進行役 | `invitationId`、`expiresAt` |
 | EV-G06 | `ObserverInvitationRevoked` | `RevokeObserverInvitation`。進行役、有効な招待 | `invitationId` |
 | EV-G07 | `ObserverJoined` | `JoinAsObserver`。有効で期限内の招待 | `observerId`、`invitationId`、`credentialExpiresAt` |
-| EV-G08 | `CredentialRevoked` | `RevokeCredential`。進行役、有効な資格 | `subject`（`kind`: FACILITATOR / PARTICIPANT / OBSERVER、`id`） |
-| EV-G09 | `CredentialReissued` | `ReissueCredential`。進行役 | `subject`、`expiresAt` |
+| EV-G08 | `CredentialRevoked` | `RevokeCredential`。進行役、失効していない参加者の資格（期限切れでも可） | `subject`（`kind`: FACILITATOR / PARTICIPANT / OBSERVER、`id`。B5 は PARTICIPANT だけが対象） |
+| EV-G09 | `CredentialReissued` | `ReissueCredential`。進行役、**失効した**参加者の資格 | `subject`、`expiresAt` |
 | EV-G10 | `ParticipationRecovered` | `RecoverParticipation`。有効な復帰資格 | `subject`（FACILITATOR / PARTICIPANT）、`credentialExpiresAt`（復帰資格を更新した新しい期限） |
 | EV-G11 | `GameStarted` | `StartGame`。進行役、準備中、各役割に 1 人以上 | `gameId` |
 
@@ -922,6 +925,8 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 
 | 33 | `SessionState.Paused(data)`、`Editor` は参加者と進行役、停止中の拒否は `NotActive` | `Paused(data, version)`（ほかの状態と同じく版を持つ）。`Editor.ByFacilitator(gameId)`（表示名を含まない）。停止中の保存・確定は新しい `SessionError.Paused`（`session.paused`、ゲート 1 の決定）。`evolveSession` は `SessionEvolve.kt` に分けた（2026-11-15、B5 Step 2） | 停止中を未開始と区別して画面に示す。状態が 4 つになり、1 つの関数では静的解析の複雑さの上限を超える |
 | 34 | 保存回数の上限は、`SessionData` に役割ごとの回数を持つ（B5 計画 2.5） | 回数は**意思決定の版と同じ**ため、`SessionData` に項目を足さない。`SaveDecision` と `SubmitProxyDecision` の判定に `hasSaveCapacity(role)` を使う（2026-11-15、B5 Step 2） | 同じ事実を二重に持たない。共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける |
+| 35 | `CredentialValidity` は発行時刻・有効期限・失効時刻 | **有効期限と `revoked`（失効したか）だけ**。時刻は封筒の `occurredAt` と `credentials.revoked_at` が持つ（2026-11-15、B5 Step 3） | `evolve` は封筒を読まず、イベントのペイロードに時刻が無い。同じ事実を二重に持たない |
+| 36 | 失効していない資格の再発行の扱いは未決 | 拒否する（`GameError.CredentialNotRevoked`、409）。失効・再発行の対象は参加者だけで、進行役自身は `Forbidden`。未作成も `Forbidden`（進行役になれる人がいない）。復帰は、操作者が主体自身であることも検査し、失敗はすべて同じ `Forbidden("復帰できない")`（2026-11-15、B5 Step 3。ゲート 1 の決定の反映） | 漏洩した資格の被害を止める。有効な資格を黙って置き換えない。資格の存在・期限・失効を、復帰の失敗から推測させない（NF-S12） |
 
 ## 未決事項
 

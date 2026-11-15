@@ -2,10 +2,12 @@ package beergame.persistence
 
 import arrow.core.Either
 import arrow.core.getOrElse
+import beergame.domain.CredentialSubject
 import beergame.domain.DecisionVersion
 import beergame.domain.Editor
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.ParticipantId
 import beergame.domain.Quantity
 import beergame.domain.Role
 import beergame.domain.SessionEvent
@@ -17,6 +19,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.time.Instant
 import java.util.UUID
 
 private fun playedScript(finalWeek: Int): GameScript {
@@ -89,6 +92,44 @@ class EventCodecSpec :
             EventCodec.encode(proxy).payloadJson shouldContain "FACILITATOR"
             listOf(SessionEvent.SessionPaused, SessionEvent.SessionResumed, proxy).forEach {
                 EventCodec.encode(it).payloadJson shouldNotContain "displayName"
+            }
+        }
+
+        test("[B5] 資格の失効・再発行・復帰のイベントを変換して戻すと、元と等しい（進行役・参加者の両方の主体）") {
+            val gameId = GameId(UUID.fromString("00000000-0000-0000-0000-00000000abcd"))
+            val expiresAt = Instant.parse("2026-12-16T09:00:00Z")
+            val participantId = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+            val subjects = listOf(CredentialSubject.Facilitator(gameId), CredentialSubject.Participant(participantId))
+            val events =
+                subjects.flatMap {
+                    listOf(
+                        GameEvent.CredentialRevoked(it),
+                        GameEvent.CredentialReissued(it, expiresAt),
+                        GameEvent.ParticipationRecovered(it, expiresAt),
+                    )
+                }
+
+            events.forEach { event ->
+                val encoded = EventCodec.encode(event)
+                EventCodec.decode(encoded.eventType, encoded.schemaVersion, encoded.payloadJson) shouldBe
+                    Either.Right(event)
+                encoded.payloadJson shouldNotContain "displayName"
+            }
+            events.map { EventCodec.encode(it).eventType }.toSet() shouldBe
+                setOf("CredentialRevoked", "CredentialReissued", "ParticipationRecovered")
+            EventCodec.encode(events.first()).payloadJson shouldContain "FACILITATOR"
+            EventCodec.encode(events[3]).payloadJson shouldContain "PARTICIPANT"
+        }
+
+        test("[B5] 主体の種別・ID・期限が不正な資格のイベントは、復号できず Left") {
+            val subject = """{"kind":"PARTICIPANT","id":"00000000-0000-0000-0000-000000000001"}"""
+            listOf(
+                "CredentialRevoked" to """{"subject":{"kind":"ROBOT","id":"x"}}""",
+                "CredentialRevoked" to """{"subject":{"kind":"PARTICIPANT","id":"not-a-uuid"}}""",
+                "CredentialReissued" to """{"subject":$subject,"expiresAt":"yesterday"}""",
+                "ParticipationRecovered" to """{"subject":$subject,"credentialExpiresAt":"yesterday"}""",
+            ).forEach { (type, json) ->
+                EventCodec.decode(type, 1, json).shouldBeInstanceOf<Either.Left<String>>()
             }
         }
 

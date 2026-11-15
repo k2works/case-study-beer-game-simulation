@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:00:01Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:21:02Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -275,11 +275,52 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ### Step 3: ドメイン — Game の資格（失効・再発行・復帰）（🔴🟢🟡）
 
-- [ ] 3.1 🔴 Kotest を先に書く。`RevokeCredential`（進行役のみ、有効な資格のみ、二重の失効は `CredentialAlreadyRevoked`）、`ReissueCredential`（新しい期限、失効後の再発行）、`RecoverParticipation`（有効な復帰資格のみ。失効・期限切れは `Forbidden` の同じ形）。**準備中と開始後の両方で受け付ける**（ドメインモデル）。失敗を確認する
-- [ ] 3.2 🟢 `GameData` に資格の有効性（`CredentialValidity`）を足し、コマンド・イベント・`evolve` を実装する（設計書の `credentials: Map<CredentialSubject, CredentialValidity>`）。`startGame` と `JoinGame`（資格を発行する経路）が、資格の有効性を初期化する
-- [ ] 3.3 🟡 リファクタリング。domain の行 100% を維持
+> **Step 3 の実施結果（2026-11-15。ゲート 3 は人の確認待ちで、承認していない）**: 3.1〜3.3 を実施した。結果は「[Step 3 の実施結果](#step-3-の実施結果2026-11-15)」。Step 3.5 以降には進んでいない。
+
+- [x] 3.1 🔴 Kotest を先に書く。`RevokeCredential`（進行役のみ、有効な資格のみ、二重の失効は `CredentialAlreadyRevoked`）、`ReissueCredential`（新しい期限、失効後の再発行）、`RecoverParticipation`（有効な復帰資格のみ。失効・期限切れは `Forbidden` の同じ形）。**準備中と開始後の両方で受け付ける**（ドメインモデル）。失敗を確認する
+- [x] 3.2 🟢 `GameData` に資格の有効性（`CredentialValidity`）を足し、コマンド・イベント・`evolve` を実装する（設計書の `credentials: Map<CredentialSubject, CredentialValidity>`）。`startGame` と `JoinGame`（資格を発行する経路）が、資格の有効性を初期化する。**実装: 初期化は `evolveGame` の `GameCreated`（進行役）と `ParticipantJoined`（参加者）が行う。`startGame` は資格に触れない**
+- [x] 3.3 🟡 リファクタリング。domain の行 100% を維持
 
 **ゲート 3**: 資格の規則（有効期限・失効・再発行・復帰）と、domain の行 100% を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+#### Step 3 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 3 の承認は記録していない。HTTP・application への配線は Step 6、イベントの golden と投影は Step 4.6・4.7 のため行っていない。**
+
+**Red の確認（3.1）**: 先にテストと補助（`DomainFixtures.kt` の資格の補助、`GameCredentialSpec.kt`、`GameEvolveSpec.kt` の追加分）を書き、`:domain:test` を実行して、**テストのコンパイルが 119 件のエラー（`CredentialSubject`・`RevokeCredential` などが未定義）で失敗する**ことを確認した（Step 2 と同じく、未定義の型の参照が Red）。そのあと最小の実装で Green にした。永続化も同じ順（`EventCodecSpec` を先に書き、`adapter-persistence` の `when` の網羅がコンパイルエラーになる Red を確認してから DTO を足した）。
+
+**実装（3.2）**:
+
+- `Credential.kt`（新規。確認必須の新規ファイル）: `CredentialSubject`（`Facilitator(gameId)`・`Participant(id)`）、`CredentialStatus`（VALID・REVOKED・EXPIRED）、`CredentialValidity(expiresAt, revoked)` と `status(now)`、`decideRevoke`・`decideReissue`・`decideRecover`、evolve の補助（`withIssued`・`revoked`・`reissued`・`recovered`）。`Game.kt` の `decideGame` は 3 コマンドをこれに委ねる。
+- `Game.kt`: `GameData.credentials`、コマンド 3 つ（`RevokeCredential`・`ReissueCredential`・`RecoverParticipation`）、イベント 3 つ（`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）、エラー 2 つ（`CredentialAlreadyRevoked`＝`game.credential_already_revoked`、`CredentialNotRevoked`＝`game.credential_not_revoked`。どちらも 409・`InvalidState`）。`evolveGame` は `GameCreated` で進行役の資格、`ParticipantJoined` で参加者の資格を未失効で持たせ、資格の 3 イベントを準備中と開始後の両方に適用する（`updateData`）。decide が作らない列（未知の主体、失効済みの再失効、有効な資格の再発行、失効後の復帰、未作成）は、状態を変えず版も進めない（`replayGame` が `InvalidTransition` として検知する）。
+- **ゲート 1 の決定の反映**: 失効していない資格の再発行は `CredentialNotRevoked`、進行役自身の資格の失効・再発行は `Forbidden`、二重の失効は `CredentialAlreadyRevoked`、復帰は準備中と開始後の両方で受け付ける。
+- **判定順**: 失効・再発行は 未作成・進行役でない（`Forbidden`）→ 進行役自身が対象（`Forbidden`）→ 未知の参加者（`ParticipantNotFound`）→ 状態（`CredentialAlreadyRevoked`／`CredentialNotRevoked`）。復帰は 資格の有無 → 操作者が主体自身 → 資格が VALID、のどれが外れても**同じ値** `Forbidden("復帰できない")`（NF-S12）。
+- **計画・設計書との差（要確認）**: (1) `CredentialValidity` は**有効期限と `revoked`**だけ（設計書の発行時刻・失効時刻は、`evolve` が時刻を読まず、イベントのペイロードにも無いため持たない。設計書の差の表 35）。(2) 失効は**期限切れで未失効の資格にも**できる（先に失効させて再発行する経路。計画 3.1 の「有効な資格のみ」を、設計書の不変条件「失効済みを再度失効できない」の意味で実装）。再発行は**失効した資格だけ**（期限切れでも未失効なら `CredentialNotRevoked`）。(3) 復帰は、**操作者が復帰の主体自身であること**も検査する（設計書に無い。別の主体の資格での復帰を防ぐ防御。Step 6 の `Auth.RECOVERY` が、資格の持ち主を `Actor` にして渡す前提）。(4) 新しい `code` `game.credential_not_revoked` を、仕様の `ErrorCode` に足した（`ApiContractSpec` の「エラー code の一致」が、ドメインの code と仕様の一致を検査するため。型の再生成 `api:check` は差分 0、`problems.ts` は `null`）。
+
+**ドメイン以外への追従（最小）**: `GameEvent` の追加で `adapter-persistence` の網羅した `when` がコンパイルできなくなったため、3 つのイベントの DTO・符号化・復号（`CredentialSubjectDto`・`CredentialRevokedDto`・`CredentialReissuedDto`・`ParticipationRecoveredDto`）を足した（Step 4.6 の一部の前倒し）。**detekt の `LongMethod`・`CyclomaticComplexMethod` が `EventCodec.decodeByType` に出たため、game・session のイベントの復号を 2 つの関数に分けた**（設定の引き下げや `@Suppress` はしていない）。`EventCodecSpec` に往復（進行役・参加者の両方の主体）・不正な入力（主体の種別・ID・期限）の 2 件を足した。**4.6 の golden（全イベントの種類の JSON の固定）と、`Projection.kt`・永続化の投影は 4.6・4.7 に残す**（`Projection.kt` の `Lobby` は資格のイベントを購読しない設計書どおり、`else` の空で足りて変更なし）。
+
+**実測**（`apps/beer-game-kotlin` で実行。静的解析は JDK 21）:
+
+| 検査 | 結果 |
+| :--- | :--- |
+| `:domain:test` | **357 件、失敗 0**（Step 3 で 57 件を追加。`GameCredentialSpec` ほか） |
+| `:domain:koverVerify`（行 100%） | 合格。**行 970 / 970（未到達 0）**。除外・閾値の引き下げなし |
+| `:application:test`・`:adapter-http:test`・`:adapter-persistence:test` | 86 件・70 件・50 件、すべて失敗 0（永続化は +2 件） |
+| `:app:test` | **71 件中 7 件 failed**。Step 2 の 8 件から「エラー code の一致」が緑になり（ドメインの `game.credential_already_revoked`・`game.credential_not_revoked` が仕様と一致）、**残り 7 件は Step 1 と同じ `ApiContractSpec` の想定どおりの Red**（`recoveryCode` が無い 5 件、要求の表、ルートの網羅）。ほかの失敗なし |
+| `:app:acceptanceTestH2` | 61 シナリオ中 **31 passed、30 failed**（Step 2 と同じ。配線が無いので、資格のシナリオは Step 6 まで Red のまま）。PostgreSQL 18 は実行していない |
+| `ktlintCheck`、`detekt`・`detektMain`・`detektTest`、`pmdMain`・`pmdTest`・`pmdAdapter`・`pmdDomainApplication` | **違反 0**（`@Suppress` なし、ベースラインなし）。途中で、行の長さ（120 超）・ktlint の整形・`EventCodec.decodeByType` の長さと複雑さを指摘され、直して解消 |
+| `web`: `npm run api:generate` → `api:check` | 差分 0（`ErrorCode` に `game.credential_not_revoked` を足した再生成） |
+
+**ゲート 3 で人が確認すること**:
+
+1. **失効・再発行の対象**: 進行役自身は `Forbidden`、未作成も `Forbidden`（`ParticipantNotFound` や `NotPreparing` にしない。進行役になれる人がいないため）。失効・再発行の権限のないときの理由の文言は仮置き（`Forbidden` の理由。試験は文言も固定している）
+2. **期限切れで未失効の資格**: 失効は**できる**、再発行は**できない**（`CredentialNotRevoked`。先に失効させる）。ゲート 1 の「失効していない資格の再発行は拒否」を字義どおりに実装した。**期限切れを失効なしで再発行できる案もある**（運用が 1 手少ない。有効でない資格を置き換えるだけで、漏洩の被害は止まっている）
+3. `CredentialValidity` の形（`expiresAt`・`revoked` だけ。発行・失効の時刻を持たない）
+4. **復帰の失敗を 1 つの値にまとめたこと**（不明・失効・期限切れ・未作成・別の主体を区別しない）。操作者が主体自身であることの検査（設計書に無い追加）が、Step 6 の認証の形（`RECOVERY` が主体を `Actor` にする）の制約になること
+5. 復帰が**期限を新しい値へ更新する**（`ParticipationRecovered.credentialExpiresAt`）こと。更新後は、旧い期限の後でも使える（試験で固定）。復帰が失敗した（拒否された）ときは、期限を変えない
+6. 新規ファイル `Credential.kt` と、仕様への `game.credential_not_revoked` の追加、4.6 の前倒し部分（永続化の DTO）、`EventCodec` の復号の関数の分割
+
+**注意**: `ReissueCredential.expiresAt`・`RecoverParticipation.credentialExpiresAt` が、コマンドの時刻より後であることは、ドメインでは検査していない（期限は境界が設定値から計算する前提。過去の期限を渡すと、再発行直後に期限切れになる）。検査を足すかは人の判断。
 
 ### Step 3.5: ドメイン — 役割の入れ替えでの資格の自動失効（H4）（🔴🟢🟡）
 
@@ -466,6 +507,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 3（Game の資格: 失効・再発行・復帰。3.1〜3.3）を実施**（ゲート 3 は人の確認待ち。**承認は記録していない**。Step 3.5 以降は未着手）。テストを先に書き、コンパイルエラー 119 件の Red を確認してから実装。`Credential.kt`（新規）に `CredentialSubject`・`CredentialValidity`・資格の decide を、`Game.kt` に `RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`、`game.credential_already_revoked`・`game.credential_not_revoked` を追加。仕様に `game.credential_not_revoked` を足し型を再生成。永続化の DTO を最小で前倒し。実測: `:domain:test` 357 件・失敗 0、domain の行 970/970（100%）、`:app:test` は想定の 7 件の Red（Step 1 の `ApiContractSpec`）、静的解析は違反 0。ゲート 3 で人が確認する 6 点は「Step 3 の実施結果」。設計書（domain-model の差の表 35・36 ほか）を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施**（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。`SessionState.Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`、`Editor.ByFacilitator`、`session.paused`・`session.not_paused`・`session.save_limit_reached` を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。`evolveSession` を `SessionEvolve.kt` へ分割（detekt の指摘の解消）。`InvalidTransition` の性質テスト（500 回）。永続化の DTO を最小で前倒し。**実測**: domain 300 件・失敗 0・行 879/879（100%）、`:app:test` は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の `code` の表・不変条件・差の表を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 2 をユーザーが承認し、確認点 1〜6 を報告どおりに確定**（選択: 「承認し、報告どおりで確定」）。判定順=状態→権限、保存回数=意思決定の版で数える、代理入力も上限に数える、停止中の `DecisionSaved`・`WeekCommitted` は evolve に通す、`Editor.ByFacilitator(gameId)`・永続化の種別 `FACILITATOR`、新規ファイル 3 つ（`SessionEvolve.kt` ほか）。ゲート 3〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 1 をユーザーが承認し、「ゲート 1 で決めること」9 項目を提案どおりに決定**（選択: 「承認し、提案どおり決定」）。H2=案 A（失効と同じトランザクションで `browser_sessions` の行を削除。スキーマ変更なし）、H3=案 A（`bg_recovery` Cookie と一度だけ示す復帰コード。`Auth.RECOVERY` を冪等照合の前に検証。設計書の例外 2 つを許容）、保存上限の code=`session.save_limit_reached`（409）、`session.not_paused`=409 のまま、失効していない資格の再発行は拒否・進行役自身は対象外、H4=`assignRole` を開始後も受け付ける、原文の解釈の差と試験道具の方式は記載どおり、契約テストの Red は Step 6 で解消。ゲート 2〜8 は未承認 | claude-code/claude-sonnet-5-5 |

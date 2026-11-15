@@ -54,7 +54,53 @@ fun assignRole(
     actor: Actor = facilitatorActor,
 ): GameCommand.AssignRole = GameCommand.AssignRole(actor, t0, pid(n), role)
 
+// ---- Game: 資格 ----
+
+/** 再発行・復帰で与える新しい有効期限。 */
+val renewedExpiry: Instant = Instant.parse("2027-01-15T09:00:00Z")
+
+val facilitatorSubject: CredentialSubject = CredentialSubject.Facilitator(gid)
+
+fun participantSubject(n: Int): CredentialSubject = CredentialSubject.Participant(pid(n))
+
+fun revokeCredential(
+    subject: CredentialSubject,
+    actor: Actor = facilitatorActor,
+): GameCommand.RevokeCredential = GameCommand.RevokeCredential(actor, t0, subject)
+
+fun reissueCredential(
+    subject: CredentialSubject,
+    actor: Actor = facilitatorActor,
+    expiresAt: Instant = renewedExpiry,
+): GameCommand.ReissueCredential = GameCommand.ReissueCredential(actor, t0, subject, expiresAt)
+
+/** 復帰は、復帰資格の持ち主（その主体自身）の操作として届く（既定の操作者は主体から作る）。 */
+fun recoverParticipation(
+    subject: CredentialSubject,
+    actor: Actor = actorOf(subject),
+    at: Instant = t0,
+    credentialExpiresAt: Instant = renewedExpiry,
+): GameCommand.RecoverParticipation = GameCommand.RecoverParticipation(actor, at, subject, credentialExpiresAt)
+
+fun actorOf(subject: CredentialSubject): Actor =
+    when (subject) {
+        is CredentialSubject.Facilitator -> Actor.Facilitator(subject.gameId)
+        is CredentialSubject.Participant -> Actor.Participant(subject.id)
+    }
+
 // ---- Game: イベントと状態 ----
+
+fun credentialRevoked(subject: CredentialSubject): GameEvent.CredentialRevoked = GameEvent.CredentialRevoked(subject)
+
+fun credentialReissued(
+    subject: CredentialSubject,
+    expiresAt: Instant = renewedExpiry,
+): GameEvent.CredentialReissued = GameEvent.CredentialReissued(subject, expiresAt)
+
+fun participationRecovered(
+    subject: CredentialSubject,
+    credentialExpiresAt: Instant = renewedExpiry,
+): GameEvent.ParticipationRecovered = GameEvent.ParticipationRecovered(subject, credentialExpiresAt)
 
 fun gameCreated(settings: GameSettings = gameSettings()): GameEvent.GameCreated =
     GameEvent.GameCreated(gid, joinCode, settings, retention, facilitatorExpiry)
