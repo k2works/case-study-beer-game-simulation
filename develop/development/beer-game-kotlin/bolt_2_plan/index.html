@@ -1,0 +1,10675 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="beer-game-kotlin の Bolt 2 のステップ計画。静的解析の厳格な適用（PMD の 14 ルールと fixture）、Kover、追記専用権限の否定テストと連鎖削除、CI の組み込み、API の契約テストの道具の選定。承認待ち。">
+      
+      
+        <meta name="author" content="Project Team">
+      
+      
+      
+        <link rel="prev" href="../bolt_1_report/">
+      
+      
+        <link rel="next" href="../bolt_2_report/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Bolt 2 計画 - 規約検査・CI・テスト基盤（Kotlin 固有、Kotlin 版） - Site Name</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/css/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#bolt-2-cikotlin" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Site Name" class="md-header__button md-logo" aria-label="Site Name" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Site Name
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bolt 2 計画 - 規約検査・CI・テスト基盤（Kotlin 固有、Kotlin 版）
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/k2works/claude-code-booster" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    claude-code-booster
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../strategy/" class="md-tabs__link">
+          
+  
+  
+  戦略
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../requirements/" class="md-tabs__link">
+          
+  
+  
+  要件
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../design/" class="md-tabs__link">
+          
+  
+  
+  設計
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+  開発
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../operation/" class="md-tabs__link">
+          
+  
+  
+  運用
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../review/" class="md-tabs__link">
+          
+  
+  
+  レビュー
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../adr/" class="md-tabs__link">
+          
+  
+  
+  ADR
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../journal/" class="md-tabs__link">
+          
+  
+  
+  ジャーナル
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../article/" class="md-tabs__link">
+          
+  
+  
+  記事
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../reference/" class="md-tabs__link">
+          
+  
+  
+  リファレンス
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../template/" class="md-tabs__link">
+          
+  
+  
+  テンプレート
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Site Name" class="md-nav__button md-logo" aria-label="Site Name" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Site Name
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/k2works/claude-code-booster" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    claude-code-booster
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    戦略
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    戦略
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    要件
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    要件
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game/requirements_definition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    要件定義
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game/business_usecase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ビジネスユースケース
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game/system_usecase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    システムユースケース
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game/user_story/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ユーザーストーリー
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/requirements_definition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    要件定義
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/business_usecase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ビジネスユースケース
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/system_usecase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    システムユースケース
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/user_story/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ユーザーストーリー
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../requirements/beer-game2/unit_definition/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit 定義
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    設計
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/domain-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ドメインモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/data-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    データモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/architecture-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    バックエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/architecture-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    フロントエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/architecture-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インフラストラクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    技術スタック
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/ui-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI 設計
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/test-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テスト戦略
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/non-functional/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    非機能要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game/operation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/domain-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ドメインモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/data-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    データモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/architecture-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    バックエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/architecture-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    フロントエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/architecture-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インフラストラクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    技術スタック
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/ui-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI 設計
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/sightseeing-map/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    サイトシーイング・マップ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/guided-tour-walking-skeleton/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ガイドツアー（ウォーキングスケルトン）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/test-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テスト戦略
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/non-functional/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    非機能要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game2/operation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/domain-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ドメインモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/data-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    データモデル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/architecture-backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    バックエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/architecture-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    フロントエンドアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/architecture-infrastructure/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インフラストラクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/tech-stack/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    技術スタック
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/ui-design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI 設計
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/test-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テスト戦略
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/non-functional/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    非機能要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design/beer-game-kotlin/operation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用要件
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    開発
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_2" id="__nav_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/release_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_1_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 1 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_1_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 1 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_2_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 2 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_3_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 3 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_3_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 3 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_4_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 4 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_4_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 4 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_5_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 5 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_5_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 5 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_6_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 6 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_6_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 6 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_7_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 7 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_7_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 7 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_8_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 8 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_8_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 8 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_9_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 9 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_9_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 9 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_10_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 10 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_10_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 10 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_11_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 11 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_11_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 11 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_12_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 12 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/bolt_12_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 12 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beer-game2/release_report-0_2_0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース完了報告書 0.2
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development_strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発戦略
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_1_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 1 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_1_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 1 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 2 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 2 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        概要
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="概要">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        着手前に、ユーザーが決めたこと（2026-11-14）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ゴール
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        確認したい仮説
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        範囲外
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        設計（4 図の扱い）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ステップ計画
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ステップ計画">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-pmd-14-fixture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: PMD の導入（14 ルールと fixture）（🔴🟢🟡）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1: PMD の導入（14 ルールと fixture）（🔴🟢🟡）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 の結果（実測。2026-11-14）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-kover" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Kover の合算とゲート（🔴🟢）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 2: Kover の合算とゲート（🔴🟢）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-2-2026-11-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 の結果（実測。2026-11-15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: 追記専用権限の否定テストと連鎖削除（🔴🟢）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3: 追記専用権限の否定テストと連鎖削除（🔴🟢）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-3-2026-11-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 の結果（実測。2026-11-14）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: CI の整備（🟢）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 4: CI の整備（🟢）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-4-2026-11-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 の結果（実測。2026-11-15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: API の契約テストの道具の候補の提示（🔵）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 5: API の契約テストの道具の候補の提示（🔵）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-5-2026-11-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 の結果（実測。2026-11-15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: 検証と終了（✅）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 6: 検証と終了（✅）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-6-2026-11-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 の結果（2026-11-15）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        完了条件（Definition of Done）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        リスクと対策
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        更新履歴
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_2_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 2 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_3_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 3 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_3_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 3 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../unit_u1_summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unit U1 総括
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    運用
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_3" id="__nav_6_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game2/application_dev_setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アプリケーション開発環境セットアップ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game2/aws_staging_setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS ステージング環境セットアップ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game2/aws_production_setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS プロダクション環境セットアップ・運用
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_4" id="__nav_6_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game-kotlin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game-kotlin/deploy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    デプロイ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game-kotlin/rollback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ロールバック
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../operation/beer-game-kotlin/container_local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コンテナのローカル実行
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    レビュー
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    レビュー
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_2" id="__nav_7_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_3" id="__nav_7_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-kotlin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-kotlin/design_review_20261114/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書レビュー（2026-11-14）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ADR
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_2" id="__nav_8_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/001-pure-weekly-simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 週次計算の分離
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/002-stateless-api-row-lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 状態を持たない API
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/003-outbox-projection-over-event-sourcing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 アウトボックスと投影
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/004-sse-version-notification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 SSE による版の通知
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/005-credential-digest-only/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-005 資格のダイジェスト保存
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/006-spa-without-router-or-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-006 SPA の構成
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/007-cloudfront-single-origin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-007 CloudFront の単一オリジン
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game/008-retention-saga/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-008 保持削除の Saga
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/001-rebuild-as-beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001 beer-game2 として作り直す
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/002-adopt-v1-adrs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002 v1 の ADR の引き継ぎ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/003-ports-and-adapters-with-lint/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003 ポートとアダプター
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/004-separate-game-and-session-aggregates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004 Game と Session の集約
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/005-role-results-and-sql-read-models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-005 役割別の週結果
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/006-sse-version-only/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-006 SSE は版の通知のみ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/007-cascade-deletion-without-queues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-007 カスケード削除
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/008-auto-commit-and-event-audit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-008 自動確定と監査
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/009-credential-key-versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-009 資格の鍵の版
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/010-url-router-and-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-010 URL ルーター
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/011-cloudfront-domain-tls-headers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-011 ドメイン・TLS・ヘッダー
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/012-delivery-pipeline-and-terraform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-012 デリバリーと Terraform
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game2/013-tech-stack-versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-013 技術スタックの版
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/001-kotlin-version-of-beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-001
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/002-event-sourcing-and-cqrs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-002
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/003-synchronous-projections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-003
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/004-idempotency-after-authorization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-004
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/005-optimistic-concurrency-and-advisory-lock/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-005
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/006-event-schema-evolution/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-006
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/007-functional-core-with-arrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-007
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/008-api-contract-and-error-codes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-008
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/009-observer-access-control/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-009
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/010-retention-deletion-with-append-only/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-010
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/011-strict-static-analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-011
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/012-gherkin-and-cucumber/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-012
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/013-tech-stack-versions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-013
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-kotlin/014-h2-for-local-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ジャーナル
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ジャーナル
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_2" id="__nav_9_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_3" id="__nav_9_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game2
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game2
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game2/20261110/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2026-11-10
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_9_4" id="__nav_9_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    beer-game-kotlin
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_9_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    beer-game-kotlin
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game-kotlin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game-kotlin/20261114/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2026-11-14
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../journal/beer-game-kotlin/20261115/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    2026-11-15
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    記事
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    記事
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../article/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リファレンス
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    リファレンス
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%88%E3%81%84%E3%82%BD%E3%83%95%E3%83%88%E3%82%A6%E3%82%A7%E3%82%A2%E3%81%A8%E3%81%AF/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    よいソフトウェアとは
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%AD%E3%82%B8%E3%82%AB%E3%83%AB%E3%82%B7%E3%83%B3%E3%82%AD%E3%83%B3%E3%82%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ロジカルシンキング
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%96%8B%E7%99%BA%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%96%8B%E7%99%BA%E3%82%AC%E3%82%A4%E3%83%89_AI-DLC%E7%89%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発ガイド（AI-DLC 版）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/AI-DLC%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-DLC 導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/AI-DLC%E7%94%A8%E8%AA%9E%E9%9B%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI-DLC 用語集
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%89%E3%82%AD%E3%83%A5%E3%83%A1%E3%83%B3%E3%83%88%E6%A7%8B%E6%88%90%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ドキュメント構成ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/LivingDocumentation%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Living Documentation 導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%A2%E3%83%8E%E3%83%86%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アノテーション導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%80%E3%82%A4%E3%83%8A%E3%83%9F%E3%83%83%E3%82%AF%E3%82%AD%E3%83%A5%E3%83%AC%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ダイナミックキュレーション導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%AC%E3%82%A4%E3%83%89%E3%83%84%E3%82%A2%E3%83%BC%E3%83%BB%E3%82%B5%E3%82%A4%E3%83%88%E3%82%B7%E3%83%BC%E3%82%A4%E3%83%B3%E3%82%B0%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ガイドツアー・サイトシーイング導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/OKF%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89_V0.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OKF 導入ガイド（Open Knowledge Format v0.2）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E7%B5%8C%E5%96%B6%E6%88%A6%E7%95%A5%E5%88%86%E6%9E%90%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    経営戦略分析ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%93%E3%82%B8%E3%83%8D%E3%82%B9%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E5%88%86%E6%9E%90%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ビジネスアーキテクチャ分析ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    要件定義ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%A6%E3%83%BC%E3%82%B9%E3%82%B1%E3%83%BC%E3%82%B9%E4%BD%9C%E6%88%90%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ユースケース作成ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%A6%E3%83%BC%E3%82%B9%E3%82%B1%E3%83%BC%E3%82%B9%E4%BD%9C%E6%88%90%E3%82%AC%E3%82%A4%E3%83%89_AI-DLC%E7%89%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ユースケース作成ガイド（AI-DLC 版）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アーキテクチャ設計ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%87%E3%83%BC%E3%82%BF%E3%83%A2%E3%83%87%E3%83%AB%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    データモデル設計ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%89%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%A2%E3%83%87%E3%83%AB%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ドメインモデル設計ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/UI%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UI 設計ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%86%E3%82%B9%E3%83%88%E6%88%A6%E7%95%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テスト戦略ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%9D%9E%E6%A9%9F%E8%83%BD%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    非機能要件定義ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%81%8B%E7%94%A8%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用要件定義ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%A4%E3%83%B3%E3%83%95%E3%83%A9%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インフラ設計ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%B3%E3%83%BC%E3%83%87%E3%82%A3%E3%83%B3%E3%82%B0%E3%81%A8%E3%83%86%E3%82%B9%E3%83%88%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コーディングとテストガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%B3%E3%83%BC%E3%83%87%E3%82%A3%E3%83%B3%E3%82%B0%E3%81%A8%E3%83%86%E3%82%B9%E3%83%88%E3%82%AC%E3%82%A4%E3%83%89_AI-DLC%E7%89%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    コーディングとテストガイド（AI-DLC 版）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/BDD%E5%B0%8E%E5%85%A5%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    BDD 導入ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%82%A8%E3%82%AF%E3%82%B9%E3%83%88%E3%83%AA%E3%83%BC%E3%83%A0%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    エクストリームプログラミング
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%AA%E3%83%AA%E3%83%BC%E3%82%B9%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリースガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%AA%E3%83%AA%E3%83%BC%E3%82%B9%E3%83%BB%E3%82%A4%E3%83%86%E3%83%AC%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E8%A8%88%E7%94%BB%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース・イテレーション計画ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E3%83%AA%E3%83%AA%E3%83%BC%E3%82%B9%E3%83%BB%E3%82%A4%E3%83%86%E3%83%AC%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E8%A8%88%E7%94%BB%E3%82%AC%E3%82%A4%E3%83%89_AI-DLC%E7%89%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース・イテレーション計画ガイド（AI-DLC 版）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E7%92%B0%E5%A2%83%E5%A4%89%E6%95%B0%E7%AE%A1%E7%90%86%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    環境変数管理ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E8%A8%80%E8%AA%9E%E5%88%A5%E9%96%8B%E7%99%BA%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    言語別開発ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/Java%E3%82%A2%E3%83%97%E3%83%AA%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E7%92%B0%E5%A2%83%E6%A7%8B%E7%AF%89%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Java アプリケーション環境構築ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/TypeScript%E3%82%A2%E3%83%97%E3%83%AA%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E7%92%B0%E5%A2%83%E6%A7%8B%E7%AF%89%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript アプリケーション環境構築ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%81%8B%E7%94%A8%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%97%E3%83%88%E4%BD%9C%E6%88%90%E3%82%AC%E3%82%A4%E3%83%89/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運用スクリプト作成ガイド
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/CodexCLIMCP%E3%82%A2%E3%83%97%E3%83%AA%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E9%96%8B%E7%99%BA%E3%83%95%E3%83%AD%E3%83%BC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex CLI MCP アプリケーション開発フロー
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/CodexCLIMCP%E3%82%B5%E3%83%BC%E3%83%90%E3%83%BC%E8%A8%AD%E5%AE%9A%E6%89%8B%E9%A0%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Codex CLI MCP サーバー設定手順
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/SonarQube%E3%83%AD%E3%83%BC%E3%82%AB%E3%83%AB%E7%92%B0%E5%A2%83%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%E6%89%8B%E9%A0%86%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SonarQube ローカル環境セットアップ手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/Vim%E6%93%8D%E4%BD%9C%E3%83%9E%E3%83%8B%E3%83%A5%E3%82%A2%E3%83%AB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vim 操作マニュアル
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E4%BC%81%E6%A5%AD%E7%B5%8C%E5%96%B6%E8%AB%96/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    企業経営論
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/%E9%81%8B%E5%96%B6%E7%AE%A1%E7%90%86/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    運営管理
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    テンプレート
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    テンプレート
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    概要
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%81%BE%E3%81%9A%E3%81%93%E3%82%8C%E3%82%92%E8%AA%AD%E3%82%82%E3%81%86%E3%83%AA%E3%82%B9%E3%83%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    まずこれを読もうリスト
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%83%93%E3%82%B8%E3%83%8D%E3%82%B9%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ビジネスアーキテクチャ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    要件定義
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E5%AE%8C%E5%85%A8%E5%BD%A2%E5%BC%8F%E3%81%AE%E3%83%A6%E3%83%BC%E3%82%B9%E3%82%B1%E3%83%BC%E3%82%B9/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    完全形式のユースケース
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E8%A8%AD%E8%A8%88/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/ADR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%82%A4%E3%83%B3%E3%82%BB%E3%83%97%E3%82%B7%E3%83%A7%E3%83%B3%E3%83%87%E3%83%83%E3%82%AD/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    インセプションデッキ
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%82%A4%E3%83%86%E3%83%AC%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E8%A8%88%E7%94%BB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    イテレーション計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%82%A4%E3%83%86%E3%83%AC%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E5%AE%8C%E4%BA%86%E5%A0%B1%E5%91%8A%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    イテレーション完了報告書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%83%AA%E3%83%AA%E3%83%BC%E3%82%B9%E8%A8%88%E7%94%BB/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%83%AA%E3%83%AA%E3%83%BC%E3%82%B9%E5%AE%8C%E4%BA%86%E5%A0%B1%E5%91%8A%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    リリース完了報告書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E3%82%A2%E3%83%97%E3%83%AA%E3%82%B1%E3%83%BC%E3%82%B7%E3%83%A7%E3%83%B3%E9%96%8B%E7%99%BA%E7%92%B0%E5%A2%83%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%E6%89%8B%E9%A0%86%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    アプリケーション開発環境セットアップ手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E9%96%8B%E7%99%BA%E7%92%B0%E5%A2%83%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%E6%89%8B%E9%A0%86%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    開発環境セットアップ手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/AWS%E3%82%B9%E3%83%86%E3%83%BC%E3%82%B8%E3%83%B3%E3%82%B0%E7%92%B0%E5%A2%83%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%E6%89%8B%E9%A0%86%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS ステージング環境セットアップ手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/AWS%E3%83%97%E3%83%AD%E3%83%80%E3%82%AF%E3%82%B7%E3%83%A7%E3%83%B3%E7%92%B0%E5%A2%83%E3%82%BB%E3%83%83%E3%83%88%E3%82%A2%E3%83%83%E3%83%97%E6%89%8B%E9%A0%86%E6%9B%B8/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS プロダクション環境セットアップ手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E4%BC%81%E6%A5%AD%E5%88%86%E6%9E%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    企業分析
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/%E4%BA%8B%E4%BE%8B%E5%88%86%E6%9E%90/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    事例分析
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--stable"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../template/README.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    README
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="bolt-2-cikotlin">Bolt 2 計画 - 規約検査・CI・テスト基盤（Kotlin 固有）<a class="headerlink" href="#bolt-2-cikotlin" title="Permanent link">&para;</a></h1>
+<h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Bolt</td>
+<td style="text-align: left;">B2（<a href="../release_plan/">リリース計画</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">Unit</td>
+<td style="text-align: left;">U1 ウォーキングスケルトン（後半）</td>
+</tr>
+<tr>
+<td style="text-align: left;">所要（計画）</td>
+<td style="text-align: left;">3 稼働日（仮定）</td>
+</tr>
+<tr>
+<td style="text-align: left;">ゲート密度</td>
+<td style="text-align: left;"><strong>密</strong>（ステップごとに、人が検証する）</td>
+</tr>
+<tr>
+<td style="text-align: left;">アプローチ</td>
+<td style="text-align: left;">序盤（<a href="../development_strategy/">開発戦略</a>）。<strong>ルール・検査そのものを、テストファーストで確かめる</strong>（fixture）</td>
+</tr>
+<tr>
+<td style="text-align: left;">状態</td>
+<td style="text-align: left;"><strong>実装は完了（2026-11-15）。ゲート 1〜5 と Bolt の承認（ゲート 6）は、すべて人の確認待ち（未承認）</strong>。本書は AI が提案したもので、<strong>B2 のステップ計画そのものも人の承認待ち</strong>。ユーザーのゴール（U1）に従い、B1 が未承認のまま 2026-11-14 に実行を開始した。結果は <a href="../bolt_2_report/">Bolt 2 終了報告</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="2026-11-14">着手前に、ユーザーが決めたこと（2026-11-14）<a class="headerlink" href="#2026-11-14" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">決定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">PMD の導入</td>
+<td style="text-align: left;"><strong>承認</strong>（PMD 7.29.0。CI のツール。XPath の 14 個の関数型ルール）</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">detekt 1.23.8 が JDK 25 で動かない問題</td>
+<td style="text-align: left;"><strong>JDK 21 専用ジョブで維持</strong>（アプリは JDK 25 のまま。PMD と併用。detekt 2 系が安定したら見直す）</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">API の契約テスト（OpenAPI）の道具</td>
+<td style="text-align: left;"><strong>公式情報で候補を調べて提示</strong>し、ユーザーが選んで承認してから導入する。<strong>選定と導入の承認までは、契約テストの導入（Step 5 の道具に依存する部分）に着手しない</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">B1 のゲート 1〜12（未承認）</td>
+<td style="text-align: left;"><strong>未承認のまま B2 へ進む</strong>（B1 の成果は人の確認待ちとして残す）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">ゴール<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p>静的解析の厳格な適用（違反 0 件、ベースラインなし、<code>@Suppress</code> なし）を CI で守らせ、追記専用権限と連鎖削除の設計が成り立つかを PostgreSQL で確かめ、Kover の計測を実態（<code>test</code>・<code>integrationTest</code>・受け入れの合算）に合わせる。</p>
+<h3 id="_3">確認したい仮説<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<ol>
+<li>PMD は、使う版（7.29.0）で、Kotlin 2.4 の構文を解析でき、14 ルールの fixture の期待件数（ガイドの例は 17 件）と一致するか。Gradle で実行でき、層ごとのルールセットの分割と両立するか。</li>
+<li>追記専用権限（<code>events</code> に UPDATE・DELETE・TRUNCATE 無し）と <code>game_roots</code> の連鎖削除は、PostgreSQL で両立するか（リスク R6）。</li>
+<li>Kover は <code>test</code>・<code>integrationTest</code>・受け入れを合算できるか。domain の行 100% を、生成コードの扱いとあわせて、どう守るか。</li>
+<li>detekt の JDK 21 専用ジョブは、CI で再現できるか。</li>
+</ol>
+<h3 id="_4">範囲外<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>API の契約テストの<strong>実装</strong>（道具の選定と承認の後。選定の候補の提示は B2 に含む）、N-1 互換ジョブの本実装（雛形のみ。B12）、デプロイの定義（B3）。<strong>契約テストの実装は、2026-11-14 にユーザーが道具を選定・承認したため、Step 5 で実施した</strong>（上の記述は着手前のもの）。</p>
+<p><strong>範囲外・未実施（検証で追記）</strong>: リリース計画の B2 の行にある<strong><code>InvalidTransition</code> の性質テスト</strong>は、この計画に Step が無く、実施していない（人の判断で、B3 以降へ回すか決める）。B1 の申し送りのうち、生きたドキュメントの公開の導線、Cucumber のタグ（<code>@US</code>・<code>@AC</code>）の整合検査、フロントエンドの lint での握りつぶしの検出、<code>@Suppress</code>・ベースラインの機械検査（CI）、<code>TAGS.md</code> の除外も、この計画に項目が無く、未実施（<a href="../bolt_2_report/">終了報告</a> の #20）。</p>
+<h2 id="4">設計（4 図の扱い）<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
+<p>B2 は、規約検査・CI・テスト基盤が主で、<strong>新しい集約・イベント・テーブル・画面を作らない</strong>。開発戦略の軸 B の「4 図」は、次のとおり、B2 で変わらない。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">図</th>
+<th style="text-align: left;">B2 での扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ドメインモデル図</td>
+<td style="text-align: left;">変更なし（B2 でドメインのコードを変えていない。<code>!!</code> の置換はテストのコードのみ）</td>
+</tr>
+<tr>
+<td style="text-align: left;">状態遷移図</td>
+<td style="text-align: left;">変更なし（状態を持つ集約の変更なし）</td>
+</tr>
+<tr>
+<td style="text-align: left;">ER 図</td>
+<td style="text-align: left;">変更なし（V101 はロールと GRANT だけで、表を作らない。権限は <a href="../../../design/beer-game-kotlin/data-model/">データモデル</a> の表で示す）</td>
+</tr>
+<tr>
+<td style="text-align: left;">画面遷移図</td>
+<td style="text-align: left;">変更なし（画面を作らない。<code>web/src/api/types.ts</code> の型を生成物に置き換えたが、画面の遷移は変えていない）</td>
+</tr>
+</tbody>
+</table>
+<p>設計書への反映（B2 の実装で変わった点）は、各文書の変更表に記録した（テスト戦略、バックエンド、データモデル、フロントエンド、インフラ、技術スタック。ADR-008・010・011）。</p>
+<hr />
+<h2 id="_5">ステップ計画<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>各ステップは TDD（Red → Green → Refactor。テスト・fixture を先に書き、失敗を確認）で進めます。<strong>ゲートは、人の確認待ち</strong>とし、承認済みとは書きません。</p>
+<h3 id="step-1-pmd-14-fixture">Step 1: PMD の導入（14 ルールと fixture）（🔴🟢🟡）<a class="headerlink" href="#step-1-pmd-14-fixture" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 1.1 🔴 ガイド §9.6 の fixture（違反するコードとしないコード）を作り、<strong>期待する件数と行</strong>を決める。ルールセット（14 ルール）を、<strong>先に fixture で確かめる</strong>（失敗を確認）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 1.2 🟢 PMD 7.29.0 を Gradle に導入（Kotlin のソースを検査。層ごとのルールセットの分割。<code>message</code> に波括弧を書かない）。fixture の期待件数と一致する</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 1.3 本体のコードに適用し、<strong>違反 0 件</strong>にする（ベースラインなし、<code>@Suppress</code> なし。違反は修正する）。境界のコード（<code>main</code>、アダプター）とテストで外すルールは、層ごとのルールセットで明示し、理由を記録</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 1.4 CI に組み込む（fixture のテストとあわせて）。<strong>規約違反コードを 1 つ置くと CI が落ちる</strong>ことを、detekt（JDK 21）と PMD のそれぞれで確認する（<strong>ローカルの同じタスクで確認</strong>。GitHub Actions 上の実行は未確認）</li>
+</ul>
+<p><strong>ゲート 1</strong>: ルールと fixture、層ごとの緩和を、人が確認する。<strong>状態: 人の確認待ち</strong>（未承認）。</p>
+<h4 id="step-1-2026-11-14">Step 1 の結果（実測。2026-11-14）<a class="headerlink" href="#step-1-2026-11-14" title="Permanent link">&para;</a></h4>
+<p><strong>1. 先に fixture（Red）</strong></p>
+<ul>
+<li>fixture は <code>apps/beer-game-kotlin/config/pmd/fixtures/Fixture.kt</code>（ガイド §9.6 のとおり 40 行）、期待は <code>expected.txt</code>（「行 ルール名」17 件。ガイドの期待と同じ）。検査は Gradle のタスク <code>pmdFixtureTest</code>（PMD を fixture に実行して XML を読み、期待と<strong>過不足なく</strong>一致しなければ失敗。処理エラー・ルールの設定の誤りも失敗）。</li>
+<li>Red: ルールセット（<code>fp-kotlin-rules.xml</code>）が無い状態で <code>./gradlew pmdFixtureTest</code> を実行すると失敗した（PMD が <code>Cannot load ruleset config/pmd/fp-kotlin-rules.xml</code> を出し、レポートが空のため XML の読み込みで失敗）。依存の解決（<code>repositories { mavenCentral() }</code> の不足）で先に 1 度失敗したが、それは Red の理由ではないので直した。</li>
+<li>Green: ガイドの 14 ルールを <code>fp-kotlin-rules.xml</code> に実装して再実行し、<strong>実際の件数 17 件、期待と一致</strong>（<code>Found 17 violations.</code> と <code>pmdFixtureTest: 期待どおり 17 件</code>）。</li>
+</ul>
+<p><strong>2. PMD の導入と Kotlin の解析</strong></p>
+<ul>
+<li>版は <code>gradle/libs.versions.toml</code> の <code>pmd = "7.29.0"</code>（<code>pmd-cli</code>・<code>pmd-kotlin</code>。Maven Central に 7.29.0 の POM があることを確認）。</li>
+<li><strong>Kotlin 2.4 の解析: できた。</strong> 本体・テストの全ファイル（5 モジュールの main・test・integrationTest・acceptanceTest）で、構文エラーも「式本体のローカル関数」の内部エラー（ガイドの注意）も出なかった。ただし、PMD 7.29.0 が内蔵する Kotlin の字句・構文解析は kotlin-compiler-embeddable 2.4.0 に依存して動いており、<strong>PMD が Kotlin 2.4 の全構文を保証するとは確認していない</strong>（未確認。今回のコードで解析できたという事実のみ）。</li>
+<li>Gradle の <code>pmd</code> プラグインは Java 用なので使わず、<code>PmdCli</code> を <code>JavaExec</code> で実行する（<code>pmdTool</code> 構成。<code>workingDir</code> はプロジェクトのルート）。タスク: <code>pmdFixtureTest</code>、<code>pmdDomainApplication</code>、<code>pmdAdapter</code>、<code>pmdMain</code>、<code>pmdTest</code>、まとめて <code>pmd</code>。各モジュールの <code>check</code> にも <code>pmd</code> を依存させた。実行時の <code>No auxClasspath configured for Kotlin</code> の警告は、型情報を使わない構文の検査なので無視してよい（ガイドのとおり）。<code>sun.misc.Unsafe</code> の警告も出るが、PMD 7.29.0 が内蔵する kotlin-compiler-embeddable によるもので、結果には影響しない。</li>
+<li>実行時間（実測。他の Gradle・PMD が同時に動いていて、負荷が高かったときの値）: <code>pmd</code> 全体で 2〜15 分と大きくばらついた（<code>pmdTest</code> が最も重い）。CI の <code>timeout-minutes: 20</code> に収まるかは<strong>未確認</strong>（GitHub Actions 上では未実行）。</li>
+</ul>
+<p><strong>3. 層ごとのルールセット（<code>config/pmd/</code>）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ファイル</th>
+<th style="text-align: left;">対象</th>
+<th style="text-align: left;">外すもの（理由）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>fp-kotlin-rules.xml</code></td>
+<td style="text-align: left;">14 ルールの定義（正本）</td>
+<td style="text-align: left;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ruleset-domain.xml</code></td>
+<td style="text-align: left;"><code>domain/src/main</code>・<code>application/src/main</code></td>
+<td style="text-align: left;">14 ルール + 標準（bestpractices・errorprone）。外すルールは<strong>なし</strong>。<strong>標準の <code>FunctionNameTooShort</code> の閾値だけ 3 文字→2 文字に下げた</strong>（ルールは外していない）。理由: 失敗を <code>Either</code> で返す工場関数 <code>of</code>（<code>Quantity.of</code>・<code>Week.of</code>・<code>Settings.of</code> など 14 か所）が 2 文字。閾値は XPath に固定でプロパティが無いため、<code>xpath</code> を上書きした</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ruleset-adapter.xml</code></td>
+<td style="text-align: left;"><code>adapter-persistence/src/main</code>・<code>adapter-http/src/main</code></td>
+<td style="text-align: left;"><code>NoThrow</code>（コルーチンの取消 <code>CancellationException</code> の再送出、LISTEN の失敗を <code>SQLException</code> で再試行へ伝える）、<code>NoVarProperty</code>・<code>NoVarClassParameter</code>（JDBC の位置番号、設定の受け渡し、試行の窓の件数）、<code>NoMutableCollectionFactory</code>（<code>ResultSet</code> からの集計、コミット後のフック、試行の窓の表）、<code>NoRawConcurrency</code>（試行の窓の <code>@Synchronized</code>）、<code>SideEffectInNonSuspendFunction</code>（相関 ID の <code>UUID.randomUUID</code>）、標準の <code>LooseCoupling</code>（<code>LinkedHashMap</code> を型に使う）。<code>FunctionNameTooShort</code> は閾値 2</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ruleset-main.xml</code></td>
+<td style="text-align: left;"><code>app/src/main</code></td>
+<td style="text-align: left;"><code>NoRunBlocking</code>（起動時に実際のポートを同期で取得する 1 か所）、<code>SideEffectInNonSuspendFunction</code>（本物の時計・ID を組み立てる <code>Bootstrap.kt</code>・<code>Wiring.kt</code>）、<code>NoRawConcurrency</code>（シャットダウンフックの <code>Thread</code>）。<code>FunctionNameTooShort</code> は閾値 2</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ruleset-test.xml</code></td>
+<td style="text-align: left;">全モジュールの <code>test</code>・<code>integrationTest</code>・<code>acceptanceTest</code></td>
+<td style="text-align: left;"><code>NoVarProperty</code>・<code>NoVarClassParameter</code>・<code>NoMutableCollectionFactory</code>（Cucumber の World、試験の台本の累積）、<code>SideEffectInNonSuspendFunction</code>（試験データの時計・ID）、<code>NoRunBlocking</code>（同期のステップから suspend を呼ぶ）、<code>NoThrow</code>（アサーション）、<code>NoRawConcurrency</code>（実プロセスのサーバーの部品）、標準の <code>FunctionNameTooShort</code>（ドメインの試験の <code>q</code>・<code>u</code>・<code>w</code>・<code>m</code> の 1 文字の記法）。<strong>外さない</strong>: <code>NoNotNullAssertion</code>、<code>NoReduce</code>、<code>NoGenericCatch</code>、<code>NoNestedFlatMap</code>、<code>NoGlobalScope</code>、<code>NoThreadSleep</code>、<code>NoMutableCollectionInSignature</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>緩和は<strong>層ごと（ルールセット単位）</strong>で、<code>@Suppress</code> は使っていない。層の中の<strong>新しい違反も、外したルールについては検出されなくなる</strong>（件所ごとではない）。この粗さが許容できるかは、ゲート 1 で人が判断する。戦略（development_strategy.md）の「ルールの緩和は理由を ADR に記録し、人が承認」は、<strong>ADR をまだ書いていない</strong>（Step 1 の時点）。<strong>Step 6 で、記録を <a href="../../../adr/beer-game-kotlin/011-strict-static-analysis/">ADR-011</a> に追記した</strong>（提案として記録。<strong>人の承認は未</strong>）。</li>
+<li>各ルールセットの冒頭の XML コメントに、外した理由と、<strong>現に報告された箇所</strong>（ファイル名）を書いた。</li>
+</ul>
+<p><strong>4. 本体への適用と違反</strong></p>
+<ul>
+<li>初回の実測（全層に「全ルール有効」の同じルールセットを適用。層ごとの緩和の前）: ドメイン・アプリケーションの <code>main</code> 14 件（すべて <code>of</code> の <code>FunctionNameTooShort</code>）、アダプター 15 件、<code>app</code> の <code>main</code> 5 件、テスト 101 件。ルールを外さずに<strong>コードを直した違反</strong>: <code>!!</code>（<code>NoNotNullAssertion</code>）20 件を <code>checkNotNull</code> に置き換えた（<code>app/src/test</code>: <code>HttpFlowSpec.kt</code> 12 件・<code>MainSpec.kt</code> 2 件、<code>app/src/acceptanceTest</code>: 3 件、<code>app/src/integrationTest</code>: <code>PostgresHttpSpec.kt</code> 3 件）。ほかは上の層ごとの緩和で扱った。</li>
+<li><strong><code>adapter-persistence/</code> のコードは修正していない</strong>（別の作業の編集中。指示のとおり）。<code>adapter-persistence</code> の違反は、すべて層ごとのルールセットの緩和で扱った（<code>ChangeNotifiers.kt</code> の <code>throw</code>、<code>JdbcEventStore.kt</code>・<code>JdbcTx.kt</code> の可変コレクション、<code>JdbcSupport.kt</code> の <code>var</code>）。<strong>これらをコードで直すかは、人の判断</strong>（設計に関わる。たとえば <code>JdbcSupport.kt</code> の位置番号は <code>var</code>）。</li>
+<li>最終の実測: <code>pmdAdapter</code>・<code>pmdDomainApplication</code>・<code>pmdMain</code>・<code>pmdTest</code> が、それぞれ <code>Found no violations.</code>、<code>pmdFixtureTest</code> が 17 件で一致（<code>./gradlew pmd --continue</code> と、<code>pmdTest</code> の再実行で確認）。<code>./gradlew pmdTest :app:ktlintCheck :app:test :app:compileIntegrationTestKotlin :app:compileAcceptanceTestKotlin</code> も成功（<code>!!</code> の置換で、<code>app</code> の <code>test</code> は緑のまま）。</li>
+</ul>
+<p><strong>5. 規約違反コードで CI のタスクが落ちること（1.4）</strong></p>
+<ul>
+<li><code>domain/src/main/kotlin/beergame/domain/ConventionViolation.kt</code>（<code>var leaked: Int = 0</code> と <code>fun readClock(): Instant = Instant.now()</code>）を一時的に置いた。</li>
+<li>PMD（JDK 25）: <code>./gradlew pmdDomainApplication</code> が失敗（<code>NoVarProperty</code>（6 行目）と <code>SideEffectInNonSuspendFunction</code>（8 行目）の 2 件、終了コード 4、<code>BUILD FAILED</code>）。</li>
+<li>detekt（JDK 21）: <code>./gradlew :domain:detektMain</code> が失敗（<code>ForbiddenMethodCall</code>: <code>java.time.Instant.now</code>（8 行 36 桁）、<code>BUILD FAILED</code>）。</li>
+<li>ファイルは削除して、戻した（<code>git status</code> に残っていない）。</li>
+</ul>
+<p><strong>6. CI（<code>.github/workflows/beer-game-kotlin.yml</code>、4.1 の一部）</strong></p>
+<ul>
+<li>ジョブ <code>pmd</code>（JDK 25）を追加: 先に <code>./gradlew pmdFixtureTest</code>、次に <code>./gradlew pmdDomainApplication pmdAdapter pmdMain pmdTest</code>。detekt は既存の JDK 21 の専用ジョブのまま。<code>verify</code> ジョブの <code>check</code> も、<code>pmd</code> に依存するため PMD を重ねて実行する（重複。実行時間が問題なら整理する）。YAML は <code>ruby -ryaml</code> で構文を検証した（<code>ok</code>）。GitHub Actions 上では<strong>未実行</strong>。</li>
+</ul>
+<p><strong>7. 見つけた制約・未確認</strong></p>
+<ul>
+<li>ルールセットの読み込みに失敗すると、PMD は <code>Found no violations.</code> を表示する（ログの最後）が、その前に ERROR を出して終了コードは非 0 になる。fixture のテストは、<code>configerror</code> と処理エラーの有無も検査している。層ごとのタスク（<code>pmd*</code>）は終了コードに頼るので、同様に落ちる（今回、設定の誤りで 1 度失敗して確認した）。</li>
+<li>標準の <code>FunctionNameTooShort</code> は、閾値がプロパティでなく XPath に埋め込まれている。変えるには <code>xpath</code> を上書きする。</li>
+<li>依存の追加: PMD のみ（CI のツールで、実行時の依存関係ではない）。契約テストの道具は入れていない。detekt の設定は変えていない。</li>
+<li>未確認: GitHub Actions 上の実行と時間。<code>integrationTest</code>・<code>acceptanceTest</code> の実行（Docker・Cucumber。今回はコンパイルのみ）。PMD が Kotlin 2.4 の全構文を解析できるか。<code>web/</code>（TypeScript）は対象外。</li>
+</ul>
+<h3 id="step-2-kover">Step 2: Kover の合算とゲート（🔴🟢）<a class="headerlink" href="#step-2-kover" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2.1 Kover が <code>test</code>・<code>integrationTest</code>・受け入れを合算できるか実測する</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.2 層ごとの目標と、全体のゲート（行 85%・分岐 75%）を、実測に基づいて設定する。<strong>domain の行 100% と、生成コード（<code>value class</code> の生成メンバー）の扱い</strong>を調べ、<strong>人の判断が要る場合は、閾値を黙って下げず、事実と選択肢を記録する</strong>（全体のゲートは設定済み。<strong>domain の行 100% は未達のため [ ] のまま</strong>。暫定の下限 97% を設定し、人の判断待ち）</li>
+</ul>
+<p><strong>ゲート 2</strong>: 実測と、ゲートの設定を、人が確認する。<strong>（待ち。承認済みではない）</strong></p>
+<h4 id="step-2-2026-11-15">Step 2 の結果（実測。2026-11-15）<a class="headerlink" href="#step-2-2026-11-15" title="Permanent link">&para;</a></h4>
+<p><strong>1. 合算の可否（2.1）: 合算できる。</strong></p>
+<ul>
+<li>Kover 0.9.11 は、ルート（<code>build.gradle.kts</code>）で <code>kover</code> プラグインを適用し、<code>dependencies { kover(project(":domain")) ... }</code> で全 5 モジュールを集めると、ルートの <code>koverXmlReport</code>・<code>koverVerify</code> が全モジュールを合算する。</li>
+<li>公式ドキュメント（kotlin.github.io/kotlinx-kover。取得した版は 0.9.8 の記述）の記述: 「既定ではすべてのテストタスクを計測する」。実測でも、<code>adapter-persistence</code> と <code>app</code> の <code>build/kover/bin-reports/</code> に <code>test.ic</code>・<code>integrationTest.ic</code>・<code>acceptanceTest.ic</code>・<code>acceptanceTestH2.ic</code> が生成された。<code>./gradlew koverVerify --dry-run</code> で、<code>koverVerify</code> が <code>test</code>・<code>integrationTest</code>・<code>acceptanceTest</code>・<code>acceptanceTestH2</code> をすべて先に実行する依存を確認した（追加の設定は不要）。</li>
+<li><strong>落とし穴（実測）</strong>: <code>integrationTest</code>・<code>acceptanceTest</code> のソースセットのクラス（<code>beergame.acceptance.*</code>、<code>PostgresSupport</code> など）が、本番コードとして行数に入った（<code>beergame/acceptance</code> が 549 行カバー）。各モジュールで <code>kover { currentProject { sources { excludedSourceSets.addAll("integrationTest", "acceptanceTest") } } }</code> を設定して外した。</li>
+<li>公式ドキュメントで<strong>確認できなかった事項</strong>: <code>excludedSourceSets</code> の記述そのもの（ビルドが通り、効果を実測で確認しただけ）。0.9.11 の版固有のドキュメントは未確認。</li>
+</ul>
+<p><strong>2. カバレッジの実測（合算。<code>./gradlew check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport</code>）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">範囲</th>
+<th style="text-align: right;">行</th>
+<th style="text-align: right;">分岐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>全体（合算）</strong></td>
+<td style="text-align: right;"><strong>3141/3245 = 96.8%</strong></td>
+<td style="text-align: right;"><strong>804/1030 = 78.1%</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">domain</td>
+<td style="text-align: right;">784/804 = 97.5%</td>
+<td style="text-align: right;">160/163 = 98.2%</td>
+</tr>
+<tr>
+<td style="text-align: left;">application</td>
+<td style="text-align: right;">569/576 = 98.8%</td>
+<td style="text-align: right;">98/127 = 77.2%</td>
+</tr>
+<tr>
+<td style="text-align: left;">adapter-persistence</td>
+<td style="text-align: right;">921/938 = 98.2%</td>
+<td style="text-align: right;">165/233 = 70.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;">adapter-http</td>
+<td style="text-align: right;">587/615 = 95.4%</td>
+<td style="text-align: right;">257/335 = 76.7%</td>
+</tr>
+<tr>
+<td style="text-align: left;">app</td>
+<td style="text-align: right;">280/312 = 89.7%</td>
+<td style="text-align: right;">124/172 = 72.1%</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>B1（<code>test</code> のみ、モジュール別）との差: adapter-http の行は 70.4% → 95.4%、分岐は 55.8% → 76.7%（受け入れ・統合が HTTP を通すため）。合算で、設計の層ごとの目安（adapter-http 行 90%・分岐 75%）を満たした。application の分岐（目安 85%）と adapter-persistence の分岐（目安 75%）は、目安に届かない（目安で、ゲートではない）。app の行は、起動部を含む（設計は「起動部は除外」としたが、除外は未設定）。</li>
+<li>上の数値の読み方: 層の値は、合算の報告をパッケージ（<code>beergame/domain</code> など）で集計した。</li>
+</ul>
+<p><strong>3. ゲートの設定（2.2）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ゲート</th>
+<th style="text-align: right;">設定</th>
+<th style="text-align: left;">場所</th>
+<th style="text-align: right;">実測</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">全体の行</td>
+<td style="text-align: right;">85%</td>
+<td style="text-align: left;"><code>build.gradle.kts</code>（ルート。合算）</td>
+<td style="text-align: right;">96.8%</td>
+</tr>
+<tr>
+<td style="text-align: left;">全体の分岐</td>
+<td style="text-align: right;">75%</td>
+<td style="text-align: left;">同上</td>
+<td style="text-align: right;">78.1%（余裕 3.1 ポイント）</td>
+</tr>
+<tr>
+<td style="text-align: left;">domain の行</td>
+<td style="text-align: right;"><strong>暫定の下限 97%</strong>（目標 100%）</td>
+<td style="text-align: left;"><code>domain/build.gradle.kts</code>（モジュール単位）</td>
+<td style="text-align: right;">97.5%</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>設計の目標のうち、層ごとの他の目標は「目安」なので、ゲートにしていない（設計どおり）。</li>
+<li>Kover 0.9.11 の検査の規則（<code>rule</code>）には、パッケージで絞る <code>filters</code> が無い（実測: コンパイルエラー）。そのため domain の行は、domain モジュールの <code>koverVerify</code>（domain の <code>test</code> だけの計測。値は合算と同じ 784/804）に置いた。</li>
+<li><strong>閾値割れで失敗すること（実測）</strong>: 全体の分岐を 85%、domain の行を 100% に一時的に変えて <code>./gradlew koverVerify --continue</code> を実行し、<code>:koverVerify</code>・<code>:domain:koverVerify</code> が FAILED になることを確認した。その後、元の値（75%・97%）に戻した。戻したあと <code>./gradlew koverVerify</code> は BUILD SUCCESSFUL。</li>
+</ul>
+<p><strong>4. domain の行 100% の事実と選択肢（人の判断）</strong></p>
+<ul>
+<li><strong>未到達の 20 行（784/804）の内訳</strong>: すべて、手で書いた処理ではなく、コンパイラが生成するコードに対応する行。</li>
+<li><code>value class</code> のプライマリコンストラクタのプロパティの行（<code>val value: Int,</code> など）9 行（<code>Quantities.kt</code> の 10・28、<code>Values.kt</code> の 22・44・61・83・96・110・125。ボックス化したクラスの <code>getValue</code> など）。</li>
+<li><code>object Projections</code> のプロパティ宣言の行（<code>val gameOverview =</code> ほか 9 行）。プロパティ初期化の行は通るが、宣言の行に対応する getter（<code>getGameOverview()</code> など）が、どこからも呼ばれない（<code>Projections.all</code> は内部でフィールドを直接読む）。</li>
+<li><code>Foundation.kt</code> 56 行 <code>fun toRef(): ActorRef =</code> の 1 行。本体は呼ばれている（application・adapter-persistence の試験）が、宣言の行の命令の一部が未到達。<strong>原因は未確認</strong>（生成コードの疑い。バイトコードは未確認）。</li>
+<li>合計 19 行（9＋9＋1）を特定できた。報告の「未到達 20 行」との差の 1 行は、<strong>内訳は未確認</strong>（部分的に到達した行 4 行の集計の違いの可能性）。</li>
+<li><strong>除外で 100% に届くか（実測）</strong>: 届かない。Kover の除外は、クラス単位（<code>classes(...)</code>）か、注釈（<code>annotatedBy</code>）しか確認できない。生成コードだけを除く方法は、確認できなかった。実験として <code>Projections*</code>・<code>Quantity</code>・<code>Units</code> を除外すると、domain は 611/620（行 98.5%）に変わっただけで、<strong>実処理の行 184 行が計測から消えた</strong>（行 100% にも届かない）。実験は元に戻した。</li>
+<li>選択肢（決めるのは人）:</li>
+<li><strong>閾値の見直し</strong>: domain の行のゲートを 97%（現状の実測 97.5% に基づく下限）のまま、設計書の「100%」を、実測に合わせて書き換える。</li>
+<li><strong>コードの変更で生成コードを減らす</strong>: <code>object Projections</code> の <code>val</code> を <code>private val</code> にする、<code>value class</code> をやめて通常のクラスにする、など。いずれも設計・アプリのコードの変更で、本 Step の範囲外（<code>value class</code> は設計判断）。</li>
+<li><strong>クラス単位の除外</strong>: 実処理を含むクラスごと除外することになるため、お勧めしない（上の実測）。</li>
+<li><strong>注釈による除外</strong>: 自前の注釈（例: <code>@Generated</code> 相当）を作って <code>annotatedBy</code> で除外する。生成される getter には付けられないため、効果は未確認。</li>
+<li><strong>現状の設定</strong>: 97%（現状より悪化させないための暫定の下限。目標 100% は未達のまま）。</li>
+</ul>
+<p><strong>5. 未確認</strong></p>
+<ul>
+<li>GitHub Actions 上での Kover の実行（ローカルの JDK 25・macOS だけで実測）。</li>
+<li><code>suspend</code> による分岐の揺れ（全体の分岐 75% の余裕は 3.1 ポイント）。複数回の実行での揺れは未測定。</li>
+<li>app の起動部の除外（設計の「起動部を除外」）は未設定。除外すると app の行は上がる。</li>
+</ul>
+<h3 id="step-3">Step 3: 追記専用権限の否定テストと連鎖削除（🔴🟢）<a class="headerlink" href="#step-3" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 3.1 🔴 PostgreSQL（Testcontainers）の否定テスト: 書き込みロールが <code>events</code> を UPDATE・DELETE・TRUNCATE できない／<code>game_roots</code> を DELETE できない／各ロールが表の所有者・所有者ロールのメンバーでない／削除ロールが <code>game_roots</code> 以外を直接 DELETE できない。<strong>連鎖削除が、<code>events</code> に DELETE 権限が無いロールで動くか</strong>の Red のテスト</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 3.2 🟢 マイグレーション V101（PostgreSQL 専用。ロールと GRANT）。結果に合わせて設計を確定（動かない場合の代替: <code>SECURITY DEFINER</code> の関数、削除用ロール）</li>
+</ul>
+<p><strong>ゲート 3</strong>: 権限の設計と、マイグレーションを、人が確認する。<strong>（待ち。承認済みではない）</strong></p>
+<h4 id="step-3-2026-11-14">Step 3 の結果（実測。2026-11-14）<a class="headerlink" href="#step-3-2026-11-14" title="Permanent link">&para;</a></h4>
+<p><strong>変更したファイル</strong>: <code>adapter-persistence/src/main/resources/db/migration/postgres/V101__database_roles.sql</code>（新規）、<code>adapter-persistence/src/integrationTest/kotlin/beergame/persistence/RolePrivilegesSpec.kt</code>（新規。11 件）、同 <code>PostgresSupport.kt</code>（別データベースの作成と、所有者での接続の道具を追加）。依存の追加なし、<code>@Suppress</code> なし。</p>
+<p><strong>Red の確認（先に書いて失敗を確認）</strong>: V101 を置く前に <code>RolePrivilegesSpec</code> を書いて実行した。ロールが無いため、<code>role "beergame_writer" does not exist</code>（<code>SET ROLE</code>）などで失敗した（Red）。その後 V101 を置き、11 件が緑になった。なお、Red 中に分かった試験側の不備（<code>openFixture</code> の LISTEN 用の接続、台本が書かない <code>current_decisions</code>・<code>week_team_totals</code> の行）は、V101 の前に直した。
+<strong>変異による確認（常に通るテストでないこと）</strong>: V101 に一時的に <code>GRANT UPDATE, DELETE, TRUNCATE ON events TO beergame_writer</code>、<code>GRANT DELETE ON game_roots TO beergame_writer</code>、<code>GRANT SELECT ON game_join_codes TO beergame_observer</code>、<code>GRANT DELETE ON events TO beergame_deleter</code>、<code>GRANT beergame_deleter TO beergame_reader</code> を足すと、11 件中 6 件が失敗した（追記専用 2、所有者・メンバー、削除ロールの範囲、観察者の 3 表、連鎖削除の前提）。変異を戻して 11 件が緑に戻ることを確認した。</p>
+<p><strong>実行したコマンドと結果</strong>（JDK 25）:</p>
+<ul>
+<li><code>./gradlew :adapter-persistence:integrationTest --tests '*RolePrivilegesSpec*'</code>: 緑（11 件、0 失敗）。</li>
+<li><code>./gradlew :adapter-persistence:test :adapter-persistence:integrationTest :adapter-persistence:ktlintCheck</code>: 緑（<code>PostgresPersistenceSpec</code> 44 件、<code>RolePrivilegesSpec</code> 11 件。ktlint 0。警告エラー化は既存の設定のまま）。</li>
+<li><code>./gradlew :app:integrationTest</code>: 緑（V101 を含めて適用しても、単一の接続ユーザーのアプリは壊れない）。</li>
+<li>受け入れ（<code>acceptanceTest</code>）は、<strong>未実行</strong>（ルートの Gradle と CI を別のエージェントが編集中のため。アプリのコードは変えていないので影響は無い見込みだが、未確認）。</li>
+</ul>
+<p><strong>連鎖削除の可否の実測（仮説 2、リスク R6）</strong>: <strong>動いた</strong>。削除ロールに <code>events</code> の DELETE 権限が無い状態（<code>has_table_privilege('beergame_deleter', 'events', 'DELETE')</code> が false）で、<code>DELETE FROM game_roots WHERE game_id = ?</code> を 1 回実行すると、<code>game_id</code> 列を持つ<code>game_id</code> 列を持つ全表（<code>information_schema.columns</code> から取得。件数は未計測）から当該ゲームの行が消え、別のゲームの行は残った。事前に全表に行があることも検査した（台本が書かない表は直接 INSERT で補った）。理由は、PostgreSQL が参照の整合性のトリガーを子の表の所有者の権限で実行するため。したがって<strong>代替（<code>SECURITY DEFINER</code> の関数、別の削除用ロール）は不要</strong>で、試していない。ADR-010 の「トリガーを足さない」方針も維持できた。仮説 2 は支持された（PostgreSQL 18、<code>postgres:18-alpine</code>、1 回の実測）。</p>
+<p><strong>ロールと GRANT の設計（V101）</strong>: ロールは <code>beergame_writer</code>・<code>beergame_reader</code>・<code>beergame_observer</code>・<code>beergame_deleter</code>（<code>NOLOGIN</code>、非特権、継承なし。<code>CREATE ROLE</code> は存在しなければ作る）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ロール</th>
+<th style="text-align: left;">権限</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>beergame_writer</code></td>
+<td style="text-align: left;"><code>events</code>・<code>game_roots</code> は SELECT・INSERT のみ。投影・周辺ストア・冪等記録・<code>projection_checkpoints</code> は SELECT・INSERT・UPDATE・DELETE（再構築が行を消すため）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>beergame_reader</code></td>
+<td style="text-align: left;">投影の表（<code>projection_checkpoints</code>・<code>game_join_codes</code>・<code>game_settings</code> を含む。V101 の GRANT の一覧のとおり）と <code>display_profiles</code> の SELECT のみ</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>beergame_observer</code></td>
+<td style="text-align: left;"><code>game_overview</code>・<code>session_overview</code>・<code>week_team_totals</code> の SELECT のみ</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>beergame_deleter</code></td>
+<td style="text-align: left;"><code>game_roots</code> の SELECT・DELETE のみ（WHERE 句の列の参照に SELECT が要る）</td>
+</tr>
+</tbody>
+</table>
+<p>所有者は新しいロールを作らず、マイグレーションを実行する接続のユーザー（テストでは Testcontainers のスーパーユーザー）とした。否定テストは、所有者の接続を <code>SET ROLE</code> で切り替えて行い、拒否は SQLState 42501 で確かめた。検査の内訳: (a) 書き込みロールの <code>events</code> の UPDATE・DELETE・TRUNCATE、(b) <code>game_roots</code> の DELETE・UPDATE・TRUNCATE（<code>CASCADE</code> つきを含む）、(c) 4 ロールが表の所有者でも所有者ロールのメンバーでもなく、特権属性（superuser など）も他ロールのメンバーシップも無い、(d) 削除ロールの DELETE 権限が <code>game_roots</code> だけ（全表を <code>pg_tables</code> から列挙）、(e) 観察者の SELECT 可能な表が設計書の 3 表と完全に一致、観察者と読み取りに書き込み権限がどの表にも無い、(f) 連鎖削除。加えて、書き込みロールが過剰に絞られていない（INSERT・SELECT ができる）ことと、全ロールが <code>flyway_schema_history</code> を読めないことも検査した。</p>
+<p><strong>設計書との食い違い・未決・未確認</strong>（設計書は直していない。人の判断で反映する）:</p>
+<ul>
+<li>読み取りロールの権限は設計書（「投影の SELECT のみ」）に表の一覧が無いため、<code>display_profiles</code>（ロビーの表示名の結合）を含めた。<strong>これは本 Step の判断</strong>であり、<code>credentials</code>・<code>browser_sessions</code>・<code>idempotency_records</code> は含めていない。認証と冪等記録を読み取り側の問い合わせが使うかは、B3 で用途別のプールを配線するときに確定する（未決）。</li>
+<li>ロールの名前（<code>beergame_*</code>）は設計書に規定が無いため、本 Step で付けた。<code>data-model.md</code> と <code>architecture-infrastructure.md</code> の「データベースのロール」の表に、名前と GRANT の表を追記する必要がある。連鎖削除の未決事項（<code>data-model.md</code> の未決、<code>test-strategy.md</code> の未決、ADR-010 の「未検証」）は「実測済み」に更新できる。</li>
+<li>「所有者」のロールは、独立したロールとして作っていない（マイグレーションの接続ユーザー）。本番の RDS で、マイグレーション用のユーザーをどう作るかは未決（B3 以降）。</li>
+<li>通知の受信（<code>LISTEN</code> のみ）のロールは作っていない（設計書の表にあるが、LISTEN は特別な権限が要らない。専用の接続の配線は B3 以降。未決）。</li>
+<li><code>deletion_*</code>（V006、B11）の GRANT は、その表を作るマイグレーションで書く（既定の権限は与えていない）。設計書の削除ロールの権限「<code>deletion_*</code> の読み書き」は、B11 に持ち越し。</li>
+<li>V101 は V102 より小さい番号で、<strong>すでに V102 まで適用済みの既存の DB には、そのままでは適用できない</strong>（Flyway は、適用済みの最大の版より小さい未適用の版を、既定で検証エラーにする）。現時点で PostgreSQL に永続の環境が無い前提（ローカルは H2、CI は使い捨て）なので問題にならないが、ステージング・本番を作る前に確認が要る（B3 以降）。</li>
+<li>アプリのコードを用途別のロール・接続に切り替える作業は、本 Step の範囲外（アプリは単一の接続ユーザーのまま）。観察者の接続プールの配線の検査（H13）も未実施（B3 以降）。</li>
+<li>統合テストは、同一コンテナ内の専用データベース（<code>beergame_roles</code>）を毎回作り直して実行する。ロールはクラスタ全体のため、他の統合テスト（<code>beergame_test</code>）も V101 でロールを作るが、<code>CREATE ROLE</code> は存在確認つきで、実行は直列（並列実行の設定なし）。</li>
+<li>1 回の実測であり、PostgreSQL 18 以外の版では未確認。権限の否定テストの実行時間は、Testcontainers の起動を除いて数秒。</li>
+</ul>
+<h3 id="step-4-ci">Step 4: CI の整備（🟢）<a class="headerlink" href="#step-4-ci" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.1 CI の工程（ktlint、detekt（JDK 21 の専用ジョブ）、PMD、fixture、<code>test</code>、<code>integrationTest</code>、受け入れ（<code>@api</code>）、カバレッジ）を整える。DB の統合が 1 件も実行されなければ失敗、Undefined・Pending で失敗（<strong>ワークフローの作成とローカルでの各工程の実測まで。GitHub Actions 上の実行は未確認</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.2 N-1 互換ジョブの雛形（直前のリリースが無い間は実行しない）</li>
+</ul>
+<p><strong>ゲート 4</strong>: CI の構成を、人が確認する。<strong>（待ち。承認済みではない）</strong></p>
+<h4 id="step-4-2026-11-15">Step 4 の結果（実測。2026-11-15）<a class="headerlink" href="#step-4-2026-11-15" title="Permanent link">&para;</a></h4>
+<p><strong>1. ジョブの構成（<code>.github/workflows/beer-game-kotlin.yml</code>。検証のみ、デプロイなし）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ジョブ</th>
+<th style="text-align: left;">JDK / Node</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: right;"><code>timeout-minutes</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>test</code></td>
+<td style="text-align: left;">JDK 25</td>
+<td style="text-align: left;"><code>check -x pmd</code>（ktlint・test・モジュール依存）→ <code>integrationTest</code>（PostgreSQL 18）→ <code>acceptanceTest</code>（<code>@api</code>、PostgreSQL）→ <code>acceptanceTestH2</code> → <strong>DB の統合が実行されたことの検査</strong> → <code>koverVerify koverXmlReport</code>（カバレッジのゲート）→ Kover の報告を保存</td>
+<td style="text-align: right;">30</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>detekt</code></td>
+<td style="text-align: left;">JDK 21</td>
+<td style="text-align: left;"><code>detekt detektMain detektTest</code></td>
+<td style="text-align: right;">15</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>pmd</code></td>
+<td style="text-align: left;">JDK 25</td>
+<td style="text-align: left;"><code>pmdFixtureTest</code>（先）→ 層ごとの検査（4 タスク）</td>
+<td style="text-align: right;">15</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>web</code></td>
+<td style="text-align: left;">Node 26</td>
+<td style="text-align: left;"><code>npm ci</code>、<code>npm run verify</code>（format・lint・typecheck・Vitest・build）、<code>npm run acceptance:dry-run</code>（Undefined の検出）</td>
+<td style="text-align: right;">15</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ui</code></td>
+<td style="text-align: left;">JDK 25・Node 26</td>
+<td style="text-align: left;">Playwright の Chromium を導入し、H2 のバックエンド（ポート 3100）を起動して <code>npm run acceptance</code>（<code>@ui</code>）</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>n1</code></td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">N-1 互換の雛形（下記）</td>
+<td style="text-align: right;">10</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>PMD の重複の整理</strong>: <code>check</code> が <code>pmd</code> に依存するため、<code>test</code> ジョブは <code>check -x pmd</code> にして、PMD は <code>pmd</code> ジョブだけで実行する。<code>./gradlew check -x pmd ... --dry-run</code> で、PMD のタスクがグラフに含まれないことを確認した（0 件）。</li>
+<li><strong><code>timeout-minutes</code> の根拠</strong>: ローカルの実測で、<code>check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport --rerun-tasks</code>（再コンパイルを含む）が 3 分 25 秒。CI の依存の取得・コンテナの取得・Gradle のキャッシュ無しを見込んで 30 分。設計の実行時間の目標（全体 12 分）との比較は、GitHub Actions 上の実測が無いので<strong>未確認</strong>。</li>
+</ul>
+<p><strong>2. 失敗の条件（実測）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">条件</th>
+<th style="text-align: left;">結果</th>
+<th style="text-align: left;">実測の方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Undefined のステップ（<code>@api</code>）</td>
+<td style="text-align: left;"><strong>失敗</strong>（<code>UndefinedStepException</code>。<code>:app:acceptanceTestH2 FAILED</code>、29 tests completed, 1 failed）</td>
+<td style="text-align: left;">一時的に、定義の無いステップのシナリオを <code>features/weekly-play/</code> に置いて実行し、削除した（<code>git status</code> に残っていない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">Pending のステップ</td>
+<td style="text-align: left;"><strong>未実測</strong>（Cucumber-JVM は、strict が既定のため Undefined と同じく失敗する想定。確認していない）</td>
+<td style="text-align: left;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">DB の統合が 0 件・全件スキップ</td>
+<td style="text-align: left;"><strong>失敗</strong>（<code>::error::</code> を出して終了コード 1）</td>
+<td style="text-align: left;">ワークフローの検査の手順（<code>test</code> の結果の XML の合計）を、実際の結果に実行して合格を確認（integrationTest 55 件＋1 件、acceptanceTest 28 件（スキップ 1）、acceptanceTestH2 28 件（スキップ 1））。0 件で落ちる分岐は、条件式の確認だけで、<strong>0 件の状態での実行は未実測</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">カバレッジの閾値割れ</td>
+<td style="text-align: left;"><strong>失敗</strong>（Step 2 の結果）</td>
+<td style="text-align: left;">閾値を一時的に上げて実行</td>
+</tr>
+<tr>
+<td style="text-align: left;">Docker が無い</td>
+<td style="text-align: left;">統合・受け入れ（PostgreSQL）が失敗する想定（Testcontainers）。<strong>未実測</strong></td>
+<td style="text-align: left;">—</td>
+</tr>
+<tr>
+<td style="text-align: left;">Cucumber-JS の Undefined（<code>@ui</code>）</td>
+<td style="text-align: left;"><code>web</code> ジョブの dry-run、<code>ui</code> ジョブの実行で検出される（Cucumber-JS の strict が既定）。<strong>Undefined を置いての実測は未実施</strong></td>
+<td style="text-align: left;">—</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>受け入れの <code>skipped=1</code> は、<code>@ui</code> のシナリオ（Cucumber-JVM は <code>@api</code> だけを実行する）と見ているが、<strong>どのシナリオかは未確認</strong>。</li>
+</ul>
+<p><strong>3. Node の工程（<code>web</code>・<code>ui</code>）を追加した</strong></p>
+<ul>
+<li><code>web</code>: <code>npm run verify</code>（ローカルで B1 に実行済み）と <code>npm run acceptance:dry-run</code>（今回ローカルで実行、<code>1 scenario (1 skipped)</code>）。</li>
+<li><code>ui</code>: <code>web/support/hooks.mjs</code> の案内どおり、<code>APP_ENV=local DB_KIND=h2 PORT=3100 ALLOWED_ORIGINS=http://localhost:5273 ./gradlew :app:run</code> で起動し、<code>/api/v1/ready</code> を待って <code>npm run acceptance</code> を実行する。<strong>ローカルで同じ手順を実行した</strong>（起動 8 回目の確認で ready、<code>1 scenario (1 passed)</code>、<code>8 steps (8 passed)</code>、約 2.5 秒）。バックエンドは実行後に停止した（ポート 3100 のみ。人の開発サーバーの 3000・5173 は触っていない）。</li>
+<li><strong>未実施</strong>: Playwright の e2e と axe（設計の CI の工程にあるが、本 Bolt の範囲外）。ブラウザ行列（Firefox・WebKit 等）は定期実行の工程。<code>ui</code> ジョブの <code>npx playwright install --with-deps chromium</code> は、GitHub Actions の runner 上で<strong>未確認</strong>（ローカルは導入済みのブラウザを使った）。</li>
+</ul>
+<p><strong>4. N-1 互換ジョブの雛形（<code>n1</code>）</strong></p>
+<ul>
+<li><code>git tag --list 'beer-game-kotlin-v*'</code> で直前のリリースのタグを探す。<strong>タグの名前の規約は未決</strong>（仮に <code>beer-game-kotlin-v*</code>）。タグが無い間は、検査の工程を実行しない（<code>if: steps.previous.outputs.tag != ''</code>）。</li>
+<li>タグが有るのに本実装が無い場合は、意図的に<strong>失敗</strong>する（<code>exit 1</code>）。黙って通すと、検査があるように見えて何も確かめない状態になるため。本実装の手順（タグの取り出し・読み取り側のビルド・golden の再生）は、コメントに記した（設計 M22）。<strong>本実装は範囲外・未着手</strong>。</li>
+<li>ローカルで、<code>git tag --list 'beer-game-kotlin-v*'</code> が空であることは確認していない（未確認）。</li>
+</ul>
+<p><strong>5. actions の版</strong></p>
+<ul>
+<li><code>actions/checkout</code>（v7.0.1）・<code>actions/setup-node</code>（v7.1.0）・<code>actions/upload-artifact</code>（v7.0.2）は、beer-game3.yml に書かれている SHA とコメントの版を、そのまま使って SHA 固定した（beer-game3.yml の記述を転記したもので、<strong>GitHub 上での照合はしていない</strong>）。</li>
+<li><code>actions/setup-java</code>（<code>@v4</code>）と <code>gradle/actions/setup-gradle</code>（<code>@v4</code>）は、SHA を確認できる情報が（リポジトリ内に）無いため、<strong>未固定のまま</strong>。固定は未実施。</li>
+</ul>
+<p><strong>6. 検証</strong></p>
+<ul>
+<li>YAML の構文: <code>ruby -ryaml -e 'YAML.load_file(ARGV[0])'</code> で読み込め、ジョブは <code>test</code>・<code>detekt</code>・<code>pmd</code>・<code>web</code>・<code>ui</code>・<code>n1</code> の 6 つ。</li>
+<li><strong>GitHub Actions 上の実行は、未確認</strong>（push していない）。特に、<code>ui</code> のバックグラウンド起動と待機、<code>n1</code> のシェル、<code>$GITHUB_OUTPUT</code> の扱い、アップロードした報告の経路は、ローカルでは再現していない。</li>
+<li>ローカルで、<code>./gradlew check -x pmd integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport --rerun-tasks</code> が BUILD SUCCESSFUL（detekt は JDK 25 で無効。detekt・PMD の今回の変更による再実行はしていない）。</li>
+</ul>
+<h3 id="step-5-api">Step 5: API の契約テストの道具の候補の提示（🔵）<a class="headerlink" href="#step-5-api" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.1 OpenAPI の妥当性の検査、応答のスキーマ適合の検査、TypeScript の型の生成の候補を、公式の情報（Maven Central、npm）で確認し、比較表にする（<strong>比較表は未作成</strong>。ユーザーが 2026-11-14 に選定・承認した）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.2 承認後に、契約テストと型の生成を CI に組み込む（2026-11-15 実施。下の「Step 5 の結果」）</li>
+</ul>
+<p><strong>ゲート 5</strong>: 道具の選定と、導入の承認（人）。選定・承認は 2026-11-14 に済み。<strong>実装の確認（人）は待ち</strong>。</p>
+<h4 id="step-5-2026-11-15">Step 5 の結果（実測。2026-11-15）<a class="headerlink" href="#step-5-2026-11-15" title="Permanent link">&para;</a></h4>
+<p><strong>1. 使った道具と版（確認した値）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">道具</th>
+<th style="text-align: left;">版</th>
+<th style="text-align: left;">確認</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>@redocly/cli</code>（devDependency、固定）</td>
+<td style="text-align: left;">2.78.0</td>
+<td style="text-align: left;"><code>npm view @redocly/cli version</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>openapi-typescript</code>（devDependency、固定）</td>
+<td style="text-align: left;">7.13.0</td>
+<td style="text-align: left;"><code>npm view</code>。peer は <code>typescript ^5.x</code></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>com.networknt:json-schema-validator</code>（<code>app</code> の test のみ）</td>
+<td style="text-align: left;">3.0.9</td>
+<td style="text-align: left;">Maven Central の maven-metadata（latest・release）と POM。推移的に jackson-databind 3.1.8、itu 1.17.0、slf4j（テスト実行時に jackson-dataformat-yaml）</td>
+</tr>
+</tbody>
+</table>
+<p>これ以外の依存は足していない。</p>
+<p><strong>2. 型の生成の試行（スパイク）の結果</strong></p>
+<ul>
+<li><code>npm install -D openapi-typescript@7.13.0</code> は、予想どおり <strong>ERESOLVE で失敗</strong>（peer <code>typescript ^5.x</code> と web の TypeScript 6.0.3 の衝突）。</li>
+<li><code>package.json</code> に <code>"overrides": { "openapi-typescript": { "typescript": "$typescript" } }</code> を足すと導入でき、<code>npm ls</code> は <code>openapi-typescript@7.13.0 -&gt; typescript@6.0.3 deduped</code>。</li>
+<li>TS 6.0.3 で、生成（<code>openapi-typescript ../contracts/openapi.yaml</code>）が成功。生成物を <code>src/api/generated/schema.d.ts</code> に置き、<code>src/api/types.ts</code> を生成物からの写しに置き換えた。<strong><code>npm run typecheck</code>（tsc）、Vitest（70 件）、lint、format:check、build（<code>npm run verify</code>）がすべて通った</strong>。<code>npm ci --dry-run</code>（スクラッチ）も成功。</li>
+<li><strong>結論: 採用</strong>。手書きの型は、画面だけの型（<code>CreateGameResult</code>、<code>ProblemBody</code>、整数以外も受ける <code>CreateGameRequest</code>）と実行時の値（<code>ROLES</code>）に絞った。<code>CreateGameRequest</code> が仕様より狭くならないこと、<code>ROLES</code> が <code>Role</code> を網羅することは、型の検査で守る。</li>
+<li>スクリプト: <code>api:lint</code>（<code>redocly lint ... --config ../contracts/redocly.yaml</code>）、<code>api:generate</code>（生成と prettier での整形）、<code>api:check</code>（<code>scripts/check-generated.mjs</code>。生成し直してコミット済みと比べる。差分 0 でなければ失敗）。<code>contracts/redocly.yaml</code> は <code>recommended-strict</code>（警告も失敗）に、3 つのルールだけを off（info-license、tag-description、operation-4xx-response。理由は同ファイルに記載）。</li>
+</ul>
+<p><strong>3. 契約テスト（<code>app/src/test/kotlin/beergame/app/contract/</code>。13 件）</strong></p>
+<ul>
+<li><strong>置き場の判断</strong>: 指示は <code>adapter-http</code> だったが、<code>adapter-http</code> のテストには永続化の読み取り側（投影）が無く、成功の応答（状態の投影）を作れない。H2 の永続化と全経路の組み立てがあるのは <code>app</code> のため、<code>app</code> の test に置いた（PostgreSQL 不要。H2 のメモリ上）。<code>app/build.gradle.kts</code> の <code>test</code> の入力に <code>contracts/openapi.yaml</code> を加えた（仕様だけを変えたときにテストが再実行されるように）。</li>
+<li>検査: 応答の適合（スキーマ・<code>unevaluatedProperties: false</code> による未宣言の項目の検出・状態・Content-Type・ヘッダー）、全体の守り（429・413・500・503 が全操作に宣言されていること）、リクエストの適合（事例 39 件の仕様の判定と実装の受理・拒否、Idempotency-Key 必須）、エラー <code>code</code> の一致（欠けても余っても失敗）、ルートの網羅、検査自体が違反を見つけること（常に緑でない確認）。</li>
+<li>code の突き合わせの前提: ドメインの code はソースの走査（kotlin-reflect を足さないため）、HTTP の層は <code>Codes</code> のリフレクションで集める。分類が Forbidden のドメインの誤り（<code>session.forbidden</code>、<code>game.forbidden</code>）は <code>app.unauthorized</code> に写るため仕様に載せず、参加コードの失敗（<code>game.invitation_invalid</code>）だけが例外（ProblemMapping.kt）。</li>
+</ul>
+<p><strong>4. 契約テストが見つけた不一致と対処（Red の実測）</strong></p>
+<p>最初の実行は 13 件中 8 件が失敗した（Red）。うち、テストの誤りは経路の接頭辞・Forbidden の扱い・503 の再現用の状態の 3 点で、テスト側を直した。<strong>仕様と実装の不一致は次のとおりで、実装（アダプターの本体）は変えず、仕様を実装に合わせた</strong>（実装が設計書・受入条件に沿っているため）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不一致</th>
+<th style="text-align: left;">対処</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">409 の problem に、実装は拡張メンバー（<code>requestedWeek</code>・<code>currentWeek</code>・<code>role</code>・<code>latest</code>・<code>week</code>・<code>current</code>）を返すが、仕様に無い</td>
+<td style="text-align: left;"><code>ConflictProblem</code>・<code>ConflictProblemBody</code>・<code>DecisionEntry</code> を追加し、saveDecision・commitWeek の 409 に使用</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">429（レート制限）が、全操作（探針を除く）に掛かるが、7 操作に宣言が無い</td>
+<td style="text-align: left;">7 操作に 429 を追加</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">413（64 KB 超）が、変更系の全操作に掛かるが、4 操作に宣言が無い</td>
+<td style="text-align: left;">assignRole・startGame・saveDecision・commitWeek に追加</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">500 が、問い合わせ系 3 操作に宣言が無い</td>
+<td style="text-align: left;">getLobby・getSessionState・getGameState に追加</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">CreateGameRequest の範囲（最終週 1〜50、需要 0〜1000、保持日数 1〜3650）が、説明文だけでスキーマに無く、実装は範囲外を 422 にする</td>
+<td style="text-align: left;"><code>minimum</code>・<code>maximum</code> を追加</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">表示名が、実装は 1〜80 文字だが、仕様は「上限は未決」</td>
+<td style="text-align: left;"><code>minLength: 1</code>・<code>maxLength: 80</code> を追加</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;"><code>GameState.sessionId</code> が、実装は常に含める（開始前は null）が、仕様は任意（型の生成で、画面が <code>string \| null</code> と読めなくなって発覚）</td>
+<td style="text-align: left;"><code>required</code> に追加</td>
+</tr>
+</tbody>
+</table>
+<p><strong>これらの仕様の変更は、ADR-008 の「仕様が先」に照らすと、実装に合わせた後追いの修正</strong>。人の確認が要る（特に 5・6 の範囲を仕様に重複して持つこと）。</p>
+<p><strong>5. 変異の確認（わざと仕様と実装をずらし、失敗→戻して成功）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">変異</th>
+<th style="text-align: left;">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">仕様の <code>ErrorCode</code> から <code>session.week_advanced</code> を削除</td>
+<td style="text-align: left;">契約テスト 2 件が失敗（code の一致、応答の適合）</td>
+</tr>
+<tr>
+<td style="text-align: left;">実装の応答の項目名 <code>submittedRoleCount</code> を変更</td>
+<td style="text-align: left;">応答の適合が失敗（必須項目の欠落と未宣言の項目を指摘）</td>
+</tr>
+<tr>
+<td style="text-align: left;">実装のルート <code>/games/{gameId}/start</code> を <code>/begin</code> に変更</td>
+<td style="text-align: left;">8 件が失敗。ルートの網羅は「実装にあって仕様に無い: begin、仕様にあって実装に無い: start」を指摘</td>
+</tr>
+<tr>
+<td style="text-align: left;">実装の code <code>app.rate_limited</code> を変更</td>
+<td style="text-align: left;">code の一致が「仕様にあって実装に無い、実装にあって仕様に無い」を指摘</td>
+</tr>
+<tr>
+<td style="text-align: left;">仕様の <code>$ref</code> を壊す（スクラッチの写し）</td>
+<td style="text-align: left;"><code>redocly lint</code> が終了コード 1（no-unresolved-refs）</td>
+</tr>
+<tr>
+<td style="text-align: left;">仕様の <code>HealthStatus</code> の enum に値を追加</td>
+<td style="text-align: left;"><code>api:check</code> が終了コード 1（再生成を促す）</td>
+</tr>
+</tbody>
+</table>
+<p>いずれも元に戻し、アダプターの本体のコードに差分が残っていないことを <code>git status</code> で確認した。</p>
+<p><strong>6. CI</strong>: <code>.github/workflows/beer-game-kotlin.yml</code> に <code>contract</code> ジョブ（<code>npm ci</code> → <code>api:lint</code> → <code>api:check</code>）を追加し、<code>web</code>（typecheck を含む）は <code>contract</code> の後、<code>test</code>（契約テストを含む）は <code>contract</code> と <code>web</code> の後に実行する（順序: 仕様の検証 → 型の生成 → 型の検査 → テスト）。YAML の構文は Ruby で読み込めることまで確認。<strong>GitHub Actions 上の実行は未確認</strong>。</p>
+<p><strong>7. 静的解析</strong>: ktlint 緑、PMD（<code>pmd</code> 全タスク）違反 0（fixture 17 件は期待どおり）、detekt（JDK 21、<code>:app</code> の detekt・detektMain・detektTest）緑。<code>@Suppress</code> なし、ルールの緩和なし。</p>
+<p><strong>8. 未確認・未決</strong>
+- 問い合わせ系の 503（<code>app.retry_exhausted</code>）が起きうるかは未確認（コマンド系だけ検証。問い合わせ系の仕様に 503 は無い）。
+- SSE の検査は、B1 の範囲に SSE が無いため未実施。
+- スキーマで表せない条件（経路の週と <code>requestedWeek</code> の一致、需要系列の長さ、空白だけの表示名）は、事例と説明文で扱うだけ。
+- <code>required</code> が実装より緩い仕様（#7 のような）は、応答の適合では検出できない（任意の項目は、無くても適合）。型の生成と typecheck で補うが、網羅は保証しない。
+- 設計書・ADR の更新が要る点（直していない）: test-strategy.md の「契約テストは adapter-http」に読める記述の置き場（実際は app）、CI の工程表への <code>contract</code> ジョブ、エンドポイント表（architecture-backend.md）への 409 拡張メンバーと 429・413・500 の共通宣言の反映。
+- 全体の確認: <code>./gradlew check -x pmd koverVerify</code>（JDK 25。integrationTest・acceptanceTest・acceptanceTestH2 を含む）が <strong>BUILD SUCCESSFUL（4 分 35 秒）</strong>。Kover のゲートを含めて通った（契約テスト追加後の合算の数値は未記録）。</p>
+<h3 id="step-6">Step 6: 検証と終了（✅）<a class="headerlink" href="#step-6" title="Permanent link">&para;</a></h3>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.1 全テスト、静的解析、Kover、CI の確認（<strong>ローカルの同じタスクまで。GitHub Actions 上の確認は未実施</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.2 設計書の更新と、<code>validating-design</code> の完了時の実施。Bolt 終了報告（<code>bolt_2_report.md</code>）。人の確認待ちの項目の一覧</li>
+</ul>
+<p><strong>ゲート 6</strong>: Bolt の承認（人）。<strong>状態: 人の確認待ち</strong>（未承認）。</p>
+<h4 id="step-6-2026-11-15">Step 6 の結果（2026-11-15）<a class="headerlink" href="#step-6-2026-11-15" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>全体のビルド</strong>: <code>./gradlew build integrationTest acceptanceTest acceptanceTestH2 koverVerify --rerun-tasks</code>（JDK 25）が BUILD SUCCESSFUL（5 分 31 秒）。合計 583 件、失敗 0。<code>web</code> の <code>npm run verify</code> 成功（Vitest 70 件、<code>api:lint</code>、<code>api:check</code>）。detekt は JDK 21 で緑、PMD は 4 層とも違反 0（fixture は期待 17 件と一致）。内訳は <a href="../bolt_2_report/">終了報告</a> の「実測値」。</li>
+<li><strong>設計書・ADR の更新</strong>: テスト戦略、バックエンド、データモデル、フロントエンド、インフラ、技術スタック、ADR-008・010・011、開発戦略（未決事項の注記のみ）を更新し、各変更表に 1 行ずつ記録した。<strong>決められないものは直さず、各文書の未決事項に書いた。</strong></li>
+<li><strong><code>validating-design</code>（完了時）</strong>: 軸 A は NG（6 件。修正 3、人の判断待ち 3）、軸 B は NG（9 件。修正 7、人の判断待ち 2）、軸 C は NG（3 件。修正 1、持ち越し 2）。修正の内容と、人の判断待ちの項目は <a href="../bolt_2_report/">終了報告</a> に記録した。<strong>着手前の検証の記録はこの計画に無い</strong>（規律の逸脱）。</li>
+<li><strong>終了報告</strong>: <a href="../bolt_2_report/">bolt_2_report</a>。完了条件の達成・未達・未実施、仮説の検証結果、人の判断が要る項目 20 件、学び、B3 への申し送り。</li>
+</ul>
+<hr />
+<h2 id="definition-of-done">完了条件（Definition of Done）<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 規約違反コードを置くと CI が落ちる（detekt（JDK 21）と PMD のそれぞれ）。PMD の fixture のテストが期待どおり（<strong>ローカルの同じ Gradle タスクで確認。GitHub Actions 上は未確認</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 違反 0 件・ベースラインなし・<code>@Suppress</code> なしで全コードが緑（<strong>層ごとのルールセットで外したルールがある。人の承認は未。ADR-011 に追記</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 追記専用権限の否定テストが通り、連鎖削除の可否が確定している（連鎖削除は動く。V101）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Kover の合算の可否と、ゲートの設定が記録されている（合算の可否と全体のゲートは [x]。<strong>domain の行 100% は未達で、暫定の下限 97%。人の判断待ち</strong>のため、[ ] のまま）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> API の契約テストの道具の候補が提示されている（候補の提示と選定はユーザーとの対話で 2026-11-14 に行われ、導入まで実施したが、<strong>比較表は文書に残していない</strong>ため [ ] のまま）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> ktlint の <code>.editorconfig</code> の調整が実際の版で動く（戦略・リリース計画の受入条件。<strong>B2 で個別に確認していない。未確認</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>validating-design</code> を実施し、結果を <a href="../bolt_2_report/">終了報告</a> に記録した</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>validating-design</code> の不整合が 0 件、または人が判断済み（<strong>判断待ちが残る</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（<strong>未実施。人の確認待ち</strong>）</li>
+</ul>
+<h2 id="_6">リスクと対策<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">リスク</th>
+<th style="text-align: center;">影響</th>
+<th style="text-align: left;">対策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">PMD が Kotlin 2.4 の構文を解析できない、または Gradle で動かない</td>
+<td style="text-align: center;">高</td>
+<td style="text-align: left;">fixture で最初に確かめる。動かなければ、事実を記録して止め、人に判断を仰ぐ（代替: ktlint のカスタムルールなど）</td>
+</tr>
+<tr>
+<td style="text-align: left;">追記専用と連鎖削除が両立しない</td>
+<td style="text-align: center;">高</td>
+<td style="text-align: left;">Step 3 の Red のテストで確かめ、動かない場合の代替を設計（<code>SECURITY DEFINER</code> など）</td>
+</tr>
+<tr>
+<td style="text-align: left;">厳格な適用で、本体の違反の修正が多く、所要が膨らむ</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">違反は修正する（ベースラインにしない）。膨らんだら B16（予備）で吸収</td>
+</tr>
+<tr>
+<td style="text-align: left;">domain の行 100% が生成コードで届かない</td>
+<td style="text-align: center;">中</td>
+<td style="text-align: left;">事実と選択肢を記録し、人の判断を仰ぐ</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_7">更新履歴<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">日付</th>
+<th style="text-align: left;">更新内容</th>
+<th style="text-align: left;">更新者</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">2026-11-14</td>
+<td style="text-align: left;">初版作成（AI が提案。<strong>ステップ計画は人の承認待ち</strong>。ユーザーの決定 4 件を反映し、ゴール U1 に従って実行を開始）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;">Step 1〜5 の結果を記録（実施日の連続セッション）。Step 6（検証と終了）を実施: 完了条件のチェック（達成したものだけ [x]）、状態を「実装は完了、ゲートは人の確認待ち」に更新、範囲外・未実施（<code>InvalidTransition</code> の性質テストほか）と「設計（4 図の扱い）」を追記、ADR-011 への緩和の記録を反映、終了報告（bolt_2_report.md）を作成</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>検証による修正</strong>（<code>validating-design</code>、完了時）: 軸 A の A1〜A3、軸 B の B1、軸 C の C2 を計画側で修正。<strong>ステップ計画は人が承認していないため、人の再確認を求める</strong></td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/k2works" target="_blank" rel="noopener" title="GitHub Repository/claude-code-booster" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "toc.integrate", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"></script>
+      
+        <script src="../../../assets/js/extra.js"></script>
+      
+        <script src="../../../assets/js/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
