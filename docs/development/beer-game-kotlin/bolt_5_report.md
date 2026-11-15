@@ -4,7 +4,7 @@ title: "Bolt 5 終了報告 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）の結果。完了条件の達成・未達・未実施、デモ項目の実操作の申告欄（人が行う。空）、仮説の検証結果、人の判断が要る項目、B6 への申し送り、Release 0.2 への影響。ゲート 8 は人の確認待ちで、承認は記録していない。"
 tags: [report, plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T11:00:41Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T13:55:38Z }
 ---
 
 # Bolt 5 終了報告（Kotlin 版）
@@ -114,7 +114,7 @@ Step 8 で見つけて直したこと（自分の試験の違反）: 初回の `
 | # | 項目 | 内容 | AI の提案 |
 | :--- | :--- | :--- | :--- |
 | 1 | **ゲート 8** | B5 全体とコードの全行理解。上の未達・未実施を許容して承認するか | 人が決める |
-| 2 | **ADR-016・017・018 の承認** と、ADR-015 の全体の承認 | いずれも提案中。承認には ADR の `verify`（人）が要る | 内容を確認し、修正があれば指示する |
+| 2 | **ADR-016・017・018 の承認** と、ADR-015 の全体の承認 | **2026-11-15 にユーザーが承認した（ゲート 8 の後）**。以下は承認前の記述: いずれも提案中。承認には ADR の `verify`（人）が要る | 内容を確認し、修正があれば指示する |
 | 3 | **Living Documentation の方式**（ADR-018） | (a) 注釈を domain 内に置いた（開発戦略は「別モジュール」。逸脱）。(b) 生成を domain の試験に置いた（`main` の成果物でない）。(c) 設計書の EV 表を、生成物への参照に置き換えるか（現在は手書きを残して不一致を検出）。(d) 公開の導線と、CI のパスフィルター（`docs/design/beer-game-kotlin/**` を足すか）。(e) `@Term` の付与の範囲（現在 13 項目） | 最小の案として実装した。(c)(d) は別途決める |
 | 4 | **新規ファイル**（確認必須） | `Documentation.kt`、`LivingDocumentation.kt`、`LivingDocumentationSpec.kt`、`generated/events.md`、`generated/glossary.md`、ADR-016〜018、本書 | 必要性は、計画の 8.4・8.5 と上の説明 |
 | 5 | **運営者との合意（R11）** | 資格の期限（24 時間・30 日）、参加・復帰の上限（10 回・10 分・IPv6 は /64）が未合意の仮置き。永続環境へ出す前に取得 | 合意の前に永続環境へ出さない |

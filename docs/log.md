@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Verification**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を human:kakimomokuri が検証
+* **Update**: [bolt_5_report](/development/beer-game-kotlin/bolt_5_report.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: bolt_6_plan: Step 0（0.1〜0.4）の実施結果を記録（ゲート 0 は未承認）
 * **Verification**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を human:kakimomokuri が検証
 * **Update**: B6 計画の承認と判断項目 17 件の決定を記録
