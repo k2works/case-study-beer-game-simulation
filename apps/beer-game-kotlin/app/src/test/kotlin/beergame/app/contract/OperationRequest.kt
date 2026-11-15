@@ -56,7 +56,47 @@ internal fun operationRequests(game: PlayedGame): List<OperationRequest> =
         ),
         OperationRequest("getSessionState", HttpMethod.Get, "/sessions/${game.id}/state", null, game.facilitator),
         OperationRequest("getGameState", HttpMethod.Get, "/games/${game.id}/state", null, game.facilitator),
+    ) + continuationRequests(game)
+
+/** 失効・再発行の本文（参加者を指す）。 */
+internal fun subjectBody(participantId: String): String = """{"subject":{"kind":"PARTICIPANT","id":"$participantId"}}"""
+
+/** B5 の継続と資格の操作（停止・再開・代理入力・失効・再発行・復帰）。復帰は、復帰コードを本文で渡す（Cookie は使わない）。 */
+private fun continuationRequests(game: PlayedGame): List<OperationRequest> {
+    val retailer = game.players.getValue("RETAILER")
+    return listOf(
+        OperationRequest("pauseSession", HttpMethod.Post, "/sessions/${game.id}/pause", null, game.facilitator),
+        OperationRequest("resumeSession", HttpMethod.Post, "/sessions/${game.id}/resume", null, game.facilitator),
+        OperationRequest(
+            "submitProxyDecision",
+            HttpMethod.Put,
+            "/sessions/${game.id}/proxy-decisions/FACTORY",
+            """{"requestedWeek":1,"quantity":4}""",
+            game.facilitator,
+        ),
+        OperationRequest(
+            "revokeCredential",
+            HttpMethod.Post,
+            "/games/${game.id}/credentials/revoke",
+            subjectBody(retailer.participantId),
+            game.facilitator,
+        ),
+        OperationRequest(
+            "reissueCredential",
+            HttpMethod.Post,
+            "/games/${game.id}/credentials/reissue",
+            subjectBody(retailer.participantId),
+            game.facilitator,
+        ),
+        OperationRequest(
+            "recoverParticipation",
+            HttpMethod.Post,
+            "/participations/recover",
+            """{"gameId":"${game.id}","recoveryCode":"${retailer.recovery}"}""",
+            null,
+        ),
     )
+}
 
 /** 資格・ID が実在しなくてよい検査（レート制限、サイズの上限）用の、仮のゲーム。 */
 internal fun placeholderGame(): PlayedGame =

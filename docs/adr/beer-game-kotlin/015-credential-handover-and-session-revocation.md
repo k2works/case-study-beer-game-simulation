@@ -4,7 +4,7 @@ title: "ADR-015: 復帰資格の受け渡しと、失効でブラウザセッシ
 description: "B5 の H2・H3 の提案。復帰資格を Cookie と一度だけ示す復帰コードで渡し、失効の書き込みと同じトランザクションでブラウザセッションの行を削除する案を推奨する。人のゲート 1 で決める。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T07:43:36Z }
 ---
 
 # ADR-015: 復帰資格の受け渡しと、失効でブラウザセッションを止める結び付き（提案）
@@ -76,7 +76,7 @@ Bolt 5（進行の継続と資格）で、(H2) 資格の失効で発行済みの
 
 ## 未確認
 
-- `browser_sessions` への `DELETE` の GRANT の実際（V101。Step 4 で確認）。
-- 冪等な再送で `recoveryCode` を返す実装の可否（Step 4.4、6.2）。
+- `browser_sessions` への `DELETE` の GRANT の実際（V101。Step 4 で確認）。**確認済み（Step 4・6）**: 番号は付け替えで V102（ロールと GRANT）。`beergame_writer` は `browser_sessions` に SELECT・INSERT・UPDATE・DELETE を持ち、読み取り・観察者・削除のロールは持たない（`RolePrivilegesSpec` が PostgreSQL で検査）。スキーマ変更は要らない。
+- 冪等な再送で `recoveryCode` を返す実装の可否（Step 4.4、6.2）。**可能（Step 6 で実測）**: 作成・再発行の同じ `Idempotency-Key`・同じ本文の再送は、同じ `recoveryCode`（と、再発行は同じ `expiresAt`）を返し、新しい資格の行を作らない（`ContinuationHttpSpec`。冪等記録は `OutcomeCodec` が暗号化して保存する本文に、復帰資格の値と期限を含む。形式は `v2` のまま、期限の項目の無い古い形も読める）。ログに値は出ない（同 spec の否定テスト）。
 - 進行役自身の資格の失効・再発行の扱い（B5 は参加者だけを対象にした。bolt_5_plan のゲート 1 の項目 6）。
 - 資格の有効期間の運営者との合意（R11。永続環境の前に取得）。

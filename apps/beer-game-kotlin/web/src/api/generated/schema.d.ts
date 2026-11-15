@@ -603,9 +603,8 @@ export interface components {
             displayName: string | null;
             role: components['schemas']['Role'] | null;
             /**
-             * @description **条件付きの提案（Step 3.5.1。スキーマ変更の承認が条件。bolt_5_plan の「Step 3.5.1 の結果」の確認点 1）。**
-             *     役割の入れ替えで外された旧担当者なら true（入れ替え以外では false。省略時は false）。履歴と入力者のラベルのために行は残る。
-             *     この項目を採らない場合（`lobby_participants.replaced_at` を足さない場合）は、本項目を削除し、旧担当者は「役割なし」として並ぶ。
+             * @description 役割の入れ替えで外された旧担当者なら true（入れ替え以外では省略 = false。`lobby_participants.replaced_at`。マイグレーション 007。
+             *     ゲート 5 で承認済み）。履歴と入力者のラベルのために行は残る。
              */
             replaced?: boolean;
         };
@@ -779,7 +778,11 @@ export interface components {
     headers: {
         /** @description すべての応答に付ける相関 ID（要求の `x-correlation-id` が UUID ならそれを使い、そうでなければ作る） */
         CorrelationId: string;
-        /** @description 資格の Cookie（`bg_session=<値>; Path=/; HttpOnly; SameSite=Strict; Max-Age=<秒>`。HTTPS の環境では `Secure`）。 */
+        /**
+         * @description 資格の Cookie。ブラウザセッションは `bg_session=<値>; Path=/; HttpOnly; SameSite=Strict; Max-Age=<秒>`（`Max-Age` は、サーバー側の
+         *     ブラウザセッションの有効期限と同じ。既定 86400 秒）。作成・参加の応答は、復帰資格の `bg_recovery=<値>; Path=/api/v1/participations/recover;
+         *     HttpOnly; SameSite=Strict; Max-Age=<秒>`（既定 2592000 秒）も付ける。HTTPS の環境では `Secure`。
+         */
         SetCookie: string;
     };
     pathItems: never;

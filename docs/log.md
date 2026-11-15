@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）
+* **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）
+* **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）
+* **Update**: B5 Step 6（アプリケーションと HTTP）の実施結果・設計書の例外 2 つ・ADR-015 の確認を反映（ゲート 6 は未承認）
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: B5 Step 5（参加・復帰のレート制限、マイグレーション 007・008、101・102 の付け替え）の設計書・計画の更新
 * **Update**: B5 Step 5（参加・復帰のレート制限、マイグレーション 007・008、101・102 の付け替え）の設計書・計画の更新

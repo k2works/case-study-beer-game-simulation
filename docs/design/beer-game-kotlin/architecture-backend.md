@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T07:43:36Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -422,7 +422,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 形 | 永続化用の DTO（**kotlinx.serialization**。`@Serializable`、`@SerialName` で `event_type` を固定。決定済み）と、ドメインイベントの相互変換（`EventCodec`）。`schema_version` を持つ。**アップキャストは `adapter-persistence` が持つ** |
 | アップキャスト | 旧版の DTO を新版へ変換する純粋関数の列。読み込み時に、`evolve` へ渡す前に適用する（[データモデル](./data-model.md) の規則） |
 | 網羅の検査 | 変換は `when` で網羅し、イベントの追加でコンパイルが失敗する。全イベントの往復（`encode` -> `decode`）の性質テストを置く |
-| 秘匿 | DTO に、表示名・資格の値・招待コードの値のフィールドを**持たせない**（型で防ぐ） |
+| 秘匿 | **永続化の DTO（イベント）** に、表示名・資格の値・招待コードの値のフィールドを**持たせない**（型で防ぐ）。応答の本文には、再発行・作成の復帰コードを一度だけ載せる例外がある（上の「応答とスナップショット」。HTTP の応答の層だけで、イベントには入らない） |
 
 ## API 設計方針
 
@@ -472,7 +472,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 保持 | `GET /games/:id/retention`、`POST …/retry` | （問い合わせ。`retry` は保持の手続きへ） | 進行役 |
 | 運用 | `GET /health`、`GET /ready` | — | なし。**B1 の実装は `/api/v1` の配下**（`/api/v1/health`、`/api/v1/ready`。OpenAPI の servers のとおり）。負荷分散のヘルスチェックのパスの設定が要る（[インフラストラクチャ](./architecture-infrastructure.md)） |
 
-**B1 の実装で確定した、経路の補足（2026-11-14）。** (1) `SaveDecision` の `role` は本文に持たせず、**認証つきの `snapshot` で参加者の役割を引いてから** `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) `GET /sessions/:id/state` の `?role=`（他の役割の取得。AC2.1.2）は、自分の役割と違えば `game.forbidden`（HTTP では `app.unauthorized`）。(3) `POST /games` の応答は `versions` だけで、ゲームの ID は `Location`（`/api/v1/games/{id}/state`）、資格は `Set-Cookie`。参加の応答は `versions` だけで、`gameId` を含まない（**参加者が、参加後に `gameId` を知る手段が無い。未決事項**）。(4) 作成の入力は `finalWeek` と `demand` を必須とし、`retentionDays` は未指定で 90。(5) `UnassignRole`（`DELETE …/role`）は B1 に実装していない。
+**B1 の実装で確定した、経路の補足（2026-11-14）。** (1) `SaveDecision` の `role` は本文に持たせず、**認証つきの `snapshot` で参加者の役割を引いてから** `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) `GET /sessions/:id/state` の `?role=`（他の役割の取得。AC2.1.2）は、自分の役割と違えば `game.forbidden`（HTTP では `app.unauthorized`）。(3) `POST /games` の応答は `versions` だけで、ゲームの ID は `Location`（`/api/v1/games/{id}/state`）、資格は `Set-Cookie`。参加の応答は `versions` だけで、`gameId` を含まない（**参加者が、参加後に `gameId` を知る手段が無い。未決事項** → **B5 Step 6 で解消**: 参加の応答に `gameId`、作成の応答に復帰コード `recoveryCode` を足した。「応答とスナップショット」を参照）。(4) 作成の入力は `finalWeek` と `demand` を必須とし、`retentionDays` は未指定で 90。(5) `UnassignRole`（`DELETE …/role`）は B1 に実装していない。
 
 **B2 の契約テストで確定した、仕様の補足（2026-11-15）。** [契約テスト](./test-strategy.md)（`app` の test）が仕様と実装の不一致を見つけ、実装は変えず、**仕様（`contracts/openapi.yaml`）を実装に合わせた**（ADR-008 の「仕様が先」に照らすと後追い。人の確認待ち）。(1) **409 の problem に拡張メンバー**を持つ: 実装は `requestedWeek`・`currentWeek`・`role`・`latest`・`week`・`current` を返す。仕様に `ConflictProblem`・`ConflictProblemBody`・`DecisionEntry` を追加し、`saveDecision`・`commitWeek` の 409 に使う（どのメンバーがどちらの操作かは、仕様と `ProblemMapping.kt` が正本）。(2) **429（`app.rate_limited`）は、探針（`/health`・`/ready`）を除く全操作に、413（`request.too_large`、本文 64 KB 超）は変更系の全操作に、500 は問い合わせ系を含む全操作に宣言**する（HTTP の層の共通の守り。7 操作・4 操作・3 操作の宣言漏れを足した）。(3) **`CreateGameRequest` の範囲**を `minimum`・`maximum` で持つ（最終週 1〜50、需要 0〜1000、保持日数 1〜3650。範囲外は 422）。(4) **表示名は 1〜80 文字**（`minLength: 1`、`maxLength: 80`。「上限は未決」だった）。(5) **`GameState.sessionId` は `required`**（開始前は `null`）。(6) 参加コードの失敗（`game.invitation_invalid`）と、分類が Forbidden のドメインの誤り（`session.forbidden`・`game.forbidden`。HTTP では `app.unauthorized` に写る）の `code` の扱いは、`ProblemMapping.kt` が正本。範囲と表示名の長さを**仕様にも重複して持つ**ことの確認は人の判断。
 
@@ -508,7 +508,12 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 
 ### 応答とスナップショット
 
-コマンドの応答は `{ versions: { game, session } }` だけで、画面の表示は応答から作りません。画面は応答を受けたらすぐスナップショット（`GET state`）を取得し、`versions` に追いつくまで待って表示します。SSE は、他の人の変更の通知（と取得の補助）です。SSE が切れていても、自分の保存は画面に出ます。自動確定でも同じで、最後に保存した人の応答にも確定結果は含めず、週の進行はスナップショットで見ます。
+コマンドの応答は `{ versions: { game, session } }` だけで、画面の表示は応答から作りません。**例外は、資格を発行・受け渡す操作の 2 つだけです**（B5 Step 6。[ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md) の H3 案 A。ゲート 1 で決定済み）。
+
+1. **応答の本文に、資格の値（復帰コード）を一度だけ載せる**。作成（`POST /games`）の応答は `recoveryCode`（進行役の復帰コード）、再発行（`POST /games/{id}/credentials/reissue`）の応答は `recoveryCode` と `expiresAt` を持つ。保存はダイジェストだけで、再表示しない。冪等な再送でも、同じ値を返す（冪等記録に暗号化して保存する。実測で確認）。ブラウザセッションの値は、これまでどおり `Set-Cookie`（`bg_session`）だけが運び、本文に含めない。ログ・イベントには、どの値も出さない。
+2. **本文に、`versions` 以外の項目を持つ**。参加（`POST /participations/join`）の応答は `gameId`（判断項目 7）、復帰（`POST /participations/recover`）の応答は `gameId`・`kind`（`FACILITATOR` または `PARTICIPANT`）・`role`（担当の役割。未割り当てなら項目ごと付けない）を持つ。表示の内容（週の状況など）は含めない。
+
+Cookie の寿命は、サーバー側の有効期限と同じ値にする（`bg_session` の `Max-Age` は `sessionTtl`、既定 24 時間。B1 は復帰資格の期限を流用していた。`bg_recovery` は `participantCredentialTtl`、既定 30 日で、復帰の経路だけに送る `Path=/api/v1/participations/recover`）。復帰の認可は、本文の `recoveryCode`、なければ Cookie `bg_recovery` の復帰資格（冪等記録の照合より前に検証）。画面は応答を受けたらすぐスナップショット（`GET state`）を取得し、`versions` に追いつくまで待って表示します。SSE は、他の人の変更の通知（と取得の補助）です。SSE が切れていても、自分の保存は画面に出ます。自動確定でも同じで、最後に保存した人の応答にも確定結果は含めず、週の進行はスナップショットで見ます。
 
 ## 自動確定
 
@@ -750,6 +755,7 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 | 44 | `CommandOutcome(gameId, versions, issued?)`。資格は 1 つの値がセッションと復帰を兼ねる | `CommandOutcome(gameId, versions, issued?, recovery?)`。`issued` はブラウザセッションの値、`recovery` は復帰資格の値（復帰コード）。冪等記録の本文の形式は `v2`（HTTP が応答に載せるのは、Step 6 まで `issued` の `Set-Cookie` と `versions` だけ） | H3 案 A。復帰コードの応答への載せ方は Step 6 |
 | 45 | `Auth` は `ANONYMOUS`・`REQUIRED` | `RECOVERY` を追加。`PeripheralStore` に `authenticateRecovery` を追加。`CommandRequest` の資格の発行は、操作者から作る関数（復帰は認証まで主体が決まらない） | 復帰の認可は復帰資格の有効性（冪等記録の照合より前） |
 | 46 | `PeripheralWrite.IssueCredentialRow`（資格とセッションを 1 行の導出で書く） | `IssueRecoveryRow`・`IssueSessionRow`・`ExtendRecoveryRow`・`RevokeSubject`。**`CredentialRevoked` のイベントには、必ず `RevokeSubject` が付く**（追記の共通の流れが、イベントから導く）。失効・再発行・復帰の内側の操作（`CredentialCommands.kt`。`internal`）は、公開の関数・HTTP への配線を Step 6 が行う | 資格の行の変更が、対応するイベントなしに起きない・イベントだけが書かれて行が残らない、のどちらも防ぐ |
+| 48（B5 Step 6。2026-11-15） | 応答は `versions` だけ。失効・再発行・復帰の内側の操作は `internal` で、HTTP への配線は Step 6 | 作成の応答は `recoveryCode`、参加は `gameId`、再発行は `recoveryCode`・`expiresAt`、復帰は `gameId`・`kind`・`role?` を足す（`Reply`。ほかは `versions` だけ）。`revokeCredential`・`reissueCredential` は公開、復帰は `recover`（担当の役割を添える）を公開（`recoverParticipation` は `internal` のまま）。`pauseSession`・`resumeSession`・`submitProxyDecision`（`SessionControl.kt`）。開始後の `assignRole` は `applyAssign` が、準備中は `game` だけ、開始後は入れ替えとして `game` と `session` の 2 ストリームへ 1 回の追記で書く。`IssuedCredential.expiresAt`（再発行の応答に示す期限。冪等記録に含める。4 項目の形も読める）。`CommandRequest.recovery` は `(Actor, Instant)`（時刻を受け取る）。ブラウザセッションの Cookie の `Max-Age` は `sessionTtl`（B1・Step 4 は復帰資格の期限を流用。Step 4 の逸脱の解消）。`bg_recovery`（Path は復帰の経路だけ）を作成・参加で発行。ロビーの参加者に `replaced`（入れ替えで外された旧担当者）。**停止中の参加者の保存・確定を判定する順は「状態 → 権限」（ゲート 2）のため、資格のある参加者が停止中でないゲームを再開しようとすると 403 でなく 409 `session.not_paused`** | H3 案 A（ゲート 1）。**ゲート 6 で人が確認する**（API の形・認可の行列） |
 | 47（B5 Step 5。2026-11-15） | 参加・復帰の専用のレート制限は、状態の共有が未決（BD8）。`AppSettings` は期限を 3 つのプロパティで持つ | **DB の窓**（`participation_attempts`）。`Stores` に `attempts: AttemptStore`、`AppSettings` に `attempts: AttemptPolicy`（上限・窓の長さ）、`RequestMeta` に `source: AttemptSource?`（正規化した接続元）。期限は `AppTtls`（`idempotency`・`session`・`participantCredential`）にまとめた（`AppSettings` の引数の数が detekt の上限に達したため。`idempotencyTtl` などのプロパティは同じ名前で読める）。`AppFailure.RateLimited(retryAfterSeconds)`（429 `app.rate_limited`）を追加。`app` は `Tuning`（資格の期限と窓）と `ATTEMPT_MAX_FAILURES`・`ATTEMPT_WINDOW_SECONDS` を設定から渡す。ログ（`LogRecord`）に、参加・復帰の要求だけが持つ `src`（接続元の鍵付き要約）を追加 | 判断項目 4 の案 A。**ゲート 5 で人が確認する** |
 
 ## 設計判断

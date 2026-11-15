@@ -12,6 +12,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.server.testing.ApplicationTestBuilder
 import java.nio.file.Files
@@ -50,6 +51,7 @@ private class Call(
     val body: String? = null,
     val cookie: String? = null,
     val headers: Map<String, String> = emptyMap(),
+    val recovery: String? = null,
 )
 
 private fun get(
@@ -74,7 +76,13 @@ private fun put(
 private suspend fun ContractClient.expect(
     status: Int,
     call: Call,
-) = send(call.method, call.path, call.body, call.cookie, call.headers).also { it.status.value shouldBe status }
+) = send(call.method, call.path, call.body, call.cookie, call.headers + call.recoveryCookie()).also {
+    it.status.value shouldBe status
+}
+
+/** 復帰資格の Cookie（bg_session とは別の Cookie ヘッダーにはせず、復帰の経路だけが読む）。 */
+private fun Call.recoveryCookie(): Map<String, String> =
+    recovery?.let { mapOf(HttpHeaders.Cookie to "bg_recovery=$it") }.orEmpty()
 
 private const val BAD_DEMAND = """{"kind":"KIT","finalWeek":2,"demand":[4,1001]}"""
 private const val OTHER_GAME = """{"kind":"KIT","finalWeek":2,"demand":[1,2]}"""
@@ -143,6 +151,56 @@ private suspend fun ContractClient.changedDecisionsPhase() {
     send(stale.method, stale.path, stale.body, stale.cookie, stale.headers)
 }
 
+private const val PROXY_BODY = """{"requestedWeek":1,"quantity":4}"""
+
+private fun recover(
+    gameId: String,
+    code: String? = null,
+    recovery: String? = null,
+) = Call(
+    HttpMethod.Post,
+    "/participations/recover",
+    """{"gameId":"$gameId"${code?.let { ",\"recoveryCode\":\"$it\"" } ?: ""}}""",
+    recovery = recovery,
+)
+
+/** 継続と資格の経路（B5）: 停止・再開・代理入力、失効・再発行、復帰の、成功と失敗。 */
+private suspend fun ContractClient.continuationPhase() {
+    val game = started()
+    val retailer = game.players.getValue("RETAILER")
+    val session = "/sessions/${game.id}"
+    val credentials = "/games/${game.id}/credentials"
+    val target = subjectBody(retailer.participantId)
+    val unknown = subjectBody(UNKNOWN_PARTICIPANT)
+
+    expect(403, post("$session/pause", cookie = retailer.cookie))
+    expect(200, post("$session/pause", cookie = game.facilitator))
+    expect(409, post("$session/pause", cookie = game.facilitator))
+    expect(409, put("$session/decisions", """{"week":1,"quantity":4}""", retailer.cookie))
+    expect(200, put("$session/proxy-decisions/FACTORY", PROXY_BODY, game.facilitator))
+    expect(409, put("$session/proxy-decisions/FACTORY", """{"requestedWeek":2,"quantity":4}""", game.facilitator))
+    expect(422, put("$session/proxy-decisions/MANAGER", PROXY_BODY, game.facilitator))
+    expect(200, post("$session/resume", cookie = game.facilitator))
+    expect(409, post("$session/resume", cookie = game.facilitator))
+
+    expect(409, post("$credentials/reissue", target, game.facilitator))
+    expect(403, post("$credentials/revoke", target, retailer.cookie))
+    expect(404, post("$credentials/revoke", unknown, game.facilitator))
+    expect(
+        422,
+        post("$credentials/revoke", """{"subject":{"kind":"FACILITATOR","id":"${game.id}"}}""", game.facilitator),
+    )
+    expect(200, post("$credentials/revoke", target, game.facilitator))
+    expect(409, post("$credentials/revoke", target, game.facilitator))
+    val code = expect(200, post("$credentials/reissue", target, game.facilitator)).body().str("recoveryCode")
+
+    expect(422, post("/participations/recover", "{}"))
+    expect(403, recover(game.id, recovery = retailer.recovery))
+    expect(200, recover(game.id, code = code))
+    expect(200, recover(game.id, recovery = game.players.getValue("FACTORY").recovery))
+    expect(200, recover(game.id, code = game.facilitatorCode))
+}
+
 /** 全体の守りを調べる: [requests] を [status] で返す応答が、すべて仕様に適合すること。違反（と、状態の違い）の一覧を返す。 */
 private suspend fun ContractClient.violationsOf(
     requests: List<OperationRequest>,
@@ -181,6 +239,7 @@ class ApiContractSpec :
                 c.startPhase(game)
                 c.playPhase(game)
                 c.changedDecisionsPhase()
+                c.continuationPhase()
                 // 経路・メソッドの違い（仕様に無い経路は、request.* の problem+json）と、運用の確認
                 c.expect(404, get("/no-such-route"))
                 c.expect(405, Call(HttpMethod.Delete, "/games"))
@@ -251,11 +310,34 @@ class ApiContractSpec :
                 val prepared = c.prepared()
                 val started = c.started()
                 val decided = c.started().also { game -> ROLES.forEach { c.saveFirst(game, it) } }
+                // 停止中でなければ再開は追記まで届かず、失効していなければ再発行は追記まで届かない
+                val paused =
+                    c.started().also { game ->
+                        c.expect(200, post("/sessions/${game.id}/pause", cookie = game.facilitator))
+                    }
+                val revoked =
+                    c.started().also { game ->
+                        val subject = subjectBody(game.players.getValue("RETAILER").participantId)
+                        c.expect(200, post("/games/${game.id}/credentials/revoke", subject, game.facilitator))
+                    }
                 broken.set(true)
+                val needsState =
+                    setOf(
+                        "saveDecision",
+                        "commitWeek",
+                        "pauseSession",
+                        "resumeSession",
+                        "submitProxyDecision",
+                        "reissueCredential",
+                    )
                 val requests =
-                    operationRequests(prepared).filter { it.operationId !in setOf("saveDecision", "commitWeek") } +
-                        operationRequests(started).filter { it.operationId == "saveDecision" } +
-                        operationRequests(decided).filter { it.operationId == "commitWeek" }
+                    operationRequests(prepared).filter { it.operationId !in needsState } +
+                        operationRequests(started).filter {
+                            it.operationId in setOf("saveDecision", "pauseSession", "submitProxyDecision")
+                        } +
+                        operationRequests(decided).filter { it.operationId == "commitWeek" } +
+                        operationRequests(paused).filter { it.operationId == "resumeSession" } +
+                        operationRequests(revoked).filter { it.operationId == "reissueCredential" }
 
                 c.violationsOf(requests.filter { it.method != HttpMethod.Get }, 503).shouldBeEmpty()
             }

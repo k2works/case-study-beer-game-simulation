@@ -37,6 +37,8 @@ internal class Player(
     val role: String,
     val cookie: String,
     val participantId: String,
+    /** 復帰資格（Cookie `bg_recovery` の値）。 */
+    val recovery: String = "placeholder-recovery",
 )
 
 internal class PlayedGame(
@@ -44,9 +46,19 @@ internal class PlayedGame(
     val facilitator: String,
     val joinCode: String,
     val players: Map<String, Player>,
+    /** 進行役の復帰コード（作成の応答の `recoveryCode`）。 */
+    val facilitatorCode: String = "placeholder-recovery",
 ) {
     fun cookieOf(role: String): String = players.getValue(role).cookie
 }
+
+private fun HttpResponse.cookieValue(name: String): String? =
+    headers
+        .getAll(HttpHeaders.SetCookie)
+        .orEmpty()
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter("$name=")
+        ?.substringBefore(";")
 
 internal class ContractClient(
     private val client: HttpClient,
@@ -125,16 +137,15 @@ internal class ContractClient(
         val id =
             checkNotNull(created.headers[HttpHeaders.Location]).removePrefix("$API/games/").removeSuffix("/state")
         val joinCode = send(HttpMethod.Get, "/games/$id/state", cookie = facilitator).body().str("joinCode")
-        val cookies =
+        val joinedAs =
             ROLES.associateWith { role ->
-                val joined =
-                    send(
-                        HttpMethod.Post,
-                        "/participations/join",
-                        """{"joinCode":"$joinCode","displayName":"${ROLE_NAMES.getValue(role)}"}""",
-                    )
-                checkNotNull(joined.credential()) { "参加者の資格が発行されていない" }
+                send(
+                    HttpMethod.Post,
+                    "/participations/join",
+                    """{"joinCode":"$joinCode","displayName":"${ROLE_NAMES.getValue(role)}"}""",
+                )
             }
+        val cookies = joinedAs.mapValues { checkNotNull(it.value.credential()) { "参加者の資格が発行されていない" } }
         val participants = send(HttpMethod.Get, "/games/$id/lobby", cookie = facilitator).body().array("participants")
         val players =
             ROLES.associateWith { role ->
@@ -149,9 +160,14 @@ internal class ContractClient(
                     """{"role":"$role"}""",
                     cookie = facilitator,
                 )
-                Player(role, cookies.getValue(role), participantId)
+                Player(
+                    role,
+                    cookies.getValue(role),
+                    participantId,
+                    checkNotNull(joinedAs.getValue(role).cookieValue("bg_recovery")),
+                )
             }
-        return PlayedGame(id, facilitator, joinCode, players)
+        return PlayedGame(id, facilitator, joinCode, players, created.body().str("recoveryCode"))
     }
 
     suspend fun started(): PlayedGame =

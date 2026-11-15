@@ -46,6 +46,7 @@ class ContinuationSteps {
     private var sentRecovery: SentRecovery? = null
     private var staleVersion: Int = 0
     private var replaced: Participant? = null
+    private var historySize = 0
     private val reissuedCodes = mutableMapOf<String, String>()
 
     private fun player(label: String): Participant = ctx.game.playerOf(Role.ofLabel(label))
@@ -717,7 +718,118 @@ class ContinuationSteps {
             old.role = null
             incoming.role = role
             replaced = old
+            // 「最新の状況」は、役割を引き継いだ新担当者から見た状況
+            lastRecovered = incoming
         }
+    }
+
+    @When("進行役が、{word}の担当を{}に入れ替えようとする")
+    fun facilitatorTriesToReplaceHolder(
+        label: String,
+        name: String,
+    ) {
+        ctx.last =
+            ctx.api.assignRole(
+                ctx.game.id,
+                ctx.game.participantNamed(name).participantId,
+                Role.ofLabel(label),
+                ctx.game.facilitator,
+            )
+    }
+
+    @When("{word}の参加者が、{word}の担当を{}に入れ替えようとする")
+    fun participantTriesToReplaceHolder(
+        actor: String,
+        label: String,
+        name: String,
+    ) {
+        ctx.last =
+            ctx.api.assignRole(
+                ctx.game.id,
+                ctx.game.participantNamed(name).participantId,
+                Role.ofLabel(label),
+                player(actor).cookie,
+            )
+    }
+
+    @When("進行役が、{word}の参加者を{word}に割り当て直す")
+    fun facilitatorReassignsSameRole(
+        current: String,
+        label: String,
+    ) {
+        historySize = ctx.app.auditTrail(ctx.game.id).size
+        ctx.last =
+            ctx.api.assignRole(ctx.game.id, player(current).participantId, Role.ofLabel(label), ctx.game.facilitator)
+    }
+
+    @When("進行役が、{word}の参加者を{word}に割り当てようとする")
+    fun facilitatorTriesToMoveHolder(
+        current: String,
+        label: String,
+    ) {
+        ctx.last =
+            ctx.api.assignRole(ctx.game.id, player(current).participantId, Role.ofLabel(label), ctx.game.facilitator)
+    }
+
+    @Given("^進行役が、(?!.*参加者)(.+)の資格を失効させている$")
+    fun facilitatorHasRevokedNamed(name: String) {
+        val target = ctx.game.participantNamed(name).participantId
+        okOrFail(ctx.api.revokeCredential(ctx.game.id, target, ctx.game.facilitator), "失効できない")
+    }
+
+    @Then("割り当ては受け付けられるが、履歴に何も足されない")
+    fun assignedWithoutHistory() {
+        okOrFail(ctx.response(), "割り当てが受け付けられていない")
+        val size = ctx.app.auditTrail(ctx.game.id).size
+        expect(size == historySize) { "履歴が $historySize 件から $size 件に増えた" }
+    }
+
+    @Then("権限エラーになる")
+    fun permissionDenied() {
+        val response = ctx.response()
+        expect(response.status == HTTP_FORBIDDEN && response.code() == "app.unauthorized") {
+            "権限エラーではない: ${response.status} ${response.text}"
+        }
+    }
+
+    @Then("準備中でないという理由で、割り当ては拒否される")
+    fun assignRejectedNotPreparing() = problemIs(HTTP_CONFLICT, "game.not_preparing")
+
+    @Then("{word}の参加者の資格は、失効していない")
+    fun participantCredentialIsNotRevoked(label: String) = participantCredentialRemains(label)
+
+    @Then("{word}の入力 {int} の入力者は、以前の{word}の参加者として残っている")
+    fun editorLabelRemains(
+        label: String,
+        quantity: Int,
+        former: String,
+    ) {
+        val old = checkNotNull(replaced) { "入れ替えられた参加者がいない（$former）" }
+        val saved =
+            ctx.app
+                .auditTrail(ctx.game.id)
+                .filter { it.eventType == "DecisionSaved" }
+                .map { Json.parseToJsonElement(it.payload).jsonObject }
+                .lastOrNull { it["role"]?.jsonPrimitive?.content == Role.ofLabel(label).apiName }
+        val editor = checkNotNull(saved) { "監査履歴に ${label}の保存が無い" }["editor"]?.jsonObject
+        expect(
+            saved["quantity"]?.jsonPrimitive?.content == quantity.toString() &&
+                editor?.get("id")?.jsonPrimitive?.content == old.participantId,
+        ) { "入力者が以前の担当者として残っていない: $saved" }
+    }
+
+    @Given("{word}の参加者が、識別子つきで第 {int} 週の数量として {int} を保存している")
+    fun participantSavedWithIdentifier(
+        label: String,
+        week: Int,
+        quantity: Int,
+    ) = participantSavedWithKey(label, week, quantity)
+
+    @Then("以前の{word}の参加者が、同じ識別子で同じ保存を再送すると、権限エラーになる")
+    fun formerHolderResendsAndIsRefused(label: String) {
+        participantResendsSave(label)
+        permissionDenied()
+        storedResponseIsNotReturned()
     }
 
     @Then("{}が{word}の担当になる")

@@ -19,6 +19,7 @@ import beergame.domain.SessionState
 import beergame.domain.StartGame
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
+import beergame.domain.assignRoleAfterStart
 import beergame.domain.decideGame
 import beergame.domain.decideSession
 import beergame.domain.evolveGame
@@ -98,6 +99,39 @@ internal suspend fun Ports.applyStart(
         val envelopes = events.append(tx, expected, newEvents).bind()
         writeSideEffects(tx, ctx.gameId, envelopes, emptyList()).bind()
         versionsOf(envelopes.map { it.streamType to it.streamVersion })
+    }
+
+/**
+ * 役割の割り当て。準備中（と未作成）は、`game` だけへのコマンド（付け替え。D9）。開始後は、入れ替え（H4）で、
+ * `game`（担当から外れた事実・資格の失効・新担当者の割り当て）と `session`（役割の写しの更新。D4）の両方を、1 回の追記で書く。
+ * 資格の失効の行の変更（復帰資格の失効とブラウザセッションの削除）は、追記した `CredentialRevoked` から必ず導かれる。
+ */
+internal suspend fun Ports.applyAssign(
+    tx: Tx,
+    ctx: Ctx,
+    command: GameCommand.AssignRole,
+): Either<AppFailure, Versions> =
+    either {
+        val gameRead = events.read(tx, ctx.gameId, StreamType.GAME).bind()
+        val game = gameStream.replay(gameRead).bind()
+        if (game is GameState.Started) {
+            val sessionRead = events.read(tx, ctx.gameId, StreamType.SESSION).bind()
+            val session = sessionStream.replay(sessionRead).bind()
+            val decision = assignRoleAfterStart(game, session, command).mapLeft(AppFailure::Domain).bind()
+            val newEvents =
+                decision.game.map { newEvent(StreamType.GAME, it, ctx) } +
+                    decision.session.map { newEvent(StreamType.SESSION, it, ctx) }
+            if (newEvents.isEmpty()) {
+                versionsOf(listOf(StreamType.GAME to gameRead.version, StreamType.SESSION to sessionRead.version))
+            } else {
+                val expected = mapOf(StreamType.GAME to gameRead.version, StreamType.SESSION to sessionRead.version)
+                val envelopes = events.append(tx, expected, newEvents).bind()
+                writeSideEffects(tx, ctx.gameId, envelopes, emptyList()).bind()
+                versionsOf(envelopes.map { it.streamType to it.streamVersion })
+            }
+        } else {
+            applySingle(tx, ctx, gameStream, command).bind()
+        }
     }
 
 private suspend fun Ports.newEvent(

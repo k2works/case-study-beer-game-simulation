@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.util.UUID
 import javax.sql.DataSource
 
 /**
@@ -98,15 +99,29 @@ internal class JdbcProjectionReader(
             .query(
                 PARTICIPANTS_SQL,
                 gameId,
-            ) { rs -> Triple(rs.getUuid("participant_id"), rs.getString("role"), rs.getString("display_name")) }
-            .map { (id, role, name) ->
-                val parsed = role?.let { roleOf(it) }
+            ) { rs ->
+                ParticipantRow(
+                    rs.getUuid("participant_id"),
+                    rs.getString("role"),
+                    rs.getString("display_name"),
+                    rs.getBoolean("replaced"),
+                )
+            }.map { row ->
+                val parsed = row.role?.let { roleOf(it) }
                 when {
-                    id == null -> failure("参加者の ID が無い").left()
-                    role != null && parsed == null -> failure("役割が不正: $role").left()
-                    else -> ProjectedParticipant(ParticipantId(id), name, parsed).right()
+                    row.id == null -> failure("参加者の ID が無い").left()
+                    row.role != null && parsed == null -> failure("役割が不正: ${row.role}").left()
+                    else -> ProjectedParticipant(ParticipantId(row.id), row.name, parsed, row.replaced).right()
                 }
             }.sequence()
+
+    /** 参加者の 1 行。[replaced] は、役割の入れ替えで外された旧担当者（`replaced_at` がある）。 */
+    private data class ParticipantRow(
+        val id: UUID?,
+        val role: String?,
+        val name: String?,
+        val replaced: Boolean,
+    )
 
     private fun session(
         c: Connection,
@@ -204,7 +219,8 @@ internal class JdbcProjectionReader(
             "SELECT o.status, o.final_week, j.join_code FROM game_overview o " +
                 "JOIN game_join_codes j ON j.game_id = o.game_id WHERE o.game_id = ?"
         const val PARTICIPANTS_SQL =
-            "SELECT l.participant_id, l.role, d.display_name FROM lobby_participants l " +
+            "SELECT l.participant_id, l.role, d.display_name, (l.replaced_at IS NOT NULL) AS replaced " +
+                "FROM lobby_participants l " +
                 "LEFT JOIN display_profiles d ON d.game_id = l.game_id AND d.actor_kind = 'PARTICIPANT' " +
                 "AND d.actor_id = l.participant_id WHERE l.game_id = ? ORDER BY l.joined_at, l.participant_id"
         const val SESSION_SQL = "SELECT status, week, submitted_role_count FROM session_overview WHERE game_id = ?"

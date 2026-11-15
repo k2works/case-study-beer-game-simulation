@@ -15,13 +15,14 @@ info:
     `?role=` の追加、`versions` の null、`/ready` の 503 は problem+json（`type` あり）、413・429 の追加、
     `Set-Cookie`（HttpOnly・SameSite=Strict）の明記。ログ・相関 ID・セキュリティヘッダーは全応答に付く。
 
-    **Bolt 5 の Step 1（2026-11-15）で、継続と資格の経路を足した（仕様が先。実装は無い。人の承認待ち）**:
+    **Bolt 5 の Step 1（2026-11-15）で、継続と資格の経路を足し、Step 6（2026-11-15）で実装した**（ゲート 6 は人の確認待ち）:
     停止・再開・代理入力（`pauseSession`・`resumeSession`・`submitProxyDecision`）、資格の失効・再発行（`revokeCredential`・`reissueCredential`）、
     復帰（`recoverParticipation`）。参加・復帰の応答にゲームの ID（`gameId`。bolt_5_plan の判断項目 7）。
-    新しい code: `session.paused`・`session.not_paused`・`session.save_limit_reached`・`game.credential_already_revoked`。
-    **提案であって、決定ではないもの**（ゲート 1 で人が決める。各所に「提案」と書いた）: 復帰資格の受け渡し（Cookie `bg_recovery` と復帰コード。H3）、
-    保存回数の上限の code・文言、`session.not_paused` などの派生の code。
-    （役割の入れ替え〔開始後の `assignRole`〕の形は、ゲート 1 で提案どおりに決定した。規則の細部は Step 3.5.1（2026-11-15）で `assignRole` の description に書いた。ゲート 3.5 は人の確認待ち。）
+    新しい code: `session.paused`・`session.not_paused`・`session.save_limit_reached`・`game.credential_already_revoked`・`game.credential_not_revoked`。
+    復帰資格の受け渡し（Cookie `bg_recovery` と、作成・再発行の応答に一度だけ示す復帰コード。H3 の案 A）、保存回数の上限の code、
+    `session.not_paused` の 409 は、ゲート 1 で決定済み（各所の「提案」は、その決定を指す）。
+    ブラウザセッションの Cookie（`bg_session`）の `Max-Age` は、サーバー側の有効期限（既定 24 時間）と同じ値。復帰資格の Cookie（`bg_recovery`）は 30 日。
+    役割の入れ替え〔開始後の `assignRole`〕の形は、ゲート 1 で提案どおりに決定し、規則の細部は `assignRole` の description に書いた（Step 6 で実装）。
 servers:
   - url: /api/v1
 tags:
@@ -611,7 +612,10 @@ components:
       description: すべての応答に付ける相関 ID（要求の `x-correlation-id` が UUID ならそれを使い、そうでなければ作る）
       schema: { type: string }
     SetCookie:
-      description: 資格の Cookie（`bg_session=<値>; Path=/; HttpOnly; SameSite=Strict; Max-Age=<秒>`。HTTPS の環境では `Secure`）。
+      description: |
+        資格の Cookie。ブラウザセッションは `bg_session=<値>; Path=/; HttpOnly; SameSite=Strict; Max-Age=<秒>`（`Max-Age` は、サーバー側の
+        ブラウザセッションの有効期限と同じ。既定 86400 秒）。作成・参加の応答は、復帰資格の `bg_recovery=<値>; Path=/api/v1/participations/recover;
+        HttpOnly; SameSite=Strict; Max-Age=<秒>`（既定 2592000 秒）も付ける。HTTPS の環境では `Secure`。
       schema: { type: string }
   responses:
     Problem:
@@ -983,9 +987,8 @@ components:
         replaced:
           type: boolean
           description: |
-            **条件付きの提案（Step 3.5.1。スキーマ変更の承認が条件。bolt_5_plan の「Step 3.5.1 の結果」の確認点 1）。**
-            役割の入れ替えで外された旧担当者なら true（入れ替え以外では false。省略時は false）。履歴と入力者のラベルのために行は残る。
-            この項目を採らない場合（`lobby_participants.replaced_at` を足さない場合）は、本項目を削除し、旧担当者は「役割なし」として並ぶ。
+            役割の入れ替えで外された旧担当者なら true（入れ替え以外では省略 = false。`lobby_participants.replaced_at`。マイグレーション 007。
+            ゲート 5 で承認済み）。履歴と入力者のラベルのために行は残る。
     Lobby:
       type: object
       description: ロビーの投影（lobby_*）から書き出した、進行役向けの一覧。

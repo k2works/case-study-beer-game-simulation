@@ -106,6 +106,42 @@ class SupportSpec :
             OutcomeCodec.decode(OutcomeCodec.encode(outcome)).ok() shouldBe outcome
         }
 
+        test("[ADR-004・B5] Given 有効期限つきの復帰資格（再発行） When 符号化し、復元する Then 冪等な再送でも同じ期限を返す") {
+            val outcome =
+                CommandOutcome(
+                    GAME,
+                    Versions(version(5), null),
+                    recovery =
+                        IssuedCredential(
+                            "v2.reissued",
+                            CredentialKind.PARTICIPANT_RECOVERY,
+                            Actor.Participant(PARTICIPANT).toRef(),
+                            T0.plusSeconds(2_592_000),
+                        ),
+                )
+
+            OutcomeCodec.decode(OutcomeCodec.encode(outcome)).ok() shouldBe outcome
+        }
+
+        test("[ADR-004・B5] Given 有効期限の行が無い形（4 項目）の保存済みの応答 When 復元する Then 期限なしとして読める") {
+            val text =
+                "v2\ngameId=${GAME.value}\ngame=5\nsession=-\ncredential=-\n" +
+                    "recovery=v2.old|PARTICIPANT_RECOVERY|PARTICIPANT|${PARTICIPANT.value}"
+
+            val decoded = OutcomeCodec.decode(text.toByteArray()).ok()
+
+            decoded.recovery?.raw shouldBe "v2.old"
+            decoded.recovery?.expiresAt shouldBe null
+        }
+
+        test("[ADR-004・B5] Given 有効期限が日時でない保存済みの応答 When 復元する Then Persistence の失敗") {
+            val text =
+                "v2\ngameId=${GAME.value}\ngame=5\nsession=-\ncredential=-\n" +
+                    "recovery=v2.old|PARTICIPANT_RECOVERY|PARTICIPANT|${PARTICIPANT.value}|tomorrow"
+
+            (OutcomeCodec.decode(text.toByteArray()).err() is AppFailure.Persistence) shouldBe true
+        }
+
         test("[ADR-004] Given 資格のない応答と、版が両方ある応答 When 符号化し、復元する Then 同じ応答に戻る") {
             listOf(
                 CommandOutcome(GAME, Versions(null, version(12)), null),

@@ -24,7 +24,15 @@ object Disclosure {
                 SnapshotView.Facilitator(
                     joinCode = game.joinCode,
                     finalWeek = game.finalWeek,
-                    lobby = game.participants.map { LobbyEntry(it.participantId, it.displayName, it.role) },
+                    lobby =
+                        game.participants.map {
+                            LobbyEntry(
+                                it.participantId,
+                                it.displayName,
+                                it.role,
+                                it.replaced,
+                            )
+                        },
                     roles = Role.entries.mapNotNull { role -> game.statusOf(role)?.let { role to it } }.toMap(),
                     results = game.results.sortedWith(compareBy({ it.week }, { it.role.ordinal })).map { it.view() },
                 ),

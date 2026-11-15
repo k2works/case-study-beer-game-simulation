@@ -48,6 +48,13 @@ data class CommitWeekInput(
     val basis: RoleMap<Long>,
 )
 
+/** 代理入力の入力（B5）。画面が見ている週と、代わりに入力する数量。意思決定の版は要求しない。 */
+data class ProxyDecisionInput(
+    val role: Role,
+    val requestedWeek: Int,
+    val quantity: Int,
+)
+
 /** 現在の版の鍵で、新しい資格を作る。値は版の接頭辞つきで、応答だけが運ぶ。保存するのはダイジェストと版だけ。 */
 internal suspend fun Ports.issue(
     kind: CredentialKind,
@@ -92,7 +99,7 @@ suspend fun Ports.createGame(
                 STATUS_CREATED,
                 meta,
                 issued = { issuance.session.credential },
-                recovery = { issuance.recovery.credential },
+                recovery = { _, _ -> issuance.recovery.credential },
             )
         runCommand(request) { tx, ctx ->
             val expiresAt = ctx.at.plus(Duration.ofDays(retention.value.toLong()))
@@ -153,7 +160,7 @@ private suspend fun Ports.joinWithCode(
                 STATUS_OK,
                 meta,
                 issued = { issuance.session.credential },
-                recovery = { issuance.recovery.credential },
+                recovery = { _, _ -> issuance.recovery.credential },
             )
         runCommand(request) { tx, ctx ->
             val expiresAt = ctx.at.plus(settings.participantCredentialTtl)
@@ -174,8 +181,9 @@ suspend fun Ports.assignRole(
 ): Either<AppFailure, CommandOutcome> {
     val operation = Operation(gameId, "assign:${participantId.value}", "assign|${participantId.value}|${role.name}")
     val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
+    // 準備中は付け替え（D9。game だけ）、開始後は入れ替え（H4。game と session の 2 ストリーム）。呼び分けは applyAssign
     return runCommand(request) { tx, ctx ->
-        applySingle(tx, ctx, gameStream, GameCommand.AssignRole(ctx.actor, ctx.at, participantId, role))
+        applyAssign(tx, ctx, GameCommand.AssignRole(ctx.actor, ctx.at, participantId, role))
     }
 }
 

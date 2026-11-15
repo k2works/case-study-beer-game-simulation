@@ -175,6 +175,28 @@ private fun FunSpec.replacedRoleProjectionContract(fixture: () -> Fixture) {
             .filter { it.first != old && it.first != newcomer.value.toString() }
             .map { it.third } shouldBe listOf(null, null, null)
     }
+
+    test("[B5/6.2] Given 開始後に役割を入れ替えたゲーム When 問い合わせ用の投影を読む Then 旧担当者だけが replaced で、役割は無い") {
+        val fx = fixture()
+        val script = GameScript().create()
+        val players = script.joinAllRoles()
+        val newcomer = script.join()
+        script.startGame().replaceRoleHolder(newcomer, Role.RETAILER)
+        fx.appendScript(script)
+
+        val game =
+            checkNotNull(
+                fx.persistence.reader
+                    .read(script.gameId)
+                    .getOrNull(),
+            )
+        val replaced = game.participants.filter { it.replaced }
+
+        replaced.map { it.participantId } shouldBe listOf(players.getValue(Role.RETAILER))
+        replaced.single().role shouldBe null
+        game.participants.single { it.participantId == newcomer }.role shouldBe Role.RETAILER
+        game.participants.size shouldBe 5
+    }
 }
 
 private fun FunSpec.projectedEndContract(fixture: () -> Fixture) {

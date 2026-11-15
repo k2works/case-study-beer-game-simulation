@@ -51,6 +51,14 @@ internal fun validateSave(input: SaveDecisionInput): Either<Errors, Triple<Week,
         ) { week, quantity, version -> Triple(week, quantity, version) }
     }
 
+internal fun validateProxy(input: ProxyDecisionInput): Either<Errors, Pair<Week, Quantity>> =
+    either {
+        zipOrAccumulate(
+            { Week.of(input.requestedWeek).bind() },
+            { Quantity.of(input.quantity).bind() },
+        ) { week, quantity -> week to quantity }
+    }
+
 internal fun validateCommit(input: CommitWeekInput): Either<Errors, Pair<Week, RoleMap<DecisionVersion>>> =
     Week.of(input.requestedWeek).nel() and
         Role.entries

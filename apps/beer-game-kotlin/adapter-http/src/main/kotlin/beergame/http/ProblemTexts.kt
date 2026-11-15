@@ -30,6 +30,11 @@ private val TITLES =
         "session.decision_conflict" to "入力が、別の操作で更新されました。",
         "session.decisions_changed" to "確定の根拠にした入力が、変わりました。",
         "session.incomplete_decisions" to "入力がそろっていないため、確定できません。",
+        "session.paused" to "一時停止中です。",
+        "session.not_paused" to "一時停止中ではありません。",
+        "session.save_limit_reached" to "この週の保存回数の上限（9 回）に達しました。",
+        "game.credential_already_revoked" to "この資格は、すでに失効しています。",
+        "game.credential_not_revoked" to "この資格は失効していないため、再発行できません。",
     )
 
 private val DETAILS =
@@ -39,6 +44,8 @@ private val DETAILS =
         "session.not_active" to "セッションは進行中ではありません。",
         "session.already_ended" to "セッションは終了しています。",
         "session.already_started" to "セッションは開始済みです。",
+        "session.paused" to "セッションは一時停止中のため、入力の保存と週の確定はできません。",
+        "session.not_paused" to "セッションは一時停止中ではありません。",
     )
 
 internal fun titleOf(code: String): String = TITLES[code] ?: "リクエストを処理できません。"

@@ -87,7 +87,7 @@ internal fun parseCommitWeek(body: ByteArray): Either<Problem, CommitWeekInput> 
     }
 
 /** UTF-8（不正なバイトは拒否）の JSON のオブジェクト。それ以外は 400。 */
-private fun parseObject(body: ByteArray): Either<Problem, JsonObject> =
+internal fun parseObject(body: ByteArray): Either<Problem, JsonObject> =
     Either
         .catch {
             val decoder =
@@ -101,10 +101,10 @@ private fun parseObject(body: ByteArray): Either<Problem, JsonObject> =
             (element as? JsonObject)?.right() ?: badRequestProblem("本文は JSON のオブジェクトにしてください。").left()
         }
 
-private fun combine(
+internal fun combine(
     first: FieldErrors,
     second: FieldErrors,
 ): FieldErrors = first + second
 
-private fun <A> collect(block: Raise<FieldErrors>.() -> A): Either<Problem, A> =
+internal fun <A> collect(block: Raise<FieldErrors>.() -> A): Either<Problem, A> =
     either<FieldErrors, A> { block() }.mapLeft { validationProblem(it.toList()) }

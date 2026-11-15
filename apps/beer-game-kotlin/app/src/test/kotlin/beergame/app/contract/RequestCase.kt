@@ -160,6 +160,43 @@ private fun commitCases(started: PlayedGame): List<RequestCase> {
     )
 }
 
+private fun proxyCases(started: PlayedGame): List<RequestCase> {
+    val path = "/sessions/${started.id}/proxy-decisions/FACTORY"
+    val b = CaseBuilder("代理入力", "submitProxyDecision", PUT, path, started.facilitator)
+    return listOf(
+        b.case("requestedWeek が欠けている", """{"quantity":4}""", false),
+        b.case("requestedWeek が 0", """{"requestedWeek":0,"quantity":4}""", false),
+        b.case("数量が欠けている", """{"requestedWeek":1}""", false),
+        b.case("数量が 1001", """{"requestedWeek":1,"quantity":1001}""", false),
+        b.case("数量が文字列", """{"requestedWeek":1,"quantity":"4"}""", false),
+        // 確定の事例（先に実行される）で第 1 週が確定済みなので、現在の週は 2
+        b.case("正しい要求", """{"requestedWeek":2,"quantity":4}""", true),
+    )
+}
+
+/** 失効・再発行・復帰。受理される事例（失効 → 再発行）は、状態を変えるので、拒否される事例の後に、この順で置く。 */
+private fun credentialCases(prepared: PlayedGame): List<RequestCase> {
+    val retailer = prepared.players.getValue("RETAILER").participantId
+    val revoke =
+        CaseBuilder("失効", "revokeCredential", POST, "/games/${prepared.id}/credentials/revoke", prepared.facilitator)
+    val reissue =
+        CaseBuilder("再発行", "reissueCredential", POST, "/games/${prepared.id}/credentials/reissue", prepared.facilitator)
+    val recover = CaseBuilder("復帰", "recoverParticipation", POST, "/participations/recover", null)
+    val code = prepared.players.getValue("DISTRIBUTOR").recovery
+    return listOf(
+        revoke.case("subject が欠けている", "{}", false),
+        revoke.case("subject.kind が進行役（参加者だけ）", """{"subject":{"kind":"FACILITATOR","id":"$retailer"}}""", false),
+        revoke.case("subject.id が欠けている", """{"subject":{"kind":"PARTICIPANT"}}""", false),
+        reissue.case("subject が欠けている", "{}", false),
+        reissue.case("subject.kind が観察者（B9。参加者だけ）", """{"subject":{"kind":"OBSERVER","id":"$retailer"}}""", false),
+        recover.case("gameId が欠けている", """{"recoveryCode":"$code"}""", false),
+        recover.case("recoveryCode が数値", """{"gameId":"${prepared.id}","recoveryCode":5}""", false),
+        revoke.case("正しい要求", subjectBody(retailer), true),
+        reissue.case("正しい要求（失効した資格）", subjectBody(retailer), true),
+        recover.case("正しい要求", """{"gameId":"${prepared.id}","recoveryCode":"$code"}""", true),
+    )
+}
+
 /**
  * [prepared] は準備中（作成・参加・割り当て済みで未開始）、[started] は開始済みで、FACTORY 以外の 3 役割は入力済みのゲーム。
  * 状態を変える事例（受理される要求）は、各操作の拒否される事例の後に置く（拒否は状態を変えない）。
@@ -168,7 +205,8 @@ internal fun requestCases(
     prepared: PlayedGame,
     started: PlayedGame,
 ): List<RequestCase> =
-    createCases() + joinCases(prepared) + assignCases(prepared) + saveCases(started) + commitCases(started)
+    createCases() + joinCases(prepared) + assignCases(prepared) + saveCases(started) + commitCases(started) +
+        proxyCases(started) + credentialCases(prepared)
 
 /** 実装のルート（`METHOD /api/v1/...`）。Ktor のルーティングの木から集める。 */
 internal fun implementedRoutes(): Set<String> {

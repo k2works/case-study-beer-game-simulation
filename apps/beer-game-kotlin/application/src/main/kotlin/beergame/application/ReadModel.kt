@@ -20,6 +20,8 @@ data class ProjectedParticipant(
     val participantId: ParticipantId,
     val displayName: String?,
     val role: Role?,
+    /** 役割の入れ替えで外された旧担当者（履歴と入力者のラベルのために行は残る）。 */
+    val replaced: Boolean = false,
 )
 
 data class ProjectedSession(
@@ -93,6 +95,7 @@ data class LobbyEntry(
     val participantId: ParticipantId,
     val displayName: String?,
     val role: Role?,
+    val replaced: Boolean = false,
 )
 
 data class WeekResultView(

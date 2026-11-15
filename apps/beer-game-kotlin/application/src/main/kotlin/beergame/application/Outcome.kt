@@ -9,6 +9,7 @@ import beergame.domain.ActorRef
 import beergame.domain.GameId
 import beergame.domain.StreamVersion
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 import java.util.UUID
 
 /** 追記したストリームごとの、追記後の版。追記しなかったストリームは null。 */
@@ -51,7 +52,13 @@ object OutcomeCodec {
 
     private fun encodeIssued(issued: IssuedCredential?): String =
         issued?.let {
-            listOf(it.raw, it.kind.name, it.actor.kind.name, it.actor.id?.toString() ?: NONE).joinToString("|")
+            listOf(
+                it.raw,
+                it.kind.name,
+                it.actor.kind.name,
+                it.actor.id?.toString() ?: NONE,
+                it.expiresAt?.toString() ?: NONE,
+            ).joinToString("|")
         } ?: NONE
 
     fun decode(bytes: ByteArray): Either<AppFailure, CommandOutcome> =
@@ -91,21 +98,34 @@ object OutcomeCodec {
             else -> parseIssued(text.split('|'))?.let { Box(it) }
         }
 
-    private fun parseIssued(parts: List<String>): IssuedCredential? {
-        val fields = parts.takeIf { it.size == ISSUED_PARTS } ?: return null
-        val (raw, kindName, actorKindName) = fields
-        val actorIdText = fields.last()
-        val kind = CredentialKind.entries.firstOrNull { it.name == kindName }
-        val actorKind = ActorKind.entries.firstOrNull { it.name == actorKindName }
-        val actorId = if (actorIdText == NONE) Box(null) else uuidOrNull(actorIdText)?.let { Box(it) }
-        return if (kind == null || actorKind == null || actorId == null) {
-            null
+    /** 4 つ（有効期限が無い形）と 5 つ（有効期限つき）の、どちらも読む。 */
+    private fun parseIssued(parts: List<String>): IssuedCredential? =
+        either<Unit, IssuedCredential> {
+            ensure(parts.size == ISSUED_PARTS || parts.size == ISSUED_PARTS_WITH_EXPIRY) {}
+            val kind = ensureNotNull(CredentialKind.entries.firstOrNull { it.name == parts[1] }) {}
+            val actorKind = ensureNotNull(ActorKind.entries.firstOrNull { it.name == parts[2] }) {}
+            val actorId = optional(parts[ACTOR_ID_AT], ::uuidOrNull).bind()
+            val expiry = optional(parts.getOrNull(ISSUED_PARTS), ::instantOrNull).bind()
+            IssuedCredential(parts[0], kind, ActorRef(actorKind, actorId), expiry)
+        }.getOrNull()
+
+    /** 値が無い（`-`、または項目そのものが無い）なら null。値があって読めなければ Left。 */
+    private fun <A : Any> optional(
+        text: String?,
+        parse: (String) -> A?,
+    ): Either<Unit, A?> =
+        if (text == null || text == NONE) {
+            Either.Right(null)
         } else {
-            IssuedCredential(raw, kind, ActorRef(actorKind, actorId.value))
+            parse(text)?.let { Either.Right(it) } ?: Either.Left(Unit)
         }
-    }
+
+    private fun instantOrNull(text: String): Instant? = Either.catch { Instant.parse(text) }.getOrNull()
+
+    private const val ACTOR_ID_AT = 3
 
     private const val ISSUED_PARTS = 4
+    private const val ISSUED_PARTS_WITH_EXPIRY = 5
 
     /** 「値が無い」と「不正」を区別するための入れ物。 */
     private class Box<out A : Any>(

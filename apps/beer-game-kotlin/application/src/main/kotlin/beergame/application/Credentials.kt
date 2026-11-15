@@ -31,11 +31,15 @@ import java.util.UUID
 /** 資格の種別。観察用の招待（B9）は含めない。 */
 enum class CredentialKind { FACILITATOR, PARTICIPANT_RECOVERY }
 
-/** 応答だけが運ぶ、資格の生の値と主体。 */
+/**
+ * 応答だけが運ぶ、資格の生の値と主体。[expiresAt] は、再発行した復帰資格の有効期限（応答に示す。冪等な再送でも同じ値を返すため、
+ * 冪等記録に含める）。ほかの資格は null。
+ */
 data class IssuedCredential(
     val raw: String,
     val kind: CredentialKind,
     val actor: ActorRef,
+    val expiresAt: Instant? = null,
 )
 
 /** 発行した資格と、保存するダイジェストとそれを作った鍵の版。生の値は、ダイジェストの元になった値。 */

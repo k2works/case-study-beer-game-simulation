@@ -28,6 +28,10 @@ internal const val CORRELATION_HEADER = "x-correlation-id"
 /** 資格の Cookie の名前（contracts/openapi.yaml。設計書に名前は無く、B1 の仮置き）。 */
 internal const val COOKIE_NAME = "bg_session"
 
+/** 復帰資格の Cookie の名前と、送る経路（復帰の経路だけ。ほかの要求には付かない。contracts/openapi.yaml の `recoveryCookie`）。 */
+internal const val RECOVERY_COOKIE_NAME = "bg_recovery"
+internal const val RECOVERY_COOKIE_PATH = "$API_BASE/participations/recover"
+
 internal const val IDEMPOTENCY_HEADER = "Idempotency-Key"
 private const val IDEMPOTENCY_KEY_MAX_LENGTH = 200
 private const val PRINTABLE_ASCII_FIRST = 0x21
@@ -52,6 +56,9 @@ internal val ApplicationCall.correlationId: UUID
     get() = attributes.getOrNull(CorrelationKey) ?: UUID(0L, 0L)
 
 internal fun ApplicationCall.credential(): String? = request.cookies[COOKIE_NAME]
+
+/** 復帰の経路だけが読む、復帰資格の Cookie。 */
+internal fun ApplicationCall.recoveryCredential(): String? = request.cookies[RECOVERY_COOKIE_NAME]
 
 /** ログに載せる操作名（OpenAPI の operationId）。 */
 internal fun ApplicationCall.operation(name: String) = attributes.put(OperationKey, name)

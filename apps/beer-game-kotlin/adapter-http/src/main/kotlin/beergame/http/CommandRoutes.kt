@@ -34,12 +34,13 @@ import io.ktor.server.response.header
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
-import java.util.UUID
+import kotlinx.serialization.json.JsonPrimitive
 
 /*
  * コマンドのルート。ルートは、本文の形の検証（RequestParsing）と、資格・冪等キーの取り出しだけを持つ。
  * 認証・認可・冪等・業務の判定は application（execute と decide）にあり、ここには無い。
- * 応答は `versions` だけ（資格を発行する作成・参加は、Set-Cookie も付ける）。
+ * 応答は `versions`（資格を発行する作成・参加・復帰は、Set-Cookie も付ける。本文の項目は [Reply]）。
+ * 継続と資格の経路（停止・再開・代理入力・失効・再発行・復帰）は ContinuationRoutes.kt。
  */
 
 private val SAME_SITE_STRICT = mapOf("SameSite" to "Strict")
@@ -48,13 +49,20 @@ internal fun Route.commandRoutes(deps: HttpDeps) {
     val ports = deps.ports
     post("/games") {
         call.operation("createGame")
-        call.command(deps, HttpStatusCode.Created, ::parseCreateGame) { input, meta -> ports.createGame(input, meta) }
+        call.command(deps, HttpStatusCode.Created, ::parseCreateGame) { input, meta ->
+            // 作成の応答は、進行役の復帰コードを一度だけ示す（ADR-015。保存はダイジェストだけで、再表示しない）
+            ports.createGame(input, meta).map { outcome ->
+                Reply(outcome, mapOf("recoveryCode" to JsonPrimitive(outcome.recoveryRaw())), recoveryCookie = true)
+            }
+        }
     }
     post("/participations/join") {
         call.operation("joinGame")
-        // 参加は、接続元ごとの失敗の窓で制限する（B5 Step 5。復帰の経路は Step 6 で同じく limited にする）
-        call.command(deps, HttpStatusCode.OK, ::parseJoinGame, limited = true) { input, meta ->
-            ports.joinGame(input, meta)
+        // 参加は、接続元ごとの失敗の窓で制限する（B5 Step 5）。応答に、参加したゲームの ID を含める（判断項目 7）
+        call.command(deps, HttpStatusCode.OK, ::parseJoinGame, CallPolicy(limited = true)) { input, meta ->
+            ports.joinGame(input, meta).map { outcome ->
+                Reply(outcome, mapOf("gameId" to JsonPrimitive(outcome.gameId.value.toString())), recoveryCookie = true)
+            }
         }
     }
     put("/games/{gameId}/participants/{participantId}/role") {
@@ -62,17 +70,20 @@ internal fun Route.commandRoutes(deps: HttpDeps) {
         val ids = call.gameIdParam("gameId").flatMap { game -> call.uuidParam("participantId").map { game to it } }
         call.withIds(ids) { (game, participant) ->
             call.command(deps, HttpStatusCode.OK, ::parseAssignRole) { role, meta ->
-                ports.assignRole(GameId(game), ParticipantId(participant), role, meta)
+                ports.assignRole(GameId(game), ParticipantId(participant), role, meta).reply()
             }
         }
     }
     post("/games/{gameId}/start") {
         call.operation("startGame")
         call.withIds(call.gameIdParam("gameId")) { game ->
-            call.command(deps, HttpStatusCode.OK, { Unit.right() }) { _, meta -> ports.startGame(GameId(game), meta) }
+            call.command(deps, HttpStatusCode.OK, { Unit.right() }) { _, meta ->
+                ports.startGame(GameId(game), meta).reply()
+            }
         }
     }
     sessionCommandRoutes(deps)
+    continuationRoutes(deps)
 }
 
 private fun Route.sessionCommandRoutes(deps: HttpDeps) {
@@ -89,7 +100,7 @@ private fun Route.sessionCommandRoutes(deps: HttpDeps) {
                     val role =
                         ensureNotNull((snapshot.view as? SnapshotView.Participant)?.role) { AppFailure.Unauthorized }
                     val input = SaveDecisionInput(role, body.week, body.quantity, body.expectedVersion)
-                    ports.saveDecision(GameId(id), input, meta).bind()
+                    Reply(ports.saveDecision(GameId(id), input, meta).bind())
                 }
             }
         }
@@ -99,10 +110,27 @@ private fun Route.sessionCommandRoutes(deps: HttpDeps) {
         val pathWeek = call.parameters["week"]?.toIntOrNull()
         call.withIds(call.gameIdParam("sessionId")) { id ->
             val parse = { body: ByteArray -> parseCommitWeek(body).flatMap { sameWeek(it, pathWeek) } }
-            call.command(deps, HttpStatusCode.OK, parse) { input, meta -> ports.commitWeek(GameId(id), input, meta) }
+            call.command(deps, HttpStatusCode.OK, parse) { input, meta ->
+                ports.commitWeek(GameId(id), input, meta).reply()
+            }
         }
     }
 }
+
+/** 資格を発行した操作の応答の、復帰資格の生の値。発行した操作は必ず持つ（無ければ内部の不整合で、500 になる）。 */
+internal fun CommandOutcome.recoveryRaw(): String = checkNotNull(recovery) { "復帰資格が発行されていない" }.raw
+
+/**
+ * 要求の扱い。[limited] は、参加・復帰の専用のレート制限の対象（接続元を正規化して application へ渡し、ログには鍵付き要約だけを載せる）。
+ * [credentialCookie] は、要求の資格として読む Cookie（既定はブラウザセッション。復帰は復帰資格の Cookie）。
+ */
+internal class CallPolicy(
+    val limited: Boolean = false,
+    val credentialCookie: String = COOKIE_NAME,
+)
+
+/** 成功を [Reply] にする（本文が versions だけの操作）。 */
+internal fun Either<AppFailure, CommandOutcome>.reply(): Either<AppFailure, Reply> = map { Reply(it) }
 
 /** 経路の週と本文の `requestedWeek` が違う確定は、拒否する（どちらの週を確定するのか決められない）。 */
 private fun sameWeek(
@@ -116,7 +144,7 @@ private fun sameWeek(
     }
 
 /** 経路の ID が不正なら、404 を返す。そうでなければ [block] を続ける。 */
-private suspend fun <A> ApplicationCall.withIds(
+internal suspend fun <A> ApplicationCall.withIds(
     ids: Either<Problem, A>,
     block: suspend (A) -> Unit,
 ) {
@@ -129,24 +157,25 @@ private suspend fun <A> ApplicationCall.withIds(
 /**
  * 1 つのコマンドの共通の流れ: 冪等キー → 本文（上限つき）→ 形の検証 → application → 応答。
  * 失敗は、写像の関数（[toProblem]）で problem+json にする。
- * [limited] は、参加・復帰の専用のレート制限の対象（接続元を正規化して application へ渡し、ログには鍵付き要約だけを載せる）。
+ * [policy] は、要求の資格の読み方と、レート制限の対象かどうか。
  */
-private suspend fun <A> ApplicationCall.command(
+internal suspend fun <A> ApplicationCall.command(
     deps: HttpDeps,
     status: HttpStatusCode,
     parse: (ByteArray) -> Either<Problem, A>,
-    limited: Boolean = false,
-    run: suspend (A, RequestMeta) -> Either<AppFailure, CommandOutcome>,
+    policy: CallPolicy = CallPolicy(),
+    run: suspend (A, RequestMeta) -> Either<AppFailure, Reply>,
 ) {
-    val source = if (limited) attemptSource(deps) else null
+    val source = if (policy.limited) attemptSource(deps) else null
     val result =
-        either<Problem, CommandOutcome> {
+        either<Problem, Reply> {
             val key = idempotencyKey().bind()
             val body = readBody(deps.settings.maxBodyBytes).bind()
             val input = parse(body).bind()
-            run(input, RequestMeta(key, credential(), correlationId, source)).mapLeft { it.toProblem() }.bind()
+            val meta = RequestMeta(key, request.cookies[policy.credentialCookie], correlationId, source)
+            run(input, meta).mapLeft { it.toProblem() }.bind()
         }
-    result.fold({ respondProblem(it) }, { respondOutcome(deps, status, it) })
+    result.fold({ respondProblem(it) }, { respondReply(deps, status, it) })
 }
 
 /**
@@ -159,34 +188,58 @@ private fun ApplicationCall.attemptSource(deps: HttpDeps): AttemptSource {
     return source
 }
 
-private suspend fun ApplicationCall.respondOutcome(
+private suspend fun ApplicationCall.respondReply(
     deps: HttpDeps,
     status: HttpStatusCode,
-    outcome: CommandOutcome,
+    reply: Reply,
 ) {
+    val outcome = reply.outcome
     attributes.put(VersionsKey, outcome.versions)
     attributes.put(GameIdKey, outcome.gameId.value.toString())
+    val settings = deps.ports.settings
+    // ブラウザセッションの Cookie の寿命は、サーバー側の有効期限（sessionTtl）と同じ値にする（B5 Step 6。B1 は復帰資格の期限を流用していた）
     outcome.issued?.let { issued ->
-        val ttl =
-            deps.ports.settings.participantCredentialTtl.seconds
-                .toInt()
-        // Ktor の既定は、内部の符号化の印（$x-enc）を Set-Cookie に付ける。標準の属性だけにする
-        val setCookie =
-            renderSetCookieHeader(
-                name = COOKIE_NAME,
-                value = issued.raw,
-                encoding = CookieEncoding.URI_ENCODING,
-                maxAge = ttl,
-                path = "/",
-                secure = deps.settings.cookieSecure,
-                httpOnly = true,
-                extensions = SAME_SITE_STRICT,
-                includeEncoding = false,
+        response.header(
+            HttpHeaders.SetCookie,
+            credentialCookie(deps, COOKIE_NAME, issued.raw, settings.sessionTtl.seconds, "/"),
+        )
+    }
+    if (reply.recoveryCookie) {
+        outcome.recovery?.let { recovery ->
+            response.header(
+                HttpHeaders.SetCookie,
+                credentialCookie(
+                    deps,
+                    RECOVERY_COOKIE_NAME,
+                    recovery.raw,
+                    settings.participantCredentialTtl.seconds,
+                    RECOVERY_COOKIE_PATH,
+                ),
             )
-        response.header(HttpHeaders.SetCookie, setCookie)
+        }
     }
     if (status == HttpStatusCode.Created) {
         response.header(HttpHeaders.Location, "$API_BASE/games/${outcome.gameId.value}/state")
     }
-    respondJson(status, commandResponse(outcome.versions))
+    respondJson(status, reply.toJson())
 }
+
+/** 標準の属性だけの Set-Cookie（Ktor の既定は、内部の符号化の印 `$x-enc` を付ける）。 */
+private fun credentialCookie(
+    deps: HttpDeps,
+    name: String,
+    value: String,
+    maxAgeSeconds: Long,
+    path: String,
+): String =
+    renderSetCookieHeader(
+        name = name,
+        value = value,
+        encoding = CookieEncoding.URI_ENCODING,
+        maxAge = maxAgeSeconds.toInt(),
+        path = path,
+        secure = deps.settings.cookieSecure,
+        httpOnly = true,
+        extensions = SAME_SITE_STRICT,
+        includeEncoding = false,
+    )

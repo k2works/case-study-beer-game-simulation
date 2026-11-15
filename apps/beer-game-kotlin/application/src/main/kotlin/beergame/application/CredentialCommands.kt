@@ -4,16 +4,17 @@ import arrow.core.Either
 import arrow.core.raise.either
 import arrow.core.raise.ensureNotNull
 import beergame.domain.Actor
+import beergame.domain.ActorKind
 import beergame.domain.ActorRef
 import beergame.domain.CredentialSubject
 import beergame.domain.GameCommand
 import beergame.domain.GameId
+import beergame.domain.Role
 import java.util.UUID
 
 /*
- * 資格の失効・再発行・復帰（B5）。**application の内側の操作**で、HTTP・公開の関数への配線は Step 6 が行う
- * （入力の形の検証、経路、`Set-Cookie`・復帰コードの応答は Step 6）。ここは、認可 → 冪等記録の照合の順序
- * （ADR-004）と、資格の行の変更が追記と同じトランザクションにあること（Step 4）を、実際のコマンドで確かめるための土台。
+ * 資格の失効・再発行・復帰（B5）。HTTP の層が呼ぶ公開の操作（Step 6）。経路・入力の形の検証・`Set-Cookie`・復帰コードの応答は HTTP の層。
+ * ここは、認可 → 冪等記録の照合の順序（ADR-004）と、資格の行の変更が追記と同じトランザクションにあること（Step 4）を持つ。
  * - 失効: 進行役のブラウザセッションが認可。`CredentialRevoked` に付く行の変更（復帰資格の失効とブラウザセッションの削除）は、
  *   追記の共通の流れ（[revocationWrites]）が書く。
  * - 再発行: 進行役のブラウザセッションが認可。新しい復帰資格の値は、応答（[CommandOutcome.recovery]）だけが運ぶ。
@@ -53,7 +54,7 @@ private fun CredentialSubject.kind(): CredentialKind =
     }
 
 /** 進行役が、参加者の資格を失効させる。復帰資格を失効させ、そのブラウザセッションを止める（同じトランザクション）。 */
-internal suspend fun Ports.revokeCredential(
+suspend fun Ports.revokeCredential(
     gameId: GameId,
     subject: CredentialSubject,
     meta: RequestMeta,
@@ -67,7 +68,7 @@ internal suspend fun Ports.revokeCredential(
 }
 
 /** 進行役が、失効した参加者の資格を再発行する。新しい復帰資格の値は、この応答だけが運ぶ（再表示しない）。 */
-internal suspend fun Ports.reissueCredential(
+suspend fun Ports.reissueCredential(
     gameId: GameId,
     subject: CredentialSubject,
     meta: RequestMeta,
@@ -80,7 +81,8 @@ internal suspend fun Ports.reissueCredential(
             Auth.REQUIRED,
             STATUS_OK,
             meta,
-            recovery = { recovery.credential },
+            // 応答に示す有効期限は、イベントの期限（ctx.at + 期限の長さ）と同じ時刻から作る（冪等な再送でも同じ値）
+            recovery = { _, at -> recovery.credential.copy(expiresAt = at.plus(settings.participantCredentialTtl)) },
         )
     return runCommand(request) { tx, ctx ->
         val expiresAt = ctx.at.plus(settings.participantCredentialTtl)
@@ -100,6 +102,37 @@ internal suspend fun Ports.reissueCredential(
         }
     }
 }
+
+/** 復帰の結果。[role] は、復帰した参加者の担当の役割（役割が未割り当ての参加者と、進行役は null）。 */
+data class Recovered(
+    val outcome: CommandOutcome,
+    val role: Role?,
+)
+
+/**
+ * 復帰（公開）。[recoverParticipation] に、応答に載せる担当の役割を添える（投影から引く。復帰した操作者の ID で引き、資格は使わない）。
+ * 再送で保存済みの応答を返す場合も、いまの担当を返す。
+ */
+suspend fun Ports.recover(
+    gameId: GameId,
+    meta: RequestMeta,
+): Either<AppFailure, Recovered> =
+    either {
+        val outcome = recoverParticipation(gameId, meta).bind()
+        val actor = outcome.issued?.actor
+        val role =
+            if (actor?.kind == ActorKind.PARTICIPANT) {
+                reader
+                    .read(gameId)
+                    .bind()
+                    ?.participants
+                    ?.firstOrNull { it.participantId.value == actor.id }
+                    ?.role
+            } else {
+                null
+            }
+        Recovered(outcome, role)
+    }
 
 /**
  * 提示した復帰資格（[RequestMeta.credential]）で復帰する。復帰資格が無効（不明・失効・期限切れ・別のゲーム・鍵が外された版）なら、

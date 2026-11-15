@@ -60,8 +60,8 @@ private class Game(
 )
 
 /**
- * 参加者の資格を失効させる。HTTP に失効の経路が無い（Step 6）ので、失効のイベントに付く書き込み（復帰資格の失効と、
- * ブラウザセッションの削除）を、周辺ストアへ直接書く（`credentials` だけの更新では、ブラウザセッションは止まらない）。
+ * 参加者の資格を失効させる。失効のイベントに付く書き込み（復帰資格の失効と、ブラウザセッションの削除）を、周辺ストアへ
+ * 直接書く（B1 の試験の名残。HTTP の失効の経路は B5 の Step 6 で足し、ContinuationHttpSpec が通しで確かめる）。
  */
 private fun World.revokeParticipant(
     game: Game,
@@ -198,13 +198,15 @@ class HttpFlowSpec :
             }
         }
 
-        test("[US1.1/AC1.1.1] 作成: 201、Location、資格の Cookie（HttpOnly・SameSite=Strict）。応答は versions だけ（資格の値を含めない）") {
+        test(
+            "[US1.1/AC1.1.1] 作成: 201、Location、資格の Cookie（HttpOnly・SameSite=Strict）。応答は versions と復帰コード（H3）",
+        ) {
             withWorld {
                 val response = client.createGame()
 
                 response.status shouldBe HttpStatusCode.Created
                 val body = response.body()
-                body.keys shouldBe setOf("versions")
+                body.keys shouldBe setOf("versions", "recoveryCode")
                 body.obj("versions").str("game") shouldBe "1"
                 body.obj("versions")["session"] shouldBe JsonNull
                 response.location() shouldContain "/api/v1/games/"
@@ -805,7 +807,7 @@ class HttpFlowSpec :
             }
         }
 
-        test("[NF] コマンドの応答の本文は versions（game と session）だけ: 作成・参加・割り当て・開始・保存・確定のすべて") {
+        test("[NF] コマンドの応答の本文は versions（game と session）。例外は、資格を発行する作成（復帰コード）と参加（gameId）") {
             withWorld {
                 val created = client.createGame(key = "shape")
                 val facilitator = created.requireCredential()
@@ -843,8 +845,11 @@ class HttpFlowSpec :
                         key = "shape-assign",
                     )
 
+                // 資格を発行する作成（復帰コード）と参加（gameId）だけが、versions に加えて項目を持つ（B5 の H3・判断項目 7）
+                created.body().keys shouldBe setOf("versions", "recoveryCode")
+                joined.body().keys shouldBe setOf("versions", "gameId")
+                assigned.body().keys shouldBe setOf("versions")
                 listOf(created, joined, assigned).forEach { response ->
-                    response.body().keys shouldBe setOf("versions")
                     response.body().obj("versions").keys shouldBe setOf("game", "session")
                 }
                 joined.bodyAsText() shouldNotContain joined.requireCredential()

@@ -4,6 +4,8 @@ import arrow.core.Either
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
 import beergame.application.JoinGameInput
+import beergame.domain.CredentialSubject
+import beergame.domain.ParticipantId
 import beergame.domain.Role
 import beergame.domain.RoleMap
 import io.kotest.assertions.fail
@@ -161,5 +163,60 @@ class RequestParsingSpec :
 
         test("Given 想定外の項目を含む本文 When 解釈する Then 無視する（既知の項目だけを使う）") {
             parseAssignRole(bytes("""{"role":"RETAILER","extra":1}""")).ok() shouldBe Role.RETAILER
+        }
+
+        test("[AC3.1.2] Given 代理入力の本文 When 解釈する Then requestedWeek と数量を取り出す。欠けた項目はすべて示す") {
+            parseProxyDecision(bytes("""{"requestedWeek":2,"quantity":6}""")).ok() shouldBe ProxyBody(2, 6)
+            parseProxyDecision(bytes("{}")).problem().fields() shouldBe
+                listOf("requestedWeek" to null, "quantity" to null)
+            parseProxyDecision(bytes("""{"requestedWeek":"2","quantity":6.5}""")).problem().fields() shouldBe
+                listOf("requestedWeek" to null, "quantity" to null)
+        }
+
+        test("[AC3.1.2] Given 経路の役割 When 解釈する Then 4 つの値だけを受け付け、それ以外は role の誤り（422）") {
+            Role.entries.forEach { roleParam(it.name).ok() shouldBe it }
+            listOf(null, "", "MANAGER", "factory").forEach {
+                val problem = roleParam(it).problem()
+                problem.status shouldBe 422
+                problem.fields() shouldBe listOf("role" to null)
+            }
+        }
+
+        test("[AC3.2.5] Given 失効・再発行の対象 When 解釈する Then 参加者の ID だけを受け付ける") {
+            val id = UUID.fromString("00000000-0000-0000-0000-0000000000a1")
+
+            parseCredentialSubject(bytes("""{"subject":{"kind":"PARTICIPANT","id":"$id"}}""")).ok() shouldBe
+                CredentialSubject.Participant(ParticipantId(id))
+        }
+
+        test("[AC3.2.5] Given 形の違う対象 When 解釈する Then 422 で、入れ子の項目名（subject.kind・subject.id）を示す") {
+            val id = "00000000-0000-0000-0000-0000000000a1"
+
+            parseCredentialSubject(bytes("{}")).problem().fields() shouldBe listOf("subject" to null)
+            parseCredentialSubject(bytes("""{"subject":"x"}""")).problem().fields() shouldBe listOf("subject" to null)
+            parseCredentialSubject(
+                bytes("""{"subject":{"kind":"FACILITATOR","id":"$id"}}"""),
+            ).problem().fields() shouldBe
+                listOf("subject.kind" to null)
+            parseCredentialSubject(
+                bytes("""{"subject":{"kind":"PARTICIPANT","id":"not-a-uuid"}}"""),
+            ).problem().fields() shouldBe
+                listOf("subject.id" to null)
+            parseCredentialSubject(bytes("""{"subject":{}}""")).problem().fields() shouldBe
+                listOf("subject.kind" to null, "subject.id" to null)
+        }
+
+        test("[AC3.2.1] Given 復帰の本文 When 解釈する Then gameId と、省略できる復帰コードを取り出す") {
+            val id = UUID.fromString("00000000-0000-0000-0000-0000000000a1")
+
+            parseRecover(bytes("""{"gameId":"$id"}""")).ok() shouldBe RecoverBody(id, null)
+            parseRecover(bytes("""{"gameId":"$id","recoveryCode":null}""")).ok() shouldBe RecoverBody(id, null)
+            parseRecover(bytes("""{"gameId":"$id","recoveryCode":"v1.abc"}""")).ok() shouldBe RecoverBody(id, "v1.abc")
+        }
+
+        test("[AC3.2.1] Given 形の違う復帰の本文 When 解釈する Then 422 で、誤りのある項目をすべて示す") {
+            parseRecover(bytes("{}")).problem().fields() shouldBe listOf("gameId" to null)
+            parseRecover(bytes("""{"gameId":"x","recoveryCode":5}""")).problem().fields() shouldBe
+                listOf("gameId" to null, "recoveryCode" to null)
         }
     })

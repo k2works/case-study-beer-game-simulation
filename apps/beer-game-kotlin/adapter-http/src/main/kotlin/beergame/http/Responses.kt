@@ -1,5 +1,6 @@
 package beergame.http
 
+import beergame.application.CommandOutcome
 import beergame.application.GameStatus
 import beergame.application.LobbyEntry
 import beergame.application.RoleStatus
@@ -8,6 +9,7 @@ import beergame.application.SnapshotView
 import beergame.application.Versions
 import beergame.application.WeekResultView
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -28,6 +30,23 @@ internal fun Versions.toJson(): JsonObject =
     }
 
 internal fun commandResponse(versions: Versions): JsonObject = buildJsonObject { put("versions", versions.toJson()) }
+
+/**
+ * コマンドの成功の応答。本文は `versions` に、[extra] の項目を足したもの。[extra] を持つのは、資格を発行する操作だけ
+ * （作成: 復帰コード、参加: gameId、再発行: 復帰コードと期限、復帰: gameId・kind・role。設計書の「versions だけ」の例外。ADR-015）。
+ * [recoveryCookie] は、復帰資格を Cookie（bg_recovery）でも発行するか（作成・参加。再発行は、別の人へ渡すので Cookie にしない）。
+ */
+internal class Reply(
+    val outcome: CommandOutcome,
+    val extra: Map<String, JsonElement> = emptyMap(),
+    val recoveryCookie: Boolean = false,
+)
+
+internal fun Reply.toJson(): JsonObject =
+    buildJsonObject {
+        put("versions", outcome.versions.toJson())
+        extra.forEach { (name, value) -> put(name, value) }
+    }
 
 private fun roleStatusJson(status: RoleStatus): JsonObject =
     buildJsonObject {
@@ -58,6 +77,8 @@ private fun lobbyEntryJson(entry: LobbyEntry): JsonObject =
         put("participantId", entry.participantId.value.toString())
         put("displayName", entry.displayName?.let(::JsonPrimitive) ?: JsonNull)
         put("role", entry.role?.name?.let(::JsonPrimitive) ?: JsonNull)
+        // 入れ替えで外された旧担当者だけに付ける（それ以外は省略 = false。仕様の LobbyParticipant.replaced）
+        if (entry.replaced) put("replaced", true)
     }
 
 /** `GET /sessions/{id}/state`。参加者は自分の役割だけ、進行役は全役割と確定した週の結果。 */

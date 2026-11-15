@@ -56,7 +56,8 @@ internal class CommandRequest(
     val successStatus: Int,
     val meta: RequestMeta,
     val issued: (Actor) -> IssuedCredential? = { null },
-    val recovery: (Actor) -> IssuedCredential? = { null },
+    /** 復帰資格。コマンドの時刻を受け取る（再発行は、時刻に期限の長さを足して [IssuedCredential.expiresAt] にする）。 */
+    val recovery: (Actor, Instant) -> IssuedCredential? = { _, _ -> null },
 )
 
 /** 復帰の認証に使った復帰資格のダイジェストと、現在の期限。 */
@@ -129,7 +130,7 @@ internal suspend fun Ports.runCommand(
                 } else {
                     val ctx = Ctx(gameId, actor, at, commandId, request.meta.correlationId, authenticated.presented)
                     val versions = handle(tx, ctx).bind()
-                    val outcome = CommandOutcome(gameId, versions, request.issued(actor), request.recovery(actor))
+                    val outcome = CommandOutcome(gameId, versions, request.issued(actor), request.recovery(actor, at))
                     val response =
                         StoredResponse(
                             gameId,
