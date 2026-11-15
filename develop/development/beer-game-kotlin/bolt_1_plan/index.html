@@ -10183,7 +10183,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>承認済み（2026-11-14、ユーザー）。着手前の判断項目 9 件の承認を含む。</strong> Step 1〜12 の実装と記録は完了（2026-11-14、AI の実施）。<strong>ゲート 1〜12 はすべて人の確認待ち（未承認）。</strong> 結果は <a href="../bolt_1_report/">Bolt 1 終了報告</a></td>
+<td style="text-align: left;"><strong>承認済み（2026-11-14、ユーザー）。着手前の判断項目 9 件の承認を含む。</strong> Step 1〜12 の実装と記録は完了（2026-11-14、AI の実施）。<strong>ゲート 1〜12 は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「B1 ゲート 1〜12」）。</strong> コードの全行理解の個別の承認は、指示がなく未記録。結果は <a href="../bolt_1_report/">Bolt 1 終了報告</a></td>
 </tr>
 </tbody>
 </table>
@@ -11845,6 +11845,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ゲート 1〜12 をユーザーが承認</strong>（ユーザーの選択: 「B1 ゲート 1〜12」）。コードの全行理解の個別の承認は指示がなく、未記録のまま</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;"><strong>Step 12（検証と終了）を実施</strong>。12.3〜12.5 を [x]、12.1・12.2 は未達・未実施の理由つきで [ ]。11.2 を [x]。完了条件は達成したものだけ [x]。設計の節の <code>RoleState</code> と ER 図を実装に合わせて修正（<code>validating-design</code> 完了時の軸 B）。ゲート 1〜12 は人の確認待ち。終了報告は <a href="../bolt_1_report/">bolt_1_report</a></td>
