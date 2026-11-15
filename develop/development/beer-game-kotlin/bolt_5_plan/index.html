@@ -9576,12 +9576,12 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>提案。人の承認待ち</strong>（本書は AI が作成した計画の案で、承認されていない）。実装・コード変更は未着手。着手前に、下の「人の判断が要る項目」の決定が要る</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<code>validating-design</code> は Step 0.2 で実施する</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p><strong>承認の状態について</strong>: 本書は計画のみです。ステップ計画、着手前の判断項目、各ゲートは、いずれも<strong>人の承認を受けていません</strong>。承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。</p>
+<p><strong>承認の状態について</strong>: ステップ計画の承認と判断項目 16 件の決定は、2026-11-15 にユーザーが行いました（更新履歴）。<strong>各ゲート（0〜8）は承認を受けていません。</strong> 承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。下の判断項目表の「提案」列は、決定の前の記述で、決定の内容は更新履歴にあります。</p>
 </blockquote>
 <h3 id="_2">ゴール<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <p>進行役が、停止・代理入力・再開で、不在者や中断があっても学習を継続でき、参加者・進行役が、切断後に同じ役割・同じ進行のコンソールへ復帰できるようにする。同時に、<strong>漏洩した資格の被害を止められる設計</strong>（期限・失効・再発行・鍵の複数の版・専用のレート制限）にし、<strong>失効した資格の再送が 403 になる順序</strong>（認証 → 認可の前提検査 → 冪等記録の照合。<a href="../../../adr/beer-game-kotlin/004-idempotency-after-authorization/">ADR-004</a>）を、否定テストで守る。</p>
@@ -10052,6 +10052,16 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ステップ計画をユーザーが承認</strong>（選択: 「計画を承認」。ゲートは含まない）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>判断項目 16 件をユーザーが決定</strong>（選択式）。#1 B5 を B4 より先に実施、#13 UI は最小。#2 資格の有効期間は提案どおり（セッション 24 時間、復帰 30 日、進行役はゲーム保持期間内。仮の既定値で、運営者との合意後に見直す）。#3 鍵は版の接頭辞。#4 レート制限は DB に窓を持つ。#5 マイグレーション追加（V101・V102 の付け替えを含む）を承認。#6 API 経路・<code>code</code>（<code>session.paused</code> 新設）は提案どおり。#7 参加・復帰の応答に <code>gameId</code> を追加。#8 AC3.2.3 を B5 に足す。#9 進行役の復帰は提案どおり（復帰用の値を作成時に一度だけ表示）。#10 代理入力の保存回数の上限 9 回を実装。#11 <code>EndSession</code> は範囲外（提案どおり）。#12 <code>InvalidTransition</code> の性質テストを含める。#14 所要 2 日は予備 B16 で吸収（提案どおり）。#15 新規ファイルの作成を承認。#16 ゲート密度は提案どおり（ステップごとに人が確認）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;">初版作成（AI が提案。<strong>ステップ計画・判断項目・ゲートは、人の承認待ち</strong>。実装・コード変更は未着手。<code>validating-design</code> は未実施）</td>
