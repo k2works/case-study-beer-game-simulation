@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: B5 ゲート 1 承認と判断を記録
+* **Update**: B5 ゲート 1 承認と判断を記録
 * **Update**: [015-credential-handover-and-session-revocation](/adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Verification**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を human:kakimomokuri が検証

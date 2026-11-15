@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:44:19Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:51:38Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -178,7 +178,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [x] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6 の経路を書く（`Idempotency-Key`、`code` の一覧、`requestedWeek`、`If-Match` の有無）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する
 - [x] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）
 
-**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` の名前、応答の形を確認する。**状態: 人の確認待ち（未承認）。** 人が決めること（H2・H3 を含む）は、下の「[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)」。
+**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` の名前、応答の形を確認する。**状態: 2026-11-15 にユーザーが承認し、9 項目を提案どおりに決定した（選択: 「承認し、提案どおり決定」）。** 人が決めること（H2・H3 を含む）は、下の「[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)」。
 
 #### Step 1 の実施結果（2026-11-15）
 
