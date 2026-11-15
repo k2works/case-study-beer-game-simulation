@@ -4,7 +4,7 @@ title: "Bolt 6 計画 - 共同担当と共同入力（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 6（Unit U2 の 2 つ目の Bolt）のステップ計画。同一役割に複数人の共同担当、意思決定の版による競合の検出（DecisionConflict）、WeekAdvanced と DecisionsChanged の区別、制約ごとの再試行・再照合、並行の統合テスト、RetryExhausted の発生率の計測。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T14:25:56Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T21:39:05Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T11:14:28Z }
   - { by: human:kakimomokuri, at: 2026-11-15T13:55:40Z }
@@ -233,7 +233,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 - [x] 1.2 🔴（**実施済み（2026-11-15）。契約テストの Red は実測した。下の「Step 1 の実施結果」**）`contracts/openapi.yaml` に、判断項目 6・7 の応答の形（409 `session.decision_conflict`／`session.decisions_changed` の拡張メンバー、状況の応答の保存者・時刻）を書く。**あわせて、217 行の古い注記「`session.decision_conflict` は仕様に載せるが B1 では起きない」を、現状（共同担当が入る B6 で起きる）に合わせて直す**（Step 0.3 で確認）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）
 - [x] 1.3 🔴（**実施済み（2026-11-15）。新規 17 シナリオのうち 6 件が Failing、11 件が最初から Passing（回帰として残す）。Undefined・Pending・Ambiguous は 0。下の「Step 1 の実施結果」**）`@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）。**最初から Passing のシナリオは、回帰として残す**と明記する（B5 の Step 1 と同じ扱い）
 
-**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` と応答の形（保存者の出し方。表示名の開示範囲）を確認する。**状態: 人の確認待ち（未承認）。** 結果の記録（Red の実測、最初から Passing のシナリオ、仮置き）は、本書の「Step 1 の実施結果」に、実施後に書く。
+**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` と応答の形（保存者の出し方。表示名の開示範囲）を確認する。**状態: 2026-11-15 にユーザーが承認し、判断 1〜10 を推奨どおりに決定した（選択: 「承認、推奨で決定」）。** 結果の記録（Red の実測、最初から Passing のシナリオ、仮置き）は、本書の「Step 1 の実施結果」に、実施後に書く。
 
 ### Step 1 の実施結果（2026-11-15。実施者: claude-code/claude-sonnet-5-5）
 
@@ -510,6 +510,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 | :--- | :--- | :--- |
 | 2026-11-15 | **Step 0（0.1〜0.4）を実施**（コード変更なし。**ゲート 0 は人の確認待ち（未承認）。承認は記録していない。Step 1 以降には進んでいない**）。0.1: 判断項目 17 件の決定は上の記録のとおり（チェック）。0.2: `validating-design` を実施（軸 A: OK（観察 2）、軸 B: NG 2、軸 C: NG 2。重大なずれは無し。残る人の判断は 5 項目）。0.3: 設計書のスケッチと実装の差を実ファイルで確認（参加者の投影が共同担当の表示名を含まない、`current_decisions` の保存者の列が読まれていない、`PlayPage` に競合の分岐が無い、など）。0.4: ベースラインを JDK 21 で実測（`check` 緑、domain 402・application 149・adapter-http 80・adapter-persistence 92+80・app 98+1、受け入れ `@api` 70 × 2・`@ui` 7、Kover 全体 98.1%・81.6%・domain 100%、PMD fixture 17 件・違反 0、`web` verify 緑（vitest 109）、`api:check` 差分 0、`@Suppress` 0・ベースライン無し）。**検証による修正**（承認済みの計画への修正のため、**人に再確認を求める**）: ①取り込み表に B5 申し送り 7・判断項目 3(c)・U1 #23 の残りを追加（#C2）、②入れ替えの回帰の「未確認」を事実に置き換え（Gherkin に無い→Step 1.1 で足す）、③ER 図の節の「未確認」を事実に置き換え、④Step 1.1 に `@AC2.3.1` の原文との差の注記（#B2）、⑤Step 1.2 に `openapi.yaml` 217 行の古い注記の修正を追加、⑥事実 #4・#11 を現状に更新。**計画の範囲・Step・判断項目・ゲートは変えていない** | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 1（1.1〜1.3）を実施**（仕様と受入シナリオ。実装コードは変更していない。**ゲート 1 は人の確認待ち（未承認）。承認は記録していない。Step 2 以降には進んでいない**）。1.1: Gherkin 3 ファイル（`co-assignment.feature` 4、`co-input.feature` 12、`credentials.feature` に回帰 1）とステップ定義 `CoOperationSteps.kt`。1.2: `openapi.yaml` に `DecisionEditor`・`DecisionEntry` の `editor`／`savedAt`・`RoleStatus` の `decisionEditor`／`decisionSavedAt`・`coHolders` を提案し、217 行の古い注記を修正、`api:lint`・`api:check`（差分 0）成功、契約テスト 1 件が Red。1.3: `@api` 87 シナリオ中 6 件 Failing・11 件が最初から Passing（PostgreSQL 18・H2 で同じ）、Undefined・Pending 0。ゲート 1 で人が決める 10 項目を記録（`@AC2.3.1` のタグの案 A・B・C を含む）。逸脱: `sed` を読み取り表示に使用、`awk` を含むコマンドを送り分類器が拒否 | claude-code/claude-sonnet-5-5 |
+| 2026-11-15 | **ゲート 1 をユーザーが承認し、「ゲート 1 で人が決めること」10 項目を推奨どおりに決定**（選択: 「承認、推奨で決定」）。タグは案 A（`@AC` を付けず `@US2.3` と出典コメント。テスト戦略の `[US2.3/AC2.3.1]` は Step 8.3 で直す）、応答の形（`editor`・`savedAt` の必須化、`kind`、`isSelf`、`coHolders`）と `savedAt` は投影の `updated_at`、最初から Passing の 11 件は回帰として残す、`CoOperationSteps.kt` と `fakeApi.ts` の編集を承認、detekt の範囲は現状どおり、同じ識別子の再送 403 の否定シナリオは Step 6、契約テストの Red の範囲は現状どおり。ゲート 2〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 0 と、検証による計画の修正の再確認をユーザーが承認し、人の判断 1〜6 を推奨どおりに決定**（選択: 「ゲート 0 と再確認を承認、推奨で決定」）。ゲート 1〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定**（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。**ゲート 0〜8 は未承認**。Step 0 で `validating-design` を実施する | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | 初版作成（AI が提案。**ステップ計画・判断項目 17 件・ゲート 0〜8 は、人の承認待ち**。実装・コード変更は未着手。`validating-design` は未実施で、Step 0 で行う。B5 の申し送り・持ち越しを取り込み表に整理。実コードで現状（`SaveDecision`、`decisionVersions`、`DecisionConflict`、`DecisionsChanged`、`WeekAdvanced`、`ConcurrencyConflict` の再試行、`RetryExhausted`）を確認し、事実として記載） | claude-code/claude-sonnet-5-5 |
