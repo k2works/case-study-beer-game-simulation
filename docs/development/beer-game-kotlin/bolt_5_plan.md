@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:04:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:11:24Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
 ---
@@ -18,7 +18,7 @@ verified:
 | Bolt | B5（[リリース計画](./release_plan.md)） |
 | Unit | U2 進行の継続（共同担当・資格）。U2 の最初の Bolt。次は B6（共同担当と共同入力） |
 | 所要（計画） | 2 稼働日（リリース計画の仮定。**ステップ数に対して厳しい見込み**。下のリスクと判断項目 14） |
-| 日程（仮定） | 2026-12-01〜12-02（リリース計画の稼働日による目安。**B4 の終了後**を前提とする。B4 は未着手） |
+| 日程（仮定） | リリース計画の稼働日の目安は 2026-12-01〜12-02（B4 の終了後を前提）。**判断項目 1 の決定（2026-11-15）で、B5 を B4 より先に実施する**ため、この日付は使えない。実施日は着手時に人が決める（`validating-design` の軸 A。リリース計画のスケジュールと進捗状況の更新は、人の判断待ち） |
 | ゲート密度 | **密**（リリース計画の「B5 は高リスク（認可と冪等）」。ステップごとに人が検証する）。U1 のゲートは 2026-11-15 に承認済みだが、人の検証を含めた実績はまだ少ないため、密度は下げない |
 | アプローチ | 中盤（[開発戦略](./development_strategy.md)）。**インサイドアウト**（ドメイン → 永続化・資格 → アプリケーション → HTTP）。ただし**仕様（`contracts/openapi.yaml`）と日本語 Gherkin を先**に書き、契約テストを Red にしてから実装する（API を足す Bolt の共通の順序） |
 | 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。`validating-design` は Step 0.2 で実施する |
@@ -70,6 +70,10 @@ verified:
 | N-1 互換（新しいイベント種別を足すと、旧版が読めるか） | 範囲外（本実装は B12）。**新しいイベントを足す事実と一覧を、Step 8 の記録に残す** |
 | `@ui` の拡張（参加者の画面）、Node 26 の導入と `.nvmrc` | UI の範囲は判断項目 13。Node は範囲外 |
 | 層単位の PMD の緩和、`FunctionNameTooShort`、adapter-persistence の違反をコードで直すか（B2 #3〜#5） | 範囲外。**新しいコードは、層ごとのルールセットのまま違反 0 件**を守る |
+| 役割の入れ替えでの資格の失効（B1 計画 Step 8 の記録「資格の失効の書き込み、役割の入れ替えでの失効、復帰は B5」。`validating-design` 軸 C の C1 で追加） | **範囲外（人の判断待ち）**。設計書に入れ替えのコマンドと規則が無い（[ドメインモデル](../../design/beer-game-kotlin/domain-model.md) の「開始後の入れ替え」は未決事項）。本 Bolt は、進行役の `RevokeCredential` による失効で否定テストを行う。入れ替えでの自動失効を B5 に含めるかは人が決める |
+| 観察用の招待の参加の専用のレート制限（NF-S11・NF-S19） | 範囲外（B9。観察者の参加が B9 のため）。本 Bolt の専用の制限は、参加・復帰だけ |
+| B2 の申し送り（生きたドキュメントの公開の導線、`@US`・`@AC` タグの整合検査、`@Suppress`・ベースラインの機械検査、Kover の残り、SSE の契約テスト。U1 総括 #18・#19） | 範囲外・未割り当て（`validating-design` 軸 C の C2）。B5 の計画の作成時に、項目として取り込まれていなかった。割り当て先は人が決める |
+| Living Documentation の中盤の重点（開発戦略: 用語集・イベント一覧を、中盤の最初の Bolt から整える） | **人の判断待ち**（`validating-design` 軸 A の A2）。注釈の語彙と生成の仕組みは、開発戦略が「B1〜B2 で決める」とした未決のままで、B1〜B3 の終了報告に決定の記録が見つからない。本 Bolt に含めるか、割り当てを先に決めるかは人が決める |
 
 ---
 
@@ -108,13 +112,13 @@ Active --> Ended : SessionEnded（最終週の確定）
 | :--- | :--- | :--- | :--- |
 | ブラウザセッション（`browser_sessions`） | 鍵付き HMAC のダイジェストと鍵の版 | 24 時間（設計書 NF-S4 の例） | 期限で自然に失効 |
 | 参加者の復帰資格（`credentials`、`PARTICIPANT_RECOVERY`） | 同上 | 30 日 | 進行役が失効・再発行できる |
-| 進行役の資格（`credentials`、`FACILITATOR`） | 同上 | ゲームの保持期間内（B1 は 30 日で発行している。保持日数の既定は 90 日） | 同上 |
+| 進行役の資格（`credentials`、`FACILITATOR`） | 同上 | ゲームの保持期間内。**B1 の実装は、DB の `expires_at` が作成時 + 保持日数（`Commands.kt`。既定 90 日）、Cookie の `Max-Age` が 30 日**（`Wiring.kt` の `PARTICIPANT_CREDENTIAL_TTL_DAYS`。進行役も同じ値）。期限の値は `Wiring.kt` の定数で、設定値ではない | 同上 |
 
 復帰（`RecoverParticipation`）は、有効な復帰資格を提示すると、新しいブラウザセッションを発行し、復帰資格の期限を更新する（`ParticipationRecovered.credentialExpiresAt`）。
 
 ### ER 図（変わる可能性。判断項目 4・5）
 
-**確認した事実**: [V002](../../../apps/beer-game-kotlin/adapter-persistence/src/main/resources/db/migration/common/V002__peripheral_stores.sql) の `credentials` は `key_version`・`expires_at`・`revoked_at` を、`browser_sessions` は `key_version`・`expires_at` を、すでに持つ。**鍵の複数の版・期限・失効に、表の列の追加は要らない見込み**。
+**確認した事実**: [V002](../../../apps/beer-game-kotlin/adapter-persistence/src/main/resources/db/migration/common/V002__peripheral_stores.sql) の `credentials` は `key_version`・`expires_at`・`revoked_at` を、`browser_sessions` は `key_version`・`expires_at` を、すでに持つ。鍵の複数の版・期限には、表の列の追加は要らない見込み。**ただし、失効は別（Step 0.3・`validating-design` の B3）**: `browser_sessions` に `revoked_at` も `credentials` への参照も無く、B1 は同じダイジェストで両表を結んで認証している。ブラウザセッションと復帰資格を別のダイジェストに分けると、**資格を失効させたときに、発行済みのブラウザセッションを止める結び付きが無い**。列の追加（スキーマ変更）が要るかは未確認で、Step 4.3 の前に人が決める。
 
 **変わる見込み**: 参加・復帰の専用のレート制限を、タスク数に依らない上限にするには、**試行の窓を DB に持つ表**（名前・列は未決）が要る。**スキーマ変更は確認必須**（判断項目 4・5）。表が増えれば `game_id` を持つ表の連鎖削除（B11 の「全表に行が残らない」検査）との整合も要る（接続元の鍵は要約で、ゲームに紐づけない案を提案）。
 
@@ -159,15 +163,15 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ### Step 0: 着手前の確認（`validating-design`）（✅）
 
-- [ ] 0.1 判断項目 1〜16 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）
-- [ ] 0.2 `validating-design` を、着手前に実施し、**結果を本書に記録する**（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ 過去の Bolt の計画・終了報告。B2・B3 の計画は、この記録が無いことが U1 の逸脱だった）。**本書の作成時点では未実施**
-- [ ] 0.3 設計書のスケッチと、実装（B1 の形）の差を確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に `GameData`（B1 は設定・参加者・割り当てだけ。設計書は招待・観察者・資格を含む）と `AppSettings`（資格の鍵）
+- [x] 0.1 判断項目 1〜16 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）。**決定は 2026-11-15 に更新履歴へ記録済み**（ゲート 0 の承認ではない）
+- [x] 0.2 `validating-design` を、着手前に実施し、**結果を本書に記録する**（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ 過去の Bolt の計画・終了報告。B2・B3 の計画は、この記録が無いことが U1 の逸脱だった）。**2026-11-15 に実施。結果は「[設計整合性の検証結果](#設計整合性の検証結果着手前validating-design)」**（NG。計画側の修正 10 件、人の判断待ち 5 件）
+- [x] 0.3 設計書のスケッチと、実装（B1 の形）の差を確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に `GameData`（B1 は設定・参加者・割り当てだけ。設計書は招待・観察者・資格を含む）と `AppSettings`（資格の鍵）。**2026-11-15 に実ファイルで確認。結果は「[設計書のスケッチと実装の差](#設計書のスケッチと実装の差step-03)」**
 
-**ゲート 0**: 判断項目の決定と、`validating-design` の結果を、人が確認する。**状態: 人の確認待ち（未承認）。**
+**ゲート 0**: 判断項目の決定と、`validating-design` の結果を、人が確認する。**状態: 人の確認待ち（未承認）。** 0.1〜0.3 のチェックは作業の完了を示すもので、ゲートの承認ではない。
 
 ### Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）
 
-- [ ] 1.1 🔴 日本語 Gherkin を `features/continuation/`（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。**失効した資格の再送が 403**、**鍵のローテーション後も旧版の資格が期限まで有効**、**旧版の鍵の削除後は 403**、**期限切れの資格は 403**、**復帰の失敗は存在・期限・失効を区別しない同じ応答**、**停止中の代理入力は確定しない**、**代理入力のイベントに値が残る**を含める
+- [ ] 1.1 🔴 日本語 Gherkin を `features/continuation/`（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。**失効した資格の再送が 403**、**鍵のローテーション後も旧版の資格が期限まで有効**、**旧版の鍵の削除後は 403**、**期限切れの資格は 403**、**復帰の失敗は存在・期限・失効を区別しない同じ応答**、**停止中の代理入力は確定しない**、**代理入力のイベントに値が残る**、**失効した復帰資格での復帰の再送が 403（保存済みの新しいセッションを返さない）**、**準備中と開始後の両方で、失効・再発行・復帰を受け付ける**（ドメインモデル）、複数タブ（AC3.2.3。判断項目 8）、代理入力の保存回数の上限（判断項目 10。超えたときの `code`・文言は未決で、ゲート 1 で人が決める）を含める。フォルダは `features/continuation/`（名前は判断項目 15）とし、**`features/TAGS.md` の領域の一覧（Epic 3 継続と復旧）に追記する**（`validating-design` 軸 C の C3）
 - [ ] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6 の経路を書く（`Idempotency-Key`、`code` の一覧、`requestedWeek`、`If-Match` の有無）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する
 - [ ] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）
 
@@ -176,15 +180,16 @@ Active --> Ended : SessionEnded（最終週の確定）
 ### Step 2: ドメイン — Session の停止・再開・代理入力（🔴🟢🟡）
 
 - [ ] 2.1 🔴 Kotest（Given: 過去のイベント / When: コマンド / Then: イベントまたはエラー）を先に書く。`PauseSession`・`ResumeSession`・`SubmitProxyDecision` の正常系と否定（参加者の実行は `Forbidden`、`requestedWeek` が違えば `WeekAdvanced`、停止中の `SaveDecision`・`CommitWeek` は拒否、`Ended` は `AlreadyEnded`）。**失敗を確認**する
-- [ ] 2.2 🟢 `SessionState.Paused`、コマンド・イベント・エラーを、`decideSession`・`evolve` に実装する（`updateData` は `Active`・`Paused` に適用）。代理入力は版を 1 増やし、`editor`・値を残す。停止中の代理入力は確定しない
-- [ ] 2.3 🟡 `InvalidTransition` の性質テスト（許されない状態・コマンドの組が、すべて拒否される。判断項目 12）。リファクタリング。**domain の行 100% のゲートを守る**（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）
+- [ ] 2.2 🟢 `SessionState.Paused`、コマンド・イベント・エラーを、`decideSession`・`evolve` に実装する（`updateData` は `Active`・`Paused` に適用）。代理入力は版を 1 増やし、`editor`・値を残す。停止中の代理入力は確定しない。**停止中の参加者の拒否は、判断項目 6 の決定どおり新しい `SessionError`（`session.paused`、409、`InvalidState`）で返す**（現状の設計書は「停止中の `NotActive`」で、食い違うため Step 8.3 で設計書を更新する。`validating-design` 軸 B の B1）
+- [ ] 2.3 🟡 `InvalidTransition` の性質テスト（**設計書の定義: 有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない**。判断項目 12。`validating-design` 軸 B の B6 で、計画の記述を設計書に合わせた）。リファクタリング。**domain の行 100% のゲートを守る**（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）
 - [ ] 2.4 イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。新しいイベントの種別の一覧を記録（N-1 互換の影響。B12）
+- [ ] 2.5 🔴🟢 **代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回。判断項目 10 の決定）**。`SessionData` に、役割ごとの当週の保存回数を持たせる（現状は持たない）。確定でクリアする。超えたときの `code`・文言は未決（ゲート 1 で決める）。**B6 の共同入力（`DecisionConflict` の拡張）と同じ `SaveDecision` に触れるため、B6 の前提を壊さないことを確認する**。更新履歴の決定が、ステップに反映されていなかったため追加した（`validating-design` 軸 B の B8）
 
 **ゲート 2**: Session の停止・再開・代理入力の振る舞いと、domain の行 100% を、人が確認する。**状態: 人の確認待ち（未承認）。**
 
 ### Step 3: ドメイン — Game の資格（失効・再発行・復帰）（🔴🟢🟡）
 
-- [ ] 3.1 🔴 Kotest を先に書く。`RevokeCredential`（進行役のみ、有効な資格のみ、二重の失効は `CredentialAlreadyRevoked`）、`ReissueCredential`（新しい期限、失効後の再発行）、`RecoverParticipation`（有効な復帰資格のみ。失効・期限切れは `Forbidden` の同じ形）。失敗を確認する
+- [ ] 3.1 🔴 Kotest を先に書く。`RevokeCredential`（進行役のみ、有効な資格のみ、二重の失効は `CredentialAlreadyRevoked`）、`ReissueCredential`（新しい期限、失効後の再発行）、`RecoverParticipation`（有効な復帰資格のみ。失効・期限切れは `Forbidden` の同じ形）。**準備中と開始後の両方で受け付ける**（ドメインモデル）。失敗を確認する
 - [ ] 3.2 🟢 `GameData` に資格の有効性（`CredentialValidity`）を足し、コマンド・イベント・`evolve` を実装する（設計書の `credentials: Map<CredentialSubject, CredentialValidity>`）。`startGame` と `JoinGame`（資格を発行する経路）が、資格の有効性を初期化する
 - [ ] 3.3 🟡 リファクタリング。domain の行 100% を維持
 
@@ -194,11 +199,13 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 > **高リスク（認可と冪等。R5）。否定テストを先に書く。**
 
-- [ ] 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) **失効した資格が、以前に成功したキーを再送しても 403**（保存済みの応答を返さない。ADR-004）、(b) 期限切れの資格は 403、(c) **鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効**、(d) **旧版の鍵を設定から外したら、その版の資格は 403**、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（`beergame_reader`）が `credentials` を読めない（V101 の権限。設計書は未決。**確認だけを行い、変更が要るなら人に報告**）。失敗を確認する
+- [ ] 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) **失効した資格が、以前に成功したキーを再送しても 403**（保存済みの応答を返さない。ADR-004。**既存のテストが 3 層にある**: `ExecuteSpec`、`ApplicationFlowContract`、`HttpFlowSpec`。いずれも `credentials.revoked_at` を直接更新するか `World.revoke` で失効させる。**本 Bolt は、実際の `RevokeCredential` コマンド経由で失効させて同じことを確かめる**）、(a2) **復帰（`RecoverParticipation`）の再送**: 現状の `Auth` は `ANONYMOUS`・`REQUIRED` の 2 つで、`joinGame` のような `ANONYMOUS` の操作は、同じキー・同じ本文の再送に保存済みの応答（資格の生の値を含む）を返す（参加コードが認可の代わり）。**復帰は、提示した復帰資格の有効性が認可であり、`ANONYMOUS` で実装すると、失効した復帰資格の再送に、保存済みの新しいセッションが返る**。復帰は、冪等記録の照合の前に、提示された復帰資格を検証する（`validating-design` 軸 B の B5）、(b) 期限切れの資格は 403、(c) **鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効**、(d) **旧版の鍵を設定から外したら、その版の資格は 403**、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（`beergame_reader`）が `credentials` を読めない（V101 の権限。設計書は未決。**確認だけを行い、変更が要るなら人に報告**）。失敗を確認する
 - [ ] 4.2 🟢 鍵の複数の版（判断項目 3）。設定の読み込み（本番で必須、未設定なら起動に失敗。**起動時の検査の既存の仕組みを再利用**）、発行は最新の版、検証は保存された版の鍵。資格の値は 256 ビットの乱数、保存は鍵付き HMAC のダイジェストと版
-- [ ] 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。期限を設定値にする（判断項目 2）。`credentials` の失効・発行を、`Credential*` イベントの追記と**同じトランザクション**で行う（`PeripheralWrite.RevokeCredentialRow` の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）
-- [ ] 4.4 🟢 `execute`（`Execute.kt`）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、**失効後の再送が 403 のテスト（4.1 の a）が通る**ことを確認する。**現状の順序が (a) を満たすかは未確認**（設計どおりに実装されているかを、テストで確かめる）
+- [ ] 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。**分けた後に、資格の失効でブラウザセッションを止める結び付き（`browser_sessions` に `revoked_at` または資格の主体への参照を足すか、認証が主体の未失効の資格の存在を確かめるか）を、実装の前に人が決める**（スキーマ変更は確認必須。現状は、認証が同じダイジェストで `browser_sessions` と `credentials` を結ぶ。`JdbcPeripheralStore.kt` の `AUTHENTICATE_SQL`。`validating-design` 軸 B の B3）。期限を設定値にする（判断項目 2。現状は `Wiring.kt` の定数）。`credentials` の失効・発行を、`Credential*` イベントの追記と**同じトランザクション**で行う（`PeripheralWrite.RevokeCredentialRow` の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）
+- [ ] 4.4 🟢 `execute`（`Execute.kt` の `runCommand`）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、**失効後の再送が 403 のテスト（4.1 の a、a2）が通る**ことを確認する。**確認した事実（Step 0.3）**: `Auth.REQUIRED` の操作は、`runCommand` が `authenticate`（資格の有効性とゲームの一致）を `idempotency.find` より前に評価し、無効なら `Unauthorized` を返す。既存の 3 つのテストが、この順序を確かめている。**未確認は、`RecoverParticipation`（a2）と、実際の失効コマンド経由の再送**
 - [ ] 4.5 🟡 リファクタリング。層ごとの静的解析の違反 0 件
+- [ ] 4.6 🔴🟢 **イベントの符号化**: 新しい 6 種類のイベント（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）の DTO を `EventDtos.kt` に足し、`EventCodec`・復号（`DtoDecodingGame.kt`・`DtoDecodingSession.kt`）を拡張する。`EventCodecSpec` の往復と golden（全イベントの種類）に足す。現状の DTO は 9 種類（`@SerialName` で確認）。計画に無かったため追加した（`validating-design` 軸 A の A1）
+- [ ] 4.7 🔴🟢 **投影**: `SessionOverview`（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`。`status` の `PAUSED` は V004・仕様・`SessionStatus` にすでにある）と `CurrentDecisions`（`ProxyDecisionSubmitted`）を、`Projection.kt` に足す。`Lobby` は資格のイベントを**購読しない**（設計書 L5）ことを、投影の契約テストで確かめる。計画に無かったため追加した（同 A1）
 
 **ゲート 4**: 資格の設計（漏洩時に被害を止められるか）と、否定テストの網羅を、人が確認する。**状態: 人の確認待ち（未承認）。**
 
@@ -208,13 +215,14 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] 5.2 🟢 試行の窓の保存（判断項目 4・5 の決定どおり）。参加（`/participations/join`）、復帰（`/participations/recover`）に適用する。上限・窓の値は設定値（根拠は未計測の仮置きとして記録）
 - [ ] 5.3 🟢 失敗の記録（ログの形。観測の完成は B13）。復帰の失敗の応答は、存在・期限・削除を区別しない（NF-S12）
 - [ ] 5.4 🟡 リファクタリング
+- [ ] 5.5 マイグレーションの番号（判断項目 5 の決定: 試行の窓の表の追加と、V101・V102 の付け替えを承認済み）。**現状の配置は、共通 `V001`〜`V005`、PostgreSQL `V101`（ロールと GRANT）・`V102`（冪等記録の索引）。データモデルの番号計画は、共通 `006` が B11（保持）の予約**。試行の窓の表と付け替え後の番号を、`006` と衝突しない形で決め、データモデルに記録する（**番号は、ゲート 5 で人が確認する**）。**窓の表の GRANT を、同じマイグレーションで書く**（V101 の注記: 以降の表は、その表の GRANT をそのマイグレーションで書く。既定の権限は与えない）。付け替えは永続環境がまだ無い間だけ安全（適用済みの DB は Flyway のチェックサムと版の検証に当たる）ことを確認する。**決定が更新履歴にあるのにステップに無かったため追加**（`validating-design` 軸 B の B9）
 
 **ゲート 5**: レート制限の方式、保存する情報、スキーマの変更を、人が確認する（**スキーマ変更は確認必須**）。**状態: 人の確認待ち（未承認）。**
 
 ### Step 6: アプリケーションと HTTP（🔴🟢🟡）
 
 - [ ] 6.1 🔴 HTTP の統合テスト（`testApplication`）を先に書く: 経路・認可（進行役だけが停止・再開・代理入力・失効・再発行）、`Idempotency-Key` の再送（同じ操作者・同じ本文なら保存済みの応答。**別の操作者の同じキーは `app.idempotency_key_reused`**）、`Set-Cookie`（`HttpOnly`・`SameSite=Strict`・`Max-Age`）、`code` と `problem+json`。失敗を確認する
-- [ ] 6.2 🟢 コマンド（`Commands.kt`）、ルート、DTO の検証、エラーの写像を実装する。参加・復帰の応答に `gameId`（判断項目 7）。**契約テスト（仕様 ↔ 実装）が緑**になる
+- [ ] 6.2 🟢 コマンド（`Commands.kt`）、ルート、DTO の検証、エラーの写像を実装する。参加・復帰の応答に `gameId`（判断項目 7）。**契約テスト（仕様 ↔ 実装）が緑**になる。**進行役の復帰用の値（判断項目 9 の案 A）は、現状の設計と異なる**: 資格の生の値は `Set-Cookie` だけが運び、応答の本文は `versions` だけ（`CommandRoutes.kt`、`openapi.yaml` の `createGame`、アーキテクチャ・UI 設計）。作成の応答の本文に復帰用の値を足すこと、**再発行した資格を進行役が参加者へ渡す方法**、`POST /participations/recover` の本文の形は、設計書に無い。**実装の前に、仕様と設計書の案を人が確認する**（ゲート 1・6。`validating-design` 軸 B の B7）
 - [ ] 6.3 🟢 TypeScript の型を再生成し、差分 0 の検査を通す
 - [ ] 6.4 🟡 リファクタリング。性能: 停止・再開・代理入力は p95 500 ms 以下（NF-P6）。**ローカルの計測値は、実環境の値でないことを明記して記録**
 
@@ -247,6 +255,9 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] 期限切れ・失効・不明の資格の応答が、区別されない（NF-S12）
 - [ ] 参加・復帰の専用のレート制限が働き、複数のインスタンスで合算される（判断項目 4 の決定による。決定が案 B のときは、**未達として記録**）
 - [ ] 代理入力のイベントに、値・操作者・役割・時刻が残る（AC3.1.2）
+- [ ] 新しい 6 種類のイベントが、`EventCodec` の往復と golden に含まれ、投影（`SessionOverview`・`CurrentDecisions`）が反映する。`Lobby` は資格のイベントを購読しない
+- [ ] 復帰の再送（失効した復帰資格）が 403 で、保存済みの応答を返さない（`Auth` の扱いを含む）
+- [ ] 代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回）が働く（判断項目 10 の決定）
 - [ ] 契約テスト（仕様と実装のずれで CI が落ちる）と、型の生成物の差分 0
 - [ ] domain の行 100%（除外・閾値の引き下げなし）、全体の行 85%・分岐 75%。静的解析の違反 0 件、ベースラインなし、`@Suppress` なし
 - [ ] 設計書・ADR の変更表が更新され、`validating-design` を着手前と完了時に実施し、結果を記録した
@@ -267,12 +278,97 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ## 設計整合性の検証結果（着手前。`validating-design`）
 
-**未実施**（Step 0.2）。本書の作成時に確認できた事実（設計書とコードの突き合わせ）は上の各節に記したが、`validating-design` の 3 軸の検証としては実施していない。実施後に、この節へ結果を記録する。
+**2026-11-15 に実施（Step 0.2。claude-code/claude-sonnet-5-5）。コード変更なし。** 正は、設計書・ADR・開発戦略（過去の計画は、設計書に未反映の判断だけ正）。不整合は本書側を修正した。**ステップ計画は 2026-11-15 に人が承認済みのため、下の修正（Step 2.5、4.6、4.7、5.5 の追加ほか）は、承認後の追加である。人の再確認を求める（ゲート 0）。**
+
+### 検証対象
+
+- イテレーション計画: 本書（`bolt_5_plan.md`）
+- 局面（開発戦略）: 中盤（B5〜B12）。アプローチ: インサイドアウト（高リスクの B5 は否定テストを先に書く）
+
+### 検証結果サマリー
+
+| 軸 | 検証対象 | 結果 | 不整合件数 | 内訳 |
+| :--- | :--- | :---: | ---: | :--- |
+| A | 開発戦略 ↔ 本書 | NG | 3 | 修正 2、人の判断待ち 1 |
+| B | 本書 ↔ 設計書・ADR | NG | 9 | 修正 7（B1 は設計書の更新を Step 8.3 に残す。B3 は判断を人に残す）、設計書の更新のみ 1（B2）、修正せず注記のみ 1（B7。人の判断待ち） |
+| C | 本書 ↔ B1〜B3 の計画・終了報告、U1 総括 | NG | 3 | 修正 3（うち 2 件は割り当て先が人の判断待ち） |
+
+**合計: 計画側の修正 12 件、人の判断待ち 6 件**（下の H1〜H6）。重大なずれで、修正せず報告のみとしたものは無い（設計との差 B7 は、本書に注記し、判断は人）。
+
+**一致を確認できた点**（不整合なし）: 局面とアプローチ（中盤、インサイドアウト、仕様が先、否定テストが先）、ゲート密度（密）、対象ストーリー（US3.1・3.2）、受入基準の元（AC3.1.*・AC3.2.*、期限切れ・失効・旧版・失効後の再送の否定テスト）、ドメインモデルのコマンド・イベント（`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、EV-G08〜G10・EV-S02・S03・S06 のペイロード）、`PeripheralWrite.RevokeCredentialRow` の名前（アーキテクチャ設計）、ADR-004 の順序と B5 のコンプライアンス項目、`Lobby` が資格のイベントを購読しない規則（L5）、V002 の `credentials` の列（`key_version`・`expires_at`・`revoked_at`）、`beergame_reader` が `credentials` を読めないこと（V101 の GRANT）、ADR の番号（Kotlin 版の ADR-009 は観察者。鍵の版の ADR は beer-game2 の ADR-009 を引き継ぐ。新しい ADR は 015 から）、4 図の掲載、前の Bolt の申し送りの取り込み表、着手前の `validating-design` と完了時の実施。
+
+### 不整合一覧
+
+#### 軸 A: 開発戦略との不整合
+
+| # | 不整合内容 | 計画の記述 | 正しい記述（正となる出典） | 出典 | 修正要否 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| A1 | 層の順序から**投影とイベントの符号化**が抜けている | Step 2〜4 に、新しいイベントの `EventCodec`・DTO・golden と、`SessionOverview`・`CurrentDecisions` の投影が無い | 中盤は「ドメイン → 永続化 → 投影 → アプリケーション → HTTP → 画面」で、層ごとに承認ゲート。B1 は Step 7 で同じ作業を持った | development_strategy.md（中盤のワークフロー）、bolt_1_plan.md の Step 7 | **修正済み**（Step 4.6、4.7、完了条件） |
+| A2 | 中盤の重点「用語集・イベント一覧を、中盤の最初の Bolt から整える」（Living Documentation）が、計画に無い | 言及なし | 同左。ただし、注釈の語彙と生成の仕組みは「B1〜B2 で決める」未決のまま。B1〜B3 の終了報告に決定の記録が見つからない | development_strategy.md（Living Documentation の局面ごとの重点、「注釈の語彙と生成の仕組み（未決）」） | **人の判断待ち（H1）**。範囲外の表に記録した |
+| A3 | 概要の日程が、判断項目 1 の決定（B5 を B4 より先に実施）と食い違う | 「B4 の終了後を前提」（2026-12-01〜12-02） | 決定は B5 先行 | 本書の更新履歴（2026-11-15） | **修正済み**（概要）。リリース計画の日程・進捗の更新は**人の判断待ち（H6）** |
+
+#### 軸 B: 設計書・ADR との不整合
+
+| # | 不整合内容 | 計画の記述 | 正しい記述（正となる出典） | 出典 | 修正要否 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| B1 | 停止中の拒否の `code` | 判断項目 6 の決定は新しい `session.paused` | 設計書は「停止中の `NotActive`（`session.not_active`）」、UI 設計は `code` 名の正本をドメインモデルとする | domain-model.md（エラーの表、変更表）、ui-design.md（`session.not_active` は B5 の停止中の文言と合わせて決める）、openapi.yaml の `ErrorCode` | **修正済み**（Step 2.2 に明記）。決定は人のもので、設計書は Step 8.3 で更新する（ドメインモデルの表、UI 設計の辞書、仕様の `ErrorCode`、ADR-008） |
+| B2 | 参加・復帰の専用のレート制限の保存先 | 判断項目 4 の決定は DB の窓の表 | 設計書は「未決。まず プロセス内 + 前段（WAF）の併用を提案」で、データモデルに表が無い | architecture-backend.md（BD8、未決事項）、data-model.md | 計画は決定に従う。**設計書の更新は Step 8.3**（変更なし）。**新しい ADR（015 以降）が要る**（判断項目 15） |
+| B3 | ブラウザセッションの分離後の失効 | Step 4.3 は「別のダイジェストに分ける」。ER 節は「列の追加は要らない見込み」 | 設計書は「ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功」。実装は同じダイジェストで両表を結ぶ。分けると、失効でセッションを止める結び付きが無い（`browser_sessions` に `revoked_at` も参照も無い） | architecture-backend.md（認証と認可）、V002、`JdbcPeripheralStore.kt` | **修正済み**（ER 節と Step 4.3 に、決める点を明記）。結び付きの方式とスキーマ変更は**人の判断待ち（H2）** |
+| B4 | 進行役の資格の期限の記述が不正確 | 「B1 は 30 日で発行している」 | DB の期限は作成時 + 保持日数、Cookie の `Max-Age` が 30 日。期限の値は `Wiring.kt` の定数 | `Commands.kt`、`Wiring.kt`、`CommandRoutes.kt` | **修正済み**（資格の状態の表） |
+| B5 | 復帰（`RecoverParticipation`）の再送が、ADR-004 の順序の対象になっていない | Step 4.1 は、失効した資格の再送だけ。`Auth` の種類は未検討 | ADR-004: 失効した資格が再送しても保存済みの応答を返さない。現状の `Auth` は `ANONYMOUS`・`REQUIRED` で、`ANONYMOUS` の操作は再送に保存済みの応答（資格の値を含む）を返す。復帰を `ANONYMOUS` にすると、失効した復帰資格の再送に、保存済みの新しいセッションが返る | ADR-004、`Execute.kt`（`authenticate`、`replay`） | **修正済み**（Step 1.1、4.1 の a2、4.4、完了条件）。**本 Bolt の最大のリスク（R5）の具体的な形** |
+| B6 | `InvalidTransition` の性質テストの定義 | 「許されない状態・コマンドの組が、すべて拒否される」 | 「有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない」 | architecture-backend.md（`evolve` の全域化と `InvalidTransition`） | **修正済み**（Step 2.3） |
+| B7 | 進行役の復帰用の値の返し方（判断項目 9 の案 A） | 「作成時に一度だけ表示」 | 設計では、資格は `Set-Cookie` だけが運び、作成の応答は `versions` だけ。再発行した資格の受け渡しと `recover` の本文の形は、設計書に無い | architecture-backend.md（コマンドの応答）、openapi.yaml（`createGame`）、ui-design.md（資格を含む応答） | **修正せず注記**（Step 6.2）。**設計書・仕様・ADR の案が要る。人の判断待ち（H3）** |
+| B8 | 判断項目 10（保存回数の上限 9 回）の決定が、ステップに無い | 決定は更新履歴にあるが、ステップ・完了条件が無い。`SessionData` に回数を持たない | 決定どおり実装する（NF-C8。コードと文言は設計書も未決） | 本書の更新履歴、non-functional.md | **修正済み**（Step 2.5、完了条件）。`code`・文言はゲート 1 で人が決める |
+| B9 | 判断項目 5（マイグレーションの追加と V101・V102 の付け替え）の決定が、ステップに無い | 決定は更新履歴にあるが、番号とスキーマの作業のステップが無い | データモデルの番号計画（共通 006 は B11 の保持の予約、PostgreSQL 101〜）。V101 は V102 より小さい番号 | data-model.md（マイグレーションの番号計画、V101 と V102 の順序の注意） | **修正済み**（Step 5.5） |
+
+#### 軸 C: 過去の Bolt の計画・終了報告との不整合
+
+| # | 不整合内容 | 計画の記述 | 正しい記述（正となる出典） | 出典 | 修正要否 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| C1 | B1 の申し送り「役割の入れ替えでの資格の失効」が取り込まれていない | 申し送りの表に無い | B1 計画 Step 8: 「資格の失効の書き込み、役割の入れ替えでの失効、復帰は B5」。ただし設計書に入れ替えのコマンド・規則が無い（開始後の入れ替えは未決） | bolt_1_plan.md（Step 8）、domain-model.md、test-strategy.md（H4 の「入れ替えで失効した旧担当者」） | **修正済み**（申し送りの表に、範囲外（人の判断待ち）として追加）。含めるかは**人の判断待ち（H4）** |
+| C2 | B2 の申し送りの一部が取り込まれていない | 表に無い | U1 総括 #18・#19（タグ整合検査、`@Suppress` の機械検査、生きたドキュメント、Kover の残り、SSE の契約テスト）は、割り当て先が未定 | unit_u1_summary.md（優先度 C） | **修正済み**（申し送りの表に追加）。割り当て先は**人の判断待ち（H5）** |
+| C3 | `features/` の領域の一覧（`TAGS.md`）に Epic 3 が無い | 「`features/continuation/`」だけ | `TAGS.md` は領域を Epic に合わせ、`game-setup`・`weekly-play`・`operations` を列挙する。新しい領域は一覧に足す | features/TAGS.md、開発戦略（フィーチャーファイルの整理） | **修正済み**（Step 1.1） |
+
+### 人の判断待ち
+
+| # | 内容 | 関連 |
+| :--- | :--- | :--- |
+| H1 | Living Documentation の中盤の重点（用語集・イベント一覧の生成）を、本 Bolt に含めるか、割り当てを先に決めるか | A2 |
+| H2 | 資格の失効でブラウザセッションを止める結び付きの方式と、スキーマ変更（確認必須） | B3、Step 4.3 |
+| H3 | 進行役の復帰用の値、再発行した資格の受け渡し、`recover` の本文の形（設計書にない。仕様・設計書・ADR の案が要る） | B7、判断項目 9、Step 6.2 |
+| H4 | 役割の入れ替えでの自動失効を B5 に含めるか（設計書にコマンド・規則が無い） | C1 |
+| H5 | B2 の申し送り（タグ整合検査ほか）の割り当て先 | C2 |
+| H6 | 承認済みのステップ計画に、本検証で足したステップ（2.5、4.6、4.7、5.5 ほか）の再確認。所要 2 日の見込み（ステップ増で、さらに厳しい。判断項目 14）。リリース計画の日程・進捗の更新（B5 先行） | A3、判断項目 14 |
+
+## 設計書のスケッチと実装の差（Step 0.3）
+
+2026-11-15 に、実ファイルを読んで確認した（コード変更なし）。**確認の範囲は、読んだファイルと、grep の結果。実行はしていない（ビルド・テストの再実行は本ステップの範囲外）。** 設計書の「スケッチ」は、型でなく責務で読む（B1 の学び 6）。
+
+| 対象 | 設計書のスケッチ | 実装（実ファイル） | 差と、B5 への影響 |
+| :--- | :--- | :--- | :--- |
+| `GameData` | `gameId`・`settings`・`retention`・`participants`・`invitations`・`observers`・`credentials` | `Game.kt`: `gameId`・`settings`・`participants` の 3 つだけ | `retention` は投影の責務（B1 計画）。**`credentials: Map<CredentialSubject, CredentialValidity>` を足すのが B5**。`invitations`・`observers` は B9。`GameEvent` は 5 種類（`GameCreated`・`ParticipantJoined`・`RoleAssigned`・`RoleUnassigned`・`GameStarted`）で、`GameCreated.facilitatorCredentialExpiresAt` と `ParticipantJoined.credentialExpiresAt` は**すでに運ぶ**（有効期限の初期値はイベントから導ける） |
+| `GameCommand` | 10 種類 | `Game.kt`: `CreateGame`・`JoinGame`・`AssignRole` の 3 つ | `RevokeCredential`・`ReissueCredential`・`RecoverParticipation` が B5。`UnassignRole`・観察者のコマンドは範囲外 |
+| `SessionState` | `NotStarted`・`Active`・`Paused`・`Ended` | `Session.kt`: `NotStarted`・`Active`・`Ended`。**`Paused` は無い**（読んで確認。`grep` でも domain に `Paused` は無い） | `Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted` が B5。**`decideSession` は冒頭で `activeData()` を呼び、`NotStarted` を `NotActive`、`Ended` を `AlreadyEnded` で返す**ため、停止中の分岐は構造から足す必要がある |
+| `SessionData` | 保存回数の記録は書かれていない | `Session.kt`: `gameId`・`settings`・`assignments`・`week`・`roleStates`・`decisions`・`decisionVersions`・`commitMode` | 保存回数の上限（判断項目 10）には、**回数を持つ項目の追加が要る**（Step 2.5） |
+| `SessionError` | `NotActive`・`AlreadyEnded`・`Forbidden`・`WeekAdvanced` ほか | `Session.kt`: `NotActive`・`AlreadyEnded`・`AlreadyStarted`・`Forbidden`・`WeekAdvanced`・`DecisionConflict` など | 停止中は、決定どおり `session.paused` を足す（`validating-design` B1） |
+| `AppSettings` | 再試行の上限、冪等記録の期限、資格の期限、**鍵の版と鍵** | `AppPorts.kt`: `maxAttempts`・`idempotencyTtl`・`participantCredentialTtl`・`credentialKeyVersion`（Int）・`idempotencySecret`・`credentialSecret`（**鍵は 1 つ**） | **鍵の複数の版は未実装**（KeyRing に当たるものが無い）。期限は `participantCredentialTtl` の 1 つだけ。**ブラウザセッション・復帰資格・進行役の期限を分ける設定が要る**（判断項目 2・3）。`Wiring.kt` で、24 時間・30 日・版 1 が**定数**として埋め込まれている |
+| 設定の読み込み | `CREDENTIAL_KEY` 1 つ（設計書は「鍵は複数の版を同時に持つ」） | `ServerConfig.kt`: `CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`（それぞれ Base64 の 32 バイト。`local` 以外は必須で、3 つは別の値） | 版つきの複数の鍵の指定（名前は未決。判断項目 3）。Terraform（`infra/`）の秘密の形に波及する（本 Bolt は変更しない） |
+| `Hmac.kt` | 鍵付き HMAC-SHA256（鍵の版は 1） | `Hmac.hex(secret, parts)`（`internal`）。各部分に 4 バイトの長さを前置する | **鍵を 1 つ受け取る。版の概念を持たない**。資格のダイジェストは `CredentialDigest.of(secret, raw)` = `Hmac.hex(secret, ["credential", raw])`。**版の接頭辞の方式（判断項目 3 の決定）では、生の値から版を読み、版ごとの鍵を引いてから、この関数を呼ぶ形になる**（`Hmac` 自体は変えなくてよい見込み。未確認） |
+| `SecureTokens.kt` | 資格は 256 ビットの乱数 | `SecureTokens.newCredential()`: 32 バイトの `SecureRandom` を、URL 安全な Base64（パディングなし、43 文字）にする | **版の接頭辞は無い**。接頭辞を足すと、生の値の形（43 文字）が変わる（Cookie・既存のテスト・仕様の例への影響は未確認）。参加コードは 12 文字（約 60 ビット） |
+| `execute` の順序 | ロック（共有）→ 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `decide` → … | `Execute.kt` の `runCommand`: `lock.acquireShared` → `authenticate`（`Auth.REQUIRED` なら `verified` で資格の有効性、`ensure(verified.gameId == request.operation.gameId)`）→ `idempotency.find` → 照合 → `handle`。再試行のたびに全体を評価し直す。`request_digest` は本文・範囲・**操作者の ID** | **設計どおり**。**失効後の再送が 403 になるかは、実コードとテストで確認した**: 無効な資格（なし・不明・失効・期限切れ・別のゲーム）は、`idempotency.find` より前に `Unauthorized`（`app.unauthorized`）を返し、保存済みの応答を返さない。裏付けのテスト 3 件: `ExecuteSpec` の「[ADR-004][H4] … 失効した資格が同じキーを再送 … 403 で、冪等記録を検索せず」（`calls` に `idempotency.find` が無いことまで検査）、`ApplicationFlowContract`（実 DB。`revoked_at` を更新して再送し、`snapshot` も `Unauthorized`）、`HttpFlowSpec`（失効した参加者の資格の状態取得と、期限切れの資格の同じキーの再送が、HTTP 403。**失効した資格の同じキーの再送そのものは、`ExecuteSpec` と `ApplicationFlowContract` が担う**）。**限界**: (1) 失効は、テストが `revoked_at` を直接更新（または `World.revoke`）しており、**実際の失効コマンドは存在しない**（B5 で実装）。(2) 対象は `Auth.REQUIRED` の操作。**復帰は未実装で、`ANONYMOUS` で作ると同じ保証が無い**（`validating-design` 軸 B の B5）。(3) 実 DB の並行（同時の 2 要求）での検証は未実施（ADR-004 の備考） |
+| `credentials`・`browser_sessions`（V002） | `credentials`（ダイジェスト、種別、`key_version`、`expires_at`、`revoked_at`）、`browser_sessions`（24 時間） | V002: `credentials`（`credential_digest` が主キー、`game_id`、`kind`、`subject_id`、`key_version`、`issued_at`、`expires_at`、`revoked_at`）、`browser_sessions`（`credential_digest` が主キー、`game_id`、`actor_kind`、`actor_id`、`key_version`、`expires_at`）。どちらも `game_roots` への `ON DELETE CASCADE` | 設計どおり。**`browser_sessions` に `revoked_at` も `credentials` への参照も無い**（H2）。B1 は、1 つのダイジェストを両表に書く（`insertCredential`）。`AUTHENTICATE_SQL` は、同じダイジェストで両表を結び、`s.expires_at > now AND c.expires_at > now AND c.revoked_at IS NULL` を要求する。`credentials` の種別は `FACILITATOR`・`PARTICIPANT_RECOVERY`（`OBSERVER_INVITATION` は B9）で、**ドメインの `CredentialSubject` の種別（FACILITATOR・PARTICIPANT・OBSERVER）とは名前が違う**（保存の種別と主体の種別。混同しない） |
+| ロールと GRANT（V101） | `beergame_reader` は `credentials`・`browser_sessions`・`idempotency_records` を読めない | `V101__database_roles.sql`: `beergame_writer` は `credentials`・`browser_sessions` ほかに `SELECT, INSERT, UPDATE, DELETE`。`beergame_reader` の GRANT に `credentials` は含まれない。`beergame_observer` は 3 表だけ | 設計どおり（Step 4.1 の g の「確認」は、V101 の読みで事実は確認済み。実行して確かめるのは Step 4）。V101 は `postgres/` にあり、V102 より小さい番号（付け替えは判断項目 5） |
+| レート制限 | 全体に加え、参加・復帰・観察用の招待の参加を専用に制限。状態の共有は未決（BD8） | `Guards.kt`・`SecurityPolicies.kt`: **全ての要求（`/health`・`/ready` を除く）を、接続元（`call.request.origin.remoteHost`）ごとの固定窓（既定 600 件/分）で数える**。状態は `RateLimiter` のメモリ（`LinkedHashMap`、鍵は最大 10,000 件）。`X-Forwarded-For` を読む実装は見つからなかった（grep） | **参加・復帰の専用の制限は無い**。窓の鍵は生の `remoteHost`（判断項目 4 の決定は、鍵付きの要約）。**ALB の背後では接続元が ALB になる**（設計書の未決）。**認証失敗・形式不正を数える単位（本文の解析の後か）も未実装**（project.md の Corrections の規則は、beer-game3 のもの。Kotlin 版は別に決める） |
+| `openapi.yaml` | 設計書の経路: `pause`・`resume`・`proxy-decisions`・`credentials/revoke`・`reissue`・`participations/recover` | 11 本の経路（`createGame`・`getLobby`・`assignRole`・`joinGame`・`startGame`・`saveDecision`・`commitWeek`・`getSessionState`・`getGameState`・`getHealth`・`getReady`）。**停止・代理入力・資格・復帰の経路は無い**。`ErrorCode` に `session.paused` 等は無い。`SessionStatus` の `PAUSED` と、429（`app.rate_limited`）は**すでにある** | 仕様が先（Step 1.2）。参加の応答（`joinGame` の 200）は `versions` だけで、**`gameId` は無い**（判断項目 7）。作成の応答は `Location` が `gameId` を運ぶ |
+| 設定値の置き場 | 設計書: 資格の期限は設定値にする | `Wiring.kt`: `IDEMPOTENCY_TTL_HOURS = 24`、`PARTICIPANT_CREDENTIAL_TTL_DAYS = 30`、`CREDENTIAL_KEY_VERSION = 1` が定数。`ServerConfig` は設定にしていない | 判断項目 2 の決定（設定値にする）には、**`ServerConfig` と `AppSettings` の拡張が要る**（Step 4.3） |
+
+**失効後の再送が 403 になるか（結論）**: 現在の実装では、**`Auth.REQUIRED` の操作は、失効した資格の再送に 403（`app.unauthorized`）を返す**（実コードの順序と、3 層の既存テストによる。`credentials.revoked_at` を直接更新した場合）。**B5 で新しく足す失効コマンド・復帰・鍵の版・セッションの分離が、この保証を保つかは未確認で、Step 4 で否定テストを先に書いて確かめる。**
 
 ## 更新履歴
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 0.1〜0.3 を実施**（コード変更なし。**ゲート 0 は人の確認待ちのまま。承認は記録していない**）。`validating-design`（着手前）の結果を記録: 軸 A・B・C はいずれも NG で、計画側の修正 12 件と、人の判断待ち 6 件（H1〜H6）。設計書のスケッチと実装の差を、実ファイルで確認して記録。**修正の内容: Step 1.1、2.2、2.3、3.1、4.1、4.3、4.4 の記述を直し、Step 2.5、4.6、4.7、5.5 と完了条件 3 件を追加。概要の日程、資格の状態の表、ER 図の節、範囲外の表（4 行）を修正。承認済みのステップ計画への追加のため、人の再確認を求める** | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ステップ計画をユーザーが承認**（選択: 「計画を承認」。ゲートは含まない） | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **判断項目 16 件をユーザーが決定**（選択式）。#1 B5 を B4 より先に実施、#13 UI は最小。#2 資格の有効期間は提案どおり（セッション 24 時間、復帰 30 日、進行役はゲーム保持期間内。仮の既定値で、運営者との合意後に見直す）。#3 鍵は版の接頭辞。#4 レート制限は DB に窓を持つ。#5 マイグレーション追加（V101・V102 の付け替えを含む）を承認。#6 API 経路・`code`（`session.paused` 新設）は提案どおり。#7 参加・復帰の応答に `gameId` を追加。#8 AC3.2.3 を B5 に足す。#9 進行役の復帰は提案どおり（復帰用の値を作成時に一度だけ表示）。#10 代理入力の保存回数の上限 9 回を実装。#11 `EndSession` は範囲外（提案どおり）。#12 `InvalidTransition` の性質テストを含める。#14 所要 2 日は予備 B16 で吸収（提案どおり）。#15 新規ファイルの作成を承認。#16 ゲート密度は提案どおり（ステップごとに人が確認） | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | 初版作成（AI が提案。**ステップ計画・判断項目・ゲートは、人の承認待ち**。実装・コード変更は未着手。`validating-design` は未実施） | claude-code/claude-sonnet-5-5 |
