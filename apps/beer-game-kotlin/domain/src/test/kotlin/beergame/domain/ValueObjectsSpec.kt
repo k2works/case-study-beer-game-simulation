@@ -209,4 +209,54 @@ class ValueObjectsSpec :
                 (DemandSeries.of(listOf(1, 2, 3), w(2)) is Either.Right) shouldBe true
             }
         }
+
+        context("値オブジェクトは、包んだ値で等しく、ハッシュ・文字列表現も値で決まる（集合・写像の要素にできる）") {
+            val id = UUID.fromString("00000000-0000-4000-8000-000000000001")
+            val other = UUID.fromString("00000000-0000-4000-8000-000000000002")
+            // 同じ値の 2 つ・別の値の 1 つ・期待する値の文字列表現。型ごとに作り方が違うので、組にして並べる。
+            val cases: List<Triple<Pair<Any, Any>, Any, String>> =
+                listOf(
+                    Triple(q(7) to q(7), q(8), "Quantity(value=7)"),
+                    Triple(u(7) to u(7), u(8), "Units(value=7)"),
+                    Triple(w(7) to w(7), w(8), "Week(value=7)"),
+                    Triple(m(7) to m(7), m(8), "Money(minor=7)"),
+                    Triple(name("たろう") to name("たろう"), name("じろう"), "DisplayName(value=たろう)"),
+                    Triple(
+                        JoinCode.of("K7M2Q9XW").valid("a") to JoinCode.of("K7M2Q9XW").valid("b"),
+                        JoinCode.of("ABCDEFGH").valid("c"),
+                        "JoinCode(value=K7M2Q9XW)",
+                    ),
+                    Triple(
+                        RetentionDays.of(90).valid("a") to RetentionDays.of(90).valid("b"),
+                        RetentionDays.of(91).valid("c"),
+                        "RetentionDays(value=90)",
+                    ),
+                    Triple(sv(7) to sv(7), sv(8), "StreamVersion(value=7)"),
+                    Triple(dv(7) to dv(7), dv(8), "DecisionVersion(value=7)"),
+                    Triple(GameId(id) to GameId(id), GameId(other), "GameId(value=$id)"),
+                    Triple(ParticipantId(id) to ParticipantId(id), ParticipantId(other), "ParticipantId(value=$id)"),
+                )
+            cases.forEach { (same, different, text) ->
+                val (a, b) = same
+                test("${a::class.simpleName}: 同じ値は等しくハッシュも同じで、別の値とは等しくない") {
+                    (a == b) shouldBe true
+                    (a == different) shouldBe false
+                    a.hashCode() shouldBe b.hashCode()
+                }
+                test("${a::class.simpleName}: 文字列表現は包んだ値を示す") {
+                    a.toString() shouldBe text
+                }
+                test("${a::class.simpleName}: ボックス化した値の getter は、包んだ値を返す（JVM から見える公開の窓口）") {
+                    val property = text.substringAfter('(').substringBefore('=')
+                    val getter = a.javaClass.getMethod("get" + property.replaceFirstChar { it.uppercase() })
+
+                    "$property=${getter.invoke(a)}" shouldBe text.substringAfter('(').substringBeforeLast(')')
+                }
+                test("${a::class.simpleName}: 集合では同じ値が 1 つにまとまり、写像のキーに使える") {
+                    setOf(a, b, different).size shouldBe 2
+                    mapOf(a to "x")[b] shouldBe "x"
+                    listOf(a, different).indexOf(b) shouldBe 0
+                }
+            }
+        }
     })

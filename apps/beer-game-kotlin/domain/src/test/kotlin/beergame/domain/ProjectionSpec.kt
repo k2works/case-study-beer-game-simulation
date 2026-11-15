@@ -177,4 +177,39 @@ class ProjectionSpec :
 
             Projections.all.map { it.replay(events) } shouldBe Projections.all.map { it.replay(events) }
         }
+
+        context("[7.2] 個々の投影は、自分の表の行だけを作る（all の順序と表の順序が対応する）") {
+            val saved = SessionEvent.DecisionSaved(w(1), Role.WHOLESALER, q(7), dv(2), Editor.ByParticipant(pid(3)), 2)
+            val events =
+                listOf(
+                    envelope(gameCreated(settings), StreamType.GAME, 1),
+                    envelope(GameEvent.ParticipantJoined(pid(1), credentialExpiry), StreamType.GAME, 2),
+                    envelope(saved, StreamType.SESSION, 5),
+                    envelope(weekCommitted, StreamType.SESSION, 12),
+                )
+            val expected =
+                listOf(
+                    Projections.gameOverview to ProjectionTable.GAME_OVERVIEW,
+                    Projections.gameJoinCodes to ProjectionTable.GAME_JOIN_CODES,
+                    Projections.gameSettings to ProjectionTable.GAME_SETTINGS,
+                    Projections.lobbyParticipants to ProjectionTable.LOBBY_PARTICIPANTS,
+                    Projections.sessionOverview to ProjectionTable.SESSION_OVERVIEW,
+                    Projections.roleCurrentStates to ProjectionTable.ROLE_CURRENT_STATES,
+                    Projections.currentDecisions to ProjectionTable.CURRENT_DECISIONS,
+                    Projections.weekCommits to ProjectionTable.WEEK_COMMITS,
+                    Projections.weekRoleResults to ProjectionTable.WEEK_ROLE_RESULTS,
+                )
+            expected.forEach { (projection, table) ->
+                test("${table.sqlName} の投影は、その表の行だけを 1 行以上作る") {
+                    val rows = projection.replay(events)
+
+                    rows.isNotEmpty() shouldBe true
+                    rows.map { it.table }.toSet() shouldBe setOf(table)
+                }
+            }
+            test("all は、個々の投影を表の順序で並べたもの") {
+                Projections.all shouldBe expected.map { it.first }
+                expected.map { it.second } shouldBe ProjectionTable.entries
+            }
+        }
     })

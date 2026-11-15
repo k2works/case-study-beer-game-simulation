@@ -7,6 +7,12 @@ dependencies {
     testImplementation("io.kotest:kotest-property:${libs.versions.kotest.get()}")
 }
 
+// interface の既定メソッドを、旧 Kotlin・Java 向けの互換の `DefaultImpls`（呼ばれない生成コード）なしで出す。
+// domain は同じ Kotlin のビルドからだけ使われ、互換は要らない（Actor の toRef・isFacilitatorOf の未到達の行の原因）。
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.freeCompilerArgs.add("-jvm-default=no-compatibility")
+}
+
 extensions.configure<DetektExtension> {
     config.setFrom(
         rootProject.file("config/detekt/detekt.yml"),
@@ -14,16 +20,14 @@ extensions.configure<DetektExtension> {
     )
 }
 
-// domain の行のカバレッジのゲート。設計の目標は 100% だが、コンパイラ生成のコード（value class のプライマリコンストラクタの
-// プロパティ 9 行、object Projections のプロパティの getter 9 行、ほか）が未到達で、実測は 97.5%（784/804）。
-// 下限 97% は、実測に基づく暫定の値（閾値を下げて通すためではなく、現状より悪化させないため）。100% にするか、
-// 生成コードの除外か閾値の見直しかは、人が決める（bolt_2_plan.md の Step 2 の結果）。
+// domain の行のカバレッジのゲート（設計の目標 100%）。除外はせず、未到達だった行（value class のボックス化した値の getter、
+// object Projections の個々の投影、interface の DefaultImpls）をテストと上の設定で到達させた。
 kover {
     reports {
         verify {
-            rule("domain の行（目標 100%。暫定の下限 97%）") {
+            rule("domain の行 100%") {
                 bound {
-                    minValue = 97
+                    minValue = 100
                     coverageUnits = kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE
                     aggregationForGroup = kotlinx.kover.gradle.plugin.dsl.AggregationType.COVERED_PERCENTAGE
                 }
