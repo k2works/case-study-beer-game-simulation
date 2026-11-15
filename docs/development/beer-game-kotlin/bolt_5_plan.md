@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:51:38Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:51:51Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -422,6 +422,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **ゲート 1 をユーザーが承認し、「ゲート 1 で決めること」9 項目を提案どおりに決定**（選択: 「承認し、提案どおり決定」）。H2=案 A（失効と同じトランザクションで `browser_sessions` の行を削除。スキーマ変更なし）、H3=案 A（`bg_recovery` Cookie と一度だけ示す復帰コード。`Auth.RECOVERY` を冪等照合の前に検証。設計書の例外 2 つを許容）、保存上限の code=`session.save_limit_reached`（409）、`session.not_paused`=409 のまま、失効していない資格の再発行は拒否・進行役自身は対象外、H4=`assignRole` を開始後も受け付ける、原文の解釈の差と試験道具の方式は記載どおり、契約テストの Red は Step 6 で解消。ゲート 2〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 1（仕様と受入シナリオ）を実施**（ゲート 1 は人の確認待ち。承認は記録していない）。ユーザーの決定（ゲート 0 の承認、H1・H4 を B5 に含める、H2・H3 はゲート 1 で決める）を受けて、**Step 3.5（H4。入れ替えでの自動失効）と Step 8.4（H1。用語集・イベント一覧の生成）を追加**し、旧 8.4 を 8.5 に繰り下げた。日本語 Gherkin 34 シナリオ（`features/continuation/`）、`contracts/openapi.yaml` に 6 経路・4 つの `code`、受け入れのステップ定義、型の再生成を追加。**Red を実測**: 受け入れは 61 シナリオ中 30 passed・31 failed（H2・PostgreSQL 18 とも。Undefined・Pending は 0）、契約テストは `:app:test` が 71 件中 8 件 failed、ほかは緑。**H2・H3 は提案**として [ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)（提案中）に書き、ゲート 1 で人が決めることを「ゲート 1 で決めること」に整理 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 0 と、追加ステップを含む計画の再承認（H6）をユーザーが承認**（選択: 「ゲート 0 と再承認の両方」）。**H1（Living Documentation の重点）と H4（役割の入れ替えでの自動失効）は B5 に含める**。**H2（資格失効とブラウザセッションの結び付け）と H3（進行役の復帰用の値・再発行の受け渡し）は、Step 1 のゲート 1 で決める**。**H5（B2 の申し送り）は B16（予備）へ送る**。ゲート 1〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 0.1〜0.3 を実施**（コード変更なし。**ゲート 0 は人の確認待ちのまま。承認は記録していない**）。`validating-design`（着手前）の結果を記録: 軸 A・B・C はいずれも NG で、計画側の修正 12 件と、人の判断待ち 6 件（H1〜H6）。設計書のスケッチと実装の差を、実ファイルで確認して記録。**修正の内容: Step 1.1、2.2、2.3、3.1、4.1、4.3、4.4 の記述を直し、Step 2.5、4.6、4.7、5.5 と完了条件 3 件を追加。概要の日程、資格の状態の表、ER 図の節、範囲外の表（4 行）を修正。承認済みのステップ計画への追加のため、人の再確認を求める** | claude-code/claude-sonnet-5-5 |
