@@ -735,6 +735,22 @@ stop
 - action の版: `actions/checkout`・`setup-node`・`upload-artifact` は beer-game3.yml の SHA を転記して固定した（GitHub 上の照合はしていない）。`actions/setup-java`・`gradle/actions/setup-gradle` は `@v4` のまま、SHA を確認できず**未固定**。
 - 未実施: Playwright の e2e と axe（本 Bolt の範囲外）、ブラウザ行列、生きたドキュメントの公開、タグ（`@US`・`@AC`）の整合検査、`@Suppress`・ベースラインの機械検査。
 
+### コンテナのスモークテストと `container` ジョブ（B3 の実装。2026-11-15）
+
+`scripts/container-smoke.sh`（`apps/beer-game-kotlin/`）が、イメージを実際にビルド・起動して確かめる恒久のスモークテスト。ローカルの Docker で全項目成功。CI の `container` ジョブ（`.github/workflows/beer-game-kotlin.yml`。`docker build` とこのスクリプト。`timeout-minutes: 30`）に組み込んだが、**GitHub Actions 上の実行は未確認**（所要はローカルの実測からの見積もり）。
+
+| 項目 | 期待 | 実測（ローカル） |
+| :--- | :--- | :--- |
+| api（`APP_ENV=production`、PostgreSQL 18） | `/api/v1/ready`・`/api/v1/health` が 200、HEALTHCHECK が healthy | 成功。起動時間は最大 6.0 秒（[インフラ](./architecture-infrastructure.md)） |
+| migrate | マイグレーションを適用して終了コード 0 | 成功 |
+| 秘密無しで本番相当の起動 | 終了コード 78。ログに足りない設定の名前（`CREDENTIAL_KEY`）が出て、値は出ない | 成功 |
+| 本番で H2 | 終了コード 78 | 成功 |
+| 未実装の `retention`・`rebuild-projections` | 終了コード 69 | 成功（単体テスト `MainSpec` でも別に押さえる） |
+| イメージの内容 | uid 10001（非 root）、H2 が無い | 成功 |
+| SIGTERM（`docker stop`） | 強制終了（137）でない | 終了コード 143（**設計の「正常終了 0」と異なる。人の判断待ち**） |
+
+**Red の確認の範囲**: `MainSpec`（未実装モード 2 件と案内）は実装前に失敗を確認した。スモークテストは `Dockerfile` が無い状態で失敗を確認したが、**検査項目そのもの（終了コード 78 など）の Red はイメージが無く未確認**（実装後の Green で初めて動いた）。デプロイ・ロールバックのワークフローと Terraform の定義は、テストを先に書く対象でなく、`terraform fmt`・`validate` と YAML の構文検証で確認した（`plan`・`actionlint`・`shellcheck`・AWS での実行は未実施）。業務のスモーク（作成・参加・SSE・ポーリング・自動確定）は未実装。
+
 ## トレーサビリティ（ユーザーストーリー → テスト）
 
 **対応表は、タグから自動で抽出して生成します**。
@@ -802,6 +818,7 @@ stop
 | 31 | PMD の導入は承認待ち。Gradle での実行方法は未確認 | **導入した**（7.29.0。fixture は 17 件で一致）。`PmdCli` を `JavaExec` で実行。層ごとのルールセット 4 つ。`FunctionNameTooShort` の閾値を 2 文字へ。層単位の緩和は粗い（人の承認待ち。ADR-011） | B2 の Step 1 |
 | 32 | CI の工程は `ktlint`・`detekt`・`PMD`・テスト・カバレッジ | ジョブを `contract`・`test`・`detekt`（JDK 21）・`pmd`・`web`・`ui`・`n1` に分けた。**GitHub Actions 上は未実行** | B2 の Step 4・5 |
 | 33 | 追記専用権限の否定テストは「加える」 | PostgreSQL 18 で 11 件（`RolePrivilegesSpec`）。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）。**連鎖削除は動く**（実測） | B2 の Step 3（[データモデル](./data-model.md)） |
+| 34（以降は B3 の実装で変わった点。2026-11-15） | CI に「コンテナ・IaC の検査」を含める想定（ツールは未選定） | CI に `container` ジョブ（`docker build` + `scripts/container-smoke.sh`）を追加。コンテナのスモークテストはローカルで全項目成功。**IaC の検査は `terraform fmt`・`validate` のみ**（`tflint`・`checkov`・Trivy は未実行）。**GitHub Actions 上は未実行** | B3 の Step 1・3 |
 
 ## 設計判断
 
@@ -863,6 +880,7 @@ stop
 - 実 DB での負荷試験の環境（CI の夜間か、ステージングか）。
 - 手動のアクセシビリティの確認（スクリーンリーダー）を実施する担当者と時期。
 - Kover が計測できる指標の種類（行・命令・分岐のほか、関数・文の有無）と、生成コードの除外の方法（**B2: 合算は動く**。生成コードだけを除く方法は確認できず、`domain` の行 100% は人の判断待ち）。`suspend` による分岐の揺れ（全体の分岐 75% の余裕は 3.1 ポイント。複数回の実行での揺れは未測定）、app の起動部の除外（未設定）、GitHub Actions 上の合算（未確認）。
+- **B3 で出た未決（2026-11-15）**: GitHub Actions 上の `container` ジョブの実行と所要、業務のスモークテスト、IaC の検査（`tflint`・`checkov`・`actionlint`・`shellcheck`・Trivy）、ワークフローの AWS での動作確認、ロールバックの訓練（ステージング。AWS 未適用）。
 - 追記の競合の自動再試行の上限（データモデルの未決事項）。決まったら、アプリケーション層のテストに反映する。
 - 連鎖削除が、`events` に DELETE 権限を持たないロールでも動くか: **実測済み（B2 の Step 3。動く。PostgreSQL 18 での 1 回の実測）**。権限の否定テストは `RolePrivilegesSpec`（11 件）。残りは、観察者の接続プールの配線の検査（H13）と、`deletion_*` の GRANT の検査（B11）。
 - 出力（`buildExport`）が大きい場合のキャッシュ（H3、将来の検討）。

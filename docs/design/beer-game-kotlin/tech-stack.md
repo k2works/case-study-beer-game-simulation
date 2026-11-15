@@ -167,7 +167,7 @@ beer-game2 の構成を引き継ぎます。**版は、beer-game2 が 2026-11-09
 | カテゴリ | 技術 | Kotlin 版での扱い |
 | :--- | :--- | :--- |
 | クラウド | AWS（ap-northeast-1） | 同左 |
-| コンテナ | Docker | ビルドは Gradle の**マルチステージ**。実行イメージは JDK 25 の JRE を含むもの（イメージの名前とタグは**実装開始時に確認**）。ローカルの DB は **H2 の PostgreSQL モード（Docker 不要。設計判断 T7）**。PostgreSQL を使うローカルの確認（統合テスト、受け入れ）は `postgres:18-alpine`（beer-game2 の確認値）か Testcontainers |
+| コンテナ | Docker | ビルドは Gradle の**マルチステージ**。実行イメージは JDK 25 の JRE を含むもの（**B3 で `eclipse-temurin:25-jre-noble` を使用。ビルドは `25-jdk-noble`**。変更表 33）。ローカルの DB は **H2 の PostgreSQL モード（Docker 不要。設計判断 T7）**。PostgreSQL を使うローカルの確認（統合テスト、受け入れ）は `postgres:18-alpine`（beer-game2 の確認値）か Testcontainers |
 | 実行基盤 | ECS Fargate | JVM のヒープと、タスクのメモリの割り当ては [非機能要件](./non-functional.md) の NF-P17 で実測して決める |
 | データベース | RDS for PostgreSQL 18（Multi-AZ、PITR） | 同左 |
 | 配信・観測・IaC・CI | CloudFront、S3、ALB、CloudWatch、Terraform、GitHub Actions | 同左。CI のビルドは Gradle（`./gradlew check`）。詳細は [インフラ](./architecture-infrastructure.md)、[運用要件](./operation.md) |
@@ -329,6 +329,16 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 | 30 | detekt は JDK 25 での代替を B2 で判断 | **JDK 21 の専用ジョブで維持**（ユーザーの決定）。detekt 2 系が安定したら見直す。`@Suppress` の実使用 0、ベースラインなし | Step 1 |
 | 31 | Kover は `test` を計測（合算は未確認） | 0.9.11 は全 Test タスクを合算できる。`excludedSourceSets` で統合・受け入れのソースセットを外す。ルールに `filters` が無く、domain の行のゲートは domain モジュールに置く | Step 2 |
 
+**B3 の実装で確認できた・変わった点（2026-11-15）。** AWS には接続していない。
+
+| # | 初稿 | B3 の実装で確認した結果 | 理由・扱い |
+| :--- | :--- | :--- | :--- |
+| 32 | Terraform 1.17 以上、AWS プロバイダー `~> 6.0` は beer-game2 の確認値の引き継ぎ（本書では再確認していない） | 作業用の **Terraform 1.17.2**（`releases.hashicorp.com` の一覧と SHA256SUMS の一致を確認して取得。システムの 1.5.7 は入れ替えていない）。AWS プロバイダーは registry で **6.x の最新が 6.73.0**、random **3.9.1** を取得。`required_version = ">= 1.17.0"`、`~> 6.0`、random `~> 3.6`。`terraform fmt -check` と `validate`（staging・production）が成功。**`plan` は未実行**。ロックファイルに linux_amd64・darwin_arm64・darwin_amd64 のハッシュを記録 | Step 2 |
+| 33 | コンテナのイメージの名前とタグは実装開始時に確認 | ビルドは `eclipse-temurin:25-jdk-noble`、実行は `eclipse-temurin:25-jre-noble`（`docker pull` で実在を確認。イメージ 494.6MB。ベースの `25-jre-noble` が 430.0MB）。軽量な派生は未検討 | Step 1 |
+| 34 | 「ローカルの DB は H2。実行イメージの H2 の扱いは未定」 | **配布から H2 を除外した**（`app/build.gradle.kts`。`:app:run` とテストの実行時の依存には残る）。イメージの `/app/lib` に H2 は無い | Step 1。ADR-014 に追記 |
+| 35 | 状態のロックは「S3 とロック」 | **S3 の `use_lockfile`**（Terraform 1.10 以降。DynamoDB は使わない）。beer-game2 は DynamoDB | Step 2。人の確認が要る |
+| 36 | ツールとして Docker、gitleaks、Trivy、Checkov を想定 | B3 で実行したのは Docker（ビルド・スモーク）と Terraform（`fmt`・`validate`）のみ。**`tflint`・`checkov`・`actionlint`・`shellcheck`・Trivy は未実行** | Step 2・3 |
+
 ## アップグレード計画
 
 | 時期 | 対象 | 内容 |
@@ -350,7 +360,8 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 - **選定未決**: 生きたドキュメントの公開の道具（Pickles、Cucumber Reports など。B1〜B2 で選び、版を確認）、変異テストの道具（Pitest の Kotlin 対応は未確認）、Gradle の依存関係の検査の道具、Dependabot と Renovate のどちらを使うか。
 - PMD の Gradle での実行方法: **解決済み（B2。`PmdCli` を `JavaExec` で実行）**。detekt の設定値（ルール名と既定値）は、導入する版の公式ドキュメントで確認する（`FunctionNameTooShort` は PMD の標準ルールで、閾値が XPath に固定されているため `xpath` を上書きした。B2）。
 - フィーチャーファイルの配置は **B1 で確定**（共有の `features/`。[テスト戦略](./test-strategy.md)）。
-- Docker の実行イメージ（Temurin の JRE を含むもの。`25-jre-noble` を想定）の名前とタグの確定。
+- Docker の実行イメージ: **B3 で `25-jre-noble`（実行）と `25-jdk-noble`（ビルド）を確認・使用した**（2026-11-15）。軽量な派生の採否とサポート期限の確認は未決。
+- **B3 の結果（2026-11-15）**: Terraform 1.17.2・プロバイダー 6.73.0 を確認（上の変更表 32）。状態のロックの `use_lockfile`（35）、`actions` の版（`configure-aws-credentials@v5`、`amazon-ecr-login@v2`、`setup-java`、`gradle/actions` は SHA 未固定）は人の確認が要る。`terraform plan` は未実行。
 - **解決済み（M16）**: API の契約（`contracts/openapi.yaml` の手書きを正本）、マイグレーション（Flyway。導入は承認待ち）、ログ（Logback）、JSON とアップキャスト（kotlinx.serialization と `EventCodec`。アップキャストは `adapter-persistence`）、SSE（`ktor-server-sse`）。
 - **H2（設計判断 T7）**: **B1 で実測して確定した**（Step 1・7。結果は [データモデル](./data-model.md)）。H2 2.5.252 と JDK 25、Flyway 13.12.2 との組み合わせは動作した。**公式のサポート期限は確認できていない**（未確認のまま）。
 - Ktor のエンジン（Netty か CIO）の最終確認（設計判断 T2）。

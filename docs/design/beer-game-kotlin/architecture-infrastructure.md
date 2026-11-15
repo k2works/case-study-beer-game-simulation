@@ -28,6 +28,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 
 | 区分 | 技術 | 確認した版 | 出典・備考 |
 | :--- | :--- | :--- | :--- |
+| IaC（B3 で確認） | Terraform / AWS プロバイダー / random | 作業用の **1.17.2**（`releases.hashicorp.com` の一覧と SHA256SUMS で確認）/ **6.73.0** / **3.9.1** | `required_version >= 1.17.0`、プロバイダー `~> 6.0`。**6.x の最新が 6.73.0 であることを registry で確認した**（2026-11-15）。システムの Terraform は 1.5.7 のまま |
 | 実行環境 | JDK（Eclipse Temurin、LTS） | **25** | endoflife.date の `eclipse-temurin`（2026-11-14 に再確認）。25 は LTS、2025-09-22 リリース、**EOL 2031-09-30**。コンテナに実際に使う配布（Eclipse Temurin のイメージ）の値で、[技術スタック](./tech-stack.md) と同じ。Oracle JDK の期限（2030-09-30）は、使わない配布の値のため採用しない |
 | 言語 | Kotlin | **2.4.21**（安定版の最新）。2.5.0 は RC | Maven Central（kotlin-stdlib）。2.5.0 の安定版が出たときに更新を判断する |
 | ビルド | Gradle | **9.9.1** | Gradle の公式のバージョン情報（current） |
@@ -42,7 +43,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 | 静的解析 | detekt（`io.gitlab.arturbosch.detekt`） | **1.23.8**（安定版の最新、2025-02-21）。`dev.detekt` の 2.0.0 は alpha | Maven Central。**採用する Kotlin 2.4 に 1.23.8 が対応するかは未確認。ウォーキングスケルトンの最初のビルドの受入条件**（規約違反のコードを 1 つ置き、CI が落ちること。[テスト戦略](./test-strategy.md)）。代替（PMD の XPath、detekt 2 alpha、ktlint のカスタムルール）は、最初のビルドで落ちなければ確定、落ちる場合は最初の Bolt の中で選ぶ |
 | 整形 | ktlint | **1.8.0** | Maven Central |
 | ローカル開発用 DB | H2（`com.h2database:h2`） | **2.5.252**（確認日 2026-11-14） | Maven Central の `maven-metadata.xml`（`<release>`。ファイルの公開は 2026-09-26）。**ローカル開発だけ**（本番・ステージング・CI・統合テストでは使わない。[技術スタック](./tech-stack.md) T7）。公式のサポート期限は確認できていない。**導入は承認待ち** |
-| コンテナのイメージ | Eclipse Temurin | タグ `25-jre`、`25-jre-noble` を確認 | Docker Hub。軽量な派生（Alpine など）の有無は確認していない |
+| コンテナのイメージ | Eclipse Temurin | タグ `25-jre`、`25-jre-noble` を確認。**B3 で `25-jdk-noble`（ビルド）と `25-jre-noble`（実行）を `docker pull` で実在確認し、実際にビルドして使用**（2026-11-15） | Docker Hub。軽量な派生（Alpine など）の有無は確認していない |
 
 | 確認できていない事項 | 扱い |
 | :--- | :--- |
@@ -121,6 +122,8 @@ Mon --> SNS
 @enduml
 ```
 
+**B3 の注記（2026-11-15）**: 上の図は設計のままで、Terraform の定義と次の点で異なる（人の判断待ち）。ECS は**公開サブネット**（図はプライベート）、**KMS は未定義**、本番は**ローリング**（ブルー/グリーンは未定義）、DB ログインロールは分離していない。詳細は下の「Terraform の定義の実際」。
+
 ### 構成要素
 
 CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネットワーク、観測の基本は、[beer-game2](../beer-game2/architecture-infrastructure.md) と同じです。**変更する要素と、JVM に固有の設定**を示します。
@@ -167,7 +170,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 
 - **Docker なしで起動できる**: ローカルの既定は、プロセス内の H2（PostgreSQL モード）。マイグレーションは Flyway のベンダー別の場所の H2 用を適用する（共通の部分を最大化し、差分だけを分ける。配置は B1 で確定）。
 - **選択は設定で行う**: `DB_KIND=postgres|h2`。`AppConfig.load` が、環境の種別（**B1 で確定: `APP_ENV=local|test|staging|production` の 4 値**。`ci` でなく `test`。H2 を許すのは `local` だけで、`test` でも拒否する）と合わせて検証する。**B1 の実装の環境変数（B1 の実装の提案。名前はここで正本にするが、人の承認が要る）**: `APP_ENV`、`DB_KIND`、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`（Base64 の 32 バイト。3 つは別の値。`local` 以外で必須）、`DB_URL`・`DB_USER`・`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`（`local` 以外で必須。Origin の検査の許可リスト）、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`。鍵は Secrets Manager から注入する。設定の誤りは、足りない設定の**名前だけ**をログに出して終了コード 78 で終わる（値は出さない）。
-- **本番・ステージングで H2 を拒否する検査**: `APP_ENV` が `staging` または `production` のとき、`DB_KIND=h2`、または JDBC の URL が `jdbc:h2:` で始まる設定は、`AppConfig.load` が**起動前に失敗**させる（起動しない。通知の受信や接続の準備に進まない）。この検査は、設定の単体テストで、**環境ごとの全組み合わせ**を確かめる。Terraform のタスク定義も `DB_KIND=postgres` を固定で渡し、H2 の依存関係は本番のイメージに含めない（二重の防御）。
+- **本番・ステージングで H2 を拒否する検査**: `APP_ENV` が `staging` または `production` のとき、`DB_KIND=h2`、または JDBC の URL が `jdbc:h2:` で始まる設定は、`AppConfig.load` が**起動前に失敗**させる（起動しない。通知の受信や接続の準備に進まない）。この検査は、設定の単体テストで、**環境ごとの全組み合わせ**を確かめる。Terraform のタスク定義も `DB_KIND=postgres` を固定で渡し、H2 の依存関係は本番のイメージに含めない（二重の防御）。**B3 で実施・実測した**: 配布から H2 を除外し（イメージの `/app/lib` に無い）、コンテナで `APP_ENV=production DB_KIND=h2` は終了コード 78、`local` + h2 は 70（ドライバ無し）。Terraform の `DB_KIND=postgres` の固定は定義のみ（AWS では未確認）。
 - **ローカルの乖離の防止**: CI の統合テスト・受け入れは PostgreSQL が正で、H2 でしか通らない記述は禁止する（[テスト戦略](./test-strategy.md)）。
 
 各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（beer-game2 と同じ）。
@@ -188,6 +191,42 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 - イメージのタグは、コミット SHA（ECR の不変のタグ。beer-game2 と同じ）。
 - ベースイメージは `25-jre-noble` を想定します（確認したタグ）。小さな派生を使うかどうかは、脆弱性の検査の結果とサイズで決めます（未決事項）。
 
+**B3 の実装（2026-11-15。`apps/beer-game-kotlin/Dockerfile`。ローカルの Docker でだけ検証。AWS・ECR には触れていない）。**
+
+| 項目 | 実装 |
+| :--- | :--- |
+| ベースイメージ | ビルドは `eclipse-temurin:25-jdk-noble`（`./gradlew :app:installDist`）、実行は `eclipse-temurin:25-jre-noble`（両タグとも `docker pull` で実在を確認）。ビルドの道具（JDK、Gradle、ソース）は実行イメージに含まれない |
+| 層 | 依存の JAR（`lib/` の外部 JAR。32.3MB）とアプリの JAR（5 モジュール。1.16MB）を別の層に分けた |
+| 非 root | uid 10001 |
+| 起動 | **`ENTRYPOINT ["/app/bin/app"]`、`CMD ["api"]`**（設計の「ENTRYPOINT にモードを含める」形ではなく、**モードは `CMD` で渡し、上書きできる**。人の確認が要る） |
+| JVM | `JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"`（設計の初期案。ヒープの測定による決定は未実施。Terraform のタスク定義からは渡していない） |
+| ヘルスチェック | `HEALTHCHECK`（interval 30s、timeout 3s、start-period 40s、retries 3）。**実行イメージに `curl`・`wget` が無い**ことを実測で確認したため、`bash` の `/dev/tcp` で `/api/v1/ready` に GET を送り、200 のときだけ healthy とする |
+| H2 | **配布から除外した**: H2 は `adapter-persistence` の `runtimeOnly` なので、`app/build.gradle.kts` で `startScripts` のクラスパスと `distributions.main` から `h2-*.jar` を除外した（`:app:run` とテストの実行時の依存には残る）。イメージの `/app/lib` に H2 は無い。`APP_ENV=local DB_KIND=h2` はイメージで起動せず終了コード 70（ドライバ無し）。設計の「本番のイメージに H2 を含めない案」を実施した |
+| サイズ | 494.6MB（ベースの `25-jre-noble` が 430.0MB。追加は依存 JAR 32.3MB、アプリ JAR 1.16MB、起動スクリプト 32.8kB） |
+| 検証 | `scripts/container-smoke.sh`（恒久のスモークテスト）が、api の `/api/v1/ready`・`/api/v1/health` が 200、HEALTHCHECK が healthy、migrate が終了コード 0、秘密無しは 78、`production` + h2 は 78、未実装モードは 69、非 root、H2 無し、SIGTERM を確認する。CI の `container` ジョブでも実行する（GitHub Actions 上は未実行） |
+| 未実施 | 軽量な派生の採否、読み取り専用ファイルシステムでの起動、AppCDS、ヒープの割合の測定、RDS の CA バンドル（`sslmode` の方針と合わせて決める）、脆弱性の検査（Trivy 等） |
+
+### 起動モードと終了コード（B3）
+
+同じイメージを、`CMD`（引数）のモードで切り替える。モードの実装は `Main.kt`、単体テストは `MainSpec`。
+
+| モード | 状態 | 終了 |
+| :--- | :--- | :--- |
+| `api` | 実装済み | 常駐。SIGTERM でコンテナの終了コードは **143**（下） |
+| `migrate` | 実装済み | マイグレーションを適用して、成功で 0 |
+| `retention` | **名前だけ定義**（B11 で実装） | 設定を読む前に「未実装です」を ERROR で記録して **69** |
+| `rebuild-projections` | **名前だけ定義**（B12 で実装） | 同上、**69** |
+| 不明なモード | — | 使い方（4 モードを列挙）を示して **64** |
+
+| 終了コード | 意味（sysexits の慣例に沿う） |
+| :--- | :--- |
+| 0 | 1 回限りの処理（migrate）の成功 |
+| 64 | 使い方の誤り（不明なモード） |
+| 69 | 未実装のモード（`retention`・`rebuild-projections`） |
+| 70 | 起動の失敗（H2 のドライバが無い、ほか） |
+| 78 | 設定の誤り（秘密が無い、本番・ステージングで H2、ほか）。足りない設定の**名前だけ**をログに出す |
+| 143 | SIGTERM でのコンテナの停止（JVM が停止フックを実行して終わる。強制終了の 137 ではない。**設計の「正常終了 0」と異なる。人の判断待ち**） |
+
 ### JVM の設定（初期案。測定で決める）
 
 | 項目 | 設計 |
@@ -206,6 +245,8 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 | マイグレーションとの順序 | マイグレーションのタスクが完了してから、アプリのタスクを起動する（デプロイの手順で保証）。アプリは起動時に、**期待するスキーマの版が適用済みか**を確認し、未適用なら準備できていない |
 | 終了 | ECS は、タスクの停止時に SIGTERM を送り、一定の時間の後に強制終了する（停止の猶予時間は、サービスの設定で調整できる）。アプリは SIGTERM で、**新しい要求の受付を止め、処理中の要求を完了させ、SSE の接続を閉じ、接続プールを閉じる**。クライアントは、SSE が切れても再接続し、スナップショットを取得して追いつく（再生なしの設計） |
 | 負荷分散との整合 | ALB のターゲットの登録解除の遅延（deregistration delay）と、アプリの終了の猶予を整合させる。長い SSE の接続は、猶予の後に切られてよい（クライアントが再接続する） |
+| **起動時間の実測（B3、2026-11-15）** | コンテナ開始から `/api/v1/ready` が 200 になるまで（マイグレーションは別に適用済み）。7 回: 4935、4189、5191、5552、4979、5978、4009 ms。再実行 3 回: 5171、3608、3994 ms。**最大 6.0 秒**（NF-P16 の p95 30 秒に対して余裕）。**ホストでの `docker run -d` の呼び出し時間を含み、約 50ms 間隔のポーリング。ローカルの Docker Desktop（Intel Mac）の値で、ECS Fargate（1 vCPU / 2 GiB）の値ではない。標本が少なく p95 は言えない。Fargate での実測は未確認**。猶予期間（定義は 120 秒の初期案）はステージングの実測の後に見直す |
+| **終了コード（B3）** | SIGTERM でのコンテナの終了コードは **143**（実測）。上の「起動モードと終了コード」の表。設計の「1 回限りの処理の正常終了は 0」は migrate の成功に当てはまる。**api の SIGTERM を正常とみなす条件（143 を許容する）は人の判断待ち** |
 | 保持・マイグレーション・再構築 | 1 回限りの処理。正常終了は終了コード 0、失敗は 0 以外。失敗は CloudWatch のアラームで通知する |
 
 ## ビルド（Gradle）
@@ -265,6 +306,13 @@ stop
 ```
 
 - **B2 の CI の実装（`.github/workflows/beer-game-kotlin.yml`。検証のみ、デプロイなし。GitHub Actions 上の実行は未確認）**: ジョブは `contract`（仕様の検証と型の生成物の差分 0）、`test`（ktlint・test・`integrationTest`・`acceptanceTest`・`acceptanceTestH2`・DB の統合の実行の検査・Kover のゲート）、`detekt`（**JDK 21 の専用ジョブ**）、`pmd`（fixture → 層ごとの検査）、`web`（`npm run verify`、Cucumber-JS の dry-run）、`ui`（Playwright の Chromium、H2 のバックエンド、`@ui`）、`n1`（N-1 の雛形。タグ名は仮）。詳細は [テスト戦略](./test-strategy.md) の「B2 の CI の構成」。`actions/setup-java`・`gradle/actions/setup-gradle` は `@v4` で SHA 未固定（`checkout`・`setup-node`・`upload-artifact` は beer-game3.yml の SHA を転記）。
+- **B3 の CI/CD の定義（2026-11-15。AWS・GitHub Actions では未実行。ワークフローは一度も起動していない）**:
+  - 既存の `beer-game-kotlin.yml` に **`container` ジョブ**（`docker build` と `scripts/container-smoke.sh`。検証のみ・AWS 無関係。`timeout-minutes: 30`。所要はローカルの実測からの見積もり）を追加。
+  - **デプロイ・ロールバックの 4 本（`workflow_dispatch` のみ。自動で起動しない）**: `beer-game-kotlin-deploy-staging.yml`、`-deploy-production.yml`、`-rollback-staging.yml`、`-rollback-production.yml`。`push` はデプロイ（staging）にコメントアウトで残した。
+  - デプロイの流れ: ビルド → ECR（不変タグ、以降ダイジェスト固定）→ タスク定義の登録（api と migrate）→ **migrate（1 回限りの ECS タスク。終了コード 0 でなければ中止）** → api の更新（ローリング + サーキットブレーカー）→ 静的ファイル（`web/dist` を S3 の `releases/<SHA>/` から `current/`）→ スモークテスト（`/api/v1/ready`・`/api/v1/health`。**業務のスモークは未実装**）→ 履歴の記録（S3 の `deployments/`）。失敗時は直前のタスク定義と静的ファイルの版へ自動で戻す（マイグレーションは戻さない）。本番はステージングのダイジェストを昇格（ビルドしない）。
+  - ロールバックは履歴から版を選び、`confirm_compatible`（旧イメージが現在のイベントを読めることの確認）を必須入力にした。2 段階リリースと戻せないケースは [ロールバック手順書](../../operation/beer-game-kotlin/rollback.md)。
+  - 値（ロール ARN、リージョン、クラスタ名など）はすべて `vars` から取り、ワークフローに書いていない。GitHub Environment（`staging`・`production`。`production` には必須のレビュアー）と変数の一覧は [デプロイ手順書](../../operation/beer-game-kotlin/deploy.md)。
+  - **未確認**: OIDC、`aws ecs`、`aws s3` の呼び出しの動作。Terraform の IAM との突合。`actionlint`・`shellcheck`。`aws-actions/configure-aws-credentials@v5`、`amazon-ecr-login@v2`、`setup-java`、`gradle/actions` の SHA 固定。
 - CI は、GitHub Actions の **OIDC** で、環境ごとの最小権限のロールを引き受ける（長期のアクセスキーを置かない）。beer-game2 と同じ。
 - JDK と Gradle の準備、Gradle のキャッシュは、公式のアクションで行い、各アクションの版は、コミット SHA で固定する（beer-game2 と同じ方針）。
 - 依存関係の検査は、JVM の依存関係（Maven Central の成果物）に対応するツールを、実装開始時に選ぶ（未決事項）。秘密情報、コンテナ、IaC の検査は beer-game2 のツールの方針（gitleaks、Trivy、Checkov または同等のもの）を引き継ぐ。
@@ -272,6 +320,12 @@ stop
 - スキーマの変更は、旧アプリが動く間は、必須の列・制約を削除しない（拡張 → 互換 → 縮小）。**イベントは書き換えない**（形の変更は `schema_version` とアップキャスト。[データモデル](./data-model.md)）。投影の形の変更は、マイグレーションの後に**投影の再構築**で埋めるため、再構築のタスクをデプロイの手順に含められるようにする。
 - **N-1 互換のジョブ（M22）**: 直前のリリースの読み取り側（アップキャストと `evolve`）で、現在の書く版の golden を再生する（[テスト戦略](./test-strategy.md)）。新しいイベントの種類の追加は `schema_version` で制御できないため、**読む側を先にリリースする規則（読める版 → 書く版）に、「新しいイベントの種類を書き始める前に、読む側を 1 リリース以上先行させる」を加える**。ロールバックで旧イメージが動いても、新しいイベントを読める状態を保つため。
 - スモークテストに、**自動確定**（4 役割の入力で、週が確定すること）を加える。
+
+### Terraform の定義の実際（B3、2026-11-15。AWS には適用していない・接続していない）
+
+`apps/beer-game-kotlin/infra/`: `modules/`（`network`・`rds`・`ecr`・`secrets`・`alb`・`web`・`ecs`・`github_oidc`）と `envs/`（`staging`・`production`）。`required_version >= 1.17.0`、AWS プロバイダー `~> 6.0`（取得は 6.73.0）、random `~> 3.6`（3.9.1）。`terraform fmt -check` と、両環境の `terraform validate` は成功（作業用の Terraform 1.17.2）。**`terraform plan` は認証情報が無く未実行**。変更点の一覧（ポート 8080、ヘルスチェック `/api/v1/ready`、環境変数、秘密の分割、サイズ、猶予、自動増減など）は [Bolt 3 計画](../../development/beer-game-kotlin/bolt_3_plan.md) の Step 2。
+
+**設計との差（人の判断待ち）**: (1) **ECS は公開サブネット**（NAT を作らず、パブリック IP + セキュリティグループ。設計の図はプライベート。プライベートにするなら NAT または VPC エンドポイントの費用が要る。上の「全体構成」の図は設計のまま）。(2) **KMS の顧客管理鍵は未定義**。(3) **ブルー/グリーン（CodeDeploy）は未定義**（両環境ともローリング + サーキットブレーカー）。(4) **DB ログインロールの分離は未定義**（api も migrate も所有者の資格。V101 の 4 ロールは NOLOGIN）。(5) 状態のロックは S3 の `use_lockfile`（DynamoDB は使わない）。(6) 保持の定期タスクと観測（B11・B13）は定義しない。(7) タスクのサイズ・猶予・`stopTimeout`・クールダウンはすべて初期案で、実測の根拠が無い。
 
 ## 品質属性への対応
 
@@ -301,6 +355,9 @@ stop
 | 12 | ローカルの DB は Docker の PostgreSQL 18 | ローカル開発だけ H2 の PostgreSQL モード（Docker 不要）。CI・ステージング・本番は PostgreSQL のまま。本番・ステージングでは起動時の検査で H2 を拒否 | ユーザーの決定（2026-11-14）。設計判断 ID6 |
 | 13（以降は B2 の実装で変わった点。2026-11-15） | DB ロールの GRANT と連鎖削除は設計のみ（実測前） | V101 でロール 4 つを作成。連鎖削除は実測済み。所有者はマイグレーションの接続のユーザー。V101 < V102 の順序の注意 | B2 の Step 3 |
 | 14 | CI の検証の工程は上の図のとおり（ジョブの分割は未定） | `contract`・`test`・`detekt`（JDK 21）・`pmd`・`web`・`ui`・`n1` に分割。**GitHub Actions 上は未実行** | B2 の Step 4・5 |
+| 15（以降は B3 の実装で変わった点。2026-11-15） | `ENTRYPOINT [起動スクリプト, モード]`。実行イメージの H2 の除外は案。ヘルスチェックは `/ready`。終了は SIGTERM で正常終了（0）。起動時間は未計測 | `ENTRYPOINT ["/app/bin/app"]` + `CMD ["api"]`。H2 を配布から除外（実施）。ヘルスチェックは `bash` の `/dev/tcp` で `/api/v1/ready`（イメージに `curl`・`wget` が無い）。モードの終了コード（64・69・70・78）。SIGTERM でコンテナの終了コードは 143。起動時間はローカルで最大 6.0 秒（Fargate は未測定） | B3 の Step 1。人の判断待ち（ENTRYPOINT の形、143） |
+| 16 | Terraform の構成は beer-game2 の踏襲（想定） | `infra/` に 8 モジュール + 2 環境を定義。**AWS には適用せず、`validate` までを確認**（`plan` は未実行）。ECS は公開サブネット、KMS・ブルー/グリーン・DB ログインロールの分離は未定義、状態のロックは `use_lockfile` | B3 の Step 2。人の判断待ち |
+| 17 | CI/CD はデプロイの流れの図（自動のステージング、承認つきの本番） | デプロイ・ロールバックのワークフロー 4 本（`workflow_dispatch` のみ。AWS で未実行）と、CI の `container` ジョブ。運用手順書 3 本 | B3 の Step 3 |
 
 ## 設計判断
 
@@ -378,8 +435,9 @@ stop
 - ブルー/グリーンの実装（CodeDeploy）と、ステージングのローリングの差の許容。
 - 合成監視（CloudWatch Synthetics）の費用と、頻度（1 分ごと）の妥当性。
 - アカウントの分離（環境ごと）の方針。
-- **H2（設計判断 ID6）**: B1 で実測し確定した（[データモデル](./data-model.md)）。環境の種別は `APP_ENV=local|test|staging|production`、Flyway の配置は共通 `V001〜V005`・PostgreSQL `V102`（H2 専用なし）。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせは動作した。公式のサポート期限は未確認。**本番のイメージに H2 を含めない案は未実施**（H2 は `adapter-persistence` の `runtimeOnly`）。
-- **B1 の実装で出た、インフラの確認事項（2026-11-14）**: (1) **ヘルスチェックのパスは `/api/v1/ready`・`/api/v1/health`**（`/ready` でなく。ALB のヘルスチェックの設定に反映する）。`/ready` が失敗したときの 503 は problem+json（`app.not_ready`）。(2) **Origin の検査**（`ALLOWED_ORIGINS`）に、CloudFront のオリジンを設定する。ALB の背後では接続元が ALB になり、レート制限（接続元ごと 600 件/分の仮置き）の実効の単位が変わる。`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。(3) ログは標準出力へ 1 行の JSON（CloudWatch での収集は未確認）。(4) マイグレーションは PostgreSQL の `api` では適用せず、`migrate` モード（1 回限りのタスク）で適用する。(5) 起動時間（NF-P16）は未計測。
+- **H2（設計判断 ID6）**: B1 で実測し確定した（[データモデル](./data-model.md)）。環境の種別は `APP_ENV=local|test|staging|production`、Flyway の配置は共通 `V001〜V005`・PostgreSQL `V102`（H2 専用なし）。H2 2.5.252 と JDK 25・Flyway 13.12.2 の組み合わせは動作した。公式のサポート期限は未確認。**本番のイメージに H2 を含めない案は B3 で実施した**（配布から除外。上の「イメージ」）。
+- **B1 の実装で出た、インフラの確認事項（2026-11-14）**: (1) **ヘルスチェックのパスは `/api/v1/ready`・`/api/v1/health`**（`/ready` でなく。ALB のヘルスチェックの設定に反映する）。`/ready` が失敗したときの 503 は problem+json（`app.not_ready`）。(2) **Origin の検査**（`ALLOWED_ORIGINS`）に、CloudFront のオリジンを設定する。ALB の背後では接続元が ALB になり、レート制限（接続元ごと 600 件/分の仮置き）の実効の単位が変わる。`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。(3) ログは標準出力へ 1 行の JSON（CloudWatch での収集は未確認）。(4) マイグレーションは PostgreSQL の `api` では適用せず、`migrate` モード（1 回限りのタスク）で適用する。(5) 起動時間（NF-P16）は未計測（**B3 でローカルのコンテナで計測した。最大 6.0 秒。Fargate は未測定**）。
+- **B3 で出た未決（2026-11-15。人の判断待ち。詳細は [Bolt 3 終了報告](../../development/beer-game-kotlin/bolt_3_report.md)）**: (1) SIGTERM の終了コード 143 と設計の「正常終了 0」。(2) ECS の置き場所（公開サブネットと NAT・エンドポイントの費用）。(3) KMS の顧客管理鍵。(4) 本番のブルー/グリーン（CodeDeploy）かローリングか。(5) DB ログインロールの分離と、マイグレーション用ユーザーの作り方、V101 と V102 の順序。(6) 状態のロック方式（`use_lockfile` か DynamoDB）。(7) Terraform の IAM とワークフローの突合（`iam:PassRole`、`ecr:BatchGetImage` ほか）。(8) `terraform plan` の未実行。(9) 初回の適用の順序（ECR を先に作る手順）。(10) 業務のスモークテスト（作成・参加・SSE・ポーリング・自動確定）。(11) `JAVA_OPTS` と Terraform のタスク定義の整合、ヒープの割合の測定。(12) RDS の CA バンドルと `sslmode`。(13) CloudFront の CSP と SSE のオリジン待ち時間。(14) 履歴（S3 の `deployments/`）とバケットポリシー、CloudFront のオリジンの `current/` の整合。(15) 秘密が Terraform の状態に入ること。(16) ステージングと本番の ECR が同一アカウントであること。(17) `actions` の SHA 固定、`actionlint`・`shellcheck`・`tflint`・`checkov` の未実行。(18) 起動時間の Fargate での実測と、猶予・サイズ・クールダウンの見直し。
 - 投影の再構築のタスクを、デプロイの標準の手順に含める条件。再構築中の追記の扱いは、アドバイザリロックで決定済み（M23）。未決は、ロック待ちの上限と、再構築中のコマンドの応答（[データモデル](./data-model.md) の未決事項）。
 
 ## 出典

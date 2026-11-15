@@ -163,6 +163,9 @@ nav:
           - Bolt 1 終了報告: development/beer-game-kotlin/bolt_1_report.md
           - Bolt 2 計画: development/beer-game-kotlin/bolt_2_plan.md
           - Bolt 2 終了報告: development/beer-game-kotlin/bolt_2_report.md
+          - Bolt 3 計画: development/beer-game-kotlin/bolt_3_plan.md
+          - Bolt 3 終了報告: development/beer-game-kotlin/bolt_3_report.md
+          - Unit U1 総括: development/beer-game-kotlin/unit_u1_summary.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
