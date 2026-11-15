@@ -9576,7 +9576,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>提案。人の承認待ち。</strong> ステップ計画・判断項目・ゲートは、いずれも承認を受けていない。実装・コード変更は未着手（本書の作成のみ）。<code>validating-design</code>（着手前）も未実施で、Step 0 で行う</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<code>validating-design</code>（着手前）は未実施で、Step 0 で行う</td>
 </tr>
 </tbody>
 </table>
@@ -10170,6 +10170,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定</strong>（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。<strong>ゲート 0〜8 は未承認</strong>。Step 0 で <code>validating-design</code> を実施する</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;">初版作成（AI が提案。<strong>ステップ計画・判断項目 17 件・ゲート 0〜8 は、人の承認待ち</strong>。実装・コード変更は未着手。<code>validating-design</code> は未実施で、Step 0 で行う。B5 の申し送り・持ち越しを取り込み表に整理。実コードで現状（<code>SaveDecision</code>、<code>decisionVersions</code>、<code>DecisionConflict</code>、<code>DecisionsChanged</code>、<code>WeekAdvanced</code>、<code>ConcurrencyConflict</code> の再試行、<code>RetryExhausted</code>）を確認し、事実として記載）</td>
