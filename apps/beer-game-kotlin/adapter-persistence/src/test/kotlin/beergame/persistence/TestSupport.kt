@@ -12,6 +12,29 @@ import java.sql.ResultSet
 import java.util.UUID
 import javax.sql.DataSource
 
+/**
+ * 共通のマイグレーション（H2・PostgreSQL の両方に適用）の、適用される順。**006 は B11（保持）の予約として空けてある**
+ * （B5 Step 5.5: 007 は `lobby_participants.replaced_at`、008 は参加・復帰の窓 `participation_attempts`）。
+ */
+val COMMON_MIGRATIONS =
+    listOf(
+        "V001__event_store.sql",
+        "V002__peripheral_stores.sql",
+        "V003__projections_lobby.sql",
+        "V004__projections_session.sql",
+        "V005__projections_results.sql",
+        "V007__lobby_participants_replaced_at.sql",
+        "V008__participation_attempts.sql",
+    )
+
+/**
+ * PostgreSQL のマイグレーションの、適用される順。PostgreSQL 専用の 101〜 は、共通の表がすべて揃った後に適用される。
+ * B5 Step 5.5 で、冪等記録の索引（B1。旧 102）を 101、ロールと GRANT（B2。旧 101）を 102 に付け替えた
+ * （作った順と番号の順を合わせる。ロールの GRANT は、共通の表がすべて揃った後に適用される）。
+ */
+val POSTGRES_MIGRATIONS =
+    COMMON_MIGRATIONS + listOf("V101__idempotency_create_unique_index.sql", "V102__database_roles.sql")
+
 /** 試験用の鍵（32 バイト。試験の外では使わない）。 */
 val TEST_RESPONSE_KEY: ByteArray = ByteArray(32) { it.toByte() }
 

@@ -4,6 +4,9 @@ import arrow.core.Either
 import arrow.core.raise.either
 import beergame.application.AppFailure
 import beergame.application.AppSettings
+import beergame.application.AppTtls
+import beergame.application.AttemptPolicy
+import beergame.application.AttemptSource
 import beergame.application.CommandOutcome
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
@@ -43,23 +46,25 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
-private val CLOCK: Instant = Instant.parse("2026-11-14T10:00:00Z")
+internal val CLOCK: Instant = Instant.parse("2026-11-14T10:00:00Z")
 private val CORRELATION: UUID = UUID(9L, 9L)
 
 private val CREDENTIAL_KEY = ByteArray(32) { (it + 7).toByte() }
 
-private fun appSettings(): AppSettings =
+/** 試験用の窓の上限と長さ（失敗 3 回まで、10 分。時計は固定なので、同じ窓に入る）。 */
+internal val FLOW_ATTEMPT_POLICY: AttemptPolicy = AttemptPolicy.of(3, Duration.ofMinutes(10)).orFail()
+
+internal fun appSettings(): AppSettings =
     AppSettings(
         maxAttempts = 5,
-        idempotencyTtl = Duration.ofHours(24),
-        sessionTtl = Duration.ofHours(24),
-        participantCredentialTtl = Duration.ofDays(30),
+        ttls = AppTtls(Duration.ofHours(24), Duration.ofHours(24), Duration.ofDays(30)),
         idempotencySecret = ByteArray(32) { it.toByte() },
         credentialKeys = CredentialKeyRing.of(1, mapOf(1 to CREDENTIAL_KEY)).orFail(),
+        attempts = FLOW_ATTEMPT_POLICY,
     )
 
 /** 実物のアダプターを束ねた Ports（時計だけ固定）。 */
-private fun Fixture.ports(): Ports =
+internal fun Fixture.ports(): Ports =
     Ports(
         generators =
             Generators(
@@ -74,6 +79,7 @@ private fun Fixture.ports(): Ports =
                 project = persistence.projections,
                 idempotency = persistence.idempotency,
                 peripheral = persistence.peripheral,
+                attempts = persistence.attempts,
                 reader = persistence.reader,
             ),
         lock = persistence.lock,
@@ -81,10 +87,11 @@ private fun Fixture.ports(): Ports =
         settings = appSettings(),
     )
 
-private fun meta(
+internal fun meta(
     key: String,
     credential: String? = null,
-) = RequestMeta(key, credential, CORRELATION)
+    source: AttemptSource? = null,
+) = RequestMeta(key, credential, CORRELATION, source)
 
 private data class Seat(
     val participantId: ParticipantId,

@@ -115,7 +115,7 @@ private fun seedPeripheralRows(gameId: UUID) {
 }
 
 /**
- * DB ロールと GRANT（V101。PostgreSQL 専用）の否定テスト（H12・H13 の一部）。H2 版にはロールが無いので、ここが正。
+ * DB ロールと GRANT（V102。PostgreSQL 専用。B5 Step 5.5 で 101 から付け替えた）の否定テスト（H12・H13 の一部）。H2 版にはロールが無いので、ここが正。
  * 各ロールの接続は、所有者の接続を `SET ROLE` で切り替えて作る（パスワードと用途別のプールは B3 以降）。
  */
 class RolePrivilegesSpec :
@@ -198,6 +198,34 @@ class RolePrivilegesSpec :
             val countSql = "SELECT count(*) FROM credentials WHERE game_id = '$id' AND revoked_at IS NOT NULL"
             val revokedRows = asOwner { c -> c.queryList(countSql) { it.getInt(1) }.single() }
             revokedRows shouldBe 1
+        }
+
+        test(
+            "[5.5] Given 参加・復帰の窓（participation_attempts）When ロールごとに操作する Then 書き込みロールだけが読み書き・掃除できる。ほかのロールは読めず、書けない（GRANT は 102 に含む）",
+        ) {
+            val key = "role-test-${UUID.randomUUID()}"
+            asRole(WRITER) { c ->
+                c.exec("INSERT INTO participation_attempts VALUES ('join', '$key', now(), 0) ON CONFLICT DO NOTHING")
+                c.exec(
+                    "UPDATE participation_attempts SET failure_count = failure_count + 1 WHERE key_digest = '$key'",
+                ) shouldBe
+                    1
+                c.queryList(
+                    "SELECT failure_count FROM participation_attempts WHERE key_digest = '$key'",
+                ) { it.getInt(1) } shouldBe
+                    listOf(1)
+                c.exec("DELETE FROM participation_attempts WHERE key_digest = '$key'") shouldBe 1
+            }
+
+            listOf(READER, OBSERVER, DELETER).forEach { role ->
+                deniedQuery(role, "participation_attempts")
+                denied(role, "INSERT INTO participation_attempts VALUES ('join', 'x', now(), 0)")
+                denied(role, "UPDATE participation_attempts SET failure_count = 0")
+                denied(role, "DELETE FROM participation_attempts")
+            }
+            denied(WRITER, "TRUNCATE participation_attempts")
+            // 窓の表はゲームに属さない（接続元の要約だけ）。ゲームの連鎖削除の対象にも、game_id を持つ表の網羅にも入らない
+            gameIdTables().contains("participation_attempts") shouldBe false
         }
 
         test("[3.1] Given 4 つのロール When 表の所有者と所有者ロールのメンバーかを調べる Then いずれでもなく、特権も持たない") {

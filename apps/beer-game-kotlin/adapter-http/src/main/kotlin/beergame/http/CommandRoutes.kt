@@ -7,6 +7,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensureNotNull
 import arrow.core.right
 import beergame.application.AppFailure
+import beergame.application.AttemptSource
 import beergame.application.CommandOutcome
 import beergame.application.CommitWeekInput
 import beergame.application.Ports
@@ -19,6 +20,7 @@ import beergame.application.createGame
 import beergame.application.joinGame
 import beergame.application.saveDecision
 import beergame.application.snapshot
+import beergame.application.sourceKey
 import beergame.application.startGame
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
@@ -27,6 +29,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.renderSetCookieHeader
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.origin
 import io.ktor.server.response.header
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
@@ -49,7 +52,10 @@ internal fun Route.commandRoutes(deps: HttpDeps) {
     }
     post("/participations/join") {
         call.operation("joinGame")
-        call.command(deps, HttpStatusCode.OK, ::parseJoinGame) { input, meta -> ports.joinGame(input, meta) }
+        // 参加は、接続元ごとの失敗の窓で制限する（B5 Step 5。復帰の経路は Step 6 で同じく limited にする）
+        call.command(deps, HttpStatusCode.OK, ::parseJoinGame, limited = true) { input, meta ->
+            ports.joinGame(input, meta)
+        }
     }
     put("/games/{gameId}/participants/{participantId}/role") {
         call.operation("assignRole")
@@ -123,21 +129,34 @@ private suspend fun <A> ApplicationCall.withIds(
 /**
  * 1 つのコマンドの共通の流れ: 冪等キー → 本文（上限つき）→ 形の検証 → application → 応答。
  * 失敗は、写像の関数（[toProblem]）で problem+json にする。
+ * [limited] は、参加・復帰の専用のレート制限の対象（接続元を正規化して application へ渡し、ログには鍵付き要約だけを載せる）。
  */
 private suspend fun <A> ApplicationCall.command(
     deps: HttpDeps,
     status: HttpStatusCode,
     parse: (ByteArray) -> Either<Problem, A>,
+    limited: Boolean = false,
     run: suspend (A, RequestMeta) -> Either<AppFailure, CommandOutcome>,
 ) {
+    val source = if (limited) attemptSource(deps) else null
     val result =
         either<Problem, CommandOutcome> {
             val key = idempotencyKey().bind()
             val body = readBody(deps.settings.maxBodyBytes).bind()
             val input = parse(body).bind()
-            run(input, RequestMeta(key, credential(), correlationId)).mapLeft { it.toProblem() }.bind()
+            run(input, RequestMeta(key, credential(), correlationId, source)).mapLeft { it.toProblem() }.bind()
         }
     result.fold({ respondProblem(it) }, { respondOutcome(deps, status, it) })
+}
+
+/**
+ * 接続元（TCP の接続元。`X-Forwarded-For` は信頼しない。ALB の背後の扱いは未決で、B14 で決める）を正規化する。
+ * ログ用に、鍵付き要約（窓の鍵と同じ値）を覚える。生の接続元は、ここから先へ渡さない（ログにも載せない）。
+ */
+private fun ApplicationCall.attemptSource(deps: HttpDeps): AttemptSource {
+    val source = AttemptSource.of(request.origin.remoteHost)
+    attributes.put(SourceKey, deps.ports.settings.sourceKey(source))
+    return source
 }
 
 private suspend fun ApplicationCall.respondOutcome(

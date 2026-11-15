@@ -19,15 +19,27 @@ typealias NewId = suspend () -> UUID
 class AppSettings(
     /** 追記の競合の再試行を含む、1 つのコマンドの試行回数の上限（1 以上。1 未満は 1 として扱う）。 */
     val maxAttempts: Int,
-    val idempotencyTtl: Duration,
-    /** ブラウザセッション（`browser_sessions`）の期限。 */
-    val sessionTtl: Duration,
-    /** 参加者の復帰資格の期限（作成・参加・復帰で新しくする）。進行役の復帰資格は、ゲームの保持期間が決める。 */
-    val participantCredentialTtl: Duration,
+    val ttls: AppTtls,
     /** 冪等キーと要求の digest の鍵（32 バイト）。 */
     val idempotencySecret: ByteArray,
     /** 資格の digest の鍵束（版ごとの 32 バイトの鍵）。冪等記録の鍵とは別にする。 */
     val credentialKeys: CredentialKeyRing,
+    /** 参加・復帰の窓（失敗の上限と長さ。B5 Step 5）。 */
+    val attempts: AttemptPolicy,
+) {
+    val idempotencyTtl: Duration get() = ttls.idempotency
+    val sessionTtl: Duration get() = ttls.session
+    val participantCredentialTtl: Duration get() = ttls.participantCredential
+}
+
+/**
+ * 期限の束。[session] はブラウザセッション（`browser_sessions`）、[participantCredential] は参加者の復帰資格
+ * （作成・参加・復帰で新しくする。進行役の復帰資格は、ゲームの保持期間が決める）。
+ */
+class AppTtls(
+    val idempotency: Duration,
+    val session: Duration,
+    val participantCredential: Duration,
 )
 
 /**
@@ -52,6 +64,7 @@ class Stores(
     val project: ProjectionWriter,
     val idempotency: IdempotencyStore,
     val peripheral: PeripheralStore,
+    val attempts: AttemptStore,
     val reader: ProjectionReader,
 )
 
@@ -74,5 +87,6 @@ class Ports(
     val project: ProjectionWriter get() = stores.project
     val idempotency: IdempotencyStore get() = stores.idempotency
     val peripheral: PeripheralStore get() = stores.peripheral
+    val attempts: AttemptStore get() = stores.attempts
     val reader: ProjectionReader get() = stores.reader
 }

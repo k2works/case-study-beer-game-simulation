@@ -52,6 +52,11 @@ sealed interface AppFailure {
     /** 資格が無効（失効・期限切れ・不明を区別しない）。403 `app.unauthorized`。 */
     data object Unauthorized : AppFailure
 
+    /** 参加・復帰の失敗が上限に達した接続元（B5 Step 5）。429 `app.rate_limited`。[retryAfterSeconds] は窓が終わるまでの秒数。 */
+    data class RateLimited(
+        val retryAfterSeconds: Int,
+    ) : AppFailure
+
     data class Persistence(
         val failure: PersistenceFailure,
     ) : AppFailure

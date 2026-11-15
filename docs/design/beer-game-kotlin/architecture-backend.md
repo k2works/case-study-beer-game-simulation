@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -585,7 +585,7 @@ fun Ports.observed(log: (LogRecord) -> Unit, emit: (Metric) -> Unit, now: () -> 
 
 | 項目 | 設計 |
 | :--- | :--- |
-| ログ | 構造化 JSON。`LogRecord` はデータクラスで、**項目として、資格・表示名・非公開の値を持たない**（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤は **SLF4J + Logback**（決定済み。[技術スタック](./tech-stack.md)）。アプリのログは `LogRecord` の JSON、Logback は枠組みのログ用 |
+| ログ | 構造化 JSON。`LogRecord` はデータクラスで、**項目として、資格・表示名・非公開の値を持たない**（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID、**参加・復帰の要求だけが持つ接続元の鍵付き要約（`src`。窓の鍵と同じ値。生の接続元ではない。B5 Step 5）**を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤は **SLF4J + Logback**（決定済み。[技術スタック](./tech-stack.md)）。アプリのログは `LogRecord` の JSON、Logback は枠組みのログ用 |
 | 秘密の型 | 秘密の値は、`toString` が伏せ字になる `Secret<A>`（`value class`）で持つ。誤ってログや例外のメッセージへ出ても漏れない |
 | エラー | 予期しないエラーは、スタックと相関 ID を含めて、必ず記録する。利用者へは、相関 ID だけを返す |
 | メトリクス | 応答時間（操作・結果別）、エラー率、`ConcurrencyConflict` の件数と再試行の回数、`DecisionConflict`、確定の方式（手動 / 自動）、**再生したイベント数と再生の所要時間**（スナップショットの要否の判断材料）、投影の更新時間、SSE の接続数、通知の遅延、接続プールの使用状況、JVM のヒープと GC の停止時間、削除の経過時間。CloudWatch の Embedded Metric Format の JSON 行を標準出力へ出す（追加のサーバーを持たない。beer-game2 と同じ） |
@@ -603,7 +603,7 @@ beer-game2 の設計を引き継ぎ、Kotlin 版での実現方法を加えま�
 | 有効期限と失効 | 進行役の資格、復帰資格、観察用の招待、ブラウザセッションのすべてが、有効期限と失効を持つ。判定は純粋関数 `CredentialValidity.status(now)` |
 | 認証と認可 | 認証は、Cookie の生の値から `Actor` を決める（`credentials` / `browser_sessions` を引く）。**B1 の実装では、Ktor のプラグインでなく `application` の `execute` の中（トランザクションの中）で行う**（ルートは生の資格を `RequestMeta.credential` に入れて渡す）。ブラウザセッションが有効（`browser_sessions` の行があり、未期限切れ。失効は行の削除）なときだけ成功し、不明・失効・期限切れ・鍵が外された版を区別しない（`app.unauthorized`）。**B5 Step 4 の実装: 復帰（`RecoverParticipation`）は `Auth.RECOVERY`**（提示した復帰資格が `credentials` で未失効・未期限切れであることが認可）。**冪等記録の照合より前に検証する**（`ANONYMOUS` で作ると、失効した復帰資格の再送に保存済みの新しいセッションが返る。ADR-004、ADR-015。HTTP への配線は Step 6）。**認可はドメインの `decide` が行う**（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる |
 | 入力 | DTO のスキーマと、スマートコンストラクタの範囲検査。本文のサイズ上限と数量の上限を設ける |
-| レート制限 | 全体に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8） |
+| レート制限 | 全体（接続元ごとの固定窓。プロセス内）に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。**B5 Step 5 の実装（参加と復帰。観察用の招待は B9）**: 窓は **DB**（`participation_attempts`。BD8 の案 B。複数のインスタンスで合算される）。数えるのは**認可の失敗**（不明な参加コード、無効な復帰資格）だけで、成功と形式が不正な本文は数えない。検査の前に 1 を足し（別のトランザクション）、上限を超えたら検査せずに 429（`app.rate_limited`、`Retry-After`）、認可の失敗でなければ 1 を戻す。接続元は TCP の接続元を正規化（IPv6 は /64）して**鍵付き要約**にし、生の IP は DB にもログにも残さない（ログの `src` は要約）。上限・窓は設定値（`ATTEMPT_MAX_FAILURES`・`ATTEMPT_WINDOW_SECONDS`。既定 10 回・10 分。未計測の仮置き）。窓を保存できないときは通さない（閉じる側に倒す）。実装は `AttemptLimit.kt`（application。ポート `AttemptStore`）と `JdbcAttemptStore`（adapter-persistence。H2 と PostgreSQL で同じ SQL） |
 | ヘッダー | CSP、HSTS、`nosniff`、Referrer-Policy を、すべての応答に付ける（Ktor のプラグインまたは自前のインターセプタ）。CloudFront のレスポンスヘッダーポリシーとの二重化は許容する |
 | 秘匿 | 表示名と資格は、イベント、ログ、出力、通知に含めない（NF-S14）。型（`Secret<A>`、`LogRecord`、イベントの DTO）で守る |
 | データベースのロール | 用途別に分ける: **書き込み**（`events` は INSERT / SELECT のみ。投影と周辺ストアの書き込み）、**読み取り**（投影の SELECT）、**観察者の読み取り**（`game_overview`、`session_overview`、`week_team_totals` の SELECT だけ。`game_join_codes` は含まない）、**削除**（保持削除）、**所有者**（マイグレーションだけ）。生の認証情報は Secrets Manager から注入する。**ロールと GRANT は PostgreSQL の統合テストでだけ検証する。H2 版（ローカル）は単一の接続ユーザーで、ロールの分離・追記専用・プールの分離は守られない** |
@@ -665,7 +665,7 @@ apps/beer-game-kotlin/
 ├── adapter-http/                     （Ktor のルート、検証、認証、SSE、エラーの写像）
 │   └── src/main/kotlin/.../{routes,security,sse,problem}/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
-│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`**。V101 は DB ロール用に空け、006（保持）は B11。h2/ は作らない）
+│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`。B5 Step 5.5 で、`common/V007`・`V008` を足し、`postgres/` は 101＝冪等記録の索引、102＝DB ロールと GRANT に付け替えた**。006（保持）は B11 の予約。h2/ は作らない）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
 ├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う。**B1 の実装の場所は `web/`**）
@@ -750,6 +750,7 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 | 44 | `CommandOutcome(gameId, versions, issued?)`。資格は 1 つの値がセッションと復帰を兼ねる | `CommandOutcome(gameId, versions, issued?, recovery?)`。`issued` はブラウザセッションの値、`recovery` は復帰資格の値（復帰コード）。冪等記録の本文の形式は `v2`（HTTP が応答に載せるのは、Step 6 まで `issued` の `Set-Cookie` と `versions` だけ） | H3 案 A。復帰コードの応答への載せ方は Step 6 |
 | 45 | `Auth` は `ANONYMOUS`・`REQUIRED` | `RECOVERY` を追加。`PeripheralStore` に `authenticateRecovery` を追加。`CommandRequest` の資格の発行は、操作者から作る関数（復帰は認証まで主体が決まらない） | 復帰の認可は復帰資格の有効性（冪等記録の照合より前） |
 | 46 | `PeripheralWrite.IssueCredentialRow`（資格とセッションを 1 行の導出で書く） | `IssueRecoveryRow`・`IssueSessionRow`・`ExtendRecoveryRow`・`RevokeSubject`。**`CredentialRevoked` のイベントには、必ず `RevokeSubject` が付く**（追記の共通の流れが、イベントから導く）。失効・再発行・復帰の内側の操作（`CredentialCommands.kt`。`internal`）は、公開の関数・HTTP への配線を Step 6 が行う | 資格の行の変更が、対応するイベントなしに起きない・イベントだけが書かれて行が残らない、のどちらも防ぐ |
+| 47（B5 Step 5。2026-11-15） | 参加・復帰の専用のレート制限は、状態の共有が未決（BD8）。`AppSettings` は期限を 3 つのプロパティで持つ | **DB の窓**（`participation_attempts`）。`Stores` に `attempts: AttemptStore`、`AppSettings` に `attempts: AttemptPolicy`（上限・窓の長さ）、`RequestMeta` に `source: AttemptSource?`（正規化した接続元）。期限は `AppTtls`（`idempotency`・`session`・`participantCredential`）にまとめた（`AppSettings` の引数の数が detekt の上限に達したため。`idempotencyTtl` などのプロパティは同じ名前で読める）。`AppFailure.RateLimited(retryAfterSeconds)`（429 `app.rate_limited`）を追加。`app` は `Tuning`（資格の期限と窓）と `ATTEMPT_MAX_FAILURES`・`ATTEMPT_WINDOW_SECONDS` を設定から渡す。ログ（`LogRecord`）に、参加・復帰の要求だけが持つ `src`（接続元の鍵付き要約）を追加 | 判断項目 4 の案 A。**ゲート 5 で人が確認する** |
 
 ## 設計判断
 
@@ -820,6 +821,8 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 
 結論は未決とし、まず A（アプリ内）+ C（前段）の併用を提案します。B を採る場合は、[データモデル](./data-model.md) に表を追加します。
 
+**B5 Step 5 の決定（2026-11-15。判断項目 4 の案 A。ゲート 5 で人が確認する）**: **参加・復帰の専用の制限だけ、案 B（DB の窓）で実装した**。全体の制限（接続元ごと 600 件/分）は、プロセス内のまま（案 A。負荷の保護で、数える対象が違う）。案 C（WAF）は B14 の判断で、併用できる。窓の表は `participation_attempts`（[データモデル](./data-model.md)「参加・復帰の失敗の窓」）。ALB の背後の接続元の取り方（信頼するホップの数）は B14 で決める。
+
 ### BD9: メトリクスの出力
 
 | 案 | 内容 | 評価 |
@@ -880,7 +883,7 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 
 - **参加者が、参加後に `gameId` を知る手段が無い。** 参加の応答は `versions` だけで、`gameId` も `Location` も返さない。参加者の画面が、ロビー・プレイの画面へ進めない。対応案は、参加の応答に `gameId`（と `Location`）を足すこと（バックエンドと仕様の変更。決めるまで、API は変えない）。
 - **参加者向けのロビー**（`GET /games/:id/lobby` の参加者への開放）。投影の型に項目が無く、B1 は進行役だけ。
-- **レート制限の値と範囲。** 接続元（`remoteHost`）ごとの固定窓、既定 600 件/分は**根拠なし（未計測）**の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5。
+- **レート制限の値と範囲。** 接続元（`remoteHost`）ごとの固定窓、既定 600 件/分は**根拠なし（未計測）**の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5 Step 5 で実装した（DB の窓。上の「レート制限」と BD8）。
 - **競合の再試行の上限 `maxAttempts`**は 5 を仮置き（`AppSettings` に既定を置かず、`COMMAND_MAX_ATTEMPTS` で注入。未計測）。競合の再試行の遅延は無し。`lock_timeout` の既定 5 秒も仮置き。
 - **Origin の検査。** 許可リスト（`ALLOWED_ORIGINS`。`local` 以外は必須）か、Host と同じ権限。Origin も Referer も無い要求は許す（ブラウザの外のクライアントのため）。拒否は `app.unauthorized`（専用の `code` は置かなかった）。Vite の開発用の中継は Host と Origin が一致しないため、`ALLOWED_ORIGINS` の指定が要る（開発手順書への反映は未実施）。
 - **ログ。** `LogRecord` は項目の許可リスト（試験で固定）。`message` はコードの固定文だけ。予期しない例外はクラス名とスタックの各行を記録し、**メッセージは書かない**（接続文字列などが入りうる）。CloudWatch での収集、EMF のメトリクスは未確認・未実装。

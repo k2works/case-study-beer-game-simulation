@@ -129,7 +129,18 @@ suspend fun Ports.joinGame(
                 .nel()
                 .mapLeft(AppFailure::Invalid)
                 .bind()
-        val code = JoinCode.of(input.joinCode).mapLeft { AppFailure.Domain(GameError.InvitationInvalid) }.bind()
+        // 入力の検証（上）は、窓に数えない。参加コードの検査から先を、接続元ごとの窓で制限する（B5 Step 5）
+        limitedAttempts(AttemptScope.JOIN, meta.source) { joinWithCode(input.joinCode, name, meta) }.bind()
+    }
+
+/** 参加コードを検査して参加する（窓で制限される部分）。不明・形式不正の参加コードは `game.invitation_invalid`（認可の失敗）。 */
+private suspend fun Ports.joinWithCode(
+    joinCode: String,
+    name: DisplayName,
+    meta: RequestMeta,
+): Either<AppFailure, CommandOutcome> =
+    either {
+        val code = JoinCode.of(joinCode).mapLeft { AppFailure.Domain(GameError.InvitationInvalid) }.bind()
         val found = events.transaction { tx -> peripheral.findGameByJoinCode(tx, code) }.bind()
         val gameId = ensureNotNull(found) { AppFailure.Domain(GameError.InvitationInvalid) }
         val participantId = ParticipantId(newId())

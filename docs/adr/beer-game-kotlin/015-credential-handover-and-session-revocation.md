@@ -4,7 +4,7 @@ title: "ADR-015: 復帰資格の受け渡しと、失効でブラウザセッシ
 description: "B5 の H2・H3 の提案。復帰資格を Cookie と一度だけ示す復帰コードで渡し、失効の書き込みと同じトランザクションでブラウザセッションの行を削除する案を推奨する。人のゲート 1 で決める。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:51:38Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 ---
 
 # ADR-015: 復帰資格の受け渡しと、失効でブラウザセッションを止める結び付き（提案）
@@ -34,7 +34,7 @@ Bolt 5（進行の継続と資格）で、(H2) 資格の失効で発行済みの
 | B | `browser_sessions` に `revoked_at`（または `credentials` への参照）を追加し、認証が見る。**スキーマ変更（確認必須）** | 失効の痕跡が行に残る | マイグレーションの追加（番号は保持の `006` と衝突させない）、権限（GRANT）の確認、連鎖削除の検査との整合が要る |
 | C（不採用） | 認証が、主体の未失効の `credentials` の存在を確かめる | 列の追加が要らない | **再発行で新しい資格が有効になると、失効したはずの古いブラウザセッションが復活する**ため、漏洩の被害を止められない |
 
-提案は A。`writer` ロールは `browser_sessions` への `DELETE` を持つ（V101）が、**実際の GRANT は Step 4 で確かめる**（未確認）。
+提案は A。`writer` ロールは `browser_sessions` への `DELETE` を持つ（V102。B5 Step 5.5 で 101 から付け替えた）。**実際の GRANT は Step 4 で PostgreSQL に対して実行して確かめた**（`RolePrivilegesSpec`）。
 
 ### H3: 復帰資格の受け渡し
 

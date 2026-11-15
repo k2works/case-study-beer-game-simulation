@@ -2,12 +2,14 @@ package beergame.persistence
 
 import arrow.core.raise.either
 import beergame.application.AppFailure
+import beergame.domain.GameEvent
 import beergame.domain.Role
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import java.time.OffsetDateTime
 
 private fun String.compactJson(): String = filterNot { it.isWhitespace() }
 
@@ -16,6 +18,7 @@ fun FunSpec.projectionContract(fixture: () -> Fixture) {
     projectedRowsContract(fixture)
     projectedStatesContract(fixture)
     continuationProjectionContract(fixture)
+    replacedRoleProjectionContract(fixture)
     projectedEndContract(fixture)
     checkpointContract(fixture)
     projectionRollbackContract(fixture)
@@ -136,6 +139,41 @@ private fun FunSpec.continuationProjectionContract(fixture: () -> Fixture) {
 
         fx.query("SELECT role FROM lobby_participants WHERE game_id = ? ORDER BY role", id) { it.getString(1) } shouldBe
             Role.entries.map { it.name }.sorted()
+    }
+}
+
+/** 開始後の役割の入れ替えの投影（B5 Step 3.5・5.5。`lobby_participants.replaced_at`。Step 4 で保留した永続化の契約）。 */
+private fun FunSpec.replacedRoleProjectionContract(fixture: () -> Fixture) {
+    test(
+        "[B5/5.5] Given 開始後に役割を入れ替えたゲーム When 投影を読む " +
+            "Then 旧担当者の行は消えず role が NULL・replaced_at に入れ替えの時刻、新担当者は role を持ち replaced_at は NULL",
+    ) {
+        val fx = fixture()
+        val script = GameScript().create()
+        val players = script.joinAllRoles()
+        val newcomer = script.join()
+        script.startGame().replaceRoleHolder(newcomer, Role.RETAILER)
+        fx.appendScript(script)
+        val id = script.gameId.value
+        val replacedAt = script.events.single { it.payload is GameEvent.ParticipantReplaced }.occurredAt
+
+        val rows =
+            fx.query("SELECT participant_id, role, replaced_at FROM lobby_participants WHERE game_id = ?", id) {
+                Triple(
+                    it.getString(1),
+                    it.getString(2),
+                    it.getObject(3, OffsetDateTime::class.java)?.toInstant(),
+                )
+            }
+
+        rows.size shouldBe 5
+        val old = players.getValue(Role.RETAILER).value.toString()
+        rows.single { it.first == old } shouldBe Triple(old, null, replacedAt)
+        rows.single { it.first == newcomer.value.toString() } shouldBe
+            Triple(newcomer.value.toString(), Role.RETAILER.name, null)
+        rows
+            .filter { it.first != old && it.first != newcomer.value.toString() }
+            .map { it.third } shouldBe listOf(null, null, null)
     }
 }
 

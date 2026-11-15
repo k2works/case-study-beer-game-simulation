@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -92,6 +92,7 @@ entity 保持削除
 | 資格（進行役・復帰・観察用の招待） | `credentials` | 周辺ストア |
 | ブラウザセッション | `browser_sessions` | 周辺ストア |
 | 冪等キー | `idempotency_records` | 横断 |
+| 参加・復帰の失敗の窓（総当たりの制限。B5 Step 5） | `participation_attempts` | 横断（ゲームに属さない） |
 | `RetentionSaga` | `deletion_runs`、`deletion_attempts`、`deletion_receipts` | 状態（D8） |
 
 ## 論理データモデル
@@ -179,6 +180,19 @@ entity "idempotency_records" as idem {
   expires_at : timestamptz
 }
 
+entity "participation_attempts" as attempts {
+  * scope : text <<PK。join・recover>>
+  * key_digest : text <<PK。接続元の鍵付き要約>>
+  * window_start : timestamptz <<PK>>
+  --
+  failure_count : integer <<0 以上>>
+}
+note bottom of attempts
+  B5 Step 5（V008）。ゲームに属さない
+  （game_roots の連鎖削除の対象でない）。
+  生の接続元（IP）は持たない
+end note
+
 roots ||--o{ events
 roots ||--o{ checkpoints
 roots ||--o{ profiles
@@ -239,7 +253,7 @@ entity "lobby_participants" as lp {
   game_id : uuid <<FK>>
   role : text
   joined_at : timestamptz
-  replaced_at : timestamptz <<提案。B5 Step 3.5。V003 に無い。確認必須>>
+  replaced_at : timestamptz <<B5 Step 5.5。V007。NULL は入れ替えられていない>>
 }
 
 entity "lobby_observer_invitations" as li {
@@ -512,7 +526,7 @@ interface TransactionRunner {
 - アプリケーションが使う DB ロールには、`events` の **INSERT と SELECT だけ**を与え、UPDATE と DELETE を与えません。
 - 保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。連鎖削除が、`events` に DELETE 権限を持たないロールでも動くことは、**B2 の Step 3 で実測した（2026-11-14、PostgreSQL 18）**: `events` の DELETE 権限が無い削除ロールで `game_roots` を 1 回 DELETE すると、`game_id` を持つ全表から当該ゲームの行が消え、別のゲームの行は残った。PostgreSQL が参照の整合性のトリガーを、子の表の所有者の権限で実行するためで、**`SECURITY DEFINER` の関数や別の削除用ロールは不要**（R6 は解消。1 回の実測で、他の版は未確認）。
 
-**V101 のロールと GRANT（B2）。** ロールは `beergame_writer`・`beergame_reader`・`beergame_observer`・`beergame_deleter`（`NOLOGIN`、非特権、継承なし。`CREATE ROLE` は存在しなければ作る）。所有者は新しいロールを作らず、マイグレーションを実行する接続のユーザー（本番の RDS で、マイグレーション用のユーザーをどう作るかは未決）。
+**V102 のロールと GRANT（B2。B5 Step 5.5 で 101 から付け替え）。** ロールは `beergame_writer`・`beergame_reader`・`beergame_observer`・`beergame_deleter`（`NOLOGIN`、非特権、継承なし。`CREATE ROLE` は存在しなければ作る）。所有者は新しいロールを作らず、マイグレーションを実行する接続のユーザー（本番の RDS で、マイグレーション用のユーザーをどう作るかは未決）。
 
 | ロール | 権限 |
 | :--- | :--- |
@@ -594,7 +608,7 @@ interface TransactionRunner {
 | `game_overview` | `game_id` | `GameCreated`、`GameStarted`、`AutoCommitChanged`、`SessionEnded` | `status` は `PREPARING`・`STARTED`・`ENDED`（`SessionEnded` で導出）。`final_week` は 1〜50。`commit_mode` は `MANUAL`・`AUTO`。`settings_kind` は `KIT`・`CUSTOM`。`settings_changes` に準拠値から変えた項目。**参加コードは持たない**（観察者が読むため。M1） |
 | `game_join_codes` | `game_id` | `GameCreated` | `join_code` 一意（索引）。**進行役と、参加の問い合わせ（参加コードの照合）だけ**が読む。観察者のロールには SELECT を与えない（BR-17） |
 | `game_settings` | `game_id` | `GameCreated` | 需要系列、初期条件、費用、遅延、公開範囲。遅延と単価は 0 以上。**進行役の画面にだけ**使う（将来の需要を含むため） |
-| `lobby_participants` | `participant_id` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned`、**`ParticipantReplaced`（B5 Step 3.5。提案）** | `game_id` は外部キー。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**（共同担当、FR-16）。表示名は `display_profiles` と結合。**役割の入れ替えで外れた旧担当者の行は消さず**（履歴と入力者のラベルのため）、`ParticipantReplaced` で `role` を NULL にし、**`replaced_at`（入れ替えられた時刻。NULL は未入れ替え）を書く提案**。**この列は現在のスキーマ（V003）に無い。スキーマ変更で確認必須。人の判断**（下の「役割の入れ替えと永続化」） |
+| `lobby_participants` | `participant_id` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned`、**`ParticipantReplaced`（B5 Step 3.5）** | `game_id` は外部キー。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**（共同担当、FR-16）。表示名は `display_profiles` と結合。**役割の入れ替えで外れた旧担当者の行は消さず**（履歴と入力者のラベルのため）、`ParticipantReplaced` で `role` を NULL にし、**`replaced_at`（入れ替えられた時刻。NULL は未入れ替え）を書く**。**この列は V007（B5 Step 5.5。V003 を書き換えず、`ALTER TABLE` で足した）**（下の「役割の入れ替えと永続化」） |
 | `lobby_observer_invitations` | `invitation_id` | `ObserverInvited`、`ObserverInvitationRevoked` | 有効期限、失効。招待コードの値は持たない |
 | `lobby_observers` | `observer_id` | `ObserverJoined` | 役割を持たない |
 | `session_overview` | `game_id` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | `status` は `ACTIVE`・`PAUSED`・`ENDED`。`week > 0`。**`submitted_role_count`（0〜4。入力済みの役割数。値は含めない）**。`DecisionSaved`・`ProxyDecisionSubmitted` のペイロードの `submittedRoleCount`（保存後に入力済みの役割数。`decide` が数える。投影は他の行を読まないため、増減をイベントが運ぶ）をそのまま書き、`WeekCommitted` で 0 に戻す。観察者が読める（AC4.1.1。M3） |
@@ -648,6 +662,24 @@ interface TransactionRunner {
 
 `credentials.revoked_at` は、`CredentialRevoked` を追記する同じトランザクションで更新します（再発行では、新しい行を挿入します。旧行は失効のまま残ります）。**B5 Step 4 の実装**: 同じトランザクションで、**同じ主体（`game_id`、`actor_kind`、`actor_id`）の `browser_sessions` の行を削除**します（ゲート 1 の H2 案 A。スキーマ変更なし。再発行しても、失効前のブラウザセッションは復活しません）。この 2 つの行の変更は、追記したイベントから導きます（`CredentialRevoked` が追記されたら、必ず失効の行の変更が付きます。手動の失効と、役割の入れ替えの `CredentialRevoked` の両方）。`key_version` は、資格の値の接頭辞（`v<版>.`）が示す版で、保存時の検証の鍵を決めます。**整合のルール**: 「`credentials` の失効・発行が、対応する `Credential*` イベント（または `GameCreated`・`ParticipantJoined`・`ObserverInvited`・`ObserverJoined`・`ParticipationRecovered`）と必ず一緒に起きる」ことを、統合テストで確認します。
 
+### 参加・復帰の失敗の窓（B5 Step 5。NF-S11・NF-S19。ゲート 5 で人が確認する）
+
+参加（`POST /participations/join`）と復帰（`POST /participations/recover`。HTTP の配線は Step 6）の**総当たり**を止める、専用のレート制限の保存先です。全体の制限（接続元ごとの固定窓、600 件/分）は、プロセス内のままで、役割が違います（全体の負荷の保護。専用の制限は、認可の失敗だけを数える）。
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 表 | `participation_attempts`（V008。共通のマイグレーション。H2 と PostgreSQL の両方） |
+| 列 | `scope`（`join`・`recover`）、`key_digest`（接続元の鍵付き要約）、`window_start`（窓の開始時刻）、`failure_count`（0 以上） |
+| 主キー | `(scope, key_digest, window_start)`。索引 `ix_participation_attempts_window (window_start)`（古い行の掃除） |
+| 保存する情報 | **接続元の鍵付き要約だけ**。TCP の接続元（`remoteHost`）を正規化して（IPv4 はそのまま、IPv4 射影の IPv6 は IPv4、IPv6 は上位 64 ビット `/64`）、HMAC-SHA256（鍵は冪等キーの鍵。部分の並びを `"attempt-source"` で分ける）にする。**生の IP アドレスは DB に残さない**（全表の全列に、生の値が無いことを契約テストで確認）。ログの `src` と窓の鍵は同じ値で突き合わせられる |
+| ゲームとの関係 | **ゲームに属さない**（`game_id` を持たず、`game_roots` の連鎖削除の対象でない。B11 の「`game_id` を持つ全表から行が消える」検査の対象外）。窓が終わった行は、新しい窓の最初の記録のときに掃除する |
+| 数え方 | 検査の**前**に 1 を足し（別のトランザクション。失敗が取り消されても残る）、上限を超えたら検査せずに 429、認可の失敗（不明な参加コード、無効な復帰資格）でなければ 1 を戻す。成功と、形式が不正な本文（入力の検証の失敗）は数えない。先に足すのは、同時の要求が上限を超えて検査を通り抜けないため |
+| 同時の呼び出し | `INSERT … ON CONFLICT DO NOTHING`（行が無ければ 0 で作る）→ `UPDATE … SET failure_count = failure_count + 1`（行をロックして直列化）→ `SELECT`。PostgreSQL 固有の機能は使わず、同じ SQL が H2 でも動く。契約テストで、同時の 24 回の呼び出しが、1〜24 の連番を 1 回ずつ受け取ることと、別の接続プール（別のインスタンス）の呼び出しが合算されることを確認 |
+| 設定値 | `ATTEMPT_MAX_FAILURES`（既定 10）、`ATTEMPT_WINDOW_SECONDS`（既定 600）。**根拠のない（未計測の）仮置き**。運営者との合意は未取得 |
+| GRANT（PostgreSQL） | `beergame_writer` に `SELECT, INSERT, UPDATE, DELETE`（`102__database_roles.sql`）。読み取り・観察者・削除のロールには与えない（`RolePrivilegesSpec` の否定テスト） |
+
+**信頼の範囲**: 接続元は TCP の接続元（`X-Forwarded-For` は信頼しない）。**ALB の背後では、接続元が ALB になり、全利用者が同じ窓に入る**。ALB・CloudFront の背後の接続元の取り方（信頼するホップの数）は、B14（AWS・本番の定義）で決める（設計書の未決事項。本 Bolt の範囲外）。
+
 ### 役割の入れ替えと永続化（B5 Step 3.5。提案。ゲート 3.5 で人が確認する）
 
 開始後の役割の入れ替え（[ドメインモデル](./domain-model.md)の「役割の入れ替え」）は、**次の 3 つを、イベントの追記と同じトランザクションで**行います。
@@ -671,11 +703,13 @@ interface TransactionRunner {
 
 提案は A です。**A を採ると、`LobbyParticipant` の応答に `replaced`（boolean）が増えます**（`contracts/openapi.yaml` に条件付きの提案として書いた。B を採るなら削除し、`ParticipantReplaced` を `RoleUnassigned` に置き換える）。
 
+**決定と実装（B5 Step 5.5。2026-11-15）**: 案 A は、Step 3.5 のゲートで承認済み（スキーマ変更。マイグレーション追加の承認は判断項目 5）。共通のマイグレーション `V007__lobby_participants_replaced_at.sql`（`ALTER TABLE lobby_participants ADD COLUMN replaced_at timestamp with time zone`。NULL 可。既存行は NULL）を足した。H2 と PostgreSQL 18 の両方で適用でき、永続化の契約テスト（`ProjectionContract`）が、`ParticipantReplaced` の投影（旧担当者の行は消えず `role` が NULL・`replaced_at` に入れ替えの時刻、新担当者は `role` を持ち `replaced_at` は NULL）を確かめる（Step 4 で保留していた `SQLSTATE 42S22` の契約）。`LobbyParticipant.replaced` を応答へ返す配線は Step 6。
+
 ## 保持削除
 
 ### 削除の網羅
 
-すべての表（`deletion_*` を除く）が、`game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ちます。**`DELETE FROM game_roots WHERE game_id = $1` の 1 回で、イベント、投影、周辺ストア、冪等記録が連鎖して消えます**（ADR-007）。`deletion_runs`・`deletion_attempts` は、同じトランザクションで明示的に削除します。
+ゲームに属するすべての表（`deletion_*` と、**ゲームに属さない `participation_attempts`（B5 Step 5。接続元の窓。`game_id` を持たず、窓が終わると掃除される）を除く**）が、`game_roots(game_id)` への外部キー（`ON DELETE CASCADE`）を持ちます。**`DELETE FROM game_roots WHERE game_id = $1` の 1 回で、イベント、投影、周辺ストア、冪等記録が連鎖して消えます**（ADR-007）。`deletion_runs`・`deletion_attempts` は、同じトランザクションで明示的に削除します。
 
 削除の網羅は、次のテストで確認します。
 
@@ -727,6 +761,7 @@ end
 | `events` | `event_id` | `game_id` は外部キー（`CASCADE`）。`stream_type` は `GAME`・`SESSION`。**`(game_id, stream_type, stream_version)` 一意（制約名 `uq_events_stream_version`）**。`stream_version >= 1`。`schema_version >= 1` | 追記専用の状態の正本。監査の記録を兼ねる（操作者の種別と ID、入力値を含む。表示名と資格は含まない） |
 | `projection_checkpoints` | `(game_id, stream_type)` | `game_id` は外部キー（`CASCADE`） | 投影が適用した最後の版 |
 | `idempotency_records` | `(game_id, scope, key_digest)`（制約名 `pk_idempotency_records`） | `game_id` は外部キー（`CASCADE`）。応答は暗号化。`expires_at` は 24 時間後。`scope = 'create'` の部分一意索引 `uq_idempotency_create` | 冪等キーと**成功した応答だけ**の保存 |
+| `participation_attempts` | `(scope, key_digest, window_start)`（制約名 `pk_participation_attempts`） | `scope` は `join`・`recover`（`ck_participation_attempts_scope`）。`failure_count >= 0`（`ck_participation_attempts_count`）。**`game_id` を持たない**（ゲームに属さない）。生の接続元を持たない | 参加・復帰の失敗の窓（総当たりの制限。B5 Step 5。上の「参加・復帰の失敗の窓」） |
 
 ## マイグレーション
 
@@ -742,23 +777,37 @@ end
 | 003 | 共通 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_*` |
 | 004 | 共通 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | 005 | 共通 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
-| 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
-| （提案。未作成） | 共通 | **B5 Step 3.5 の確認点（人の判断）**: `lobby_participants.replaced_at timestamptz`（NULL 可）の追加。承認されるまで書かない。番号は 006（B11 の保持）と 101・102 に合わせて、実装時に決める |
-| 101 | PostgreSQL | **B2 で作成（`V101__database_roles.sql`）**。DB ロールと GRANT（書き込み・読み取り・観察者・削除。所有者はマイグレーションの接続のユーザー）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限。**V102 より小さい番号のため、V102 まで適用済みの DB には Flyway がそのまま適用できない（下の注意）** |
-| 102 | PostgreSQL | 部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
+| 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts`。**B11 の予約として空けてある（B5 は使わない。下の「B5 Step 5.5 の番号」）** |
+| 007 | 共通 | **B5 Step 5.5**（`V007__lobby_participants_replaced_at.sql`）: `lobby_participants.replaced_at timestamptz`（NULL 可）の追加（拡張だけ） |
+| 008 | 共通 | **B5 Step 5.5**（`V008__participation_attempts.sql`）: 参加・復帰の失敗の窓 `participation_attempts`（主キー `pk_participation_attempts`、`CHECK`、索引 `ix_participation_attempts_window`） |
+| 101 | PostgreSQL | **B5 Step 5.5 で付け替え**（`V101__idempotency_create_unique_index.sql`。B1 で 102 として作った）。部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
+| 102 | PostgreSQL | **B5 Step 5.5 で付け替え**（`V102__database_roles.sql`。B2 で 101 として作った）。DB ロールと GRANT（書き込み・読み取り・観察者・削除。所有者はマイグレーションの接続のユーザー）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限。**`participation_attempts` の GRANT（書き込みロールだけ）を含む**。共通の表（001〜008）がすべて揃った後に適用される番号 |
 | 201 | H2 | **作らない**（B1 の Step 7 で、共通の V001〜V005 が H2 にそのまま適用できたため）。省略した制約は、ローカルでは守られない |
 
-**確定（B1。2026-11-14）**: ファイル名は `V001__event_store.sql`、`V002__peripheral_stores.sql`、`V003__projections_lobby.sql`、`V004__projections_session.sql`、`V005__projections_results.sql`（共通）、`V102__idempotency_create_unique_index.sql`（PostgreSQL）。**006（保持）は B11、101（DB ロールと GRANT）は B2**で、B1 では作りません（V101 は空けてある）。
+**確定（B1。2026-11-14）**: ファイル名は `V001__event_store.sql`、`V002__peripheral_stores.sql`、`V003__projections_lobby.sql`、`V004__projections_session.sql`、`V005__projections_results.sql`（共通）、`V102__idempotency_create_unique_index.sql`（PostgreSQL）。**006（保持）は B11、101（DB ロールと GRANT）は B2**で、B1 では作りません（V101 は空けてある）。**これは B2 までの記録で、B5 Step 5.5 の付け替えにより、PostgreSQL は 101＝冪等記録の索引、102＝ロールと GRANT になった（下の「B5 Step 5.5 の番号」）。**
 
 ```text
 db/migration/
-├── common/      V001〜V005（B1。両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダ ${json_type} で切り替える）。V006（保持）は B11
-├── postgres/    V101（B2。ロール、GRANT）、V102（B1）
+├── common/      V001〜V005（B1。両方言で動く DDL。方言で型が違う列は Flyway のプレースホルダ ${json_type} で切り替える）、
+│                V007・V008（B5 Step 5.5）。V006（保持）は B11 の予約として空けてある
+├── postgres/    V101（B1 の冪等記録の索引。旧 102）、V102（B2 のロールと GRANT。旧 101。B5 Step 5.5 で付け替え）
 └── h2/          作らない
 # Flyway の場所: PostgreSQL = common + postgres、H2 = common
+# 適用順（PostgreSQL）: 001 → 002 → 003 → 004 → 005 → 007 → 008 → 101 → 102。H2 は 001〜005・007・008
 ```
 
-- **V101 と V102 の順序の注意（B2）。** Flyway は、適用済みの最大の版より小さい未適用の版を、既定で検証エラーにします。V101 は V102 より小さいため、**V102 まで適用済みの既存の DB には、そのままでは適用できません**。現時点では PostgreSQL の永続環境が無い（ローカルは H2、CI は使い捨て）ので問題になりませんが、**ステージング・本番を作る前に、`outOfOrder` を許すか、番号を付け替えるかを決めます（人の判断。未決）**。
+#### B5 Step 5.5 の番号（ゲート 5 で人が確認する）
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 追加 | 共通 **007**（`lobby_participants.replaced_at`）と **008**（`participation_attempts`）。**006 は B11（保持）の予約のまま空け、B5 は使わない**（Flyway は欠番を許す） |
+| 付け替え | PostgreSQL の **101 と 102 を入れ替えた**（`git mv`）。冪等記録の索引（B1。旧 102）を **101**、ロールと GRANT（B2。旧 101）を **102** にした。作った順と番号の順を合わせ、ロールの GRANT が、共通の表（001〜008）がすべて揃った後に適用される番号にする |
+| GRANT | `participation_attempts` の GRANT は、**102 に含めた**（付け替えと同時のため。永続環境が無い間だけできる）。共通のマイグレーションはロールの無い H2 にも適用されるので、GRANT を書けない |
+| 今後の規則 | 共通の表を足したら、その表の GRANT は、**その表のマイグレーションより大きい番号の PostgreSQL 専用のマイグレーション（103〜）**に書く（既定の権限は与えない。V102 のコメントにも書いた）。B11 の `deletion_*`（006）の GRANT も同じ |
+| B11 の注意 | 006 は 007・008 より小さい。**B11 の着手時に、007 以降が適用済みの DB（永続環境）があれば、Flyway は 006 を検証エラーにする**。そのときは 006 ではなく、次の空き番号（009 以降）を使う（欠番を許す）。**永続環境（ステージング・本番）を作る前に、番号を確定する** |
+| 安全性 | 付け替えは、**永続環境がまだ無い間だけ**安全（適用済みの DB は、Flyway の版・チェックサムの検証に当たる）。ローカルの PostgreSQL（`docker-compose` など）に、古い 101・102 を適用済みの DB が残っていれば、作り直す（CI は使い捨て）。本 Bolt でステージング・本番は作っていない |
+
+- **V101 と V102 の順序の注意（B2。B5 Step 5.5 で解消）。** B2 で、Flyway が適用済みの最大の版より小さい未適用の版を検証エラーにするため、V101（ロール）が V102（索引）より小さいと、V102 まで適用済みの DB に適用できない問題が出ていました。**Step 5.5 の付け替えで、作った順（B1 の索引 → B2 のロール）と番号の順を合わせました**。この問題は、永続環境が無い間の付け替えで解消し、以降は上の「今後の規則」に従います。
 - 追記専用の保護、観察者向けの権限、部分一意索引は PostgreSQL の場所（101・102）にだけ置きます。投影の `CHECK`（数量の上限）は、共通（001〜005）に含めます。
 - `events.payload` の型は、PostgreSQL は `jsonb`、H2 は `json` です（プレースホルダ `${json_type}`。**B1 で確定**）。書き込みは方言ごとに分けます（PostgreSQL は `CAST(? AS jsonb)`、H2 は `? FORMAT JSON`）。読み込みは両方 `CAST(payload AS VARCHAR)`。
 - 共通の DDL は H2 で通ることを B1 の Step 7 で確認しました（`text` 型の主キー・一意制約、`GENERATED ALWAYS AS IDENTITY`、`timestamp with time zone`、`bytea`、`ON DELETE CASCADE`、`CHECK`）。再適用は 0 件です。
@@ -828,6 +877,7 @@ db/migration/
 | `game_join_codes` | `(join_code)`（一意） | 参加コードでの検索（観察者は読めない） |
 | `credentials` | `(game_id, kind, subject_id)`、`(expires_at)` | 主体ごとの検索、期限切れの掃除 |
 | `browser_sessions` | `(game_id, expires_at)` | 期限切れの掃除 |
+| `participation_attempts` | `(window_start)`（`ix_participation_attempts_window`。主キーは `(scope, key_digest, window_start)`） | 窓が終わった行の掃除（B5 Step 5） |
 | `lobby_participants` | `(game_id)` | ロビーの一覧 |
 | `idempotency_records` | `(expires_at)`、`(scope, key_digest)`（部分一意、`WHERE scope = 'create'`。**PostgreSQL のみ。H2 版は省略**） | 期限切れの掃除、作成の再送の検索 |
 | `retention_policies` | `(delete_after, game_id)` | 期限到来の検出 |
@@ -886,16 +936,19 @@ db/migration/
 | 30 | `role_current_states.production_pipeline` は必須の想定 | NULL を許し、B1 では書かない。`shipment_pipeline` に `deliveryPipeline`、`order_pipeline` に `orderPipeline` | キットでは生産の待ち行列が配送と同じ。B1 のイベントに初期条件が載らない |
 | 31 | 観察者向けの 3 表（003・005 の中）は B1 で作り、書く | 表は作るが、**書き込みは B9 まで省く** | B1 に観察者のイベントが無く、公開範囲の規則（`Disclosure`）は B9 |
 | 32（以降は B2 の実装で変わった点。2026-11-15） | 連鎖削除が `events` に DELETE 権限が無いロールでも動くかは未検証（実装開始時に確認） | **実測済み（動く）**。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）と GRANT。否定テスト 11 件（PostgreSQL 18）。`SECURITY DEFINER` は不要 | B2 の Step 3 |
-| 33 | V101 は V102 の前のつもり（番号の順序は考慮なし） | **V101 < V102 のため、V102 まで適用済みの DB に Flyway がそのまま適用できない**。永続環境の前に、`outOfOrder` か番号の付け替えを決める（未決） | Flyway の既定の検証 |
+| 33 | V101 は V102 の前のつもり（番号の順序は考慮なし） | **V101 < V102 のため、V102 まで適用済みの DB に Flyway がそのまま適用できない**。永続環境の前に、`outOfOrder` か番号の付け替えを決める（未決） | Flyway の既定の検証。**B5 Step 5.5 で、番号の付け替えにより解消**（行 39） |
 | 34 | 読み取りロールの表の一覧は無い | `display_profiles` を含める（ロビーの表示名の結合）。`credentials`・`browser_sessions`・`idempotency_records` は含めない（未決） | B2 の判断 |
 | 35（B5 Step 4。2026-11-15） | ブラウザセッションと復帰資格は、同じダイジェストで両表に書く（B1 の仮置き）。認証は両表を結ぶ。失効は `credentials.revoked_at` | **別の値・別のダイジェスト**。認証は `browser_sessions` だけ、復帰の認証は `credentials` だけを見る。失効は `credentials.revoked_at` の更新と、同じ主体の `browser_sessions` の行の**削除**（同じトランザクション。スキーマ変更なし） | ゲート 1 の H2 案 A・ADR-015。失効後の再発行で古いセッションが復活しない。`DELETE` の権限は `beergame_writer` にある（V101。PostgreSQL の統合テストで実行して確認） |
-| 36（同上） | 入れ替えられた旧担当者の `lobby_participants` に `replaced_at` を書く | 投影（`Projections.lobbyParticipants`）は `ParticipantReplaced` で `role` を NULL にし `replaced_at` を書く行の変更を作る（純粋関数の試験まで）。**`replaced_at` の列は、マイグレーション（Step 5.5）まで DB に無い**ため、この投影を DB に適用すると失敗する（H2 で `SQLSTATE 42S22` を実測）。`ParticipantReplaced` を追記する経路は Step 6 の配線まで無い | Step 5.5 で列を足してから、永続化の契約を足す |
+| 36（同上） | 入れ替えられた旧担当者の `lobby_participants` に `replaced_at` を書く | 投影（`Projections.lobbyParticipants`）は `ParticipantReplaced` で `role` を NULL にし `replaced_at` を書く行の変更を作る（純粋関数の試験まで）。**`replaced_at` の列は、マイグレーション（Step 5.5）まで DB に無い**ため、この投影を DB に適用すると失敗する（H2 で `SQLSTATE 42S22` を実測）。`ParticipantReplaced` を追記する経路は Step 6 の配線まで無い | Step 5.5 で列を足してから、永続化の契約を足す。**Step 5.5 で実施済み**（V007。行 37） |
+| 37（B5 Step 5。2026-11-15） | `lobby_participants.replaced_at` は V003 に無い（提案） | **V007 で追加**（`ALTER TABLE`。NULL 可。拡張だけ）。H2・PostgreSQL 18 の両方で、`ParticipantReplaced` の投影の永続化の契約が通る（旧担当者の行は消えず `role` が NULL・`replaced_at` に時刻） | 判断項目 5 のマイグレーション追加の承認、Step 3.5 のスキーマ変更の承認（案 A） |
+| 38（同上） | 参加・復帰の専用のレート制限の保存先は未決（BD8。プロセス内） | **DB に窓の表 `participation_attempts` を持つ**（V008。判断項目 4 の案 A）。接続元の鍵付き要約だけを保存し、ゲームに属さない。GRANT は 102 に含める | NF-S11・NF-S19（タスク数に依らない上限）。**ゲート 5 で人が確認する**（方式、保存する情報、スキーマ変更、番号） |
+| 39（同上） | PostgreSQL は 101＝ロールと GRANT、102＝冪等記録の索引（作った順と番号の順が逆） | **101＝冪等記録の索引、102＝ロールと GRANT に付け替え**（`git mv`）。006 は B11 の予約として空け、B5 は 007・008 | 判断項目 5 の付け替えの承認。永続環境が無い間だけ安全。**番号はゲート 5 で人が確認する** |
 
 ## 未決事項
 
 - マイグレーションの管理ツールは Flyway です（[技術スタック](./tech-stack.md) T4。B1 で導入。マイグレーション 001〜005 は B1 の Gate 7 の承認待ち）。適用の自動化は、B1 の実装で **H2（local）の起動時は自動、PostgreSQL の `api` は適用せず `migrate` モード**とした（本番での運用の最終決定は、導入の承認後）。
 - 追記の `ConcurrencyConflict` の自動再試行の上限と、再試行の間隔（実装開始時に、競合の頻度を測って決める）。
-- `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認: **解決済み（B2 の実測。動く。代替は不要）**。**未決（B2 で出たもの）**: V101 と V102 の順序（上）、読み取りロールの権限の範囲（`credentials` ほか）、所有者のロールの作り方（RDS）、通知の受信（`LISTEN`）専用のロールと接続、`deletion_*` の GRANT（B11）、アプリの用途別のロール・接続への切り替え（B3 以降）。
+- `events` に UPDATE/DELETE を与えないロールでも、`game_roots` の連鎖削除が動くことの確認: **解決済み（B2 の実測。動く。代替は不要）**。**未決（B2 で出たもの）**: V101 と V102 の順序（**B5 Step 5.5 で付け替えて解消**。006 の空けた番号の扱いは、B11 の着手時と永続環境の前に確定する）、読み取りロールの権限の範囲（`credentials` ほか）、所有者のロールの作り方（RDS）、通知の受信（`LISTEN`）専用のロールと接続、`deletion_*` の GRANT（B11）、アプリの用途別のロール・接続への切り替え（B3 以降）。
 - 再構築の同時実行制御（解決済み: アドバイザリロック。コマンドは共有、再構築は排他。M23）。**未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。研修中の再構築の所要時間の実測。
 - 数量の上限を、`CHECK`（固定値）にするか、設定の値と照合する検査にするか（beer-game2 から継続）。
 - `retention_starts_at` の起点: **暫定で作成時**（M5）。終了済みゲームは終了時から数える案（ユーザー代表の提案）は未決で、人の確認が要る（ドメインモデルの未決事項と共通）。

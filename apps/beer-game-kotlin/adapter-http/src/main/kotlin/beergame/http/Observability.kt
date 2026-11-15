@@ -68,6 +68,7 @@ private fun accessRecord(
         gameId = call.attributes.getOrNull(GameIdKey),
         gameVersion = versions?.game?.value,
         sessionVersion = versions?.session?.value,
+        src = call.attributes.getOrNull(SourceKey),
     )
 }
 

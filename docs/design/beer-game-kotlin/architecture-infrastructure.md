@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "Kotlin 版のインフラアーキテクチャ。beer-game2 の ECS Fargate、CloudFront、RDS、Terraform、CI/CD を踏襲し、JVM のコンテナ、起動と終了、メモリ、Gradle のビルド、データベースのロール、確認したバージョンなど JVM 固有の変更を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -426,7 +426,7 @@ stop
 
 - Kotlin 2.4.21、Gradle 9.9.1、JDK 25、Ktor 3.6.1、Arrow 2.3.0 の互換性の確認（実装開始時）。
 - detekt 1.23.8 と Kotlin 2.4: **JDK 21 の専用ジョブで維持（ユーザーの決定、2026-11-14）。GitHub Actions 上の再現は未確認。**
-- **B2 で出た未決（2026-11-15）**: V101 と V102 の順序（`outOfOrder` か番号の付け替え）、RDS のマイグレーション用ユーザーの作り方、用途別の接続プールの配線、`LISTEN` の専用接続、`ui`・`n1` ジョブと `pmd` の実行時間の GitHub Actions 上での確認、action の SHA 固定（`setup-java`・`setup-gradle`）、N-1 のタグ名。
+- **B2 で出た未決（2026-11-15）**: V101 と V102 の順序（**B5 Step 5.5 で番号を付け替えて解消**。101＝冪等記録の索引、102＝ロールと GRANT。[データモデル](./data-model.md)「B5 Step 5.5 の番号」。Terraform の `infra/modules/rds/main.tf` のコメントが「マイグレーション V101 が作る」とあるのは、まだ直していない（本 Bolt は Terraform を変更しない。B14 で直す））、RDS のマイグレーション用ユーザーの作り方、用途別の接続プールの配線、`LISTEN` の専用接続、`ui`・`n1` ジョブと `pmd` の実行時間の GitHub Actions 上での確認、action の SHA 固定（`setup-java`・`setup-gradle`）、N-1 のタグ名。
 - コンテナのベースイメージ（Temurin の `25-jre-noble` を想定。JDK の期限は 2031-09-30 に統一済み）の、軽量な派生の採否と、そのサポート期限の確認。
 - タスクのサイズ、ヒープの割合、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウンの値（負荷試験で決める）。
 - `LISTEN` の接続と、RDS の接続数の上限の整合（タスクの最大数での確認）。

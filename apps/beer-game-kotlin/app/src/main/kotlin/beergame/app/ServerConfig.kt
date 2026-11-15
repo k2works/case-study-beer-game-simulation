@@ -89,10 +89,18 @@ data class ServerConfig(
     val sessionTtlHours: Int = DEFAULT_SESSION_TTL_HOURS,
     /** 参加者の復帰資格の期限（日）。同上。 */
     val participantCredentialTtlDays: Int = DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS,
+    /** 参加・復帰の窓の、失敗の上限。**根拠の無い（未計測の）仮置き**。 */
+    val attemptMaxFailures: Int = DEFAULT_ATTEMPT_MAX_FAILURES,
+    /** 参加・復帰の窓の長さ（秒）。同上。 */
+    val attemptWindowSeconds: Int = DEFAULT_ATTEMPT_WINDOW_SECONDS,
 ) {
     companion object {
         const val DEFAULT_PORT = 8080
         const val DEFAULT_MAX_ATTEMPTS = 5
+        const val DEFAULT_ATTEMPT_MAX_FAILURES = 10
+        const val DEFAULT_ATTEMPT_WINDOW_SECONDS = 600
+        const val MAX_ATTEMPT_MAX_FAILURES = 10_000
+        const val MAX_ATTEMPT_WINDOW_SECONDS = 86_400
         const val DEFAULT_SESSION_TTL_HOURS = 24
         const val DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS = 30
         const val MAX_SESSION_TTL_HOURS = 24 * 365
@@ -132,11 +140,21 @@ data class ServerConfig(
                     DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS,
                     1..MAX_PARTICIPANT_CREDENTIAL_TTL_DAYS,
                 )
+            val attemptMax =
+                readInt(variables, "ATTEMPT_MAX_FAILURES", DEFAULT_ATTEMPT_MAX_FAILURES, 1..MAX_ATTEMPT_MAX_FAILURES)
+            val attemptWindow =
+                readInt(
+                    variables,
+                    "ATTEMPT_WINDOW_SECONDS",
+                    DEFAULT_ATTEMPT_WINDOW_SECONDS,
+                    1..MAX_ATTEMPT_WINDOW_SECONDS,
+                )
             val errors =
                 base.leftOrNull().orEmpty().toList() +
                     secrets.errors + database.leftOrEmpty() + port.leftOrEmpty() + origins.leftOrEmpty() +
                     attempts.leftOrEmpty() + migrate.leftOrEmpty() + keyRing.leftOrEmpty() +
-                    sessionTtl.leftOrEmpty() + participantTtl.leftOrEmpty()
+                    sessionTtl.leftOrEmpty() + participantTtl.leftOrEmpty() +
+                    attemptMax.leftOrEmpty() + attemptWindow.leftOrEmpty()
             return if (errors.isNotEmpty()) {
                 NonEmptyList(errors.first(), errors.drop(1)).left()
             } else {
@@ -153,6 +171,8 @@ data class ServerConfig(
                     migrateOnStart = migrate.orFail(),
                     sessionTtlHours = sessionTtl.orFail(),
                     participantCredentialTtlDays = participantTtl.orFail(),
+                    attemptMaxFailures = attemptMax.orFail(),
+                    attemptWindowSeconds = attemptWindow.orFail(),
                 ).right()
             }
         }

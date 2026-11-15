@@ -1,5 +1,6 @@
 package beergame.app
 
+import beergame.application.AttemptPolicy
 import beergame.application.Ports
 import beergame.http.HttpDeps
 import beergame.http.HttpSettings
@@ -91,6 +92,7 @@ class World(
     val logs: CapturingLogs = CapturingLogs(),
     maxAttempts: Int = 3,
     rateLimitPerMinute: Int = 100_000,
+    attempts: AttemptPolicy = defaultAttemptPolicy(),
     val wrap: (Ports) -> Ports = { it },
 ) : AutoCloseable {
     val dataSource: HikariDataSource = h2TestDataSource()
@@ -107,7 +109,7 @@ class World(
             cookieSecure = false,
             rateLimitPerMinute = rateLimitPerMinute,
         )
-    val ports: Ports = wrap(appPorts(persistence, TEST_SECRETS, maxAttempts, clock::now))
+    val ports: Ports = wrap(appPorts(persistence, TEST_SECRETS, maxAttempts, clock::now, Tuning(attempts = attempts)))
 
     fun deps(): HttpDeps =
         HttpDeps(

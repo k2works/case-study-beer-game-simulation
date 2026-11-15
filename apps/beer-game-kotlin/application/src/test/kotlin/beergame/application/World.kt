@@ -37,23 +37,27 @@ fun keyRing(
     vararg keys: Pair<Int, ByteArray> = arrayOf(1 to CREDENTIAL_KEY_V1),
 ): CredentialKeyRing = CredentialKeyRing.of(current, keys.toMap()).ok()
 
+/** 参加・復帰の失敗の窓（試験用の小さい値）。窓は 10 分で、時刻（[T0]）は窓の境界に合っている。 */
+val TEST_ATTEMPT_POLICY: AttemptPolicy = AttemptPolicy.of(maxFailures = 3, window = Duration.ofMinutes(10)).ok()
+
 fun testSettings(
     maxAttempts: Int = 3,
     credentialKeys: CredentialKeyRing = keyRing(),
+    attempts: AttemptPolicy = TEST_ATTEMPT_POLICY,
 ): AppSettings =
     AppSettings(
         maxAttempts = maxAttempts,
-        idempotencyTtl = Duration.ofHours(24),
-        sessionTtl = Duration.ofHours(24),
-        participantCredentialTtl = Duration.ofDays(30),
+        ttls = AppTtls(Duration.ofHours(24), Duration.ofHours(24), Duration.ofDays(30)),
         idempotencySecret = ByteArray(32) { it.toByte() },
         credentialKeys = credentialKeys,
+        attempts = attempts,
     )
 
 fun meta(
     key: String,
     credential: String? = null,
-): RequestMeta = RequestMeta(key, credential, CORRELATION)
+    source: AttemptSource? = null,
+): RequestMeta = RequestMeta(key, credential, CORRELATION, source)
 
 fun <A> Either<*, A>.ok(): A =
     when (this) {
@@ -114,6 +118,8 @@ data class Store(
     val displayNames: Map<ParticipantId, String> = emptyMap(),
     val joinCodes: Map<String, GameId> = emptyMap(),
     val notices: List<VersionNotice> = emptyList(),
+    /** 参加・復帰の窓ごとの失敗の数（`participation_attempts`）。 */
+    val attempts: Map<AttemptWindow, Int> = emptyMap(),
 ) {
     fun events(
         gameId: GameId,
@@ -150,6 +156,9 @@ class World(
     var conflictsToInject = 0
     var failProjection = false
     var failPeripheral = false
+
+    /** 窓の保存（charge）を、永続化の失敗にする。 */
+    var failAttempts = false
     var lockResult: Either<AppFailure, Unit> = Unit.right()
 
     /** 最初の冪等記録の検索だけ、記録があっても見つからないことにする（同時の重複を、別の要求が先に保存した場面の再現）。 */
@@ -327,6 +336,34 @@ class World(
             },
         )
 
+    private val attemptStore =
+        AttemptStore(
+            charge = { tx, window ->
+                calls += "attempts.charge"
+                if (failAttempts) {
+                    persistence("窓の保存の失敗").left()
+                } else {
+                    val fake = tx.fake()
+                    val next = (fake.store.attempts[window] ?: 0) + 1
+                    fake.store = fake.store.copy(attempts = fake.store.attempts + (window to next))
+                    next.right()
+                }
+            },
+            refund = { tx, window ->
+                calls += "attempts.refund"
+                val fake = tx.fake()
+                val next = ((fake.store.attempts[window] ?: 0) - 1).coerceAtLeast(0)
+                fake.store = fake.store.copy(attempts = fake.store.attempts + (window to next))
+                Unit.right()
+            },
+            purge = { tx, before ->
+                calls += "attempts.purge"
+                val fake = tx.fake()
+                fake.store = fake.store.copy(attempts = fake.store.attempts.filterKeys { it.start >= before })
+                Unit.right()
+            },
+        )
+
     private fun actorOf(
         gameId: GameId,
         kind: CredentialKind,
@@ -435,6 +472,7 @@ class World(
             project = projectionWriter,
             idempotency = idempotencyStore,
             peripheral = peripheralStore,
+            attempts = attemptStore,
             reader =
                 ProjectionReader {
                     calls += "reader.read"

@@ -27,6 +27,7 @@ class LogRecordSpec :
                     "gameId",
                     "gameVersion",
                     "sessionVersion",
+                    "src",
                     "message",
                     "errorType",
                     "stack",

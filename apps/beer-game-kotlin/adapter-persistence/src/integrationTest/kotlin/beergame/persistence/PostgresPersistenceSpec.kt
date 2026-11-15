@@ -72,6 +72,29 @@ class PostgresPersistenceSpec :
             Migrations.migrate(fx.dataSource, Dialect.POSTGRES) shouldBe 0
         }
 
+        test("[5.5] Given 空の PostgreSQL When マイグレーションを適用する Then 版の順に適用され、101・102 は共通の表がすべて揃った後に入る") {
+            fx.query(
+                "SELECT script FROM flyway_schema_history " +
+                    "WHERE success AND version IS NOT NULL ORDER BY installed_rank",
+            ) {
+                it.getString(1)
+            } shouldBe POSTGRES_MIGRATIONS
+        }
+
+        test(
+            "[5.5] Given 空の PostgreSQL When マイグレーションを適用する Then lobby_participants.replaced_at は timestamptz で NULL 可、窓の表の主キーは 3 列",
+        ) {
+            fx.query(
+                "SELECT data_type, is_nullable FROM information_schema.columns " +
+                    "WHERE table_name = 'lobby_participants' AND column_name = 'replaced_at'",
+            ) { it.getString(1) to it.getString(2) } shouldBe listOf("timestamp with time zone" to "YES")
+            fx.query(
+                "SELECT a.attname FROM pg_index i " +
+                    "JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey) " +
+                    "WHERE i.indrelid = 'participation_attempts'::regclass AND i.indisprimary ORDER BY a.attname",
+            ) { it.getString(1) } shouldBe listOf("key_digest", "scope", "window_start")
+        }
+
         test("[7.1] Given トランザクション When 分離レベルを見る Then READ COMMITTED") {
             val level = mutableListOf<String>()
             fx
@@ -202,6 +225,8 @@ class PostgresPersistenceSpec :
         projectionLockContract { fx }
         changeNotifierContract { fx }
         applicationFlowContract { fx }
+        attemptStoreContract { fx }
+        attemptFlowContract { fx }
 
         test("[7.1] 確認: テスト用の PostgreSQL は postgres:18 である") {
             fx.query("SHOW server_version") { it.getString(1) }.single().substringBefore('.') shouldBe "18"

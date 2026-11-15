@@ -40,8 +40,25 @@ class H2PersistenceSpec :
                     "week_commits",
                     "week_role_results",
                     "week_team_totals",
+                    "participation_attempts",
                 )
             Migrations.migrate(fx.dataSource, Dialect.H2) shouldBe 0
+        }
+
+        test("[5.5] Given 空の H2 When マイグレーションを適用する Then 共通の版が、006（B11 の保持）を空けた順に適用される") {
+            fx.query(
+                "SELECT script FROM flyway_schema_history " +
+                    "WHERE success AND version IS NOT NULL ORDER BY installed_rank",
+            ) {
+                it.getString(1)
+            } shouldBe COMMON_MIGRATIONS
+        }
+
+        test("[5.5] Given 空の H2 When マイグレーションを適用する Then lobby_participants に replaced_at（NULL 可）の列がある") {
+            fx.query(
+                "SELECT is_nullable FROM information_schema.columns " +
+                    "WHERE table_name = 'lobby_participants' AND column_name = 'replaced_at'",
+            ) { it.getString(1) } shouldBe listOf("YES")
         }
 
         eventStoreContract { fx }
@@ -51,4 +68,6 @@ class H2PersistenceSpec :
         projectionLockContract { fx }
         changeNotifierContract { fx }
         applicationFlowContract { fx }
+        attemptStoreContract { fx }
+        attemptFlowContract { fx }
     })

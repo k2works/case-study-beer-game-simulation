@@ -75,6 +75,18 @@ internal fun badRequestProblem(detail: String): Problem =
 
 internal fun unauthorizedProblem(): Problem = Problem(HttpStatusCodes.FORBIDDEN, Codes.UNAUTHORIZED, "この操作を行う権限がありません。")
 
+/**
+ * 429（`app.rate_limited`、`Retry-After` つき）。全体の制限（[installGuards]）と、参加・復帰の専用の制限
+ * （[beergame.application.AppFailure.RateLimited]）が同じ形で返す。利用者へは、どの制限かも、接続元の値も返さない。
+ */
+internal fun rateLimitedProblem(retryAfterSeconds: Int): Problem =
+    Problem(
+        status = HttpStatusCodes.TOO_MANY_REQUESTS,
+        code = Codes.RATE_LIMITED,
+        title = "要求が多すぎます。しばらくしてからお試しください。",
+        retryAfterSeconds = retryAfterSeconds,
+    )
+
 /** HTTP の状態コード。魔法の数を避けるための名前。 */
 internal object HttpStatusCodes {
     const val BAD_REQUEST = 400

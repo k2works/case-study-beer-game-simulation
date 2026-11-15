@@ -43,6 +43,7 @@ internal fun throwingPorts(
                         if (broken.get()) explode() else peripheral.findGameByJoinCode(tx, code)
                     },
                 ),
+            attempts = stores.attempts,
             reader = ProjectionReader { id -> if (broken.get()) explode() else stores.reader.read(id) },
         ),
         ports.lock,
@@ -70,6 +71,7 @@ internal fun conflictingPorts(
             project = stores.project,
             idempotency = stores.idempotency,
             peripheral = stores.peripheral,
+            attempts = stores.attempts,
             reader = stores.reader,
         ),
         ports.lock,

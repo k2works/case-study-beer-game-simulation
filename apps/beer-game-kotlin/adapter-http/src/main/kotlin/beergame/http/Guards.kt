@@ -42,21 +42,13 @@ private fun rejectionOf(
     if (call.request.path() in PROBE_PATHS) return null
     val decision = limiter.tryAcquire(call.request.origin.remoteHost)
     return when {
-        decision is RateDecision.Limited -> rateLimitedProblem(decision)
+        decision is RateDecision.Limited -> rateLimitedProblem(decision.retryAfterSeconds)
         call.request.httpMethod in SAFE_METHODS -> null
         !originAllowed(call, origins) -> unauthorizedProblem()
         (call.request.contentLength() ?: 0L) > deps.settings.maxBodyBytes -> payloadTooLargeProblem()
         else -> null
     }
 }
-
-private fun rateLimitedProblem(decision: RateDecision.Limited): Problem =
-    Problem(
-        status = HttpStatusCodes.TOO_MANY_REQUESTS,
-        code = Codes.RATE_LIMITED,
-        title = "要求が多すぎます。しばらくしてからお試しください。",
-        retryAfterSeconds = decision.retryAfterSeconds,
-    )
 
 private fun originAllowed(
     call: ApplicationCall,

@@ -161,6 +161,7 @@ class RunningApp(
                 persistence = Persistence.open(dialect, dataSource, PersistenceConfig(secrets.responseKey))
             }
         }
+        clearAttemptWindows()
         server = startServer(secrets, 0)
         port =
             runBlocking {
@@ -170,6 +171,16 @@ class RunningApp(
                     .port
             }
         baseUrl = "http://127.0.0.1:$port/api/v1"
+    }
+
+    /**
+     * 参加・復帰の失敗の窓を空にする。PostgreSQL のコンテナはシナリオ間で共有し、接続元（127.0.0.1）も同じなので、
+     * 前のシナリオの失敗が、次のシナリオの参加を止めないようにする（試験の分離。本番のコードではない）。
+     */
+    private fun clearAttemptWindows() {
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { it.executeUpdate("DELETE FROM participation_attempts") }
+        }
     }
 
     /** 本番と同じ組み立て（appPorts）でサーバーを起動する。[port] が 0 なら空いているポート。 */

@@ -1,6 +1,8 @@
 package beergame.app
 
 import beergame.application.AppSettings
+import beergame.application.AppTtls
+import beergame.application.AttemptPolicy
 import beergame.application.Generators
 import beergame.application.Ports
 import beergame.application.SecureTokens
@@ -37,12 +39,38 @@ class CredentialTtls(
     }
 }
 
+/** 設定の値（検査済み）から、参加・復帰の窓の上限と長さを作る。 */
+fun attemptPolicy(
+    maxFailures: Int,
+    windowSeconds: Int,
+): AttemptPolicy =
+    AttemptPolicy
+        .of(maxFailures, Duration.ofSeconds(windowSeconds.toLong()))
+        .getOrNull() ?: error("検査を通った窓の設定が不正: $maxFailures 回、$windowSeconds 秒")
+
+fun attemptPolicy(config: ServerConfig): AttemptPolicy =
+    attemptPolicy(config.attemptMaxFailures, config.attemptWindowSeconds)
+
+/** 既定の窓（失敗 10 回、10 分。未計測の仮置き）。 */
+fun defaultAttemptPolicy(): AttemptPolicy =
+    attemptPolicy(ServerConfig.DEFAULT_ATTEMPT_MAX_FAILURES, ServerConfig.DEFAULT_ATTEMPT_WINDOW_SECONDS)
+
+/** 設定値で調整する、資格の期限と、参加・復帰の窓。既定は設計書の例と、未計測の仮置き。 */
+class Tuning(
+    val ttls: CredentialTtls = CredentialTtls(),
+    val attempts: AttemptPolicy = defaultAttemptPolicy(),
+) {
+    companion object {
+        fun of(config: ServerConfig): Tuning = Tuning(CredentialTtls.of(config), attemptPolicy(config))
+    }
+}
+
 fun appPorts(
     persistence: Persistence,
     secrets: Secrets,
     maxAttempts: Int,
     now: () -> Instant = Instant::now,
-    ttls: CredentialTtls = CredentialTtls(),
+    tuning: Tuning = Tuning(),
 ): Ports =
     Ports(
         generators =
@@ -58,11 +86,15 @@ fun appPorts(
         settings =
             AppSettings(
                 maxAttempts = maxAttempts,
-                idempotencyTtl = Duration.ofHours(IDEMPOTENCY_TTL_HOURS),
-                sessionTtl = ttls.session,
-                participantCredentialTtl = ttls.participantCredential,
+                ttls =
+                    AppTtls(
+                        Duration.ofHours(IDEMPOTENCY_TTL_HOURS),
+                        tuning.ttls.session,
+                        tuning.ttls.participantCredential,
+                    ),
                 idempotencySecret = secrets.idempotencyKey,
                 credentialKeys = secrets.credentialKeyRing(),
+                attempts = tuning.attempts,
             ),
     )
 

@@ -8,7 +8,8 @@ import org.slf4j.LoggerFactory
  * 構造化ログの 1 件。**項目として、資格・表示名・参加コード・冪等キー・非公開の値を持たない**（型で除外する。
  * 秘匿の設定に頼らない。NF-O1、NF-S14）。項目を足すときは、`LogRecordSpec` の許可リストを人が確かめて直す。
  *
- * [gameId] は不透明な UUID（参加コードではない）。[message] は、コードに書いた固定の文だけを入れる
+ * [gameId] は不透明な UUID（参加コードではない）。[src] は、参加・復帰の専用のレート制限の対象の要求だけが持つ、接続元の鍵付き要約
+ * （窓の鍵と同じ値。生の接続元ではない）。失敗の突き合わせに使う（B5 Step 5）。[message] は、コードに書いた固定の文だけを入れる
  * （例外のメッセージや入力の値は入れない）。[errorType] と [stack] は、予期しない例外のクラス名とスタックの各行。
  */
 @Serializable
@@ -23,6 +24,7 @@ data class LogRecord(
     val gameId: String? = null,
     val gameVersion: Long? = null,
     val sessionVersion: Long? = null,
+    val src: String? = null,
     val message: String? = null,
     val errorType: String? = null,
     val stack: List<String>? = null,

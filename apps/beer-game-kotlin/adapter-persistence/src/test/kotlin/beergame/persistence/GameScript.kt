@@ -19,6 +19,7 @@ import beergame.domain.SessionCommand
 import beergame.domain.SessionState
 import beergame.domain.StartGame
 import beergame.domain.StreamType
+import beergame.domain.assignRoleAfterStart
 import beergame.domain.decideGame
 import beergame.domain.decideSession
 import beergame.domain.evolveGame
@@ -121,6 +122,21 @@ class GameScript(
     /** 4 役割に 1 人ずつ参加させ、割り当てる。役割ごとの参加者を返す。 */
     fun joinAllRoles(): Map<Role, ParticipantId> =
         Role.entries.associateWith { role -> join().also { assign(it, role) } }
+
+    /** 開始後の役割の入れ替え（B5 Step 3.5）。担当者のいる [role] へ、参加済み・未割り当ての [participant] を割り当てる。 */
+    fun replaceRoleHolder(
+        participant: ParticipantId,
+        role: Role,
+    ): GameScript {
+        val at = now()
+        val command = GameCommand.AssignRole(facilitator, at, participant, role)
+        val decision = assignRoleAfterStart(game, session, command).getOrElse { error("入れ替えに失敗: $it") }
+        record(StreamType.GAME, facilitator, at, decision.game)
+        record(StreamType.SESSION, facilitator, at, decision.session)
+        game = decision.game.fold(game, ::evolveGame)
+        session = decision.session.fold(session, ::evolveSession)
+        return this
+    }
 
     fun startGame(): GameScript {
         val at = now()

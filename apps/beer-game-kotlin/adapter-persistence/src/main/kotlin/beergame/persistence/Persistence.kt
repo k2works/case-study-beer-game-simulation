@@ -1,5 +1,6 @@
 package beergame.persistence
 
+import beergame.application.AttemptStore
 import beergame.application.ChangeNotifier
 import beergame.application.EventStore
 import beergame.application.IdempotencyStore
@@ -40,6 +41,7 @@ class Persistence internal constructor(
     val projections: ProjectionWriter get() = stores.project
     val idempotency: IdempotencyStore get() = stores.idempotency
     val peripheral: PeripheralStore get() = stores.peripheral
+    val attempts: AttemptStore get() = stores.attempts
     val reader: ProjectionReader get() = stores.reader
     val lock: ProjectionLock get() = coordination.lock
     val notifier: ChangeNotifier get() = coordination.notifier
@@ -66,6 +68,7 @@ class Persistence internal constructor(
                     project = JdbcProjectionWriter(dialect),
                     idempotency = JdbcIdempotencyStore(dialect, ResponseCipher(config.responseKey)).port(),
                     peripheral = JdbcPeripheralStore().port(),
+                    attempts = JdbcAttemptStore().port(),
                     reader = JdbcProjectionReader(dataSource),
                 )
             return when (dialect) {

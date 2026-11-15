@@ -42,6 +42,9 @@ internal val GameIdKey = AttributeKey<String>("beergame.gameId")
 internal val ResultKey = AttributeKey<String>("beergame.result")
 internal val VersionsKey = AttributeKey<Versions>("beergame.versions")
 
+/** 参加・復帰の専用のレート制限の対象の要求の、接続元の鍵付き要約（ログの `src`。生の接続元ではない）。 */
+internal val SourceKey = AttributeKey<String>("beergame.source")
+
 /** 直前に返した problem。StatusPages の状態コードの処理が、同じ 404 を別の本文で上書きしないために覚えておく。 */
 internal val ProblemKey = AttributeKey<Problem>("beergame.problem")
 

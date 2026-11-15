@@ -119,7 +119,16 @@ internal suspend fun Ports.recoverParticipation(
             meta,
             issued = { actor -> actor.subject()?.let { IssuedCredential(session.raw, it.kind(), it.actorRef()) } },
         )
-    return runCommand(request) { tx, ctx ->
+    // 復帰資格の検査から先を、接続元ごとの窓で制限する（認可の失敗だけを数える。B5 Step 5）
+    return limitedAttempts(AttemptScope.RECOVER, meta.source) { runRecovery(gameId, request, session) }
+}
+
+private suspend fun Ports.runRecovery(
+    gameId: GameId,
+    request: CommandRequest,
+    session: MintedCredential,
+): Either<AppFailure, CommandOutcome> =
+    runCommand(request) { tx, ctx ->
         either {
             val subject = ensureNotNull(ctx.actor.subject()) { AppFailure.Unauthorized }
             val presented = ensureNotNull(ctx.presented) { AppFailure.Unauthorized }
@@ -144,7 +153,6 @@ internal suspend fun Ports.recoverParticipation(
             }.bind()
         }
     }
-}
 
 private const val STATUS_OK = 200
 private const val SCOPE_RECOVER = "recover"

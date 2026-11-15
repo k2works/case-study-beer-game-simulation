@@ -28,11 +28,15 @@ import java.util.UUID
  */
 internal enum class Auth { ANONYMOUS, REQUIRED, RECOVERY }
 
-/** 1 つの要求（冪等キー、資格、相関 ID）。 */
+/**
+ * 1 つの要求（冪等キー、資格、相関 ID）。[source] は正規化した接続元で、参加・復帰の専用のレート制限（[limitedAttempts]）だけが使う。
+ * HTTP の層が必ず渡す。無い呼び出し（HTTP の外の試験など）は、制限を受けない。
+ */
 data class RequestMeta(
     val idempotencyKey: String,
     val credential: String?,
     val correlationId: UUID,
+    val source: AttemptSource? = null,
 )
 
 /** 何を・どのゲームに・どんな内容で。[scope] は「操作の名前 + 対象」で、冪等記録の範囲と、要求の同一性の対象になる。 */

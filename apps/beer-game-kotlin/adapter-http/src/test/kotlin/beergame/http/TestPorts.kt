@@ -3,6 +3,9 @@ package beergame.http
 import arrow.core.Either
 import beergame.application.AppFailure
 import beergame.application.AppSettings
+import beergame.application.AppTtls
+import beergame.application.AttemptPolicy
+import beergame.application.AttemptStore
 import beergame.application.ChangeNotifier
 import beergame.application.CredentialKeyRing
 import beergame.application.EventStore
@@ -34,14 +37,31 @@ class UnexpectedPortCall(
 
 private fun unreachable(name: String): Nothing = throw UnexpectedPortCall(name)
 
-private object NoTx : TransactionRunner {
+/** 参加・復帰の窓の上限（失敗 3 回まで、10 分）。 */
+val ATTEMPT_POLICY: AttemptPolicy =
+    when (val policy = AttemptPolicy.of(3, Duration.ofMinutes(10))) {
+        is Either.Right -> policy.value
+        is Either.Left -> unreachable("attemptPolicy: ${policy.value}")
+    }
+
+object NoTx : TransactionRunner {
     override suspend fun <A> invoke(block: suspend (Tx) -> Either<AppFailure, A>): Either<AppFailure, A> =
         unreachable("transaction")
 }
 
+/** 参加・復帰の窓の保存の差し替え。既定は、呼ばれたら失敗する。 */
+val NO_ATTEMPTS: AttemptStore =
+    AttemptStore(
+        charge = { _, _ -> unreachable("attempts.charge") },
+        refund = { _, _ -> unreachable("attempts.refund") },
+        purge = { _, _ -> unreachable("attempts.purge") },
+    )
+
 fun stubPorts(
     notifierAlive: Boolean = true,
     newId: suspend () -> UUID = { unreachable("newId") },
+    attempts: AttemptStore = NO_ATTEMPTS,
+    transaction: TransactionRunner = NoTx,
 ): Ports =
     Ports(
         generators =
@@ -57,7 +77,7 @@ fun stubPorts(
                     EventStore(
                         read = { _, _, _ -> unreachable("events.read") },
                         append = { _, _, _ -> unreachable("events.append") },
-                        transaction = NoTx,
+                        transaction = transaction,
                     ),
                 project = ProjectionWriter { _, _, _ -> unreachable("project") },
                 idempotency =
@@ -72,6 +92,7 @@ fun stubPorts(
                         authenticateRecovery = { _, _, _ -> unreachable("peripheral.authenticateRecovery") },
                         findGameByJoinCode = { _, _ -> unreachable("peripheral.findGameByJoinCode") },
                     ),
+                attempts = attempts,
                 reader = ProjectionReader { unreachable("reader") },
             ),
         lock =
@@ -88,15 +109,14 @@ fun stubPorts(
         settings =
             AppSettings(
                 maxAttempts = 3,
-                idempotencyTtl = Duration.ofHours(24),
-                sessionTtl = Duration.ofHours(24),
-                participantCredentialTtl = Duration.ofDays(30),
+                ttls = AppTtls(Duration.ofHours(24), Duration.ofHours(24), Duration.ofDays(30)),
                 idempotencySecret = ByteArray(32) { it.toByte() },
                 credentialKeys =
                     when (val ring = CredentialKeyRing.of(1, mapOf(1 to ByteArray(32) { (it + 7).toByte() }))) {
                         is Either.Right -> ring.value
                         is Either.Left -> unreachable("credentialKeys: ${ring.value}")
                     },
+                attempts = ATTEMPT_POLICY,
             ),
     )
 

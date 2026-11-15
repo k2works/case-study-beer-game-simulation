@@ -1,4 +1,7 @@
--- 101: DB ロールと GRANT（PostgreSQL 専用。H2 には適用しない）。events の追記専用と、観察者の最小権限（NF-S18、BR-17）。
+-- 102: DB ロールと GRANT（PostgreSQL 専用。H2 には適用しない）。events の追記専用と、観察者の最小権限（NF-S18、BR-17）。
+-- 番号は B5 Step 5.5 で付け替えた（B2 で 101 として作った。冪等記録の索引の 101 を B1 の作った順に前へ置き、GRANT は、
+-- 共通の表（001〜008）がすべて揃った後に適用される番号にした）。永続環境がまだ無い間だけ安全な変更（適用済みの DB は、
+-- Flyway の版・チェックサムの検証に当たる）。
 --
 -- 表の所有者は、このマイグレーションを実行する接続のユーザー（所有者。migrate タスクだけが使う）。
 -- 下の 4 つのロールは、どの表も所有せず、所有者のロールのメンバーにもならない（権限の継承で広がらない）。
@@ -8,7 +11,9 @@
 -- 連鎖削除（ON DELETE CASCADE）の子の行の削除は、PostgreSQL が参照の整合性のトリガーを「子の表の所有者」の権限で
 -- 実行するため、削除ロールに events の DELETE 権限が無くても動く（Step 3 の実測。RolePrivilegesSpec）。
 --
--- 以降の表の追加（V006 の deletion_* など）は、その表の GRANT をそのマイグレーションで書く（既定の権限は与えない）。
+-- 以降の表の追加（V006 の deletion_* など）は、その表の GRANT を書く。共通のマイグレーション（H2 にも適用する）には
+-- ロールが無いので GRANT を書けない。**その表のマイグレーションより大きい番号の、PostgreSQL 専用のマイグレーション（103〜）**に書く
+-- （既定の権限は与えない）。participation_attempts（V008）の GRANT は、この 102 に含めた（永続環境が無い間の付け替えと同時のため）。
 
 DO $$
 DECLARE
@@ -38,6 +43,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON
     session_overview, role_current_states, current_decisions,
     week_commits, week_role_results, week_team_totals
     TO beergame_writer;
+
+-- 参加・復帰の窓（V008。接続元の鍵付き要約の失敗の数。ゲームに属さない）。書き込みロールだけが、数えて（INSERT・UPDATE）、
+-- 古い窓を掃除する（DELETE）。読み取り・観察者・削除のロールには与えない。TRUNCATE は与えない。
+GRANT SELECT, INSERT, UPDATE, DELETE ON participation_attempts TO beergame_writer;
 
 -- 読み取り（api の問い合わせ）。投影の SELECT だけ。display_profiles はロビーの表示名の結合に使う。
 GRANT SELECT ON

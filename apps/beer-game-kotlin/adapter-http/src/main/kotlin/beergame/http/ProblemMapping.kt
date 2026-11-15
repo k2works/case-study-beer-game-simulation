@@ -27,6 +27,7 @@ internal fun AppFailure.toProblem(): Problem =
         is AppFailure.ConcurrencyConflict, is AppFailure.RetryExhausted -> retryExhaustedProblem()
         is AppFailure.IdempotencyKeyReused -> idempotencyKeyReusedProblem()
         is AppFailure.Unauthorized -> unauthorizedProblem()
+        is AppFailure.RateLimited -> rateLimitedProblem(retryAfterSeconds)
         is AppFailure.Persistence -> internalProblem()
     }
 

@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:33:58Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -492,13 +492,90 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ### Step 5: 参加・復帰の専用のレート制限（🔴🟢）
 
-- [ ] 5.1 🔴 総当たりのテストを先に書く（NF-S11、NF-S19）: 同じ接続元の連続した失敗が上限で 429、**複数のアプリケーションのインスタンスで合算される**（判断項目 4 の案 A の場合。2 つのアプリで同じ DB を共有する統合テスト）、成功は窓に数えない、**形式が不正な本文は窓に数えない**案の確認、接続元の鍵に生の IP が DB に残らない。失敗を確認する
-- [ ] 5.2 🟢 試行の窓の保存（判断項目 4・5 の決定どおり）。参加（`/participations/join`）、復帰（`/participations/recover`）に適用する。上限・窓の値は設定値（根拠は未計測の仮置きとして記録）
-- [ ] 5.3 🟢 失敗の記録（ログの形。観測の完成は B13）。復帰の失敗の応答は、存在・期限・削除を区別しない（NF-S12）
-- [ ] 5.4 🟡 リファクタリング
-- [ ] 5.5 マイグレーションの番号（判断項目 5 の決定: 試行の窓の表の追加と、V101・V102 の付け替えを承認済み）。**現状の配置は、共通 `V001`〜`V005`、PostgreSQL `V101`（ロールと GRANT）・`V102`（冪等記録の索引）。データモデルの番号計画は、共通 `006` が B11（保持）の予約**。試行の窓の表と付け替え後の番号を、`006` と衝突しない形で決め、データモデルに記録する（**番号は、ゲート 5 で人が確認する**）。**窓の表の GRANT を、同じマイグレーションで書く**（V101 の注記: 以降の表は、その表の GRANT をそのマイグレーションで書く。既定の権限は与えない）。付け替えは永続環境がまだ無い間だけ安全（適用済みの DB は Flyway のチェックサムと版の検証に当たる）ことを確認する。**決定が更新履歴にあるのにステップに無かったため追加**（`validating-design` 軸 B の B9）
+> **Step 5 の実施結果（2026-11-15。ゲート 5 は人の確認待ちで、承認していない）**: 5.1〜5.5 を実施した。結果は「[Step 5 の実施結果](#step-5-の実施結果2026-11-15)」。Step 6 以降には進んでいない。
+
+- [x] 5.1 🔴 総当たりのテストを先に書く（NF-S11、NF-S19）: 同じ接続元の連続した失敗が上限で 429、**複数のアプリケーションのインスタンスで合算される**（判断項目 4 の案 A の場合。2 つのアプリで同じ DB を共有する統合テスト）、成功は窓に数えない、**形式が不正な本文は窓に数えない**案の確認、接続元の鍵に生の IP が DB に残らない。失敗を確認する
+- [x] 5.2 🟢 試行の窓の保存（判断項目 4・5 の決定どおり）。参加（`/participations/join`）、復帰（`/participations/recover`）に適用する。上限・窓の値は設定値（根拠は未計測の仮置きとして記録）
+- [x] 5.3 🟢 失敗の記録（ログの形。観測の完成は B13）。復帰の失敗の応答は、存在・期限・削除を区別しない（NF-S12）
+- [x] 5.4 🟡 リファクタリング
+- [x] 5.5 マイグレーションの番号（判断項目 5 の決定: 試行の窓の表の追加と、V101・V102 の付け替えを承認済み）。**現状の配置は、共通 `V001`〜`V005`、PostgreSQL `V101`（ロールと GRANT）・`V102`（冪等記録の索引）。データモデルの番号計画は、共通 `006` が B11（保持）の予約**。試行の窓の表と付け替え後の番号を、`006` と衝突しない形で決め、データモデルに記録する（**番号は、ゲート 5 で人が確認する**）。**窓の表の GRANT を、同じマイグレーションで書く**（V101 の注記: 以降の表は、その表の GRANT をそのマイグレーションで書く。既定の権限は与えない）。付け替えは永続環境がまだ無い間だけ安全（適用済みの DB は Flyway のチェックサムと版の検証に当たる）ことを確認する。**決定が更新履歴にあるのにステップに無かったため追加**（`validating-design` 軸 B の B9）
 
 **ゲート 5**: レート制限の方式、保存する情報、スキーマの変更を、人が確認する（**スキーマ変更は確認必須**）。**状態: 人の確認待ち（未承認）。**
+
+#### Step 5 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 5 の承認は記録していない。Step 6 以降には進んでいない。**
+
+**決定の反映**: 判断項目 4 の案 A（DB に窓を持つ）、判断項目 5（マイグレーション追加と V101・V102 の付け替えの承認。ただし番号は、ゲート 5 で人が確認する）、Step 3.5 のスキーマ変更の承認（案 A: `lobby_participants.replaced_at`）。
+
+**手順（TDD）**: テストを先に書いた。application・persistence・http・app のテストが、未定義の型（`AttemptPolicy`・`AttemptSource`・`AttemptStore`・`AppFailure.RateLimited` ほか）のコンパイルエラー（`:application:compileTestKotlin` ほか。出力した `e:` は 202 行）で失敗することを確認してから実装した。**永続化の契約（`replaced_at`）は、V007 を一時的に外して実行し、3 件が失敗する（Step 4 で実測した列の欠如の失敗）ことを確かめてから、戻した**。**規則を壊すと否定テストが落ちることを個別に確かめた**（下の「ミューテーションの確認」）。順序を守れなかった箇所: 無し（`ServerConfig` の設定も、`ServerConfigSpec` を先に書いた）。
+
+**実装したもの**:
+
+- `AttemptLimit.kt`（新規。application）: `AttemptScope`（`join`・`recover`）、`AttemptPolicy`（上限・窓の長さ。`of` で検査）、`AttemptSource`（接続元の正規化。IPv4 はそのまま、IPv4 射影の IPv6 は IPv4、IPv6 は上位 64 ビット `/64`、IP でない文字列は小文字の不透明な値。`toString` は値を含めない）、`AttemptWindow`、ポート `AttemptStore`（`charge`・`refund`・`purge`）、`AppSettings.sourceKey`（HMAC-SHA256 の鍵付き要約。冪等キーの鍵を、部分の並び `"attempt-source"` で分けて使う）、`limitedAttempts`（窓で制限して実行する）。
+- 順序: **窓に 1 を足す（別のトランザクション）→ 上限を超えたら検査せずに `AppFailure.RateLimited` → 検査・実行 → 認可の失敗（`Unauthorized`・`game.invitation_invalid`）でなければ 1 を戻す**。新しい窓の最初の記録で、前の窓の行を掃除する。窓を保存できないときは通さない（`Persistence` を返す）。`RequestMeta.source` が無い呼び出し（HTTP の外）は制限しない。
+- `joinGame`: 表示名の検証（入力の誤り）の**後**から、参加コードの検査（形式不正・不明）と参加を、窓で制限する。`recoverParticipation`（`internal`。HTTP の配線は Step 6）: 復帰資格の検査から先を、窓で制限する。
+- `JdbcAttemptStore`（新規。adapter-persistence）: H2 と PostgreSQL で同じ SQL。`INSERT … ON CONFLICT DO NOTHING`（0 で作る）→ `UPDATE … failure_count + 1`（行をロックして直列化）→ `SELECT`。
+- マイグレーション: 共通 `V007__lobby_participants_replaced_at.sql`、共通 `V008__participation_attempts.sql`、PostgreSQL の 101・102 の付け替え（`git mv`）と、102 への `participation_attempts` の GRANT。
+- HTTP: `POST /participations/join` を `limited`（接続元を `AttemptSource` にして渡し、ログへ鍵付き要約を載せる）にした。`AppFailure.RateLimited` を 429 `app.rate_limited`（`Retry-After`）に写す（全体の制限と同じ本文）。`LogRecord` に `src`（参加・復帰の要求だけ）を追加。**復帰（`/participations/recover`）の経路は Step 6**。
+- `app`: `ATTEMPT_MAX_FAILURES`（既定 10）・`ATTEMPT_WINDOW_SECONDS`（既定 600）。**根拠のない（未計測の）仮置き**。
+
+**番号の提案（ゲート 5 で人が確認する）**: 共通は **007（`replaced_at`）と 008（`participation_attempts`）**。**006 は B11（保持）の予約として空けた**（B5 は使わない）。PostgreSQL は **101＝冪等記録の索引（B1。旧 102）、102＝ロールと GRANT（B2。旧 101）に付け替え**た。適用順は 001〜005 → 007 → 008 → 101 → 102。詳細は [データモデル](../../design/beer-game-kotlin/data-model.md)「B5 Step 5.5 の番号」。**限界**: 006 は 007・008 より小さい。B11 の着手時に永続環境があれば Flyway が 006 を拒否するので、そのときは次の空き番号を使う。付け替えは、永続環境が無い間だけ安全（ローカルに古い 101・102 を適用済みの PostgreSQL があれば作り直す）。
+
+**実測**（`apps/beer-game-kotlin` で実行。静的解析は JDK 21 = Corretto 21.0.12、それ以外は既定の JDK 25。Docker の PostgreSQL 18 の Testcontainers は使えた）:
+
+| 検査 | 結果 |
+| :--- | :--- |
+| `:domain:test`・`:domain:koverVerify` | 395 件、失敗 0。行 100% のゲートは合格（domain は変更なし） |
+| `:application:test` | **146 件、失敗 0**（121 件から 25 件増: `AttemptLimitSpec` 16、`AttemptSourceSpec` 9） |
+| `:adapter-persistence:test`（H2） | **91 件、失敗 0**（77 件から 14 件増: 窓の契約 8、窓の実 DB のフロー 3、`replaced_at` の投影の契約 1、マイグレーション 2） |
+| `:adapter-persistence:integrationTest`（PostgreSQL 18） | **78 件、失敗 0**（63 件〔51 + 12〕から 15 件増: 上の契約 12、マイグレーションの順序と列 2、`RolePrivilegesSpec` に窓の表の権限 1）。H2 と同じ契約を PostgreSQL でも実行した |
+| `:adapter-http:test` | **74 件、失敗 0**（70 件から 4 件増: `AttemptRoutesSpec`） |
+| `:app:test` | **78 件中 7 件 failed**（Step 4 と同じ `ApiContractSpec` の想定どおりの Red 7 件。`HttpFlowSpec` に窓の流れ 1、`ServerConfigSpec` に 2 を足した） |
+| `:app:integrationTest` | 1 件、失敗 0（`PostgresHttpSpec`） |
+| `:app:acceptanceTestH2`・`:app:acceptanceTest`（PostgreSQL 18） | どちらも **71 件中 36 件 failed、1 件 skipped**（Step 4 の 68 件中 36 件 failed と**失敗の数は同じ**。新しい 3 シナリオ〔`features/game-setup/join-rate-limit.feature`〕は、H2・PostgreSQL とも passed）。残りの 36 件は、Step 6 の配線の前の想定内の Red |
+| `web`: `npm run acceptance:dry-run` | 緑（`@api` のシナリオは対象外） |
+| `ktlintCheck`、`detekt`・`detektMain`・`detektTest`、`pmd`（`pmdMain`・`pmdTest`・`pmdAdapter`・`pmdDomainApplication`・fixture） | **違反 0**（`@Suppress` なし、ベースラインなし。`pmdFixtureTest` の 17 件は、期待する違反の検査）。途中で、ktlint の行の長さと detekt の `TooManyFunctions`（`ProblemMapping.kt`）・`LongParameterList`（`AppSettings`・`appPorts`）・`LongMethod`・`InjectDispatcher` を指摘され、設定を変えずにコードを直した |
+
+**否定テストの網羅**（NF-S11・NF-S19。application の `AttemptLimitSpec`、永続化の契約、HTTP）:
+
+| 観点 | テスト |
+| :--- | :--- |
+| 上限で 429 | 失敗が上限（3 回）に達した接続元は、**正しい参加コード・正しい復帰資格でも** `RateLimited`（残りの秒数つき）。参加コードの検査・冪等記録の検索・追記に進まない。別の接続元は影響を受けない。窓が過ぎると参加できる。HTTP は 429 `app.rate_limited` と `Retry-After` |
+| 合算 | 同じ DB を共有する 2 つのインスタンス（2 つの `Ports`）が受けた失敗が合算される（H2・PostgreSQL）。**別の接続プール 2 つ**の `charge` が合算される。同時の 24 回の `charge` が、1〜24 の連番を 1 回ずつ受け取る（H2・PostgreSQL） |
+| 成功・入力の誤りは数えない | 上限を超えて成功し続けられる（参加・復帰）。形式が不正な本文（表示名が空・項目なし・構文エラー）は 422 / 400 で、窓の保存に触れない。受付が終わったゲーム（`game.not_preparing`）は認可の失敗ではないので数えない |
+| 理由を区別しない（NF-S12） | 無い・形式違い・不明・失効・別のゲームの復帰資格が、すべて同じ `Unauthorized` で、すべて窓に数える。形式不正と不明な参加コードは同じ失敗で、どちらも数える |
+| 参加と復帰は別 | 参加で上限に達しても、復帰は検査される |
+| 生の接続元が残らない | 失敗を記録した後、**全表の全列**を文字列にして、生の IP を含む表が無い（H2・PostgreSQL）。窓の表の列は `scope`・`key_digest`・`window_start`・`failure_count` だけ。窓の鍵は 64 桁の 16 進で、ログの `src` と同じ値。ログに `127.0.0.1`・`localhost` は載らない |
+| 閉じる側に倒す | 窓を保存できないとき、参加コードの検査も追記もせず `Persistence` を返す |
+| 権限（PostgreSQL） | 書き込みロールだけが、窓の表を読み書き・掃除できる。読み取り・観察者・削除のロールは読めず、書けない。窓の表は `game_id` を持たず、連鎖削除の網羅の対象外 |
+| 制約 | `failure_count` の負の値と、未知の `scope` は、制約で拒否される |
+| マイグレーション | H2 は 001〜005・007・008、PostgreSQL は 001〜005・007・008・101・102 の順に適用される。`replaced_at` は NULL 可（PostgreSQL は `timestamptz`）。窓の表の主キーは 3 列 |
+| `replaced_at`（Step 4 で保留） | 入れ替えた後、旧担当者の行は消えず `role` が NULL・`replaced_at` に時刻、新担当者は `role` を持ち `replaced_at` は NULL（H2・PostgreSQL） |
+
+**ミューテーションの確認**（規則を壊すと否定テストが落ちること。壊した後に戻し、緑に戻したことを確認した）: (1) 成功を戻さない → 2 件が失敗（成功した参加・復帰が数えられる）。(2) 認可の失敗以外も数える → 1 件が失敗（受付が終わったゲーム）。(3) 上限の検査を外す → 3 件が失敗（上限の拒否、窓が過ぎた後、復帰の拒否）。
+
+**計画・設計からの差**（設計書は更新した。[data-model](../../design/beer-game-kotlin/data-model.md) の「参加・復帰の失敗の窓」・マイグレーションの表・差の表 37〜39、[architecture-backend](../../design/beer-game-kotlin/architecture-backend.md) の「レート制限」・BD8・差の表 47）:
+
+1. **接続元の鍵に、冪等キーの鍵を流用した**（部分の並びを `"attempt-source"` で分ける。新しい設定・秘密を足さない）。鍵を替えると、窓が切れる（失敗の数がリセットされる）。専用の鍵・鍵の版を持つかは人が決める。
+2. **検査の前に足し、認可の失敗でなければ戻す**方式にした（失敗してから数える方式では、同時の要求が上限を超えて検査を通り抜ける）。戻せなかった場合は、数が多めに残るだけ（安全な側）。
+3. **上限に達した接続元は、正しい参加コードでも 429**（総当たりの当たりを知らせないため）。**同じ接続元（NAT・研修会場の共有 IP）の別の参加者も、その窓の間は参加できない**。上限（10 回）と窓（10 分）は、運営者との合意の無い仮置き。
+4. **IPv6 は /64 にまとめた**（アドレスを替えて窓を避けられないため）。仮置き。
+5. **ALB の背後では、接続元が ALB になり、全利用者が同じ窓に入る**。`X-Forwarded-For` は信頼しない。接続元の取り方は B14 で決める（本 Bolt の範囲外。設計書の未決事項のまま）。
+6. 失敗の記録（5.3）は、アクセスログの `result`（`game.invitation_invalid`・`app.unauthorized`・`app.rate_limited`）と `src`（鍵付き要約）で表す。**専用の失敗のログ行・アラートは足していない**（観測の完成は B13）。
+7. `AppSettings` の引数が detekt の上限に達したため、期限を `AppTtls` にまとめた（`idempotencyTtl`・`sessionTtl`・`participantCredentialTtl` は同じ名前のプロパティで読める）。`app` の `appPorts` は `Tuning`（資格の期限と窓）を受け取る。
+8. 受け入れの試験の道具: `RunningApp` が、シナリオの開始時に窓の表を空にする（PostgreSQL のコンテナをシナリオ間で共有し、接続元も同じ `127.0.0.1` のため、前のシナリオの失敗が次を止めないように。試験の分離で、本番のコードではない）。新しいタグ `@NF-<名前>`（`features/TAGS.md`）。
+
+**ゲート 5 で人が確認すること**:
+
+1. **方式**。DB の窓（案 A）で、検査の前に足して戻す方式。**数えるのは認可の失敗だけ**で、成功と入力の誤りは数えない。上限に達したら、**正しい参加コード・復帰資格でも検査せずに 429**。窓を保存できないときは通さない。**同じ接続元（共有 IP）の巻き込み**を許容するか。仮置き（10 回・10 分・IPv6 は /64）の値。
+2. **保存する情報**。接続元の**鍵付き要約だけ**（生の IP は DB にもログにも残さない）。鍵は冪等キーの鍵を流用。ゲームに属さない（連鎖削除の対象外。窓が終わった行は、新しい窓の最初の記録で掃除）。ログの `src`。
+3. **スキーマの変更**（確認必須）。V007（`lobby_participants.replaced_at`。拡張だけ）、V008（`participation_attempts` の新規作成と索引）、102 への GRANT（書き込みロールだけ）。
+4. **番号**。共通 007・008（006 は B11 の予約として空け）。PostgreSQL の 101 と 102 の入れ替え。B11 の着手時と、永続環境の前の扱い（006 を使わず次の空き番号にする）。Terraform の `infra/modules/rds/main.tf` のコメントが「V101」のままであること（本 Bolt は Terraform を変更しない）。
+5. **新規ファイル**（確認必須）: `AttemptLimit.kt`、`JdbcAttemptStore.kt`、V007・V008、試験の `AttemptLimitSpec.kt`・`AttemptSourceSpec.kt`・`AttemptStoreContract.kt`・`AttemptFlowContract.kt`・`AttemptRoutesSpec.kt`、受け入れの `join-rate-limit.feature`・`JoinRateLimitSteps.kt`。
+6. 設計の変更: `AppSettings`（`ttls: AppTtls`・`attempts: AttemptPolicy`）、`Stores.attempts`、`RequestMeta.source`、`AppFailure.RateLimited`、`app` の `Tuning`・設定名。**復帰の経路への適用は Step 6**（`limited = true` を付ける。application は適用済み）。
+
+**実施中の逸脱**（正直に記録する）: (1) 作業中に、ファイルの編集を禁じられている heredoc を、**何も書かない確認のために 2 回誤って起動した**（`python3` の heredoc を 1 回、`cat` の heredoc を 1 回。ファイルの変更は無い）。ファイルの編集は、Write・Edit と、`git mv`（101・102 の付け替え）、`mv`（`replaced_at` の失敗の確認のために V007 を一時的に外して戻した）だけで行った。(2) 書式の違反（行の長さ・引数の改行）の自動修正に、プロジェクトの `./gradlew ktlintFormat` を使った（自分で書いたファイルだけが変わったことを `git status` で確認した）。(3) 試験の一時ファイルは作っていない。
 
 ### Step 6: アプリケーションと HTTP（🔴🟢🟡）
 
@@ -651,6 +728,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 5（参加・復帰の専用のレート制限。5.1〜5.5）を実施**（ゲート 5 は人の確認待ち。**承認は記録していない**。Step 6 以降は未着手）。テストを先に書き、コンパイルエラーの Red（`replaced_at` は、V007 を外した 3 件の失敗）を確認してから実装。**DB に窓を持つ**（`participation_attempts`。検査の前に足し、認可の失敗でなければ戻す。上限超過は検査せずに 429。接続元は正規化して鍵付き要約にし、生の IP は残さない）。参加（HTTP まで）と復帰（application まで。HTTP は Step 6）に適用。マイグレーション: 共通 007（`replaced_at`）・008（窓の表）、PostgreSQL の 101 と 102 の付け替え（101＝冪等記録の索引、102＝ロールと GRANT。窓の表の GRANT を含む）、**006 は B11 の予約として空けた**。**実測**: application 146 件、persistence（H2）91 件・PostgreSQL の統合 78 件、http 74 件、すべて失敗 0。`:app:test` は想定の 7 件の Red（`ApiContractSpec`）、受入は H2・PostgreSQL とも 71 件中 36 failed（Step 4 と同数。新しい 3 シナリオは passed）。ktlint・detekt（JDK 21）・PMD は違反 0。ミューテーション 3 件で否定テストが落ちることを確認。設計書（data-model、architecture-backend、architecture-infrastructure）と ADR-015 の注記を更新。**逸脱: heredoc を何も書かない確認で 2 回誤って起動（ファイルの変更なし）。書式の自動修正に `ktlintFormat` を使用**。人が確認する点（方式、保存する情報、スキーマ変更、番号）は「Step 5 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 4（鍵の版・資格の期限と失効・冪等記録の順序。4.1〜4.7）を実施**（ゲート 4 は人の確認待ち。**承認は記録していない**。Step 5 以降は未着手）。テストを先に書き、application はコンパイルエラー 125 件・domain の投影は 4 件の Red を確認してから実装（`ServerConfig` の設定だけ、実装が先で逸脱）。`CredentialKeyRing`（値の版の接頭辞）、ブラウザセッションと復帰資格を別のダイジェストに分離、`Auth.RECOVERY`（冪等記録の照合より前に検証）、失効（H2 案 A。`credentials.revoked_at` の更新と `browser_sessions` の行の削除を同じトランザクションで。`CredentialRevoked` から必ず導く）、`internal` の失効・再発行・復帰（公開と HTTP は Step 6）、全 17 種類のイベントの golden、停止・再開・代理入力・入れ替えの投影、鍵のローテーションの受入の道具（再起動）。**実測**: domain 395 件・行 1038/1038（100%）、application 121 件、persistence（H2）77 件・PostgreSQL の統合 64 件（51 + 12 + 1）、すべて失敗 0。`:app:test` は想定の 7 件の Red（`ApiContractSpec`）。受入は H2・PostgreSQL とも 68 件中 36 failed（Step 3.5 と同じ）。ktlint・detekt（JDK 21）・PMD は違反 0。ミューテーション 5 件で否定テストが落ちることを確認。**`replaced_at` の永続化は Step 5.5 まで保留**（H2 で `SQLSTATE 42S22` を実測）。設計書（architecture-backend 43〜46、data-model 35・36、domain-model 39）を更新。**逸脱: heredoc・python を何も書かない確認で 2 回誤って起動（ファイルの変更なし）**。人が確認する 6 点は「Step 4 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3.5.2〜3.5.4（役割の入れ替えのドメイン実装）を実施**（ゲート 3.5 の後半〔実装の確認〕は人の確認待ち。**承認は記録していない**。Step 4 以降は未着手）。テストを先に書き、コンパイルエラーの Red を確認してから実装。`ParticipantReplaced`・`RoleHolderReplaced`・`assignRoleAfterStart`（`ReplaceDecision.kt` 新規）、`evolveGame` が開始後の `RoleAssigned` を採用する変更、永続化の DTO・往復を追加。実測: `:domain:test` 390 件・失敗 0、domain の行 1018/1018（100%）、`:app:test` は想定の 7 件の Red（`ApiContractSpec`）、静的解析は違反 0（JDK 21）。マイグレーション（`replaced_at`）は Step 5.5、配線・ステップ定義は Step 6 に残す。**`lobby_participants` の投影を足すステップが計画に無い**ことを記録。人が確認する 5 点は「Step 3.5 の実施結果」。設計書の差の表 38 を追加 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3.5.1（役割の入れ替えの仕様と設計書）を実施**（ゲート 3.5 は人の確認待ち。**承認は記録していない**。3.5.2 以降は着手していない。Kotlin のコードとマイグレーションは書いていない）。`openapi.yaml` の `assignRole` に規則を書き（新しい `code` なし、`LobbyParticipant.replaced` を条件付きで追加）、`api:generate`・`api:check`・`api:lint` を実行（差分 0・有効）。設計書（`domain-model.md` の「役割の入れ替え」・イベント EV-G12・EV-S09・差の表 37、`data-model.md` の「役割の入れ替えと永続化」ほか）と `credentials.feature` の 6 シナリオを追加。**確認した事実: Kotlin 版に `participants.replaced_at` に当たる列は無い（スキーマ変更の要否は確認必須の人の判断）。`session` の割り当ての写し（D4）の更新が要るため、入れ替えは 2 ストリームにまたがる**。`ApiContractSpec` は 13 件中 7 件 failed（Step 3 と同じ。新しい Red なし）。人が確認する 8 点は「Step 3.5.1 の結果」 | claude-code/claude-sonnet-5-5 |

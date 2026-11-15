@@ -2,6 +2,7 @@ package beergame.app
 
 import arrow.core.left
 import beergame.application.AppFailure
+import beergame.application.AttemptPolicy
 import beergame.application.PeripheralWrite
 import beergame.application.Ports
 import beergame.domain.CredentialSubject
@@ -24,6 +25,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -283,6 +285,44 @@ class HttpFlowSpec :
                 }
                 unknown.problemWithoutCorrelation() shouldBe malformed.problemWithoutCorrelation()
                 game.joinCode.length shouldBe 12
+            }
+        }
+
+        test(
+            "[5.1][NF-S11] 参加の総当たり: 失敗が上限（3 回）の接続元は、正しい参加コードでも 429（Retry-After つき）。" +
+                "成功は数えず、窓が過ぎると参加できる",
+        ) {
+            val attempts = AttemptPolicy.of(3, Duration.ofMinutes(10)).getOrNull() ?: error("窓の設定が不正")
+            withWorld(World(attempts = attempts)) { world ->
+                val created = client.createGame(key = "c-limit")
+                val facilitator = created.requireCredential()
+                val id = created.location().removePrefix("$API/games/").removeSuffix("/state")
+                val code = client.call(HttpMethod.Get, "/games/$id/state", cookie = facilitator).body().str("joinCode")
+
+                suspend fun join(
+                    joinCode: String,
+                    key: String,
+                ) = client.call(
+                    HttpMethod.Post,
+                    "/participations/join",
+                    """{"joinCode":"$joinCode","displayName":"田中"}""",
+                    key = key,
+                )
+
+                // 成功は、上限を超えて繰り返しても数えない
+                repeat(5) { join(code, "ok-$it").status shouldBe HttpStatusCode.OK }
+                // 失敗（不明な参加コード）は 3 回まで 403。形式が不正な本文は数えない
+                repeat(3) { join("ZZZZZZZZZZZ$it", "bad-$it").status shouldBe HttpStatusCode.Forbidden }
+                client.call(HttpMethod.Post, "/participations/join", "{}", key = "malformed").status shouldBe
+                    HttpStatusCode.UnprocessableEntity
+
+                val blocked = join(code, "blocked")
+
+                blocked.status shouldBe HttpStatusCode.TooManyRequests
+                blocked.body().str("code") shouldBe "app.rate_limited"
+                blocked.headers[HttpHeaders.RetryAfter] shouldBe "600"
+                world.clock.advance(600)
+                join(code, "after-window").status shouldBe HttpStatusCode.OK
             }
         }
 
@@ -827,7 +867,14 @@ private fun deadNotifier(ports: Ports): Ports = ports.withNotifier(ports.notifie
 private fun Ports.withEvents(events: beergame.application.EventStore): Ports =
     Ports(
         generators,
-        beergame.application.Stores(events, stores.project, stores.idempotency, stores.peripheral, stores.reader),
+        beergame.application.Stores(
+            events,
+            stores.project,
+            stores.idempotency,
+            stores.peripheral,
+            stores.attempts,
+            stores.reader,
+        ),
         lock,
         notifier,
         settings,

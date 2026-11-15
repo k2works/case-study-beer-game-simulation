@@ -204,6 +204,28 @@ class ServerConfigSpec :
                 )
         }
 
+        test("[5.2] Given 参加・復帰の窓の設定が無い When 読み込む Then 既定は失敗 10 回・10 分（未計測の仮置き）。設定すれば反映する") {
+            val defaults = configOf(production())
+            val tuned = configOf(production("ATTEMPT_MAX_FAILURES" to "5", "ATTEMPT_WINDOW_SECONDS" to "300"))
+
+            defaults.attemptMaxFailures shouldBe 10
+            defaults.attemptWindowSeconds shouldBe 600
+            tuned.attemptMaxFailures shouldBe 5
+            tuned.attemptWindowSeconds shouldBe 300
+        }
+
+        test("[5.2] Given 参加・復帰の窓の設定が不正（0・負・数でない・窓が 1 日超） When 読み込む Then 設定の名前だけを示して失敗する") {
+            errorsOf(production("ATTEMPT_MAX_FAILURES" to "0", "ATTEMPT_WINDOW_SECONDS" to "x")) shouldBe
+                listOf(
+                    ConfigError.InvalidSetting("ATTEMPT_MAX_FAILURES"),
+                    ConfigError.InvalidSetting("ATTEMPT_WINDOW_SECONDS"),
+                )
+            errorsOf(production("ATTEMPT_WINDOW_SECONDS" to "0")) shouldBe
+                listOf(ConfigError.InvalidSetting("ATTEMPT_WINDOW_SECONDS"))
+            errorsOf(production("ATTEMPT_WINDOW_SECONDS" to "86401")) shouldBe
+                listOf(ConfigError.InvalidSetting("ATTEMPT_WINDOW_SECONDS"))
+        }
+
         test("Given 本番相当で ALLOWED_ORIGINS が無い When 読み込む Then 失敗する（許可するオリジンを明示する）") {
             errorsOf(production() - "ALLOWED_ORIGINS") shouldBe listOf(ConfigError.MissingSetting("ALLOWED_ORIGINS"))
             configOf(mapOf("APP_ENV" to "local", "DB_KIND" to "h2")).allowedOrigins shouldBe
