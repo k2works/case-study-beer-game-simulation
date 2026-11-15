@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:22:40Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -326,12 +326,45 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 > H4 を B5 に含める決定（2026-11-15）で追加した。**設計書に、開始後の入れ替えのコマンドと規則が無い**（[ドメインモデル](../../design/beer-game-kotlin/domain-model.md)の「開始後の入れ替え」は未決）ため、**仕様と設計書を先に書き、人が確認してから実装する**。入れ替えの形は、Step 1 の提案（[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)の項目 7）による。
 
-- [ ] 3.5.1 仕様と設計書を先に書く（📝）: 入れ替えの経路（提案: 既存の `PUT /games/{gameId}/participants/{participantId}/role`〔`assignRole`〕を、開始後も受け付け、**すでに別の参加者が担当している役割へ、参加済み・未割り当ての参加者を割り当てる**ことを「入れ替え」とする）と規則（旧担当者の資格の自動失効、旧担当者の履歴・入力者のラベルは残す、旧担当者のブラウザセッションを止める）を、`contracts/openapi.yaml`、ドメインモデル（コマンド・イベント・不変条件）、データモデル（`participants.replaced_at`、`credentials.revoked_at`）に書く。**人が確認してから 3.5.2 へ進む**（ゲート 3.5 の前半。ゲート 1 でも入れ替えのシナリオ（Step 1.1）とともに確認する）
+- [x] 3.5.1 仕様と設計書を先に書く（📝。**2026-11-15 に実施。結果は「[Step 3.5.1 の結果](#step-351-の結果2026-11-15)」。3.5.2 以降は着手していない**）: 入れ替えの経路（提案: 既存の `PUT /games/{gameId}/participants/{participantId}/role`〔`assignRole`〕を、開始後も受け付け、**すでに別の参加者が担当している役割へ、参加済み・未割り当ての参加者を割り当てる**ことを「入れ替え」とする）と規則（旧担当者の資格の自動失効、旧担当者の履歴・入力者のラベルは残す、旧担当者のブラウザセッションを止める）を、`contracts/openapi.yaml`、ドメインモデル（コマンド・イベント・不変条件）、データモデル（`participants.replaced_at`、`credentials.revoked_at`）に書く。**人が確認してから 3.5.2 へ進む**（ゲート 3.5 の前半。ゲート 1 でも入れ替えのシナリオ（Step 1.1）とともに確認する）
 - [ ] 3.5.2 🔴 Kotest を先に書く: 入れ替えで、旧担当者の資格が失効し（`CredentialRevoked` を同じ追記で返す）、新担当者が役割を持つ。同じ役割への割り当て直し（何も変わらない）は履歴に足さない。進行役以外は `Forbidden`。**準備中の付け替え（B1 の D9）の振る舞いを変えない**ことの回帰。失敗を確認する
 - [ ] 3.5.3 🟢 `decideGame` の `AssignRole`（開始後の分岐）、イベント、`evolveGame`（`credentials` の失効）を実装する。永続化（`credentials.revoked_at` と `participants.replaced_at` を同じコミットで更新。旧担当者のブラウザセッションの扱いは Step 4.3 の決定による）は Step 4.3 と 6 で実装する
 - [ ] 3.5.4 🟡 リファクタリング。domain の行 100% を維持
 
 **ゲート 3.5**: 入れ替えの仕様（3.5.1）と、規則の実装（3.5.3）を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+#### Step 3.5.1 の結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**仕様と設計書だけを書いた（Kotlin のコード、マイグレーションは書いていない）。ゲート 3.5 の承認は記録していない。3.5.2 以降は、人が仕様を確認してから行う。**
+
+**書いたもの**:
+
+- `apps/beer-game-kotlin/contracts/openapi.yaml`: `assignRole` の description に、入れ替えの規則（進行役のみ、同じ役割への割り当て直しは履歴に足さない、担当者全員が外れる、別の役割にいる人は従来どおり `game.not_preparing`、失効済みの参加者は `game.credential_already_revoked`、終了後は `session.already_ended`、開始後は新規参加が無いため対象は開始前に参加した人だけ）を書いた。経路・メソッド・本文・応答の形は変えていない。**新しい `code` は足していない**。`LobbyParticipant.replaced`（任意の boolean）を、**スキーマ変更の承認が条件**として足した。`web` で `npm run api:generate` → `api:check`（差分 0）→ `api:lint`（有効）を実行した。
+- `docs/design/beer-game-kotlin/domain-model.md`: 「役割の入れ替え」を新設（準備中・開始後の境界の表、`assignRoleAfterStart` のスケッチ、規則 8 点、不採用の代替）。不変条件、状態遷移図、`GameData` の注釈、イベント一覧（EV-G12 `ParticipantReplaced`、EV-S09 `RoleHolderReplaced`）、D4・D9 の追記、差の表 37、未決事項を更新した。
+- `docs/design/beer-game-kotlin/data-model.md`: 「役割の入れ替えと永続化」を新設（`credentials.revoked_at`・`browser_sessions` の行の削除・`lobby_participants` を同じトランザクションで更新する表、確認点の案 A・B）。`lobby_participants` の購読イベントと ER 図、マイグレーションの表に提案を追記した。
+- `architecture-backend.md`（経路の表の `AssignRole` の行）、`ui-design.md`（S04 の開始後の入れ替え）を追記した。
+- `apps/beer-game-kotlin/features/continuation/credentials.feature`: 既存の入れ替えのシナリオ（ステップ定義あり）に、6 シナリオを追加した（旧担当者の入力と入力者のラベルが残る、同じ役割への割り当て直し、進行役以外、別の役割にいる人、失効済みの参加者、旧担当者の識別子の再送）。**追加分のステップの一部は、ステップ定義が無い**（`assignRole` の入れ替えの既存の 4 ステップと、「資格はすでに失効しているという理由で拒否される」などの既存のステップは再利用）。Step 3.5.2 で足す。
+
+**事実の確認**:
+
+1. **B1 の準備中の付け替え（D9）との境界**: 準備中の `decideGame` の `AssignRole` は変えない。開始後だけ、別の関数（`assignRoleAfterStart`）に分ける。`GameState.Started` は、現在の `decideGame` では `state.preparingData()` で `NotPreparing` を返す（`Game.kt`）。B1 の準備中のシナリオ（`features/game-setup/joining.feature` の AC1.2.5）は変わらない。
+2. **ゲート 1 の H2 案 A との整合**: 入れ替えの `CredentialRevoked` を、手動の失効と同じ処理（`credentials.revoked_at` の更新と、同じトランザクションでの `browser_sessions` の行の削除）で扱う。入れ替え専用の永続化は持たない。既存の受入ステップ（`replacedCredentialsRevoked`）は、旧担当者の復帰と、ブラウザセッションでの状態の取得が 403 になることを確かめており、この設計と整合する。
+3. **Kotlin 版に `participants.replaced_at` に当たる列があるか: ない。** `V001`〜`V005`（共通）と `V101`・`V102`（PostgreSQL）の実ファイルを確認した。`lobby_participants` は `participant_id`・`game_id`・`role`・`joined_at`、`credentials` は `revoked_at` を持つ、`browser_sessions` は失効の列を持たない。**入れ替えられた印を持つには `lobby_participants.replaced_at` の追加（スキーマ変更）が要る**（確認点 1。マイグレーションは書いていない）。
+4. **設計書の見落としの発見（重要）**: `Session` の役割の確認は、`SessionStarted` が運んだ**割り当ての写し**（`SessionData.assignments`）だけで行う（D4。`Session.kt` の `actor.id in assignments[role]`）。**入れ替えで `game` にだけ `RoleAssigned` を追記しても、新担当者が `SaveDecision` できない**（既存の受入シナリオ「佐藤は、第 1 週の数量として 5 を保存できる」が成り立たない）。このため、入れ替えは `game` と `session` の 2 ストリームにまたがる（`startGame` と同じ形）。設計書の D4 は「写しを更新するイベントが要る」と、すでに予告していた。
+5. **開始後に参加できる人はいない**: `JoinGame` は準備中だけ。入れ替えの対象は「開始前に参加し、役割を持たなかった参加者」に限られる。既存の受入シナリオも、この順（参加 → 開始 → 入れ替え）で書かれている。
+
+**契約テストの想定**: 追加した仕様は、説明と任意の項目（`replaced`）だけで、経路・`code` を増やしていないため、**新しい Red は生まない**見込みで、`:app:test --tests '*ApiContractSpec*'` を実測した（13 件中 7 件 failed。Step 3 の報告と同じ 7 件で、Step 1 の `recoveryCode` ほかの想定どおりの Red。新しい失敗なし）。受入テスト（`acceptanceTestH2`）は、追加した 6 シナリオが、ステップ定義が無く Undefined になる（3.5.2 で足すまで）。Step 1 の「Undefined 0」は、この追加分だけ崩れる。
+
+**ゲート 3.5 の前半（仕様）で、人が確認すること**:
+
+1. **スキーマ変更の要否（確認必須）**: `lobby_participants.replaced_at` を追加するか。**案 A（提案）**: 追加する（ロビーが入れ替えられた旧担当者を示せる。API の `LobbyParticipant.replaced`）。**案 B**: 追加しない（旧担当者を `RoleUnassigned` で役割なしに戻す。ただしロビーでは割り当て待ちと区別できず、割り当てると 409）。案 A の場合、マイグレーションの番号と、H2・PostgreSQL での確認を、3.5.3 の前に決める。
+2. **構造の追加（確認必須）**: 開始後の `AssignRole` を、`game` と `session` の 2 ストリームにまたがる関数（`assignRoleAfterStart`）にし、`session` に新イベント `RoleHolderReplaced`（EV-S09）、`game` に新イベント `ParticipantReplaced`（EV-G12）を足す。アプリケーション層が、ゲームの状態で呼び分ける。
+3. **共同担当がいる役割**: 現在の担当者**全員**が外れる設計でよいか（1 人だけを外す案もある。B6 の共同入力の前提になる）。
+4. **終了後の入れ替え**: 拒否する（`session.already_ended`）設計でよいか。進行中・一時停止中は受け付ける。
+5. **資格が失効済みの参加者を新担当者にしない**（`game.credential_already_revoked`。新しい `code` を足さない）。手動で失効させた参加者も同じ。専用の `code` が要るか。
+6. **当週に保存済みの意思決定は、役割に属するので新担当者が引き継ぐ**（版は変えない）。旧担当者の入力と入力者のラベルは履歴に残る。
+7. 判定順（権限 → 参加者の存在 → 変化なし → 別の役割にいる人 → 資格の失効 → 終了）と、イベントの名前・形（`ParticipantReplaced`〔`participantId`、`role`、`replacedBy`〕、`RoleHolderReplaced`〔`role`、`removed`、`added`〕）。
+8. 追加した Gherkin 6 シナリオの文言と、3.5.2 で足すステップ定義の範囲。
 
 ### Step 4: 鍵の版・資格の期限と失効・冪等記録の順序（🔴🟢🟡）
 
@@ -507,6 +540,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 3.5.1（役割の入れ替えの仕様と設計書）を実施**（ゲート 3.5 は人の確認待ち。**承認は記録していない**。3.5.2 以降は着手していない。Kotlin のコードとマイグレーションは書いていない）。`openapi.yaml` の `assignRole` に規則を書き（新しい `code` なし、`LobbyParticipant.replaced` を条件付きで追加）、`api:generate`・`api:check`・`api:lint` を実行（差分 0・有効）。設計書（`domain-model.md` の「役割の入れ替え」・イベント EV-G12・EV-S09・差の表 37、`data-model.md` の「役割の入れ替えと永続化」ほか）と `credentials.feature` の 6 シナリオを追加。**確認した事実: Kotlin 版に `participants.replaced_at` に当たる列は無い（スキーマ変更の要否は確認必須の人の判断）。`session` の割り当ての写し（D4）の更新が要るため、入れ替えは 2 ストリームにまたがる**。`ApiContractSpec` は 13 件中 7 件 failed（Step 3 と同じ。新しい Red なし）。人が確認する 8 点は「Step 3.5.1 の結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3（Game の資格: 失効・再発行・復帰。3.1〜3.3）を実施**（ゲート 3 は人の確認待ち。**承認は記録していない**。Step 3.5 以降は未着手）。テストを先に書き、コンパイルエラー 119 件の Red を確認してから実装。`Credential.kt`（新規）に `CredentialSubject`・`CredentialValidity`・資格の decide を、`Game.kt` に `RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`、`game.credential_already_revoked`・`game.credential_not_revoked` を追加。仕様に `game.credential_not_revoked` を足し型を再生成。永続化の DTO を最小で前倒し。実測: `:domain:test` 357 件・失敗 0、domain の行 970/970（100%）、`:app:test` は想定の 7 件の Red（Step 1 の `ApiContractSpec`）、静的解析は違反 0。ゲート 3 で人が確認する 6 点は「Step 3 の実施結果」。設計書（domain-model の差の表 35・36 ほか）を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施**（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。`SessionState.Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`、`Editor.ByFacilitator`、`session.paused`・`session.not_paused`・`session.save_limit_reached` を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。`evolveSession` を `SessionEvolve.kt` へ分割（detekt の指摘の解消）。`InvalidTransition` の性質テスト（500 回）。永続化の DTO を最小で前倒し。**実測**: domain 300 件・失敗 0・行 879/879（100%）、`:app:test` は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の `code` の表・不変条件・差の表を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 3 をユーザーが承認し、確認点 1〜6 を報告どおりに確定**（選択: 「承認、報告どおり・期限の検査なし」）。失効・再発行の対象は参加者のみ、期限切れで未失効の資格は失効後に再発行、`CredentialValidity` は `expiresAt` と `revoked`、復帰の失敗は同一の `Forbidden`、復帰は期限を更新、新規 `Credential.kt` ほか。**再発行・復帰の新しい期限の検査はドメインに足さない**。ゲート 3.5〜8 は未承認 | claude-code/claude-sonnet-5-5 |

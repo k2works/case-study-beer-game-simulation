@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:21:02Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -305,7 +305,7 @@ sealed interface GameState {
 
     data object NotCreated : GameState                       // ストリームが空
     data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`。招待・観察者は B9。保持方針 `retention` は未実装）
-    data class Started(val data: GameData) : GameState       // 設定と割り当てを固定
+    data class Started(val data: GameData) : GameState       // 設定を固定。割り当ては、入れ替え（下の「役割の入れ替え」）だけが変える
 }
 
 data class GameData(
@@ -401,8 +401,9 @@ private fun GameState.invalid(@Suppress("UNUSED_PARAMETER") event: GameEvent): G
 | 開始条件 | 4 役割のそれぞれに、1 人以上が割り当てられている | UC-04、FR-03 | `StartConditionNotMet(missing)`（`RuleViolation`） |
 | 観察用の招待 | 参加コードと別の値。失効または期限切れの招待では新しい参加ができない。観察者は役割を持てない | FR-17、BR-17 | `InvitationRevoked`、`InvitationExpired`、`InvitationNotFound` |
 | 資格の有効性 | 進行役・参加者・観察者の資格は有効期限と失効を持つ。失効済みを再度失効できない。**失効していない資格は再発行しない**（先に失効させる）。再発行は新しい有効期限を持つ。**失効・再発行の対象は参加者だけ**（進行役自身は対象外）。**復帰は、有効（未失効・期限内）な復帰資格の持ち主自身だけができ、不明・失効・期限切れ・別の主体は、区別しない同じ `Forbidden`**（NF-S12）。資格のコマンドは、準備中と開始後の両方で受け付ける（B5 Step 3） | NFR-06、NF-S4、NF-S12 | `CredentialAlreadyRevoked`・`CredentialNotRevoked`（`InvalidState`）、`Forbidden` |
-| 設定の固定 | 開始後は、設定と役割の割り当てを変更しない | — | `NotPreparing` |
-| 権限 | 割り当て、招待、失効・再発行、開始は進行役だけ | — | `Forbidden` |
+| 設定の固定 | 開始後は、設定を変更しない。**役割の割り当ては、入れ替え（担当者のいる役割へ、参加済み・未割り当ての参加者を割り当てる）だけを受け付ける**（B5 Step 3.5。下の「役割の入れ替え」）。それ以外の開始後の割り当て（別の役割にいる人の付け替えなど）は変更しない | — | `NotPreparing` |
+| 役割の入れ替え | 開始後の入れ替えは、**旧担当者の資格を同じ追記で失効させ**、`session` の役割の写しを同じトランザクションで更新する。旧担当者の履歴と入力者のラベルは残す。資格が失効済みの参加者は、新担当者になれない。同じ役割への割り当て直しは履歴に足さない。詳細は下の「役割の入れ替え」 | H4、NFR-06 | `Forbidden`、`ParticipantNotFound`、`NotPreparing`、`CredentialAlreadyRevoked`、`AlreadyEnded` |
+| 権限 | 割り当て（入れ替えを含む）、招待、失効・再発行、開始は進行役だけ | — | `Forbidden` |
 
 #### Game 集約の状態遷移
 
@@ -418,11 +419,65 @@ state "Started" as G2
 G0 --> G1 : GameCreated
 G1 --> G1 : ParticipantJoined\nRoleAssigned / RoleUnassigned\nObserverInvited / ObserverInvitationRevoked\nObserverJoined\nCredentialRevoked / CredentialReissued\nParticipationRecovered
 G1 --> G2 : GameStarted\n[各役割に 1 人以上]
-G2 --> G2 : ObserverInvited / ObserverInvitationRevoked\nObserverJoined\nCredentialRevoked / CredentialReissued\nParticipationRecovered
+G2 --> G2 : ObserverInvited / ObserverInvitationRevoked\nObserverJoined\nCredentialRevoked / CredentialReissued\nParticipationRecovered\n役割の入れ替え: ParticipantReplaced\n+ CredentialRevoked + RoleAssigned
 @enduml
 ```
 
-開始後も、観察者の招待と参加、資格の失効・再発行、復帰は受け付けます（プレイ中の観察と、漏れた資格への対応のため）。参加者の追加と役割の割り当ては受け付けません。
+開始後も、観察者の招待と参加、資格の失効・再発行、復帰は受け付けます（プレイ中の観察と、漏れた資格への対応のため）。参加者の追加は受け付けません。**役割の割り当ては、入れ替え（B5 Step 3.5）だけを受け付けます**（`Started` の自己遷移は、`ParticipantReplaced` と `RoleAssigned`。下の「役割の入れ替え」）。
+
+#### 役割の入れ替え（開始後。B5 Step 3.5。形はゲート 1 で決定済み。規則の細部はゲート 3.5 で人が確認する）
+
+開始後に、担当者のいる役割へ、別の参加者を担当させる操作です（担当者の離脱・交代への対応）。**コマンドは新設せず**、既存の `AssignRole`（`PUT /games/{gameId}/participants/{participantId}/role`）を、開始後も受け付けます。**境界は次のとおりです。**
+
+| 状況 | 準備中（B1。変えない） | 開始後（B5 で追加） |
+| :--- | :--- | :--- |
+| 役割なしの参加者を、空いている役割へ | `RoleAssigned` | **起きない**（開始条件で、4 役割すべてに担当がいる） |
+| 役割なしの参加者を、担当者のいる役割へ | `RoleAssigned`（共同担当に加わる） | **入れ替え**（下の列）。担当者は外れる |
+| 別の役割にいる参加者を、別の役割へ | `RoleUnassigned` + `RoleAssigned`（付け替え。D9） | `NotPreparing`（従来どおり拒否） |
+| すでにその役割にいる参加者を、同じ役割へ | 何も返さない（履歴に足さない。D9） | 何も返さない（同じ） |
+
+準備中と開始後で `decide` の入力が違います。準備中は `game` だけで決まる（`decideGame` のまま）一方、**開始後は `session` の役割の写し（D4）も更新する必要がある**ため、`StartGame` と同じ形の **2 ストリームにまたがる関数**になります。アプリケーション層は、ゲームの状態が準備中なら `decideGame`、開始済みなら下の関数を呼びます（構造の追加。確認必須。Step 3.5.1 の確認点 2）。
+
+```kotlin
+data class ReplaceDecision(val game: List<GameEvent>, val session: List<SessionEvent>)
+
+/** AssignRole（開始後）。game と session の両方を読み、両方の期待する版で、同一トランザクションに追記する */
+fun assignRoleAfterStart(game: GameState, session: SessionState, command: AssignRole): Either<DomainError, ReplaceDecision> = either {
+    val data = game.startedDataOrNull() ?: raise(GameError.NotPreparing)           // 準備中は decideGame の担当（呼び分けはアプリケーション層）
+    ensure(command.actor.isFacilitatorOf(data.gameId)) { GameError.Forbidden("割り当ては進行役だけができる") }
+    val incoming = ensureNotNull(data.participants[command.participantId]) { GameError.ParticipantNotFound(command.participantId) }
+    when {
+        incoming.role == command.role -> ReplaceDecision(emptyList(), emptyList())   // 変化なし。履歴に足さない
+        incoming.role != null -> raise(GameError.NotPreparing)                       // 別の役割にいる人の付け替えは、開始後は拒否
+        else -> {
+            ensure(data.credentials.isValid(Participant(command.participantId))) { GameError.CredentialAlreadyRevoked }  // 失効済みの参加者は新担当者になれない
+            ensure(session is SessionState.Active || session is SessionState.Paused) { SessionError.AlreadyEnded }
+            val outgoing = data.holdersOf(command.role) - command.participantId      // 現在の担当者全員（ParticipantId の順）
+            ReplaceDecision(
+                game = outgoing.flatMap { listOf(ParticipantReplaced(it, command.role, replacedBy = command.participantId),
+                                                  CredentialRevoked(Participant(it))) } +
+                       RoleAssigned(command.participantId, command.role),
+                session = listOf(RoleHolderReplaced(command.role, removed = outgoing.toSet(), added = command.participantId)),
+            )
+        }
+    }
+}
+```
+
+**規則**（`assignRoleAfterStart`）:
+
+1. **権限は進行役だけ。** 判定順は、権限 → 参加者の存在（`ParticipantNotFound`）→ 変化なし（イベントなし）→ 別の役割にいる人（`NotPreparing`）→ 資格の失効（`CredentialAlreadyRevoked`。新しい `code` は足さない。理由は区別しない）→ 終了（`session.already_ended`）。権限のない人に、参加者の有無や状態を知らせない。
+2. **入れ替えの条件**は、割り当て先の参加者が「**参加済みで役割を持たず、資格が有効**」なことだけ。対象の役割の担当者は、開始条件（各役割に 1 人以上）と、担当者が入れ替えでしか外れないことから、開始後は常に 1 人以上いる（`outgoing` は空にならない）。
+3. **担当者が複数いる役割**（共同担当）は、**現在の担当者全員**が外れる。準備中の共同担当の追加（B6 の共同入力の前提）とは別の操作で、開始後に担当者を「足す」ことは、未決事項のとおり受け付けない。
+4. **旧担当者**には、`ParticipantReplaced`（外れた事実。`replacedBy` を持つ）と `CredentialRevoked`（資格の自動失効）の 2 イベントを、**同じ追記で**返す。旧担当者の `ParticipantEntry.role` は null になる（`evolve`）。**参加者の行・表示名・過去の入力・入力者のラベルは消さない**（`DecisionSaved.editor` は旧担当者の `participantId` のまま。表示名は `display_profiles` に残る）。
+5. **当週にすでに保存された意思決定は、役割に属する**ため、新担当者が引き継ぐ（`decisions[role]`・`decisionVersions[role]` は変えない）。新担当者は、現在の版で保存し直せる。旧担当者の保存の再送は、資格が失効しているので、認証の段階で 403（ADR-004。冪等記録の照合の前）。
+6. **`session` の写しの更新**: `SessionData.assignments[role]` から旧担当者を外し、新担当者を入れる（`RoleHolderReplaced`）。`session` は `game` を読まず、写しだけで操作者の役割を確認する（D4）ので、写しが更新されないと、新担当者が保存できない。`session` が進行中・一時停止中のとき更新し、終了後は拒否する（`AlreadyEnded`）。
+7. **ブラウザセッションの失効**（H2 案 A）: アプリケーション層が、`CredentialRevoked` を追記する**同じトランザクション**で、対象の参加者の `credentials.revoked_at` を更新し、`browser_sessions` の行を**削除**する（手動の失効〔`RevokeCredential`〕と同じ処理を、イベントの種類で呼ぶ。入れ替え専用の処理は持たない）。復帰資格（`credentials`）の行は残る（履歴と失効の痕跡のため）。
+8. **ロビーの投影**: `ParticipantReplaced` で、旧担当者の `lobby_participants.role` を NULL にし、入れ替えられたことを示す印（`replaced_at`）を付ける。**印の列は、現在の Kotlin 版のスキーマに無い**（[データモデル](./data-model.md)の「役割の入れ替え」。スキーマ変更で、確認必須。人の判断）。
+
+**分類**: `ParticipantReplaced` は、旧担当者の事実（外れた・誰に引き継いだか）、`CredentialRevoked` は資格の事実、`RoleAssigned` は新担当者の事実、`RoleHolderReplaced`（`session`）は役割の写しの更新、と**事実ごとに 1 イベント**にします。1 つの大きなイベントにまとめない理由は、`CredentialRevoked` を手動の失効と同じ形に保ち、`credentials` の更新を共通にするためです。
+
+**不採用の代替**: (1) 専用のコマンドと経路（`POST …/roles/{role}/replace`）: 準備中の付け替えと同じ入口を使えば、画面と契約が増えない（ゲート 1 の決定）。(2) 入れ替えで旧担当者の行を物理削除: 履歴と入力者のラベルが失われる。(3) `game` だけに `RoleAssigned` を追記し、`session` の写しは更新しない: 新担当者が保存できず、AC3.2.5 の受入シナリオを満たさない。(4) 旧担当者を `RoleUnassigned` で「役割なし」に戻す（`ParticipantReplaced` を持たない）: スキーマ変更は要らないが、ロビーが旧担当者を「割り当て待ち」の参加者と区別できない（Step 3.5.1 の確認点 1 の案 B）。
 
 ### Session 集約（進行）
 
@@ -443,7 +498,7 @@ sealed interface SessionState {
 data class SessionData(
     val gameId: GameId,
     val settings: GameSettings,                           // 開始時の写し
-    val assignments: RoleMap<Set<ParticipantId>>,         // 開始時の写し（開始後は変わらない）
+    val assignments: RoleMap<Set<ParticipantId>>,         // 開始時の写し（開始後は、役割の入れ替え RoleHolderReplaced だけが変える）
     val week: Week,
     val roleStates: RoleMap<RoleState>,
     val decisions: Map<Role, DecisionEntry>,              // 当週に保存された意思決定。確定でクリア
@@ -564,7 +619,8 @@ fun evolveSession(state: SessionState, event: SessionEvent): SessionState = when
 | 保存回数の上限 | 同じ週に、同じ役割へ保存できるのは **9 回まで**（参加者の保存と進行役の代理入力を合わせて数える）。確定で数え直す。**回数は意思決定の版と同じ**（保存のたびに 1 増え、確定で 0 に戻る）ので、別の項目を持たず `decisionVersions[role] < 9` で判定する。判定順は、権限 → 週（`WeekAdvanced`）→ 版（`DecisionConflict`）→ 上限 | NF-C8 | `SaveLimitReached`（`InvalidState`） |
 | 共同入力 | 同じ役割の意思決定は、1 つの値と 1 つの**意思決定の版**を、共同担当で共有する。版が古い保存は拒否し、**最新値と最後の保存者**を返す（変更を黙って失わない） | FR-16、BR-15 | `DecisionConflict(role, latest)`（`Conflict`） |
 | 代理入力 | 進行役だけが任意の役割へ入力できる。**進行中と一時停止中の両方で受け付ける**（UC-09、AC3.1.1: 停止 → 代理入力 → 再開）。`requestedWeek` を持ち、現在の週と違えば `WeekAdvanced`。入力値、操作者、時刻をイベントに残す。意思決定の版は要求しないが 1 増やすので、古い版を持つ参加者の保存は拒否される。一時停止中の代理入力では自動確定しない | FR-15 | `Forbidden`、`WeekAdvanced`（`Conflict`）、`AlreadyEnded` / `NotStarted`（`InvalidState`） |
-| 役割の確認 | 保存できるのは、`SessionStarted` の割り当ての写しに含まれる参加者だけ。観察者は常に拒否 | FR-04、FR-17 | `Forbidden` |
+| 役割の確認 | 保存できるのは、`SessionStarted` の割り当ての写し（**入れ替え後は、`RoleHolderReplaced` で更新した写し**）に含まれる参加者だけ。観察者は常に拒否 | FR-04、FR-17 | `Forbidden` |
+| 役割の入れ替え | `RoleHolderReplaced` は、進行中・一時停止中の `session` に、`game` の入れ替え（`ParticipantReplaced` など）と**同じトランザクション**で追記する（`assignRoleAfterStart`）。`decideSession` のコマンドは増やさない。当週の意思決定と版は変えない | H4 | 終了後は `AlreadyEnded`（`InvalidState`） |
 | 週確定の条件 | 4 役割の意思決定が揃うまで確定できない | BR-12 | `IncompleteDecisions(missing)`（`RuleViolation`） |
 | 週確定の一回性 | `CommitWeek(requestedWeek, basis)` は、次の順で判定する。(1) 週が違えば `WeekAdvanced`。(2) 週が同じで、`basis` が現在の各役割の意思決定の版と違えば `DecisionsChanged`（現在の値と保存者を返す）。`session` ストリームの版は前提にしない（共同担当が保存し直しただけで、事実と違う「すでに確定されています」にならない）。再送は、アプリケーション層の冪等記録が同じ結果を返す | FR-09 | `WeekAdvanced`、`DecisionsChanged`（`Conflict`） |
 | 週確定の結果 | **役割別の週結果**（需要、出荷、発注、在庫、受注残、費用）と次週の役割状態を、1 つのイベントに含める | FR-13、FR-14 | — |
@@ -588,10 +644,10 @@ state "Ended（終了）" as S3
 
 [*] --> S0
 S0 --> S1 : SessionStarted\n（startGame が追記）
-S1 --> S1 : DecisionSaved / ProxyDecisionSubmitted\n（AUTO で揃えば WeekCommitted も）\nWeekCommitted [最終週でない]\nAutoCommitChanged
+S1 --> S1 : DecisionSaved / ProxyDecisionSubmitted\n（AUTO で揃えば WeekCommitted も）\nWeekCommitted [最終週でない]\nAutoCommitChanged\nRoleHolderReplaced（役割の入れ替え）
 S1 --> S2 : SessionPaused
 S2 --> S1 : SessionResumed\n（AUTO かつ揃っていれば WeekCommitted も）
-S2 --> S2 : AutoCommitChanged\nProxyDecisionSubmitted\n（進行役の代理入力。確定しない）
+S2 --> S2 : AutoCommitChanged\nProxyDecisionSubmitted\n（進行役の代理入力。確定しない）\nRoleHolderReplaced（役割の入れ替え）
 S1 --> S3 : WeekCommitted + SessionEnded [最終週]\nSessionEnded（進行役の終了）
 S2 --> S3 : SessionEnded
 S3 --> [*]
@@ -691,7 +747,7 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | :--- | :--- | :--- | :--- |
 | EV-G01 | `GameCreated` | `CreateGame`。ストリームが空 | `gameId`、`joinCode`、`settings`（最終週、需要系列、初期条件、費用方針、遅延、公開範囲、確定方式、種別 `Kit`/`Custom` と変更項目）、`retentionDays`、`facilitatorCredentialExpiresAt` |
 | EV-G02 | `ParticipantJoined` | `JoinGame`。準備中 | `participantId`、`credentialExpiresAt` |
-| EV-G03 | `RoleAssigned` | `AssignRole`。進行役、準備中、役割が変わる | `participantId`、`role` |
+| EV-G03 | `RoleAssigned` | `AssignRole`。進行役、役割が変わる（準備中。**開始後は入れ替えの新担当者**。B5） | `participantId`、`role` |
 | EV-G04 | `RoleUnassigned` | `UnassignRole`、または `AssignRole` による付け替え（解除の側） | `participantId`、`role`（解除前の役割） |
 | EV-G05 | `ObserverInvited` | `InviteObserver`。進行役 | `invitationId`、`expiresAt` |
 | EV-G06 | `ObserverInvitationRevoked` | `RevokeObserverInvitation`。進行役、有効な招待 | `invitationId` |
@@ -700,6 +756,7 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-G09 | `CredentialReissued` | `ReissueCredential`。進行役、**失効した**参加者の資格 | `subject`、`expiresAt` |
 | EV-G10 | `ParticipationRecovered` | `RecoverParticipation`。有効な復帰資格 | `subject`（FACILITATOR / PARTICIPANT）、`credentialExpiresAt`（復帰資格を更新した新しい期限） |
 | EV-G11 | `GameStarted` | `StartGame`。進行役、準備中、各役割に 1 人以上 | `gameId` |
+| EV-G12 | `ParticipantReplaced`（**提案。ゲート 3.5 で人が確認する**） | `AssignRole`（開始後の入れ替え）。進行役、開始後、旧担当者ごとに 1 件。`CredentialRevoked`（同じ参加者）と同じ追記 | `participantId`（外れた旧担当者）、`role`（外れた役割）、`replacedBy`（引き継いだ新担当者の `participantId`） |
 
 ### session ストリーム
 
@@ -713,6 +770,8 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-S06 | `ProxyDecisionSubmitted` | `SubmitProxyDecision`。進行役、進行中**または一時停止中**、`requestedWeek` が現在の週と一致 | `week`、`role`、`quantity`、`decisionVersion`（保存後の版）、`editor`（進行役）、`submittedRoleCount`（同上）。入力値・操作者・時刻（封筒）を残す（FR-15） |
 | EV-S07 | `AutoCommitChanged` | `SetCommitMode`。進行役 | `mode`（`MANUAL` / `AUTO`） |
 | EV-S08 | `WeekCommitted` | `CommitWeek`（進行役、進行中、4 役割が揃う、週が一致し、`basis` が現在の意思決定の版と一致）、または `AUTO` の進行中に `SaveDecision` / `SubmitProxyDecision` / `ResumeSession` / `SetCommitMode` が揃った状態を作った場合（一時停止中の代理入力と `SetCommitMode` は確定しない） | `week`、`commitKind`（`MANUAL` / `AUTO`）、`decisions`（`RoleMap<Quantity>`、確定した発注）、`results`（`RoleMap<RoleWeekResult>`）、`nextStates`（`RoleMap<RoleState>`）、`contributors`（寄与者数。現在は 4 役割） |
+
+| EV-S09 | `RoleHolderReplaced`（**提案。ゲート 3.5 で人が確認する**） | `AssignRole`（開始後の入れ替え。`game` の `ParticipantReplaced` などと同一トランザクション）。進行中または一時停止中 | `role`、`removed`（外れた旧担当者の `Set<ParticipantId>`）、`added`（新担当者の `ParticipantId`）。`SessionData.assignments[role]` を更新する |
 
 `RoleWeekResult` は、受注（需要）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用を持ちます。`WeekCommitted` は 1 件で、1 週の事実のすべてを含みます。
 
@@ -814,7 +873,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | **A（採用）** | 写しを運ぶ | `session` が自己完結し、読み込みが 1 ストリームで済む。開始後は設定も割り当ても変わらないので、写しは古くならない |
 | B | 毎回 `game` を読んで確認 | beer-game2 の ADR-004 が懸念した「毎回の読み取り」が残る。ストリームの版の取り合いは起きないが、読み込みと整合の確認が増える |
 
-トレードオフ: 開始後に、参加者の入れ替えや共同担当の追加をしたくなった場合は、写しを更新するイベントが要ります（未決事項）。
+トレードオフ: 開始後に、参加者の入れ替えや共同担当の追加をしたくなった場合は、写しを更新するイベントが要ります。**入れ替えは B5（Step 3.5）で、`RoleHolderReplaced`（EV-S09）として足す設計にした**（提案。ゲート 3.5 で人が確認する）。共同担当の**追加**は未決事項のままです。
 
 ### D5: `WeekCommitted` は結果と次週の状態を事実として含む
 
@@ -855,7 +914,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 
 ### D9: 共同担当の割り当ての付け替え
 
-`AssignRole` は、すでに別の役割にいる参加者に対して `RoleUnassigned` と `RoleAssigned` の 2 イベントを返します（[ガイド §7.4](../../reference/関数型プログラミングガイド_Kotlin編.md) の 1 コマンドから複数イベント）。同じ役割への再割り当ては、イベントを返さず（`Right(emptyList())`）、履歴に足しません。
+`AssignRole` は、すでに別の役割にいる参加者に対して `RoleUnassigned` と `RoleAssigned` の 2 イベントを返します（[ガイド §7.4](../../reference/関数型プログラミングガイド_Kotlin編.md) の 1 コマンドから複数イベント）。同じ役割への再割り当ては、イベントを返さず（`Right(emptyList())`）、履歴に足しません。**D9 は準備中の規則で、B5 の開始後の入れ替え（「役割の入れ替え」）は変えません。** 開始後は、別の役割にいる人の付け替えを従来どおり `NotPreparing` で拒否し、同じ役割への割り当て直しは履歴に足しません。
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
@@ -927,10 +986,13 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 34 | 保存回数の上限は、`SessionData` に役割ごとの回数を持つ（B5 計画 2.5） | 回数は**意思決定の版と同じ**ため、`SessionData` に項目を足さない。`SaveDecision` と `SubmitProxyDecision` の判定に `hasSaveCapacity(role)` を使う（2026-11-15、B5 Step 2） | 同じ事実を二重に持たない。共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける |
 | 35 | `CredentialValidity` は発行時刻・有効期限・失効時刻 | **有効期限と `revoked`（失効したか）だけ**。時刻は封筒の `occurredAt` と `credentials.revoked_at` が持つ（2026-11-15、B5 Step 3） | `evolve` は封筒を読まず、イベントのペイロードに時刻が無い。同じ事実を二重に持たない |
 | 36 | 失効していない資格の再発行の扱いは未決 | 拒否する（`GameError.CredentialNotRevoked`、409）。失効・再発行の対象は参加者だけで、進行役自身は `Forbidden`。未作成も `Forbidden`（進行役になれる人がいない）。復帰は、操作者が主体自身であることも検査し、失敗はすべて同じ `Forbidden("復帰できない")`（2026-11-15、B5 Step 3。ゲート 1 の決定の反映） | 漏洩した資格の被害を止める。有効な資格を黙って置き換えない。資格の存在・期限・失効を、復帰の失敗から推測させない（NF-S12） |
+| 37 | 開始後の入れ替えのコマンド・規則が無い（「開始後の入れ替え」は未決） | 既存の `AssignRole` を開始後も受け付け、**2 ストリームの関数 `assignRoleAfterStart`** が `ParticipantReplaced`・`CredentialRevoked`・`RoleAssigned`（game）と `RoleHolderReplaced`（session）を同一トランザクションで返す。旧担当者の資格を自動失効し、履歴と入力者のラベルは残す（2026-11-15、B5 Step 3.5.1。**提案。ゲート 3.5 で人が確認する**） | 写し（D4）を更新しないと新担当者が保存できない。コマンドと経路を増やさず、準備中の付け替え（D9）と同じ入口にする（ゲート 1 の決定） |
 
 ## 未決事項
 
-- 開始後に、共同担当の参加者を**追加**できるか。できる場合、写しを更新するイベントが要ります（D4）。当面は、準備中だけとします（beer-game2 と同じ）。
+- 開始後に、共同担当の参加者を**追加**できるか。できる場合、写しを更新するイベントが要ります（D4）。当面は、準備中だけとします（beer-game2 と同じ）。**入れ替え（担当者を替える）は、B5 で別に扱う**（「役割の入れ替え」）。
+- **開始後に新しく参加する人**（`JoinGame` は準備中だけ）。入れ替えの対象は「開始前に参加し、役割を持たなかった参加者」に限られるため、開始後に参加が必要になった担当者の交代は、準備中に予備の参加者を参加させておく運用になる。開始後の参加を認めるかは未決（B5 の範囲外）。
+- **入れ替えの未決（B5 Step 3.5。ゲート 3.5 で人が決める）**: (1) 共同担当がいる役割は、担当者全員が外れる設計でよいか（1 人だけを外す案もある）。(2) 終了後の入れ替えを拒否する設計でよいか。(3) `ParticipantReplaced`・`RoleHolderReplaced` の名前と形。(4) ロビーの「入れ替えられた」印の列（スキーマ変更。確認必須。[データモデル](./data-model.md)）。(5) `AssignRole` を 2 ストリームの関数に分ける構造の追加（`assignRoleAfterStart`）。
 - 観察用の招待の有効期間の既定値、観察者の人数の上限、参加者数の上限、観察者の復帰の要否（beer-game2 の未決事項を引き継ぎ）。
 - 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。**遅延 0 を許すか（B1 で判明）**: 待ち行列の長さが「遅延 − 1」のため、遅延 0 は長さ −1 になり表せない（beer-game2 も遅延は 1 週以上）。テスト戦略の「遅延 0 を含むカスタムの遅延」の golden は、遅延 0 を許すと決めるまで書けない。遅延 1（待ち行列が空）の golden は書いた。実装は、遅延 0 を許さない前提です。
 - **需要の上限（B1 で判明）。** 実装は `DemandSeries` の各週を `Quantity` の範囲（0〜1000）で検証する。設計書に需要の上限の規定は無く、「0 以上の整数」だけだった。実装が正しいかは未決（根拠は `Quantity` の 0〜1000 と需要系列の「0 以上」の組）。

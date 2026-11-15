@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -239,6 +239,7 @@ entity "lobby_participants" as lp {
   game_id : uuid <<FK>>
   role : text
   joined_at : timestamptz
+  replaced_at : timestamptz <<提案。B5 Step 3.5。V003 に無い。確認必須>>
 }
 
 entity "lobby_observer_invitations" as li {
@@ -593,7 +594,7 @@ interface TransactionRunner {
 | `game_overview` | `game_id` | `GameCreated`、`GameStarted`、`AutoCommitChanged`、`SessionEnded` | `status` は `PREPARING`・`STARTED`・`ENDED`（`SessionEnded` で導出）。`final_week` は 1〜50。`commit_mode` は `MANUAL`・`AUTO`。`settings_kind` は `KIT`・`CUSTOM`。`settings_changes` に準拠値から変えた項目。**参加コードは持たない**（観察者が読むため。M1） |
 | `game_join_codes` | `game_id` | `GameCreated` | `join_code` 一意（索引）。**進行役と、参加の問い合わせ（参加コードの照合）だけ**が読む。観察者のロールには SELECT を与えない（BR-17） |
 | `game_settings` | `game_id` | `GameCreated` | 需要系列、初期条件、費用、遅延、公開範囲。遅延と単価は 0 以上。**進行役の画面にだけ**使う（将来の需要を含むため） |
-| `lobby_participants` | `participant_id` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned` | `game_id` は外部キー。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**（共同担当、FR-16）。表示名は `display_profiles` と結合 |
+| `lobby_participants` | `participant_id` | `ParticipantJoined`、`RoleAssigned`、`RoleUnassigned`、**`ParticipantReplaced`（B5 Step 3.5。提案）** | `game_id` は外部キー。`role` は 4 値または NULL。**`(game_id, role)` の一意制約は無い**（共同担当、FR-16）。表示名は `display_profiles` と結合。**役割の入れ替えで外れた旧担当者の行は消さず**（履歴と入力者のラベルのため）、`ParticipantReplaced` で `role` を NULL にし、**`replaced_at`（入れ替えられた時刻。NULL は未入れ替え）を書く提案**。**この列は現在のスキーマ（V003）に無い。スキーマ変更で確認必須。人の判断**（下の「役割の入れ替えと永続化」） |
 | `lobby_observer_invitations` | `invitation_id` | `ObserverInvited`、`ObserverInvitationRevoked` | 有効期限、失効。招待コードの値は持たない |
 | `lobby_observers` | `observer_id` | `ObserverJoined` | 役割を持たない |
 | `session_overview` | `game_id` | `SessionStarted`、`SessionPaused`、`SessionResumed`、`SessionEnded`、`DecisionSaved`、`ProxyDecisionSubmitted`、`WeekCommitted` | `status` は `ACTIVE`・`PAUSED`・`ENDED`。`week > 0`。**`submitted_role_count`（0〜4。入力済みの役割数。値は含めない）**。`DecisionSaved`・`ProxyDecisionSubmitted` のペイロードの `submittedRoleCount`（保存後に入力済みの役割数。`decide` が数える。投影は他の行を読まないため、増減をイベントが運ぶ）をそのまま書き、`WeekCommitted` で 0 に戻す。観察者が読める（AC4.1.1。M3） |
@@ -646,6 +647,29 @@ interface TransactionRunner {
 | `browser_sessions` | `credential_digest` | ブラウザセッション（24 時間） | `actor_kind` は `FACILITATOR`・`PARTICIPANT`・`OBSERVER`。`expires_at` で掃除 |
 
 `credentials.revoked_at` は、`CredentialRevoked` を追記する同じトランザクションで更新します（再発行では、新しい行を挿入し、旧行を失効させます）。**整合のルール**: 「`credentials` の失効・発行が、対応する `Credential*` イベント（または `GameCreated`・`ParticipantJoined`・`ObserverInvited`・`ObserverJoined`・`ParticipationRecovered`）と必ず一緒に起きる」ことを、統合テストで確認します。
+
+### 役割の入れ替えと永続化（B5 Step 3.5。提案。ゲート 3.5 で人が確認する）
+
+開始後の役割の入れ替え（[ドメインモデル](./domain-model.md)の「役割の入れ替え」）は、**次の 3 つを、イベントの追記と同じトランザクションで**行います。
+
+| 対象 | 更新 | 根拠 |
+| :--- | :--- | :--- |
+| `credentials` | 旧担当者（`CredentialRevoked` の `subject`）の行の `revoked_at` を更新する（手動の失効〔`RevokeCredential`〕と同じ処理。イベントの種類で呼ぶ） | 資格の自動失効。失効後の再送は、認証の段階で 403（ADR-004） |
+| `browser_sessions` | 旧担当者（`game_id`、`actor_id`）の行を**削除する**（ゲート 1 の H2 案 A。スキーマ変更なし。`browser_sessions` に失効の列は足さない） | 旧担当者のブラウザセッションを止める。`credentials` の行は、失効の痕跡として残る |
+| `lobby_participants` | `ParticipantReplaced` で旧担当者の `role` を NULL にし、`replaced_at` を書く（**下の確認点**） | ロビーが、入れ替えられた旧担当者と、割り当て待ちの参加者を区別する |
+
+**整合のルール**（上の「周辺ストア」の規則の延長）: 「入れ替えの `CredentialRevoked` と、`credentials.revoked_at` の更新、`browser_sessions` の行の削除が、必ず一緒に起きる」ことを統合テストで確認します。
+
+**旧担当者の履歴と入力者のラベルを残す**: `participants` の行に当たる `lobby_participants` の行、`display_profiles` の行（表示名）、過去のイベント（`DecisionSaved.editor`）、`current_decisions` の入力者は、**物理削除も更新もしません**。入力者のラベルは、`display_profiles` の表示名で引きます。
+
+**確認点（確認必須。スキーマ変更。人の判断）**: 現在の Kotlin 版のスキーマに、**beer-game3 の `participants.replaced_at` に当たる列はありません**（実ファイルの確認。2026-11-15）。`lobby_participants` は `participant_id`・`game_id`・`role`・`joined_at` だけ（`V003__projections_lobby.sql`）、`credentials` は `revoked_at` を持ちます（`V002__peripheral_stores.sql`）。
+
+| 案 | 内容 | 長所 | 短所 |
+| :--- | :--- | :--- | :--- |
+| **A（提案）** | 共通のマイグレーションを 1 つ足し、`lobby_participants.replaced_at timestamptz`（NULL 可。既存行は NULL）を追加する。`ParticipantReplaced` の投影が書く。番号は、B11 の保持（006）と衝突させない（実装時に決める。**この計画ではマイグレーションを書かない**） | ロビーと状態の投影が、入れ替えられた旧担当者を確実に示せる。投影は再構築で埋められる（イベントからの導出） | スキーマ変更（拡張だけ。ロールバックしやすい）。H2・PostgreSQL の両方で通ることの確認が要る |
+| B | スキーマを変えない。入れ替えの旧担当者を `RoleUnassigned` で「役割なし」に戻す（`ParticipantReplaced` を持たない） | 列が増えない。イベントの種類も 1 つ減る | ロビーが旧担当者を割り当て待ちと区別できず、**進行役が割り当てても `game.credential_already_revoked` で拒否される**（画面で説明できない）。`credentials.revoked_at` の結合を読みに足せば導出できるが、投影の独立性が下がる |
+
+提案は A です。**A を採ると、`LobbyParticipant` の応答に `replaced`（boolean）が増えます**（`contracts/openapi.yaml` に条件付きの提案として書いた。B を採るなら削除し、`ParticipantReplaced` を `RoleUnassigned` に置き換える）。
 
 ## 保持削除
 
@@ -719,6 +743,7 @@ end
 | 004 | 共通 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | 005 | 共通 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
 | 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
+| （提案。未作成） | 共通 | **B5 Step 3.5 の確認点（人の判断）**: `lobby_participants.replaced_at timestamptz`（NULL 可）の追加。承認されるまで書かない。番号は 006（B11 の保持）と 101・102 に合わせて、実装時に決める |
 | 101 | PostgreSQL | **B2 で作成（`V101__database_roles.sql`）**。DB ロールと GRANT（書き込み・読み取り・観察者・削除。所有者はマイグレーションの接続のユーザー）、`events` の追記専用、`TRUNCATE` の拒否、観察者向けの権限。**V102 より小さい番号のため、V102 まで適用済みの DB には Flyway がそのまま適用できない（下の注意）** |
 | 102 | PostgreSQL | 部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |
 | 201 | H2 | **作らない**（B1 の Step 7 で、共通の V001〜V005 が H2 にそのまま適用できたため）。省略した制約は、ローカルでは守られない |

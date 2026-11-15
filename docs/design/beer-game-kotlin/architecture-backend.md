@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -452,7 +452,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | ゲーム | `POST /games` | `CreateGame`（`game`） | 誰でも可 |
 | | `GET /games/:id/lobby` | （問い合わせ。`lobby_*`） | 進行役、参加者（**B1 の実装は進行役だけ**。参加者向けのロビーは、投影の型に項目が無く未実装で、参加者には 403。未決事項） |
 | | `GET /games/:id/state` | （問い合わせ。呼び出した人ごとの投影。**B1 の実装で追加**） | 進行役（準備中の参加コード・ロビー・開始後の全役割）、参加者（自分の役割と `participantId`）。無資格・別のゲームは 403。`sessionId` は `gameId` と同じ（ドメインモデル） |
-| | `PUT /games/:id/participants/:pid/role` | `AssignRole`（`game`） | 進行役 |
+| | `PUT /games/:id/participants/:pid/role` | `AssignRole`（準備中は `game`。**開始後は役割の入れ替えで、`game` + `session` の 2 ストリーム**。B5 Step 3.5。アプリケーション層が、ゲームの状態で `decideGame` と `assignRoleAfterStart` を呼び分ける。提案。ゲート 3.5 で人が確認する） | 進行役 |
 | | `DELETE /games/:id/participants/:pid/role` | `UnassignRole`（`game`） | 進行役 |
 | 参加 | `POST /participations/join` | `JoinGame`（`game`） | 参加コード |
 | | `POST /participations/recover` | `RecoverParticipation`（`game`） | 復帰資格（進行役を含む） |
