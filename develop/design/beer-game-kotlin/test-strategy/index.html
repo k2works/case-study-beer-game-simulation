@@ -11218,7 +11218,7 @@
 <tr>
 <td style="text-align: left;"><code>domain</code> の行</td>
 <td style="text-align: right;">—</td>
-<td style="text-align: right;"><strong>目標 100%、実装済みのゲートは暫定の下限 97%</strong>（B2。実測 97.5%。<strong>100% は未達で、人の判断待ち</strong>）</td>
+<td style="text-align: right;"><strong>100%（ゲート。2026-11-15 に暫定の 97% から引き上げ。ローカルの実測 100%。ゲートの確認は人の判断待ち）</strong></td>
 </tr>
 </tbody>
 </table>
@@ -11241,9 +11241,9 @@
 </tr>
 <tr>
 <td style="text-align: left;">domain</td>
-<td style="text-align: right;">97.5%（784/804）</td>
+<td style="text-align: right;">97.5%（784/804。B2 の終了時。2026-11-15 の追補で 100%）</td>
 <td style="text-align: right;">98.2%</td>
-<td style="text-align: left;">行は暫定の下限 97%（<code>domain/build.gradle.kts</code>）</td>
+<td style="text-align: left;">行は 100%（<code>domain/build.gradle.kts</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">application</td>
@@ -11272,6 +11272,7 @@
 </tbody>
 </table>
 <p>閾値割れで失敗することは、全体の分岐を 85%、domain の行を 100% に一時的に変えて確認した（<code>:koverVerify</code>・<code>:domain:koverVerify</code> が FAILED。元に戻して BUILD SUCCESSFUL）。この数値は Step 2 の実測で、契約テスト追加後の再測定値は記録していない。GitHub Actions 上の合算、<code>suspend</code> による分岐の揺れ（複数回の実行）は未測定。</p>
+<p><strong>追補（2026-11-15）: <code>domain</code> の行は 100% に到達した（除外・閾値の引き下げなし）。</strong> 値オブジェクトの値の意味（等しさ・ハッシュ・文字列表現・ボックス化した値の getter）と個々の投影のテスト 54 件を足し、<code>Actor$DefaultImpls</code>（呼ばれない互換の生成コード）を出さない <code>-jvm-default=no-compatibility</code> を設定した。ゲートは 100%（確認は人の判断待ち）。実測した未到達は 19 行で、「20 行」の差の 1 行は再現できなかった（未確認）。以下は到達前（B2 の終了時）の記録。</p>
 <p><strong>domain の行 100% が届かない理由（B2 の事実。未到達 20 行）</strong>: value class のコンストラクタのプロパティの行 9（<code>Quantities.kt</code>・<code>Values.kt</code>）、<code>object Projections</code> の getter の宣言の行 9（<code>Projections.all</code> は内部でフィールドを直接読み、getter が呼ばれない）、<code>Foundation.kt</code> の <code>toRef</code> の宣言の行 1（原因は未確認。生成コードの疑い）が 19 行で、残り 1 行の内訳は未確認。生成コードだけを除く Kover の設定は確認できなかった（<code>Projections*</code>・<code>Quantity</code>・<code>Units</code> をクラス単位で除外すると、実処理の 184 行が計測から消えて 98.5% にしかならない）。選択肢は、(1) 設計書の 100% を実測に合わせて書き換え、ゲートは 97% のままにする、(2) <code>private val</code> や通常のクラスへの変更（設計・コードの変更）、(3) クラス単位の除外（非推奨）、(4) 注釈による除外（効果は未確認）。<strong>決めるのは人</strong>（<a href="../../../development/beer-game-kotlin/bolt_2_report/">Bolt 2 終了報告</a> の #1）。</p>
 <h3 id="kover-h14">Kover の計測の範囲（H14）<a class="headerlink" href="#kover-h14" title="Permanent link">&para;</a></h3>
 <p><strong>Kover は <code>test</code> と <code>integrationTest</code> を合算して計測する設定にする</strong>。<code>adapters/persistence</code> の行 90% は、DB の統合を含めないと到達できないためである。合算されないと、判定が意図とずれる。合算の設定がビルドで動くことは、B1 の時点では未確認だった。<strong>B2 の実測（2026-11-15）で確認した</strong>: Kover 0.9.11 は、ルート（<code>build.gradle.kts</code>）で <code>kover</code> プラグインを適用し、<code>dependencies { kover(project(":domain")) ... }</code> で全 5 モジュールを集めると、ルートの <code>koverXmlReport</code>・<code>koverVerify</code> が全モジュールを合算する。既定ですべての Test タスク（<code>test</code>・<code>integrationTest</code>・<code>acceptanceTest</code>・<code>acceptanceTestH2</code>）を計測し、追加の設定は不要（<code>koverVerify</code> がこれらを先に実行する依存を <code>--dry-run</code> で確認）。<strong>落とし穴</strong>: <code>integrationTest</code>・<code>acceptanceTest</code> のソースセットのクラス（<code>beergame.acceptance.*</code>、<code>PostgresSupport</code> など）が本番コードの行に入るため、各モジュールで <code>kover { currentProject { sources { excludedSourceSets.addAll("integrationTest", "acceptanceTest") } } }</code> を設定して外した（<code>excludedSourceSets</code> の記述は、公式ドキュメントで確認できず、ビルドが通り効果を実測した）。検査の規則（<code>rule</code>）には、パッケージで絞る <code>filters</code> が無く（実測: コンパイルエラー）、domain の行のゲートは domain モジュールの <code>koverVerify</code> に置いた。<strong>app の起動部の除外は未設定。</strong></p>
@@ -11293,7 +11294,7 @@
 <td style="text-align: left;"><code>domain</code>（集約、<code>simulateWeek</code>、値オブジェクト、<code>RetentionSaga</code>。<strong><code>Disclosure</code> は B1 の実装では <code>application</code></strong>）</td>
 <td style="text-align: right;">100%</td>
 <td style="text-align: right;">90%</td>
-<td style="text-align: left;">行 100% が<strong>ゲートの目標</strong>（B2 の実装は暫定の下限 97%。上記）。分岐は目安</td>
+<td style="text-align: left;">行 100% が<strong>ゲート</strong>（2026-11-15 の追補で到達、ゲート 100%。上記）。分岐は目安</td>
 <td style="text-align: left;">中核。例と性質のテストで網羅する。<code>sealed</code> の網羅が生む到達不能な分岐は、除外ではなく分岐の目標を 100% にしないことで扱う</td>
 </tr>
 <tr>

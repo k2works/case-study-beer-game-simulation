@@ -10064,7 +10064,7 @@
 <h3 id="step-2-kover">Step 2: Kover の合算とゲート（🔴🟢）<a class="headerlink" href="#step-2-kover" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2.1 Kover が <code>test</code>・<code>integrationTest</code>・受け入れを合算できるか実測する</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.2 層ごとの目標と、全体のゲート（行 85%・分岐 75%）を、実測に基づいて設定する。<strong>domain の行 100% と、生成コード（<code>value class</code> の生成メンバー）の扱い</strong>を調べ、<strong>人の判断が要る場合は、閾値を黙って下げず、事実と選択肢を記録する</strong>（全体のゲートは設定済み。<strong>domain の行 100% は未達のため [ ] のまま</strong>。暫定の下限 97% を設定し、人の判断待ち）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2.2 層ごとの目標と、全体のゲート（行 85%・分岐 75%）を、実測に基づいて設定する。<strong>domain の行 100% と、生成コード（<code>value class</code> の生成メンバー）の扱い</strong>を調べ、<strong>人の判断が要る場合は、閾値を黙って下げず、事実と選択肢を記録する</strong>（全体のゲートは設定済み。<strong>domain の行 100% は、除外も閾値の引き下げもせず、テストの追加とコンパイラ設定 1 つで到達し、ゲートを 100% にした（2026-11-15 の追補。下の 4）</strong>。ゲートの設定そのものは、人の確認待ち）</li>
 </ul>
 <p><strong>ゲート 2</strong>: 実測と、ゲートの設定を、人が確認する。<strong>（待ち。承認済みではない）</strong></p>
 <h4 id="step-2-2026-11-15">Step 2 の結果（実測。2026-11-15）<a class="headerlink" href="#step-2-2026-11-15" title="Permanent link">&para;</a></h4>
@@ -10146,9 +10146,9 @@
 </tr>
 <tr>
 <td style="text-align: left;">domain の行</td>
-<td style="text-align: right;"><strong>暫定の下限 97%</strong>（目標 100%）</td>
+<td style="text-align: right;"><strong>100%</strong>（2026-11-15 に暫定の 97% から引き上げ。下の 4 の追補）</td>
 <td style="text-align: left;"><code>domain/build.gradle.kts</code>（モジュール単位）</td>
-<td style="text-align: right;">97.5%</td>
+<td style="text-align: right;">100%（未到達 0 行）</td>
 </tr>
 </tbody>
 </table>
@@ -10158,6 +10158,10 @@
 <li><strong>閾値割れで失敗すること（実測）</strong>: 全体の分岐を 85%、domain の行を 100% に一時的に変えて <code>./gradlew koverVerify --continue</code> を実行し、<code>:koverVerify</code>・<code>:domain:koverVerify</code> が FAILED になることを確認した。その後、元の値（75%・97%）に戻した。戻したあと <code>./gradlew koverVerify</code> は BUILD SUCCESSFUL。</li>
 </ul>
 <p><strong>4. domain の行 100% の事実と選択肢（人の判断）</strong></p>
+<p><strong>追補（2026-11-15）: 100% に到達した。</strong> 除外・閾値の引き下げはしていない。以下の「未到達の 20 行」以降は、到達前の記録として残す。
+- <strong>実測した未到達の行は 19 行</strong>（Kover の XML の <code>ci=0</code>）。「20 行」は再現できなかった（差の 1 行は内訳不明のまま。集計の違いの可能性。<strong>未確認</strong>）。内訳は下の記述どおりで、<code>Foundation.kt</code> 56 行の原因が確定した: <strong><code>Actor</code> の interface の既定メソッドに、コンパイラが互換用に生成する <code>Actor$DefaultImpls</code>（呼ばれない）</strong>。<code>value class</code> の 9 行の原因は、ボックス化した値のインスタンスの <code>getValue</code>（Kotlin のコードからは unbox 経由のため呼ばれず、JVM の呼び出しからだけ到達する）。
+- <strong>到達させた方法</strong>: (1) <code>ValueObjectsSpec</code> に値の意味の試験を追加（11 型 × 4 件 = 44 件: 等しさ・ハッシュ・別の値との非等価、文字列表現、ボックス化した値の getter が包んだ値を返すこと（<code>Class.getMethod</code> による。JVM から見える窓口）、集合・写像・リストの要素にできること）。(2) <code>ProjectionSpec</code> に、個々の投影（9 つ）が自分の表の行だけを 1 行以上作ること（9 件）と、<code>all</code> が個々の投影を表の順序で並べたものであること（1 件）を追加（10 件）。(3) <code>domain/build.gradle.kts</code> に Kotlin コンパイラの <code>-jvm-default=no-compatibility</code> を追加（<code>DefaultImpls</code> を生成しない。domain は Kotlin のビルドだけから使われる。<strong>この設定の妥当性は人の確認待ち</strong>）。本番コード（<code>domain/src/main</code>）は変更していない。追加したテストは計 54 件。
+- <strong>ゲート</strong>: <code>domain/build.gradle.kts</code> を 100% に変更。未到達の関数を 1 つ足すと <code>:domain:koverVerify</code> が失敗（<code>99.8755 ... expected minimum is 100</code>）することを確認し、戻した。</p>
 <ul>
 <li><strong>未到達の 20 行（784/804）の内訳</strong>: すべて、手で書いた処理ではなく、コンパイラが生成するコードに対応する行。</li>
 <li><code>value class</code> のプライマリコンストラクタのプロパティの行（<code>val value: Int,</code> など）9 行（<code>Quantities.kt</code> の 10・28、<code>Values.kt</code> の 22・44・61・83・96・110・125。ボックス化したクラスの <code>getValue</code> など）。</li>
@@ -10526,7 +10530,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 規約違反コードを置くと CI が落ちる（detekt（JDK 21）と PMD のそれぞれ）。PMD の fixture のテストが期待どおり（<strong>ローカルの同じ Gradle タスクで確認。GitHub Actions 上は未確認</strong>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 違反 0 件・ベースラインなし・<code>@Suppress</code> なしで全コードが緑（<strong>層ごとのルールセットで外したルールがある。人の承認は未。ADR-011 に追記</strong>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 追記専用権限の否定テストが通り、連鎖削除の可否が確定している（連鎖削除は動く。V101）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Kover の合算の可否と、ゲートの設定が記録されている（合算の可否と全体のゲートは [x]。<strong>domain の行 100% は未達で、暫定の下限 97%。人の判断待ち</strong>のため、[ ] のまま）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Kover の合算の可否と、ゲートの設定が記録されている（合算の可否と全体のゲートは [x]。domain の行 100% は 2026-11-15 に到達し、ゲートを 100% にした。<strong>ゲートは人の確認待ち</strong>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> API の契約テストの道具の候補が提示されている（候補の提示と選定はユーザーとの対話で 2026-11-14 に行われ、導入まで実施したが、<strong>比較表は文書に残していない</strong>ため [ ] のまま）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> ktlint の <code>.editorconfig</code> の調整が実際の版で動く（戦略・リリース計画の受入条件。<strong>B2 で個別に確認していない。未確認</strong>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>validating-design</code> を実施し、結果を <a href="../bolt_2_report/">終了報告</a> に記録した</li>
@@ -10578,6 +10582,11 @@
 <tr>
 <td style="text-align: left;">2026-11-14</td>
 <td style="text-align: left;">初版作成（AI が提案。<strong>ステップ計画は人の承認待ち</strong>。ユーザーの決定 4 件を反映し、ゴール U1 に従って実行を開始）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>domain の行 100% に到達</strong>（Step 2 の追補）: 未到達 19 行を特定、テスト 54 件を追加、<code>-jvm-default=no-compatibility</code> を追加、ゲートを 97% から 100% に変更（除外・引き下げなし）。ゲートと設定の妥当性は人の確認待ち</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>

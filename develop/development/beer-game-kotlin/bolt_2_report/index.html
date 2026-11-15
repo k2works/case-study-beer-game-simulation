@@ -9889,8 +9889,8 @@
 </tr>
 <tr>
 <td style="text-align: left;"><strong>CI で domain の行 100% のゲートが有効</strong></td>
-<td style="text-align: left;"><strong>未達</strong></td>
-<td style="text-align: left;">domain の行は 97.5%（784/804）。暫定の下限 97% を設定。<strong>人の判断待ち</strong>（下の #1）</td>
+<td style="text-align: left;"><strong>ローカルで達成（2026-11-15 の追補）。CI での実行は未確認</strong></td>
+<td style="text-align: left;">domain の行は 100%。ゲートを 100% に設定（除外・引き下げなし。テスト 54 件の追加と <code>-jvm-default=no-compatibility</code>）。ゲートと設定の確認は人の判断待ち（下の #1）</td>
 </tr>
 <tr>
 <td style="text-align: left;">API の契約テストと型の生成が CI に組み込まれ、仕様と実装をずらすと落ちる</td>
@@ -9964,9 +9964,9 @@
 </tr>
 <tr>
 <td style="text-align: left;">domain</td>
-<td style="text-align: right;">97.5%</td>
-<td style="text-align: right;">98.2%</td>
-<td style="text-align: left;">行は暫定の下限 97%（目標 100% は未達）</td>
+<td style="text-align: right;">100%（追補後。B2 の終了時は 97.5%）</td>
+<td style="text-align: right;">98.2%（B2 の終了時。追補後は未測定）</td>
+<td style="text-align: left;">行は 100%（<code>domain/build.gradle.kts</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">application</td>
@@ -10046,7 +10046,7 @@
 <tr>
 <td style="text-align: left;">1</td>
 <td style="text-align: left;"><strong>domain の行 100%</strong></td>
-<td style="text-align: left;">97.5%。未到達は生成コード由来。選択肢: (1) ゲートを 97% のまま、設計書の 100% を書き換える、(2) <code>Projections</code> の <code>val</code> を <code>private val</code> にする、<code>value class</code> をやめる（設計・コードの変更）、(3) クラス単位の除外（実処理の 184 行が計測から消えるため非推奨）、(4) 注釈による除外（効果は未確認）。<strong>暫定の 97% は「悪化させない」ための下限で、決定ではない</strong></td>
+<td style="text-align: left;"><strong>（2026-11-15 の追補: 到達した。ゲートは 100%。未到達 19 行をテスト 54 件の追加と <code>-jvm-default=no-compatibility</code> で解消。除外・引き下げなし。ゲート 100% と、コンパイラ設定の妥当性の確認は人の判断待ち）</strong> B2 の終了時は 97.5%。未到達は生成コード由来。当時の選択肢: (1) ゲートを 97% のまま、設計書の 100% を書き換える、(2) <code>Projections</code> の <code>val</code> を <code>private val</code> にする、<code>value class</code> をやめる（設計・コードの変更）、(3) クラス単位の除外（実処理の 184 行が計測から消えるため非推奨）、(4) 注釈による除外（効果は未確認）。<strong>暫定の 97% は「悪化させない」ための下限で、決定ではない</strong></td>
 <td style="text-align: left;">Step 2</td>
 </tr>
 <tr>
@@ -10232,7 +10232,7 @@
 <tr>
 <td style="text-align: left;">A4</td>
 <td style="text-align: left;">戦略・リリース計画は「domain の行 100% のゲート」。計画は暫定 97% に設定した</td>
-<td style="text-align: left;"><strong>人の判断待ち</strong>（#1）。計画の記述と事実は一致している（97% は暫定と明記）</td>
+<td style="text-align: left;"><strong>追補（2026-11-15）で 100% に到達し、ゲートを 100% にした</strong>。確認は人の判断待ち（#1）</td>
 </tr>
 <tr>
 <td style="text-align: left;">A5</td>

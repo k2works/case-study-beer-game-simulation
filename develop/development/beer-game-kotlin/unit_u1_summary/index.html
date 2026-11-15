@@ -10001,7 +10001,7 @@
 <ul>
 <li>増分: B2 は権限の否定テスト 11 件と契約テスト 13 件（+24）、B3 は <code>MainSpec</code> の起動モードのテスト 3 件（+3）。</li>
 <li>最終検証: <code>./gradlew build integrationTest acceptanceTest acceptanceTestH2 koverVerify --rerun-tasks</code>（JDK 25）が BUILD SUCCESSFUL（B1 5 分 28 秒、B2 5 分 31 秒、B3 5 分 39 秒）。detekt は JDK 21、PMD は 4 層で違反 0、<code>@Suppress</code> の実使用 0、ベースラインなし。</li>
-<li>Kover（B2 の実測）: 全体 行 96.8%・分岐 78.1%、domain 行 97.5%・分岐 98.2%。B3 では再測定の値を記録していない（<code>koverVerify</code> は成功）。</li>
+<li>Kover（B2 の実測）: 全体 行 96.8%・分岐 78.1%、domain 行 97.5%・分岐 98.2%（domain の行は追補で 100%。全体の再測定は未記録）。B3 では再測定の値を記録していない（<code>koverVerify</code> は成功）。</li>
 </ul>
 <h2 id="3">3. 成果物の一覧<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
 <table>
@@ -10089,7 +10089,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">domain の行 100% のゲート</td>
-<td style="text-align: left;">97.5%（784/804）。暫定の下限 97%。未到達 20 行のうち 19 行は生成コード由来。<strong>人の判断待ち</strong>（B2 #1）</td>
+<td style="text-align: left;">B2 の終了時は 97.5%（784/804）。<strong>追補（2026-11-15）で 100% に到達し、ゲートを 100% にした</strong>（テスト 54 件の追加と <code>-jvm-default=no-compatibility</code>。除外・引き下げなし。ローカルの実測。CI は未確認）。ゲートと設定の確認は<strong>人の判断待ち</strong>（B2 #1）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>terraform plan</code> が通る（リリース計画・開発戦略の B3 の受入条件）</td>
@@ -10156,7 +10156,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">domain の行 100%、全体の行 85%・分岐 75%</td>
-<td style="text-align: left;"><strong>domain は未達（97.5%）</strong>。全体は達成（96.8%・78.1%。B2 の実測）</td>
+<td style="text-align: left;"><strong>domain は追補（2026-11-15）で 100% に到達（ローカルの実測。B2 の終了時は 97.5%）</strong>。全体は達成（96.8%・78.1%。B2 の実測）</td>
 </tr>
 <tr>
 <td style="text-align: left;">規約違反コードで CI が落ちる（detekt と PMD のそれぞれ）</td>
@@ -10224,7 +10224,7 @@
 <tr>
 <td style="text-align: left;">3</td>
 <td style="text-align: left;"><strong>domain の行 100% のゲート</strong></td>
-<td style="text-align: left;">97.5%。選択肢は、97% のまま設計書を直す、<code>private val</code> や value class をやめる、クラス単位の除外（非推奨）、注釈による除外</td>
+<td style="text-align: left;">追補（2026-11-15）で 100% に到達しゲートを 100% にした（除外・引き下げなし）。ゲートの 100% と <code>-jvm-default=no-compatibility</code> の確認が人の判断。（当時の選択肢: 97% のまま設計書を直す、<code>private val</code> や value class をやめる、クラス単位の除外、注釈による除外）</td>
 <td style="text-align: left;">B1 #14、B2 #1</td>
 </tr>
 <tr>
