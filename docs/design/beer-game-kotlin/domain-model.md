@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T22:04:25Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -992,6 +992,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 38 | `assignRoleAfterStart` のスケッチ（セッションの状態は `Active`・`Paused` の確認だけ。`evolve` は入れ替えの事実を採用） | **実装**（2026-11-15、B5 Step 3.5.2〜3.5.4。実装の確認はゲート 3.5 で人が行う）: 関数は `ReplaceDecision.kt`（`ReplaceDecision` と同じファイル）。(1) セッションの確認は `openData()` を使い、**未開始は `NotActive`**、終了後は `AlreadyEnded`（スケッチは終了後と同じ扱い）。(2) 新担当者の資格の確認は `credentials[subject]?.revoked == false`（資格の行がない参加者は `CredentialAlreadyRevoked`。参加時に必ず発行されるので到達しない列）。(3) **`evolveGame` の `RoleAssigned` は、開始後も役割を付ける**（準備中と同じ `updateData`。従来は準備中だけで、開始済みでは状態を変えなかった）。`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（準備中・未作成・未知の参加者は状態を変えない）。(4) `RoleHolderReplaced` は進行中・一時停止中だけ写しを更新する（未開始・終了後は状態を変えない） | 開始後の `RoleAssigned` を採用しないと、入れ替えの結果が再生で復元できない。`decide` が作らない列は、これまでどおり状態を変えずに返す（`replay` が検知する） |
 | 39（B5 Step 4.7。2026-11-15） | 投影は `SessionStarted`・`DecisionSaved`・`WeekCommitted` などを購読する（B1） | `SessionPaused`・`SessionResumed`（`session_overview.status` を PAUSED・ACTIVE）、`ProxyDecisionSubmitted`（`current_decisions` に進行役の入力者で書き、`submitted_role_count` を更新）、`ParticipantReplaced`（`lobby_participants` の `role` を NULL、`replaced_at` を書く行の変更。DB の列はマイグレーション（Step 5.5）まで無い）を購読する。**資格のイベント（`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）と `RoleHolderReplaced` は、どの投影も購読しない**（L5。資格の状態の正本は `credentials`、割り当ての写しは session ストリームの再生） | 投影の契約テストで、資格のイベントが行を作らないことを確認 |
 | 40（B5 Step 8.4。2026-11-15） | 用語・イベントの一覧は、設計書の手書きの表だけ（ユビキタス言語、ドメインイベントの表） | **コードから生成する一覧を足した**: 型に注釈 `@Term`・`@EventSpec`（`Documentation.kt`。標準ライブラリだけ）を付け、`LivingDocumentationSpec` が [イベント一覧](./generated/events.md)・[用語集](./generated/glossary.md) を生成する。**手書きの EV 表は残し**、生成物との不一致（ID・名前）を試験が検出する（実装済みの 17 イベントの ID と名前が、EV 表と一致）。未実装のイベント（EV-G05〜G07、EV-S07）は、生成物の「設計書にあり、まだ実装が無いイベント」に載る。EV 表を生成物への参照に置き換えるかは、人の判断（[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案） | 開発戦略の「手作業で更新する一覧は作らない」。生成物と手書きの境界: 生成物 = ID・名前・ストリーム・ペイロードの項目・購読する投影・用語、手書き = 意図・判断・却下した代替案 |
+| 41（B6 Step 2。2026-11-16） | 差の表 34 は「共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける」と条件を残していた | **版の意味は変えない（B6 判断項目 5 の結論）ので、回数を分けない**。共同担当（同じ役割に 2 人以上）でも、意思決定の版は役割・週ごとの保存の通し番号で、`hasSaveCapacity` の上限 9 回は役割ごとに共同担当で共有する（担当者の人数では増えない）。拒否された保存（`DecisionConflict`・`SaveLimitReached`・`WeekAdvanced`）は版も保存回数も進めない。**同じ値の保存し直しも 1 回に数え、版が進むので、古い根拠での確定は `DecisionsChanged`**（版は値の変化でなく保存で数える）。`DecisionEntry`・`DecisionSaved`・`SessionError` は変えない（判断項目 7。保存の時刻はイベントに足さない）。**実装（`Session.kt`）は変更なし**で、共同担当の振る舞いを `SessionCoInputSpec`・`CoInputPropertySpec` が固定する | 判定の実装は B1・B5 から共同担当で正しく働く。足りなかったのは、同じ役割に 2 人いる Given の試験だった |
 
 ## 未決事項
 
@@ -1002,7 +1003,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 - 遅延の週数のカスタム範囲（0〜何週まで）と、待ち行列の初期値の決め方。**遅延 0 を許すか（B1 で判明）**: 待ち行列の長さが「遅延 − 1」のため、遅延 0 は長さ −1 になり表せない（beer-game2 も遅延は 1 週以上）。テスト戦略の「遅延 0 を含むカスタムの遅延」の golden は、遅延 0 を許すと決めるまで書けない。遅延 1（待ち行列が空）の golden は書いた。実装は、遅延 0 を許さない前提です。
 - **需要の上限（B1 で判明）。** 実装は `DemandSeries` の各週を `Quantity` の範囲（0〜1000）で検証する。設計書に需要の上限の規定は無く、「0 以上の整数」だけだった。実装が正しいかは未決（根拠は `Quantity` の 0〜1000 と需要系列の「0 以上」の組）。
 - **単独の `UnassignRole`（判断項目 #13）。** B1 は実装していない（付け替えの内部の `RoleUnassigned` だけ。`evolveGame` は処理できる）。B1 に含めるかは未決。含めない場合は、UI 設計の S04 から「外す」を除く。
-- **同じ役割に別の参加者を割り当てる（共同担当）を、B1 で拒否するか。** 実装は、不変条件（1 つの役割に複数の参加者を割り当てられる）に従い拒否しない。計画の「B1 は 1 役割 1 人（共同担当は B6）」の制限を課すかは未決（課すなら、設計書にない `DomainError` が要る）。
+- ~~**同じ役割に別の参加者を割り当てる（共同担当）を、B1 で拒否するか。**~~ **解消（B6 Step 2。2026-11-16）**: 準備中の共同担当は拒否しない。AC1.2.4 の受入条件として、`GameDecideSpec`（2 人目・3 人目の割り当て）と `SessionCoInputSpec`（共同担当のどちらも保存できる）で固定した。人数の上限は設けない（B6 判断項目 4）。開始後の追加は、上の未決のとおり範囲外のまま。
 - `ParticipantJoined` の重複（同じ参加者の ID が再び来る）。`decideGame` は ID の重複を検査せず、`evolveGame` が不正な遷移として扱う（ID は境界が生成する前提）。重複の `DomainError` が要るかは未決。
 - `JoinCode` の検証は 8 桁以上の長さだけ（文字の種類は未決）。`RetentionDays` は 1〜3650。`DisplayName` の長さは Unicode のコードポイント数で数える（1〜80。UI の `maxLength` との一致は未確認）。
 - `Forbidden` の理由の文言（日本語）は仮置き。試験は型だけを確かめる。

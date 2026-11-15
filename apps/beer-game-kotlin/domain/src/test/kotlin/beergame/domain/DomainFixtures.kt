@@ -206,11 +206,24 @@ fun savedTimes(
 /** 役割ごとの参加者（工場 = 参加者 1 … 小売店 = 参加者 4）。 */
 val assignedParticipants: RoleMap<Set<ParticipantId>> = RoleMap.of { setOf(pid(it.ordinal + 1)) }
 
-fun sessionStarted(settings: GameSettings = gameSettings()): SessionEvent.SessionStarted =
+/** 共同担当（B6）。各役割に 2 人: 担当者（参加者 1〜4）と、共同担当（参加者 11〜14。役割の順に +10）。 */
+fun coHolderId(role: Role): ParticipantId = pid(role.ordinal + 11)
+
+val coAssignedParticipants: RoleMap<Set<ParticipantId>> =
+    RoleMap.of { setOf(pid(it.ordinal + 1), coHolderId(it)) }
+
+fun coHolderActor(role: Role): Actor = Actor.Participant(coHolderId(role))
+
+fun coHolderEditor(role: Role): Editor = Editor.ByParticipant(coHolderId(role))
+
+fun sessionStarted(
+    settings: GameSettings = gameSettings(),
+    assignments: RoleMap<Set<ParticipantId>> = assignedParticipants,
+): SessionEvent.SessionStarted =
     SessionEvent.SessionStarted(
         gid,
         settings,
-        assignedParticipants,
+        assignments,
         KitPreset.initialStates(settings.demand),
         settings.commitMode,
     )
@@ -230,6 +243,16 @@ fun decisionSaved(
         Editor.ByParticipant(pid(role.ordinal + 1)),
         submittedRoleCount,
     )
+
+/** 第 1 週に、[editor]（共同担当など、役割の既定の担当者以外）が保存した事実。 */
+fun decisionSavedBy(
+    editor: Editor,
+    role: Role,
+    quantity: Int,
+    version: Long = 1,
+    submittedRoleCount: Int = 1,
+): SessionEvent.DecisionSaved =
+    SessionEvent.DecisionSaved(w(1), role, q(quantity), dv(version), editor, submittedRoleCount)
 
 fun sessionOf(vararg events: SessionEvent): SessionState =
     events.fold<SessionEvent, SessionState>(SessionState.NotStarted, ::evolveSession)

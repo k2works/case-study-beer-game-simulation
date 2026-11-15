@@ -56,11 +56,24 @@ class GameDecideSpec :
                 val onRetailer = gameOf(gameCreated(), participantJoined(1), roleAssigned(1, Role.RETAILER))
                 decideGame(onRetailer, assignRole(1, Role.RETAILER)) shouldBe emptyList<GameEvent>().right()
             }
-            test("[設計 D9・AC1.2.4] 同じ役割に別の参加者を割り当てても拒否しない（共同担当の扱いは B6 で決める。未決）") {
+            test("[AC1.2.4] 準備中は、同じ役割に別の参加者を割り当てられる（共同担当。拒否も付け替えもしない）") {
                 val onRetailer =
                     gameOf(gameCreated(), participantJoined(1), participantJoined(2), roleAssigned(1, Role.RETAILER))
                 decideGame(onRetailer, assignRole(2, Role.RETAILER)) shouldBe
                     listOf(roleAssigned(2, Role.RETAILER)).right()
+            }
+            test("[AC1.2.4] 3 人目も割り当てられる（共同担当の人数に上限は設けない。判断項目 4）") {
+                val twoOnRetailer =
+                    gameOf(
+                        gameCreated(),
+                        participantJoined(1),
+                        participantJoined(2),
+                        participantJoined(3),
+                        roleAssigned(1, Role.RETAILER),
+                        roleAssigned(2, Role.RETAILER),
+                    )
+                decideGame(twoOnRetailer, assignRole(3, Role.RETAILER)) shouldBe
+                    listOf(roleAssigned(3, Role.RETAILER)).right()
             }
             test("When 進行役以外（参加者・匿名）が割り当て Then Forbidden") {
                 listOf(participantActor(1), anonymousActor, Actor.Facilitator(GameId(UUID(9L, 9L)))).forEach { actor ->
