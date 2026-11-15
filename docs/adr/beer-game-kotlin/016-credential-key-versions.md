@@ -3,8 +3,10 @@ type: ADR
 title: "ADR-016: 資格の鍵の版を、値の接頭辞で持つ（提案）"
 description: "B5 の判断項目 3 の提案。資格の値に版の接頭辞（v<版>.<乱数>）を含め、版ごとの鍵でダイジェストを検証する。鍵のローテーションで旧版の資格が期限まで有効で、版を外すと使えなくなる。人の承認待ち。"
 tags: [adr]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:49:31Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-15T10:49:32Z }
 ---
 
 # ADR-016: 資格の鍵の版を、値の接頭辞で持つ（提案）
@@ -15,7 +17,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 ## ステータス
 
-提案中（レビュー待ち）。
+承認済み（2026-11-15、ユーザー。B5 ゲート 8）。
 
 ## コンテキスト
 

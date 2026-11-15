@@ -3,8 +3,10 @@ type: ADR
 title: "ADR-017: 参加・復帰の失敗の窓を DB に持つ（提案）"
 description: "B5 の判断項目 4 の提案。参加・復帰の専用のレート制限を、接続元の鍵付き要約ごとの失敗の窓（participation_attempts）として DB に持ち、複数のインスタンスで合算する。検査の前に足し、認可の失敗でなければ戻す。人の承認待ち。"
 tags: [adr]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:49:31Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-15T10:49:32Z }
 ---
 
 # ADR-017: 参加・復帰の失敗の窓を DB に持つ（提案）
@@ -15,7 +17,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 ## ステータス
 
-提案中（レビュー待ち）。
+承認済み（2026-11-15、ユーザー。B5 ゲート 8）。
 
 ## コンテキスト
 

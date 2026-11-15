@@ -3,8 +3,10 @@ type: ADR
 title: "ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する（提案）"
 description: "B5 の H1（Living Documentation の中盤の重点）の提案。domain に標準ライブラリだけの注釈（Term・EventSpec）を置き、domain の試験が用語集とイベント一覧を生成して、コミット済みの生成物・設計書の ID との不一致を失敗にする。人の承認待ち。"
 tags: [adr]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:49:31Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-15T10:49:32Z }
 ---
 
 # ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する（提案）
@@ -15,7 +17,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 ## ステータス
 
-提案中（レビュー待ち）。
+承認済み（2026-11-15、ユーザー。B5 ゲート 8。注釈は domain 内、生成は domain のテスト、手書きの EV 表は残す方式）。
 
 ## コンテキスト
 

@@ -1,6 +1,17 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Verification**: [018-living-documentation-annotations](/adr/beer-game-kotlin/018-living-documentation-annotations.md) を human:kakimomokuri が検証
+* **Verification**: [017-attempt-window-in-database](/adr/beer-game-kotlin/017-attempt-window-in-database.md) を human:kakimomokuri が検証
+* **Verification**: [016-credential-key-versions](/adr/beer-game-kotlin/016-credential-key-versions.md) を human:kakimomokuri が検証
+* **Verification**: [015-credential-handover-and-session-revocation](/adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md) を human:kakimomokuri が検証
+* **Verification**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を human:kakimomokuri が検証
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
+* **Update**: B5 ゲート 8 と ADR-015〜018 の承認を記録
 * **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
 * **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
 * **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）

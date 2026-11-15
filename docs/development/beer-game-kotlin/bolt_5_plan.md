@@ -4,10 +4,11 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:49:31Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
+  - { by: human:kakimomokuri, at: 2026-11-15T10:49:32Z }
 ---
 
 # Bolt 5 計画 - 進行の継続と資格
@@ -768,7 +769,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [x] 8.4c 🟡 **不安定な試験の修正**: 「応答に `998` が含まれない」を `shouldNotContain "998"` で確かめる 3 箇所（`ApplicationFlowContract`、`HttpFlowSpec`、`PostgresHttpSpec`）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）
 - [x] 8.5 Bolt 終了報告（[`bolt_5_report.md`](./bolt_5_report.md)）。**デモ項目の実操作の申告欄**（人が行う。空のまま）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
 
-**ゲート 8**（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。**状態: 人の確認待ち（未承認）。**
+**ゲート 8**（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。**状態: 2026-11-15 にユーザーが承認した（選択: 「ゲート 8 を承認」「B5 のコード全行理解を承認」）。デモ項目の人の実操作は、申告がなく未記録。**
 
 #### Step 8 の実施結果（2026-11-15）
 
@@ -848,7 +849,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] domain の行 100%（除外・閾値の引き下げなし）、全体の行 85%・分岐 75%。静的解析の違反 0 件、ベースラインなし、`@Suppress` なし
 - [ ] 設計書・ADR の変更表が更新され、`validating-design` を着手前と完了時に実施し、結果を記録した
 - [ ] Bolt 終了報告があり、未達・未実施・人の判断項目が列挙されている
-- [ ] コードを、人が全行理解して承認した（**未。人の確認待ち**）
+- [x] コードを、人が全行理解して承認した（2026-11-15 にユーザーが承認。選択: 「B5 のコード全行理解を承認」）
 
 ## リスクと対策
 
@@ -963,6 +964,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 | 2026-11-15 | **Step 3.5.1（役割の入れ替えの仕様と設計書）を実施**（ゲート 3.5 は人の確認待ち。**承認は記録していない**。3.5.2 以降は着手していない。Kotlin のコードとマイグレーションは書いていない）。`openapi.yaml` の `assignRole` に規則を書き（新しい `code` なし、`LobbyParticipant.replaced` を条件付きで追加）、`api:generate`・`api:check`・`api:lint` を実行（差分 0・有効）。設計書（`domain-model.md` の「役割の入れ替え」・イベント EV-G12・EV-S09・差の表 37、`data-model.md` の「役割の入れ替えと永続化」ほか）と `credentials.feature` の 6 シナリオを追加。**確認した事実: Kotlin 版に `participants.replaced_at` に当たる列は無い（スキーマ変更の要否は確認必須の人の判断）。`session` の割り当ての写し（D4）の更新が要るため、入れ替えは 2 ストリームにまたがる**。`ApiContractSpec` は 13 件中 7 件 failed（Step 3 と同じ。新しい Red なし）。人が確認する 8 点は「Step 3.5.1 の結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3（Game の資格: 失効・再発行・復帰。3.1〜3.3）を実施**（ゲート 3 は人の確認待ち。**承認は記録していない**。Step 3.5 以降は未着手）。テストを先に書き、コンパイルエラー 119 件の Red を確認してから実装。`Credential.kt`（新規）に `CredentialSubject`・`CredentialValidity`・資格の decide を、`Game.kt` に `RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`、`game.credential_already_revoked`・`game.credential_not_revoked` を追加。仕様に `game.credential_not_revoked` を足し型を再生成。永続化の DTO を最小で前倒し。実測: `:domain:test` 357 件・失敗 0、domain の行 970/970（100%）、`:app:test` は想定の 7 件の Red（Step 1 の `ApiContractSpec`）、静的解析は違反 0。ゲート 3 で人が確認する 6 点は「Step 3 の実施結果」。設計書（domain-model の差の表 35・36 ほか）を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施**（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。`SessionState.Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`、`Editor.ByFacilitator`、`session.paused`・`session.not_paused`・`session.save_limit_reached` を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。`evolveSession` を `SessionEvolve.kt` へ分割（detekt の指摘の解消）。`InvalidTransition` の性質テスト（500 回）。永続化の DTO を最小で前倒し。**実測**: domain 300 件・失敗 0・行 879/879（100%）、`:app:test` は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の `code` の表・不変条件・差の表を更新 | claude-code/claude-sonnet-5-5 |
+| 2026-11-15 | **ゲート 8（Bolt の承認）と B5 のコードの全行理解を、ユーザーが承認**（選択: 「ゲート 8 を承認」「B5 のコード全行理解を承認」）。**ADR-015〜018 を承認し、Living Documentation の方式（注釈は domain 内、生成は domain のテスト、手書きの EV 表は残す）を現状どおり承認**（選択: 「ADR-015〜018 を承認」「LD の方式を現状どおり承認」）。**デモ項目の人の実操作は申告がなく、終了報告の申告欄は空のまま**。CI のパスフィルターへの追加、R11（運営者との合意）、H5 の割り当ては未決 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 7 をユーザーが承認し、確認点 1〜7 を報告どおりに確定**（選択: 「承認、報告どおり・axe は導入しない」）。UI の範囲（代理入力・失効・再発行・終了は範囲外）、復帰の入口、計画外の足し 4 点、提案文言、復帰後の行き先、SSE 未実装、新規ファイル 5 点。axe は導入しない。**不安定な試験（`998` の検査）は項目単位の検査に直す**（選択: 「直す（項目単位の検査）」。Step 8 の 8.4c）。CI は 8 ジョブすべて success（`646c23a`）。ゲート 8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 6 をユーザーが承認**（ユーザーの入力: 「承認」。Step 6 の報告の確認点 1〜5 を報告どおりとして記録。資格のある参加者による停止中でないゲームの再開は 409 `session.not_paused`、`bg_recovery` の `Max-Age` は 30 日、新規ファイル 4 点）。**不安定な試験（`998` の検査）を直すかは、指示がなく未決のまま**。CI は 8 ジョブすべて success（`9053387`）。ゲート 7・8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 5 をユーザーが承認し、報告どおりに確定**（選択: 「承認、報告どおりで確定」）。窓は DB（`participation_attempts`）、10 回・10 分（未計測の仮置き。運営者との合意は未取得）、接続元の要約は冪等キーの鍵を流用、マイグレーションは共通 V007（`replaced_at`）・V008（窓の表）、PostgreSQL は 101（冪等記録の索引）・102（ロールと GRANT）に付け替え、006 は B11 用に空ける、新規ファイルを承認。ALB 背後の接続元は B14 で決める。ゲート 6〜8 は未承認 | claude-code/claude-sonnet-5-5 |
