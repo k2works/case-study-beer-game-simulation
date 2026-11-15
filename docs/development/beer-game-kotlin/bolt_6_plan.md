@@ -4,7 +4,7 @@ title: "Bolt 6 計画 - 共同担当と共同入力（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 6（Unit U2 の 2 つ目の Bolt）のステップ計画。同一役割に複数人の共同担当、意思決定の版による競合の検出（DecisionConflict）、WeekAdvanced と DecisionsChanged の区別、制約ごとの再試行・再照合、並行の統合テスト、RetryExhausted の発生率の計測。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T11:14:27Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T11:32:44Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T11:14:28Z }
 ---
@@ -21,7 +21,7 @@ verified:
 | 日程（仮定） | リリース計画の稼働日の目安は、累計 15 日目・2026-12-04 終了（B5 の後。B5 は B4 より先に実施済みなので、この日付は使えない）。実施日は着手時に人が決める。リリース計画の日程・進捗の更新は、人の判断待ち |
 | ゲート密度 | **密**（リリース計画の「B6 は高リスク（並行性）」。ステップごとに人が検証する）。B5 のゲート 0〜8 は人が通した実績があるが、並行の試験と計測は AI の自己申告が効きにくいため、密度は下げない |
 | アプローチ | 中盤（[開発戦略](./development_strategy.md)）。**インサイドアウト**（ドメイン → 永続化・投影 → 並行の試験と計測 → アプリケーション・HTTP → UI）。仕様（`contracts/openapi.yaml`）と日本語 Gherkin を先に書き、契約テストを Red にしてから実装する。**否定テストと並行テストを実装より先に書く**（開発戦略の中盤の手順の要点） |
-| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。`validating-design`（着手前）は未実施で、Step 0 で行う |
+| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。**Step 0（0.1〜0.4）は 2026-11-15 に実施済み**（`validating-design`（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。**ゲート 0 は人の確認待ち（未承認）。Step 1 以降には進んでいない**） |
 
 > **承認の状態について**: 本書の「提案」は AI の案で、承認ではありません。承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。各ゲートは「人の確認待ち（未承認）」です。
 
@@ -58,7 +58,7 @@ verified:
 | :--- | :--- |
 | `SaveDecision` に触れる。B6 の共同入力（`DecisionConflict` の拡張）と、B5 で足した保存回数の上限（9 回）が同じ判定にある | **取り込む**（Step 2。判断項目 5） |
 | **保存回数は意思決定の版で数える**（ドメインモデルの差の表 34: 「共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける」） | **取り込む**（判断項目 5、Step 0.3・Step 2）。提案は「版の意味は変わらない」。**変わる場合だけ、回数を別の項目に分ける**。拒否された保存は版を進めないので、競合で上限を消費しない（Step 2 で試験する） |
-| 入れ替え（`assignRoleAfterStart`）と共同担当。B5 の入れ替えは、**担当者全員が外れる**設計（ゲート 3.5 で承認）で、共同担当の**追加**を含まない（未決） | **取り込む（回帰）**: 共同担当のいる役割の入れ替えで、全員の資格が失効し、写しが更新されることを確かめる（B5 の受入シナリオが共同担当を含むかは**未確認**。Step 0.3）。追加は判断項目 3 |
+| 入れ替え（`assignRoleAfterStart`）と共同担当。B5 の入れ替えは、**担当者全員が外れる**設計（ゲート 3.5 で承認）で、共同担当の**追加**を含まない（未決） | **取り込む（回帰）**: 共同担当のいる役割の入れ替えで、全員の資格が失効し、写しが更新されることを確かめる。**Step 0.3 で確認した事実: 受入の Gherkin（`credentials.feature`）に共同担当を含むシナリオは無い。ドメインの Kotest（`ReplaceRoleSpec`「共同担当（小売店に参加者 4 と 6）… 担当者全員が外れ、失効する」）にはある**。追加は判断項目 3 |
 | 試験の道具: `credentialConcurrencyContract` の待ち合わせ（`Barrier`・`racing`）、項目単位の検査 `leafValues()`・`integerValues()` | **取り込む**（Step 4・3）。並行の試験は待ち合わせで状況を確実に作り、勝者に依存しない不変条件で判定する。開示の否定は項目単位で確かめ、変異で検査が働くことを確かめる |
 | N-1 互換: 新しいイベントを足す前に方針を確認 | **取り込む**: 既定は**新しいイベントを足さない**案（判断項目 7）。足す場合は一覧を残す |
 | 生成物: 足すイベント・用語に `@EventSpec`・`@Term` を付ける（付け忘れ・設計書との不一致は試験が落ちる） | **取り込む**（足す場合。用語「共同担当」の追加を提案。Step 8） |
@@ -70,6 +70,7 @@ verified:
 | U1 総括の持ち越し H5（`@US`・`@AC` タグの整合検査、`@Suppress`・ベースラインの機械検査、生きたドキュメントの公開の導線、Kover の残り、SSE の契約テスト） | 範囲外・未割り当て（B16 へ送る決定。**割り当ては人が決める**）。ただし、**新しいシナリオのタグ（`@US`・`@AC`）は手で整合させる**（機械検査が無いため） |
 | CI のパスフィルター（`docs/design/beer-game-kotlin/**` を足すか。設計書だけの変更で CI が走らない） | **人の判断待ち**（B5 から未決）。本 Bolt も設計書を更新するため、影響する。提案は取り込まない |
 | 冪等記録の掃除、SSE と `LISTEN` 切断中の欠落、投影の整合検査 | 範囲外・未割り当て（B12 付近） |
+| B5 終了報告の申し送り 7（`Wiring.kt`・`ServerConfig.kt` の設定名は提案のまま）と判断項目 3(c)（設計書のイベント表を生成物への参照に置き換えるか）、U1 総括 #23 の残り（Node 26 の導入と `.nvmrc`、`session_overview.week` の最終週）（Step 0.2 の軸 C で、取り込み表に無かったため追加） | 範囲外・未割り当て（**割り当ては人が決める**）。ただし、Step 5.6 で `COMMAND_MAX_ATTEMPTS` の既定値を変えるときは、設定名が提案のままであることを前提に、設計書・手順書と食い違わせない |
 | デモ項目の人の実操作（B5 の申告欄は空） | 範囲外（人が行う）。**B6 の終了報告にも申告欄を設け、AI は記入しない** |
 | GitHub Actions 上の確認（B5 の Step 8 の変更分は未確認） | **取り込む**: push は人の判断。B6 の達成の記述に、確認の範囲（ローカル、CI）を必ず書く（U1 の学び 5） |
 
@@ -118,7 +119,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 ### ER 図（変わらない見込み。判断項目 15）
 
-**確認した事実**: `current_decisions`（V004）は `(game_id, role)` で、`quantity`・`decision_version`・`editor_kind`・`editor_id`・`updated_at` を持つ。保存者・時刻を応答に返すために、**列の追加は要らない見込み**。表示名は周辺ストア（`participants`）から結合する（B1 の設計。イベントに表示名を入れない。ADR-002）。**未確認**: 表示名の結合の経路（`Disclosure.kt` が読むポート）。Step 0.3 で確かめる。**スキーマ変更が要るとわかった場合は、確認必須で、人に決めてもらう**（番号は共通 006 を B11 の予約として避ける）。
+**確認した事実**: `current_decisions`（V004）は `(game_id, role)` で、`quantity`・`decision_version`・`editor_kind`・`editor_id`・`updated_at` を持つ。保存者・時刻を応答に返すために、**列の追加は要らない見込み**。表示名は周辺ストア（`participants`）から結合する（B1 の設計。イベントに表示名を入れない。ADR-002）。**Step 0.3 で確認した事実**: 表示名の結合は、ロビーの行だけ `JdbcProjectionReader` の `PARTICIPANTS_SQL`（`lobby_participants` と `display_profiles` の LEFT JOIN）で行われ、**`current_decisions` の `editor_kind`・`editor_id`・`updated_at` は読まれていない**（`DECISIONS_SQL` は `role, week, quantity, decision_version` だけ。`ProjectedDecision` は `week`・`quantity`・`version`）。**参加者の投影（`SnapshotView.Participant`）は他の参加者の表示名を含まない**（データモデルの開示表は「ロビー（自分の役割と共同担当）」を参加者に開示するとしており、**設計と実装に差がある**）。したがって、保存者を返すには、読み取りの型・問い合わせ・開示の規則を足す必要があり、**スキーマの変更は要らない見込みのまま**（列は既にある）。**スキーマ変更が要るとわかった場合は、確認必須で、人に決めてもらう**（番号は共通 006 を B11 の予約として避ける）。
 
 ### 画面遷移図（変わる。UI を含める場合のみ。判断項目 9）
 
@@ -169,14 +170,54 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 - **人の開発サーバー（ポート 3000・5173）は止めない。E2E は専用のポート（3100・5273）**。
 - **承認を先回りして書かない**。承認は、ユーザーが指示した範囲を、更新履歴に記録する。
 
-### Step 0: 着手前の確認（`validating-design`）（未実施）
+### Step 0: 着手前の確認（`validating-design`）（実施済み・2026-11-15。ゲート 0 は人の確認待ち）
 
-- [ ] 0.1 判断項目 1〜17 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）
-- [ ] 0.2 **`validating-design` を、着手前に実施し、結果を本書に記録する**（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ B1〜B5 の計画・終了報告・U1 総括）。**NG が 0 件、または、残る項目を人が判断済み**であることを、着手の条件にする。**本書の作成者は、`validating-design` を実施していない**（下の「計画作成時に確認した事実」は、実コードと設計書の確認であり、検証の結果ではない）。**軸 C の照合対象に、上の取り込み表の全行を含める**
-- [ ] 0.3 設計書のスケッチと実装の差を、実ファイルで確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に: (a) 表示名の結合の経路（`Disclosure.kt` が読むポートと、同じ役割の共同担当だけに見せられるか）、(b) `AssignRole` が準備中に複数人を受け付ける事実と、`features/` の既存の入れ替えのシナリオが共同担当を含むか、(c) `PlayPage.tsx` に `session.decision_conflict` の分岐があるか（`grep` では `session.week_advanced` だけが見つかった）、(d) `maxAttempts` の既定値と上限の範囲（`ServerConfig.kt`）、(e) 版の意味（判断項目 5）が、共同担当で変わらないこと
-- [ ] 0.4 **現状のベースラインを実測して記録する**（コード変更なし）: 既存の全テスト・静的解析・Kover が緑であること、`:app:acceptanceTest`（PostgreSQL 18）と `:app:acceptanceTestH2` のシナリオ数（B5 終了時: `@api` 70、`@ui` 7）。B6 の追加分と区別するため
+- [x] 0.1 判断項目 1〜17 を、人が決める（**2026-11-15 に、ユーザーが 17 件すべてを計画の「提案」列どおりに決定した。更新履歴に記録済み**。ゲートの承認は含まない）
+- [x] 0.2 **`validating-design` を、着手前に実施し、結果を本書に記録する**（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ B1〜B5 の計画・終了報告・U1 総括）。**NG が 0 件、または、残る項目を人が判断済み**であることを、着手の条件にする。**実施した（2026-11-15）。結果は下の「設計整合性の検証結果（着手前）」。NG は 4 件（軸 B 2 件・軸 C 2 件）。軸 C の 2 件と軸 B の 1 件は本書を修正し、残る 2 項目（軸 B #B1 の 4 図の形式、#B2 の `@AC2.3.1` タグ）は人の判断待ち**。軸 C の照合対象に、上の取り込み表の全行を含めた
+- [x] 0.3 設計書のスケッチと実装の差を、実ファイルで確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に: (a)〜(e)。**結果は下の「Step 0.3 の実施結果」**
+- [x] 0.4 **現状のベースラインを実測して記録する**（コード変更なし）。**結果は下の「Step 0.4 の実施結果（ベースライン）」**。`:app:acceptanceTest`（PostgreSQL 18）と `:app:acceptanceTestH2` の `@api` は各 70、`@ui` は 7（JVM では skipped）で、B5 終了時と一致
 
 **ゲート 0**: 判断項目の決定と、`validating-design` の結果を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+### Step 0 の実施結果（2026-11-15。実施者: claude-code/claude-sonnet-5-5。コード変更なし）
+
+**実測の事実だけを書く。ゲート 0 の承認は記録していない。Step 1 以降には進んでいない。**
+
+#### Step 0.3 の実施結果（設計書のスケッチと実装の差）
+
+| 項目 | 確認した事実（実ファイル） | 計画への影響 |
+| :--- | :--- | :--- |
+| (a) 表示名の結合の経路 | 表示名は `JdbcProjectionReader` の `PARTICIPANTS_SQL`（`lobby_participants` と `display_profiles` の LEFT JOIN）でロビーの行にだけ付く。**`DECISIONS_SQL` は `role, week, quantity, decision_version` だけを読み、`current_decisions` の `editor_kind`・`editor_id`・`updated_at` は読まれていない**（`ProjectedDecision` は `week`・`quantity`・`version`）。`RoleStatus` に保存者は無い。**`SnapshotView.Participant` は「他の参加者の表示名を含まない」と明記され、データモデルの開示表（参加者にはロビー（自分の役割と共同担当）を開示）と差がある**。ドメインの `DecisionEntry.editor`（`Editor.ByParticipant(id)`／`ByFacilitator(gameId)`）は表示名を持たない（ADR-002） | 保存者を返すには、(1) 読み取りの型と SQL に `editor_*`・`updated_at` を足し、(2) `display_profiles` の結合を足し、(3) `Disclosure` に「同じ役割の共同担当にだけ」の規則を足す。**スキーマの変更は要らない**（列は V004 にある。判断項目 15 の提案どおり）。409 の本文の保存者は、ドメインのエラー（`DecisionConflict.latest.editor` は ID）から、HTTP またはアプリケーションの層で表示名に解決する必要がある（現在の `entryJson` は ID も表示名も出さない）。Step 3・6 の設計で扱う。ER 図の節の「未確認」を、この事実に置き換えた |
+| (b) `AssignRole` の複数人受付と、既存の入れ替えのシナリオ | 準備中の `AssignRole`（`Game.kt`）は、既存の担当者を検査せず、`previous == command.role` なら空、`previous == null` なら `RoleAssigned`、別の役割なら `RoleUnassigned` + `RoleAssigned`（D9）。`startGame` は `assignments[it].isEmpty()` の役割を `StartConditionNotMet` にするだけ（`StartGame.kt`）。**`features/` に共同担当を含むシナリオは無い**（`共同`・`AC1.2.4`・`AC2.1.4`・`AC2.2.3`・`AC2.2.4` の grep が、`joining.feature` の AC1.2.5 のコメントだけ）。入れ替えの Gherkin（`credentials.feature`）は担当が 1 人の役割だけ。**ドメインの Kotest `ReplaceRoleSpec` には「共同担当（小売店に参加者 4 と 6）… 入れ替え … 担当者全員が外れ、失効する」がある** | 取り込み表の「未確認」を事実に置き換えた。AC1.2.4 の受入シナリオは Step 1 で新規に書く（実装は変わらない見込み）。入れ替えの回帰は、ドメインにあり、**受入（HTTP を通した）のシナリオは Step 1.1 の最後の項目で足す** |
+| (c) `PlayPage` の `session.decision_conflict` の分岐 | `web/src/features/play/PlayPage.tsx` の `handleSaveFailure` は、422（`quantity`）・`session.week_advanced`・`session.paused`・その他（`setFailure`）の 4 つ。**競合は「その他」で、辞書（`web/src/api/problems.ts`）の「他の人が先に保存しました。」が出るだけ**。最新値・保存者・自分の入力・選択肢（「最新の値を使う」「この値で保存し直す」）は未実装。`ConsolePage.tsx` は `session.decisions_changed`・`session.week_advanced` の分岐を持つ | Step 7 は新規の実装（UI 設計の S05 の競合の表示）。`PlayPage.test.tsx` に `week_advanced` の試験はあるが、競合の試験は無い |
+| (d) `maxAttempts` の既定値と範囲 | `ServerConfig.kt`: `DEFAULT_MAX_ATTEMPTS = 5`、環境変数 `COMMAND_MAX_ATTEMPTS`、範囲 `1..Int.MAX_VALUE`（上限なし）。`AppPorts.kt` の `maxAttempts` は既定を持たない（コメントは「設計書が実装開始時に決めるとする未決」）。`Execute.kt` の `withAppendRetry` は `ConcurrencyConflict` だけを再試行し、`remaining > 1` で再帰、尽きたら `RetryExhausted`。**間隔・ジッターは無い**。試験の補助 `AppTestKit` の既定は 3 | 計画の記述と一致。値は計測の後に決める（判断項目 10） |
+| (e) 版の意味 | `DecisionVersion` は役割ごと（`decisionVersions: RoleMap`）で、`DecisionSaved` ごとに `current.next()`、代理入力（`ProxyDecisionSubmitted`）も `next()`。週の確定（`SessionData` の次の週への更新、`Session.kt` 98 行）で `ZERO` に戻る。保存の判定順は `saveDecisionEvents` で、**週（`WeekAdvanced`）→ 版（`DecisionConflict`）→ 上限（`SaveLimitReached`）**。拒否は `ensure` の失敗でイベントを返さないため、**版も回数も進まない**。上限 `SAVE_LIMIT_PER_ROLE_WEEK = 9` は `hasSaveCapacity`（`decisionVersions[role] < 9`）。**版は役割単位なので、共同担当で共有される**。`CommitWeek` の判定順は、週 → `command.basis == data.decisionVersions`（`DecisionsChanged`）で、設計判断 D10 と一致 | 判断項目 5 の「版の意味は変わらない」が成り立つ。B6 のドメインの変更は小さい見込み（Step 2 の「何も変わらない」も結論） |
+
+追加で確認した事実: (1) `contracts/openapi.yaml` の 217 行に、`session.decision_conflict` を「仕様に載せるが B1 では起きない」とする古い注記が残る（Step 1.2 で直す。**本書に反映済み**）。(2) 409 の拡張メンバー `latest` は `quantity` と `version` だけ（`openapi.yaml` 763 行付近、`ProblemMapping.kt` の `entryJson`）。保存者・時刻は無い。(3) 道具: `credentialConcurrencyContract`・`Barrier`・`racing`・`integerValues` は `adapter-persistence` の `ApplicationFlowContract.kt`（`credentialConcurrencyContract` は `PostgresPersistenceSpec.kt` から呼ばれる）、`leafValues` は `app` の `AppTestKit.kt`（`HttpFlowSpec`・`PostgresHttpSpec` が使う）。
+
+#### Step 0.4 の実施結果（ベースライン。コード変更なし）
+
+**実行の条件**: `apps/beer-game-kotlin`、JDK は Amazon Corretto 21.0.12（`JAVA_HOME` を指定。既定の `java` は 25 のため、**detekt を含む全タスクを JDK 21 で実行**）。Docker（Testcontainers の PostgreSQL 18）は起動中。Node は v24.11.0（`web` の `engines` は `^24 || >=26` を許す。B5 で使った Node 26 ではない）。2026-11-15 20:15〜20:30（JST）に実行。`git status` で、`apps/` 配下に変更が無いことを確認した（`build/`・`dist/` は無視対象）。
+
+| 検査 | 実行したコマンド | 結果（実測） |
+| :--- | :--- | :--- |
+| 全テスト・整形・静的解析・Kover・受け入れ | `./gradlew check -x pmd --continue --rerun-tasks`（約 9 分 44 秒、112 タスクすべて実行） | **BUILD SUCCESSFUL**。ktlint・detekt（5 モジュール × `detekt`・`detektMain`・`detektTest`）・`koverVerify`・`integrationTest`・`acceptanceTest`・`acceptanceTestH2` を含む |
+| PMD・fixture・Kover の XML | `./gradlew integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport detekt detektMain detektTest pmdFixtureTest pmdDomainApplication pmdAdapter pmdMain pmdTest --continue`（約 4 分 27 秒。テスト系は上の実行で最新のため UP-TO-DATE） | **BUILD SUCCESSFUL**。PMD: fixture は期待どおり 17 件、`pmdDomainApplication`・`pmdAdapter`・`pmdMain`・`pmdTest` は違反なし |
+| JVM のテスト件数（XML の集計） | `build/test-results/*/TEST-*.xml` | domain **402**、application **149**、adapter-http **80**、adapter-persistence **92**（H2）+ **80**（PostgreSQL 18、`integrationTest`）、app **98** + **1**（`integrationTest`）、受け入れ **77 × 2**（`acceptanceTest`＝PostgreSQL、`acceptanceTestH2`＝H2。**各 skipped 7＝`@ui`**）。**失敗 0、エラー 0** |
+| 受け入れのシナリオ数 | `acceptanceTest`・`acceptanceTestH2` の XML | **`@api` 70（各バックエンドで実行）**、`@ui` 7（JVM では skipped。`web` の Cucumber-JS が担当）。**B5 終了時（`@api` 70、`@ui` 7）と一致** |
+| Kover | `build/reports/kover/report.xml`、`domain/build/reports/kover/report.xml` | 全体 行 **98.1%**（4174/4253）、分岐 **81.6%**（1133/1389）。domain 行 **100%**（1038/1038）、分岐 258/263。ゲート（domain 100%、全体 85%・75%）を通過 |
+| `@Suppress`・ベースライン | `grep -rnE "^\s*@(file:)?Suppress\(\|@SuppressWarnings"`、`find -name '*baseline*'` | 注釈は **0 件**（`@Suppress` の語は、使わない旨のコメント 5 件にだけある）。ベースラインのファイルは **無し** |
+| `web` | `npm run verify`（`format:check`・`lint`（`--max-warnings=0`）・`typecheck`・`test`・`build`）、`npm run api:check` | **成功**。vitest **8 ファイル・109 件**、`api:check` は差分 0（`schema.d.ts` は `openapi.yaml` から生成した内容と一致） |
+| 未実行 | `web` の `npm run acceptance`（`@ui` 7 シナリオ・実ブラウザ）、GitHub Actions 上の実行 | **未実行・未確認**（`@ui` はブラウザと専用ポート（3100・5273）のサーバーが要る。B5 の実測 7 シナリオ・53 ステップは、本実測では再確認していない） |
+
+**注意（誤読の防止）**: 上の値は**ローカル（開発機、逐次に近い負荷）**の実測で、CI（GitHub Actions）・実環境の値ではない。B6 の追加分と区別するための**基準値**である。
+
+#### Step 0 の規律の自己確認
+
+- ファイルの編集は Write・Edit のみ。heredoc・python・sed・perl・awk は起動していない（`okf_apply.py` は手順書の指定のスクリプトで、本書の更新に使う）。件数の集計は `grep`・`paste`・`bc` で行った。
+- コード・設定・仕様・設計書・ADR は変更していない。変更したのは本書（`bolt_6_plan.md`）だけ。
+- 人の開発サーバー（3000・5173）は止めていない（起動していなかった。`lsof` で確認）。E2E も実行していない。
+- 逸脱: (1) 最初の `gradle` のバックグラウンド起動が、サブシェルを使ったためすぐに完了通知を返した（実行は継続しており、ログのファイルで完了を確認した）。(2) Node を B5 の 26 でなく 24.11 で実行した（`engines` の範囲内）。(3) `web` の `acceptance`（`@ui`）は、ブラウザ・専用ポートが要るため実行していない。
 
 ### Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）
 
@@ -185,10 +226,10 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
   - AC2.1.4: 共同担当が、同じ状況・入力値・版を見る／**他の役割の参加者は、その役割の保存者・版を見られない**（否定）
   - AC2.2.3: 同じ版から 2 人が保存すると、2 人目は競合し、**最新値と保存者**が示される。**黙って失われた更新が無い**（最新の値は 1 人目のまま）。競合した人の入力は応答に含まれず、画面が保持する（API では、再度の保存が最新の版を指定して成功する）。代理入力が共同担当の入力を上書きした後の保存は競合し、保存者は進行役の代理入力と示される
   - AC2.2.4: 共同担当の一人が保存すると、同じ役割の別の共同担当が取得した状況は、同じ値と版になる（`@api`。画面の自動反映は判断項目 8 の案による）
-  - **`WeekAdvanced` と `DecisionsChanged` の区別**（設計の AC2.3.1。タグは `@AC2.3.1`、解釈の差はコメント）: 確定の根拠にした入力が、共同担当の保存で変わったあとの確定は `DecisionsChanged`（現在の値と保存者を返す）／別の確定で週が進んだあとの確定は `WeekAdvanced`／**両方に当てはまる場合は週が先**（`WeekAdvanced`）
+  - **`WeekAdvanced` と `DecisionsChanged` の区別**（設計の AC2.3.1。タグは `@AC2.3.1`、解釈の差はコメント。**Step 0.2 の軸 B で判明: ユーザーストーリーの AC2.3.1 の原文は「4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される」で、この区別を含まない。[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) が `[US2.3/AC2.3.1]` の名で置いている。`week-commit.feature` はすでに `@AC2.3.1` を原文の意味で使っている。`TAGS.md` は「期待値は原文の意味と一致」と定めるため、この区別のシナリオに `@AC2.3.1` を付けるか（原文と別の意味になる）、タグを付けず `@NF-` 系や設計判断 D10 の ID を使うかは、ゲート 1 で人が決める**）: 確定の根拠にした入力が、共同担当の保存で変わったあとの確定は `DecisionsChanged`（現在の値と保存者を返す）／別の確定で週が進んだあとの確定は `WeekAdvanced`／**両方に当てはまる場合は週が先**（`WeekAdvanced`）
   - 保存回数の上限が、共同担当で共有される（B5 の AC 外の確認。判断項目 5）。拒否された保存は上限を消費しない
-  - 共同担当のいる役割の入れ替えで、担当者全員が外れ、旧担当者の資格が失効する（B5 の回帰。未確認の場合のみ）
-- [ ] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6・7 の応答の形（409 `session.decision_conflict`／`session.decisions_changed` の拡張メンバー、状況の応答の保存者・時刻）を書く。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）
+  - 共同担当のいる役割の入れ替えで、担当者全員が外れ、旧担当者の資格が失効する（B5 の回帰。**Step 0.3 で確認: 受入の Gherkin には無い（ドメインの Kotest にだけある）ので、Step 1 で足す**）
+- [ ] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6・7 の応答の形（409 `session.decision_conflict`／`session.decisions_changed` の拡張メンバー、状況の応答の保存者・時刻）を書く。**あわせて、217 行の古い注記「`session.decision_conflict` は仕様に載せるが B1 では起きない」を、現状（共同担当が入る B6 で起きる）に合わせて直す**（Step 0.3 で確認）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）
 - [ ] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）。**最初から Passing のシナリオは、回帰として残す**と明記する（B5 の Step 1 と同じ扱い）
 
 **ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` と応答の形（保存者の出し方。表示名の開示範囲）を確認する。**状態: 人の確認待ち（未承認）。** 結果の記録（Red の実測、最初から Passing のシナリオ、仮置き）は、本書の「Step 1 の実施結果」に、実施後に書く。
@@ -316,23 +357,75 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 ## 設計整合性の検証結果（着手前。`validating-design`）
 
-**Step 0.2 で実施する。2026-11-15 時点では未実施。** 結果は、軸ごとの OK / NG と不整合の件数、一覧（不整合の内容、計画の記述、正しい記述と出典、修正の要否）、人の判断待ちを、ここに記録する。**承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める**（[開発戦略](./development_strategy.md)の「不整合の扱い」）。
+**Step 0.2 で実施した（2026-11-15。実施者: claude-code/claude-sonnet-5-5）。** 軸 A・B・C のすべてを、実ファイル（開発戦略、設計書、ADR、B1〜B5 の計画・終了報告、U1 総括、実コード、`features/`、`contracts/openapi.yaml`）と突き合わせた（サブエージェントは使っていない。`validating-iteration-plan` のフィールド単位の突合は行っていない）。**承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める**（[開発戦略](./development_strategy.md)の「不整合の扱い」）。
 
-### 計画作成時に確認した事実（検証の結果ではない。Step 0 の入力）
+### 検証対象
+
+- Bolt 計画: `docs/development/beer-game-kotlin/bolt_6_plan.md`
+- 局面（開発戦略）: **中盤**（B5〜B12）、アプローチ: **インサイドアウト**
+
+### 検証結果サマリー
+
+| 軸 | 検証対象 | 結果 | 不整合件数 |
+| :--- | :--- | :---: | :---: |
+| A | 開発戦略 ↔ 本書 | OK | 0 件（観察 2 件） |
+| B | 本書 ↔ 設計書・ADR | NG | 2 件（#B1 は人の判断待ち、#B2 は注記を追加・タグは人の判断待ち） |
+| C | 本書 ↔ B1〜B5 の計画・終了報告・U1 総括 | NG | 2 件（いずれも本書を修正済み） |
+
+**合計 NG 4 件。修正済み 3 件（#B2 の注記、#C1、#C2）。人の判断待ちが残る項目は 2 つ（#B1、#B2 のタグ）。重大なずれ（戦略や設計そのものの見直しが要るもの）は無い。**
+
+### 軸 A: 開発戦略との整合（OK。観察 2 件）
+
+確認した事項（すべて一致）: B6 は中盤（インサイドアウト）。受け入れ基準の元（開発戦略の B6: AC1.2.4、AC2.1.4、AC2.2.3、AC2.2.4。並行の統合テスト。`RetryExhausted` の発生率）と、本書の対象の受入条件・完了条件が同じ。ワークフロー（ドメイン → 永続化 → 投影 → アプリケーション → HTTP → 画面）と、本書の Step 2〜7 の順（並行・計測の Step 4・5 が永続化と HTTP の間）が一致。高リスクの Bolt（B6）で否定テスト・並行テストを実装より先に書く、層ごとの承認ゲート、仕様（`openapi.yaml`）が先で契約テスト・型の差分 0、デモ項目を受け入れ基準にして実操作の申告欄を設ける、`validating-design` を着手前と完了時に実施、静的解析の違反 0・ベースラインなし・`@Suppress` なし、Living Documentation（`@EventSpec`・`@Term`）の方針。Gherkin は実装の前に書いて合意し、Bolt の最後に Cucumber で結合を確認する（Step 1 のゲート 1 と Step 8.1）。
+
+| # | 観察 | 扱い |
+| :--- | :--- | :--- |
+| A1 | 開発戦略の中盤の「対象ストーリー」（413 行）は「US1.2（共同）、US2.2（共同）」で、**US2.1 を含まない**。一方、同じ戦略の「Bolt ごとの受け入れ基準の元」の B6 の行（242 行）とリリース計画は AC2.1.4（US2.1）を含む。本書はリリース計画・戦略の表に従っている | **本書の誤りではない**。戦略の対象ストーリーの行の軽微な不備（US2.1 の共同表示が漏れている）。**戦略（承認済み）は本書では変更しない。人の判断（次の戦略の更新時に直すか）** |
+| A2 | 本書の `@AC2.3.1` の区別のシナリオ（`WeekAdvanced`・`DecisionsChanged`）は、戦略の B6 の受け入れ基準の元に無い。リリース計画の B6 の目標（「`WeekAdvanced` と `DecisionsChanged` の区別」）には含まれる | 一致（リリース計画の記述）。タグの扱いは軸 B の #B2 |
+
+### 軸 B: 設計書・ADR との整合（NG 2 件）
+
+確認した事項（一致）: ADR-005 の B6 の検証 3 項目（同じ役割の 2 人の同時保存、競合を続けたときの `app.retry_exhausted`、`uq_idempotency_create`・`pk_idempotency_records` の同時の重複）は、Step 4 の (a)(c)(d) が網羅する。制約名 3 つと 40001・40P01・55P03 の扱い（データモデル、アーキテクチャ（バックエンド））。`current_decisions` の列（`editor_kind`・`editor_id`・`updated_at`）、V004、マイグレーション番号 006 が B11 の予約（007・008 は B5 で使用済み）、次の ADR は 019（018 まで）、ADR-005 の状態は提案中（索引）。`CommitWeek` の判定順（週 → 基準の版）、`WeekAdvanced`・`DecisionsChanged`・`DecisionConflict` の分類と `code`（ドメインモデル、UI 設計の競合の表と辞書）。保存回数 9 回と「版 = 回数」（ドメインモデルの差の表 34、NF-C8）。NF-R14・NF-P13・NF-C2・NF-C3・NF-C8 の記述。UI 設計 S05 の共同入力の競合の文言・選択肢・代理入力の上書き（M10）・保存者が自分のとき（L1）。テスト戦略の NF-P13 の計測は夜間・NF-R14 の並行は毎回（本書のリスクの「計測は CI の常時の対象にしない」と整合）。設計書の更新は、Step 8.3 の変更表で扱う。
+
+| # | 不整合内容 | 本書の記述 | 正しい記述（出典） | 修正要否 |
+| :--- | :--- | :--- | :--- | :--- |
+| B1 | **「4 図」のうち 3 つが PlantUML でない**。開発戦略の軸 B は、当該 Bolt のスコープの 4 図（ドメインモデル図・状態遷移図・ER 図・画面遷移図）が計画の「設計」節にあることを求める。本書の「設計」節は、状態遷移図だけが PlantUML（シーケンス図）で、ドメインモデル・ER・画面遷移は**表**。**B5 の計画も同じ形式**（`@startuml` は 1 つ。承認済み） | 「ドメインモデル図」「ER 図」「画面遷移図」の節が表 | `development_strategy.md`（設計整合性の検証、軸 B）、`validating-design`（軸 B の【絶対項目】は 4 図を PlantUML で掲載） | **人の判断待ち**。B6 は状態・コマンド・イベント・スキーマを足さない案で、変わる点が小さいため、表で足りるとする（B5 と同じ運用）か、3 図を PlantUML で足すかを人が決める。**本書は修正していない**（足す場合も、PlantUML の描画の確認は B1 から未実施のまま） |
+| B2 | **`@AC2.3.1` の意味の食い違い**。ユーザーストーリーの AC2.3.1 の原文は「4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される」で、`WeekAdvanced`／`DecisionsChanged` の区別を含まない。テスト戦略の例は、この区別を `[US2.3/AC2.3.1]` と名付けている。`week-commit.feature` は `@AC2.3.1` を原文の意味で使用済み。`TAGS.md` は「シナリオの期待値は、受入条件の原文と意味が一致していること」と定める | Step 1.1 は「タグは `@AC2.3.1`、解釈の差はコメント」 | `user_story.md`（AC2.3.1、AC2.3.2）、`features/TAGS.md`、`test-strategy.md`（174・176 行。設計側のタグ付けの誤りの可能性） | **注記を追加（修正済み）**: Step 1.1 に、原文との差と、「付けるか、別の ID を使うか」をゲート 1 で人が決めることを書いた。**タグの最終決定は人の判断待ち**（設計書のテスト戦略の記述の直しも、人が決める） |
+
+### 軸 C: 過去の Bolt の計画・終了報告・U1 総括との整合（NG 2 件）
+
+確認した事項（一致）: 命名（`DecisionConflict`・`DecisionsChanged`・`WeekAdvanced`・`hasSaveCapacity`・`SAVE_LIMIT_PER_ROLE_WEEK`・`assignRoleAfterStart`・`Editor.ByParticipant`／`ByFacilitator`）が B1・B5 の計画と実コードで一致。B5 の「保存回数は版と同じ。共同入力が版の意味を変えるなら、そのとき回数を分ける」（B5 計画 2.5、ドメインモデル差の表 34）→ 判断項目 5 と取り込み表に反映済み。B1 の「共同担当は拒否しない。B6 で扱う」（B1 計画 757 行）→ 判断項目 3。B1 の「共同担当の競合の画面は B6」（B1 計画 503 行）→ Step 7。B1 終了報告の「実 DB の並行下の検証（冪等記録の同時の重複）は未実施」→ Step 4 (d)。B5 の複数タブ（AC3.2.3）は B5 で `recovery.feature` に実装済みで、B6 に持ち越されていない。B5 終了報告の「未達・未実施」（11 行）と「B6 への申し送り」（1〜6）の各項目、「人の判断が要る項目」の #5・6・7・8・9・10・11 は、取り込み表または判断項目にある。**U1 総括の学び 7（申し送りは項目として取り込むか範囲外と明記する）に従い、取り込み表の全行を照合した**。
+
+| # | 不整合内容 | 本書の記述 | 正しい記述（出典） | 修正要否 |
+| :--- | :--- | :--- | :--- | :--- |
+| C1 | 計画作成時の事実 #11 の記述が、B5 終了報告の現状と合わない。終了報告の完了条件の表（26 行）には、承認済みの注記（「2026-11-15 にユーザーが承認した（下の記述は承認前のもの）」）が**すでにある**。残っているのは「人の判断が要る項目」#2（117 行）の承認前の記述 | 「終了報告は『提案中』とするが…」（注記の有無に触れていない） | `bolt_5_report.md` 26 行・117 行 | **修正済み**（事実 #11 を現状に合わせた）。終了報告 #2 の更新は人の判断（本書では変更しない） |
+| C2 | **取り込み表に無い申し送りがあった**: (1) B5 終了報告の申し送り 7（`Wiring.kt`・`ServerConfig.kt` の設定名は提案のまま）。B6 は `COMMAND_MAX_ATTEMPTS` の既定値を変えうるため関係する。(2) B5 終了報告の判断項目 3(c)（設計書のイベント表を生成物への参照に置き換えるか）。(3) U1 総括の持ち越し #23 の残り（Node 26 の導入と `.nvmrc`、`session_overview.week` の最終週） | 該当する行が無い | `bolt_5_report.md`（B6 への申し送り 7、判断項目 3）、`unit_u1_summary.md`（#23） | **修正済み**（取り込み表に 1 行を足し、範囲外・未割り当て（割り当ては人が決める）と明記） |
+
+### 実施後に残る、人の判断が要る項目（Step 0.2 の結果）
+
+| # | 項目 | 内容 | AI の提案 |
+| :--- | :--- | :--- | :--- |
+| 1 | 軸 B #B1: 4 図の形式 | 3 図が表のまま（B5 と同じ形式） | 表のままでよいか、PlantUML を足すかを、人が決める（足す場合も描画の確認は未実施） |
+| 2 | 軸 B #B2: `@AC2.3.1` のタグ | 原文と別の意味になる | ゲート 1 で決める。設計書（テスト戦略）の `[US2.3/AC2.3.1]` の記述の直しも含む |
+| 3 | 軸 A #A1: 戦略の対象ストーリー | US2.1 が漏れている（軽微） | 戦略の次の更新時に直すか、人が決める |
+| 4 | 設計と実装の差（Step 0.3 (a)） | 設計は参加者にロビー（自分の役割と共同担当）を開示するが、実装の参加者の投影は他の参加者の表示名を含まない | B6 の Step 3 で実装して埋める（提案どおり）。データモデルの開示表と実装の差を、Step 8.3 の変更表に残す |
+| 5 | B5 終了報告 #2 の記述 | 承認前の「提案中」が残る（#C1） | 終了報告の更新は人の判断 |
+
+### 計画作成時に確認した事実（検証の結果ではない。Step 0 の入力。Step 0.2・0.3 で再確認し、#4・#11 を更新した）
 
 | # | 事実（実コード・設計書で確認） | 出典 | Step 0 で確かめること |
 | :--- | :--- | :--- | :--- |
 | 1 | `WeekAdvanced`・`DecisionsChanged`・`DecisionConflict` は、ドメイン・HTTP・仕様・画面の辞書に**すでにある**。リリース計画の B6 の記述は「区別」を新規のように書くが、実装済み。受入の Gherkin が無い | `Session.kt`、`ProblemMapping.kt`、`openapi.yaml`、`web/src/api/problems.ts`、`features/` の grep | リリース計画の B6 の記述と、実装済みの差を、軸 A・B で扱う |
 | 2 | 409 の本文（`entryJson`）は**最新値と版だけ**で、保存者・時刻が無い。設計は保存者を含める | `ProblemMapping.kt`、ui-design.md S05 共同入力の競合 | 軸 B。応答の形の仕様（判断項目 6） |
 | 3 | `DecisionEntry` は `editor` を持つが時刻を持たない。`Evolve` は時刻を受け取らない | `Session.kt` | 判断項目 7 |
-| 4 | `PlayPage.tsx` に `session.week_advanced` の分岐は見つかったが、`session.decision_conflict` の分岐は `grep` で見つからなかった（辞書には文言がある） | `PlayPage.tsx` | Step 0.3（c）。画面の競合の表示が未実装かを確認 |
+| 4 | `PlayPage.tsx`（実際の場所は `web/src/features/play/PlayPage.tsx`）に `session.week_advanced` の分岐は見つかったが、`session.decision_conflict` の分岐は `grep` で見つからなかった（辞書には文言がある） | `PlayPage.tsx` | Step 0.3（c）。**確認済み: `handleSaveFailure` の分岐は 422（`quantity`）・`session.week_advanced`・`session.paused`・その他（`setFailure`）だけ。競合は「その他」で、辞書の文言「他の人が先に保存しました。」が出るだけ。最新値・保存者・自分の入力を並べる表示と選択肢は未実装** |
 | 5 | 再試行の既定は上限 5・間隔なし（`COMMAND_MAX_ATTEMPTS`）。ADR-005 は上限の値・ジッターの要否を未決とする。再試行は認証・冪等記録の照合からやり直す | `ServerConfig.kt`、`Execute.kt`、ADR-005 | 軸 B。ADR-005 の更新（ADR-019） |
 | 6 | `session` ストリームは 1 ゲームに 1 本。役割をまたぐ保存も同じ版を取り合う | データモデル（ストリームと版）、ADR-005 | 計測の設計（Step 5） |
 | 7 | 再試行の対象の制約は `uq_events_stream_version`・`uq_idempotency_create`・`pk_idempotency_records` と 40001・40P01。55P03 は `RetryExhausted`。冪等記録の同時の重複の**実 DB の並行は未検証**（B1 の持ち越し） | `ConstraintNames.kt`、`SqlFailures.kt`、architecture-backend.md の未決事項 | 軸 C。Step 4 の(d) |
 | 8 | 準備中の `AssignRole` は、既存の担当者の有無を検査しない。受入のシナリオは無い。開始後の共同担当の追加は未決事項（当面は準備中だけ） | `Game.kt`、domain-model.md の未決事項 | 判断項目 3 |
 | 9 | SSE は未実装。画面の更新は手動と保存・確定の応答の後だけ（`PlayPage.tsx` の注記） | `PlayPage.tsx`、B5 終了報告 | 判断項目 8 |
 | 10 | 次の ADR の番号は 019（`docs/adr/beer-game-kotlin/` は 018 まで）。ADR-005 の状態は「提案中」 | ADR の一覧 | ADR の番号の確認 |
-| 11 | **B5 終了報告の記述と、他の記録の食い違い**: 終了報告は「ADR-015・016・017・018 は提案中」とするが、B5 計画の更新履歴と ADR の一覧は「承認済み」とする（ゲート 8 の後の承認） | `bolt_5_report.md`、`bolt_5_plan.md`、ADR の一覧 | 軸 C。終了報告の更新は人の判断（本書では変更しない） |
+| 11 | **B5 終了報告の記述と、他の記録の食い違い**: 終了報告の「人の判断が要る項目」#2（117 行）は「ADR-015・016・017・018 は提案中」のまま（承認前の記述）で、B5 計画の更新履歴と ADR の一覧は「承認済み」とする（ゲート 8 の後の承認）。**終了報告の完了条件の表（26 行）には「2026-11-15 にユーザーが承認した（下の記述は承認前のもの）」の注記がすでにある**（Step 0.2 の軸 C で再確認。判断項目 #2 の記述の更新は人の判断で、本書では変更しない） | `bolt_5_report.md`、`bolt_5_plan.md`、ADR の一覧 | 軸 C。終了報告の更新は人の判断（本書では変更しない） |
 | 12 | `domain-model.md` の差の表 34 は「共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける」と、B6 への条件を残している | `domain-model.md` | 判断項目 5。軸 C で、取り込み表と照合 |
 
 ---
@@ -341,5 +434,6 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 0（0.1〜0.4）を実施**（コード変更なし。**ゲート 0 は人の確認待ち（未承認）。承認は記録していない。Step 1 以降には進んでいない**）。0.1: 判断項目 17 件の決定は上の記録のとおり（チェック）。0.2: `validating-design` を実施（軸 A: OK（観察 2）、軸 B: NG 2、軸 C: NG 2。重大なずれは無し。残る人の判断は 5 項目）。0.3: 設計書のスケッチと実装の差を実ファイルで確認（参加者の投影が共同担当の表示名を含まない、`current_decisions` の保存者の列が読まれていない、`PlayPage` に競合の分岐が無い、など）。0.4: ベースラインを JDK 21 で実測（`check` 緑、domain 402・application 149・adapter-http 80・adapter-persistence 92+80・app 98+1、受け入れ `@api` 70 × 2・`@ui` 7、Kover 全体 98.1%・81.6%・domain 100%、PMD fixture 17 件・違反 0、`web` verify 緑（vitest 109）、`api:check` 差分 0、`@Suppress` 0・ベースライン無し）。**検証による修正**（承認済みの計画への修正のため、**人に再確認を求める**）: ①取り込み表に B5 申し送り 7・判断項目 3(c)・U1 #23 の残りを追加（#C2）、②入れ替えの回帰の「未確認」を事実に置き換え（Gherkin に無い→Step 1.1 で足す）、③ER 図の節の「未確認」を事実に置き換え、④Step 1.1 に `@AC2.3.1` の原文との差の注記（#B2）、⑤Step 1.2 に `openapi.yaml` 217 行の古い注記の修正を追加、⑥事実 #4・#11 を現状に更新。**計画の範囲・Step・判断項目・ゲートは変えていない** | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定**（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。**ゲート 0〜8 は未承認**。Step 0 で `validating-design` を実施する | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | 初版作成（AI が提案。**ステップ計画・判断項目 17 件・ゲート 0〜8 は、人の承認待ち**。実装・コード変更は未着手。`validating-design` は未実施で、Step 0 で行う。B5 の申し送り・持ち越しを取り込み表に整理。実コードで現状（`SaveDecision`、`decisionVersions`、`DecisionConflict`、`DecisionsChanged`、`WeekAdvanced`、`ConcurrencyConflict` の再試行、`RetryExhausted`）を確認し、事実として記載） | claude-code/claude-sonnet-5-5 |
