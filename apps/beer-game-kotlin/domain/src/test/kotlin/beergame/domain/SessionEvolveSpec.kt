@@ -18,6 +18,7 @@ private val allSessionEvents: List<SessionEvent> =
             SessionEvent.SessionResumed,
             proxyDecisionSubmitted(Role.FACTORY, 6),
             committedWithDifferentNextStates(),
+            roleHolderReplaced(Role.RETAILER, removed = setOf(4), added = 5),
         )
 
 private fun activeAtStart(): SessionState = sessionOf(sessionStarted(settings))
@@ -131,6 +132,43 @@ class SessionEvolveSpec :
                 val proxy = proxyDecisionSubmitted(Role.FACTORY, 6)
                 listOf(SessionState.NotStarted, ended).forEach { state -> evolveSession(state, proxy) shouldBe state }
                 evolveSession(pausedAtStart(), sessionStarted(settings)) shouldBe pausedAtStart()
+            }
+        }
+
+        context("[B5/H4] RoleHolderReplaced（役割の入れ替えでの、役割の写しの更新）") {
+            val replaced = roleHolderReplaced(Role.RETAILER, removed = setOf(4), added = 5)
+
+            test("進行中・一時停止中のどちらも、その役割の担当者を入れ替え、ほかの役割・入力・版は変えない（版は 1 進む）") {
+                listOf(
+                    activeAtStart() to SessionState.Active::class,
+                    pausedAtStart() to SessionState.Paused::class,
+                ).forEach { (state, kind) ->
+                    val next = evolveSession(state, replaced)
+                    next::class shouldBe kind
+                    val before = sessionDataOf(state)
+                    val after = sessionDataOf(next)
+                    after.assignments shouldBe before.assignments.copy(retailer = setOf(pid(5)))
+                    after.copy(assignments = before.assignments) shouldBe before
+                    next.version shouldBe state.version.next()
+                }
+            }
+            test("共同担当は、外す集合の全員が外れ、ほかの担当者は残る") {
+                val shared = assignedParticipants.copy(retailer = setOf(pid(4), pid(6), pid(7)))
+                val state = sessionOf(sessionStarted(settings).copy(assignments = shared))
+                val next = evolveSession(state, roleHolderReplaced(Role.RETAILER, removed = setOf(4, 6), added = 5))
+                sessionDataOf(next).assignments.retailer shouldBe setOf(pid(7), pid(5))
+            }
+            test("当週に保存済みの入力と版は、入れ替えの後も残る（新担当者が引き継ぐ）") {
+                val state = sessionOf(sessionStarted(settings), decisionSaved(Role.RETAILER, 4))
+                val after = sessionDataOf(evolveSession(state, replaced))
+                after.decisions shouldBe sessionDataOf(state).decisions
+                after.decisionVersions shouldBe sessionDataOf(state).decisionVersions
+            }
+            test("未開始・終了後には効かない（状態を変えない）") {
+                val (ended, _) = sessionPlayed(3, settings = settings)
+                listOf(SessionState.NotStarted, ended).forEach { state ->
+                    evolveSession(state, replaced) shouldBe state
+                }
             }
         }
 

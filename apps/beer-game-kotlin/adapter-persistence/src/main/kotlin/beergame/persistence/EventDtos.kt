@@ -119,6 +119,14 @@ internal data class ParticipationRecoveredDto(
 )
 
 @Serializable
+@SerialName("ParticipantReplaced")
+internal data class ParticipantReplacedDto(
+    val participantId: String,
+    val role: String,
+    val replacedBy: String,
+)
+
+@Serializable
 @SerialName("SessionStarted")
 internal data class SessionStartedDto(
     val gameId: String,
@@ -137,6 +145,15 @@ internal data class DecisionSavedDto(
     val decisionVersion: Long,
     val editor: EditorDto,
     val submittedRoleCount: Int,
+)
+
+/** `removed` は、識別子の順に並べて書く（同じ事実は同じ JSON になる）。 */
+@Serializable
+@SerialName("RoleHolderReplaced")
+internal data class RoleHolderReplacedDto(
+    val role: String,
+    val removed: List<String>,
+    val added: String,
 )
 
 @Serializable

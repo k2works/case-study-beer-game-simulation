@@ -102,3 +102,12 @@ internal fun WeekCommittedDto.toWeekCommitted(): Either<String, DomainEvent> =
 
 internal fun SessionEndedDto.toSessionEnded(): Either<String, DomainEvent> =
     either { SessionEvent.SessionEnded(enumOf<EndReason>(reason, "終了の理由").bind()) }
+
+internal fun RoleHolderReplacedDto.toRoleHolderReplaced(): Either<String, DomainEvent> =
+    either {
+        SessionEvent.RoleHolderReplaced(
+            enumOf<Role>(role, "役割").bind(),
+            removed.traverse { uuid(it).map(::ParticipantId) }.bind().toSet(),
+            ParticipantId(uuid(added).bind()),
+        )
+    }

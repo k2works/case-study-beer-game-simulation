@@ -69,6 +69,16 @@ internal fun encodeGameEvent(event: GameEvent): EventCodec.Encoded =
             val dto = ParticipationRecoveredDto(event.subject.toDto(), event.credentialExpiresAt.toString())
             enc(ParticipationRecoveredDto.serializer(), dto)
         }
+
+        is GameEvent.ParticipantReplaced -> {
+            val dto =
+                ParticipantReplacedDto(
+                    event.participantId.value.toString(),
+                    event.role.name,
+                    event.replacedBy.value.toString(),
+                )
+            enc(ParticipantReplacedDto.serializer(), dto)
+        }
     }
 
 internal fun encodeSessionEvent(event: SessionEvent): EventCodec.Encoded =
@@ -120,22 +130,29 @@ internal fun encodeSessionEvent(event: SessionEvent): EventCodec.Encoded =
         }
 
         is SessionEvent.WeekCommitted -> {
-            val dto =
-                WeekCommittedDto(
-                    event.week.value,
-                    event.commitKind.name,
-                    event.decisions.toDto { it.value },
-                    event.results.toDto { it.toDto() },
-                    event.nextStates.toDto { it.toDto() },
-                    event.contributors,
-                )
-            enc(WeekCommittedDto.serializer(), dto)
+            enc(WeekCommittedDto.serializer(), event.toDto())
         }
 
         is SessionEvent.SessionEnded -> {
             enc(SessionEndedDto.serializer(), SessionEndedDto(event.reason.name))
         }
+
+        is SessionEvent.RoleHolderReplaced -> {
+            val removed = event.removed.map { it.value.toString() }.sorted()
+            val dto = RoleHolderReplacedDto(event.role.name, removed, event.added.value.toString())
+            enc(RoleHolderReplacedDto.serializer(), dto)
+        }
     }
+
+private fun SessionEvent.WeekCommitted.toDto() =
+    WeekCommittedDto(
+        week.value,
+        commitKind.name,
+        decisions.toDto { it.value },
+        results.toDto { it.toDto() },
+        nextStates.toDto { it.toDto() },
+        contributors,
+    )
 
 private fun GameSettings.toDto() =
     SettingsDto(finalWeek.value, demand.asInts(), costPolicy.holding.minor, costPolicy.backlog.minor, commitMode.name)

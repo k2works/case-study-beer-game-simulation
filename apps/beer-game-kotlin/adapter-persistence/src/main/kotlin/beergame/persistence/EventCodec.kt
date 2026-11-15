@@ -99,6 +99,12 @@ object EventCodec {
                     .toParticipationRecovered()
             }
 
+            "ParticipantReplaced" -> {
+                json
+                    .decodeFromString(ParticipantReplacedDto.serializer(), payloadJson)
+                    .toParticipantReplaced()
+            }
+
             else -> {
                 null
             }
@@ -140,6 +146,10 @@ object EventCodec {
 
             "SessionEnded" -> {
                 json.decodeFromString(SessionEndedDto.serializer(), payloadJson).toSessionEnded()
+            }
+
+            "RoleHolderReplaced" -> {
+                json.decodeFromString(RoleHolderReplacedDto.serializer(), payloadJson).toRoleHolderReplaced()
             }
 
             else -> {

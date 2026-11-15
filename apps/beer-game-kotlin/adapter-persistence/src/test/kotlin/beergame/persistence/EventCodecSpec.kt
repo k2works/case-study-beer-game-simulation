@@ -133,6 +133,42 @@ class EventCodecSpec :
             }
         }
 
+        test("[B5/H4] 役割の入れ替えのイベント（ParticipantReplaced・RoleHolderReplaced）を変換して戻すと、元と等しい") {
+            val old1 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000004"))
+            val old2 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000006"))
+            val new1 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000005"))
+            val replaced = GameEvent.ParticipantReplaced(old1, Role.RETAILER, new1)
+            val holders = SessionEvent.RoleHolderReplaced(Role.RETAILER, setOf(old2, old1), new1)
+
+            listOf(replaced, holders).forEach { event ->
+                val encoded = EventCodec.encode(event)
+                EventCodec.decode(encoded.eventType, encoded.schemaVersion, encoded.payloadJson) shouldBe
+                    Either.Right(event)
+                encoded.payloadJson shouldNotContain "displayName"
+            }
+            EventCodec.encode(replaced).eventType shouldBe "ParticipantReplaced"
+            EventCodec.encode(holders).eventType shouldBe "RoleHolderReplaced"
+            // 集合は識別子の順に並べて書く（同じ事実は同じ JSON になる）
+            EventCodec.encode(holders).payloadJson shouldBe
+                """{"role":"RETAILER","removed":["${old1.value}","${old2.value}"],"added":"${new1.value}"}"""
+            EventCodec.encode(replaced).payloadJson shouldBe
+                """{"participantId":"${old1.value}","role":"RETAILER","replacedBy":"${new1.value}"}"""
+        }
+
+        test("[B5/H4] 識別子・役割が不正な入れ替えのイベントは、復号できず Left") {
+            val id = "00000000-0000-0000-0000-000000000004"
+            listOf(
+                "ParticipantReplaced" to """{"participantId":"x","role":"RETAILER","replacedBy":"$id"}""",
+                "ParticipantReplaced" to """{"participantId":"$id","role":"ROBOT","replacedBy":"$id"}""",
+                "ParticipantReplaced" to """{"participantId":"$id","role":"RETAILER","replacedBy":"x"}""",
+                "RoleHolderReplaced" to """{"role":"ROBOT","removed":["$id"],"added":"$id"}""",
+                "RoleHolderReplaced" to """{"role":"RETAILER","removed":["x"],"added":"$id"}""",
+                "RoleHolderReplaced" to """{"role":"RETAILER","removed":["$id"],"added":"x"}""",
+            ).forEach { (type, json) ->
+                EventCodec.decode(type, 1, json).shouldBeInstanceOf<Either.Left<String>>()
+            }
+        }
+
         test("[B5] 入力者の種別が不正な代理入力は、復号できず Left") {
             val broken =
                 """{"week":1,"role":"FACTORY","quantity":6,"decisionVersion":1,""" +

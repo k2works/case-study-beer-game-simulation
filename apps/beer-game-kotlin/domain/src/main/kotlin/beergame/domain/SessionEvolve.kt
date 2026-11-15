@@ -105,4 +105,8 @@ fun evolveSession(
         is SessionEvent.SessionEnded -> {
             state.ended()
         }
+
+        is SessionEvent.RoleHolderReplaced -> {
+            state.updateData { it.withHolderReplaced(event.role, event.removed, event.added) }
+        }
     }

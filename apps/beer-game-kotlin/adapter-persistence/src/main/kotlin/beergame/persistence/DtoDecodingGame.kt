@@ -4,7 +4,6 @@ import arrow.core.Either
 import arrow.core.raise.either
 import beergame.domain.CommitMode
 import beergame.domain.CostPolicy
-import beergame.domain.CredentialSubject
 import beergame.domain.DemandSeries
 import beergame.domain.DomainEvent
 import beergame.domain.GameEvent
@@ -53,20 +52,11 @@ internal fun RoleUnassignedDto.toRoleUnassigned(): Either<String, DomainEvent> =
 internal fun GameStartedDto.toGameStarted(): Either<String, DomainEvent> =
     either { GameEvent.GameStarted(GameId(uuid(gameId).bind())) }
 
-private fun CredentialSubjectDto.toSubject(): Either<String, CredentialSubject> =
+internal fun ParticipantReplacedDto.toParticipantReplaced(): Either<String, DomainEvent> =
     either {
-        when (kind) {
-            "FACILITATOR" -> CredentialSubject.Facilitator(GameId(uuid(id).bind()))
-            "PARTICIPANT" -> CredentialSubject.Participant(ParticipantId(uuid(id).bind()))
-            else -> raise("資格の主体の種別が不正: $kind")
-        }
+        GameEvent.ParticipantReplaced(
+            ParticipantId(uuid(participantId).bind()),
+            enumOf<Role>(role, "役割").bind(),
+            ParticipantId(uuid(replacedBy).bind()),
+        )
     }
-
-internal fun CredentialRevokedDto.toCredentialRevoked(): Either<String, DomainEvent> =
-    either { GameEvent.CredentialRevoked(subject.toSubject().bind()) }
-
-internal fun CredentialReissuedDto.toCredentialReissued(): Either<String, DomainEvent> =
-    either { GameEvent.CredentialReissued(subject.toSubject().bind(), instant(expiresAt).bind()) }
-
-internal fun ParticipationRecoveredDto.toParticipationRecovered(): Either<String, DomainEvent> =
-    either { GameEvent.ParticipationRecovered(subject.toSubject().bind(), instant(credentialExpiresAt).bind()) }

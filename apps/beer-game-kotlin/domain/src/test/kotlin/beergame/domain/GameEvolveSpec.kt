@@ -106,10 +106,37 @@ class GameEvolveSpec :
                 evolveGame(state, roleAssigned(9, Role.FACTORY)) shouldBe state
                 evolveGame(state, roleUnassigned(9, Role.FACTORY)) shouldBe state
             }
-            test("開始済みへの ParticipantJoined・RoleAssigned・GameStarted・GameCreated は、状態を変えない") {
+            test("開始済みへの ParticipantJoined・RoleUnassigned・GameStarted・GameCreated は、状態を変えない") {
                 val state = gameOf(gameCreated(), participantJoined(1), gameStarted())
-                val events = listOf(participantJoined(2), roleAssigned(1, Role.FACTORY), gameStarted(), gameCreated())
+                val events =
+                    listOf(participantJoined(2), roleUnassigned(1, Role.FACTORY), gameStarted(), gameCreated())
                 events.forEach { event -> evolveGame(state, event) shouldBe state }
+            }
+            test("[B5/H4] 開始済みへの RoleAssigned は、役割のない参加者に役割を付ける（入れ替えの新担当者。版が進む）") {
+                val state = gameOf(gameCreated(), participantJoined(1), gameStarted())
+                val next = evolveGame(state, roleAssigned(1, Role.FACTORY))
+                (next is GameState.Started) shouldBe true
+                gameDataOf(next).participants[pid(1)] shouldBe ParticipantEntry(Role.FACTORY)
+                gameDataOf(next).credentials shouldBe gameDataOf(state).credentials
+                next.version shouldBe state.version.next()
+            }
+            test("[B5/H4] ParticipantReplaced は、開始済みで旧担当者の役割を外す（参加者の行と資格は残す）") {
+                val state = gameOf(*(fullyAssignedEvents() + gameStarted()).toTypedArray())
+                val next = evolveGame(state, participantReplaced(4, Role.RETAILER, replacedBy = 5))
+                val data = gameDataOf(next)
+                data.participants[pid(4)] shouldBe ParticipantEntry(null)
+                data.credentials shouldBe gameDataOf(state).credentials
+                data.participants.filterKeys { it != pid(4) } shouldBe
+                    gameDataOf(state).participants.filterKeys { it != pid(4) }
+                next.version shouldBe state.version.next()
+            }
+            test("[B5/H4] ParticipantReplaced は、未知の参加者・準備中・未作成では、状態を変えない") {
+                val started = gameOf(gameCreated(), participantJoined(1), gameStarted())
+                val preparing = fullyAssignedGame()
+                val event = participantReplaced(4, Role.RETAILER, replacedBy = 5)
+                evolveGame(started, participantReplaced(9, Role.RETAILER, replacedBy = 1)) shouldBe started
+                evolveGame(preparing, event) shouldBe preparing
+                evolveGame(GameState.NotCreated, event) shouldBe GameState.NotCreated
             }
             test("同じ参加者の ParticipantJoined が再び来ても、既存の割り当てと資格を消さない") {
                 val state = gameOf(gameCreated(), participantJoined(1), roleAssigned(1, Role.FACTORY))

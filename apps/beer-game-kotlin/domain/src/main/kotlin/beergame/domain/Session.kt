@@ -78,6 +78,14 @@ data class SessionData(
         return copy(decisions = decisions + (role to saved), decisionVersions = versions)
     }
 
+    /** 入れ替えの事実を採用する。[role] の担当者から [removed] を外し、[added] を入れる（ほかの役割・入力・版は変えない）。 */
+    internal fun withHolderReplaced(
+        role: Role,
+        removed: Set<ParticipantId>,
+        added: ParticipantId,
+    ): SessionData =
+        copy(assignments = assignments.map { r, holders -> if (r == role) holders - removed + added else holders })
+
     /** 当週に、この役割へ保存できる回数が残っているか。 */
     fun hasSaveCapacity(role: Role): Boolean = decisionVersions[role].value < SAVE_LIMIT_PER_ROLE_WEEK
 
@@ -204,6 +212,16 @@ sealed interface SessionEvent : DomainEvent {
     data class SessionEnded(
         val reason: EndReason,
     ) : SessionEvent
+
+    /**
+     * 役割の入れ替えで、[role] の担当者の写しを更新した（旧担当者の集合 [removed] を外し、[added] を入れる。D4）。
+     * 当週の入力と版は変えない。game の入れ替え（ParticipantReplaced ほか）と同じトランザクションで追記する。
+     */
+    data class RoleHolderReplaced(
+        val role: Role,
+        val removed: Set<ParticipantId>,
+        val added: ParticipantId,
+    ) : SessionEvent
 }
 
 sealed interface SessionError : DomainError {
@@ -302,8 +320,8 @@ private fun SessionState.pausedData(): Either<SessionError, SessionData> =
         is SessionState.Ended -> SessionError.AlreadyEnded.left()
     }
 
-/** 進行中でも一時停止中でもデータを返す（進行役の代理入力が使う）。 */
-private fun SessionState.openData(): Either<SessionError, SessionData> =
+/** 進行中でも一時停止中でもデータを返す（進行役の代理入力と、役割の入れ替えが使う）。 */
+internal fun SessionState.openData(): Either<SessionError, SessionData> =
     when (this) {
         is SessionState.Active -> data.right()
         is SessionState.Paused -> data.right()

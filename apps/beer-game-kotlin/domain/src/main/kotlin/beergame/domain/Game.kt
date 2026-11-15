@@ -203,6 +203,13 @@ sealed interface GameEvent : DomainEvent {
         val subject: CredentialSubject,
         val credentialExpiresAt: Instant,
     ) : GameEvent
+
+    /** 開始後の入れ替えで、旧担当者 [participantId] が [role] から外れ、[replacedBy] が引き継いだ事実（資格の失効は別のイベント）。 */
+    data class ParticipantReplaced(
+        val participantId: ParticipantId,
+        val role: Role,
+        val replacedBy: ParticipantId,
+    ) : GameEvent
 }
 
 sealed interface GameError : DomainError {
@@ -342,6 +349,29 @@ private fun GameState.updateData(update: (GameData) -> GameData?): GameState =
         is GameState.NotCreated -> this
     }
 
+/** 未作成だけが、作成で準備中になる（作成者の進行役の資格を発行する）。 */
+private fun GameState.created(event: GameEvent.GameCreated): GameState =
+    when (this) {
+        is GameState.NotCreated -> {
+            val facilitator = CredentialSubject.Facilitator(event.gameId)
+            val data =
+                GameData(event.gameId, event.settings, emptyMap(), emptyMap())
+                    .withIssued(facilitator, event.facilitatorCredentialExpiresAt)
+            GameState.Preparing(data, version.next())
+        }
+
+        is GameState.Preparing, is GameState.Started -> {
+            this
+        }
+    }
+
+/** 開始後のときだけデータを更新して版を進める（役割の入れ替え）。decide が作らない列（更新できない）は、状態を変えずに返す。 */
+private fun GameState.updateStarted(update: (GameData) -> GameData?): GameState =
+    when (this) {
+        is GameState.Started -> update(data)?.let { GameState.Started(it, version.next()) } ?: this
+        is GameState.NotCreated, is GameState.Preparing -> this
+    }
+
 /** 準備中のときだけデータを更新して版を進める。decide が作らない列（更新できない）は、状態を変えずに返す。 */
 private fun GameState.updatePreparing(update: (GameData) -> GameData?): GameState =
     when (this) {
@@ -359,19 +389,7 @@ fun evolveGame(
 ): GameState =
     when (event) {
         is GameEvent.GameCreated -> {
-            when (state) {
-                is GameState.NotCreated -> {
-                    val facilitator = CredentialSubject.Facilitator(event.gameId)
-                    val data =
-                        GameData(event.gameId, event.settings, emptyMap(), emptyMap())
-                            .withIssued(facilitator, event.facilitatorCredentialExpiresAt)
-                    GameState.Preparing(data, state.version.next())
-                }
-
-                is GameState.Preparing, is GameState.Started -> {
-                    state
-                }
-            }
+            state.created(event)
         }
 
         is GameEvent.ParticipantJoined -> {
@@ -387,7 +405,12 @@ fun evolveGame(
         }
 
         is GameEvent.RoleAssigned -> {
-            state.updatePreparing { it.withRole(event.participantId, event.role) }
+            // 準備中の割り当てと、開始後の入れ替えの新担当者の両方（開始後の RoleAssigned は assignRoleAfterStart だけが作る）
+            state.updateData { it.withRole(event.participantId, event.role) }
+        }
+
+        is GameEvent.ParticipantReplaced -> {
+            state.updateStarted { it.withRole(event.participantId, null) }
         }
 
         is GameEvent.RoleUnassigned -> {

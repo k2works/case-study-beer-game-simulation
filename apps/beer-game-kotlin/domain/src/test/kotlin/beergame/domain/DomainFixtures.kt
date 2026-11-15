@@ -119,6 +119,20 @@ fun roleUnassigned(
 
 fun gameStarted(): GameEvent.GameStarted = GameEvent.GameStarted(gid)
 
+/** 役割の入れ替えで、旧担当者 [n] が外れ、[replacedBy] が引き継いだ事実（B5 Step 3.5）。 */
+fun participantReplaced(
+    n: Int,
+    role: Role,
+    replacedBy: Int,
+): GameEvent.ParticipantReplaced = GameEvent.ParticipantReplaced(pid(n), role, pid(replacedBy))
+
+/** `session` の役割の写しの更新（旧担当者の集合 [removed] を外し、[added] を入れる）。 */
+fun roleHolderReplaced(
+    role: Role,
+    removed: Set<Int>,
+    added: Int,
+): SessionEvent.RoleHolderReplaced = SessionEvent.RoleHolderReplaced(role, removed.map(::pid).toSet(), pid(added))
+
 /** 過去のイベントを畳み込んだ状態（Given）。 */
 fun gameOf(vararg events: GameEvent): GameState = events.fold<GameEvent, GameState>(GameState.NotCreated, ::evolveGame)
 
