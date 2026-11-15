@@ -13,11 +13,13 @@ import beergame.application.CreateGameInput
 import beergame.application.CredentialDigest
 import beergame.application.CredentialKeyRing
 import beergame.application.CredentialKind
+import beergame.application.EventStore
 import beergame.application.Generators
 import beergame.application.JoinGameInput
 import beergame.application.PeripheralWrite
 import beergame.application.Ports
 import beergame.application.RequestMeta
+import beergame.application.RoleStatus
 import beergame.application.SaveDecisionInput
 import beergame.application.SecureTokens
 import beergame.application.Snapshot
@@ -29,6 +31,8 @@ import beergame.application.assignRole
 import beergame.application.commitWeek
 import beergame.application.createGame
 import beergame.application.joinGame
+import beergame.application.recover
+import beergame.application.revokeCredential
 import beergame.application.saveDecision
 import beergame.application.snapshot
 import beergame.application.startGame
@@ -39,12 +43,18 @@ import beergame.domain.ParticipantId
 import beergame.domain.Role
 import beergame.domain.RoleMap
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotContain
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 internal val CLOCK: Instant = Instant.parse("2026-11-14T10:00:00Z")
 private val CORRELATION: UUID = UUID(9L, 9L)
@@ -63,8 +73,8 @@ internal fun appSettings(): AppSettings =
         attempts = FLOW_ATTEMPT_POLICY,
     )
 
-/** 実物のアダプターを束ねた Ports（時計だけ固定）。 */
-internal fun Fixture.ports(): Ports =
+/** 実物のアダプターを束ねた Ports（時計だけ固定）。[events] は、並行の試験が追記の直前に割り込むための差し替え。 */
+internal fun Fixture.ports(events: EventStore = persistence.events): Ports =
     Ports(
         generators =
             Generators(
@@ -75,7 +85,7 @@ internal fun Fixture.ports(): Ports =
             ),
         stores =
             Stores(
-                events = persistence.events,
+                events = events,
                 project = persistence.projections,
                 idempotency = persistence.idempotency,
                 peripheral = persistence.peripheral,
@@ -172,6 +182,36 @@ private fun Fixture.playWeekOne(game: Started): CommandOutcome =
 private fun Snapshot.participant(): SnapshotView.Participant = view as? SnapshotView.Participant ?: error("参加者の投影ではない")
 
 private fun Snapshot.facilitator(): SnapshotView.Facilitator = view as? SnapshotView.Facilitator ?: error("進行役の投影ではない")
+
+/**
+ * 投影が運ぶ整数の項目を、項目単位に平らにして返す。`toString()` に対する部分文字列の検索は、ランダムな UUID
+ * （例: `…-998d-…`）で偶発的に一致して不安定になるため、「この値が、どの項目にも無い」は、この関数の結果で確かめる。
+ */
+private fun Snapshot.integerValues(): List<Int> {
+    fun RoleStatus.values() = listOfNotNull(inventory, backlog, arrivals, orders, customerDemand, decision)
+    val own = listOfNotNull(session?.week, session?.submittedRoleCount)
+    return own +
+        when (val v = view) {
+            is SnapshotView.Participant -> {
+                v.status?.values().orEmpty()
+            }
+
+            is SnapshotView.Facilitator -> {
+                listOf(v.finalWeek) +
+                    v.roles.values.flatMap { it.values() } +
+                    v.results.flatMap {
+                        listOf(
+                            it.week,
+                            it.orders,
+                            it.shipped,
+                            it.ordered,
+                            it.endingInventory,
+                            it.endingBacklog,
+                        )
+                    }
+            }
+        }
+}
 
 private fun Either<AppFailure, *>.code(): String =
     (leftOrFail() as? AppFailure.Domain)?.error?.code ?: error("業務のエラーではない: ${leftOrFail()}")
@@ -373,7 +413,8 @@ private fun FunSpec.disclosureContract(fixture: () -> Fixture) {
         checkNotNull(wholesaler.participant().status).customerDemand shouldBe null
         // AC2.1.3: 小売店だけが当週（第 2 週）の顧客需要 999 を読む。将来（第 3 週）の 998 は、どの投影にも無い
         checkNotNull(retailer.participant().status).customerDemand shouldBe 999
-        listOf(wholesaler, retailer, facilitator).forEach { it.toString() shouldNotContain "998" }
+        listOf(wholesaler, retailer, facilitator).forEach { it.integerValues() shouldNotContain 998 }
+        retailer.integerValues() shouldContain 999
         // AC2.1.1: 自分の役割の値だけ。他の参加者の表示名・参加コードは返らない
         listOf(
             Role.FACTORY,
@@ -507,5 +548,123 @@ private fun FunSpec.authorizationFlowContract(fixture: () -> Fixture) {
         save.code() shouldBe "session.forbidden"
         read.code() shouldBe "game.forbidden"
         fx.count("current_decisions WHERE game_id = ?", game.gameId.value) shouldBe 0
+    }
+}
+
+private const val RACE_ROUNDS = 8
+
+/** 2 つの要求が、追記の直前にそろうまで待つための合流点（両方が同じ版を読んでから追記を試みる状況を、確実に作る）。 */
+private class Barrier(
+    private val parties: Int,
+) {
+    private val arrived = AtomicInteger()
+    private val gate = CompletableDeferred<Unit>()
+
+    // suspend の関数型の値にしてある（detekt 1.23.8 が、Kotlin 2.4 でビルドされたライブラリの suspend 呼び出しを検出できず、
+    // `suspend` の修飾を冗長と誤判定するため。`@Suppress` も設定の緩和も使わない。AppTestKit の `sendRequest` と同じ理由）
+    val await: suspend () -> Unit = {
+        if (arrived.incrementAndGet() == parties) gate.complete(Unit)
+        gate.await()
+    }
+}
+
+/**
+ * 最初の追記の直前に [barrier] で待ち合わせ、追記の競合（ConcurrencyConflict）の回数を [conflicts] に数える。
+ * 再試行の追記は待たない（敗者は、勝者のコミットの後に、最初から評価し直す）。
+ */
+private fun EventStore.racing(
+    barrier: Barrier,
+    conflicts: AtomicInteger,
+): EventStore {
+    val first = AtomicBoolean(true)
+    return copy(
+        append = { tx, expected, events ->
+            if (first.compareAndSet(true, false)) barrier.await()
+            append(tx, expected, events).onLeft {
+                if (it ==
+                    AppFailure.ConcurrencyConflict
+                ) {
+                    conflicts.incrementAndGet()
+                }
+            }
+        },
+    )
+}
+
+private data class Raced(
+    val conflicts: Int,
+    val recoverWon: Boolean,
+)
+
+/**
+ * 進行役の失効と、参加者の復帰を、同じ版のゲームのストリームから同時に追記させ、競合の後の結果を検査する。
+ * 勝つ側は実行ごとに決まらないので、どちらの順でも成り立つ不変条件を確かめる。
+ */
+private fun Fixture.raceRevokeAndRecover(tag: String): Raced {
+    val game = start(tag)
+    val seat = game.seats[Role.RETAILER]
+    val before = maxVersion(game.gameId, "GAME")
+    val barrier = Barrier(2)
+    val conflicts = AtomicInteger()
+    val (revoked, recovered) =
+        runBlocking {
+            val go = CompletableDeferred<Unit>()
+            val revoke =
+                async {
+                    go.await()
+                    ports(persistence.events.racing(barrier, conflicts))
+                        .revokeCredential(
+                            game.gameId,
+                            CredentialSubject.Participant(seat.participantId),
+                            meta("revoke-$tag", game.facilitator),
+                        )
+                }
+            val recover =
+                async {
+                    go.await()
+                    ports(
+                        persistence.events.racing(barrier, conflicts),
+                    ).recover(game.gameId, meta("recover-$tag", seat.recovery))
+                }
+            go.complete(Unit)
+            revoke.await() to recover.await()
+        }
+
+    revoked.orFail()
+    // 復帰が負けた場合は、失効の後に評価し直されて、無効な資格として拒否される（再試行の上限や競合は漏れない）
+    recovered.onLeft { it shouldBe AppFailure.Unauthorized }
+    val events =
+        query(
+            "SELECT stream_version, event_type FROM events " +
+                "WHERE game_id = ? AND stream_type = 'GAME' AND stream_version > ? ORDER BY stream_version",
+            game.gameId.value,
+            before,
+        ) { it.getLong(1) to it.getString(2) }
+    events.map { it.first } shouldBe (1..events.size).map { before + it }
+    events.map { it.second } shouldBe
+        if (recovered.isRight()) listOf("ParticipationRecovered", "CredentialRevoked") else listOf("CredentialRevoked")
+    // どちらの順でも、失効は効いている。復帰で得た新しいセッションも、失効で止まる
+    recovered.onRight { authenticateSession(checkNotNull(it.outcome.issued).raw) shouldBe null }
+    authenticateSession(seat.credential) shouldBe null
+    authenticateRecovery(seat.recovery) shouldBe null
+    count("browser_sessions WHERE game_id = ? AND actor_id = ?", game.gameId.value, seat.participantId.value) shouldBe 0
+    revokedCount(game.gameId) shouldBe 1
+    return Raced(conflicts.get(), recovered.isRight())
+}
+
+/**
+ * 実 DB（PostgreSQL）の並行の契約（B5 Step 8.4b）。資格の失効と復帰が同時に実行されても、ゲームのストリームの版の競合で
+ * 直列化され、失効した後に復帰で得たセッションが生き残らないことを確かめる。H2 では実行しない（実際の並行は PostgreSQL が正）。
+ */
+fun FunSpec.credentialConcurrencyContract(fixture: () -> Fixture) {
+    test(
+        "[B5/8.4b] Given 実 DB When 失効と復帰を同じ版から同時に追記する Then 競合で直列化され、版は欠けず、どちらの順でも復帰のセッションは失効で止まる",
+    ) {
+        val fx = fixture()
+
+        val rounds = (1..RACE_ROUNDS).map { fx.raceRevokeAndRecover("race-$it") }
+
+        // 追記の直前に待ち合わせるので、毎回、ちょうど 1 回の競合が起きる（敗者の再試行は競合しない）
+        rounds.map { it.conflicts } shouldBe List(RACE_ROUNDS) { 1 }
     }
 }

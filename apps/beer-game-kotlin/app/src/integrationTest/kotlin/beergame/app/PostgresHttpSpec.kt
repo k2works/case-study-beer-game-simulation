@@ -10,9 +10,8 @@ import beergame.persistence.PersistenceConfig
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldNotContain
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -163,8 +162,9 @@ class PostgresHttpSpec :
                             "/sessions/$id/state",
                             cookie = players.getValue("RETAILER"),
                         )
-                    retailer.body().obj("roleStatus").str("customerDemand") shouldBe "999"
-                    retailer.bodyAsText() shouldNotContain "998"
+                    val retailerBody = retailer.body()
+                    retailerBody.obj("roleStatus").str("customerDemand") shouldBe "999"
+                    retailerBody.leafValues() shouldNotContain "998"
 
                     dataSource.close()
                     client.call(HttpMethod.Get, "/ready").status shouldBe HttpStatusCode.ServiceUnavailable

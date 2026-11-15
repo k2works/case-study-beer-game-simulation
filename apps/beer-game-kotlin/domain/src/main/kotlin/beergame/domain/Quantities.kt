@@ -5,6 +5,7 @@ import arrow.core.left
 import arrow.core.right
 
 /** 発注数・生産要請数。0〜1000 の整数（BR-10）。 */
+@Term("発注量", "各週に、役割が上流へ注文する数量。0〜1000 の整数", "BR-10")
 @JvmInline
 value class Quantity private constructor(
     val value: Int,

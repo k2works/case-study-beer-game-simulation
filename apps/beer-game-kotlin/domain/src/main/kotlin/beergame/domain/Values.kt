@@ -17,6 +17,7 @@ value class ParticipantId(
 )
 
 /** 週。1〜50（AC1.1.5）。 */
+@Term("週", "ゲームの進行の単位。1〜50 の整数。週ごとに、4 役割の発注量を確定して在庫・受注残・費用を更新する", "AC1.1.5")
 @JvmInline
 value class Week internal constructor(
     val value: Int,
@@ -105,6 +106,7 @@ value class RetentionDays private constructor(
 }
 
 /** ストリームの版。追記したイベントの通し番号（楽観的並行制御の期待値）。 */
+@Term("ストリームの版", "1 本のイベントの列（game・session）に追記した通し番号。同じ版への同時の追記は競合になり、一方だけが成功する", "ドメインモデル ユビキタス言語、ADR-005")
 @JvmInline
 value class StreamVersion private constructor(
     val value: Long,
@@ -120,6 +122,7 @@ value class StreamVersion private constructor(
 }
 
 /** 意思決定の版。役割ごと・週ごとに 0 から始まり、保存のたびに 1 増える（ストリームの版とは別）。 */
+@Term("意思決定の版", "役割ごと・週ごとの入力の版。保存のたびに 1 増え、古い画面からの保存や確定を拒否する根拠になる（ストリームの版とは別）", "ドメインモデル D10")
 @JvmInline
 value class DecisionVersion private constructor(
     val value: Long,

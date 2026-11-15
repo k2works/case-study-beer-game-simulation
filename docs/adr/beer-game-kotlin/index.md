@@ -21,6 +21,9 @@ beer-game-kotlin プロジェクトの ADR ドキュメントです。
 | [ADR-013](./013-tech-stack-versions.md) | 技術スタックの版を、確認済みの値で固定する（JDK 25 LTS、Kotlin 2.4、PostgreSQL 18） | 提案中 |
 | [ADR-014](./014-h2-for-local-development.md) | ローカル開発だけ H2（PostgreSQL モード）を使い、PostgreSQL 固有の機能をポートで抽象化する | 提案中 |
 | [ADR-015](./015-credential-handover-and-session-revocation.md) | 復帰資格の受け渡しと、失効でブラウザセッションを止める結び付き（B5 の H2・H3。人のゲート 1 で決める） | 提案中 |
+| [ADR-016](./016-credential-key-versions.md) | 資格の鍵の版を、値の接頭辞（`v<版>.<乱数>`）で持つ（B5 の判断項目 3） | 提案中 |
+| [ADR-017](./017-attempt-window-in-database.md) | 参加・復帰の失敗の窓を DB に持ち、複数のインスタンスで合算する（B5 の判断項目 4） | 提案中 |
+| [ADR-018](./018-living-documentation-annotations.md) | 用語集とイベント一覧を、型の注釈とソースから生成する（B5 の H1） | 提案中 |
 
 ## 補足
 

@@ -112,6 +112,7 @@ sealed interface SessionState {
     ) : SessionState
 
     /** 一時停止中。参加者の保存と週の確定を受け付けない。進行役の代理入力は受け付ける（確定はしない）。 */
+    @Term("一時停止", "進行役が進行を止めた状態。参加者は入力の保存も週の確定もできず、入力済みの値は失われない。再開すると最後の確定済みの週から続ける", "AC3.1.1、AC3.1.3")
     data class Paused(
         val data: SessionData,
         override val version: StreamVersion,
@@ -137,6 +138,7 @@ sealed interface SessionCommand : Command {
     ) : SessionCommand
 
     /** 進行役が、画面の週 [requestedWeek] で、[role] の数量を代わりに入力する。意思決定の版は要求しない（最終決定）。 */
+    @Term("代理入力", "不在の参加者に代わって、進行役が役割の発注量を入力すること。値・操作者・役割・時刻を履歴に残し、一時停止中も受け付ける（確定はしない）", "AC3.1.2、FR-15")
     data class SubmitProxyDecision(
         override val actor: Actor,
         override val at: Instant,
@@ -166,6 +168,7 @@ sealed interface SessionCommand : Command {
 
 sealed interface SessionEvent : DomainEvent {
     /** 設定と役割の割り当ての写しを運ぶ。以後 session は game を読まない（D4）。[gameId] は session の識別子でもある。 */
+    @EventSpec("EV-S01", "StartGame（game ストリームの GameStarted と同一トランザクション）")
     data class SessionStarted(
         val gameId: GameId,
         val settings: GameSettings,
@@ -174,6 +177,7 @@ sealed interface SessionEvent : DomainEvent {
         val commitMode: CommitMode,
     ) : SessionEvent
 
+    @EventSpec("EV-S05", "SaveDecision。進行中、その役割の参加者、意思決定の版が一致")
     data class DecisionSaved(
         val week: Week,
         val role: Role,
@@ -184,12 +188,15 @@ sealed interface SessionEvent : DomainEvent {
     ) : SessionEvent
 
     /** 進行役が一時停止した。 */
+    @EventSpec("EV-S02", "PauseSession。進行役、進行中")
     data object SessionPaused : SessionEvent
 
     /** 進行役が再開した。 */
+    @EventSpec("EV-S03", "ResumeSession。進行役、一時停止中")
     data object SessionResumed : SessionEvent
 
     /** 進行役の代理入力。値・入力者（進行役）を残す。操作者と時刻は封筒が持つ（FR-15）。 */
+    @EventSpec("EV-S06", "SubmitProxyDecision。進行役、進行中または一時停止中、requestedWeek が現在の週と一致")
     data class ProxyDecisionSubmitted(
         val week: Week,
         val role: Role,
@@ -200,6 +207,7 @@ sealed interface SessionEvent : DomainEvent {
     ) : SessionEvent
 
     /** 1 週の事実のすべて。結果と次週の状態を含み、evolve はそれを採用するだけ（D5）。 */
+    @EventSpec("EV-S08", "CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定は未実装")
     data class WeekCommitted(
         val week: Week,
         val commitKind: CommitKind,
@@ -209,6 +217,7 @@ sealed interface SessionEvent : DomainEvent {
         val contributors: Int,
     ) : SessionEvent
 
+    @EventSpec("EV-S04", "最終週の WeekCommitted と同じ decide。手動の EndSession は未実装")
     data class SessionEnded(
         val reason: EndReason,
     ) : SessionEvent
@@ -217,6 +226,7 @@ sealed interface SessionEvent : DomainEvent {
      * 役割の入れ替えで、[role] の担当者の写しを更新した（旧担当者の集合 [removed] を外し、[added] を入れる。D4）。
      * 当週の入力と版は変えない。game の入れ替え（ParticipantReplaced ほか）と同じトランザクションで追記する。
      */
+    @EventSpec("EV-S09", "AssignRole（開始後の入れ替え）。game ストリームの ParticipantReplaced と同一トランザクション。進行中または一時停止中")
     data class RoleHolderReplaced(
         val role: Role,
         val removed: Set<ParticipantId>,

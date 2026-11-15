@@ -43,6 +43,13 @@ beer-game-kotlin（[beer-game2](../beer-game2/index.md) の Kotlin 版）の設�
 
 サイトシーイング・マップとガイドツアーは、コードの注釈から自動生成する成果物です。**実装後に生成します**（現時点では作りません）。
 
+用語集とイベント一覧は、B5 Step 8.4 から、コードの注釈（`@Term`・`@EventSpec`）から生成しています（手で編集しません。再生成は `./gradlew :domain:generateLivingDocs`。方式は [ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案）。
+
+| ドキュメント | 概要 | 状況 |
+| :--- | :--- | :--- |
+| [イベント一覧（生成）](./generated/events.md) | 実装済みのドメインイベントの ID・ストリーム・発生条件・ペイロードの項目・購読する投影。設計書の EV 表との不一致は試験が検出する | 生成物 |
+| [用語集（生成）](./generated/glossary.md) | 注釈 `@Term` を付けた型の用語・定義・出典（これから書くコードと B5 の概念から） | 生成物 |
+
 ## 補足
 
 - 実ドキュメントを追加したら、この一覧を更新します。

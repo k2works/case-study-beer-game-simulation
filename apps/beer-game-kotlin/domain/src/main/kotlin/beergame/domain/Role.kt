@@ -1,6 +1,7 @@
 package beergame.domain
 
 /** 4 役割。上流から下流の順に並ぶ。 */
+@Term("役割", "サプライチェーンの 4 つの持ち場（工場・一次卸・二次卸・小売店）。上流から下流の順に並び、発注先は 1 つ上流の役割", "ドメインモデル 用語（beer-game2）")
 enum class Role {
     FACTORY,
     DISTRIBUTOR,

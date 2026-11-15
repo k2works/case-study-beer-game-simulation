@@ -4,7 +4,7 @@ title: "テスト戦略 - ビールゲームシミュレーション（Kotlin �
 description: "Kotlin 版のテスト戦略。BDD（受入条件は日本語 Gherkin と Cucumber、ドメインは Kotest の Given/When/Then）、decide/evolve/simulateWeek の純粋関数テスト、プロパティベーステスト、イベントストアと投影の統合テスト、冪等性・競合・復元・再構築、カバレッジ目標の判断、静的解析の厳格な適用（detekt・PMD・ktlint）、CI、タグからのトレーサビリティを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 ---
 
 # テスト戦略 - ビールゲームシミュレーション（Kotlin 版）
@@ -821,6 +821,9 @@ stop
 | 32 | CI の工程は `ktlint`・`detekt`・`PMD`・テスト・カバレッジ | ジョブを `contract`・`test`・`detekt`（JDK 21）・`pmd`・`web`・`ui`・`n1` に分けた。**GitHub Actions 上は未実行** | B2 の Step 4・5 |
 | 33 | 追記専用権限の否定テストは「加える」 | PostgreSQL 18 で 11 件（`RolePrivilegesSpec`）。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）。**連鎖削除は動く**（実測） | B2 の Step 3（[データモデル](./data-model.md)） |
 | 34（以降は B3 の実装で変わった点。2026-11-15） | CI に「コンテナ・IaC の検査」を含める想定（ツールは未選定） | CI に `container` ジョブ（`docker build` + `scripts/container-smoke.sh`）を追加。コンテナのスモークテストはローカルで全項目成功。**IaC の検査は `terraform fmt`・`validate` のみ**（`tflint`・`checkov`・Trivy は未実行）。**GitHub Actions 上は未実行** | B3 の Step 1・3 |
+| 35（B5 Step 8.4b。2026-11-15） | 資格の失効と復帰の同時実行は、「ストリームの版の競合で直列化」される設計だが、実 DB の並行の試験は未実施（B5 のゲート 4 の確認点） | **PostgreSQL 18 で並行の契約を足した**（`credentialConcurrencyContract`。`PostgresPersistenceSpec` だけが実行し、H2 では実行しない）。失効と復帰を、**追記の直前で待ち合わせて**（両方が同じ版を読んだ後に追記する）8 回行い、毎回ちょうど 1 回の競合が起き、(a) 失効は成功、(b) 復帰は成功するか、失効後に再評価されて `Unauthorized`（競合・再試行の上限は漏れない）、(c) 版が欠けず連続し、イベントの順序が `ParticipationRecovered` → `CredentialRevoked`（復帰が勝った場合）または `CredentialRevoked` だけ、(d) どちらの順でも、復帰で得た新しいセッションも失効後は認証できない（`browser_sessions` の行が 0）、を確かめる。**どちらが勝つかは実行ごとに決まらない**（両方の順の不変条件を確かめる）。失効の SQL でセッションの行を削除しない変異で、PostgreSQL の統合試験が 4 件失敗することを確認した（新しい並行の試験が、その 4 件に含まれるかは、個別に確かめていない） | ゲート 4 の確認点 1(d)。ADR-004 の備考の「実 DB の並行」 |
+| 36（B5 Step 8.4c。2026-11-15） | 将来の需要（`998`）が応答に含まれないことを、本文の文字列の検索（`shouldNotContain "998"`）で確かめる | **項目単位の検査に直した**。HTTP は JSON の葉の値（`JsonElement.leafValues()`。`AppTestKit`）、永続化は投影の整数の項目（`Snapshot.integerValues()`）に対して「998 が無い」を確かめる。理由: ランダムな UUID（例: `…-998d-…`）の一部に偶発的に一致して不安定だった（B5 Step 6 で 1 回失敗）。「UUID の一部の 998 には一致せず、項目の値が 998 のときだけ一致する」ことを試験で固定し、検査を「999 が無い」に変えると 2 箇所（HTTP・永続化）が失敗することを確認した | B5 の Step 6 の既知の不安定な試験（ゲート 7 で修正を決定） |
+| 37（B5 Step 8.4。2026-11-15） | 用語・イベントの一覧の生成は未決（開発戦略の Living Documentation） | `LivingDocumentationSpec`（domain の試験 7 件。`check` に含まれる）が、注釈の漏れ・設計書の EV 表との ID と名前の不一致・コミット済みの生成物との差を失敗にする。再生成は `./gradlew :domain:generateLivingDocs`（[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案）。**設計書だけの変更では、CI のパスフィルターに当たらない**（人の判断） | 開発戦略の「重複させる知識の検証」 |
 
 ## 設計判断
 

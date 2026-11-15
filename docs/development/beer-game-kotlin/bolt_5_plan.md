@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T08:29:27Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -22,9 +22,9 @@ verified:
 | 日程（仮定） | リリース計画の稼働日の目安は 2026-12-01〜12-02（B4 の終了後を前提）。**判断項目 1 の決定（2026-11-15）で、B5 を B4 より先に実施する**ため、この日付は使えない。実施日は着手時に人が決める（`validating-design` の軸 A。リリース計画のスケジュールと進捗状況の更新は、人の判断待ち） |
 | ゲート密度 | **密**（リリース計画の「B5 は高リスク（認可と冪等）」。ステップごとに人が検証する）。U1 のゲートは 2026-11-15 に承認済みだが、人の検証を含めた実績はまだ少ないため、密度は下げない |
 | アプローチ | 中盤（[開発戦略](./development_strategy.md)）。**インサイドアウト**（ドメイン → 永続化・資格 → アプリケーション → HTTP）。ただし**仕様（`contracts/openapi.yaml`）と日本語 Gherkin を先**に書き、契約テストを Red にしてから実装する（API を足す Bolt の共通の順序） |
-| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。`validating-design` は Step 0.2 で実施する |
+| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（ユーザーの選択: 「計画を承認」）。着手前の判断項目 16 件は、同日にユーザーが決定した（下の更新履歴）。ゲート 0〜7 は、2026-11-15 にユーザーが承認した（更新履歴）。ゲート 8（Bolt の承認）は人の確認待ち（未承認）。** Step 0〜8 は実施済み（Step 8 の結果は「[Step 8 の実施結果](#step-8-の実施結果2026-11-15)」、終了報告は [bolt_5_report](./bolt_5_report.md)）。B6 には進んでいない |
 
-> **承認の状態について**: ステップ計画の承認と判断項目 16 件の決定は、2026-11-15 にユーザーが行いました（更新履歴）。**各ゲート（0〜8）は承認を受けていません。** 承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。下の判断項目表の「提案」列は、決定の前の記述で、決定の内容は更新履歴にあります。
+> **承認の状態について**: ステップ計画の承認と判断項目 16 件の決定は、2026-11-15 にユーザーが行いました（更新履歴）。**ゲート 0〜7 は、更新履歴のとおり、ユーザーが承認しました。ゲート 8 は承認を受けていません。** 承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。下の判断項目表の「提案」列は、決定の前の記述で、決定の内容は更新履歴にあります。
 
 ### ゴール
 
@@ -760,19 +760,80 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ### Step 8: 受け入れの green と検証・終了（✅）
 
-- [ ] 8.1 `@api` の AC3.1.*、AC3.2.* が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403
-- [ ] 8.2 全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、`web` の検証が緑。CI で、GitHub Actions 上の実行を確認する（**push は人の判断**。ローカルだけの結果を「CI で動く」と書かない）
-- [ ] 8.3 設計書・ADR の更新（変更表）と、`validating-design`（完了時）。新しい ADR（判断項目 3・4）は**提案として記録し、承認は人**
-- [ ] 8.4 🟢 **Living Documentation の用語集・イベント一覧の生成（H1）**。H1 を B5 に含める決定（2026-11-15）で追加した。[開発戦略](./development_strategy.md)が「B1〜B2 で決める」とした未決（**注釈の語彙と生成の仕組み**）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、**ADR を提案として書く**（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の `EventCodec` の種別の一覧、`@SerialName`、ドメインモデルの EV 表を突き合わせる検査を含める。**生成物と設計書の ID（EV-G*、EV-S*）の不一致で CI が落ちる**形を目指す）。(c) 生成物を `docs/` に置く導線を作る（新規ファイルの作成は確認必須）。**B5 で足す 6 種類のイベントが、一覧に載る**ことを、完了条件とする。**未確認**: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）
-- [ ] 8.4b 🔴🟢 **実 DB（PostgreSQL 18）の並行テスト**: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）
-- [ ] 8.4c 🟡 **不安定な試験の修正**: 「応答に `998` が含まれない」を `shouldNotContain "998"` で確かめる 3 箇所（`ApplicationFlowContract`、`HttpFlowSpec`、`PostgresHttpSpec`）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）
-- [ ] 8.5 Bolt 終了報告（`bolt_5_report.md`）。**デモ項目の実操作の申告欄**（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
+- [x] 8.1 `@api` の AC3.1.*、AC3.2.* が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403（**自動の受け入れは実施した。人の実操作の申告欄は空のまま**）
+- [x] 8.2（**ローカルの実行は済み。GitHub Actions 上の実行は未確認**）全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、`web` の検証が緑。CI で、GitHub Actions 上の実行を確認する（**push は人の判断**。ローカルだけの結果を「CI で動く」と書かない）
+- [x] 8.3 設計書・ADR の更新（変更表）と、`validating-design`（完了時）。新しい ADR（判断項目 3・4）は**提案として記録し、承認は人**（**`validating-design` は 3 軸に沿って、機械で確認できる項目を中心に自分で確認した。スキルの全手順の再実行ではない**）
+- [x] 8.4 🟢 **Living Documentation の用語集・イベント一覧の生成（H1）**。H1 を B5 に含める決定（2026-11-15）で追加した。[開発戦略](./development_strategy.md)が「B1〜B2 で決める」とした未決（**注釈の語彙と生成の仕組み**）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、**ADR を提案として書く**（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の `EventCodec` の種別の一覧、`@SerialName`、ドメインモデルの EV 表を突き合わせる検査を含める。**生成物と設計書の ID（EV-G*、EV-S*）の不一致で CI が落ちる**形を目指す）。(c) 生成物を `docs/` に置く導線を作る（新規ファイルの作成は確認必須）。**B5 で足す 6 種類のイベントが、一覧に載る**ことを、完了条件とする。**未確認**: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）
+- [x] 8.4b 🔴🟢 **実 DB（PostgreSQL 18）の並行テスト**: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）
+- [x] 8.4c 🟡 **不安定な試験の修正**: 「応答に `998` が含まれない」を `shouldNotContain "998"` で確かめる 3 箇所（`ApplicationFlowContract`、`HttpFlowSpec`、`PostgresHttpSpec`）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）
+- [x] 8.5 Bolt 終了報告（[`bolt_5_report.md`](./bolt_5_report.md)）。**デモ項目の実操作の申告欄**（人が行う。空のまま）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
 
 **ゲート 8**（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。**状態: 人の確認待ち（未承認）。**
+
+#### Step 8 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 8 の承認と「U2 が完了」は記録していない。B6 には進んでいない。** 詳細（デモ項目の実操作の申告欄、未達・未実施、人の判断項目、B6 への申し送り、仮説の検証結果、Release 0.2 への影響）は [Bolt 5 終了報告](./bolt_5_report.md)。
+
+**8.4c（不安定な試験）**: `shouldNotContain "998"` の 3 箇所（`ApplicationFlowContract`、`HttpFlowSpec`、`PostgresHttpSpec`）を項目単位の検査に直した。HTTP は `JsonElement.leafValues()`（`AppTestKit` に追加）で JSON の葉の値を、永続化は `Snapshot.integerValues()` で投影の整数の項目を、それぞれ平らにして「998 が無い」を確かめる。`HttpFlowSpec` に「UUID の一部の 998 には一致せず、項目の値が 998 のときだけ一致する」試験を足した。**直した検査が正しく失敗することの確認**: 検査を「999 が無い」へ変えると、`HttpFlowSpec`（1 件）と永続化（1 件）が失敗した（戻して緑）。`PostgresHttpSpec` は同じ補助を使う（その検査の変異は個別に行っていない）。
+
+**8.4b（実 DB の並行）**: `credentialConcurrencyContract`（`ApplicationFlowContract.kt`）を足し、`PostgresPersistenceSpec` だけが実行する（H2 では実行しない）。失効（進行役）と復帰（参加者）を、追記の直前で待ち合わせて同じ版から 8 回同時に追記させる。毎回ちょうど 1 回の競合が起き、失効は成功、復帰は成功するか失効後に再評価されて `Unauthorized`、版は連続し、復帰で得たセッションも失効後は認証できない（どちらが勝つかは実行ごとに決まらず、両方の順の不変条件を確かめる）。**TDD の順序の注記**: 試験は最初の実行で緑だった（実装が既に正しかったため。失敗の Red は観察していない）。代わりに、失効のセッション削除の SQL を壊す変異で、PostgreSQL の統合試験が 4 件失敗することを確認した（新しい試験が、その 4 件に含まれるかは個別に確かめていない）。設計書: [テスト戦略](../../design/beer-game-kotlin/test-strategy.md) の変更の表 35・36。
+
+**8.4（Living Documentation。H1）**: 提案の方式（[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)。人の承認待ち）。
+
+- `domain/src/main/kotlin/beergame/domain/Documentation.kt`（新規）: 標準ライブラリだけの注釈 `@Term`（用語・定義・出典）と `@EventSpec`（設計書の ID・発生する条件）。
+- 型に付けた: 全 17 種類のイベントに `@EventSpec`、13 項目に `@Term`（役割、発注量、週、ストリームの版、意思決定の版、一時停止、代理入力、資格の主体、資格の有効性、資格の失効、資格の再発行、復帰、役割の入れ替え）。
+- `domain/src/test/.../LivingDocumentation.kt`・`LivingDocumentationSpec.kt`（新規）: sealed の部分型（`permittedSubclasses`）とフィールド、`Projection.kt` の走査（購読する投影）、設計書の EV 表の突き合わせ、生成物の本文とコミット済みの本文の比較。`./gradlew :domain:generateLivingDocs`（同じ試験を `-Dbeergame.docs.update=true` で実行）で再生成。koverVerify の依存に入らないよう、`disabledForTestTasks` に追加した。
+- 生成物: [`docs/design/beer-game-kotlin/generated/events.md`](../../design/beer-game-kotlin/generated/events.md)（実装済みの 17 種類。**B5 で足した 8 種類を含む**。設計書にあって未実装の 4 種類 EV-G05〜G07・EV-S07 も別に列挙）、[`glossary.md`](../../design/beer-game-kotlin/generated/glossary.md)（13 項目）。
+- **Red の確認**: 試験を先に書き、注釈を付ける前に 7 件中 6 件が失敗することを確認してから注釈を付けた。**変異**: `EV-G08` を `EV-G88` に変えると 2 件が失敗した（戻して緑）。
+- `@Term` の付与は、B5 で足した概念と核だけ（既存コードへの一括適用はしない）。公開（サイトへの掲載）の導線、CI のパスフィルター（`apps/beer-game-kotlin/**` のため、設計書だけの変更では走らない）は未実装・未変更。
+
+**8.1（受け入れ）**: 結果は下の 8.2 の表。`@api` の AC3.1.1〜3.1.3・AC3.2.1〜3.2.5 は、PostgreSQL 18 と H2 の両方で、**70 シナリオ（Examples を含む。`@api`）が成功、失敗 0、Undefined・Pending なし**（JVM の実行は `@ui` の 7 件を skipped に数える）。`@ui` は 7 シナリオ・53 ステップすべて passed（H2 のバックエンド。PostgreSQL のバックエンドでの `@ui` は未実施）。デモ項目の対応（自動で通る範囲。**人の実操作は未実施**）:
+
+| デモ項目 | 自動の確認 | 範囲外・未実施 |
+| :--- | :--- | :--- |
+| 進行役が停止 → 代理入力 → 再開 | `pause-resume.feature`「停止して代理入力し、再開して確定すると、週が進む」（`@api`）、`pause-resume-ui.feature`（`@ui`。停止 → 参加者の画面は停止中 → 再開） | **代理入力の画面は無い**（B6 以降。UI は API のみ）。人の実操作は未実施 |
+| 参加者が切断 → 復帰 | `recovery.feature`（AC3.2.1。`@api`）、`recovery-ui.feature`（AC3.2.1・AC3.2.4。`@ui`） | 人の実操作は未実施。SSE は未実装（切断中の自動更新は無い） |
+| 漏れた資格の失効 → 再発行 → 旧資格の再送が 403 | `credentials.feature`（失効、再発行、失効した資格の再送が 403 になる 2 シナリオ） | **失効・再発行の画面は無い**（API のみ）。人の実操作は未実施 |
+
+**8.2（全テスト・静的解析・カバレッジ。ローカル）**: `apps/beer-game-kotlin`、既定の JDK 25（detekt だけ JDK 21 = Corretto 21.0.12）。`--rerun-tasks` で、全テストを実際に再実行した。**GitHub Actions 上の実行は未確認**（push していない。直近の CI の成功は、Step 7 のコミット `646c23a` の 8 ジョブ）。
+
+| 検査 | 結果 |
+| :--- | :--- |
+| `./gradlew check -x pmd --continue --rerun-tasks` | **成功**（約 7 分）。ただし**初回の実行は、自分が書いた試験の ktlint 違反（行の長さ・引数の改行）で失敗し、`ktlintFormat` で直した** |
+| `:domain:test` | **402 件、失敗 0**（395 件から 7 件増: `LivingDocumentationSpec`） |
+| `:application:test` | 149 件、失敗 0（変更なし） |
+| `:adapter-http:test` | 80 件、失敗 0（変更なし） |
+| `:adapter-persistence:test`（H2。契約を含む） | 92 件、失敗 0 |
+| `:adapter-persistence:integrationTest`（PostgreSQL 18） | **80 件、失敗 0**（79 件から 1 件増: 並行の契約。`PostgresPersistenceSpec` 67 + `RolePrivilegesSpec` 13） |
+| `:app:test`（契約テスト `ApiContractSpec` 13 件を含む） | **98 件、失敗 0**（97 件から 1 件増: 項目単位の検査の試験） |
+| `:app:integrationTest` | 1 件、失敗 0 |
+| `:app:acceptanceTest`（PostgreSQL 18）・`:app:acceptanceTestH2` | どちらも **77 テスト、失敗 0、skipped 7**（`@ui` の 7 シナリオを JVM の実行が除外。`@api` は 70 件が成功） |
+| Kover（`koverVerify`。test・integrationTest・acceptanceTest・acceptanceTestH2 の合算） | **合格**。**全体: 行 98.1%（4174 / 4253）、分岐 81.6%（1133 / 1389）**（閾値は行 85%・分岐 75%）。**domain: 行 100%（1038 / 1038）**、分岐 98.1%（258 / 263）。除外・閾値の引き下げなし |
+| `ktlintCheck` | 違反 0 |
+| `detekt`・`detektMain`・`detektTest`（JDK 21） | 違反 0（`@Suppress` なし、ベースラインなし）。**初回は、自分が書いた試験の違反 4 件（行の長さ 1、`InjectDispatcher` 2、`RedundantSuspendModifier` 1）で失敗し、設定を変えずにコードを直した** |
+| `pmdFixtureTest`・`pmdDomainApplication`・`pmdAdapter`・`pmdMain`・`pmdTest` | 違反 0（fixture は期待どおりの 17 件） |
+| 契約テスト・型の生成物 | `npm run api:lint` 有効、`npm run api:check` 差分 0 |
+| `web`: `npm run verify`（format:check・lint・typecheck・vitest・build） | **緑**。vitest 109 件、失敗 0 |
+| `web`: `npm run acceptance:dry-run` / `npm run acceptance`（`@ui`。H2 のバックエンド、ポート 3100・5273） | dry-run は 7 シナリオ・53 ステップ（Undefined なし）。実行は **7 シナリオ・53 ステップすべて passed**。起動した 3100 のプロセスだけを止めた（人の開発サーバー 3000・5173 は使わず、止めていない） |
+
+**8.3（設計書・ADR の更新と `validating-design`）**:
+
+- ADR を 3 件、**提案**として追加した（[ADR-016](../../adr/beer-game-kotlin/016-credential-key-versions.md) 鍵の版、[ADR-017](../../adr/beer-game-kotlin/017-attempt-window-in-database.md) 失効の窓、[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md) 注釈と生成）。**承認は書いていない**。[ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md) も提案中のまま。ADR の一覧を更新した。
+- 設計書の変更表: [ドメインモデル](../../design/beer-game-kotlin/domain-model.md) の 40、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) の 35〜37。[設計の一覧](../../design/beer-game-kotlin/index.md) に生成物を追加。
+- `validating-design`（完了時。**機械で確認できる項目を中心に自分で確認した。スキルの全手順の再実行ではない**）:
+  - 軸 A（開発戦略とのずれ）: 中盤のインサイドアウト・BDD（先に Gherkin）・デモ項目の受け入れ基準は守った。Living Documentation の中盤の重点（用語集・イベント一覧の生成）は本ステップで実装（ADR-018 は提案中）。**生成と公開の自動化のうち、公開（サイトへの掲載）は未実装**。開発戦略は注釈の定義を「別モジュール」としたが、本ステップは **domain 内の標準ライブラリだけの注釈**にした（逸脱。ADR-018 に記録）。
+  - 軸 B（設計書との整合）: 実装済みの 17 イベントの ID・名前は、設計書の EV 表と**試験で一致を確認**。6 つの `code`（`session.paused`、`session.not_paused`、`session.save_limit_reached`、`game.credential_already_revoked`、`game.credential_not_revoked`、`app.rate_limited`）が仕様・ドメインモデル・UI 設計に載ることを確認（`ErrorCodeInventory` の契約テストは緑）。6 経路が仕様とアーキテクチャ設計に載ることを確認。V007・V008 がデータモデルに載ることを確認。未検証: UI 設計の文言の「提案」（ゲート 7 で確定済みの範囲を除く）の全件突き合わせ。
+  - 軸 C（過去の Bolt との連続性）: 既存のイベント名・`code` を変えていない（golden と契約テストが緑）。U1 総括の持ち越し（#18・#19: `@US`・`@AC` タグの整合検査、`@Suppress`・ベースラインの機械検査、生きたドキュメントの公開の導線、Kover の残り、SSE の契約テスト）は、**本 Bolt でも未実施**（B16 へ送る決定の記録は、判断項目の H5）。
+
+**ゲート 8 で人が確認すること**: [Bolt 5 終了報告](./bolt_5_report.md)の「人の判断が要る項目」と「デモ項目の実操作の申告欄」。
+
+**実施中の逸脱**（正直に記録する）: (1) ファイルの編集は、Write・Edit と、書式の自動修正の `./gradlew ktlintFormat`、生成物の再生成 `./gradlew :domain:generateLivingDocs`、自分が作った生成物の削除（`rm`。書式の誤りの再生成のため）だけで行った。heredoc・python・sed・perl・awk は使っていない（件数の集計に `grep`・`paste`・`bc` を読み取りだけに使った）。(2) 8.4b の試験は、最初から緑で、Red を観察していない（上の注記）。(3) 初回の `check` で ktlint の違反、detekt の違反（自分の試験）があり、直した。(4) `koverVerify` が `generateLivingDocs`（`Test` 型）を先に実行し、`docs/` を書き換える副作用があった（差分は無かった）。`disabledForTestTasks` で依存から外した。(5) 新規ファイル（確認必須。判断項目 15 の範囲外のものを含む）: `Documentation.kt`、`LivingDocumentation.kt`、`LivingDocumentationSpec.kt`、`generated/events.md`、`generated/glossary.md`、ADR-016〜018、`bolt_5_report.md`。人が確認する。
 
 ---
 
 ## 完了条件（Definition of Done）
+
+> チェックは、人がゲート 8 で確認してから付ける。**各項目の実測の達成状況は、[Bolt 5 終了報告](./bolt_5_report.md)の「完了条件の達成状況」**（AI の自己申告ではなく、実測の根拠つき）。
 
 - [ ] AC3.1.1〜3.1.3、AC3.2.1〜3.2.5 の Gherkin シナリオが green（PostgreSQL 18 と H2。Undefined・Pending なし）
 - [ ] **鍵のローテーションの否定テスト**が通る（旧版の資格は期限まで有効。旧版の鍵を外すと 403）
@@ -893,6 +954,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 8（8.1〜8.5、8.4b、8.4c）を実施**（**ゲート 8 は人の確認待ち。承認と「U2 が完了」は記録していない**。B6 には進んでいない）。8.4c: `998` の検査 3 箇所を項目単位に直し、変異で正しく失敗することを確認。8.4b: PostgreSQL 18 で、失効と復帰を追記の直前で待ち合わせて 8 回同時に実行する並行の契約を足した（毎回 1 回の競合で直列化。試験は最初から緑で、Red は未観察。変異で統合試験が 4 件失敗）。8.4: 注釈 `@Term`・`@EventSpec` と、domain の試験による用語集・イベント一覧の生成（17 イベント、13 用語。ADR-018 は提案）。**実測（ローカル）**: `check`・統合・受け入れ（PostgreSQL・H2 とも `@api` 70 件成功）・Kover（全体の行 98.1%・分岐 81.6%、domain の行 100%）・ktlint・detekt（JDK 21）・PMD・`web` の検証と `@ui` 7 シナリオが緑。**GitHub Actions 上は未確認**。ADR-016〜018 を提案として追加（ADR-015 とあわせて承認は人）。設計書の変更表（domain-model 40、test-strategy 35〜37）。[終了報告](./bolt_5_report.md)を作成（デモ項目の実操作の申告欄は空）。**逸脱**: 8.4b の試験が最初から緑、初回の `check`・detekt で自分の試験の違反（修正済み）、新規ファイルの追加、開発戦略の「注釈は別モジュール」からの逸脱（domain 内の注釈） | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 7（UI 最小。7.1〜7.3）を実施**（ゲート 7 は人の確認待ち。**承認は記録していない**。Step 8 は未着手。バックエンド・仕様・スキーマの変更なし）。判断項目 13 の最小の UI: S03 の復帰（ゲーム ID と任意の復帰コード。Cookie の復帰資格）と、参加後のプレイ画面への遷移（応答の `gameId`）、S06 の停止・再開（確認ダイアログ）、S05 の停止中の表示、S02 の復帰コード表示。**代理入力・資格の失効・再発行・終了の画面は範囲外**（理由は「Step 7 の実施結果」）。テストを先に書き、**vitest 39 件・`@ui` 6 シナリオの Red を確認**してから実装。**実測**: `web` の `verify` 緑、vitest 109 件・失敗 0（70 件から 39 件増）、`@ui` は 7 シナリオ・53 ステップすべて passed（H2 のバックエンド。2 回）。アクセシビリティの自動確認は自前の DOM 構造の検査のみ（axe は未導入）。**逸脱: heredoc を何も書かない確認で 1 回誤って起動（ファイルの変更なし）。自分のテスト 2 件が不安定で修正。計画に明示のない足し（S02 の復帰コード表示ほか）。新規ファイル 5 点**。人が確認する点は「Step 7 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 6（アプリケーションと HTTP。6.1〜6.4）を実施**（ゲート 6 は人の確認待ち。**承認は記録していない**。Step 7 以降は未着手。スキーマ変更なし）。HTTP の統合テスト 19 件を先に書き、**19 件の失敗を確認**してから実装。停止・再開・代理入力・失効・再発行・復帰の 6 経路と、開始後の `assignRole`（入れ替え）を実装。作成・再発行の応答に復帰コード、参加・復帰の応答に `gameId`（復帰は `kind`・`role?`）。`bg_session` の `Max-Age` を `sessionTtl`（24 時間）にし、Step 4 の不一致を解消。`bg_recovery`（30 日。Path は復帰の経路だけ）を発行。ロビーの `replaced`。設計書の例外 2 つと ADR-015 の未確認 2 点を更新。**冪等な再送で `recoveryCode` を返せることを実測**。**実測**: domain 395・application 149・adapter-http 80・persistence 92（H2）/ 79（PostgreSQL）・app 97（`ApiContractSpec` 13 件は緑）・integration 1、すべて失敗 0。受け入れは H2・PostgreSQL 18 とも 71 シナリオ、failed 0、skipped 1。`api:check` 差分 0、`web` の `verify` 緑。ktlint・detekt（JDK 21）・PMD は違反 0。**性能（ローカル。PostgreSQL 18 の Testcontainers、逐次）: p95 は停止 37.7 ms・再開 36.2 ms・代理入力 38.1 ms（実環境の値ではない）**。**逸脱: python の heredoc を何も書かない確認で 1 回誤って起動（ファイルの変更なし）。受け入れのステップ定義 11 個を追加（3.5.1 の持ち越し）。一部の単体試験は実装のあとに書いた。既存の不安定な試験（UUID に `998`）を 1 回踏んだ（未修正）**。人が確認する点は「Step 6 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 5（参加・復帰の専用のレート制限。5.1〜5.5）を実施**（ゲート 5 は人の確認待ち。**承認は記録していない**。Step 6 以降は未着手）。テストを先に書き、コンパイルエラーの Red（`replaced_at` は、V007 を外した 3 件の失敗）を確認してから実装。**DB に窓を持つ**（`participation_attempts`。検査の前に足し、認可の失敗でなければ戻す。上限超過は検査せずに 429。接続元は正規化して鍵付き要約にし、生の IP は残さない）。参加（HTTP まで）と復帰（application まで。HTTP は Step 6）に適用。マイグレーション: 共通 007（`replaced_at`）・008（窓の表）、PostgreSQL の 101 と 102 の付け替え（101＝冪等記録の索引、102＝ロールと GRANT。窓の表の GRANT を含む）、**006 は B11 の予約として空けた**。**実測**: application 146 件、persistence（H2）91 件・PostgreSQL の統合 78 件、http 74 件、すべて失敗 0。`:app:test` は想定の 7 件の Red（`ApiContractSpec`）、受入は H2・PostgreSQL とも 71 件中 36 failed（Step 4 と同数。新しい 3 シナリオは passed）。ktlint・detekt（JDK 21）・PMD は違反 0。ミューテーション 3 件で否定テストが落ちることを確認。設計書（data-model、architecture-backend、architecture-infrastructure）と ADR-015 の注記を更新。**逸脱: heredoc を何も書かない確認で 2 回誤って起動（ファイルの変更なし）。書式の自動修正に `ktlintFormat` を使用**。人が確認する点（方式、保存する情報、スキーマ変更、番号）は「Step 5 の実施結果」 | claude-code/claude-sonnet-5-5 |

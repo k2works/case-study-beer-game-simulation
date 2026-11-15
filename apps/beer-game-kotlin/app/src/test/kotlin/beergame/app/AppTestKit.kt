@@ -26,7 +26,10 @@ import io.ktor.http.contentType
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -160,6 +163,18 @@ const val API = "/api/v1"
 fun json(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
 
 fun JsonObject.str(name: String): String = getValue(name).jsonPrimitive.content
+
+/**
+ * JSON の葉（文字列・数値・真偽値）の値を、項目単位に平らにして返す。
+ * 応答の本文に対する部分文字列の検索（`shouldNotContain "998"`）は、ランダムな UUID（例: `…-998d-…`）で偶発的に一致して
+ * 不安定になる。「この値が、どの項目にも無い」は、この関数の結果に対して確かめる。
+ */
+fun JsonElement.leafValues(): List<String> =
+    when (this) {
+        is JsonObject -> values.flatMap { it.leafValues() }
+        is JsonArray -> flatMap { it.leafValues() }
+        is JsonPrimitive -> listOf(content)
+    }
 
 fun JsonObject.obj(name: String): JsonObject = getValue(name).jsonObject
 

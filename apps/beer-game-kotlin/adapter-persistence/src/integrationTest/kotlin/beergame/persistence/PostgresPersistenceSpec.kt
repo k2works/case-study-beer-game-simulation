@@ -225,6 +225,7 @@ class PostgresPersistenceSpec :
         projectionLockContract { fx }
         changeNotifierContract { fx }
         applicationFlowContract { fx }
+        credentialConcurrencyContract { fx }
         attemptStoreContract { fx }
         attemptFlowContract { fx }
 

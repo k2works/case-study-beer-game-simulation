@@ -4,7 +4,7 @@ title: "リリース計画 - ビールゲームシミュレーション（Kotlin
 description: "beer-game2 の Kotlin 版のリリース計画。Intent、Unit、Bolt 計画（B1〜B15、予備 B16）、リリース 0.1 / 0.2 / 1.0、バッファ、リスク台帳、進捗管理。承認済み（2026-11-14）。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:52:23Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-14T08:52:24Z }
 ---
@@ -354,7 +354,8 @@ gantt
 | B1 | U1 | 実装・記録は完了。**人のゲート 1〜12 は未承認** | 実績 2026-11-14（連続セッション） | [Bolt 1 終了報告](./bolt_1_report.md)。domain の行 100% は未達。GitHub Actions 上は未実行 |
 | B2 | U1 | 実装・記録は完了。**人のゲート 1〜6 は未承認。ステップ計画も未承認** | 実績 2026-11-14〜15 | [Bolt 2 終了報告](./bolt_2_report.md)。domain の行 100% は未達（暫定 97%）。GitHub Actions 上は未実行 |
 | B3 | U1 | **定義と記録は完了。AWS には適用していない。人のゲートは未承認。ステップ計画も未承認** | 実績 2026-11-15 | [Bolt 3 終了報告](./bolt_3_report.md)。`terraform plan` は未実行（受入条件の一部が未達）。ワークフローは AWS・GitHub Actions で未実行 |
-| B4〜B15 | — | 未着手 | - | 計画は承認済み（2026-11-14）。B4 は、人の判断項目（[Unit U1 の総括](./unit_u1_summary.md)）の確認後に着手 |
+| B5 | U2 | 実装・記録は完了（Step 0〜8）。**ゲート 0〜7 は承認済み（2026-11-15）。ゲート 8 は未承認。デモ項目の人の実操作は未実施** | 実績 2026-11-15（連続セッション。B4 より先に実施） | [Bolt 5 終了報告](./bolt_5_report.md)。ローカルの全テスト・静的解析・Kover が緑（domain の行 100%、全体の行 98.1%・分岐 81.6%）。GitHub Actions 上の Step 8 の変更分は未確認。資格の期限・参加の上限は運営者と未合意（R11） |
+| B4、B6〜B15 | — | 未着手 | - | 計画は承認済み（2026-11-14）。B4 は、人の判断項目（[Unit U1 の総括](./unit_u1_summary.md)）の確認後に着手 |
 | B16 | — | 予備 | - | |
 
 **Unit U1（B1〜B3）の総括**: [unit_u1_summary](./unit_u1_summary.md)。実績の所要は、人の検証時間を含まないため、計画（9 稼働日）との比較に使わない。**リリース 0.1 の条件のうち、デプロイの定義の検証（`plan`）、domain の行 100%、GitHub Actions 上の実行、人の承認は未達・未確認**（総括を参照）。
@@ -387,3 +388,4 @@ gantt
 | 2026-11-14 | ユーザーの決定（ローカル開発は H2 の PostgreSQL モード、検証・CI は PostgreSQL 18）を反映: B1 の最初に H2 の実測、ポート `ProjectionLock`・`ChangeNotifier` の 2 実装と契約テスト、リスク R20、H2 の導入の承認を追加。Bolt の所要と日程は変更しない | claude-code/claude-sonnet-5-5 |
 | 2026-11-14 | 開発戦略の決定を反映: B1 に Cucumber の基盤、B2 に PMD の 14 ルール・fixture・厳格な適用を追加。B1 を 4 日、B2 を 3 日に変更し、日程を再計算（Release 0.1 は 11-30、0.2 は 12-09、1.0 は 12-30、バッファ込みで 2027-01-06）。リスク R16〜R19、測定基準、リリース 0.1 の条件、次のステップを更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | B1〜B3 の完了状況（人のゲートは未承認）を進捗状況に反映。リスク R1・R6・R10・R16 の状況、PMD の導入の承認を追記。[Bolt 3 終了報告](./bolt_3_report.md)・[Unit U1 の総括](./unit_u1_summary.md) を参照。**承認済みの文書への追記のため、人に再確認を求める**（Bolt の計画・所要・日程・リリースの条件は変えていない） | claude-code/claude-sonnet-5-5 |
+| 2026-11-15 | B5 の完了状況（実装と記録は完了。ゲート 0〜7 は承認済み、ゲート 8 は未承認。B4 より先に実施）を進捗状況に反映（事実のみ。承認を伴う記述なし）。[Bolt 5 終了報告](./bolt_5_report.md) を参照。**承認済みの文書への追記のため、人に再確認を求める**（Bolt の計画・所要・日程・リリースの条件は変えていない） | claude-code/claude-sonnet-5-5 |

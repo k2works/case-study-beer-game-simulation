@@ -135,6 +135,7 @@ sealed interface GameCommand : Command {
     ) : GameCommand
 
     /** 進行役が、参加者の資格を失効させる（漏れた資格の被害を止める。AC3.2.5）。準備中と開始後の両方で受け付ける。 */
+    @Term("資格の失効", "進行役が、漏れた参加者の資格を使えなくすること。失効した資格での要求は、以前に成功したものの再送でも拒否する", "AC3.2.5、ADR-004")
     data class RevokeCredential(
         override val actor: Actor,
         override val at: Instant,
@@ -142,6 +143,7 @@ sealed interface GameCommand : Command {
     ) : GameCommand
 
     /** 進行役が、失効した参加者の資格を、新しい有効期限で再発行する。資格の値（復帰コード）は境界が作る。 */
+    @Term("資格の再発行", "失効した参加者の資格に代わる、新しい復帰資格（復帰コード）を進行役が発行すること。値は発行時の応答だけが運び、再表示しない", "AC3.2.5、ADR-015")
     data class ReissueCredential(
         override val actor: Actor,
         override val at: Instant,
@@ -150,6 +152,7 @@ sealed interface GameCommand : Command {
     ) : GameCommand
 
     /** 有効な復帰資格の持ち主（[actor] は [subject] 自身）が復帰する。復帰資格の期限を [credentialExpiresAt] へ更新する。 */
+    @Term("復帰", "切断や再起動のあとに、有効な復帰資格で、同じゲーム・同じ役割へ戻ること。新しいブラウザセッションを発行し、復帰資格の期限を新しくする", "AC3.2.1、AC3.2.4")
     data class RecoverParticipation(
         override val actor: Actor,
         override val at: Instant,
@@ -159,6 +162,7 @@ sealed interface GameCommand : Command {
 }
 
 sealed interface GameEvent : DomainEvent {
+    @EventSpec("EV-G01", "CreateGame。ストリームが空")
     data class GameCreated(
         val gameId: GameId,
         val joinCode: JoinCode,
@@ -167,44 +171,53 @@ sealed interface GameEvent : DomainEvent {
         val facilitatorCredentialExpiresAt: Instant,
     ) : GameEvent
 
+    @EventSpec("EV-G02", "JoinGame。準備中")
     data class ParticipantJoined(
         val participantId: ParticipantId,
         val credentialExpiresAt: Instant,
     ) : GameEvent
 
+    @EventSpec("EV-G03", "AssignRole。進行役、役割が変わる（準備中。開始後は入れ替えの新担当者）")
     data class RoleAssigned(
         val participantId: ParticipantId,
         val role: Role,
     ) : GameEvent
 
     /** 解除前の役割。付け替えの解除の側（単独の UnassignRole は B1 の範囲外）。 */
+    @EventSpec("EV-G04", "AssignRole による付け替え（解除の側）。単独の UnassignRole は未実装")
     data class RoleUnassigned(
         val participantId: ParticipantId,
         val role: Role,
     ) : GameEvent
 
+    @EventSpec("EV-G11", "StartGame。進行役、準備中、各役割に 1 人以上")
     data class GameStarted(
         val gameId: GameId,
     ) : GameEvent
 
     /** 資格を失効させた。資格の値・表示名は含めない（ADR-002）。 */
+    @EventSpec("EV-G08", "RevokeCredential。進行役、失効していない参加者の資格（期限切れでも可）")
     data class CredentialRevoked(
         val subject: CredentialSubject,
     ) : GameEvent
 
     /** 失効した資格を再発行した。新しい有効期限だけを持つ（資格の値は周辺ストアへ、同じトランザクションで書く）。 */
+    @EventSpec("EV-G09", "ReissueCredential。進行役、失効した参加者の資格")
     data class CredentialReissued(
         val subject: CredentialSubject,
         val expiresAt: Instant,
     ) : GameEvent
 
     /** 復帰した。復帰資格の期限を更新した新しい期限を持つ。 */
+    @EventSpec("EV-G10", "RecoverParticipation。有効な復帰資格の持ち主")
     data class ParticipationRecovered(
         val subject: CredentialSubject,
         val credentialExpiresAt: Instant,
     ) : GameEvent
 
     /** 開始後の入れ替えで、旧担当者 [participantId] が [role] から外れ、[replacedBy] が引き継いだ事実（資格の失効は別のイベント）。 */
+    @Term("役割の入れ替え", "開始後に、進行役が役割の担当者を別の参加者に替えること。旧担当者の資格は同じ追記で失効し、入力済みの値と週は変わらない", "ドメインモデル 役割の入れ替え、ADR-015")
+    @EventSpec("EV-G12", "AssignRole（開始後の入れ替え）。進行役、旧担当者ごとに 1 件。同じ追記で CredentialRevoked と RoleHolderReplaced が付く")
     data class ParticipantReplaced(
         val participantId: ParticipantId,
         val role: Role,

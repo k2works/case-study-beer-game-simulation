@@ -12,6 +12,7 @@ import java.time.Instant
  */
 
 /** 資格の主体。B5 は進行役と参加者（観察者は B9）。 */
+@Term("資格の主体", "資格を持つ人。進行役（ゲーム単位）か参加者。資格の失効・再発行・復帰は、主体ごとに行う（観察者は未実装）", "ドメインモデル 資格、AC3.2.5")
 sealed interface CredentialSubject {
     data class Facilitator(
         val gameId: GameId,
@@ -29,6 +30,7 @@ enum class CredentialStatus { VALID, REVOKED, EXPIRED }
  * 資格の有効性。有効期限と、失効したか。発行・失効の時刻はイベントの封筒（occurredAt）が持ち、evolve は時刻を読まないので、
  * 状態には持たない（設計書の「発行時刻・失効時刻」からの差）。期限の瞬間から使えない。
  */
+@Term("資格の有効性", "資格の有効期限と、失効したか。失効は期限より優先する。期限の瞬間から使えない。不明・失効・期限切れは、利用者には区別して見せない", "AC3.2.2、AC3.2.5、NF-S12")
 data class CredentialValidity(
     val expiresAt: Instant,
     val revoked: Boolean,

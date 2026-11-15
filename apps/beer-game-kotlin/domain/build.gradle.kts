@@ -13,6 +13,20 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     compilerOptions.freeCompilerArgs.add("-jvm-default=no-compatibility")
 }
 
+// Living Documentation（B5 Step 8.4）: 注釈とソースから、用語集とイベント一覧を生成する（docs/design/beer-game-kotlin/generated/）。
+// 通常の test は、コミット済みの生成物との一致を検査するだけ。この task は、同じ試験を更新モードで実行して、生成物を書き換える。
+tasks.register<Test>("generateLivingDocs") {
+    group = "documentation"
+    description = "用語集とイベント一覧を、コードの注釈とソースから生成して docs/design/beer-game-kotlin/generated/ へ書く。"
+    val testSourceSet = sourceSets.named("test")
+    testClassesDirs = testSourceSet.get().output.classesDirs
+    classpath = testSourceSet.get().runtimeClasspath
+    useJUnitPlatform()
+    filter { includeTestsMatching("beergame.domain.LivingDocumentationSpec") }
+    systemProperty("beergame.docs.update", "true")
+    outputs.upToDateWhen { false }
+}
+
 extensions.configure<DetektExtension> {
     config.setFrom(
         rootProject.file("config/detekt/detekt.yml"),
@@ -23,6 +37,12 @@ extensions.configure<DetektExtension> {
 // domain の行のカバレッジのゲート（設計の目標 100%）。除外はせず、未到達だった行（value class のボックス化した値の getter、
 // object Projections の個々の投影、interface の DefaultImpls）をテストと上の設定で到達させた。
 kover {
+    // 生成用の task は、docs/ を書き換える。計測の対象（koverVerify が先に実行する Test）に入れない。
+    currentProject {
+        instrumentation {
+            disabledForTestTasks.add("generateLivingDocs")
+        }
+    }
     reports {
         verify {
             rule("domain の行 100%") {

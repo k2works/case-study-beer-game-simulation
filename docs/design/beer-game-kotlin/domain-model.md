@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -78,7 +78,7 @@ RT ..> GAME : 期限到達の検出（保持方針の投影）\nと game_roots �
 
 ## ユビキタス言語
 
-beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game2/domain-model.md) を参照）。ES で加わった用語と、コード上の名称を示します。
+beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game2/domain-model.md) を参照）。ES で加わった用語と、コード上の名称を示します。**B5 以降に書くコードの用語は、型の注釈 `@Term` から生成した [用語集](./generated/glossary.md) が正本**です（手で複製しません。変更の表 40）。
 
 | 用語 | コード上の名称 | 定義 |
 | :--- | :--- | :--- |
@@ -739,6 +739,8 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 
 ## ドメインイベント
 
+> **コードから生成した一覧**: [イベント一覧（生成）](./generated/events.md)（ID・イベント・ストリーム・条件・ペイロードの項目・購読する投影）。下の表は、意図・発生条件の詳細を手で書いたもので、**ID と名前が生成物と一致しないと、試験 `LivingDocumentationSpec` が失敗する**（変更の表 40）。
+
 すべてのイベントは、封筒（`EventEnvelope`）に、ストリームの版、スキーマ版、操作者（種別と ID）、相関 ID、コマンド ID、発生時刻を持ちます。**イベントそのものが監査の記録**です（専用の別テーブルは作りません。ADR-008）。表示名と資格の値はペイロードに含めません。
 
 ### game ストリーム
@@ -989,6 +991,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 37 | 開始後の入れ替えのコマンド・規則が無い（「開始後の入れ替え」は未決） | 既存の `AssignRole` を開始後も受け付け、**2 ストリームの関数 `assignRoleAfterStart`** が `ParticipantReplaced`・`CredentialRevoked`・`RoleAssigned`（game）と `RoleHolderReplaced`（session）を同一トランザクションで返す。旧担当者の資格を自動失効し、履歴と入力者のラベルは残す（2026-11-15、B5 Step 3.5.1。**提案。ゲート 3.5 で人が確認する**） | 写し（D4）を更新しないと新担当者が保存できない。コマンドと経路を増やさず、準備中の付け替え（D9）と同じ入口にする（ゲート 1 の決定） |
 | 38 | `assignRoleAfterStart` のスケッチ（セッションの状態は `Active`・`Paused` の確認だけ。`evolve` は入れ替えの事実を採用） | **実装**（2026-11-15、B5 Step 3.5.2〜3.5.4。実装の確認はゲート 3.5 で人が行う）: 関数は `ReplaceDecision.kt`（`ReplaceDecision` と同じファイル）。(1) セッションの確認は `openData()` を使い、**未開始は `NotActive`**、終了後は `AlreadyEnded`（スケッチは終了後と同じ扱い）。(2) 新担当者の資格の確認は `credentials[subject]?.revoked == false`（資格の行がない参加者は `CredentialAlreadyRevoked`。参加時に必ず発行されるので到達しない列）。(3) **`evolveGame` の `RoleAssigned` は、開始後も役割を付ける**（準備中と同じ `updateData`。従来は準備中だけで、開始済みでは状態を変えなかった）。`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（準備中・未作成・未知の参加者は状態を変えない）。(4) `RoleHolderReplaced` は進行中・一時停止中だけ写しを更新する（未開始・終了後は状態を変えない） | 開始後の `RoleAssigned` を採用しないと、入れ替えの結果が再生で復元できない。`decide` が作らない列は、これまでどおり状態を変えずに返す（`replay` が検知する） |
 | 39（B5 Step 4.7。2026-11-15） | 投影は `SessionStarted`・`DecisionSaved`・`WeekCommitted` などを購読する（B1） | `SessionPaused`・`SessionResumed`（`session_overview.status` を PAUSED・ACTIVE）、`ProxyDecisionSubmitted`（`current_decisions` に進行役の入力者で書き、`submitted_role_count` を更新）、`ParticipantReplaced`（`lobby_participants` の `role` を NULL、`replaced_at` を書く行の変更。DB の列はマイグレーション（Step 5.5）まで無い）を購読する。**資格のイベント（`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）と `RoleHolderReplaced` は、どの投影も購読しない**（L5。資格の状態の正本は `credentials`、割り当ての写しは session ストリームの再生） | 投影の契約テストで、資格のイベントが行を作らないことを確認 |
+| 40（B5 Step 8.4。2026-11-15） | 用語・イベントの一覧は、設計書の手書きの表だけ（ユビキタス言語、ドメインイベントの表） | **コードから生成する一覧を足した**: 型に注釈 `@Term`・`@EventSpec`（`Documentation.kt`。標準ライブラリだけ）を付け、`LivingDocumentationSpec` が [イベント一覧](./generated/events.md)・[用語集](./generated/glossary.md) を生成する。**手書きの EV 表は残し**、生成物との不一致（ID・名前）を試験が検出する（実装済みの 17 イベントの ID と名前が、EV 表と一致）。未実装のイベント（EV-G05〜G07、EV-S07）は、生成物の「設計書にあり、まだ実装が無いイベント」に載る。EV 表を生成物への参照に置き換えるかは、人の判断（[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案） | 開発戦略の「手作業で更新する一覧は作らない」。生成物と手書きの境界: 生成物 = ID・名前・ストリーム・ペイロードの項目・購読する投影・用語、手書き = 意図・判断・却下した代替案 |
 
 ## 未決事項
 

@@ -1,6 +1,16 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
+* **Update**: B5 Step 8: 終了報告、ADR-016〜018（提案）、生成した用語集・イベント一覧、設計書の変更表、計画・進捗の更新（ゲート 8 は未承認）
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend](/design/beer-game-kotlin/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [ui-design](/design/beer-game-kotlin/ui-design.md) を更新（claude-code/claude-sonnet-5-5）

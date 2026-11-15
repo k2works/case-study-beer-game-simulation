@@ -10,6 +10,7 @@ import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -478,6 +479,17 @@ class HttpFlowSpec :
             }
         }
 
+        test("[Step8/8.4c] 項目単位の検査: UUID の一部に現れる 998 には一致せず、項目の値が 998 のときだけ一致する") {
+            val withUuid = """{"gameId":"0b1c5d2e-998d-4f3a-8a11-aa00bb11cc22","roleStatus":{"customerDemand":999}}"""
+            val withValue = """{"roleStatus":{"customerDemand":998},"history":[1,998]}"""
+
+            json(withUuid).leafValues() shouldNotContain "998"
+            json(withUuid).leafValues() shouldContain "999"
+            json(withValue).leafValues() shouldContain "998"
+            // 部分文字列の検索では、UUID の一部で偶発的に一致してしまう（修正前の不安定さの再現）
+            withUuid shouldContain "998"
+        }
+
         test("[US2.1/AC2.1.1] 参加者は自分の役割の値だけを見る（他の役割・参加コード・他の参加者の表示名・将来の需要を含まない）") {
             withWorld {
                 val game = started("disclosure")
@@ -489,7 +501,7 @@ class HttpFlowSpec :
                     wholesaler shouldNotContain ROLE_NAMES.getValue(role)
                 }
                 wholesaler shouldNotContain game.joinCode
-                wholesaler shouldNotContain "998"
+                json(wholesaler).leafValues() shouldNotContain "998"
                 wholesaler shouldNotContain "roles"
                 json(wholesaler).obj("roleStatus").containsKey("customerDemand") shouldBe false
             }
@@ -503,9 +515,10 @@ class HttpFlowSpec :
                 val retailer = state(game, game.players.getValue("RETAILER").cookie)
                 val facilitator = state(game, game.facilitator).bodyAsText()
 
-                retailer.body().obj("roleStatus").str("customerDemand") shouldBe "999"
-                retailer.bodyAsText() shouldNotContain "998"
-                facilitator shouldNotContain "998"
+                val retailerBody = retailer.body()
+                retailerBody.obj("roleStatus").str("customerDemand") shouldBe "999"
+                retailerBody.leafValues() shouldNotContain "998"
+                json(facilitator).leafValues() shouldNotContain "998"
             }
         }
 
