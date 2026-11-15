@@ -56,6 +56,7 @@ export interface paths {
         /**
          * 役割を割り当てる（AssignRole。game ストリーム）
          * @description 認可は進行役。1 人の参加者に同時に複数の役割は持たせない（AC1.2.5）。別の役割にいる人を選んだ場合は、付け替え（D9。移動元の RoleUnassigned と移動先の RoleAssigned）として扱う。
+         *     **同じ役割に、複数の参加者を割り当てられる**（共同担当。AC1.2.4。準備中だけ。人数の上限は設けない。B6 で受入シナリオを足した。実装は B1 から変えない）。
          *     `DELETE` の UnassignRole（単独の解除）は B1 に含めない（bolt_1_plan 判断項目 13。未決）。
          *
          *     **B5 の役割の入れ替え（H4。形はゲート 1 で決定済み。規則の細部は Step 3.5.1 で書いた。ゲート 3.5 は人の確認待ち）**:
@@ -140,7 +141,11 @@ export interface paths {
          *     入力する役割は、**資格から決まる**（本文に役割を持たない）。役割が無い操作者（進行役、役割が未割り当ての参加者）は、資格の失敗と同じ 403。
          *     流通役は発注、生産役（工場）は生産要請として保存する（AC2.2.1）。数量は 0〜1000 の整数（範囲外は 422 の quantity。
          *     小数・空・文字は、形の誤りとして 422 の quantity。AC2.2.2）。
-         *     共同担当の競合は B6（`session.decision_conflict` は仕様に載せるが B1 では起きない）。
+         *     **共同担当（B6。AC2.2.3）**: 同じ役割の複数の参加者が、同じ意思決定の版を共有する。`If-Match` の版が、その役割の最新の版と違えば、
+         *     **`session.decision_conflict`（409）**で拒否する（B1 では共同担当が無く、起きなかった。B6 の提案）。拒否した保存は、版も保存回数も進めない。
+         *     409 の本文は `role`（競合した役割）と `latest`（**最新の入力**。数量・版・**最後の保存者**・**保存の時刻**）を持つ。競合した人自身の入力は応答に含めない
+         *     （画面が保持する）。最新の版を指定して保存し直せば、受け付ける。最後の保存者の表示名は、同じ役割の共同担当にだけ示す（進行役の代理入力は表示名を持たない種別で示す）。
+         *     週の判定が先で、週が違えば `session.week_advanced`（版が違っても同じ）。保存回数の上限（9 回）は、役割ごとに共有する。
          */
         put: operations['saveDecision'];
         post?: never;
@@ -165,6 +170,8 @@ export interface paths {
          *     経路の `week` と本文の `requestedWeek` が違えば 422（field は requestedWeek）。
          *     判定の順は「週が違う → `session.week_advanced`」「週が同じで basis が現在の各役割の版と違う → `session.decisions_changed`」。
          *     入力が揃っていなければ `session.incomplete_decisions`（422。不足する役割を示す）。確定は 1 週につき一度だけ（AC2.3.2）。
+         *     **B6 の提案**: `session.decisions_changed` の `current` は、役割ごとの現在の入力（数量・版・最後の保存者・保存の時刻）を返す
+         *     （共同担当が保存し直した値と保存者を、進行役が確認し直せるようにする。進行役には表示名も示す）。週が違えば、版も違っていても `session.week_advanced`（週が先）。
          */
         post: operations['commitWeek'];
         delete?: never;
@@ -458,10 +465,33 @@ export interface components {
                 message: string;
             }[];
         };
-        /** @description 役割ごとの、保存済みの入力（数量と版）。 */
+        /**
+         * @description 入力を保存した人（B6 の提案）。参加者か、進行役の代理入力。**表示名は、同じ役割の共同担当と進行役にだけ**示す
+         *     （他の役割の参加者・観察者・無資格には、そもそもこの値を返さない）。進行役の代理入力は、表示名を持たない（画面が「進行役（代理入力）」と示す）。
+         */
+        DecisionEditor: {
+            /** @enum {string} */
+            kind: 'PARTICIPANT' | 'FACILITATOR_PROXY';
+            /** @description 参加者の表示名（`kind` が `PARTICIPANT` のときだけ。周辺ストアの値。無ければ null）。 */
+            displayName?: string | null;
+            /** @description 呼び出した人自身が保存したか（参加者は自分の参加者、進行役は代理入力のとき true）。画面が「あなたが 10:42 に保存」と示すのに使う。 */
+            isSelf: boolean;
+        };
+        /** @description 役割ごとの、保存済みの入力（数量・版・最後の保存者・保存の時刻）。 */
         DecisionEntry: {
             quantity: number;
             version: number;
+            editor: components['schemas']['DecisionEditor'];
+            /**
+             * Format: date-time
+             * @description 保存の時刻（投影 `current_decisions.updated_at`。イベントには時刻を足さない。判断項目 7）。
+             */
+            savedAt: string;
+        };
+        /** @description 同じ役割の共同担当（B6 の提案）。表示名は、同じ役割の参加者にだけ示す。参加者の ID は含めない。 */
+        CoHolder: {
+            displayName: string | null;
+            isSelf: boolean;
         };
         /** @description 409 の拡張メンバー。どれが付くかは code による。 */
         ConflictProblemBody: components['schemas']['Problem'] & {
@@ -471,7 +501,7 @@ export interface components {
             currentWeek?: number;
             /** @description `session.decision_conflict`: 競合した役割 */
             role?: components['schemas']['Role'];
-            /** @description `session.decision_conflict`: 最新の入力（無ければ項目ごと付けない） */
+            /** @description `session.decision_conflict`: 最新の入力（数量・版・最後の保存者・保存の時刻。競合した人自身の入力は含めない。無ければ項目ごと付けない） */
             latest?: components['schemas']['DecisionEntry'];
             /** @description `session.decisions_changed`: 確定の対象の週 */
             week?: number;
@@ -655,6 +685,13 @@ export interface components {
             /** @description 当週の入力値（未入力は null） */
             decision: number | null;
             decisionVersion: number;
+            /** @description 当週の入力を最後に保存した人（B6 の提案。未入力は null）。表示名は同じ役割の共同担当と進行役にだけ示す。 */
+            decisionEditor: components['schemas']['DecisionEditor'] | null;
+            /**
+             * Format: date-time
+             * @description 当週の入力の保存の時刻（B6 の提案。未入力は null）。
+             */
+            decisionSavedAt: string | null;
         };
         /** @description 確定した週の、役割別の結果。AC2.3.5 の例示（注文、在庫、受注残、出荷、費用）。費用は最小単位（セント）の整数。 */
         RoleWeekResult: {
@@ -697,6 +734,8 @@ export interface components {
             /** @description 進行役だけ。 */
             finalWeek?: number;
             roleStatus?: components['schemas']['RoleStatus'];
+            /** @description 参加者だけ（B6 の提案）。同じ役割の共同担当（自分を含む。入れ替えで外れた旧担当者は含めない）。他の役割の担当者は含めない。 */
+            coHolders?: components['schemas']['CoHolder'][];
             /** @description 進行役だけ。役割ごとの状況。 */
             roles?: {
                 [key: string]: components['schemas']['RoleStatus'];

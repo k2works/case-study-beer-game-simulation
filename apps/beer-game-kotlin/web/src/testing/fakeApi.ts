@@ -67,6 +67,8 @@ export function roleStatus(overrides: Partial<NonNullable<SessionState['roleStat
         orders: 4,
         decision: null,
         decisionVersion: 0,
+        decisionEditor: null,
+        decisionSavedAt: null,
         ...overrides,
     };
 }

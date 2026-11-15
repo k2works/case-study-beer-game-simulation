@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: bolt_6_plan: Step 1（1.1〜1.3）の実施結果を記録（ゲート 1 は未承認）
 * **Verification**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を human:kakimomokuri が検証
 * **Update**: [bolt_5_report](/development/beer-game-kotlin/bolt_5_report.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を更新（claude-code/claude-sonnet-5-5）

@@ -4,7 +4,7 @@ title: "Bolt 6 計画 - 共同担当と共同入力（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 6（Unit U2 の 2 つ目の Bolt）のステップ計画。同一役割に複数人の共同担当、意思決定の版による競合の検出（DecisionConflict）、WeekAdvanced と DecisionsChanged の区別、制約ごとの再試行・再照合、並行の統合テスト、RetryExhausted の発生率の計測。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T13:55:38Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T14:25:56Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T11:14:28Z }
   - { by: human:kakimomokuri, at: 2026-11-15T13:55:40Z }
@@ -22,7 +22,7 @@ verified:
 | 日程（仮定） | リリース計画の稼働日の目安は、累計 15 日目・2026-12-04 終了（B5 の後。B5 は B4 より先に実施済みなので、この日付は使えない）。実施日は着手時に人が決める。リリース計画の日程・進捗の更新は、人の判断待ち |
 | ゲート密度 | **密**（リリース計画の「B6 は高リスク（並行性）」。ステップごとに人が検証する）。B5 のゲート 0〜8 は人が通した実績があるが、並行の試験と計測は AI の自己申告が効きにくいため、密度は下げない |
 | アプローチ | 中盤（[開発戦略](./development_strategy.md)）。**インサイドアウト**（ドメイン → 永続化・投影 → 並行の試験と計測 → アプリケーション・HTTP → UI）。仕様（`contracts/openapi.yaml`）と日本語 Gherkin を先に書き、契約テストを Red にしてから実装する。**否定テストと並行テストを実装より先に書く**（開発戦略の中盤の手順の要点） |
-| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。**Step 0（0.1〜0.4）は 2026-11-15 に実施済み**（`validating-design`（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。**ゲート 0 は人の確認待ち（未承認）。Step 1 以降には進んでいない**） |
+| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。**Step 0（0.1〜0.4）は 2026-11-15 に実施済み**（`validating-design`（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。**ゲート 0 は 2026-11-15 にユーザーが承認済み**）。**Step 1（1.1〜1.3）は 2026-11-15 に実施済み**（Gherkin・仕様・Red の実測は「Step 1 の実施結果」。**ゲート 1 は人の確認待ち（未承認）。Step 2 以降には進んでいない**） |
 
 > **承認の状態について**: 本書の「提案」は AI の案で、承認ではありません。承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。各ゲートは「人の確認待ち（未承認）」です。
 
@@ -222,7 +222,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 ### Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）
 
-- [ ] 1.1 🔴 日本語 Gherkin を書く（AC1.2.4、AC2.1.4、AC2.2.3、AC2.2.4。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。配置は `features/game-setup/`（AC1.2.4）と `features/weekly-play/`（AC2.1.4・2.2.3・2.2.4。`TAGS.md` の領域の一覧は変更不要の見込み）。**最低限含めるシナリオ**:
+- [x] 1.1 🔴 日本語 Gherkin を書く（**実施済み（2026-11-15）。結果は下の「Step 1 の実施結果」。ゲート 1 は人の確認待ち（未承認）**）（AC1.2.4、AC2.1.4、AC2.2.3、AC2.2.4。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。配置は `features/game-setup/`（AC1.2.4）と `features/weekly-play/`（AC2.1.4・2.2.3・2.2.4。`TAGS.md` の領域の一覧は変更不要の見込み）。**最低限含めるシナリオ**:
   - AC1.2.4: 同じ役割に 2 人を割り当てられる／各役割に 1 人以上いれば開始できる／1 人が 2 つの役割を持てない（AC1.2.5 の回帰。別の役割へは付け替え）
   - AC2.1.4: 共同担当が、同じ状況・入力値・版を見る／**他の役割の参加者は、その役割の保存者・版を見られない**（否定）
   - AC2.2.3: 同じ版から 2 人が保存すると、2 人目は競合し、**最新値と保存者**が示される。**黙って失われた更新が無い**（最新の値は 1 人目のまま）。競合した人の入力は応答に含まれず、画面が保持する（API では、再度の保存が最新の版を指定して成功する）。代理入力が共同担当の入力を上書きした後の保存は競合し、保存者は進行役の代理入力と示される
@@ -230,10 +230,83 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
   - **`WeekAdvanced` と `DecisionsChanged` の区別**（設計の AC2.3.1。タグは `@AC2.3.1`、解釈の差はコメント。**Step 0.2 の軸 B で判明: ユーザーストーリーの AC2.3.1 の原文は「4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される」で、この区別を含まない。[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) が `[US2.3/AC2.3.1]` の名で置いている。`week-commit.feature` はすでに `@AC2.3.1` を原文の意味で使っている。`TAGS.md` は「期待値は原文の意味と一致」と定めるため、この区別のシナリオに `@AC2.3.1` を付けるか（原文と別の意味になる）、タグを付けず `@NF-` 系や設計判断 D10 の ID を使うかは、ゲート 1 で人が決める**）: 確定の根拠にした入力が、共同担当の保存で変わったあとの確定は `DecisionsChanged`（現在の値と保存者を返す）／別の確定で週が進んだあとの確定は `WeekAdvanced`／**両方に当てはまる場合は週が先**（`WeekAdvanced`）
   - 保存回数の上限が、共同担当で共有される（B5 の AC 外の確認。判断項目 5）。拒否された保存は上限を消費しない
   - 共同担当のいる役割の入れ替えで、担当者全員が外れ、旧担当者の資格が失効する（B5 の回帰。**Step 0.3 で確認: 受入の Gherkin には無い（ドメインの Kotest にだけある）ので、Step 1 で足す**）
-- [ ] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6・7 の応答の形（409 `session.decision_conflict`／`session.decisions_changed` の拡張メンバー、状況の応答の保存者・時刻）を書く。**あわせて、217 行の古い注記「`session.decision_conflict` は仕様に載せるが B1 では起きない」を、現状（共同担当が入る B6 で起きる）に合わせて直す**（Step 0.3 で確認）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）
-- [ ] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）。**最初から Passing のシナリオは、回帰として残す**と明記する（B5 の Step 1 と同じ扱い）
+- [x] 1.2 🔴（**実施済み（2026-11-15）。契約テストの Red は実測した。下の「Step 1 の実施結果」**）`contracts/openapi.yaml` に、判断項目 6・7 の応答の形（409 `session.decision_conflict`／`session.decisions_changed` の拡張メンバー、状況の応答の保存者・時刻）を書く。**あわせて、217 行の古い注記「`session.decision_conflict` は仕様に載せるが B1 では起きない」を、現状（共同担当が入る B6 で起きる）に合わせて直す**（Step 0.3 で確認）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）
+- [x] 1.3 🔴（**実施済み（2026-11-15）。新規 17 シナリオのうち 6 件が Failing、11 件が最初から Passing（回帰として残す）。Undefined・Pending・Ambiguous は 0。下の「Step 1 の実施結果」**）`@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）。**最初から Passing のシナリオは、回帰として残す**と明記する（B5 の Step 1 と同じ扱い）
 
 **ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` と応答の形（保存者の出し方。表示名の開示範囲）を確認する。**状態: 人の確認待ち（未承認）。** 結果の記録（Red の実測、最初から Passing のシナリオ、仮置き）は、本書の「Step 1 の実施結果」に、実施後に書く。
+
+### Step 1 の実施結果（2026-11-15。実施者: claude-code/claude-sonnet-5-5）
+
+**実測の事実だけを書く。ゲート 1 の承認は記録していない。Step 2 以降には進んでいない（ドメイン・アプリケーション・HTTP・永続化・UI の実装コードは変更していない）。**
+
+#### 変更したファイル
+
+| 区分 | ファイル | 内容 |
+| :--- | :--- | :--- |
+| 新規（Gherkin） | `features/game-setup/co-assignment.feature` | AC1.2.4（2 人目の割り当て、共同担当がいても開始できる、役割が空なら開始できない）と AC1.2.5 の回帰（共同担当の 1 人を別の役割へ付け替え）。4 シナリオ |
+| 新規（Gherkin） | `features/weekly-play/co-input.feature` | AC2.1.4（2）、AC2.2.3（3）、AC2.2.4（1）、保存回数の上限の共有（2。`@NF-C8`）、`WeekAdvanced`／`DecisionsChanged` の区別（4）。計 12 シナリオ。**背景に、小売店の共同担当「鈴木」を足して開始する**（開始後に共同担当は足せないので、既存の週次の背景は使えない） |
+| 編集（Gherkin） | `features/continuation/credentials.feature` | B5 の回帰: 共同担当のいる役割の入れ替えで、担当者全員の資格が自動で失効する（1 シナリオ。US3.2 のため既存の feature に足した） |
+| 新規（ステップ定義） | `app/src/acceptanceTest/kotlin/beergame/acceptance/CoOperationSteps.kt` | 上の新規ステップの定義。薄く保ち、HTTP を呼んで期待値を確かめるだけ。**判断項目 14 の「見込み」の一覧に無い新規ファイル**（Undefined にしないために必要。ゲート 1 で人が確認する） |
+| 編集（仕様） | `contracts/openapi.yaml` | 下の「応答の形」 |
+| 生成 | `web/src/api/generated/schema.d.ts` | `npm run api:generate` で再生成 |
+| 編集（試験の補助） | `web/src/testing/fakeApi.ts` | `roleStatus()` の既定値に `decisionEditor: null`・`decisionSavedAt: null` を足した（仕様の必須項目の追加で `typecheck` が 3 つのテストファイル・5 か所で落ちたため。**挙動の変更ではなく、型の整合**） |
+
+#### 仕様（`openapi.yaml`）の応答の形（提案。ゲート 1 で人が決める）
+
+| 項目 | 内容 |
+| :--- | :--- |
+| `DecisionEditor`（新規） | `kind`（`PARTICIPANT`／`FACILITATOR_PROXY`）、`isSelf`、`displayName`（`PARTICIPANT` のときだけ。同じ役割の共同担当と進行役にだけ出す。進行役の代理入力は持たない） |
+| `DecisionEntry`（409 の `latest`、`decisions_changed` の `current`） | `editor`（必須）・`savedAt`（必須。date-time）を追加。競合した人自身の入力は応答に含めない |
+| `RoleStatus`（状況の応答） | `decisionEditor`（必須。未入力は null）・`decisionSavedAt`（必須。未入力は null）を追加 |
+| `SessionState` | 参加者だけ、`coHolders`（任意。`CoHolder`＝`displayName`・`isSelf`。参加者の ID は含めない。入れ替えで外れた旧担当者は含めない）を追加 |
+| 古い注記 | 217 行の「`session.decision_conflict` は B1 では起きない」を、B6 の現状（共同担当で起きる。週が先。拒否は版・保存回数を進めない）に直した。`assignRole` に共同担当（AC1.2.4）の説明、`commitWeek` に `current` の中身を追記 |
+| 変えていない | `ErrorCode`（`session.decision_conflict`・`session.decisions_changed`・`session.week_advanced` は B1 から）、経路、ステータス、スキーマ（DB）。判断項目 7 のとおり、イベントに時刻は足さない |
+
+`api:lint`（redocly）は valid。`api:generate` の後、`api:check`（差分 0）は成功。
+
+#### Red の実測（PostgreSQL 18 と H2 の両方で同じ結果）
+
+条件: JDK は Amazon Corretto 21.0.12、Docker 起動中。`./gradlew :app:acceptanceTest :app:acceptanceTestH2`（実行は 2026-11-15）。
+
+| 検査 | 結果（実測） |
+| :--- | :--- |
+| `@api` のシナリオ数 | **87**（B5 終了時の 70 + 新規 17。`@ui` 7 は JVM では skipped）。**81 passed、6 failed**（PostgreSQL・H2 とも同じ） |
+| Undefined・Pending・Ambiguous | **0 件**（`grep` で確認。失敗はすべて `AssertionError`＝Failing） |
+| **Failing の 6 件**（すべて `co-input.feature`） | ①共同担当は、同じ状況・入力値・版を見て…（`coHolders` が状況に無い）／②同じ版から 2 人が保存すると、2 人目は競合し…（409 の `latest` に `editor` が無い。応答は `{"quantity":5,"version":1}`）／③競合した人が、最新の版を指定して保存し直すと…（`decisionEditor` が状況に無い。**保存し直し自体は成功し、入力 77・版 2 までは通る**）／④進行役の代理入力が上書きした後に…（`latest.editor` が無い）／⑤共同担当の一人が保存すると…同じ値・版・保存者（`decisionEditor` が無い）／⑥確認の後に共同担当が保存し直すと…（`current` の保存者が無い） |
+| **最初から Passing の 11 件（回帰として残す）** | `co-assignment.feature` の 4 件（AC1.2.4・AC1.2.5。**実装は B1 から共同担当を拒否していない**ので、要件の v1 の「✗」は、受入の欠落だった）／`credentials.feature` の共同担当の入れ替え 1 件／`co-input.feature` の他の役割への非開示 1 件（**今は何も開示していないので、検査が空振りしていないかは、Step 3 の変異で確かめる**）、保存回数の上限の共有 2 件、`WeekAdvanced`／`DecisionsChanged` の区別 3 件（週が先、確認後の確定、最新の版での確定。**既存のドメイン・HTTP の実装が、すでに正しい**） |
+| 契約テスト（`:app:test`） | 98 件中 **97 件が緑、1 件が Red**: `ApiContractSpec` の「応答の適合」。`GET /sessions/{sessionId}/state 200` が、必須の `roleStatus.decisionEditor`・`decisionSavedAt` を持たないため。**この検査は最初の違反で止まる**ので、保存の 409（`latest` の `editor`・`savedAt`）の違反は、まだ測れていない（状態の応答を直した後に現れる見込み） |
+| 既存テスト（新規 Red 以外） | `:app:test` の 97 件、`@api` の既存 70 シナリオ（両バックエンド）が緑。`web`: `npm run verify`（format・lint・`typecheck`・vitest 109 件・build）が緑（`fakeApi.ts` の整合の後）。`web` の `acceptance:dry-run`: 7 シナリオ・53 ステップで変化なし。ドメイン・アプリケーション・adapter のテストは、仕様に依存しないため、再実行していない（Step 0.4 のベースラインのまま） |
+
+#### 静的解析・規律の機械確認
+
+- `./gradlew ktlintCheck :app:detekt :app:detektMain :app:detektTest pmdTest pmdMain`（JDK 21）: **成功（違反 0）**。新しい試験コード（`CoOperationSteps.kt`）の ktlint 違反（初版 40 件、修正中に 3 件の再発）と detekt の `MaxLineLength` は、編集で解消した。
+- `@Suppress`・`@SuppressWarnings`: `app/src` に **0 件**。ベースライン: 無し。
+- **注意（未達と読まれないための記録）**: `:app:detektAcceptanceTest`（EXPERIMENTAL。Step 0.4 のベースラインの `check` には含まれない）は、**Step 1 の前から**、既存のステップ定義（`ContinuationSteps` の `LargeClass`・`TooManyFunctions`、`RunningApp` の `MagicNumber` など）で失敗する。`CoOperationSteps` も `TooManyFunctions`（48/11）を出す（既存のステップ定義のクラスと同じ分類）。**このタスクの違反 0 は、`check` の対象（`detekt`・`detektMain`・`detektTest`）の範囲**。受入のステップ定義への適用は、人の判断（ゲート 1 の項目 8）。
+- ファイルの編集は Write・Edit のみ（heredoc・python・perl は起動していない。生成は `npm run api:generate` と、手順書にある `okf_apply.py` だけ）。**逸脱（2 件。規律「確認の目的でも起動しない」に反する）**: (1) **`sed` を、ファイルの範囲表示（`sed -n`）とレポートのパスの除去表示（`sed 's#…##'`）に、読み取り専用で複数回起動した**（ファイルは書き換えていない。Read・`grep` で足りた場面があった）。(2) 集計のために `awk` を含むコマンドを 1 回送ったが、**実行前に権限の分類器が拒否し、起動していない**。以降は Read・`grep` だけで確認した。
+- 人の開発サーバー（3000・5173）は止めていない。`@ui` の実ブラウザ実行は、していない（`@ui` のシナリオは足していない）。
+- 承認は、どこにも書いていない。
+
+#### 仮置き・限界
+
+- 応答の形（上の表）は**提案**で、ゲート 1 の前は仮置き。`savedAt` を「必須」にしたが、**値の取得元（`current_decisions.updated_at`）が、409 を返す時点で最新か**は、実装（Step 3・6）で確かめるまで未確認。
+- `coHolders` と `DecisionEditor.displayName` の開示範囲（同じ役割の共同担当と進行役）は、否定テストを Step 3 で項目単位に書く。いまの「他の役割への非開示」のシナリオは、**最初から Passing で、検査が働くことは未確認**。
+- 画面の自動反映（AC2.2.4 の「全員の画面に反映」）は、判断項目 8 の案 C のとおり、**このシナリオ群では確かめていない**（`@api` で同じ値・版・保存者が返ることまで）。
+- 並行の試験は Step 4。Step 1 の Gherkin は、同時の保存を「同じ版を見ていた 2 人の保存」として決定的に再現しており、**実際の並行ではない**。
+
+### ゲート 1 で人が決めること（Step 1 の結果。いずれも未決。承認は記録していない）
+
+| # | 決めること | 現状（AI の案） |
+| :--- | :--- | :--- |
+| 1 | **`WeekAdvanced`／`DecisionsChanged` の区別のシナリオのタグ**（軸 B #B2）。ユーザーストーリーの AC2.3.1 の原文はこの区別を含まない | **案 A（いまの下書き）**: `@AC` を付けず、`@US2.3`（シナリオ側）と、出典（設計判断 D10・テスト戦略）をコメントに書く。**案 B**: `@AC2.3.1` を付ける（`TAGS.md` の「期待値は原文と一致」に反し、`week-commit.feature` の `@AC2.3.1` と意味が混ざる）。**案 C**: 設計判断の ID を持つ新しいタグ（例: `@DD-D10`）を `TAGS.md` に足して使う。**推奨は A のまま確定し、テスト戦略の `[US2.3/AC2.3.1]` を設計書の更新（Step 8.3）で直す**（C は、設計判断のシナリオが他にも出るなら） |
+| 2 | **シナリオの置き場とタグ**: AC2.1.4（US2.1）と区別（US2.3）を、`co-input.feature`（フィーチャー側は `@US2.2`）に、シナリオ側の `@US2.1`・`@US2.3` で置いた。開始後に共同担当を足せず、背景を共有するため。入れ替えの回帰は、US3.2 の `credentials.feature` に足した | このまま。分けるなら、`weekly-play/` に feature をもう 1 つ足す（判断項目 14 の範囲の追加）。ストーリー別の自動抽出がシナリオ側のタグを数えるかの確認は未実施 |
+| 3 | **応答の形**（上の表）: `editor`・`savedAt` を必須にしてよいか。`kind` の値（`PARTICIPANT`・`FACILITATOR_PROXY`）、`isSelf`、進行役の代理入力は表示名を持たない、`decisionEditor`・`decisionSavedAt` の必須化（未入力は null）、`coHolders`（`displayName` と `isSelf` だけ。ID なし） | 提案どおり。**表示名の開示範囲（同じ役割の共同担当と進行役）**は、ここで確認する。観察者・他の役割・無資格には出さない |
+| 4 | **`savedAt` の出どころ**: 409 の `latest` と状況の応答の保存時刻は、投影 `current_decisions.updated_at` から取る（判断項目 7）。ドメインの `DecisionEntry`（イベント）には時刻が無い。投影と競合の時点のずれが、実装で問題になるなら、**封筒の時刻を使うか、`DecisionEntry` に足す（N-1 に影響）かを、そのとき止めて人が決める** | 投影から取る（提案どおり）。未確認の点として Step 3・6 で測る |
+| 5 | **最初から Passing の 11 件を、回帰として残すこと**（特に「非開示」は空振りの恐れがあり、Step 3 の変異で確かめる）。AC1.2.4 は、実装が B1 から正しく、受入が欠けていただけ | 残す |
+| 6 | **新規ファイルの追加の承認**: `CoOperationSteps.kt`（判断項目 14 の見込みの一覧に無い）。`co-assignment.feature`・`co-input.feature` は 14 の範囲 | 承認をお願いします（無いと Undefined になる） |
+| 7 | **`web/src/testing/fakeApi.ts` の編集**（型の整合）。`typecheck` を緑に保つため。画面の振る舞いは変えていない | 承認をお願いします。Step 7 で、この項目を使う試験を足す |
+| 8 | **受入のステップ定義への detekt（`detektAcceptanceTest`）の扱い**: 既存のステップ定義が、Step 1 の前から失敗している（EXPERIMENTAL。`check` の対象外）。本書の「静的解析 違反 0」の範囲を、`check` の対象のままにするか | `check` の対象のまま（現状どおり）。範囲を広げるなら、既存のステップ定義の整理が要り、B6 の範囲を超える |
+| 9 | **共同担当のいる役割の「失効した資格の再送は 403」（完了条件）のシナリオ**: Step 1 では、共同担当の入れ替えの回帰（資格の失効）まで。共同担当の保存を同じ識別子で再送する否定は、Step 6 の HTTP の統合テストで書く計画 | Step 6 のまま。Gherkin に足すなら、いま足す |
+| 10 | **契約テストの Red の範囲**: `ApiContractSpec` は最初の違反で止まる。保存の 409 の本文の違反を、Red として確かめるには、状態の応答を直すまで待つ必要がある。**いま確かめたい場合は、契約テストの対象の呼び出しを分ける（試験コードの変更）** | 待つ（Step 6 の実装で順に Red → Green になる）。Step 1 では試験コードを変えていない |
 
 ### Step 2: ドメイン — 共同入力の判定と版の意味（🔴🟢🟡）
 
@@ -436,6 +509,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
 | 2026-11-15 | **Step 0（0.1〜0.4）を実施**（コード変更なし。**ゲート 0 は人の確認待ち（未承認）。承認は記録していない。Step 1 以降には進んでいない**）。0.1: 判断項目 17 件の決定は上の記録のとおり（チェック）。0.2: `validating-design` を実施（軸 A: OK（観察 2）、軸 B: NG 2、軸 C: NG 2。重大なずれは無し。残る人の判断は 5 項目）。0.3: 設計書のスケッチと実装の差を実ファイルで確認（参加者の投影が共同担当の表示名を含まない、`current_decisions` の保存者の列が読まれていない、`PlayPage` に競合の分岐が無い、など）。0.4: ベースラインを JDK 21 で実測（`check` 緑、domain 402・application 149・adapter-http 80・adapter-persistence 92+80・app 98+1、受け入れ `@api` 70 × 2・`@ui` 7、Kover 全体 98.1%・81.6%・domain 100%、PMD fixture 17 件・違反 0、`web` verify 緑（vitest 109）、`api:check` 差分 0、`@Suppress` 0・ベースライン無し）。**検証による修正**（承認済みの計画への修正のため、**人に再確認を求める**）: ①取り込み表に B5 申し送り 7・判断項目 3(c)・U1 #23 の残りを追加（#C2）、②入れ替えの回帰の「未確認」を事実に置き換え（Gherkin に無い→Step 1.1 で足す）、③ER 図の節の「未確認」を事実に置き換え、④Step 1.1 に `@AC2.3.1` の原文との差の注記（#B2）、⑤Step 1.2 に `openapi.yaml` 217 行の古い注記の修正を追加、⑥事実 #4・#11 を現状に更新。**計画の範囲・Step・判断項目・ゲートは変えていない** | claude-code/claude-sonnet-5-5 |
+| 2026-11-15 | **Step 1（1.1〜1.3）を実施**（仕様と受入シナリオ。実装コードは変更していない。**ゲート 1 は人の確認待ち（未承認）。承認は記録していない。Step 2 以降には進んでいない**）。1.1: Gherkin 3 ファイル（`co-assignment.feature` 4、`co-input.feature` 12、`credentials.feature` に回帰 1）とステップ定義 `CoOperationSteps.kt`。1.2: `openapi.yaml` に `DecisionEditor`・`DecisionEntry` の `editor`／`savedAt`・`RoleStatus` の `decisionEditor`／`decisionSavedAt`・`coHolders` を提案し、217 行の古い注記を修正、`api:lint`・`api:check`（差分 0）成功、契約テスト 1 件が Red。1.3: `@api` 87 シナリオ中 6 件 Failing・11 件が最初から Passing（PostgreSQL 18・H2 で同じ）、Undefined・Pending 0。ゲート 1 で人が決める 10 項目を記録（`@AC2.3.1` のタグの案 A・B・C を含む）。逸脱: `sed` を読み取り表示に使用、`awk` を含むコマンドを送り分類器が拒否 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 0 と、検証による計画の修正の再確認をユーザーが承認し、人の判断 1〜6 を推奨どおりに決定**（選択: 「ゲート 0 と再確認を承認、推奨で決定」）。ゲート 1〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定**（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。**ゲート 0〜8 は未承認**。Step 0 で `validating-design` を実施する | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | 初版作成（AI が提案。**ステップ計画・判断項目 17 件・ゲート 0〜8 は、人の承認待ち**。実装・コード変更は未着手。`validating-design` は未実施で、Step 0 で行う。B5 の申し送り・持ち越しを取り込み表に整理。実コードで現状（`SaveDecision`、`decisionVersions`、`DecisionConflict`、`DecisionsChanged`、`WeekAdvanced`、`ConcurrencyConflict` の再試行、`RetryExhausted`）を確認し、事実として記載） | claude-code/claude-sonnet-5-5 |
