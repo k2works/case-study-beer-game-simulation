@@ -10595,7 +10595,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.3 🟢 TypeScript の型を再生成し、差分 0 の検査を通す</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.4 🟡 リファクタリング。性能: 停止・再開・代理入力は p95 500 ms 以下（NF-P6）。<strong>ローカルの計測値は、実環境の値でないことを明記して記録</strong></li>
 </ul>
-<p><strong>ゲート 6</strong>: API の形（<code>code</code>、ステータス、<code>gameId</code>）と、認可の行列を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 6</strong>: API の形（<code>code</code>、ステータス、<code>gameId</code>）と、認可の行列を、人が確認する。<strong>状態: 2026-11-15 にユーザーが承認した（選択: 「承認」。報告の確認点 1〜5 を報告どおりとして扱う）。不安定な試験（<code>998</code> の検査）を直すかは、指示がなく未決。</strong></p>
 <h4 id="step-6-2026-11-15">Step 6 の実施結果（2026-11-15）<a class="headerlink" href="#step-6-2026-11-15" title="Permanent link">&para;</a></h4>
 <p>実施者: claude-code/claude-sonnet-5-5。<strong>実測の事実だけを書く。ゲート 6 の承認は記録していない。Step 7 以降には進んでいない。スキーマ変更は無い</strong>（確認必須の項目は発生しなかった）。</p>
 <p><strong>手順（TDD）</strong>: 先に <code>ContinuationHttpSpec</code>（<code>testApplication</code>。19 件）を書き、<strong>19 件すべてが失敗する（経路が無い 404、<code>recoveryCode</code> が無い）ことを確認</strong>してから実装した。契約テストの道具（<code>OperationRequest</code>・<code>RequestCase</code>・<code>ApiContractSpec</code> の継続の経路の段階、<code>ContractClient</code> の復帰資格）も、実装の前に足した。<strong>順序を守れなかった箇所</strong>: (1) <code>RequestParsingSpec</code> の新しい解析 4 種の試験、<code>OutcomeCodec</code> の有効期限つきの往復、ロビーの <code>replaced</code> の永続化の契約（H2・PostgreSQL）は、実装のあとに書いた（Red を確認していない。代わりに、規則を壊すと試験が落ちることを下の「ミューテーション」で確かめた）。(2) 受け入れのステップ定義 11 個（役割の入れ替えの 6 シナリオ分）は、Step 3.5.1 が「3.5.2 で足す」としたまま未実施だったため、ここで足した（<code>ContinuationSteps.kt</code>。これを足すまで、受け入れは 71 件中 6 件が Undefined または失敗だった）。</p>
@@ -11313,6 +11313,11 @@
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施</strong>（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。<code>SessionState.Paused</code>、<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code>、<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code>、<code>Editor.ByFacilitator</code>、<code>session.paused</code>・<code>session.not_paused</code>・<code>session.save_limit_reached</code> を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。<code>evolveSession</code> を <code>SessionEvolve.kt</code> へ分割（detekt の指摘の解消）。<code>InvalidTransition</code> の性質テスト（500 回）。永続化の DTO を最小で前倒し。<strong>実測</strong>: domain 300 件・失敗 0・行 879/879（100%）、<code>:app:test</code> は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の <code>code</code> の表・不変条件・差の表を更新</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ゲート 6 をユーザーが承認</strong>（ユーザーの入力: 「承認」。Step 6 の報告の確認点 1〜5 を報告どおりとして記録。資格のある参加者による停止中でないゲームの再開は 409 <code>session.not_paused</code>、<code>bg_recovery</code> の <code>Max-Age</code> は 30 日、新規ファイル 4 点）。<strong>不安定な試験（<code>998</code> の検査）を直すかは、指示がなく未決のまま</strong>。CI は 8 ジョブすべて success（<code>9053387</code>）。ゲート 7・8 は未承認</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>
