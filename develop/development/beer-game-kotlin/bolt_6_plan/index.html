@@ -9576,7 +9576,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<code>validating-design</code>（着手前）は未実施で、Step 0 で行う</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<strong>Step 0（0.1〜0.4）は 2026-11-15 に実施済み</strong>（<code>validating-design</code>（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。<strong>ゲート 0 は人の確認待ち（未承認）。Step 1 以降には進んでいない</strong>）</td>
 </tr>
 </tbody>
 </table>
@@ -9646,7 +9646,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">入れ替え（<code>assignRoleAfterStart</code>）と共同担当。B5 の入れ替えは、<strong>担当者全員が外れる</strong>設計（ゲート 3.5 で承認）で、共同担当の<strong>追加</strong>を含まない（未決）</td>
-<td style="text-align: left;"><strong>取り込む（回帰）</strong>: 共同担当のいる役割の入れ替えで、全員の資格が失効し、写しが更新されることを確かめる（B5 の受入シナリオが共同担当を含むかは<strong>未確認</strong>。Step 0.3）。追加は判断項目 3</td>
+<td style="text-align: left;"><strong>取り込む（回帰）</strong>: 共同担当のいる役割の入れ替えで、全員の資格が失効し、写しが更新されることを確かめる。<strong>Step 0.3 で確認した事実: 受入の Gherkin（<code>credentials.feature</code>）に共同担当を含むシナリオは無い。ドメインの Kotest（<code>ReplaceRoleSpec</code>「共同担当（小売店に参加者 4 と 6）… 担当者全員が外れ、失効する」）にはある</strong>。追加は判断項目 3</td>
 </tr>
 <tr>
 <td style="text-align: left;">試験の道具: <code>credentialConcurrencyContract</code> の待ち合わせ（<code>Barrier</code>・<code>racing</code>）、項目単位の検査 <code>leafValues()</code>・<code>integerValues()</code></td>
@@ -9693,6 +9693,10 @@
 <td style="text-align: left;">範囲外・未割り当て（B12 付近）</td>
 </tr>
 <tr>
+<td style="text-align: left;">B5 終了報告の申し送り 7（<code>Wiring.kt</code>・<code>ServerConfig.kt</code> の設定名は提案のまま）と判断項目 3(c)（設計書のイベント表を生成物への参照に置き換えるか）、U1 総括 #23 の残り（Node 26 の導入と <code>.nvmrc</code>、<code>session_overview.week</code> の最終週）（Step 0.2 の軸 C で、取り込み表に無かったため追加）</td>
+<td style="text-align: left;">範囲外・未割り当て（<strong>割り当ては人が決める</strong>）。ただし、Step 5.6 で <code>COMMAND_MAX_ATTEMPTS</code> の既定値を変えるときは、設定名が提案のままであることを前提に、設計書・手順書と食い違わせない</td>
+</tr>
+<tr>
 <td style="text-align: left;">デモ項目の人の実操作（B5 の申告欄は空）</td>
 <td style="text-align: left;">範囲外（人が行う）。<strong>B6 の終了報告にも申告欄を設け、AI は記入しない</strong></td>
 </tr>
@@ -9733,7 +9737,7 @@
 <p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJTRVFVRU5DRSIgc3R5bGU9IndpZHRoOjczMXB4O2hlaWdodDo2OTdweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNzMxcHgiIGhlaWdodD0iNjk3cHgiIHZpZXdCb3g9IjAgMCA3MzEgNjk3IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjE4My45NzMiIHk9IjI3Ljk5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMzYxLjI4NSIgZm9udC13ZWlnaHQ9IjcwMCI+5YWx5ZCM5YWl5Yqb44Gu5L+d5a2Y44Go56K65a6a44Gu56u25ZCI77yIQjYg44Gn5Zu65a6a44GZ44KL5oyv44KL6Iie44GE77yJPC90ZXh0PjwvZz48ZyBjbGFzcz0icGFydGljaXBhbnQtbGlmZWxpbmUiIGRhdGEtcXVhbGlmaWVkLW5hbWU9IkEiIGRhdGEtZW50aXR5LXVpZD0icGFydDEiIGlkPSJwYXJ0MS1saWZlbGluZSIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PGc+PHRpdGxlPi4uLi4gQTwvdGl0bGU+PHJlY3QgeD0iNDguNTE0IiB5PSIxMjUuODkxIiB3aWR0aD0iOCIgaGVpZ2h0PSI0ODIuMDQ3IiBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9IjAiLz48bGluZSB4MT0iNTIuMDE0IiB5MT0iMTI1Ljg5MSIgeDI9IjUyLjAxNCIgeTI9IjYwNy45MzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41O3N0cm9rZS1kYXNoYXJyYXk6NSw1OyIvPjwvZz48L2c+PGcgY2xhc3M9InBhcnRpY2lwYW50LWxpZmVsaW5lIiBkYXRhLXF1YWxpZmllZC1uYW1lPSJCIiBkYXRhLWVudGl0eS11aWQ9InBhcnQyIiBpZD0icGFydDItbGlmZWxpbmUiIGRhdGEtc291cmNlLWxpbmU9IjMiPjxnPjx0aXRsZT4uLi4uIEI8L3RpdGxlPjxyZWN0IHg9IjE0Mi41NTQiIHk9IjEyNS44OTEiIHdpZHRoPSI4IiBoZWlnaHQ9IjQ4Mi4wNDciIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMCIvPjxsaW5lIHgxPSIxNDYuMDU0IiB5MT0iMTI1Ljg5MSIgeDI9IjE0Ni4wNTQiIHkyPSI2MDcuOTM4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTtzdHJva2UtZGFzaGFycmF5OjUsNTsiLz48L2c+PC9nPjxnIGNsYXNzPSJwYXJ0aWNpcGFudC1saWZlbGluZSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iWCIgZGF0YS1lbnRpdHktdWlkPSJwYXJ0MyIgaWQ9InBhcnQzLWxpZmVsaW5lIiBkYXRhLXNvdXJjZS1saW5lPSI0Ij48Zz48dGl0bGU+ZXhlY3V0ZTwvdGl0bGU+PHJlY3QgeD0iMzY5LjUzMyIgeT0iMTI1Ljg5MSIgd2lkdGg9IjgiIGhlaWdodD0iNDgyLjA0NyIgZmlsbD0iIzAwMCIgZmlsbC1vcGFjaXR5PSIwIi8+PGxpbmUgeDE9IjM3My4wMzMiIHkxPSIxMjUuODkxIiB4Mj0iMzczLjAzMyIgeTI9IjYwNy45MzgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41O3N0cm9rZS1kYXNoYXJyYXk6NSw1OyIvPjwvZz48L2c+PGcgY2xhc3M9InBhcnRpY2lwYW50LWxpZmVsaW5lIiBkYXRhLXF1YWxpZmllZC1uYW1lPSJFIiBkYXRhLWVudGl0eS11aWQ9InBhcnQ0IiBpZD0icGFydDQtbGlmZWxpbmUiIGRhdGEtc291cmNlLWxpbmU9IjUiPjxnPjx0aXRsZT5ldmVudHM8L3RpdGxlPjxyZWN0IHg9IjY0NS4xMzMiIHk9IjEyNS44OTEiIHdpZHRoPSI4IiBoZWlnaHQ9IjQ4Mi4wNDciIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMCIvPjxsaW5lIHgxPSI2NDguNjMzIiB5MT0iMTI1Ljg5MSIgeDI9IjY0OC42MzMiIHkyPSI2MDcuOTM4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTtzdHJva2UtZGFzaGFycmF5OjUsNTsiLz48L2c+PC9nPjxnIGNsYXNzPSJwYXJ0aWNpcGFudCBwYXJ0aWNpcGFudC1oZWFkIiBkYXRhLXF1YWxpZmllZC1uYW1lPSJBIiBkYXRhLWVudGl0eS11aWQ9InBhcnQxIiBpZD0icGFydDEtaGVhZCIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PHJlY3QgeD0iMTAiIHk9Ijk0LjU5NCIgd2lkdGg9Ijg0LjAyNyIgaGVpZ2h0PSIzMC4yOTciIGZpbGw9IiNFMkUyRjAiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjIuNSIgcnk9IjIuNSIvPjx0ZXh0IHg9IjE3IiB5PSIxMTQuNTg5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI3MC4wMjciPuWFseWQjOaLheW9kyBBPC90ZXh0PjwvZz48ZyBjbGFzcz0icGFydGljaXBhbnQgcGFydGljaXBhbnQtaGVhZCIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iQiIgZGF0YS1lbnRpdHktdWlkPSJwYXJ0MiIgaWQ9InBhcnQyLWhlYWQiIGRhdGEtc291cmNlLWxpbmU9IjMiPjxyZWN0IHg9IjEwNC4wMjciIHk9Ijk0LjU5NCIgd2lkdGg9Ijg0LjA1NCIgaGVpZ2h0PSIzMC4yOTciIGZpbGw9IiNFMkUyRjAiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjIuNSIgcnk9IjIuNSIvPjx0ZXh0IHg9IjExMS4wMjciIHk9IjExNC41ODkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjcwLjA1NCI+5YWx5ZCM5ouF5b2TIEI8L3RleHQ+PC9nPjxnIGNsYXNzPSJwYXJ0aWNpcGFudCBwYXJ0aWNpcGFudC1oZWFkIiBkYXRhLXF1YWxpZmllZC1uYW1lPSJYIiBkYXRhLWVudGl0eS11aWQ9InBhcnQzIiBpZD0icGFydDMtaGVhZCIgZGF0YS1zb3VyY2UtbGluZT0iNCI+PHJlY3QgeD0iMzMxLjAzMyIgeT0iNzguMjk3IiB3aWR0aD0iODQiIGhlaWdodD0iNDYuNTk0IiBmaWxsPSIjRTJFMkYwIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIyLjUiIHJ5PSIyLjUiLz48dGV4dCB4PSIzNDQuOTQxIiB5PSI5OC4yOTIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjU2LjE4NSI+ZXhlY3V0ZTwvdGV4dD48dGV4dCB4PSIzMzguMDMzIiB5PSIxMTQuNTg5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI3MCI+77yI5YaN6Kmm6KGM77yJPC90ZXh0PjwvZz48ZyBjbGFzcz0icGFydGljaXBhbnQgcGFydGljaXBhbnQtaGVhZCIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iRSIgZGF0YS1lbnRpdHktdWlkPSJwYXJ0NCIgaWQ9InBhcnQ0LWhlYWQiIGRhdGEtc291cmNlLWxpbmU9IjUiPjx0ZXh0IHg9IjYyMi4wNDkiIHk9IjEwNi4yOTIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjQ3LjE2OCI+ZXZlbnRzPC90ZXh0Pjx0ZXh0IHg9IjU3Ny4wMzQiIHk9IjEyMi41ODkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjEzNy4xOTciPihzZXNzaW9uIOOCueODiOODquODvOODoCk8L3RleHQ+PHBhdGggZD0iTTYzMC42MzMsNTcuMjk3IEM2MzAuNjMzLDQ3LjI5NyA2NDguNjMzLDQ3LjI5NyA2NDguNjMzLDQ3LjI5NyBDNjQ4LjYzMyw0Ny4yOTcgNjY2LjYzMyw0Ny4yOTcgNjY2LjYzMyw1Ny4yOTcgTDY2Ni42MzMsODMuMjk3IEM2NjYuNjMzLDkzLjI5NyA2NDguNjMzLDkzLjI5NyA2NDguNjMzLDkzLjI5NyBDNjQ4LjYzMyw5My4yOTcgNjMwLjYzMyw5My4yOTcgNjMwLjYzMyw4My4yOTcgTDYzMC42MzMsNTcuMjk3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIGZpbGw9IiNFMkUyRjAiLz48cGF0aCBkPSJNNjMwLjYzMyw1Ny4yOTcgQzYzMC42MzMsNjcuMjk3IDY0OC42MzMsNjcuMjk3IDY0OC42MzMsNjcuMjk3IEM2NDguNjMzLDY3LjI5NyA2NjYuNjMzLDY3LjI5NyA2NjYuNjMzLDU3LjI5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiBmaWxsPSJub25lIi8+PC9nPjxnIGNsYXNzPSJwYXJ0aWNpcGFudCBwYXJ0aWNpcGFudC10YWlsIiBkYXRhLXF1YWxpZmllZC1uYW1lPSJBIiBkYXRhLWVudGl0eS11aWQ9InBhcnQxIiBpZD0icGFydDEtdGFpbCIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PHJlY3QgeD0iMTAiIHk9IjYwNy45MzgiIHdpZHRoPSI4NC4wMjciIGhlaWdodD0iMzAuMjk3IiBmaWxsPSIjRTJFMkYwIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIyLjUiIHJ5PSIyLjUiLz48dGV4dCB4PSIxNyIgeT0iNjI3LjkzMyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iNzAuMDI3Ij7lhbHlkIzmi4XlvZMgQTwvdGV4dD48L2c+PGcgY2xhc3M9InBhcnRpY2lwYW50IHBhcnRpY2lwYW50LXRhaWwiIGRhdGEtcXVhbGlmaWVkLW5hbWU9IkIiIGRhdGEtZW50aXR5LXVpZD0icGFydDIiIGlkPSJwYXJ0Mi10YWlsIiBkYXRhLXNvdXJjZS1saW5lPSIzIj48cmVjdCB4PSIxMDQuMDI3IiB5PSI2MDcuOTM4IiB3aWR0aD0iODQuMDU0IiBoZWlnaHQ9IjMwLjI5NyIgZmlsbD0iI0UyRTJGMCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMi41IiByeT0iMi41Ii8+PHRleHQgeD0iMTExLjAyNyIgeT0iNjI3LjkzMyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iNzAuMDU0Ij7lhbHlkIzmi4XlvZMgQjwvdGV4dD48L2c+PGcgY2xhc3M9InBhcnRpY2lwYW50IHBhcnRpY2lwYW50LXRhaWwiIGRhdGEtcXVhbGlmaWVkLW5hbWU9IlgiIGRhdGEtZW50aXR5LXVpZD0icGFydDMiIGlkPSJwYXJ0My10YWlsIiBkYXRhLXNvdXJjZS1saW5lPSI0Ij48cmVjdCB4PSIzMzEuMDMzIiB5PSI2MDcuOTM4IiB3aWR0aD0iODQiIGhlaWdodD0iNDYuNTk0IiBmaWxsPSIjRTJFMkYwIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIyLjUiIHJ5PSIyLjUiLz48dGV4dCB4PSIzNDQuOTQxIiB5PSI2MjcuOTMzIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI1Ni4xODUiPmV4ZWN1dGU8L3RleHQ+PHRleHQgeD0iMzM4LjAzMyIgeT0iNjQ0LjIyOSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iNzAiPu+8iOWGjeippuihjO+8iTwvdGV4dD48L2c+PGcgY2xhc3M9InBhcnRpY2lwYW50IHBhcnRpY2lwYW50LXRhaWwiIGRhdGEtcXVhbGlmaWVkLW5hbWU9IkUiIGRhdGEtZW50aXR5LXVpZD0icGFydDQiIGlkPSJwYXJ0NC10YWlsIiBkYXRhLXNvdXJjZS1saW5lPSI1Ij48dGV4dCB4PSI2MjIuMDQ5IiB5PSI2MjAuOTMzIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI0Ny4xNjgiPmV2ZW50czwvdGV4dD48dGV4dCB4PSI1NzcuMDM0IiB5PSI2MzcuMjI5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSIxMzcuMTk3Ij4oc2Vzc2lvbiDjgrnjg4jjg6rjg7zjg6ApPC90ZXh0PjxwYXRoIGQ9Ik02MzAuNjMzLDY1MC41MzEgQzYzMC42MzMsNjQwLjUzMSA2NDguNjMzLDY0MC41MzEgNjQ4LjYzMyw2NDAuNTMxIEM2NDguNjMzLDY0MC41MzEgNjY2LjYzMyw2NDAuNTMxIDY2Ni42MzMsNjUwLjUzMSBMNjY2LjYzMyw2NzYuNTMxIEM2NjYuNjMzLDY4Ni41MzEgNjQ4LjYzMyw2ODYuNTMxIDY0OC42MzMsNjg2LjUzMSBDNjQ4LjYzMyw2ODYuNTMxIDYzMC42MzMsNjg2LjUzMSA2MzAuNjMzLDY3Ni41MzEgTDYzMC42MzMsNjUwLjUzMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiBmaWxsPSIjRTJFMkYwIi8+PHBhdGggZD0iTTYzMC42MzMsNjUwLjUzMSBDNjMwLjYzMyw2NjAuNTMxIDY0OC42MzMsNjYwLjUzMSA2NDguNjMzLDY2MC41MzEgQzY0OC42MzMsNjYwLjUzMSA2NjYuNjMzLDY2MC41MzEgNjY2LjYzMyw2NTAuNTMxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIGZpbGw9Im5vbmUiLz48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQxIiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzEiIGRhdGEtc291cmNlLWxpbmU9IjciPjxwb2x5Z29uIHBvaW50cz0iMzYxLjAzMywxNTEuMDIzLDM3MS4wMzMsMTU1LjAyMywzNjEuMDMzLDE1OS4wMjMsMzY1LjAzMywxNTUuMDIzIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSI1Mi4wMTQiIHkxPSIxNTUuMDIzIiB4Mj0iMzY3LjAzMyIgeTI9IjE1NS4wMjMiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48dGV4dCB4PSI1OS4wMTQiIHk9IjE0OS45NTgiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjE5My41MzQiPlNhdmVEZWNpc2lvbihleHBlY3RlZD0wLCA1KTwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQyIiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzIiIGRhdGEtc291cmNlLWxpbmU9IjgiPjxwb2x5Z29uIHBvaW50cz0iMzYxLjAzMywxODAuMTU2LDM3MS4wMzMsMTg0LjE1NiwzNjEuMDMzLDE4OC4xNTYsMzY1LjAzMywxODQuMTU2IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIxNDYuMDU0IiB5MT0iMTg0LjE1NiIgeDI9IjM2Ny4wMzMiIHkyPSIxODQuMTU2IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHRleHQgeD0iMTUzLjA1NCIgeT0iMTc5LjA5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxOTMuNTM0Ij5TYXZlRGVjaXNpb24oZXhwZWN0ZWQ9MCwgNyk8L3RleHQ+PC9nPjxnIGNsYXNzPSJtZXNzYWdlIiBkYXRhLWVudGl0eS0xPSJwYXJ0MyIgZGF0YS1lbnRpdHktMj0icGFydDQiIGlkPSJtc2czIiBkYXRhLXNvdXJjZS1saW5lPSI5Ij48cG9seWdvbiBwb2ludHM9IjYzNi42MzMsMjA5LjI4OSw2NDYuNjMzLDIxMy4yODksNjM2LjYzMywyMTcuMjg5LDY0MC42MzMsMjEzLjI4OSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMzczLjAzMyIgeTE9IjIxMy4yODkiIHgyPSI2NDIuNjMzIiB5Mj0iMjEzLjI4OSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjx0ZXh0IHg9IjM4MC4wMzMiIHk9IjIwOC4yMjMiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjE1Mi43NjMiPmFwcGVuZCh2ZXJzaW9uIE4rMSkgQTwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQzIiBkYXRhLWVudGl0eS0yPSJwYXJ0NCIgaWQ9Im1zZzQiIGRhdGEtc291cmNlLWxpbmU9IjEwIj48cG9seWdvbiBwb2ludHM9IjYzNi42MzMsMjM4LjQyMiw2NDYuNjMzLDI0Mi40MjIsNjM2LjYzMywyNDYuNDIyLDY0MC42MzMsMjQyLjQyMiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMzczLjAzMyIgeTE9IjI0Mi40MjIiIHgyPSI2NDIuNjMzIiB5Mj0iMjQyLjQyMiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjx0ZXh0IHg9IjM4MC4wMzMiIHk9IjIzNy4zNTYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjE1Mi43ODgiPmFwcGVuZCh2ZXJzaW9uIE4rMSkgQjwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQ0IiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzUiIGRhdGEtc291cmNlLWxpbmU9IjExIj48cG9seWdvbiBwb2ludHM9IjM4NC4wMzMsMjg3LjM0NCwzNzQuMDMzLDI5MS4zNDQsMzg0LjAzMywyOTUuMzQ0LDM4MC4wMzMsMjkxLjM0NCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMzc4LjAzMyIgeTE9IjI5MS4zNDQiIHgyPSI2NDcuNjMzIiB5Mj0iMjkxLjM0NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1kYXNoYXJyYXk6MiwyOyIvPjx0ZXh0IHg9IjM5MC4wMzMiIHk9IjI2Ni40ODkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjI0Ni41NjIiPkIg44GvIHVxX2V2ZW50c19zdHJlYW1fdmVyc2lvbiDjga7pgZXlj408L3RleHQ+PHRleHQgeD0iMzkwLjAzMyIgeT0iMjg1LjMzNCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNyIgdGV4dExlbmd0aD0iMTkzLjUwOCIgZm9udC13ZWlnaHQ9IjcwMCI+Q29uY3VycmVuY3lDb25mbGljdDwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQzIiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzYiIGRhdGEtc291cmNlLWxpbmU9IjEyIj48bGluZSB4MT0iMzczLjAzMyIgeTE9IjMyMC40NzciIHgyPSI0MTUuMDMzIiB5Mj0iMzIwLjQ3NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxsaW5lIHgxPSI0MTUuMDMzIiB5MT0iMzIwLjQ3NyIgeDI9IjQxNS4wMzMiIHkyPSIzMzMuNDc3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PGxpbmUgeDE9IjM3NC4wMzMiIHkxPSIzMzMuNDc3IiB4Mj0iNDE1LjAzMyIgeTI9IjMzMy40NzciIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjM4NC4wMzMsMzI5LjQ3NywzNzQuMDMzLDMzMy40NzcsMzg0LjAzMywzMzcuNDc3LDM4MC4wMzMsMzMzLjQ3NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48dGV4dCB4PSIzODAuMDMzIiB5PSIzMTUuNDExIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNjEuNiI+QiDjgpLlho3oqabooYzvvIjoqq3jgb/nm7TjgZcg4oaSIGRlY2lkZSDjgpLlho3oqZXkvqHvvIk8L3RleHQ+PC9nPjxnIGNsYXNzPSJtZXNzYWdlIiBkYXRhLWVudGl0eS0xPSJwYXJ0MyIgZGF0YS1lbnRpdHktMj0icGFydDIiIGlkPSJtc2c3IiBkYXRhLXNvdXJjZS1saW5lPSIxMyI+PHBvbHlnb24gcG9pbnRzPSIxNTcuMDU0LDM3My43NDIsMTQ3LjA1NCwzNzcuNzQyLDE1Ny4wNTQsMzgxLjc0MiwxNTMuMDU0LDM3Ny43NDIiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjE1MS4wNTQiIHkxPSIzNzcuNzQyIiB4Mj0iMzcyLjAzMyIgeTI9IjM3Ny43NDIiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtZGFzaGFycmF5OjIsMjsiLz48dGV4dCB4PSIxNjMuMDU0IiB5PSIzNTcuNTQzIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxMDQuNjYiPkRlY2lzaW9uQ29uZmxpY3Q8L3RleHQ+PHRleHQgeD0iMTYzLjA1NCIgeT0iMzcyLjY3NiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMTgwLjgzMiI+77yI5pyA5paw5YCkIDXjg7vniYggMeODu+S/neWtmOiAhSBB77yJPC90ZXh0PjwvZz48cGF0aCBkPSJNMzc4LjAzMywzOTAuNzQyIEwzNzguMDMzLDQzMC43NDIgTDY1OS4wMzMsNDMwLjc0MiBMNjU5LjAzMyw0MDAuNzQyIEw2NDkuMDMzLDM5MC43NDIgTDM3OC4wMzMsMzkwLjc0MiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiBmaWxsPSIjRkVGRkREIi8+PHBhdGggZD0iTTY0OS4wMzMsMzkwLjc0MiBMNjQ5LjAzMyw0MDAuNzQyIEw2NTkuMDMzLDQwMC43NDIgTDY0OS4wMzMsMzkwLjc0MiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiBmaWxsPSIjRkVGRkREIi8+PHRleHQgeD0iMzg0LjAzMyIgeT0iNDA3LjgwOSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMTk1Ij7nq7blkIjjgZfjgZ/lgbTjga7lgKTjga/pu5njgaPjgabmjajjgabjgarjgYQ8L3RleHQ+PHRleHQgeD0iMzg0LjAzMyIgeT0iNDIyLjk0MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjYwIj7vvIjlv5znrZTjgavmnIDmlrDlgKTjgpLov5TjgZnjgILnlLvpnaLjga/lhaXlipvjgpLkv53mjIHvvIk8L3RleHQ+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQxIiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzgiIGRhdGEtc291cmNlLWxpbmU9IjE1Ij48cG9seWdvbiBwb2ludHM9IjM2MS4wMzMsNDUzLjE0MSwzNzEuMDMzLDQ1Ny4xNDEsMzYxLjAzMyw0NjEuMTQxLDM2NS4wMzMsNDU3LjE0MSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iNTIuMDE0IiB5MT0iNDU3LjE0MSIgeDI9IjM2Ny4wMzMiIHkyPSI0NTcuMTQxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHRleHQgeD0iNTkuMDE0IiB5PSI0NTIuMDc1IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyOTcuMDIiPkNvbW1pdFdlZWsocmVxdWVzdGVkV2Vlaz0xLCBiYXNpcz3niYggMCk8L3RleHQ+PC9nPjxnIGNsYXNzPSJtZXNzYWdlIiBkYXRhLWVudGl0eS0xPSJwYXJ0MyIgZGF0YS1lbnRpdHktMj0icGFydDEiIGlkPSJtc2c5IiBkYXRhLXNvdXJjZS1saW5lPSIxNiI+PHBvbHlnb24gcG9pbnRzPSI2My4wMTQsNDk3LjQwNiw1My4wMTQsNTAxLjQwNiw2My4wMTQsNTA1LjQwNiw1OS4wMTQsNTAxLjQwNiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iNTcuMDE0IiB5MT0iNTAxLjQwNiIgeDI9IjM3Mi4wMzMiIHkyPSI1MDEuNDA2IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWRhc2hhcnJheToyLDI7Ii8+PHRleHQgeD0iNjkuMDE0IiB5PSI0ODEuMjA4IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxMjAuMTQyIj5EZWNpc2lvbnNDaGFuZ2VkPC90ZXh0Pjx0ZXh0IHg9IjY5LjAxNCIgeT0iNDk2LjM0IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxOTUiPu+8iOmAseOBr+WQjOOBmOOBp+OAgeagueaLoOOBrueJiOOBjOmBleOBhu+8iTwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQxIiBkYXRhLWVudGl0eS0yPSJwYXJ0MyIgaWQ9Im1zZzEwIiBkYXRhLXNvdXJjZS1saW5lPSIxNyI+PHBvbHlnb24gcG9pbnRzPSIzNjEuMDMzLDU0MS42NzIsMzcxLjAzMyw1NDUuNjcyLDM2MS4wMzMsNTQ5LjY3MiwzNjUuMDMzLDU0NS42NzIiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjUyLjAxNCIgeTE9IjU0NS42NzIiIHgyPSIzNjcuMDMzIiB5Mj0iNTQ1LjY3MiIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjx0ZXh0IHg9IjU5LjAxNCIgeT0iNTI1LjQ3MyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjM5Ljc0NSI+Q29tbWl0V2VlayhyZXF1ZXN0ZWRXZWVrPTEsIC4uLik8L3RleHQ+PHRleHQgeD0iNTkuMDE0IiB5PSI1NDAuNjA2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxOTUiPu+8iOWIpeOBruODl+ODreOCu+OCueOBjOWFiOOBq+eiuuWumua4iOOBv++8iTwvdGV4dD48L2c+PGcgY2xhc3M9Im1lc3NhZ2UiIGRhdGEtZW50aXR5LTE9InBhcnQzIiBkYXRhLWVudGl0eS0yPSJwYXJ0MSIgaWQ9Im1zZzExIiBkYXRhLXNvdXJjZS1saW5lPSIxOCI+PHBvbHlnb24gcG9pbnRzPSI2My4wMTQsNTg1LjkzOCw1My4wMTQsNTg5LjkzOCw2My4wMTQsNTkzLjkzOCw1OS4wMTQsNTg5LjkzOCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iNTcuMDE0IiB5MT0iNTg5LjkzOCIgeDI9IjM3Mi4wMzMiIHkyPSI1ODkuOTM4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWRhc2hhcnJheToyLDI7Ii8+PHRleHQgeD0iNjkuMDE0IiB5PSI1NjkuNzM5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxMDAuODIiPldlZWtBZHZhbmNlZDwvdGV4dD48dGV4dCB4PSI2OS4wMTQiIHk9IjU4NC44NzIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjI2Ny4yNzUiPu+8iOmAseOBjOmBleOBhuOAgkRlY2lzaW9uc0NoYW5nZWQg44Gn44Gv44Gq44GE77yJPC90ZXh0PjwvZz48P3BsYW50dW1sLXNyYyBaTERUSnpERzZCeGxocFpYUWVrbW0wTVFjQ29hZFJscm5XanRHSzlnVXUxNnJldHNSQzZ4ZGpRSDhZS0kxMTQxN0lXVlpXbWFDS09Ta2xfWXVSSlQ1Tl8xenhHM3FHbHFmWC1kSnYtRnp1Q09QMWVadFpaWEltNWx4RkJkNnVtVWROVXRVRmlyZW1WSHBaVC16MFBFZWlDbFZDY19FRkVMc3VaSFZSd0hkZ3lwVG80Q1prNFEtc3lQVk5QbkRZekxMT2lPY2I1TEpPODZLazltZVM2X2xxSm8wNTlqOUQtMEsxQTR5WVMycHNBakhsMk8yVjl5Ulo3LWsxVGwxdzJLTzRrSWhYQnJpTWZaMERRbklVbW5Dc0Rac3BPZzljQmtBVkR5dmhNT1R5UXlQWlJ2ZW9YOUNYZ3dYcWhlQmRnZXJsNXpoMWEyZFM2cExRbUhoRVU3MXo1ZUxiQi0yUmdKYktlMkwwSUdNZ3JZS3lfS2lQS2VGeFdyYWVNYUR0dk1mMjhRd2NpZUtETFpMOWlQSnBFQ3N5SjJRZGR5NFd5VHdENUxfYzlucENvWkdpTktRZlE1SlVxZkY0dkM2bmY5WFZmNHhsQXJBbGJuZ3lyZUR6aHVwRVdRLVpjdFo3SThla0Noc0VodlpzdEhqYkJZSEc2QW93b052NGRYbXFxZFZGTTlFbl9HQUZDd3FSb0ZIazJVM2FoaUQ5MGlFQ21BbVNXbzlnUzhnYW1hVGpBdjBNYjZ0dDRBN2V3MDBnQnNFa2tDbGNUcUJybXlXMmtaQlBZVWpDRlRwUVl6bWtaWGJJOHVaUmloT2pXU0RyaGZ6QlBzV0EwX2ctdW9NMFczQWpJbGtiZ2ViQ2k2VU9KbmF1bzVQc2hPWGR3OWpfcDg4ODk5Q1VveXkzLVN4TVVNaHNNczJyRWdFT2RybjRoRkVINUFJbTZaaTBweHBBNVh5cEhTUThmemM4VEcwVkk0cVJkX3JpeGJTamFxZXh5QjdDblJPcndSa0hxbmZYSXMzb1dGcXVxQmx5OXB6dFRSWDROMThranJyVElrcy1qeFdEQnk3SzdpQVRYRkltaktsbTAwPz48L2c+PC9zdmc+" class="uml" alt="uml diagram" title="" /></p>
 <p><code>session</code> ストリームは 1 ゲームに 1 本で、<strong>役割をまたぐ保存も同じ版を取り合う</strong>（<code>uq_events_stream_version</code> は <code>(game_id, stream_type, stream_version)</code>）。したがって再試行の頻度は、同じ役割の共同担当の人数だけでなく、<strong>4 役割と共同担当の同時の書き手の総数</strong>で決まる（Step 5 の計測の設計の前提）。<strong>PlantUML の描画での構文確認は未実施</strong>（B1〜B5 から続く未確認事項）。</p>
 <h3 id="er-15">ER 図（変わらない見込み。判断項目 15）<a class="headerlink" href="#er-15" title="Permanent link">&para;</a></h3>
-<p><strong>確認した事実</strong>: <code>current_decisions</code>（V004）は <code>(game_id, role)</code> で、<code>quantity</code>・<code>decision_version</code>・<code>editor_kind</code>・<code>editor_id</code>・<code>updated_at</code> を持つ。保存者・時刻を応答に返すために、<strong>列の追加は要らない見込み</strong>。表示名は周辺ストア（<code>participants</code>）から結合する（B1 の設計。イベントに表示名を入れない。ADR-002）。<strong>未確認</strong>: 表示名の結合の経路（<code>Disclosure.kt</code> が読むポート）。Step 0.3 で確かめる。<strong>スキーマ変更が要るとわかった場合は、確認必須で、人に決めてもらう</strong>（番号は共通 006 を B11 の予約として避ける）。</p>
+<p><strong>確認した事実</strong>: <code>current_decisions</code>（V004）は <code>(game_id, role)</code> で、<code>quantity</code>・<code>decision_version</code>・<code>editor_kind</code>・<code>editor_id</code>・<code>updated_at</code> を持つ。保存者・時刻を応答に返すために、<strong>列の追加は要らない見込み</strong>。表示名は周辺ストア（<code>participants</code>）から結合する（B1 の設計。イベントに表示名を入れない。ADR-002）。<strong>Step 0.3 で確認した事実</strong>: 表示名の結合は、ロビーの行だけ <code>JdbcProjectionReader</code> の <code>PARTICIPANTS_SQL</code>（<code>lobby_participants</code> と <code>display_profiles</code> の LEFT JOIN）で行われ、<strong><code>current_decisions</code> の <code>editor_kind</code>・<code>editor_id</code>・<code>updated_at</code> は読まれていない</strong>（<code>DECISIONS_SQL</code> は <code>role, week, quantity, decision_version</code> だけ。<code>ProjectedDecision</code> は <code>week</code>・<code>quantity</code>・<code>version</code>）。<strong>参加者の投影（<code>SnapshotView.Participant</code>）は他の参加者の表示名を含まない</strong>（データモデルの開示表は「ロビー（自分の役割と共同担当）」を参加者に開示するとしており、<strong>設計と実装に差がある</strong>）。したがって、保存者を返すには、読み取りの型・問い合わせ・開示の規則を足す必要があり、<strong>スキーマの変更は要らない見込みのまま</strong>（列は既にある）。<strong>スキーマ変更が要るとわかった場合は、確認必須で、人に決めてもらう</strong>（番号は共通 006 を B11 の予約として避ける）。</p>
 <h3 id="ui-9">画面遷移図（変わる。UI を含める場合のみ。判断項目 9）<a class="headerlink" href="#ui-9" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -9886,14 +9890,115 @@
 <li><strong>人の開発サーバー（ポート 3000・5173）は止めない。E2E は専用のポート（3100・5273）</strong>。</li>
 <li><strong>承認を先回りして書かない</strong>。承認は、ユーザーが指示した範囲を、更新履歴に記録する。</li>
 </ul>
-<h3 id="step-0-validating-design">Step 0: 着手前の確認（<code>validating-design</code>）（未実施）<a class="headerlink" href="#step-0-validating-design" title="Permanent link">&para;</a></h3>
+<h3 id="step-0-validating-design2026-11-15-0">Step 0: 着手前の確認（<code>validating-design</code>）（実施済み・2026-11-15。ゲート 0 は人の確認待ち）<a class="headerlink" href="#step-0-validating-design2026-11-15-0" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.1 判断項目 1〜17 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.2 <strong><code>validating-design</code> を、着手前に実施し、結果を本書に記録する</strong>（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ B1〜B5 の計画・終了報告・U1 総括）。<strong>NG が 0 件、または、残る項目を人が判断済み</strong>であることを、着手の条件にする。<strong>本書の作成者は、<code>validating-design</code> を実施していない</strong>（下の「計画作成時に確認した事実」は、実コードと設計書の確認であり、検証の結果ではない）。<strong>軸 C の照合対象に、上の取り込み表の全行を含める</strong></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.3 設計書のスケッチと実装の差を、実ファイルで確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に: (a) 表示名の結合の経路（<code>Disclosure.kt</code> が読むポートと、同じ役割の共同担当だけに見せられるか）、(b) <code>AssignRole</code> が準備中に複数人を受け付ける事実と、<code>features/</code> の既存の入れ替えのシナリオが共同担当を含むか、(c) <code>PlayPage.tsx</code> に <code>session.decision_conflict</code> の分岐があるか（<code>grep</code> では <code>session.week_advanced</code> だけが見つかった）、(d) <code>maxAttempts</code> の既定値と上限の範囲（<code>ServerConfig.kt</code>）、(e) 版の意味（判断項目 5）が、共同担当で変わらないこと</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.4 <strong>現状のベースラインを実測して記録する</strong>（コード変更なし）: 既存の全テスト・静的解析・Kover が緑であること、<code>:app:acceptanceTest</code>（PostgreSQL 18）と <code>:app:acceptanceTestH2</code> のシナリオ数（B5 終了時: <code>@api</code> 70、<code>@ui</code> 7）。B6 の追加分と区別するため</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.1 判断項目 1〜17 を、人が決める（<strong>2026-11-15 に、ユーザーが 17 件すべてを計画の「提案」列どおりに決定した。更新履歴に記録済み</strong>。ゲートの承認は含まない）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.2 <strong><code>validating-design</code> を、着手前に実施し、結果を本書に記録する</strong>（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ B1〜B5 の計画・終了報告・U1 総括）。<strong>NG が 0 件、または、残る項目を人が判断済み</strong>であることを、着手の条件にする。<strong>実施した（2026-11-15）。結果は下の「設計整合性の検証結果（着手前）」。NG は 4 件（軸 B 2 件・軸 C 2 件）。軸 C の 2 件と軸 B の 1 件は本書を修正し、残る 2 項目（軸 B #B1 の 4 図の形式、#B2 の <code>@AC2.3.1</code> タグ）は人の判断待ち</strong>。軸 C の照合対象に、上の取り込み表の全行を含めた</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.3 設計書のスケッチと実装の差を、実ファイルで確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に: (a)〜(e)。<strong>結果は下の「Step 0.3 の実施結果」</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.4 <strong>現状のベースラインを実測して記録する</strong>（コード変更なし）。<strong>結果は下の「Step 0.4 の実施結果（ベースライン）」</strong>。<code>:app:acceptanceTest</code>（PostgreSQL 18）と <code>:app:acceptanceTestH2</code> の <code>@api</code> は各 70、<code>@ui</code> は 7（JVM では skipped）で、B5 終了時と一致</li>
 </ul>
 <p><strong>ゲート 0</strong>: 判断項目の決定と、<code>validating-design</code> の結果を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<h3 id="step-0-2026-11-15-claude-codeclaude-sonnet-5-5">Step 0 の実施結果（2026-11-15。実施者: claude-code/claude-sonnet-5-5。コード変更なし）<a class="headerlink" href="#step-0-2026-11-15-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
+<p><strong>実測の事実だけを書く。ゲート 0 の承認は記録していない。Step 1 以降には進んでいない。</strong></p>
+<h4 id="step-03">Step 0.3 の実施結果（設計書のスケッチと実装の差）<a class="headerlink" href="#step-03" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">確認した事実（実ファイル）</th>
+<th style="text-align: left;">計画への影響</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">(a) 表示名の結合の経路</td>
+<td style="text-align: left;">表示名は <code>JdbcProjectionReader</code> の <code>PARTICIPANTS_SQL</code>（<code>lobby_participants</code> と <code>display_profiles</code> の LEFT JOIN）でロビーの行にだけ付く。<strong><code>DECISIONS_SQL</code> は <code>role, week, quantity, decision_version</code> だけを読み、<code>current_decisions</code> の <code>editor_kind</code>・<code>editor_id</code>・<code>updated_at</code> は読まれていない</strong>（<code>ProjectedDecision</code> は <code>week</code>・<code>quantity</code>・<code>version</code>）。<code>RoleStatus</code> に保存者は無い。<strong><code>SnapshotView.Participant</code> は「他の参加者の表示名を含まない」と明記され、データモデルの開示表（参加者にはロビー（自分の役割と共同担当）を開示）と差がある</strong>。ドメインの <code>DecisionEntry.editor</code>（<code>Editor.ByParticipant(id)</code>／<code>ByFacilitator(gameId)</code>）は表示名を持たない（ADR-002）</td>
+<td style="text-align: left;">保存者を返すには、(1) 読み取りの型と SQL に <code>editor_*</code>・<code>updated_at</code> を足し、(2) <code>display_profiles</code> の結合を足し、(3) <code>Disclosure</code> に「同じ役割の共同担当にだけ」の規則を足す。<strong>スキーマの変更は要らない</strong>（列は V004 にある。判断項目 15 の提案どおり）。409 の本文の保存者は、ドメインのエラー（<code>DecisionConflict.latest.editor</code> は ID）から、HTTP またはアプリケーションの層で表示名に解決する必要がある（現在の <code>entryJson</code> は ID も表示名も出さない）。Step 3・6 の設計で扱う。ER 図の節の「未確認」を、この事実に置き換えた</td>
+</tr>
+<tr>
+<td style="text-align: left;">(b) <code>AssignRole</code> の複数人受付と、既存の入れ替えのシナリオ</td>
+<td style="text-align: left;">準備中の <code>AssignRole</code>（<code>Game.kt</code>）は、既存の担当者を検査せず、<code>previous == command.role</code> なら空、<code>previous == null</code> なら <code>RoleAssigned</code>、別の役割なら <code>RoleUnassigned</code> + <code>RoleAssigned</code>（D9）。<code>startGame</code> は <code>assignments[it].isEmpty()</code> の役割を <code>StartConditionNotMet</code> にするだけ（<code>StartGame.kt</code>）。<strong><code>features/</code> に共同担当を含むシナリオは無い</strong>（<code>共同</code>・<code>AC1.2.4</code>・<code>AC2.1.4</code>・<code>AC2.2.3</code>・<code>AC2.2.4</code> の grep が、<code>joining.feature</code> の AC1.2.5 のコメントだけ）。入れ替えの Gherkin（<code>credentials.feature</code>）は担当が 1 人の役割だけ。<strong>ドメインの Kotest <code>ReplaceRoleSpec</code> には「共同担当（小売店に参加者 4 と 6）… 入れ替え … 担当者全員が外れ、失効する」がある</strong></td>
+<td style="text-align: left;">取り込み表の「未確認」を事実に置き換えた。AC1.2.4 の受入シナリオは Step 1 で新規に書く（実装は変わらない見込み）。入れ替えの回帰は、ドメインにあり、<strong>受入（HTTP を通した）のシナリオは Step 1.1 の最後の項目で足す</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">(c) <code>PlayPage</code> の <code>session.decision_conflict</code> の分岐</td>
+<td style="text-align: left;"><code>web/src/features/play/PlayPage.tsx</code> の <code>handleSaveFailure</code> は、422（<code>quantity</code>）・<code>session.week_advanced</code>・<code>session.paused</code>・その他（<code>setFailure</code>）の 4 つ。<strong>競合は「その他」で、辞書（<code>web/src/api/problems.ts</code>）の「他の人が先に保存しました。」が出るだけ</strong>。最新値・保存者・自分の入力・選択肢（「最新の値を使う」「この値で保存し直す」）は未実装。<code>ConsolePage.tsx</code> は <code>session.decisions_changed</code>・<code>session.week_advanced</code> の分岐を持つ</td>
+<td style="text-align: left;">Step 7 は新規の実装（UI 設計の S05 の競合の表示）。<code>PlayPage.test.tsx</code> に <code>week_advanced</code> の試験はあるが、競合の試験は無い</td>
+</tr>
+<tr>
+<td style="text-align: left;">(d) <code>maxAttempts</code> の既定値と範囲</td>
+<td style="text-align: left;"><code>ServerConfig.kt</code>: <code>DEFAULT_MAX_ATTEMPTS = 5</code>、環境変数 <code>COMMAND_MAX_ATTEMPTS</code>、範囲 <code>1..Int.MAX_VALUE</code>（上限なし）。<code>AppPorts.kt</code> の <code>maxAttempts</code> は既定を持たない（コメントは「設計書が実装開始時に決めるとする未決」）。<code>Execute.kt</code> の <code>withAppendRetry</code> は <code>ConcurrencyConflict</code> だけを再試行し、<code>remaining &gt; 1</code> で再帰、尽きたら <code>RetryExhausted</code>。<strong>間隔・ジッターは無い</strong>。試験の補助 <code>AppTestKit</code> の既定は 3</td>
+<td style="text-align: left;">計画の記述と一致。値は計測の後に決める（判断項目 10）</td>
+</tr>
+<tr>
+<td style="text-align: left;">(e) 版の意味</td>
+<td style="text-align: left;"><code>DecisionVersion</code> は役割ごと（<code>decisionVersions: RoleMap</code>）で、<code>DecisionSaved</code> ごとに <code>current.next()</code>、代理入力（<code>ProxyDecisionSubmitted</code>）も <code>next()</code>。週の確定（<code>SessionData</code> の次の週への更新、<code>Session.kt</code> 98 行）で <code>ZERO</code> に戻る。保存の判定順は <code>saveDecisionEvents</code> で、<strong>週（<code>WeekAdvanced</code>）→ 版（<code>DecisionConflict</code>）→ 上限（<code>SaveLimitReached</code>）</strong>。拒否は <code>ensure</code> の失敗でイベントを返さないため、<strong>版も回数も進まない</strong>。上限 <code>SAVE_LIMIT_PER_ROLE_WEEK = 9</code> は <code>hasSaveCapacity</code>（<code>decisionVersions[role] &lt; 9</code>）。<strong>版は役割単位なので、共同担当で共有される</strong>。<code>CommitWeek</code> の判定順は、週 → <code>command.basis == data.decisionVersions</code>（<code>DecisionsChanged</code>）で、設計判断 D10 と一致</td>
+<td style="text-align: left;">判断項目 5 の「版の意味は変わらない」が成り立つ。B6 のドメインの変更は小さい見込み（Step 2 の「何も変わらない」も結論）</td>
+</tr>
+</tbody>
+</table>
+<p>追加で確認した事実: (1) <code>contracts/openapi.yaml</code> の 217 行に、<code>session.decision_conflict</code> を「仕様に載せるが B1 では起きない」とする古い注記が残る（Step 1.2 で直す。<strong>本書に反映済み</strong>）。(2) 409 の拡張メンバー <code>latest</code> は <code>quantity</code> と <code>version</code> だけ（<code>openapi.yaml</code> 763 行付近、<code>ProblemMapping.kt</code> の <code>entryJson</code>）。保存者・時刻は無い。(3) 道具: <code>credentialConcurrencyContract</code>・<code>Barrier</code>・<code>racing</code>・<code>integerValues</code> は <code>adapter-persistence</code> の <code>ApplicationFlowContract.kt</code>（<code>credentialConcurrencyContract</code> は <code>PostgresPersistenceSpec.kt</code> から呼ばれる）、<code>leafValues</code> は <code>app</code> の <code>AppTestKit.kt</code>（<code>HttpFlowSpec</code>・<code>PostgresHttpSpec</code> が使う）。</p>
+<h4 id="step-04">Step 0.4 の実施結果（ベースライン。コード変更なし）<a class="headerlink" href="#step-04" title="Permanent link">&para;</a></h4>
+<p><strong>実行の条件</strong>: <code>apps/beer-game-kotlin</code>、JDK は Amazon Corretto 21.0.12（<code>JAVA_HOME</code> を指定。既定の <code>java</code> は 25 のため、<strong>detekt を含む全タスクを JDK 21 で実行</strong>）。Docker（Testcontainers の PostgreSQL 18）は起動中。Node は v24.11.0（<code>web</code> の <code>engines</code> は <code>^24 || &gt;=26</code> を許す。B5 で使った Node 26 ではない）。2026-11-15 20:15〜20:30（JST）に実行。<code>git status</code> で、<code>apps/</code> 配下に変更が無いことを確認した（<code>build/</code>・<code>dist/</code> は無視対象）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">検査</th>
+<th style="text-align: left;">実行したコマンド</th>
+<th style="text-align: left;">結果（実測）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">全テスト・整形・静的解析・Kover・受け入れ</td>
+<td style="text-align: left;"><code>./gradlew check -x pmd --continue --rerun-tasks</code>（約 9 分 44 秒、112 タスクすべて実行）</td>
+<td style="text-align: left;"><strong>BUILD SUCCESSFUL</strong>。ktlint・detekt（5 モジュール × <code>detekt</code>・<code>detektMain</code>・<code>detektTest</code>）・<code>koverVerify</code>・<code>integrationTest</code>・<code>acceptanceTest</code>・<code>acceptanceTestH2</code> を含む</td>
+</tr>
+<tr>
+<td style="text-align: left;">PMD・fixture・Kover の XML</td>
+<td style="text-align: left;"><code>./gradlew integrationTest acceptanceTest acceptanceTestH2 koverVerify koverXmlReport detekt detektMain detektTest pmdFixtureTest pmdDomainApplication pmdAdapter pmdMain pmdTest --continue</code>（約 4 分 27 秒。テスト系は上の実行で最新のため UP-TO-DATE）</td>
+<td style="text-align: left;"><strong>BUILD SUCCESSFUL</strong>。PMD: fixture は期待どおり 17 件、<code>pmdDomainApplication</code>・<code>pmdAdapter</code>・<code>pmdMain</code>・<code>pmdTest</code> は違反なし</td>
+</tr>
+<tr>
+<td style="text-align: left;">JVM のテスト件数（XML の集計）</td>
+<td style="text-align: left;"><code>build/test-results/*/TEST-*.xml</code></td>
+<td style="text-align: left;">domain <strong>402</strong>、application <strong>149</strong>、adapter-http <strong>80</strong>、adapter-persistence <strong>92</strong>（H2）+ <strong>80</strong>（PostgreSQL 18、<code>integrationTest</code>）、app <strong>98</strong> + <strong>1</strong>（<code>integrationTest</code>）、受け入れ <strong>77 × 2</strong>（<code>acceptanceTest</code>＝PostgreSQL、<code>acceptanceTestH2</code>＝H2。<strong>各 skipped 7＝<code>@ui</code></strong>）。<strong>失敗 0、エラー 0</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">受け入れのシナリオ数</td>
+<td style="text-align: left;"><code>acceptanceTest</code>・<code>acceptanceTestH2</code> の XML</td>
+<td style="text-align: left;"><strong><code>@api</code> 70（各バックエンドで実行）</strong>、<code>@ui</code> 7（JVM では skipped。<code>web</code> の Cucumber-JS が担当）。<strong>B5 終了時（<code>@api</code> 70、<code>@ui</code> 7）と一致</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">Kover</td>
+<td style="text-align: left;"><code>build/reports/kover/report.xml</code>、<code>domain/build/reports/kover/report.xml</code></td>
+<td style="text-align: left;">全体 行 <strong>98.1%</strong>（4174/4253）、分岐 <strong>81.6%</strong>（1133/1389）。domain 行 <strong>100%</strong>（1038/1038）、分岐 258/263。ゲート（domain 100%、全体 85%・75%）を通過</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>@Suppress</code>・ベースライン</td>
+<td style="text-align: left;"><code>grep -rnE "^\s*@(file:)?Suppress\(\|@SuppressWarnings"</code>、<code>find -name '*baseline*'</code></td>
+<td style="text-align: left;">注釈は <strong>0 件</strong>（<code>@Suppress</code> の語は、使わない旨のコメント 5 件にだけある）。ベースラインのファイルは <strong>無し</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>web</code></td>
+<td style="text-align: left;"><code>npm run verify</code>（<code>format:check</code>・<code>lint</code>（<code>--max-warnings=0</code>）・<code>typecheck</code>・<code>test</code>・<code>build</code>）、<code>npm run api:check</code></td>
+<td style="text-align: left;"><strong>成功</strong>。vitest <strong>8 ファイル・109 件</strong>、<code>api:check</code> は差分 0（<code>schema.d.ts</code> は <code>openapi.yaml</code> から生成した内容と一致）</td>
+</tr>
+<tr>
+<td style="text-align: left;">未実行</td>
+<td style="text-align: left;"><code>web</code> の <code>npm run acceptance</code>（<code>@ui</code> 7 シナリオ・実ブラウザ）、GitHub Actions 上の実行</td>
+<td style="text-align: left;"><strong>未実行・未確認</strong>（<code>@ui</code> はブラウザと専用ポート（3100・5273）のサーバーが要る。B5 の実測 7 シナリオ・53 ステップは、本実測では再確認していない）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>注意（誤読の防止）</strong>: 上の値は<strong>ローカル（開発機、逐次に近い負荷）</strong>の実測で、CI（GitHub Actions）・実環境の値ではない。B6 の追加分と区別するための<strong>基準値</strong>である。</p>
+<h4 id="step-0">Step 0 の規律の自己確認<a class="headerlink" href="#step-0" title="Permanent link">&para;</a></h4>
+<ul>
+<li>ファイルの編集は Write・Edit のみ。heredoc・python・sed・perl・awk は起動していない（<code>okf_apply.py</code> は手順書の指定のスクリプトで、本書の更新に使う）。件数の集計は <code>grep</code>・<code>paste</code>・<code>bc</code> で行った。</li>
+<li>コード・設定・仕様・設計書・ADR は変更していない。変更したのは本書（<code>bolt_6_plan.md</code>）だけ。</li>
+<li>人の開発サーバー（3000・5173）は止めていない（起動していなかった。<code>lsof</code> で確認）。E2E も実行していない。</li>
+<li>逸脱: (1) 最初の <code>gradle</code> のバックグラウンド起動が、サブシェルを使ったためすぐに完了通知を返した（実行は継続しており、ログのファイルで完了を確認した）。(2) Node を B5 の 26 でなく 24.11 で実行した（<code>engines</code> の範囲内）。(3) <code>web</code> の <code>acceptance</code>（<code>@ui</code>）は、ブラウザ・専用ポートが要るため実行していない。</li>
+</ul>
 <h3 id="step-1-api">Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）<a class="headerlink" href="#step-1-api" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.1 🔴 日本語 Gherkin を書く（AC1.2.4、AC2.1.4、AC2.2.3、AC2.2.4。<strong>原文の意味と一致</strong>させる。解釈の差は、シナリオの直前にコメントで書く）。配置は <code>features/game-setup/</code>（AC1.2.4）と <code>features/weekly-play/</code>（AC2.1.4・2.2.3・2.2.4。<code>TAGS.md</code> の領域の一覧は変更不要の見込み）。<strong>最低限含めるシナリオ</strong>:</li>
@@ -9901,10 +10006,10 @@
 <li>AC2.1.4: 共同担当が、同じ状況・入力値・版を見る／<strong>他の役割の参加者は、その役割の保存者・版を見られない</strong>（否定）</li>
 <li>AC2.2.3: 同じ版から 2 人が保存すると、2 人目は競合し、<strong>最新値と保存者</strong>が示される。<strong>黙って失われた更新が無い</strong>（最新の値は 1 人目のまま）。競合した人の入力は応答に含まれず、画面が保持する（API では、再度の保存が最新の版を指定して成功する）。代理入力が共同担当の入力を上書きした後の保存は競合し、保存者は進行役の代理入力と示される</li>
 <li>AC2.2.4: 共同担当の一人が保存すると、同じ役割の別の共同担当が取得した状況は、同じ値と版になる（<code>@api</code>。画面の自動反映は判断項目 8 の案による）</li>
-<li><strong><code>WeekAdvanced</code> と <code>DecisionsChanged</code> の区別</strong>（設計の AC2.3.1。タグは <code>@AC2.3.1</code>、解釈の差はコメント）: 確定の根拠にした入力が、共同担当の保存で変わったあとの確定は <code>DecisionsChanged</code>（現在の値と保存者を返す）／別の確定で週が進んだあとの確定は <code>WeekAdvanced</code>／<strong>両方に当てはまる場合は週が先</strong>（<code>WeekAdvanced</code>）</li>
+<li><strong><code>WeekAdvanced</code> と <code>DecisionsChanged</code> の区別</strong>（設計の AC2.3.1。タグは <code>@AC2.3.1</code>、解釈の差はコメント。<strong>Step 0.2 の軸 B で判明: ユーザーストーリーの AC2.3.1 の原文は「4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される」で、この区別を含まない。<a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> が <code>[US2.3/AC2.3.1]</code> の名で置いている。<code>week-commit.feature</code> はすでに <code>@AC2.3.1</code> を原文の意味で使っている。<code>TAGS.md</code> は「期待値は原文の意味と一致」と定めるため、この区別のシナリオに <code>@AC2.3.1</code> を付けるか（原文と別の意味になる）、タグを付けず <code>@NF-</code> 系や設計判断 D10 の ID を使うかは、ゲート 1 で人が決める</strong>）: 確定の根拠にした入力が、共同担当の保存で変わったあとの確定は <code>DecisionsChanged</code>（現在の値と保存者を返す）／別の確定で週が進んだあとの確定は <code>WeekAdvanced</code>／<strong>両方に当てはまる場合は週が先</strong>（<code>WeekAdvanced</code>）</li>
 <li>保存回数の上限が、共同担当で共有される（B5 の AC 外の確認。判断項目 5）。拒否された保存は上限を消費しない</li>
-<li>共同担当のいる役割の入れ替えで、担当者全員が外れ、旧担当者の資格が失効する（B5 の回帰。未確認の場合のみ）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.2 🔴 <code>contracts/openapi.yaml</code> に、判断項目 6・7 の応答の形（409 <code>session.decision_conflict</code>／<code>session.decisions_changed</code> の拡張メンバー、状況の応答の保存者・時刻）を書く。契約テストを回し、<strong>実装が無いので失敗する（Red）</strong>ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）</li>
+<li>共同担当のいる役割の入れ替えで、担当者全員が外れ、旧担当者の資格が失効する（B5 の回帰。<strong>Step 0.3 で確認: 受入の Gherkin には無い（ドメインの Kotest にだけある）ので、Step 1 で足す</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.2 🔴 <code>contracts/openapi.yaml</code> に、判断項目 6・7 の応答の形（409 <code>session.decision_conflict</code>／<code>session.decisions_changed</code> の拡張メンバー、状況の応答の保存者・時刻）を書く。<strong>あわせて、217 行の古い注記「<code>session.decision_conflict</code> は仕様に載せるが B1 では起きない」を、現状（共同担当が入る B6 で起きる）に合わせて直す</strong>（Step 0.3 で確認）。契約テストを回し、<strong>実装が無いので失敗する（Red）</strong>ことを確認する（応答の形の変更が、既存の契約テストをどう落とすかを実測で記録する）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.3 🔴 <code>@api</code> のシナリオが、Undefined・Pending でなく <strong>Failing</strong> になることを確認する（Undefined → Pending → Failing → Passing の順）。<strong>最初から Passing のシナリオは、回帰として残す</strong>と明記する（B5 の Step 1 と同じ扱い）</li>
 </ul>
 <p><strong>ゲート 1</strong>（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、<strong>実装の前に</strong>人が検証して合意する。原文との照合（解釈の差）、<code>code</code> と応答の形（保存者の出し方。表示名の開示範囲）を確認する。<strong>状態: 人の確認待ち（未承認）。</strong> 結果の記録（Red の実測、最初から Passing のシナリオ、仮置き）は、本書の「Step 1 の実施結果」に、実施後に書く。</p>
@@ -10073,8 +10178,169 @@
 </table>
 <hr />
 <h2 id="validating-design">設計整合性の検証結果（着手前。<code>validating-design</code>）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
-<p><strong>Step 0.2 で実施する。2026-11-15 時点では未実施。</strong> 結果は、軸ごとの OK / NG と不整合の件数、一覧（不整合の内容、計画の記述、正しい記述と出典、修正の要否）、人の判断待ちを、ここに記録する。<strong>承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める</strong>（<a href="../development_strategy/">開発戦略</a>の「不整合の扱い」）。</p>
-<h3 id="step-0">計画作成時に確認した事実（検証の結果ではない。Step 0 の入力）<a class="headerlink" href="#step-0" title="Permanent link">&para;</a></h3>
+<p><strong>Step 0.2 で実施した（2026-11-15。実施者: claude-code/claude-sonnet-5-5）。</strong> 軸 A・B・C のすべてを、実ファイル（開発戦略、設計書、ADR、B1〜B5 の計画・終了報告、U1 総括、実コード、<code>features/</code>、<code>contracts/openapi.yaml</code>）と突き合わせた（サブエージェントは使っていない。<code>validating-iteration-plan</code> のフィールド単位の突合は行っていない）。<strong>承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める</strong>（<a href="../development_strategy/">開発戦略</a>の「不整合の扱い」）。</p>
+<h3 id="_9">検証対象<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Bolt 計画: <code>docs/development/beer-game-kotlin/bolt_6_plan.md</code></li>
+<li>局面（開発戦略）: <strong>中盤</strong>（B5〜B12）、アプローチ: <strong>インサイドアウト</strong></li>
+</ul>
+<h3 id="_10">検証結果サマリー<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">軸</th>
+<th style="text-align: left;">検証対象</th>
+<th style="text-align: center;">結果</th>
+<th style="text-align: center;">不整合件数</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">A</td>
+<td style="text-align: left;">開発戦略 ↔ 本書</td>
+<td style="text-align: center;">OK</td>
+<td style="text-align: center;">0 件（観察 2 件）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B</td>
+<td style="text-align: left;">本書 ↔ 設計書・ADR</td>
+<td style="text-align: center;">NG</td>
+<td style="text-align: center;">2 件（#B1 は人の判断待ち、#B2 は注記を追加・タグは人の判断待ち）</td>
+</tr>
+<tr>
+<td style="text-align: left;">C</td>
+<td style="text-align: left;">本書 ↔ B1〜B5 の計画・終了報告・U1 総括</td>
+<td style="text-align: center;">NG</td>
+<td style="text-align: center;">2 件（いずれも本書を修正済み）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>合計 NG 4 件。修正済み 3 件（#B2 の注記、#C1、#C2）。人の判断待ちが残る項目は 2 つ（#B1、#B2 のタグ）。重大なずれ（戦略や設計そのものの見直しが要るもの）は無い。</strong></p>
+<h3 id="a-ok-2">軸 A: 開発戦略との整合（OK。観察 2 件）<a class="headerlink" href="#a-ok-2" title="Permanent link">&para;</a></h3>
+<p>確認した事項（すべて一致）: B6 は中盤（インサイドアウト）。受け入れ基準の元（開発戦略の B6: AC1.2.4、AC2.1.4、AC2.2.3、AC2.2.4。並行の統合テスト。<code>RetryExhausted</code> の発生率）と、本書の対象の受入条件・完了条件が同じ。ワークフロー（ドメイン → 永続化 → 投影 → アプリケーション → HTTP → 画面）と、本書の Step 2〜7 の順（並行・計測の Step 4・5 が永続化と HTTP の間）が一致。高リスクの Bolt（B6）で否定テスト・並行テストを実装より先に書く、層ごとの承認ゲート、仕様（<code>openapi.yaml</code>）が先で契約テスト・型の差分 0、デモ項目を受け入れ基準にして実操作の申告欄を設ける、<code>validating-design</code> を着手前と完了時に実施、静的解析の違反 0・ベースラインなし・<code>@Suppress</code> なし、Living Documentation（<code>@EventSpec</code>・<code>@Term</code>）の方針。Gherkin は実装の前に書いて合意し、Bolt の最後に Cucumber で結合を確認する（Step 1 のゲート 1 と Step 8.1）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">観察</th>
+<th style="text-align: left;">扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">A1</td>
+<td style="text-align: left;">開発戦略の中盤の「対象ストーリー」（413 行）は「US1.2（共同）、US2.2（共同）」で、<strong>US2.1 を含まない</strong>。一方、同じ戦略の「Bolt ごとの受け入れ基準の元」の B6 の行（242 行）とリリース計画は AC2.1.4（US2.1）を含む。本書はリリース計画・戦略の表に従っている</td>
+<td style="text-align: left;"><strong>本書の誤りではない</strong>。戦略の対象ストーリーの行の軽微な不備（US2.1 の共同表示が漏れている）。<strong>戦略（承認済み）は本書では変更しない。人の判断（次の戦略の更新時に直すか）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">A2</td>
+<td style="text-align: left;">本書の <code>@AC2.3.1</code> の区別のシナリオ（<code>WeekAdvanced</code>・<code>DecisionsChanged</code>）は、戦略の B6 の受け入れ基準の元に無い。リリース計画の B6 の目標（「<code>WeekAdvanced</code> と <code>DecisionsChanged</code> の区別」）には含まれる</td>
+<td style="text-align: left;">一致（リリース計画の記述）。タグの扱いは軸 B の #B2</td>
+</tr>
+</tbody>
+</table>
+<h3 id="b-adr-ng-2">軸 B: 設計書・ADR との整合（NG 2 件）<a class="headerlink" href="#b-adr-ng-2" title="Permanent link">&para;</a></h3>
+<p>確認した事項（一致）: ADR-005 の B6 の検証 3 項目（同じ役割の 2 人の同時保存、競合を続けたときの <code>app.retry_exhausted</code>、<code>uq_idempotency_create</code>・<code>pk_idempotency_records</code> の同時の重複）は、Step 4 の (a)(c)(d) が網羅する。制約名 3 つと 40001・40P01・55P03 の扱い（データモデル、アーキテクチャ（バックエンド））。<code>current_decisions</code> の列（<code>editor_kind</code>・<code>editor_id</code>・<code>updated_at</code>）、V004、マイグレーション番号 006 が B11 の予約（007・008 は B5 で使用済み）、次の ADR は 019（018 まで）、ADR-005 の状態は提案中（索引）。<code>CommitWeek</code> の判定順（週 → 基準の版）、<code>WeekAdvanced</code>・<code>DecisionsChanged</code>・<code>DecisionConflict</code> の分類と <code>code</code>（ドメインモデル、UI 設計の競合の表と辞書）。保存回数 9 回と「版 = 回数」（ドメインモデルの差の表 34、NF-C8）。NF-R14・NF-P13・NF-C2・NF-C3・NF-C8 の記述。UI 設計 S05 の共同入力の競合の文言・選択肢・代理入力の上書き（M10）・保存者が自分のとき（L1）。テスト戦略の NF-P13 の計測は夜間・NF-R14 の並行は毎回（本書のリスクの「計測は CI の常時の対象にしない」と整合）。設計書の更新は、Step 8.3 の変更表で扱う。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不整合内容</th>
+<th style="text-align: left;">本書の記述</th>
+<th style="text-align: left;">正しい記述（出典）</th>
+<th style="text-align: left;">修正要否</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">B1</td>
+<td style="text-align: left;"><strong>「4 図」のうち 3 つが PlantUML でない</strong>。開発戦略の軸 B は、当該 Bolt のスコープの 4 図（ドメインモデル図・状態遷移図・ER 図・画面遷移図）が計画の「設計」節にあることを求める。本書の「設計」節は、状態遷移図だけが PlantUML（シーケンス図）で、ドメインモデル・ER・画面遷移は<strong>表</strong>。<strong>B5 の計画も同じ形式</strong>（<code>@startuml</code> は 1 つ。承認済み）</td>
+<td style="text-align: left;">「ドメインモデル図」「ER 図」「画面遷移図」の節が表</td>
+<td style="text-align: left;"><code>development_strategy.md</code>（設計整合性の検証、軸 B）、<code>validating-design</code>（軸 B の【絶対項目】は 4 図を PlantUML で掲載）</td>
+<td style="text-align: left;"><strong>人の判断待ち</strong>。B6 は状態・コマンド・イベント・スキーマを足さない案で、変わる点が小さいため、表で足りるとする（B5 と同じ運用）か、3 図を PlantUML で足すかを人が決める。<strong>本書は修正していない</strong>（足す場合も、PlantUML の描画の確認は B1 から未実施のまま）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B2</td>
+<td style="text-align: left;"><strong><code>@AC2.3.1</code> の意味の食い違い</strong>。ユーザーストーリーの AC2.3.1 の原文は「4 役割の入力が完了して週を確定すると、12 ステップ順の遅延・入荷・出荷・在庫・受注残・費用が、一度の取引で保存される」で、<code>WeekAdvanced</code>／<code>DecisionsChanged</code> の区別を含まない。テスト戦略の例は、この区別を <code>[US2.3/AC2.3.1]</code> と名付けている。<code>week-commit.feature</code> は <code>@AC2.3.1</code> を原文の意味で使用済み。<code>TAGS.md</code> は「シナリオの期待値は、受入条件の原文と意味が一致していること」と定める</td>
+<td style="text-align: left;">Step 1.1 は「タグは <code>@AC2.3.1</code>、解釈の差はコメント」</td>
+<td style="text-align: left;"><code>user_story.md</code>（AC2.3.1、AC2.3.2）、<code>features/TAGS.md</code>、<code>test-strategy.md</code>（174・176 行。設計側のタグ付けの誤りの可能性）</td>
+<td style="text-align: left;"><strong>注記を追加（修正済み）</strong>: Step 1.1 に、原文との差と、「付けるか、別の ID を使うか」をゲート 1 で人が決めることを書いた。<strong>タグの最終決定は人の判断待ち</strong>（設計書のテスト戦略の記述の直しも、人が決める）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="c-bolt-u1-ng-2">軸 C: 過去の Bolt の計画・終了報告・U1 総括との整合（NG 2 件）<a class="headerlink" href="#c-bolt-u1-ng-2" title="Permanent link">&para;</a></h3>
+<p>確認した事項（一致）: 命名（<code>DecisionConflict</code>・<code>DecisionsChanged</code>・<code>WeekAdvanced</code>・<code>hasSaveCapacity</code>・<code>SAVE_LIMIT_PER_ROLE_WEEK</code>・<code>assignRoleAfterStart</code>・<code>Editor.ByParticipant</code>／<code>ByFacilitator</code>）が B1・B5 の計画と実コードで一致。B5 の「保存回数は版と同じ。共同入力が版の意味を変えるなら、そのとき回数を分ける」（B5 計画 2.5、ドメインモデル差の表 34）→ 判断項目 5 と取り込み表に反映済み。B1 の「共同担当は拒否しない。B6 で扱う」（B1 計画 757 行）→ 判断項目 3。B1 の「共同担当の競合の画面は B6」（B1 計画 503 行）→ Step 7。B1 終了報告の「実 DB の並行下の検証（冪等記録の同時の重複）は未実施」→ Step 4 (d)。B5 の複数タブ（AC3.2.3）は B5 で <code>recovery.feature</code> に実装済みで、B6 に持ち越されていない。B5 終了報告の「未達・未実施」（11 行）と「B6 への申し送り」（1〜6）の各項目、「人の判断が要る項目」の #5・6・7・8・9・10・11 は、取り込み表または判断項目にある。<strong>U1 総括の学び 7（申し送りは項目として取り込むか範囲外と明記する）に従い、取り込み表の全行を照合した</strong>。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不整合内容</th>
+<th style="text-align: left;">本書の記述</th>
+<th style="text-align: left;">正しい記述（出典）</th>
+<th style="text-align: left;">修正要否</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">C1</td>
+<td style="text-align: left;">計画作成時の事実 #11 の記述が、B5 終了報告の現状と合わない。終了報告の完了条件の表（26 行）には、承認済みの注記（「2026-11-15 にユーザーが承認した（下の記述は承認前のもの）」）が<strong>すでにある</strong>。残っているのは「人の判断が要る項目」#2（117 行）の承認前の記述</td>
+<td style="text-align: left;">「終了報告は『提案中』とするが…」（注記の有無に触れていない）</td>
+<td style="text-align: left;"><code>bolt_5_report.md</code> 26 行・117 行</td>
+<td style="text-align: left;"><strong>修正済み</strong>（事実 #11 を現状に合わせた）。終了報告 #2 の更新は人の判断（本書では変更しない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">C2</td>
+<td style="text-align: left;"><strong>取り込み表に無い申し送りがあった</strong>: (1) B5 終了報告の申し送り 7（<code>Wiring.kt</code>・<code>ServerConfig.kt</code> の設定名は提案のまま）。B6 は <code>COMMAND_MAX_ATTEMPTS</code> の既定値を変えうるため関係する。(2) B5 終了報告の判断項目 3(c)（設計書のイベント表を生成物への参照に置き換えるか）。(3) U1 総括の持ち越し #23 の残り（Node 26 の導入と <code>.nvmrc</code>、<code>session_overview.week</code> の最終週）</td>
+<td style="text-align: left;">該当する行が無い</td>
+<td style="text-align: left;"><code>bolt_5_report.md</code>（B6 への申し送り 7、判断項目 3）、<code>unit_u1_summary.md</code>（#23）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（取り込み表に 1 行を足し、範囲外・未割り当て（割り当ては人が決める）と明記）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-02">実施後に残る、人の判断が要る項目（Step 0.2 の結果）<a class="headerlink" href="#step-02" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">AI の提案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">軸 B #B1: 4 図の形式</td>
+<td style="text-align: left;">3 図が表のまま（B5 と同じ形式）</td>
+<td style="text-align: left;">表のままでよいか、PlantUML を足すかを、人が決める（足す場合も描画の確認は未実施）</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">軸 B #B2: <code>@AC2.3.1</code> のタグ</td>
+<td style="text-align: left;">原文と別の意味になる</td>
+<td style="text-align: left;">ゲート 1 で決める。設計書（テスト戦略）の <code>[US2.3/AC2.3.1]</code> の記述の直しも含む</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">軸 A #A1: 戦略の対象ストーリー</td>
+<td style="text-align: left;">US2.1 が漏れている（軽微）</td>
+<td style="text-align: left;">戦略の次の更新時に直すか、人が決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">設計と実装の差（Step 0.3 (a)）</td>
+<td style="text-align: left;">設計は参加者にロビー（自分の役割と共同担当）を開示するが、実装の参加者の投影は他の参加者の表示名を含まない</td>
+<td style="text-align: left;">B6 の Step 3 で実装して埋める（提案どおり）。データモデルの開示表と実装の差を、Step 8.3 の変更表に残す</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">B5 終了報告 #2 の記述</td>
+<td style="text-align: left;">承認前の「提案中」が残る（#C1）</td>
+<td style="text-align: left;">終了報告の更新は人の判断</td>
+</tr>
+</tbody>
+</table>
+<h3 id="step-0-step-0203-411">計画作成時に確認した事実（検証の結果ではない。Step 0 の入力。Step 0.2・0.3 で再確認し、#4・#11 を更新した）<a class="headerlink" href="#step-0-step-0203-411" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -10105,9 +10371,9 @@
 </tr>
 <tr>
 <td style="text-align: left;">4</td>
-<td style="text-align: left;"><code>PlayPage.tsx</code> に <code>session.week_advanced</code> の分岐は見つかったが、<code>session.decision_conflict</code> の分岐は <code>grep</code> で見つからなかった（辞書には文言がある）</td>
+<td style="text-align: left;"><code>PlayPage.tsx</code>（実際の場所は <code>web/src/features/play/PlayPage.tsx</code>）に <code>session.week_advanced</code> の分岐は見つかったが、<code>session.decision_conflict</code> の分岐は <code>grep</code> で見つからなかった（辞書には文言がある）</td>
 <td style="text-align: left;"><code>PlayPage.tsx</code></td>
-<td style="text-align: left;">Step 0.3（c）。画面の競合の表示が未実装かを確認</td>
+<td style="text-align: left;">Step 0.3（c）。<strong>確認済み: <code>handleSaveFailure</code> の分岐は 422（<code>quantity</code>）・<code>session.week_advanced</code>・<code>session.paused</code>・その他（<code>setFailure</code>）だけ。競合は「その他」で、辞書の文言「他の人が先に保存しました。」が出るだけ。最新値・保存者・自分の入力を並べる表示と選択肢は未実装</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">5</td>
@@ -10147,7 +10413,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">11</td>
-<td style="text-align: left;"><strong>B5 終了報告の記述と、他の記録の食い違い</strong>: 終了報告は「ADR-015・016・017・018 は提案中」とするが、B5 計画の更新履歴と ADR の一覧は「承認済み」とする（ゲート 8 の後の承認）</td>
+<td style="text-align: left;"><strong>B5 終了報告の記述と、他の記録の食い違い</strong>: 終了報告の「人の判断が要る項目」#2（117 行）は「ADR-015・016・017・018 は提案中」のまま（承認前の記述）で、B5 計画の更新履歴と ADR の一覧は「承認済み」とする（ゲート 8 の後の承認）。<strong>終了報告の完了条件の表（26 行）には「2026-11-15 にユーザーが承認した（下の記述は承認前のもの）」の注記がすでにある</strong>（Step 0.2 の軸 C で再確認。判断項目 #2 の記述の更新は人の判断で、本書では変更しない）</td>
 <td style="text-align: left;"><code>bolt_5_report.md</code>、<code>bolt_5_plan.md</code>、ADR の一覧</td>
 <td style="text-align: left;">軸 C。終了報告の更新は人の判断（本書では変更しない）</td>
 </tr>
@@ -10160,7 +10426,7 @@
 </tbody>
 </table>
 <hr />
-<h2 id="_9">更新履歴<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<h2 id="_11">更新履歴<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10170,6 +10436,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>Step 0（0.1〜0.4）を実施</strong>（コード変更なし。<strong>ゲート 0 は人の確認待ち（未承認）。承認は記録していない。Step 1 以降には進んでいない</strong>）。0.1: 判断項目 17 件の決定は上の記録のとおり（チェック）。0.2: <code>validating-design</code> を実施（軸 A: OK（観察 2）、軸 B: NG 2、軸 C: NG 2。重大なずれは無し。残る人の判断は 5 項目）。0.3: 設計書のスケッチと実装の差を実ファイルで確認（参加者の投影が共同担当の表示名を含まない、<code>current_decisions</code> の保存者の列が読まれていない、<code>PlayPage</code> に競合の分岐が無い、など）。0.4: ベースラインを JDK 21 で実測（<code>check</code> 緑、domain 402・application 149・adapter-http 80・adapter-persistence 92+80・app 98+1、受け入れ <code>@api</code> 70 × 2・<code>@ui</code> 7、Kover 全体 98.1%・81.6%・domain 100%、PMD fixture 17 件・違反 0、<code>web</code> verify 緑（vitest 109）、<code>api:check</code> 差分 0、<code>@Suppress</code> 0・ベースライン無し）。<strong>検証による修正</strong>（承認済みの計画への修正のため、<strong>人に再確認を求める</strong>）: ①取り込み表に B5 申し送り 7・判断項目 3(c)・U1 #23 の残りを追加（#C2）、②入れ替えの回帰の「未確認」を事実に置き換え（Gherkin に無い→Step 1.1 で足す）、③ER 図の節の「未確認」を事実に置き換え、④Step 1.1 に <code>@AC2.3.1</code> の原文との差の注記（#B2）、⑤Step 1.2 に <code>openapi.yaml</code> 217 行の古い注記の修正を追加、⑥事実 #4・#11 を現状に更新。<strong>計画の範囲・Step・判断項目・ゲートは変えていない</strong></td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定</strong>（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。<strong>ゲート 0〜8 は未承認</strong>。Step 0 で <code>validating-design</code> を実施する</td>
