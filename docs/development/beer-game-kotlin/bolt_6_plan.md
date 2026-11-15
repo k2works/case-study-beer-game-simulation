@@ -3,8 +3,10 @@ type: Plan
 title: "Bolt 6 計画 - 共同担当と共同入力（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 6（Unit U2 の 2 つ目の Bolt）のステップ計画。同一役割に複数人の共同担当、意思決定の版による競合の検出（DecisionConflict）、WeekAdvanced と DecisionsChanged の区別、制約ごとの再試行・再照合、並行の統合テスト、RetryExhausted の発生率の計測。提案。人の承認待ち。"
 tags: [plan]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:59:55Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T11:14:27Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-15T11:14:28Z }
 ---
 
 # Bolt 6 計画 - 共同担当と共同入力
@@ -19,7 +21,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T10:59:55Z }
 | 日程（仮定） | リリース計画の稼働日の目安は、累計 15 日目・2026-12-04 終了（B5 の後。B5 は B4 より先に実施済みなので、この日付は使えない）。実施日は着手時に人が決める。リリース計画の日程・進捗の更新は、人の判断待ち |
 | ゲート密度 | **密**（リリース計画の「B6 は高リスク（並行性）」。ステップごとに人が検証する）。B5 のゲート 0〜8 は人が通した実績があるが、並行の試験と計測は AI の自己申告が効きにくいため、密度は下げない |
 | アプローチ | 中盤（[開発戦略](./development_strategy.md)）。**インサイドアウト**（ドメイン → 永続化・投影 → 並行の試験と計測 → アプリケーション・HTTP → UI）。仕様（`contracts/openapi.yaml`）と日本語 Gherkin を先に書き、契約テストを Red にしてから実装する。**否定テストと並行テストを実装より先に書く**（開発戦略の中盤の手順の要点） |
-| 状態 | **提案。人の承認待ち。** ステップ計画・判断項目・ゲートは、いずれも承認を受けていない。実装・コード変更は未着手（本書の作成のみ）。`validating-design`（着手前）も未実施で、Step 0 で行う |
+| 状態 | **ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。** 実装・コード変更は未着手。`validating-design`（着手前）は未実施で、Step 0 で行う |
 
 > **承認の状態について**: 本書の「提案」は AI の案で、承認ではありません。承認は、ユーザーが指示した範囲だけを、更新履歴に記録します。各ゲートは「人の確認待ち（未承認）」です。
 
@@ -339,4 +341,5 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **ステップ計画をユーザーが承認し、着手前の判断項目 17 件を、計画の「提案」列どおりに決定**（選択: 「計画を承認し、17 件を提案どおりに決定」。ゲートは含まない）。**ゲート 0〜8 は未承認**。Step 0 で `validating-design` を実施する | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | 初版作成（AI が提案。**ステップ計画・判断項目 17 件・ゲート 0〜8 は、人の承認待ち**。実装・コード変更は未着手。`validating-design` は未実施で、Step 0 で行う。B5 の申し送り・持ち越しを取り込み表に整理。実コードで現状（`SaveDecision`、`decisionVersions`、`DecisionConflict`、`DecisionsChanged`、`WeekAdvanced`、`ConcurrencyConflict` の再試行、`RetryExhausted`）を確認し、事実として記載） | claude-code/claude-sonnet-5-5 |
