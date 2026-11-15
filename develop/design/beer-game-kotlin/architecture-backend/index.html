@@ -10633,7 +10633,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">秘匿</td>
-<td style="text-align: left;">DTO に、表示名・資格の値・招待コードの値のフィールドを<strong>持たせない</strong>（型で防ぐ）</td>
+<td style="text-align: left;"><strong>永続化の DTO（イベント）</strong> に、表示名・資格の値・招待コードの値のフィールドを<strong>持たせない</strong>（型で防ぐ）。応答の本文には、再発行・作成の復帰コードを一度だけ載せる例外がある（上の「応答とスナップショット」。HTTP の応答の層だけで、イベントには入らない）</td>
 </tr>
 </tbody>
 </table>
@@ -10717,7 +10717,7 @@
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;"><code>PUT /games/:id/participants/:pid/role</code></td>
-<td style="text-align: left;"><code>AssignRole</code>（<code>game</code>）</td>
+<td style="text-align: left;"><code>AssignRole</code>（準備中は <code>game</code>。<strong>開始後は役割の入れ替えで、<code>game</code> + <code>session</code> の 2 ストリーム</strong>。B5 Step 3.5。アプリケーション層が、ゲームの状態で <code>decideGame</code> と <code>assignRoleAfterStart</code> を呼び分ける。提案。ゲート 3.5 で人が確認する）</td>
 <td style="text-align: left;">進行役</td>
 </tr>
 <tr>
@@ -10830,7 +10830,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>B1 の実装で確定した、経路の補足（2026-11-14）。</strong> (1) <code>SaveDecision</code> の <code>role</code> は本文に持たせず、<strong>認証つきの <code>snapshot</code> で参加者の役割を引いてから</strong> <code>saveDecision</code> を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) <code>GET /sessions/:id/state</code> の <code>?role=</code>（他の役割の取得。AC2.1.2）は、自分の役割と違えば <code>game.forbidden</code>（HTTP では <code>app.unauthorized</code>）。(3) <code>POST /games</code> の応答は <code>versions</code> だけで、ゲームの ID は <code>Location</code>（<code>/api/v1/games/{id}/state</code>）、資格は <code>Set-Cookie</code>。参加の応答は <code>versions</code> だけで、<code>gameId</code> を含まない（<strong>参加者が、参加後に <code>gameId</code> を知る手段が無い。未決事項</strong>）。(4) 作成の入力は <code>finalWeek</code> と <code>demand</code> を必須とし、<code>retentionDays</code> は未指定で 90。(5) <code>UnassignRole</code>（<code>DELETE …/role</code>）は B1 に実装していない。</p>
+<p><strong>B1 の実装で確定した、経路の補足（2026-11-14）。</strong> (1) <code>SaveDecision</code> の <code>role</code> は本文に持たせず、<strong>認証つきの <code>snapshot</code> で参加者の役割を引いてから</strong> <code>saveDecision</code> を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) <code>GET /sessions/:id/state</code> の <code>?role=</code>（他の役割の取得。AC2.1.2）は、自分の役割と違えば <code>game.forbidden</code>（HTTP では <code>app.unauthorized</code>）。(3) <code>POST /games</code> の応答は <code>versions</code> だけで、ゲームの ID は <code>Location</code>（<code>/api/v1/games/{id}/state</code>）、資格は <code>Set-Cookie</code>。参加の応答は <code>versions</code> だけで、<code>gameId</code> を含まない（<strong>参加者が、参加後に <code>gameId</code> を知る手段が無い。未決事項</strong> → <strong>B5 Step 6 で解消</strong>: 参加の応答に <code>gameId</code>、作成の応答に復帰コード <code>recoveryCode</code> を足した。「応答とスナップショット」を参照）。(4) 作成の入力は <code>finalWeek</code> と <code>demand</code> を必須とし、<code>retentionDays</code> は未指定で 90。(5) <code>UnassignRole</code>（<code>DELETE …/role</code>）は B1 に実装していない。</p>
 <p><strong>B2 の契約テストで確定した、仕様の補足（2026-11-15）。</strong> <a href="../test-strategy/">契約テスト</a>（<code>app</code> の test）が仕様と実装の不一致を見つけ、実装は変えず、<strong>仕様（<code>contracts/openapi.yaml</code>）を実装に合わせた</strong>（ADR-008 の「仕様が先」に照らすと後追い。人の確認待ち）。(1) <strong>409 の problem に拡張メンバー</strong>を持つ: 実装は <code>requestedWeek</code>・<code>currentWeek</code>・<code>role</code>・<code>latest</code>・<code>week</code>・<code>current</code> を返す。仕様に <code>ConflictProblem</code>・<code>ConflictProblemBody</code>・<code>DecisionEntry</code> を追加し、<code>saveDecision</code>・<code>commitWeek</code> の 409 に使う（どのメンバーがどちらの操作かは、仕様と <code>ProblemMapping.kt</code> が正本）。(2) <strong>429（<code>app.rate_limited</code>）は、探針（<code>/health</code>・<code>/ready</code>）を除く全操作に、413（<code>request.too_large</code>、本文 64 KB 超）は変更系の全操作に、500 は問い合わせ系を含む全操作に宣言</strong>する（HTTP の層の共通の守り。7 操作・4 操作・3 操作の宣言漏れを足した）。(3) <strong><code>CreateGameRequest</code> の範囲</strong>を <code>minimum</code>・<code>maximum</code> で持つ（最終週 1〜50、需要 0〜1000、保持日数 1〜3650。範囲外は 422）。(4) <strong>表示名は 1〜80 文字</strong>（<code>minLength: 1</code>、<code>maxLength: 80</code>。「上限は未決」だった）。(5) <strong><code>GameState.sessionId</code> は <code>required</code></strong>（開始前は <code>null</code>）。(6) 参加コードの失敗（<code>game.invitation_invalid</code>）と、分類が Forbidden のドメインの誤り（<code>session.forbidden</code>・<code>game.forbidden</code>。HTTP では <code>app.unauthorized</code> に写る）の <code>code</code> の扱いは、<code>ProblemMapping.kt</code> が正本。範囲と表示名の長さを<strong>仕様にも重複して持つ</strong>ことの確認は人の判断。</p>
 <p>beer-game2 の <code>POST /sessions/:id/start</code> は、<code>session</code> を対象にしていました。本書は、<strong>開始が 2 つのストリームにまたがる</strong>ため、ゲームの資源として <code>POST /games/:id/start</code> にします（beer-game2 からの変更。API の表を持つ他文書への影響として、呼び出し元で確認してください）。</p>
 <h3 id="_16">入力の検証とエラーの写像<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
@@ -10914,7 +10914,12 @@
 <p><code>StaleVersion</code> は廃止しました。<code>CommitWeek</code> の判定の順は、「週が違う → <code>WeekAdvanced</code>」「週が同じで <code>basis</code> が現在の各役割の意思決定の版と違う → <code>DecisionsChanged</code>」です（共同担当が保存し直しただけで「すでに確定されています」と出る誤りを避けます）。</p>
 <p>エラーの識別子は、<strong><code>code</code> を 1 つ</strong>に決めます。小文字のドット区切り <code>&lt;領域&gt;.&lt;名前&gt;</code>（例: <code>session.week_advanced</code>、<code>session.decision_conflict</code>、<code>session.decisions_changed</code>、<code>game.invitation_invalid</code>、アプリ層は <code>app.retry_exhausted</code>、<code>app.idempotency_key_reused</code>、<code>app.unauthorized</code>、<code>app.internal</code>、<code>app.not_ready</code>、<code>app.rate_limited</code>、入力検証は <code>validation.invalid_input</code>、HTTP の層は <code>request.not_found</code>・<code>request.method_not_allowed</code>・<code>request.too_large</code>）です。失効・期限切れ・不明を区別する識別子（<code>invitation-expired</code> など）は<strong>使いません</strong>。どの資格の失敗かの文言は、画面が「自分が送った資格の種類」から選びます（<a href="../architecture-frontend/">フロントエンド</a>）。<code>problem+json</code> の <code>type</code> は <code>/problems/{code}</code>（相対 URI）、拡張メンバー <code>code</code> に同じ値を載せます。フロントエンドの辞書の鍵は <code>code</code> で、OpenAPI の契約にも載せます（<a href="../architecture-frontend/">フロントエンド</a>）。辞書の正本は <a href="../ui-design/">UI 設計</a> の「code 列つきの表」です。各 <code>DomainError</code> の <code>code</code> と分類は <a href="../domain-model/">ドメインモデル</a> が持ちます。</p>
 <h3 id="_17">応答とスナップショット<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
-<p>コマンドの応答は <code>{ versions: { game, session } }</code> だけで、画面の表示は応答から作りません。画面は応答を受けたらすぐスナップショット（<code>GET state</code>）を取得し、<code>versions</code> に追いつくまで待って表示します。SSE は、他の人の変更の通知（と取得の補助）です。SSE が切れていても、自分の保存は画面に出ます。自動確定でも同じで、最後に保存した人の応答にも確定結果は含めず、週の進行はスナップショットで見ます。</p>
+<p>コマンドの応答は <code>{ versions: { game, session } }</code> だけで、画面の表示は応答から作りません。<strong>例外は、資格を発行・受け渡す操作の 2 つだけです</strong>（B5 Step 6。<a href="../../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation/">ADR-015</a> の H3 案 A。ゲート 1 で決定済み）。</p>
+<ol>
+<li><strong>応答の本文に、資格の値（復帰コード）を一度だけ載せる</strong>。作成（<code>POST /games</code>）の応答は <code>recoveryCode</code>（進行役の復帰コード）、再発行（<code>POST /games/{id}/credentials/reissue</code>）の応答は <code>recoveryCode</code> と <code>expiresAt</code> を持つ。保存はダイジェストだけで、再表示しない。冪等な再送でも、同じ値を返す（冪等記録に暗号化して保存する。実測で確認）。ブラウザセッションの値は、これまでどおり <code>Set-Cookie</code>（<code>bg_session</code>）だけが運び、本文に含めない。ログ・イベントには、どの値も出さない。</li>
+<li><strong>本文に、<code>versions</code> 以外の項目を持つ</strong>。参加（<code>POST /participations/join</code>）の応答は <code>gameId</code>（判断項目 7）、復帰（<code>POST /participations/recover</code>）の応答は <code>gameId</code>・<code>kind</code>（<code>FACILITATOR</code> または <code>PARTICIPANT</code>）・<code>role</code>（担当の役割。未割り当てなら項目ごと付けない）を持つ。表示の内容（週の状況など）は含めない。</li>
+</ol>
+<p>Cookie の寿命は、サーバー側の有効期限と同じ値にする（<code>bg_session</code> の <code>Max-Age</code> は <code>sessionTtl</code>、既定 24 時間。B1 は復帰資格の期限を流用していた。<code>bg_recovery</code> は <code>participantCredentialTtl</code>、既定 30 日で、復帰の経路だけに送る <code>Path=/api/v1/participations/recover</code>）。復帰の認可は、本文の <code>recoveryCode</code>、なければ Cookie <code>bg_recovery</code> の復帰資格（冪等記録の照合より前に検証）。画面は応答を受けたらすぐスナップショット（<code>GET state</code>）を取得し、<code>versions</code> に追いつくまで待って表示します。SSE は、他の人の変更の通知（と取得の補助）です。SSE が切れていても、自分の保存は画面に出ます。自動確定でも同じで、最後に保存した人の応答にも確定結果は含めず、週の進行はスナップショットで見ます。</p>
 <h2 id="_18">自動確定<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
 <p>自動確定のための処理は、アプリケーション層にありません。<a href="../domain-model/">ドメインモデル</a> の <code>decideSession</code> が、<code>SaveDecision</code>、<code>SubmitProxyDecision</code>、<code>ResumeSession</code>、<code>SetCommitMode(AUTO)</code> のそれぞれで、<code>Active</code> かつ <code>AUTO</code> で 4 役割が揃っていれば <code>WeekCommitted</code>（最終週なら <code>SessionEnded</code> も）を同じ戻り値に含めます。<code>execute</code> は、イベントが 1 件でも 3 件でも、1 回の追記として扱います。</p>
 <ul>
@@ -11013,7 +11018,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">ログ</td>
-<td style="text-align: left;">構造化 JSON。<code>LogRecord</code> はデータクラスで、<strong>項目として、資格・表示名・非公開の値を持たない</strong>（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤は <strong>SLF4J + Logback</strong>（決定済み。<a href="../tech-stack/">技術スタック</a>）。アプリのログは <code>LogRecord</code> の JSON、Logback は枠組みのログ用</td>
+<td style="text-align: left;">構造化 JSON。<code>LogRecord</code> はデータクラスで、<strong>項目として、資格・表示名・非公開の値を持たない</strong>（型で除外する。秘匿の設定に頼らない）。相関 ID、操作、結果、ストリームの版、所要時間、ゲームの不透明な ID、<strong>参加・復帰の要求だけが持つ接続元の鍵付き要約（<code>src</code>。窓の鍵と同じ値。生の接続元ではない。B5 Step 5）</strong>を含む。出力は標準出力（コンテナのログドライバが収集）。ログの基盤は <strong>SLF4J + Logback</strong>（決定済み。<a href="../tech-stack/">技術スタック</a>）。アプリのログは <code>LogRecord</code> の JSON、Logback は枠組みのログ用</td>
 </tr>
 <tr>
 <td style="text-align: left;">秘密の型</td>
@@ -11053,7 +11058,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">資格</td>
-<td style="text-align: left;">256 ビットの乱数（<code>SecureRandom</code>）。保存はダイジェスト（<strong>B1 の実装は鍵付き HMAC-SHA256、鍵の版は 1</strong>。冪等キーの digest とは別の鍵で、部分の並びも違う。ADR は B2 で確認）と<strong>鍵の版</strong>。鍵は複数の版を同時に持つ（<code>KeyRing</code>）。<strong>本番では鍵の設定を必須にし、未設定なら起動に失敗する</strong>（<code>AppConfig.load</code> が <code>Either</code> で全項目の誤りを集め、失敗なら終了する。<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド §3.4</a>）</td>
+<td style="text-align: left;">256 ビットの乱数（<code>SecureRandom</code>）。保存はダイジェスト（鍵付き HMAC-SHA256。冪等キーの digest とは別の鍵で、部分の並びも違う）と<strong>鍵の版</strong>。<strong>B5 Step 4 の実装</strong>: 資格の値は <code>v&lt;版&gt;.&lt;乱数&gt;</code>（版の接頭辞）で、鍵は複数の版を同時に持つ（<code>CredentialKeyRing</code>。発行は現在の版、検証は値が示す版の鍵。旧版の鍵を設定に残す間、旧版の資格は期限まで有効。外すと 403）。設定は <code>CREDENTIAL_KEY</code>（現在の鍵）・<code>CREDENTIAL_KEY_VERSION</code>（既定 1）・<code>CREDENTIAL_KEY_PREVIOUS</code>（旧版の鍵。<code>版:Base64</code> のカンマ区切り。名前は提案で、Terraform の秘密の形は変えていない）。ブラウザセッションの値と復帰資格の値は別の乱数・別のダイジェスト。<strong>本番では鍵の設定を必須にし、未設定なら起動に失敗する</strong>（<code>AppConfig.load</code> が <code>Either</code> で全項目の誤りを集め、失敗なら終了する。<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド §3.4</a>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">有効期限と失効</td>
@@ -11061,7 +11066,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">認証と認可</td>
-<td style="text-align: left;">認証は、Cookie の生の値から <code>Actor</code> を決める（<code>credentials</code> / <code>browser_sessions</code> を引く）。<strong>B1 の実装では、Ktor のプラグインでなく <code>application</code> の <code>execute</code> の中（トランザクションの中）で行う</strong>（ルートは生の資格を <code>RequestMeta.credential</code> に入れて渡す）。ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功し、不明・失効・期限切れを区別しない（<code>app.unauthorized</code>）。<strong>認可はドメインの <code>decide</code> が行う</strong>（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる</td>
+<td style="text-align: left;">認証は、Cookie の生の値から <code>Actor</code> を決める（<code>credentials</code> / <code>browser_sessions</code> を引く）。<strong>B1 の実装では、Ktor のプラグインでなく <code>application</code> の <code>execute</code> の中（トランザクションの中）で行う</strong>（ルートは生の資格を <code>RequestMeta.credential</code> に入れて渡す）。ブラウザセッションが有効（<code>browser_sessions</code> の行があり、未期限切れ。失効は行の削除）なときだけ成功し、不明・失効・期限切れ・鍵が外された版を区別しない（<code>app.unauthorized</code>）。<strong>B5 Step 4 の実装: 復帰（<code>RecoverParticipation</code>）は <code>Auth.RECOVERY</code></strong>（提示した復帰資格が <code>credentials</code> で未失効・未期限切れであることが認可）。<strong>冪等記録の照合より前に検証する</strong>（<code>ANONYMOUS</code> で作ると、失効した復帰資格の再送に保存済みの新しいセッションが返る。ADR-004、ADR-015。HTTP への配線は Step 6）。<strong>認可はドメインの <code>decide</code> が行う</strong>（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる</td>
 </tr>
 <tr>
 <td style="text-align: left;">入力</td>
@@ -11069,7 +11074,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">レート制限</td>
-<td style="text-align: left;">全体に加え、<strong>参加、復帰、観察用の招待の参加を専用に制限</strong>する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8）</td>
+<td style="text-align: left;">全体（接続元ごとの固定窓。プロセス内）に加え、<strong>参加、復帰、観察用の招待の参加を専用に制限</strong>する（総当たりの対策）。<strong>B5 Step 5 の実装（参加と復帰。観察用の招待は B9）</strong>: 窓は <strong>DB</strong>（<code>participation_attempts</code>。BD8 の案 B。複数のインスタンスで合算される）。数えるのは<strong>認可の失敗</strong>（不明な参加コード、無効な復帰資格）だけで、成功と形式が不正な本文は数えない。検査の前に 1 を足し（別のトランザクション）、上限を超えたら検査せずに 429（<code>app.rate_limited</code>、<code>Retry-After</code>）、認可の失敗でなければ 1 を戻す。接続元は TCP の接続元を正規化（IPv6 は /64）して<strong>鍵付き要約</strong>にし、生の IP は DB にもログにも残さない（ログの <code>src</code> は要約）。上限・窓は設定値（<code>ATTEMPT_MAX_FAILURES</code>・<code>ATTEMPT_WINDOW_SECONDS</code>。既定 10 回・10 分。未計測の仮置き）。窓を保存できないときは通さない（閉じる側に倒す）。実装は <code>AttemptLimit.kt</code>（application。ポート <code>AttemptStore</code>）と <code>JdbcAttemptStore</code>（adapter-persistence。H2 と PostgreSQL で同じ SQL）</td>
 </tr>
 <tr>
 <td style="text-align: left;">ヘッダー</td>
@@ -11163,7 +11168,7 @@
 ├── adapter-http/                     （Ktor のルート、検証、認証、SSE、エラーの写像）
 │   └── src/main/kotlin/.../{routes,security,sse,problem}/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
-│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`**。V101 は DB ロール用に空け、006（保持）は B11。h2/ は作らない）
+│   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`。B5 Step 5.5 で、`common/V007`・`V008` を足し、`postgres/` は 101＝冪等記録の索引、102＝DB ロールと GRANT に付け替えた**。006（保持）は B11 の予約。h2/ は作らない）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
 ├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う。**B1 の実装の場所は `web/`**）
@@ -11508,6 +11513,42 @@
 <td style="text-align: left;">PMD を導入し、層ごとのルールセット 4 つ。アダプター・<code>main</code>・テストは層単位で緩和（承認待ち）。契約テストは <code>app</code> の test</td>
 <td style="text-align: left;">B2 の Step 1・5</td>
 </tr>
+<tr>
+<td style="text-align: left;">43（以降は B5 Step 4 の実装で変わった点。2026-11-15）</td>
+<td style="text-align: left;"><code>AppSettings</code> は <code>credentialKeyVersion</code> と <code>credentialSecret</code>（鍵は 1 つ）、期限は <code>participantCredentialTtl</code> だけ</td>
+<td style="text-align: left;"><code>credentialKeys: CredentialKeyRing</code>（版 → 鍵）、<code>sessionTtl</code>（ブラウザセッション）、<code>participantCredentialTtl</code>。資格の値は <code>v&lt;版&gt;.&lt;乱数&gt;</code>。<code>app</code> は <code>CredentialTtls</code>（<code>SESSION_TTL_HOURS</code>・<code>PARTICIPANT_CREDENTIAL_TTL_DAYS</code>）を設定から渡す</td>
+<td style="text-align: left;">判断項目 3（値の版の接頭辞）と 2（期限は設定値）。運営者との合意（R11）は未取得</td>
+</tr>
+<tr>
+<td style="text-align: left;">44</td>
+<td style="text-align: left;"><code>CommandOutcome(gameId, versions, issued?)</code>。資格は 1 つの値がセッションと復帰を兼ねる</td>
+<td style="text-align: left;"><code>CommandOutcome(gameId, versions, issued?, recovery?)</code>。<code>issued</code> はブラウザセッションの値、<code>recovery</code> は復帰資格の値（復帰コード）。冪等記録の本文の形式は <code>v2</code>（HTTP が応答に載せるのは、Step 6 まで <code>issued</code> の <code>Set-Cookie</code> と <code>versions</code> だけ）</td>
+<td style="text-align: left;">H3 案 A。復帰コードの応答への載せ方は Step 6</td>
+</tr>
+<tr>
+<td style="text-align: left;">45</td>
+<td style="text-align: left;"><code>Auth</code> は <code>ANONYMOUS</code>・<code>REQUIRED</code></td>
+<td style="text-align: left;"><code>RECOVERY</code> を追加。<code>PeripheralStore</code> に <code>authenticateRecovery</code> を追加。<code>CommandRequest</code> の資格の発行は、操作者から作る関数（復帰は認証まで主体が決まらない）</td>
+<td style="text-align: left;">復帰の認可は復帰資格の有効性（冪等記録の照合より前）</td>
+</tr>
+<tr>
+<td style="text-align: left;">46</td>
+<td style="text-align: left;"><code>PeripheralWrite.IssueCredentialRow</code>（資格とセッションを 1 行の導出で書く）</td>
+<td style="text-align: left;"><code>IssueRecoveryRow</code>・<code>IssueSessionRow</code>・<code>ExtendRecoveryRow</code>・<code>RevokeSubject</code>。<strong><code>CredentialRevoked</code> のイベントには、必ず <code>RevokeSubject</code> が付く</strong>（追記の共通の流れが、イベントから導く）。失効・再発行・復帰の内側の操作（<code>CredentialCommands.kt</code>。<code>internal</code>）は、公開の関数・HTTP への配線を Step 6 が行う</td>
+<td style="text-align: left;">資格の行の変更が、対応するイベントなしに起きない・イベントだけが書かれて行が残らない、のどちらも防ぐ</td>
+</tr>
+<tr>
+<td style="text-align: left;">48（B5 Step 6。2026-11-15）</td>
+<td style="text-align: left;">応答は <code>versions</code> だけ。失効・再発行・復帰の内側の操作は <code>internal</code> で、HTTP への配線は Step 6</td>
+<td style="text-align: left;">作成の応答は <code>recoveryCode</code>、参加は <code>gameId</code>、再発行は <code>recoveryCode</code>・<code>expiresAt</code>、復帰は <code>gameId</code>・<code>kind</code>・<code>role?</code> を足す（<code>Reply</code>。ほかは <code>versions</code> だけ）。<code>revokeCredential</code>・<code>reissueCredential</code> は公開、復帰は <code>recover</code>（担当の役割を添える）を公開（<code>recoverParticipation</code> は <code>internal</code> のまま）。<code>pauseSession</code>・<code>resumeSession</code>・<code>submitProxyDecision</code>（<code>SessionControl.kt</code>）。開始後の <code>assignRole</code> は <code>applyAssign</code> が、準備中は <code>game</code> だけ、開始後は入れ替えとして <code>game</code> と <code>session</code> の 2 ストリームへ 1 回の追記で書く。<code>IssuedCredential.expiresAt</code>（再発行の応答に示す期限。冪等記録に含める。4 項目の形も読める）。<code>CommandRequest.recovery</code> は <code>(Actor, Instant)</code>（時刻を受け取る）。ブラウザセッションの Cookie の <code>Max-Age</code> は <code>sessionTtl</code>（B1・Step 4 は復帰資格の期限を流用。Step 4 の逸脱の解消）。<code>bg_recovery</code>（Path は復帰の経路だけ）を作成・参加で発行。ロビーの参加者に <code>replaced</code>（入れ替えで外された旧担当者）。<strong>停止中の参加者の保存・確定を判定する順は「状態 → 権限」（ゲート 2）のため、資格のある参加者が停止中でないゲームを再開しようとすると 403 でなく 409 <code>session.not_paused</code></strong></td>
+<td style="text-align: left;">H3 案 A（ゲート 1）。<strong>ゲート 6 で人が確認する</strong>（API の形・認可の行列）</td>
+</tr>
+<tr>
+<td style="text-align: left;">47（B5 Step 5。2026-11-15）</td>
+<td style="text-align: left;">参加・復帰の専用のレート制限は、状態の共有が未決（BD8）。<code>AppSettings</code> は期限を 3 つのプロパティで持つ</td>
+<td style="text-align: left;"><strong>DB の窓</strong>（<code>participation_attempts</code>）。<code>Stores</code> に <code>attempts: AttemptStore</code>、<code>AppSettings</code> に <code>attempts: AttemptPolicy</code>（上限・窓の長さ）、<code>RequestMeta</code> に <code>source: AttemptSource?</code>（正規化した接続元）。期限は <code>AppTtls</code>（<code>idempotency</code>・<code>session</code>・<code>participantCredential</code>）にまとめた（<code>AppSettings</code> の引数の数が detekt の上限に達したため。<code>idempotencyTtl</code> などのプロパティは同じ名前で読める）。<code>AppFailure.RateLimited(retryAfterSeconds)</code>（429 <code>app.rate_limited</code>）を追加。<code>app</code> は <code>Tuning</code>（資格の期限と窓）と <code>ATTEMPT_MAX_FAILURES</code>・<code>ATTEMPT_WINDOW_SECONDS</code> を設定から渡す。ログ（<code>LogRecord</code>）に、参加・復帰の要求だけが持つ <code>src</code>（接続元の鍵付き要約）を追加</td>
+<td style="text-align: left;">判断項目 4 の案 A。<strong>ゲート 5 で人が確認する</strong></td>
+</tr>
 </tbody>
 </table>
 <h2 id="_25">設計判断<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
@@ -11706,6 +11747,7 @@
 </tbody>
 </table>
 <p>結論は未決とし、まず A（アプリ内）+ C（前段）の併用を提案します。B を採る場合は、<a href="../data-model/">データモデル</a> に表を追加します。</p>
+<p><strong>B5 Step 5 の決定（2026-11-15。判断項目 4 の案 A。ゲート 5 で人が確認する）</strong>: <strong>参加・復帰の専用の制限だけ、案 B（DB の窓）で実装した</strong>。全体の制限（接続元ごと 600 件/分）は、プロセス内のまま（案 A。負荷の保護で、数える対象が違う）。案 C（WAF）は B14 の判断で、併用できる。窓の表は <code>participation_attempts</code>（<a href="../data-model/">データモデル</a>「参加・復帰の失敗の窓」）。ALB の背後の接続元の取り方（信頼するホップの数）は B14 で決める。</p>
 <h3 id="bd9">BD9: メトリクスの出力<a class="headerlink" href="#bd9" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -11826,7 +11868,7 @@
 <ul>
 <li><strong>参加者が、参加後に <code>gameId</code> を知る手段が無い。</strong> 参加の応答は <code>versions</code> だけで、<code>gameId</code> も <code>Location</code> も返さない。参加者の画面が、ロビー・プレイの画面へ進めない。対応案は、参加の応答に <code>gameId</code>（と <code>Location</code>）を足すこと（バックエンドと仕様の変更。決めるまで、API は変えない）。</li>
 <li><strong>参加者向けのロビー</strong>（<code>GET /games/:id/lobby</code> の参加者への開放）。投影の型に項目が無く、B1 は進行役だけ。</li>
-<li><strong>レート制限の値と範囲。</strong> 接続元（<code>remoteHost</code>）ごとの固定窓、既定 600 件/分は<strong>根拠なし（未計測）</strong>の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、<code>X-Forwarded-For</code> は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5。</li>
+<li><strong>レート制限の値と範囲。</strong> 接続元（<code>remoteHost</code>）ごとの固定窓、既定 600 件/分は<strong>根拠なし（未計測）</strong>の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、<code>X-Forwarded-For</code> は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5 Step 5 で実装した（DB の窓。上の「レート制限」と BD8）。</li>
 <li><strong>競合の再試行の上限 <code>maxAttempts</code></strong>は 5 を仮置き（<code>AppSettings</code> に既定を置かず、<code>COMMAND_MAX_ATTEMPTS</code> で注入。未計測）。競合の再試行の遅延は無し。<code>lock_timeout</code> の既定 5 秒も仮置き。</li>
 <li><strong>Origin の検査。</strong> 許可リスト（<code>ALLOWED_ORIGINS</code>。<code>local</code> 以外は必須）か、Host と同じ権限。Origin も Referer も無い要求は許す（ブラウザの外のクライアントのため）。拒否は <code>app.unauthorized</code>（専用の <code>code</code> は置かなかった）。Vite の開発用の中継は Host と Origin が一致しないため、<code>ALLOWED_ORIGINS</code> の指定が要る（開発手順書への反映は未実施）。</li>
 <li><strong>ログ。</strong> <code>LogRecord</code> は項目の許可リスト（試験で固定）。<code>message</code> はコードの固定文だけ。予期しない例外はクラス名とスタックの各行を記録し、<strong>メッセージは書かない</strong>（接続文字列などが入りうる）。CloudWatch での収集、EMF のメトリクスは未確認・未実装。</li>

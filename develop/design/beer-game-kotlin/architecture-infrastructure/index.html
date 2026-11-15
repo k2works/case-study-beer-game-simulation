@@ -10893,7 +10893,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <ul>
 <li>Kotlin 2.4.21、Gradle 9.9.1、JDK 25、Ktor 3.6.1、Arrow 2.3.0 の互換性の確認（実装開始時）。</li>
 <li>detekt 1.23.8 と Kotlin 2.4: <strong>JDK 21 の専用ジョブで維持（ユーザーの決定、2026-11-14）。GitHub Actions 上の再現は未確認。</strong></li>
-<li><strong>B2 で出た未決（2026-11-15）</strong>: V101 と V102 の順序（<code>outOfOrder</code> か番号の付け替え）、RDS のマイグレーション用ユーザーの作り方、用途別の接続プールの配線、<code>LISTEN</code> の専用接続、<code>ui</code>・<code>n1</code> ジョブと <code>pmd</code> の実行時間の GitHub Actions 上での確認、action の SHA 固定（<code>setup-java</code>・<code>setup-gradle</code>）、N-1 のタグ名。</li>
+<li><strong>B2 で出た未決（2026-11-15）</strong>: V101 と V102 の順序（<strong>B5 Step 5.5 で番号を付け替えて解消</strong>。101＝冪等記録の索引、102＝ロールと GRANT。<a href="../data-model/">データモデル</a>「B5 Step 5.5 の番号」。Terraform の <code>infra/modules/rds/main.tf</code> のコメントが「マイグレーション V101 が作る」とあるのは、まだ直していない（本 Bolt は Terraform を変更しない。B14 で直す））、RDS のマイグレーション用ユーザーの作り方、用途別の接続プールの配線、<code>LISTEN</code> の専用接続、<code>ui</code>・<code>n1</code> ジョブと <code>pmd</code> の実行時間の GitHub Actions 上での確認、action の SHA 固定（<code>setup-java</code>・<code>setup-gradle</code>）、N-1 のタグ名。</li>
 <li>コンテナのベースイメージ（Temurin の <code>25-jre-noble</code> を想定。JDK の期限は 2031-09-30 に統一済み）の、軽量な派生の採否と、そのサポート期限の確認。</li>
 <li>タスクのサイズ、ヒープの割合、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウンの値（負荷試験で決める）。</li>
 <li><code>LISTEN</code> の接続と、RDS の接続数の上限の整合（タスクの最大数での確認）。</li>
