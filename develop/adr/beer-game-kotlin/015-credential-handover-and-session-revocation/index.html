@@ -9544,7 +9544,7 @@
 <p>Bolt 5（進行の継続と資格）で、(H2) 資格の失効で発行済みのブラウザセッションを止める結び付きと、(H3) 進行役の復帰用の値・再発行した資格の受け渡し・<code>recover</code> の本文の形を決める必要がある。本書は、<strong>AI の提案であって、決定ではない</strong>。人が <a href="../../../development/beer-game-kotlin/bolt_5_plan/">bolt_5_plan</a> のゲート 1 で決める。</p>
 <p>日付: 2026-11-15</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p><strong>H2 案 A・H3 案 A を、2026-11-15 にユーザーが採用と決定した（B5 ゲート 1。選択: 「承認し、提案どおり決定」）。</strong> 本書全体のレビュー・承認（<code>verify</code>）は未実施のため、ADR としては提案中のまま。H3 の案は、設計書（アーキテクチャ設計の「コマンドの応答」、UI 設計の「資格を含む応答」）の記述と異なる点を含む。</p>
+<p><strong>H2 案 A・H3 案 A を、2026-11-15 にユーザーが採用と決定した（B5 ゲート 1。選択: 「承認し、提案どおり決定」）。</strong> <strong>本書全体を、2026-11-15 にユーザーが承認した（B5 ゲート 8。選択: 「ADR-015〜018 を承認」）。</strong>H3 の案は、設計書（アーキテクチャ設計の「コマンドの応答」、UI 設計の「資格を含む応答」）の記述と異なる点を含む。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>
 <li>資格は、<strong>ブラウザセッション</strong>（<code>browser_sessions</code>。24 時間）と<strong>復帰資格</strong>（<code>credentials</code>。参加者は 30 日、進行役はゲームの保持期間内）に分ける設計（<a href="../../../development/beer-game-kotlin/bolt_5_plan/">bolt_5_plan</a> の「資格の状態」）。B1 は、1 つの値を両方の表に同じダイジェストで書き、認証は、同じダイジェストで両表を結んで検査している（<code>JdbcPeripheralStore.kt</code> の <code>AUTHENTICATE_SQL</code>）。分けると、<strong>失効で発行済みのブラウザセッションを止める結び付きが無くなる</strong>（<code>browser_sessions</code> に <code>revoked_at</code> も <code>credentials</code> への参照も無い。V002）。</li>

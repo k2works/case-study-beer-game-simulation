@@ -11017,7 +11017,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.4c 🟡 <strong>不安定な試験の修正</strong>: 「応答に <code>998</code> が含まれない」を <code>shouldNotContain "998"</code> で確かめる 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.5 Bolt 終了報告（<a href="../bolt_5_report/"><code>bolt_5_report.md</code></a>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う。空のまま）、未達・未実施、人の判断項目、B6 への申し送り。<strong>承認を捏造しない</strong></li>
 </ul>
-<p><strong>ゲート 8</strong>（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 8</strong>（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。<strong>状態: 2026-11-15 にユーザーが承認した（選択: 「ゲート 8 を承認」「B5 のコード全行理解を承認」）。デモ項目の人の実操作は、申告がなく未記録。</strong></p>
 <h4 id="step-8-2026-11-15">Step 8 の実施結果（2026-11-15）<a class="headerlink" href="#step-8-2026-11-15" title="Permanent link">&para;</a></h4>
 <p>実施者: claude-code/claude-sonnet-5-5。<strong>実測の事実だけを書く。ゲート 8 の承認と「U2 が完了」は記録していない。B6 には進んでいない。</strong> 詳細（デモ項目の実操作の申告欄、未達・未実施、人の判断項目、B6 への申し送り、仮説の検証結果、Release 0.2 への影響）は <a href="../bolt_5_report/">Bolt 5 終了報告</a>。</p>
 <p><strong>8.4c（不安定な試験）</strong>: <code>shouldNotContain "998"</code> の 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を項目単位の検査に直した。HTTP は <code>JsonElement.leafValues()</code>（<code>AppTestKit</code> に追加）で JSON の葉の値を、永続化は <code>Snapshot.integerValues()</code> で投影の整数の項目を、それぞれ平らにして「998 が無い」を確かめる。<code>HttpFlowSpec</code> に「UUID の一部の 998 には一致せず、項目の値が 998 のときだけ一致する」試験を足した。<strong>直した検査が正しく失敗することの確認</strong>: 検査を「999 が無い」へ変えると、<code>HttpFlowSpec</code>（1 件）と永続化（1 件）が失敗した（戻して緑）。<code>PostgresHttpSpec</code> は同じ補助を使う（その検査の変異は個別に行っていない）。</p>
@@ -11163,7 +11163,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> domain の行 100%（除外・閾値の引き下げなし）、全体の行 85%・分岐 75%。静的解析の違反 0 件、ベースラインなし、<code>@Suppress</code> なし</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 設計書・ADR の変更表が更新され、<code>validating-design</code> を着手前と完了時に実施し、結果を記録した</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Bolt 終了報告があり、未達・未実施・人の判断項目が列挙されている</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（<strong>未。人の確認待ち</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（2026-11-15 にユーザーが承認。選択: 「B5 のコード全行理解を承認」）</li>
 </ul>
 <h2 id="_9">リスクと対策<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <table>
@@ -11622,6 +11622,11 @@
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施</strong>（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。<code>SessionState.Paused</code>、<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code>、<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code>、<code>Editor.ByFacilitator</code>、<code>session.paused</code>・<code>session.not_paused</code>・<code>session.save_limit_reached</code> を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。<code>evolveSession</code> を <code>SessionEvolve.kt</code> へ分割（detekt の指摘の解消）。<code>InvalidTransition</code> の性質テスト（500 回）。永続化の DTO を最小で前倒し。<strong>実測</strong>: domain 300 件・失敗 0・行 879/879（100%）、<code>:app:test</code> は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の <code>code</code> の表・不変条件・差の表を更新</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ゲート 8（Bolt の承認）と B5 のコードの全行理解を、ユーザーが承認</strong>（選択: 「ゲート 8 を承認」「B5 のコード全行理解を承認」）。<strong>ADR-015〜018 を承認し、Living Documentation の方式（注釈は domain 内、生成は domain のテスト、手書きの EV 表は残す）を現状どおり承認</strong>（選択: 「ADR-015〜018 を承認」「LD の方式を現状どおり承認」）。<strong>デモ項目の人の実操作は申告がなく、終了報告の申告欄は空のまま</strong>。CI のパスフィルターへの追加、R11（運営者との合意）、H5 の割り当ては未決</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>

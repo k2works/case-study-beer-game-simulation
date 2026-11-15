@@ -9544,7 +9544,7 @@
 <p>資格（ブラウザセッション・復帰資格）のダイジェストは鍵付き HMAC-SHA256 で保存する。鍵を替えても発行済みの資格を使い続けられ、漏れた鍵の版だけを外せるように、資格の値に版を含める。本書は、<strong>AI の提案であって、決定ではない</strong>。実装は B5 Step 4 で済んでおり、人のゲート 4 は 2026-11-15 に承認済み（確認点 1〜6 を報告どおりに確定）。<strong>本書全体のレビュー・承認（<code>verify</code>）は未実施のため、ADR としては提案中のまま</strong>。</p>
 <p>日付: 2026-11-15</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>提案中（レビュー待ち）。</p>
+<p>承認済み（2026-11-15、ユーザー。B5 ゲート 8）。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>
 <li>資格は 256 ビットの乱数で、保存するのは鍵付き HMAC のダイジェストだけ（NF-S4）。B1 は鍵を 1 つだけ持ち、<code>credentials</code>・<code>browser_sessions</code> の <code>key_version</code> 列は常に 1 だった。</li>
