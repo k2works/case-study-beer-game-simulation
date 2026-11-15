@@ -9564,7 +9564,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">日程（仮定）</td>
-<td style="text-align: left;">2026-12-01〜12-02（リリース計画の稼働日による目安。<strong>B4 の終了後</strong>を前提とする。B4 は未着手）</td>
+<td style="text-align: left;">リリース計画の稼働日の目安は 2026-12-01〜12-02（B4 の終了後を前提）。<strong>判断項目 1 の決定（2026-11-15）で、B5 を B4 より先に実施する</strong>ため、この日付は使えない。実施日は着手時に人が決める（<code>validating-design</code> の軸 A。リリース計画のスケジュールと進捗状況の更新は、人の判断待ち）</td>
 </tr>
 <tr>
 <td style="text-align: left;">ゲート密度</td>
@@ -9703,6 +9703,22 @@
 <td style="text-align: left;">層単位の PMD の緩和、<code>FunctionNameTooShort</code>、adapter-persistence の違反をコードで直すか（B2 #3〜#5）</td>
 <td style="text-align: left;">範囲外。<strong>新しいコードは、層ごとのルールセットのまま違反 0 件</strong>を守る</td>
 </tr>
+<tr>
+<td style="text-align: left;">役割の入れ替えでの資格の失効（B1 計画 Step 8 の記録「資格の失効の書き込み、役割の入れ替えでの失効、復帰は B5」。<code>validating-design</code> 軸 C の C1 で追加）</td>
+<td style="text-align: left;"><strong>範囲外（人の判断待ち）</strong>。設計書に入れ替えのコマンドと規則が無い（<a href="../../../design/beer-game-kotlin/domain-model/">ドメインモデル</a> の「開始後の入れ替え」は未決事項）。本 Bolt は、進行役の <code>RevokeCredential</code> による失効で否定テストを行う。入れ替えでの自動失効を B5 に含めるかは人が決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">観察用の招待の参加の専用のレート制限（NF-S11・NF-S19）</td>
+<td style="text-align: left;">範囲外（B9。観察者の参加が B9 のため）。本 Bolt の専用の制限は、参加・復帰だけ</td>
+</tr>
+<tr>
+<td style="text-align: left;">B2 の申し送り（生きたドキュメントの公開の導線、<code>@US</code>・<code>@AC</code> タグの整合検査、<code>@Suppress</code>・ベースラインの機械検査、Kover の残り、SSE の契約テスト。U1 総括 #18・#19）</td>
+<td style="text-align: left;">範囲外・未割り当て（<code>validating-design</code> 軸 C の C2）。B5 の計画の作成時に、項目として取り込まれていなかった。割り当て先は人が決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">Living Documentation の中盤の重点（開発戦略: 用語集・イベント一覧を、中盤の最初の Bolt から整える）</td>
+<td style="text-align: left;"><strong>人の判断待ち</strong>（<code>validating-design</code> 軸 A の A2）。注釈の語彙と生成の仕組みは、開発戦略が「B1〜B2 で決める」とした未決のままで、B1〜B3 の終了報告に決定の記録が見つからない。本 Bolt に含めるか、割り当てを先に決めるかは人が決める</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -9760,14 +9776,14 @@
 <tr>
 <td style="text-align: left;">進行役の資格（<code>credentials</code>、<code>FACILITATOR</code>）</td>
 <td style="text-align: left;">同上</td>
-<td style="text-align: left;">ゲームの保持期間内（B1 は 30 日で発行している。保持日数の既定は 90 日）</td>
+<td style="text-align: left;">ゲームの保持期間内。<strong>B1 の実装は、DB の <code>expires_at</code> が作成時 + 保持日数（<code>Commands.kt</code>。既定 90 日）、Cookie の <code>Max-Age</code> が 30 日</strong>（<code>Wiring.kt</code> の <code>PARTICIPANT_CREDENTIAL_TTL_DAYS</code>。進行役も同じ値）。期限の値は <code>Wiring.kt</code> の定数で、設定値ではない</td>
 <td style="text-align: left;">同上</td>
 </tr>
 </tbody>
 </table>
 <p>復帰（<code>RecoverParticipation</code>）は、有効な復帰資格を提示すると、新しいブラウザセッションを発行し、復帰資格の期限を更新する（<code>ParticipationRecovered.credentialExpiresAt</code>）。</p>
 <h3 id="er-45">ER 図（変わる可能性。判断項目 4・5）<a class="headerlink" href="#er-45" title="Permanent link">&para;</a></h3>
-<p><strong>確認した事実</strong>: <a href="../../../apps/beer-game-kotlin/adapter-persistence/src/main/resources/db/migration/common/V002__peripheral_stores.sql">V002</a> の <code>credentials</code> は <code>key_version</code>・<code>expires_at</code>・<code>revoked_at</code> を、<code>browser_sessions</code> は <code>key_version</code>・<code>expires_at</code> を、すでに持つ。<strong>鍵の複数の版・期限・失効に、表の列の追加は要らない見込み</strong>。</p>
+<p><strong>確認した事実</strong>: <a href="../../../apps/beer-game-kotlin/adapter-persistence/src/main/resources/db/migration/common/V002__peripheral_stores.sql">V002</a> の <code>credentials</code> は <code>key_version</code>・<code>expires_at</code>・<code>revoked_at</code> を、<code>browser_sessions</code> は <code>key_version</code>・<code>expires_at</code> を、すでに持つ。鍵の複数の版・期限には、表の列の追加は要らない見込み。<strong>ただし、失効は別（Step 0.3・<code>validating-design</code> の B3）</strong>: <code>browser_sessions</code> に <code>revoked_at</code> も <code>credentials</code> への参照も無く、B1 は同じダイジェストで両表を結んで認証している。ブラウザセッションと復帰資格を別のダイジェストに分けると、<strong>資格を失効させたときに、発行済みのブラウザセッションを止める結び付きが無い</strong>。列の追加（スキーマ変更）が要るかは未確認で、Step 4.3 の前に人が決める。</p>
 <p><strong>変わる見込み</strong>: 参加・復帰の専用のレート制限を、タスク数に依らない上限にするには、<strong>試行の窓を DB に持つ表</strong>（名前・列は未決）が要る。<strong>スキーマ変更は確認必須</strong>（判断項目 4・5）。表が増えれば <code>game_id</code> を持つ表の連鎖削除（B11 の「全表に行が残らない」検査）との整合も要る（接続元の鍵は要約で、ゲームに紐づけない案を提案）。</p>
 <h3 id="ui-13">画面遷移図（変わる。UI を含める場合のみ。判断項目 13）<a class="headerlink" href="#ui-13" title="Permanent link">&para;</a></h3>
 <table>
@@ -9908,14 +9924,14 @@
 <p>各ステップは、<strong>テストを先に書き、失敗を確認してから最小限を実装する</strong>（TDD、BDD）。<strong>ゲートは、人の確認待ち</strong>とし、承認済みとは書かない。<strong>ファイルの編集は、Write・Edit のみ</strong>（heredoc・python・sed・perl・awk は使わない。U1 で繰り返し起きた逸脱）。<strong>静的解析は、違反 0 件・ベースラインなし・<code>@Suppress</code> なし</strong>を、毎ステップで守る。</p>
 <h3 id="step-0-validating-design">Step 0: 着手前の確認（<code>validating-design</code>）（✅）<a class="headerlink" href="#step-0-validating-design" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.1 判断項目 1〜16 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.2 <code>validating-design</code> を、着手前に実施し、<strong>結果を本書に記録する</strong>（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ 過去の Bolt の計画・終了報告。B2・B3 の計画は、この記録が無いことが U1 の逸脱だった）。<strong>本書の作成時点では未実施</strong></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 0.3 設計書のスケッチと、実装（B1 の形）の差を確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に <code>GameData</code>（B1 は設定・参加者・割り当てだけ。設計書は招待・観察者・資格を含む）と <code>AppSettings</code>（資格の鍵）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.1 判断項目 1〜16 を、人が決める（決定を、更新履歴に、ユーザーが指示した範囲だけ記録する）。<strong>決定は 2026-11-15 に更新履歴へ記録済み</strong>（ゲート 0 の承認ではない）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.2 <code>validating-design</code> を、着手前に実施し、<strong>結果を本書に記録する</strong>（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ 過去の Bolt の計画・終了報告。B2・B3 の計画は、この記録が無いことが U1 の逸脱だった）。<strong>2026-11-15 に実施。結果は「<a href="#設計整合性の検証結果着手前validating-design">設計整合性の検証結果</a>」</strong>（NG。計画側の修正 10 件、人の判断待ち 5 件）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.3 設計書のスケッチと、実装（B1 の形）の差を確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に <code>GameData</code>（B1 は設定・参加者・割り当てだけ。設計書は招待・観察者・資格を含む）と <code>AppSettings</code>（資格の鍵）。<strong>2026-11-15 に実ファイルで確認。結果は「<a href="#設計書のスケッチと実装の差step-03">設計書のスケッチと実装の差</a>」</strong></li>
 </ul>
-<p><strong>ゲート 0</strong>: 判断項目の決定と、<code>validating-design</code> の結果を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 0</strong>: 判断項目の決定と、<code>validating-design</code> の結果を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong> 0.1〜0.3 のチェックは作業の完了を示すもので、ゲートの承認ではない。</p>
 <h3 id="step-1-api">Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）<a class="headerlink" href="#step-1-api" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.1 🔴 日本語 Gherkin を <code>features/continuation/</code>（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。<strong>原文の意味と一致</strong>させる。解釈の差は、シナリオの直前にコメントで書く）。<strong>失効した資格の再送が 403</strong>、<strong>鍵のローテーション後も旧版の資格が期限まで有効</strong>、<strong>旧版の鍵の削除後は 403</strong>、<strong>期限切れの資格は 403</strong>、<strong>復帰の失敗は存在・期限・失効を区別しない同じ応答</strong>、<strong>停止中の代理入力は確定しない</strong>、<strong>代理入力のイベントに値が残る</strong>を含める</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.1 🔴 日本語 Gherkin を <code>features/continuation/</code>（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。<strong>原文の意味と一致</strong>させる。解釈の差は、シナリオの直前にコメントで書く）。<strong>失効した資格の再送が 403</strong>、<strong>鍵のローテーション後も旧版の資格が期限まで有効</strong>、<strong>旧版の鍵の削除後は 403</strong>、<strong>期限切れの資格は 403</strong>、<strong>復帰の失敗は存在・期限・失効を区別しない同じ応答</strong>、<strong>停止中の代理入力は確定しない</strong>、<strong>代理入力のイベントに値が残る</strong>、<strong>失効した復帰資格での復帰の再送が 403（保存済みの新しいセッションを返さない）</strong>、<strong>準備中と開始後の両方で、失効・再発行・復帰を受け付ける</strong>（ドメインモデル）、複数タブ（AC3.2.3。判断項目 8）、代理入力の保存回数の上限（判断項目 10。超えたときの <code>code</code>・文言は未決で、ゲート 1 で人が決める）を含める。フォルダは <code>features/continuation/</code>（名前は判断項目 15）とし、<strong><code>features/TAGS.md</code> の領域の一覧（Epic 3 継続と復旧）に追記する</strong>（<code>validating-design</code> 軸 C の C3）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.2 🔴 <code>contracts/openapi.yaml</code> に、判断項目 6 の経路を書く（<code>Idempotency-Key</code>、<code>code</code> の一覧、<code>requestedWeek</code>、<code>If-Match</code> の有無）。契約テストを回し、<strong>実装が無いので失敗する（Red）</strong>ことを確認する</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 1.3 🔴 <code>@api</code> のシナリオが、Undefined・Pending でなく <strong>Failing</strong> になることを確認する（Undefined → Pending → Failing → Passing の順）</li>
 </ul>
@@ -9923,14 +9939,15 @@
 <h3 id="step-2-session">Step 2: ドメイン — Session の停止・再開・代理入力（🔴🟢🟡）<a class="headerlink" href="#step-2-session" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.1 🔴 Kotest（Given: 過去のイベント / When: コマンド / Then: イベントまたはエラー）を先に書く。<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code> の正常系と否定（参加者の実行は <code>Forbidden</code>、<code>requestedWeek</code> が違えば <code>WeekAdvanced</code>、停止中の <code>SaveDecision</code>・<code>CommitWeek</code> は拒否、<code>Ended</code> は <code>AlreadyEnded</code>）。<strong>失敗を確認</strong>する</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.2 🟢 <code>SessionState.Paused</code>、コマンド・イベント・エラーを、<code>decideSession</code>・<code>evolve</code> に実装する（<code>updateData</code> は <code>Active</code>・<code>Paused</code> に適用）。代理入力は版を 1 増やし、<code>editor</code>・値を残す。停止中の代理入力は確定しない</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.3 🟡 <code>InvalidTransition</code> の性質テスト（許されない状態・コマンドの組が、すべて拒否される。判断項目 12）。リファクタリング。<strong>domain の行 100% のゲートを守る</strong>（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.2 🟢 <code>SessionState.Paused</code>、コマンド・イベント・エラーを、<code>decideSession</code>・<code>evolve</code> に実装する（<code>updateData</code> は <code>Active</code>・<code>Paused</code> に適用）。代理入力は版を 1 増やし、<code>editor</code>・値を残す。停止中の代理入力は確定しない。<strong>停止中の参加者の拒否は、判断項目 6 の決定どおり新しい <code>SessionError</code>（<code>session.paused</code>、409、<code>InvalidState</code>）で返す</strong>（現状の設計書は「停止中の <code>NotActive</code>」で、食い違うため Step 8.3 で設計書を更新する。<code>validating-design</code> 軸 B の B1）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.3 🟡 <code>InvalidTransition</code> の性質テスト（<strong>設計書の定義: 有効なコマンド列を <code>decide</code> と <code>evolve</code> で回し、<code>InvalidTransition</code> が 1 件も出ない</strong>。判断項目 12。<code>validating-design</code> 軸 B の B6 で、計画の記述を設計書に合わせた）。リファクタリング。<strong>domain の行 100% のゲートを守る</strong>（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.4 イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。新しいイベントの種別の一覧を記録（N-1 互換の影響。B12）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 2.5 🔴🟢 <strong>代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回。判断項目 10 の決定）</strong>。<code>SessionData</code> に、役割ごとの当週の保存回数を持たせる（現状は持たない）。確定でクリアする。超えたときの <code>code</code>・文言は未決（ゲート 1 で決める）。<strong>B6 の共同入力（<code>DecisionConflict</code> の拡張）と同じ <code>SaveDecision</code> に触れるため、B6 の前提を壊さないことを確認する</strong>。更新履歴の決定が、ステップに反映されていなかったため追加した（<code>validating-design</code> 軸 B の B8）</li>
 </ul>
 <p><strong>ゲート 2</strong>: Session の停止・再開・代理入力の振る舞いと、domain の行 100% を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
 <h3 id="step-3-game">Step 3: ドメイン — Game の資格（失効・再発行・復帰）（🔴🟢🟡）<a class="headerlink" href="#step-3-game" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 3.1 🔴 Kotest を先に書く。<code>RevokeCredential</code>（進行役のみ、有効な資格のみ、二重の失効は <code>CredentialAlreadyRevoked</code>）、<code>ReissueCredential</code>（新しい期限、失効後の再発行）、<code>RecoverParticipation</code>（有効な復帰資格のみ。失効・期限切れは <code>Forbidden</code> の同じ形）。失敗を確認する</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 3.1 🔴 Kotest を先に書く。<code>RevokeCredential</code>（進行役のみ、有効な資格のみ、二重の失効は <code>CredentialAlreadyRevoked</code>）、<code>ReissueCredential</code>（新しい期限、失効後の再発行）、<code>RecoverParticipation</code>（有効な復帰資格のみ。失効・期限切れは <code>Forbidden</code> の同じ形）。<strong>準備中と開始後の両方で受け付ける</strong>（ドメインモデル）。失敗を確認する</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 3.2 🟢 <code>GameData</code> に資格の有効性（<code>CredentialValidity</code>）を足し、コマンド・イベント・<code>evolve</code> を実装する（設計書の <code>credentials: Map&lt;CredentialSubject, CredentialValidity&gt;</code>）。<code>startGame</code> と <code>JoinGame</code>（資格を発行する経路）が、資格の有効性を初期化する</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 3.3 🟡 リファクタリング。domain の行 100% を維持</li>
 </ul>
@@ -9940,11 +9957,13 @@
 <p><strong>高リスク（認可と冪等。R5）。否定テストを先に書く。</strong></p>
 </blockquote>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) <strong>失効した資格が、以前に成功したキーを再送しても 403</strong>（保存済みの応答を返さない。ADR-004）、(b) 期限切れの資格は 403、(c) <strong>鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効</strong>、(d) <strong>旧版の鍵を設定から外したら、その版の資格は 403</strong>、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（<code>beergame_reader</code>）が <code>credentials</code> を読めない（V101 の権限。設計書は未決。<strong>確認だけを行い、変更が要るなら人に報告</strong>）。失敗を確認する</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) <strong>失効した資格が、以前に成功したキーを再送しても 403</strong>（保存済みの応答を返さない。ADR-004。<strong>既存のテストが 3 層にある</strong>: <code>ExecuteSpec</code>、<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>。いずれも <code>credentials.revoked_at</code> を直接更新するか <code>World.revoke</code> で失効させる。<strong>本 Bolt は、実際の <code>RevokeCredential</code> コマンド経由で失効させて同じことを確かめる</strong>）、(a2) <strong>復帰（<code>RecoverParticipation</code>）の再送</strong>: 現状の <code>Auth</code> は <code>ANONYMOUS</code>・<code>REQUIRED</code> の 2 つで、<code>joinGame</code> のような <code>ANONYMOUS</code> の操作は、同じキー・同じ本文の再送に保存済みの応答（資格の生の値を含む）を返す（参加コードが認可の代わり）。<strong>復帰は、提示した復帰資格の有効性が認可であり、<code>ANONYMOUS</code> で実装すると、失効した復帰資格の再送に、保存済みの新しいセッションが返る</strong>。復帰は、冪等記録の照合の前に、提示された復帰資格を検証する（<code>validating-design</code> 軸 B の B5）、(b) 期限切れの資格は 403、(c) <strong>鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効</strong>、(d) <strong>旧版の鍵を設定から外したら、その版の資格は 403</strong>、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（<code>beergame_reader</code>）が <code>credentials</code> を読めない（V101 の権限。設計書は未決。<strong>確認だけを行い、変更が要るなら人に報告</strong>）。失敗を確認する</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.2 🟢 鍵の複数の版（判断項目 3）。設定の読み込み（本番で必須、未設定なら起動に失敗。<strong>起動時の検査の既存の仕組みを再利用</strong>）、発行は最新の版、検証は保存された版の鍵。資格の値は 256 ビットの乱数、保存は鍵付き HMAC のダイジェストと版</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。期限を設定値にする（判断項目 2）。<code>credentials</code> の失効・発行を、<code>Credential*</code> イベントの追記と<strong>同じトランザクション</strong>で行う（<code>PeripheralWrite.RevokeCredentialRow</code> の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.4 🟢 <code>execute</code>（<code>Execute.kt</code>）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、<strong>失効後の再送が 403 のテスト（4.1 の a）が通る</strong>ことを確認する。<strong>現状の順序が (a) を満たすかは未確認</strong>（設計どおりに実装されているかを、テストで確かめる）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。<strong>分けた後に、資格の失効でブラウザセッションを止める結び付き（<code>browser_sessions</code> に <code>revoked_at</code> または資格の主体への参照を足すか、認証が主体の未失効の資格の存在を確かめるか）を、実装の前に人が決める</strong>（スキーマ変更は確認必須。現状は、認証が同じダイジェストで <code>browser_sessions</code> と <code>credentials</code> を結ぶ。<code>JdbcPeripheralStore.kt</code> の <code>AUTHENTICATE_SQL</code>。<code>validating-design</code> 軸 B の B3）。期限を設定値にする（判断項目 2。現状は <code>Wiring.kt</code> の定数）。<code>credentials</code> の失効・発行を、<code>Credential*</code> イベントの追記と<strong>同じトランザクション</strong>で行う（<code>PeripheralWrite.RevokeCredentialRow</code> の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.4 🟢 <code>execute</code>（<code>Execute.kt</code> の <code>runCommand</code>）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、<strong>失効後の再送が 403 のテスト（4.1 の a、a2）が通る</strong>ことを確認する。<strong>確認した事実（Step 0.3）</strong>: <code>Auth.REQUIRED</code> の操作は、<code>runCommand</code> が <code>authenticate</code>（資格の有効性とゲームの一致）を <code>idempotency.find</code> より前に評価し、無効なら <code>Unauthorized</code> を返す。既存の 3 つのテストが、この順序を確かめている。<strong>未確認は、<code>RecoverParticipation</code>（a2）と、実際の失効コマンド経由の再送</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.5 🟡 リファクタリング。層ごとの静的解析の違反 0 件</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.6 🔴🟢 <strong>イベントの符号化</strong>: 新しい 6 種類のイベント（<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code>・<code>CredentialRevoked</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code>）の DTO を <code>EventDtos.kt</code> に足し、<code>EventCodec</code>・復号（<code>DtoDecodingGame.kt</code>・<code>DtoDecodingSession.kt</code>）を拡張する。<code>EventCodecSpec</code> の往復と golden（全イベントの種類）に足す。現状の DTO は 9 種類（<code>@SerialName</code> で確認）。計画に無かったため追加した（<code>validating-design</code> 軸 A の A1）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.7 🔴🟢 <strong>投影</strong>: <code>SessionOverview</code>（<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code>。<code>status</code> の <code>PAUSED</code> は V004・仕様・<code>SessionStatus</code> にすでにある）と <code>CurrentDecisions</code>（<code>ProxyDecisionSubmitted</code>）を、<code>Projection.kt</code> に足す。<code>Lobby</code> は資格のイベントを<strong>購読しない</strong>（設計書 L5）ことを、投影の契約テストで確かめる。計画に無かったため追加した（同 A1）</li>
 </ul>
 <p><strong>ゲート 4</strong>: 資格の設計（漏洩時に被害を止められるか）と、否定テストの網羅を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
 <h3 id="step-5">Step 5: 参加・復帰の専用のレート制限（🔴🟢）<a class="headerlink" href="#step-5" title="Permanent link">&para;</a></h3>
@@ -9953,12 +9972,13 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.2 🟢 試行の窓の保存（判断項目 4・5 の決定どおり）。参加（<code>/participations/join</code>）、復帰（<code>/participations/recover</code>）に適用する。上限・窓の値は設定値（根拠は未計測の仮置きとして記録）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.3 🟢 失敗の記録（ログの形。観測の完成は B13）。復帰の失敗の応答は、存在・期限・削除を区別しない（NF-S12）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.4 🟡 リファクタリング</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.5 マイグレーションの番号（判断項目 5 の決定: 試行の窓の表の追加と、V101・V102 の付け替えを承認済み）。<strong>現状の配置は、共通 <code>V001</code>〜<code>V005</code>、PostgreSQL <code>V101</code>（ロールと GRANT）・<code>V102</code>（冪等記録の索引）。データモデルの番号計画は、共通 <code>006</code> が B11（保持）の予約</strong>。試行の窓の表と付け替え後の番号を、<code>006</code> と衝突しない形で決め、データモデルに記録する（<strong>番号は、ゲート 5 で人が確認する</strong>）。<strong>窓の表の GRANT を、同じマイグレーションで書く</strong>（V101 の注記: 以降の表は、その表の GRANT をそのマイグレーションで書く。既定の権限は与えない）。付け替えは永続環境がまだ無い間だけ安全（適用済みの DB は Flyway のチェックサムと版の検証に当たる）ことを確認する。<strong>決定が更新履歴にあるのにステップに無かったため追加</strong>（<code>validating-design</code> 軸 B の B9）</li>
 </ul>
 <p><strong>ゲート 5</strong>: レート制限の方式、保存する情報、スキーマの変更を、人が確認する（<strong>スキーマ変更は確認必須</strong>）。<strong>状態: 人の確認待ち（未承認）。</strong></p>
 <h3 id="step-6-http">Step 6: アプリケーションと HTTP（🔴🟢🟡）<a class="headerlink" href="#step-6-http" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.1 🔴 HTTP の統合テスト（<code>testApplication</code>）を先に書く: 経路・認可（進行役だけが停止・再開・代理入力・失効・再発行）、<code>Idempotency-Key</code> の再送（同じ操作者・同じ本文なら保存済みの応答。<strong>別の操作者の同じキーは <code>app.idempotency_key_reused</code></strong>）、<code>Set-Cookie</code>（<code>HttpOnly</code>・<code>SameSite=Strict</code>・<code>Max-Age</code>）、<code>code</code> と <code>problem+json</code>。失敗を確認する</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.2 🟢 コマンド（<code>Commands.kt</code>）、ルート、DTO の検証、エラーの写像を実装する。参加・復帰の応答に <code>gameId</code>（判断項目 7）。<strong>契約テスト（仕様 ↔ 実装）が緑</strong>になる</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.2 🟢 コマンド（<code>Commands.kt</code>）、ルート、DTO の検証、エラーの写像を実装する。参加・復帰の応答に <code>gameId</code>（判断項目 7）。<strong>契約テスト（仕様 ↔ 実装）が緑</strong>になる。<strong>進行役の復帰用の値（判断項目 9 の案 A）は、現状の設計と異なる</strong>: 資格の生の値は <code>Set-Cookie</code> だけが運び、応答の本文は <code>versions</code> だけ（<code>CommandRoutes.kt</code>、<code>openapi.yaml</code> の <code>createGame</code>、アーキテクチャ・UI 設計）。作成の応答の本文に復帰用の値を足すこと、<strong>再発行した資格を進行役が参加者へ渡す方法</strong>、<code>POST /participations/recover</code> の本文の形は、設計書に無い。<strong>実装の前に、仕様と設計書の案を人が確認する</strong>（ゲート 1・6。<code>validating-design</code> 軸 B の B7）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.3 🟢 TypeScript の型を再生成し、差分 0 の検査を通す</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.4 🟡 リファクタリング。性能: 停止・再開・代理入力は p95 500 ms 以下（NF-P6）。<strong>ローカルの計測値は、実環境の値でないことを明記して記録</strong></li>
 </ul>
@@ -9987,6 +10007,9 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 期限切れ・失効・不明の資格の応答が、区別されない（NF-S12）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 参加・復帰の専用のレート制限が働き、複数のインスタンスで合算される（判断項目 4 の決定による。決定が案 B のときは、<strong>未達として記録</strong>）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 代理入力のイベントに、値・操作者・役割・時刻が残る（AC3.1.2）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 新しい 6 種類のイベントが、<code>EventCodec</code> の往復と golden に含まれ、投影（<code>SessionOverview</code>・<code>CurrentDecisions</code>）が反映する。<code>Lobby</code> は資格のイベントを購読しない</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 復帰の再送（失効した復帰資格）が 403 で、保存済みの応答を返さない（<code>Auth</code> の扱いを含む）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回）が働く（判断項目 10 の決定）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 契約テスト（仕様と実装のずれで CI が落ちる）と、型の生成物の差分 0</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> domain の行 100%（除外・閾値の引き下げなし）、全体の行 85%・分岐 75%。静的解析の違反 0 件、ベースラインなし、<code>@Suppress</code> なし</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 設計書・ADR の変更表が更新され、<code>validating-design</code> を着手前と完了時に実施し、結果を記録した</li>
@@ -10041,8 +10064,363 @@
 </tbody>
 </table>
 <h2 id="validating-design">設計整合性の検証結果（着手前。<code>validating-design</code>）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
-<p><strong>未実施</strong>（Step 0.2）。本書の作成時に確認できた事実（設計書とコードの突き合わせ）は上の各節に記したが、<code>validating-design</code> の 3 軸の検証としては実施していない。実施後に、この節へ結果を記録する。</p>
-<h2 id="_10">更新履歴<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p><strong>2026-11-15 に実施（Step 0.2。claude-code/claude-sonnet-5-5）。コード変更なし。</strong> 正は、設計書・ADR・開発戦略（過去の計画は、設計書に未反映の判断だけ正）。不整合は本書側を修正した。<strong>ステップ計画は 2026-11-15 に人が承認済みのため、下の修正（Step 2.5、4.6、4.7、5.5 の追加ほか）は、承認後の追加である。人の再確認を求める（ゲート 0）。</strong></p>
+<h3 id="_10">検証対象<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li>イテレーション計画: 本書（<code>bolt_5_plan.md</code>）</li>
+<li>局面（開発戦略）: 中盤（B5〜B12）。アプローチ: インサイドアウト（高リスクの B5 は否定テストを先に書く）</li>
+</ul>
+<h3 id="_11">検証結果サマリー<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">軸</th>
+<th style="text-align: left;">検証対象</th>
+<th style="text-align: center;">結果</th>
+<th style="text-align: right;">不整合件数</th>
+<th style="text-align: left;">内訳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">A</td>
+<td style="text-align: left;">開発戦略 ↔ 本書</td>
+<td style="text-align: center;">NG</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">修正 2、人の判断待ち 1</td>
+</tr>
+<tr>
+<td style="text-align: left;">B</td>
+<td style="text-align: left;">本書 ↔ 設計書・ADR</td>
+<td style="text-align: center;">NG</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: left;">修正 7（B1 は設計書の更新を Step 8.3 に残す。B3 は判断を人に残す）、設計書の更新のみ 1（B2）、修正せず注記のみ 1（B7。人の判断待ち）</td>
+</tr>
+<tr>
+<td style="text-align: left;">C</td>
+<td style="text-align: left;">本書 ↔ B1〜B3 の計画・終了報告、U1 総括</td>
+<td style="text-align: center;">NG</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">修正 3（うち 2 件は割り当て先が人の判断待ち）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>合計: 計画側の修正 12 件、人の判断待ち 6 件</strong>（下の H1〜H6）。重大なずれで、修正せず報告のみとしたものは無い（設計との差 B7 は、本書に注記し、判断は人）。</p>
+<p><strong>一致を確認できた点</strong>（不整合なし）: 局面とアプローチ（中盤、インサイドアウト、仕様が先、否定テストが先）、ゲート密度（密）、対象ストーリー（US3.1・3.2）、受入基準の元（AC3.1.<em>・AC3.2.</em>、期限切れ・失効・旧版・失効後の再送の否定テスト）、ドメインモデルのコマンド・イベント（<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code>、<code>RevokeCredential</code>・<code>ReissueCredential</code>・<code>RecoverParticipation</code>、EV-G08〜G10・EV-S02・S03・S06 のペイロード）、<code>PeripheralWrite.RevokeCredentialRow</code> の名前（アーキテクチャ設計）、ADR-004 の順序と B5 のコンプライアンス項目、<code>Lobby</code> が資格のイベントを購読しない規則（L5）、V002 の <code>credentials</code> の列（<code>key_version</code>・<code>expires_at</code>・<code>revoked_at</code>）、<code>beergame_reader</code> が <code>credentials</code> を読めないこと（V101 の GRANT）、ADR の番号（Kotlin 版の ADR-009 は観察者。鍵の版の ADR は beer-game2 の ADR-009 を引き継ぐ。新しい ADR は 015 から）、4 図の掲載、前の Bolt の申し送りの取り込み表、着手前の <code>validating-design</code> と完了時の実施。</p>
+<h3 id="_12">不整合一覧<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<h4 id="a">軸 A: 開発戦略との不整合<a class="headerlink" href="#a" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不整合内容</th>
+<th style="text-align: left;">計画の記述</th>
+<th style="text-align: left;">正しい記述（正となる出典）</th>
+<th style="text-align: left;">出典</th>
+<th style="text-align: left;">修正要否</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">A1</td>
+<td style="text-align: left;">層の順序から<strong>投影とイベントの符号化</strong>が抜けている</td>
+<td style="text-align: left;">Step 2〜4 に、新しいイベントの <code>EventCodec</code>・DTO・golden と、<code>SessionOverview</code>・<code>CurrentDecisions</code> の投影が無い</td>
+<td style="text-align: left;">中盤は「ドメイン → 永続化 → 投影 → アプリケーション → HTTP → 画面」で、層ごとに承認ゲート。B1 は Step 7 で同じ作業を持った</td>
+<td style="text-align: left;">development_strategy.md（中盤のワークフロー）、bolt_1_plan.md の Step 7</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 4.6、4.7、完了条件）</td>
+</tr>
+<tr>
+<td style="text-align: left;">A2</td>
+<td style="text-align: left;">中盤の重点「用語集・イベント一覧を、中盤の最初の Bolt から整える」（Living Documentation）が、計画に無い</td>
+<td style="text-align: left;">言及なし</td>
+<td style="text-align: left;">同左。ただし、注釈の語彙と生成の仕組みは「B1〜B2 で決める」未決のまま。B1〜B3 の終了報告に決定の記録が見つからない</td>
+<td style="text-align: left;">development_strategy.md（Living Documentation の局面ごとの重点、「注釈の語彙と生成の仕組み（未決）」）</td>
+<td style="text-align: left;"><strong>人の判断待ち（H1）</strong>。範囲外の表に記録した</td>
+</tr>
+<tr>
+<td style="text-align: left;">A3</td>
+<td style="text-align: left;">概要の日程が、判断項目 1 の決定（B5 を B4 より先に実施）と食い違う</td>
+<td style="text-align: left;">「B4 の終了後を前提」（2026-12-01〜12-02）</td>
+<td style="text-align: left;">決定は B5 先行</td>
+<td style="text-align: left;">本書の更新履歴（2026-11-15）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（概要）。リリース計画の日程・進捗の更新は<strong>人の判断待ち（H6）</strong></td>
+</tr>
+</tbody>
+</table>
+<h4 id="b-adr">軸 B: 設計書・ADR との不整合<a class="headerlink" href="#b-adr" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不整合内容</th>
+<th style="text-align: left;">計画の記述</th>
+<th style="text-align: left;">正しい記述（正となる出典）</th>
+<th style="text-align: left;">出典</th>
+<th style="text-align: left;">修正要否</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">B1</td>
+<td style="text-align: left;">停止中の拒否の <code>code</code></td>
+<td style="text-align: left;">判断項目 6 の決定は新しい <code>session.paused</code></td>
+<td style="text-align: left;">設計書は「停止中の <code>NotActive</code>（<code>session.not_active</code>）」、UI 設計は <code>code</code> 名の正本をドメインモデルとする</td>
+<td style="text-align: left;">domain-model.md（エラーの表、変更表）、ui-design.md（<code>session.not_active</code> は B5 の停止中の文言と合わせて決める）、openapi.yaml の <code>ErrorCode</code></td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 2.2 に明記）。決定は人のもので、設計書は Step 8.3 で更新する（ドメインモデルの表、UI 設計の辞書、仕様の <code>ErrorCode</code>、ADR-008）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B2</td>
+<td style="text-align: left;">参加・復帰の専用のレート制限の保存先</td>
+<td style="text-align: left;">判断項目 4 の決定は DB の窓の表</td>
+<td style="text-align: left;">設計書は「未決。まず プロセス内 + 前段（WAF）の併用を提案」で、データモデルに表が無い</td>
+<td style="text-align: left;">architecture-backend.md（BD8、未決事項）、data-model.md</td>
+<td style="text-align: left;">計画は決定に従う。<strong>設計書の更新は Step 8.3</strong>（変更なし）。<strong>新しい ADR（015 以降）が要る</strong>（判断項目 15）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B3</td>
+<td style="text-align: left;">ブラウザセッションの分離後の失効</td>
+<td style="text-align: left;">Step 4.3 は「別のダイジェストに分ける」。ER 節は「列の追加は要らない見込み」</td>
+<td style="text-align: left;">設計書は「ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功」。実装は同じダイジェストで両表を結ぶ。分けると、失効でセッションを止める結び付きが無い（<code>browser_sessions</code> に <code>revoked_at</code> も参照も無い）</td>
+<td style="text-align: left;">architecture-backend.md（認証と認可）、V002、<code>JdbcPeripheralStore.kt</code></td>
+<td style="text-align: left;"><strong>修正済み</strong>（ER 節と Step 4.3 に、決める点を明記）。結び付きの方式とスキーマ変更は<strong>人の判断待ち（H2）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">B4</td>
+<td style="text-align: left;">進行役の資格の期限の記述が不正確</td>
+<td style="text-align: left;">「B1 は 30 日で発行している」</td>
+<td style="text-align: left;">DB の期限は作成時 + 保持日数、Cookie の <code>Max-Age</code> が 30 日。期限の値は <code>Wiring.kt</code> の定数</td>
+<td style="text-align: left;"><code>Commands.kt</code>、<code>Wiring.kt</code>、<code>CommandRoutes.kt</code></td>
+<td style="text-align: left;"><strong>修正済み</strong>（資格の状態の表）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B5</td>
+<td style="text-align: left;">復帰（<code>RecoverParticipation</code>）の再送が、ADR-004 の順序の対象になっていない</td>
+<td style="text-align: left;">Step 4.1 は、失効した資格の再送だけ。<code>Auth</code> の種類は未検討</td>
+<td style="text-align: left;">ADR-004: 失効した資格が再送しても保存済みの応答を返さない。現状の <code>Auth</code> は <code>ANONYMOUS</code>・<code>REQUIRED</code> で、<code>ANONYMOUS</code> の操作は再送に保存済みの応答（資格の値を含む）を返す。復帰を <code>ANONYMOUS</code> にすると、失効した復帰資格の再送に、保存済みの新しいセッションが返る</td>
+<td style="text-align: left;">ADR-004、<code>Execute.kt</code>（<code>authenticate</code>、<code>replay</code>）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 1.1、4.1 の a2、4.4、完了条件）。<strong>本 Bolt の最大のリスク（R5）の具体的な形</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">B6</td>
+<td style="text-align: left;"><code>InvalidTransition</code> の性質テストの定義</td>
+<td style="text-align: left;">「許されない状態・コマンドの組が、すべて拒否される」</td>
+<td style="text-align: left;">「有効なコマンド列を <code>decide</code> と <code>evolve</code> で回し、<code>InvalidTransition</code> が 1 件も出ない」</td>
+<td style="text-align: left;">architecture-backend.md（<code>evolve</code> の全域化と <code>InvalidTransition</code>）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 2.3）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B7</td>
+<td style="text-align: left;">進行役の復帰用の値の返し方（判断項目 9 の案 A）</td>
+<td style="text-align: left;">「作成時に一度だけ表示」</td>
+<td style="text-align: left;">設計では、資格は <code>Set-Cookie</code> だけが運び、作成の応答は <code>versions</code> だけ。再発行した資格の受け渡しと <code>recover</code> の本文の形は、設計書に無い</td>
+<td style="text-align: left;">architecture-backend.md（コマンドの応答）、openapi.yaml（<code>createGame</code>）、ui-design.md（資格を含む応答）</td>
+<td style="text-align: left;"><strong>修正せず注記</strong>（Step 6.2）。<strong>設計書・仕様・ADR の案が要る。人の判断待ち（H3）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">B8</td>
+<td style="text-align: left;">判断項目 10（保存回数の上限 9 回）の決定が、ステップに無い</td>
+<td style="text-align: left;">決定は更新履歴にあるが、ステップ・完了条件が無い。<code>SessionData</code> に回数を持たない</td>
+<td style="text-align: left;">決定どおり実装する（NF-C8。コードと文言は設計書も未決）</td>
+<td style="text-align: left;">本書の更新履歴、non-functional.md</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 2.5、完了条件）。<code>code</code>・文言はゲート 1 で人が決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">B9</td>
+<td style="text-align: left;">判断項目 5（マイグレーションの追加と V101・V102 の付け替え）の決定が、ステップに無い</td>
+<td style="text-align: left;">決定は更新履歴にあるが、番号とスキーマの作業のステップが無い</td>
+<td style="text-align: left;">データモデルの番号計画（共通 006 は B11 の保持の予約、PostgreSQL 101〜）。V101 は V102 より小さい番号</td>
+<td style="text-align: left;">data-model.md（マイグレーションの番号計画、V101 と V102 の順序の注意）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 5.5）</td>
+</tr>
+</tbody>
+</table>
+<h4 id="c-bolt">軸 C: 過去の Bolt の計画・終了報告との不整合<a class="headerlink" href="#c-bolt" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">不整合内容</th>
+<th style="text-align: left;">計画の記述</th>
+<th style="text-align: left;">正しい記述（正となる出典）</th>
+<th style="text-align: left;">出典</th>
+<th style="text-align: left;">修正要否</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">C1</td>
+<td style="text-align: left;">B1 の申し送り「役割の入れ替えでの資格の失効」が取り込まれていない</td>
+<td style="text-align: left;">申し送りの表に無い</td>
+<td style="text-align: left;">B1 計画 Step 8: 「資格の失効の書き込み、役割の入れ替えでの失効、復帰は B5」。ただし設計書に入れ替えのコマンド・規則が無い（開始後の入れ替えは未決）</td>
+<td style="text-align: left;">bolt_1_plan.md（Step 8）、domain-model.md、test-strategy.md（H4 の「入れ替えで失効した旧担当者」）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（申し送りの表に、範囲外（人の判断待ち）として追加）。含めるかは<strong>人の判断待ち（H4）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">C2</td>
+<td style="text-align: left;">B2 の申し送りの一部が取り込まれていない</td>
+<td style="text-align: left;">表に無い</td>
+<td style="text-align: left;">U1 総括 #18・#19（タグ整合検査、<code>@Suppress</code> の機械検査、生きたドキュメント、Kover の残り、SSE の契約テスト）は、割り当て先が未定</td>
+<td style="text-align: left;">unit_u1_summary.md（優先度 C）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（申し送りの表に追加）。割り当て先は<strong>人の判断待ち（H5）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">C3</td>
+<td style="text-align: left;"><code>features/</code> の領域の一覧（<code>TAGS.md</code>）に Epic 3 が無い</td>
+<td style="text-align: left;">「<code>features/continuation/</code>」だけ</td>
+<td style="text-align: left;"><code>TAGS.md</code> は領域を Epic に合わせ、<code>game-setup</code>・<code>weekly-play</code>・<code>operations</code> を列挙する。新しい領域は一覧に足す</td>
+<td style="text-align: left;">features/TAGS.md、開発戦略（フィーチャーファイルの整理）</td>
+<td style="text-align: left;"><strong>修正済み</strong>（Step 1.1）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_13">人の判断待ち<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">関連</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">H1</td>
+<td style="text-align: left;">Living Documentation の中盤の重点（用語集・イベント一覧の生成）を、本 Bolt に含めるか、割り当てを先に決めるか</td>
+<td style="text-align: left;">A2</td>
+</tr>
+<tr>
+<td style="text-align: left;">H2</td>
+<td style="text-align: left;">資格の失効でブラウザセッションを止める結び付きの方式と、スキーマ変更（確認必須）</td>
+<td style="text-align: left;">B3、Step 4.3</td>
+</tr>
+<tr>
+<td style="text-align: left;">H3</td>
+<td style="text-align: left;">進行役の復帰用の値、再発行した資格の受け渡し、<code>recover</code> の本文の形（設計書にない。仕様・設計書・ADR の案が要る）</td>
+<td style="text-align: left;">B7、判断項目 9、Step 6.2</td>
+</tr>
+<tr>
+<td style="text-align: left;">H4</td>
+<td style="text-align: left;">役割の入れ替えでの自動失効を B5 に含めるか（設計書にコマンド・規則が無い）</td>
+<td style="text-align: left;">C1</td>
+</tr>
+<tr>
+<td style="text-align: left;">H5</td>
+<td style="text-align: left;">B2 の申し送り（タグ整合検査ほか）の割り当て先</td>
+<td style="text-align: left;">C2</td>
+</tr>
+<tr>
+<td style="text-align: left;">H6</td>
+<td style="text-align: left;">承認済みのステップ計画に、本検証で足したステップ（2.5、4.6、4.7、5.5 ほか）の再確認。所要 2 日の見込み（ステップ増で、さらに厳しい。判断項目 14）。リリース計画の日程・進捗の更新（B5 先行）</td>
+<td style="text-align: left;">A3、判断項目 14</td>
+</tr>
+</tbody>
+</table>
+<h2 id="step-03">設計書のスケッチと実装の差（Step 0.3）<a class="headerlink" href="#step-03" title="Permanent link">&para;</a></h2>
+<p>2026-11-15 に、実ファイルを読んで確認した（コード変更なし）。<strong>確認の範囲は、読んだファイルと、grep の結果。実行はしていない（ビルド・テストの再実行は本ステップの範囲外）。</strong> 設計書の「スケッチ」は、型でなく責務で読む（B1 の学び 6）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">対象</th>
+<th style="text-align: left;">設計書のスケッチ</th>
+<th style="text-align: left;">実装（実ファイル）</th>
+<th style="text-align: left;">差と、B5 への影響</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>GameData</code></td>
+<td style="text-align: left;"><code>gameId</code>・<code>settings</code>・<code>retention</code>・<code>participants</code>・<code>invitations</code>・<code>observers</code>・<code>credentials</code></td>
+<td style="text-align: left;"><code>Game.kt</code>: <code>gameId</code>・<code>settings</code>・<code>participants</code> の 3 つだけ</td>
+<td style="text-align: left;"><code>retention</code> は投影の責務（B1 計画）。<strong><code>credentials: Map&lt;CredentialSubject, CredentialValidity&gt;</code> を足すのが B5</strong>。<code>invitations</code>・<code>observers</code> は B9。<code>GameEvent</code> は 5 種類（<code>GameCreated</code>・<code>ParticipantJoined</code>・<code>RoleAssigned</code>・<code>RoleUnassigned</code>・<code>GameStarted</code>）で、<code>GameCreated.facilitatorCredentialExpiresAt</code> と <code>ParticipantJoined.credentialExpiresAt</code> は<strong>すでに運ぶ</strong>（有効期限の初期値はイベントから導ける）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>GameCommand</code></td>
+<td style="text-align: left;">10 種類</td>
+<td style="text-align: left;"><code>Game.kt</code>: <code>CreateGame</code>・<code>JoinGame</code>・<code>AssignRole</code> の 3 つ</td>
+<td style="text-align: left;"><code>RevokeCredential</code>・<code>ReissueCredential</code>・<code>RecoverParticipation</code> が B5。<code>UnassignRole</code>・観察者のコマンドは範囲外</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SessionState</code></td>
+<td style="text-align: left;"><code>NotStarted</code>・<code>Active</code>・<code>Paused</code>・<code>Ended</code></td>
+<td style="text-align: left;"><code>Session.kt</code>: <code>NotStarted</code>・<code>Active</code>・<code>Ended</code>。<strong><code>Paused</code> は無い</strong>（読んで確認。<code>grep</code> でも domain に <code>Paused</code> は無い）</td>
+<td style="text-align: left;"><code>Paused</code>、<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code>、<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code> が B5。<strong><code>decideSession</code> は冒頭で <code>activeData()</code> を呼び、<code>NotStarted</code> を <code>NotActive</code>、<code>Ended</code> を <code>AlreadyEnded</code> で返す</strong>ため、停止中の分岐は構造から足す必要がある</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SessionData</code></td>
+<td style="text-align: left;">保存回数の記録は書かれていない</td>
+<td style="text-align: left;"><code>Session.kt</code>: <code>gameId</code>・<code>settings</code>・<code>assignments</code>・<code>week</code>・<code>roleStates</code>・<code>decisions</code>・<code>decisionVersions</code>・<code>commitMode</code></td>
+<td style="text-align: left;">保存回数の上限（判断項目 10）には、<strong>回数を持つ項目の追加が要る</strong>（Step 2.5）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SessionError</code></td>
+<td style="text-align: left;"><code>NotActive</code>・<code>AlreadyEnded</code>・<code>Forbidden</code>・<code>WeekAdvanced</code> ほか</td>
+<td style="text-align: left;"><code>Session.kt</code>: <code>NotActive</code>・<code>AlreadyEnded</code>・<code>AlreadyStarted</code>・<code>Forbidden</code>・<code>WeekAdvanced</code>・<code>DecisionConflict</code> など</td>
+<td style="text-align: left;">停止中は、決定どおり <code>session.paused</code> を足す（<code>validating-design</code> B1）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>AppSettings</code></td>
+<td style="text-align: left;">再試行の上限、冪等記録の期限、資格の期限、<strong>鍵の版と鍵</strong></td>
+<td style="text-align: left;"><code>AppPorts.kt</code>: <code>maxAttempts</code>・<code>idempotencyTtl</code>・<code>participantCredentialTtl</code>・<code>credentialKeyVersion</code>（Int）・<code>idempotencySecret</code>・<code>credentialSecret</code>（<strong>鍵は 1 つ</strong>）</td>
+<td style="text-align: left;"><strong>鍵の複数の版は未実装</strong>（KeyRing に当たるものが無い）。期限は <code>participantCredentialTtl</code> の 1 つだけ。<strong>ブラウザセッション・復帰資格・進行役の期限を分ける設定が要る</strong>（判断項目 2・3）。<code>Wiring.kt</code> で、24 時間・30 日・版 1 が<strong>定数</strong>として埋め込まれている</td>
+</tr>
+<tr>
+<td style="text-align: left;">設定の読み込み</td>
+<td style="text-align: left;"><code>CREDENTIAL_KEY</code> 1 つ（設計書は「鍵は複数の版を同時に持つ」）</td>
+<td style="text-align: left;"><code>ServerConfig.kt</code>: <code>CREDENTIAL_KEY</code>・<code>IDEMPOTENCY_KEY</code>・<code>RESPONSE_KEY</code>（それぞれ Base64 の 32 バイト。<code>local</code> 以外は必須で、3 つは別の値）</td>
+<td style="text-align: left;">版つきの複数の鍵の指定（名前は未決。判断項目 3）。Terraform（<code>infra/</code>）の秘密の形に波及する（本 Bolt は変更しない）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Hmac.kt</code></td>
+<td style="text-align: left;">鍵付き HMAC-SHA256（鍵の版は 1）</td>
+<td style="text-align: left;"><code>Hmac.hex(secret, parts)</code>（<code>internal</code>）。各部分に 4 バイトの長さを前置する</td>
+<td style="text-align: left;"><strong>鍵を 1 つ受け取る。版の概念を持たない</strong>。資格のダイジェストは <code>CredentialDigest.of(secret, raw)</code> = <code>Hmac.hex(secret, ["credential", raw])</code>。<strong>版の接頭辞の方式（判断項目 3 の決定）では、生の値から版を読み、版ごとの鍵を引いてから、この関数を呼ぶ形になる</strong>（<code>Hmac</code> 自体は変えなくてよい見込み。未確認）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>SecureTokens.kt</code></td>
+<td style="text-align: left;">資格は 256 ビットの乱数</td>
+<td style="text-align: left;"><code>SecureTokens.newCredential()</code>: 32 バイトの <code>SecureRandom</code> を、URL 安全な Base64（パディングなし、43 文字）にする</td>
+<td style="text-align: left;"><strong>版の接頭辞は無い</strong>。接頭辞を足すと、生の値の形（43 文字）が変わる（Cookie・既存のテスト・仕様の例への影響は未確認）。参加コードは 12 文字（約 60 ビット）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>execute</code> の順序</td>
+<td style="text-align: left;">ロック（共有）→ 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → <code>decide</code> → …</td>
+<td style="text-align: left;"><code>Execute.kt</code> の <code>runCommand</code>: <code>lock.acquireShared</code> → <code>authenticate</code>（<code>Auth.REQUIRED</code> なら <code>verified</code> で資格の有効性、<code>ensure(verified.gameId == request.operation.gameId)</code>）→ <code>idempotency.find</code> → 照合 → <code>handle</code>。再試行のたびに全体を評価し直す。<code>request_digest</code> は本文・範囲・<strong>操作者の ID</strong></td>
+<td style="text-align: left;"><strong>設計どおり</strong>。<strong>失効後の再送が 403 になるかは、実コードとテストで確認した</strong>: 無効な資格（なし・不明・失効・期限切れ・別のゲーム）は、<code>idempotency.find</code> より前に <code>Unauthorized</code>（<code>app.unauthorized</code>）を返し、保存済みの応答を返さない。裏付けのテスト 3 件: <code>ExecuteSpec</code> の「[ADR-004][H4] … 失効した資格が同じキーを再送 … 403 で、冪等記録を検索せず」（<code>calls</code> に <code>idempotency.find</code> が無いことまで検査）、<code>ApplicationFlowContract</code>（実 DB。<code>revoked_at</code> を更新して再送し、<code>snapshot</code> も <code>Unauthorized</code>）、<code>HttpFlowSpec</code>（失効した参加者の資格の状態取得と、期限切れの資格の同じキーの再送が、HTTP 403。<strong>失効した資格の同じキーの再送そのものは、<code>ExecuteSpec</code> と <code>ApplicationFlowContract</code> が担う</strong>）。<strong>限界</strong>: (1) 失効は、テストが <code>revoked_at</code> を直接更新（または <code>World.revoke</code>）しており、<strong>実際の失効コマンドは存在しない</strong>（B5 で実装）。(2) 対象は <code>Auth.REQUIRED</code> の操作。<strong>復帰は未実装で、<code>ANONYMOUS</code> で作ると同じ保証が無い</strong>（<code>validating-design</code> 軸 B の B5）。(3) 実 DB の並行（同時の 2 要求）での検証は未実施（ADR-004 の備考）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>credentials</code>・<code>browser_sessions</code>（V002）</td>
+<td style="text-align: left;"><code>credentials</code>（ダイジェスト、種別、<code>key_version</code>、<code>expires_at</code>、<code>revoked_at</code>）、<code>browser_sessions</code>（24 時間）</td>
+<td style="text-align: left;">V002: <code>credentials</code>（<code>credential_digest</code> が主キー、<code>game_id</code>、<code>kind</code>、<code>subject_id</code>、<code>key_version</code>、<code>issued_at</code>、<code>expires_at</code>、<code>revoked_at</code>）、<code>browser_sessions</code>（<code>credential_digest</code> が主キー、<code>game_id</code>、<code>actor_kind</code>、<code>actor_id</code>、<code>key_version</code>、<code>expires_at</code>）。どちらも <code>game_roots</code> への <code>ON DELETE CASCADE</code></td>
+<td style="text-align: left;">設計どおり。<strong><code>browser_sessions</code> に <code>revoked_at</code> も <code>credentials</code> への参照も無い</strong>（H2）。B1 は、1 つのダイジェストを両表に書く（<code>insertCredential</code>）。<code>AUTHENTICATE_SQL</code> は、同じダイジェストで両表を結び、<code>s.expires_at &gt; now AND c.expires_at &gt; now AND c.revoked_at IS NULL</code> を要求する。<code>credentials</code> の種別は <code>FACILITATOR</code>・<code>PARTICIPANT_RECOVERY</code>（<code>OBSERVER_INVITATION</code> は B9）で、<strong>ドメインの <code>CredentialSubject</code> の種別（FACILITATOR・PARTICIPANT・OBSERVER）とは名前が違う</strong>（保存の種別と主体の種別。混同しない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">ロールと GRANT（V101）</td>
+<td style="text-align: left;"><code>beergame_reader</code> は <code>credentials</code>・<code>browser_sessions</code>・<code>idempotency_records</code> を読めない</td>
+<td style="text-align: left;"><code>V101__database_roles.sql</code>: <code>beergame_writer</code> は <code>credentials</code>・<code>browser_sessions</code> ほかに <code>SELECT, INSERT, UPDATE, DELETE</code>。<code>beergame_reader</code> の GRANT に <code>credentials</code> は含まれない。<code>beergame_observer</code> は 3 表だけ</td>
+<td style="text-align: left;">設計どおり（Step 4.1 の g の「確認」は、V101 の読みで事実は確認済み。実行して確かめるのは Step 4）。V101 は <code>postgres/</code> にあり、V102 より小さい番号（付け替えは判断項目 5）</td>
+</tr>
+<tr>
+<td style="text-align: left;">レート制限</td>
+<td style="text-align: left;">全体に加え、参加・復帰・観察用の招待の参加を専用に制限。状態の共有は未決（BD8）</td>
+<td style="text-align: left;"><code>Guards.kt</code>・<code>SecurityPolicies.kt</code>: <strong>全ての要求（<code>/health</code>・<code>/ready</code> を除く）を、接続元（<code>call.request.origin.remoteHost</code>）ごとの固定窓（既定 600 件/分）で数える</strong>。状態は <code>RateLimiter</code> のメモリ（<code>LinkedHashMap</code>、鍵は最大 10,000 件）。<code>X-Forwarded-For</code> を読む実装は見つからなかった（grep）</td>
+<td style="text-align: left;"><strong>参加・復帰の専用の制限は無い</strong>。窓の鍵は生の <code>remoteHost</code>（判断項目 4 の決定は、鍵付きの要約）。<strong>ALB の背後では接続元が ALB になる</strong>（設計書の未決）。<strong>認証失敗・形式不正を数える単位（本文の解析の後か）も未実装</strong>（project.md の Corrections の規則は、beer-game3 のもの。Kotlin 版は別に決める）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>openapi.yaml</code></td>
+<td style="text-align: left;">設計書の経路: <code>pause</code>・<code>resume</code>・<code>proxy-decisions</code>・<code>credentials/revoke</code>・<code>reissue</code>・<code>participations/recover</code></td>
+<td style="text-align: left;">11 本の経路（<code>createGame</code>・<code>getLobby</code>・<code>assignRole</code>・<code>joinGame</code>・<code>startGame</code>・<code>saveDecision</code>・<code>commitWeek</code>・<code>getSessionState</code>・<code>getGameState</code>・<code>getHealth</code>・<code>getReady</code>）。<strong>停止・代理入力・資格・復帰の経路は無い</strong>。<code>ErrorCode</code> に <code>session.paused</code> 等は無い。<code>SessionStatus</code> の <code>PAUSED</code> と、429（<code>app.rate_limited</code>）は<strong>すでにある</strong></td>
+<td style="text-align: left;">仕様が先（Step 1.2）。参加の応答（<code>joinGame</code> の 200）は <code>versions</code> だけで、<strong><code>gameId</code> は無い</strong>（判断項目 7）。作成の応答は <code>Location</code> が <code>gameId</code> を運ぶ</td>
+</tr>
+<tr>
+<td style="text-align: left;">設定値の置き場</td>
+<td style="text-align: left;">設計書: 資格の期限は設定値にする</td>
+<td style="text-align: left;"><code>Wiring.kt</code>: <code>IDEMPOTENCY_TTL_HOURS = 24</code>、<code>PARTICIPANT_CREDENTIAL_TTL_DAYS = 30</code>、<code>CREDENTIAL_KEY_VERSION = 1</code> が定数。<code>ServerConfig</code> は設定にしていない</td>
+<td style="text-align: left;">判断項目 2 の決定（設定値にする）には、<strong><code>ServerConfig</code> と <code>AppSettings</code> の拡張が要る</strong>（Step 4.3）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>失効後の再送が 403 になるか（結論）</strong>: 現在の実装では、<strong><code>Auth.REQUIRED</code> の操作は、失効した資格の再送に 403（<code>app.unauthorized</code>）を返す</strong>（実コードの順序と、3 層の既存テストによる。<code>credentials.revoked_at</code> を直接更新した場合）。<strong>B5 で新しく足す失効コマンド・復帰・鍵の版・セッションの分離が、この保証を保つかは未確認で、Step 4 で否定テストを先に書いて確かめる。</strong></p>
+<h2 id="_14">更新履歴<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10052,6 +10430,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>Step 0.1〜0.3 を実施</strong>（コード変更なし。<strong>ゲート 0 は人の確認待ちのまま。承認は記録していない</strong>）。<code>validating-design</code>（着手前）の結果を記録: 軸 A・B・C はいずれも NG で、計画側の修正 12 件と、人の判断待ち 6 件（H1〜H6）。設計書のスケッチと実装の差を、実ファイルで確認して記録。<strong>修正の内容: Step 1.1、2.2、2.3、3.1、4.1、4.3、4.4 の記述を直し、Step 2.5、4.6、4.7、5.5 と完了条件 3 件を追加。概要の日程、資格の状態の表、ER 図の節、範囲外の表（4 行）を修正。承認済みのステップ計画への追加のため、人の再確認を求める</strong></td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>ステップ計画をユーザーが承認</strong>（選択: 「計画を承認」。ゲートは含まない）</td>
