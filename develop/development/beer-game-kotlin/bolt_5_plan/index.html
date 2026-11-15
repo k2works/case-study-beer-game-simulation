@@ -10840,7 +10840,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 7.2 🟢 S03 の復帰、S06 の停止・再開、S05 の停止中の表示。文言は一般の文言に統一し、失敗の文言は送った資格の種類から選ぶ（UI 設計）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 7.3 🟡 アクセシビリティ（WCAG 2.2 AA）の確認。<strong>手動の確認は人</strong>（B15 で網羅。ここでは対象の画面だけ）。<strong>自動確認は、axe を導入せず（依存の追加は確認必須）、DOM の構造の検査（自前）にとどめた</strong>。コントラスト比・200% 拡大・キーボードの順序・スクリーンリーダーは未実施（人・B15）</li>
 </ul>
-<p><strong>ゲート 7</strong>: UI の範囲と文言を、人が確認する。判断項目 13 で UI を含めない場合、このステップは<strong>範囲外</strong>とし、理由を記録する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 7</strong>: UI の範囲と文言を、人が確認する。判断項目 13 で UI を含めない場合、このステップは<strong>範囲外</strong>とし、理由を記録する。<strong>状態: 2026-11-15 にユーザーが承認し、確認点 1〜7 を報告どおりに確定した。axe は導入しない（選択: 「承認、報告どおり・axe は導入しない」）。</strong></p>
 <h4 id="step-7-2026-11-15">Step 7 の実施結果（2026-11-15）<a class="headerlink" href="#step-7-2026-11-15" title="Permanent link">&para;</a></h4>
 <p>実施者: claude-code/claude-sonnet-5-5。<strong>実測の事実だけを書く。ゲート 7 の承認は記録していない。Step 8 以降には進んでいない。バックエンド・仕様・スキーマの変更は無い</strong>（<code>openapi.yaml</code> と生成した型は変えていない。<code>api:check</code> の再実行は不要だった）。</p>
 <p><strong>手順（TDD・BDD）</strong>: 先に、コンポーネントのテスト（<code>web/src</code> の 6 ファイル）と、<code>@ui</code> の日本語 Gherkin 6 シナリオ（ステップ定義・窓口を含む）を書き、<strong>失敗を確認</strong>してから実装した。Red の実測: <code>npx vitest run</code> は 109 件中 <strong>39 件が失敗</strong>（既存の 70 件は通る）。<code>npm run acceptance</code>（<code>@ui</code>）は 7 シナリオ中 <strong>6 件が失敗</strong>（新しい 6 件。既存のウォーキングスケルトンの 1 件は通る。画面に操作が無く、待ち時間の超過で失敗）。実装のあと、すべて緑。<strong>順序を守れなかった箇所は無い</strong>（テスト補助 <code>fakeApi</code> の新メソッドと、構造の検査 <code>a11y.ts</code> は、テストと同時に書いた道具）。</p>
@@ -11014,6 +11014,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.3 設計書・ADR の更新（変更表）と、<code>validating-design</code>（完了時）。新しい ADR（判断項目 3・4）は<strong>提案として記録し、承認は人</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4 🟢 <strong>Living Documentation の用語集・イベント一覧の生成（H1）</strong>。H1 を B5 に含める決定（2026-11-15）で追加した。<a href="../development_strategy/">開発戦略</a>が「B1〜B2 で決める」とした未決（<strong>注釈の語彙と生成の仕組み</strong>）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、<strong>ADR を提案として書く</strong>（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の <code>EventCodec</code> の種別の一覧、<code>@SerialName</code>、ドメインモデルの EV 表を突き合わせる検査を含める。<strong>生成物と設計書の ID（EV-G<em>、EV-S</em>）の不一致で CI が落ちる</strong>形を目指す）。(c) 生成物を <code>docs/</code> に置く導線を作る（新規ファイルの作成は確認必須）。<strong>B5 で足す 6 種類のイベントが、一覧に載る</strong>ことを、完了条件とする。<strong>未確認</strong>: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4b 🔴🟢 <strong>実 DB（PostgreSQL 18）の並行テスト</strong>: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4c 🟡 <strong>不安定な試験の修正</strong>: 「応答に <code>998</code> が含まれない」を <code>shouldNotContain "998"</code> で確かめる 3 箇所（<code>ApplicationFlowContract</code>、<code>HttpFlowSpec</code>、<code>PostgresHttpSpec</code>）を、項目単位の検査に直す（ランダムな UUID で偶発的に失敗する。2026-11-15 にユーザーが「直す（項目単位の検査）」と決定）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.5 Bolt 終了報告（<code>bolt_5_report.md</code>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。<strong>承認を捏造しない</strong></li>
 </ul>
 <p><strong>ゲート 8</strong>（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
@@ -11487,6 +11488,11 @@
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施</strong>（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。<code>SessionState.Paused</code>、<code>PauseSession</code>・<code>ResumeSession</code>・<code>SubmitProxyDecision</code>、<code>SessionPaused</code>・<code>SessionResumed</code>・<code>ProxyDecisionSubmitted</code>、<code>Editor.ByFacilitator</code>、<code>session.paused</code>・<code>session.not_paused</code>・<code>session.save_limit_reached</code> を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。<code>evolveSession</code> を <code>SessionEvolve.kt</code> へ分割（detekt の指摘の解消）。<code>InvalidTransition</code> の性質テスト（500 回）。永続化の DTO を最小で前倒し。<strong>実測</strong>: domain 300 件・失敗 0・行 879/879（100%）、<code>:app:test</code> は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の <code>code</code> の表・不変条件・差の表を更新</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ゲート 7 をユーザーが承認し、確認点 1〜7 を報告どおりに確定</strong>（選択: 「承認、報告どおり・axe は導入しない」）。UI の範囲（代理入力・失効・再発行・終了は範囲外）、復帰の入口、計画外の足し 4 点、提案文言、復帰後の行き先、SSE 未実装、新規ファイル 5 点。axe は導入しない。<strong>不安定な試験（<code>998</code> の検査）は項目単位の検査に直す</strong>（選択: 「直す（項目単位の検査）」。Step 8 の 8.4c）。CI は 8 ジョブすべて success（<code>646c23a</code>）。ゲート 8 は未承認</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>
