@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: [bolt_5_report](/development/beer-game-kotlin/bolt_5_report.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_6_plan](/development/beer-game-kotlin/bolt_6_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Verification**: [018-living-documentation-annotations](/adr/beer-game-kotlin/018-living-documentation-annotations.md) を human:kakimomokuri が検証
 * **Verification**: [017-attempt-window-in-database](/adr/beer-game-kotlin/017-attempt-window-in-database.md) を human:kakimomokuri が検証
 * **Verification**: [016-credential-key-versions](/adr/beer-game-kotlin/016-credential-key-versions.md) を human:kakimomokuri が検証
