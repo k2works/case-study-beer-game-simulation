@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: コードの全行理解と U1 判断項目の承認を記録
 * **Update**: コードの全行理解と U1 判断項目の承認を記録
 * **Update**: コードの全行理解と U1 判断項目の承認を記録
