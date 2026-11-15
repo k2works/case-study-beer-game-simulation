@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:33:58Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -418,7 +418,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [x] 4.6 🔴🟢 **イベントの符号化**: 新しい 6 種類のイベント（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）の DTO を `EventDtos.kt` に足し、`EventCodec`・復号（`DtoDecodingGame.kt`・`DtoDecodingSession.kt`）を拡張する。`EventCodecSpec` の往復と golden（全イベントの種類）に足す。現状の DTO は 9 種類（`@SerialName` で確認）。計画に無かったため追加した（`validating-design` 軸 A の A1）。**入れ替えの 2 種類（`ParticipantReplaced`・`RoleHolderReplaced`）の golden も対象に含める（2026-11-15 にユーザーが決定。Step 3.5 で往復は実装済み）**
 - [x] 4.7 🔴🟢 **投影**: `SessionOverview`（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`。`status` の `PAUSED` は V004・仕様・`SessionStatus` にすでにある）と `CurrentDecisions`（`ProxyDecisionSubmitted`）を、`Projection.kt` に足す。`Lobby` は資格のイベントを**購読しない**（設計書 L5）ことを、投影の契約テストで確かめる。計画に無かったため追加した（同 A1）。**`lobby_participants` の投影に `ParticipantReplaced` の購読（`replaced_at`。マイグレーションは Step 5.5）と、`RoleHolderReplaced` による `session` 側の反映の確認を足す（2026-11-15 にユーザーが決定）**
 
-**ゲート 4**: 資格の設計（漏洩時に被害を止められるか）と、否定テストの網羅を、人が確認する。**状態: 人の確認待ち（未承認）。**
+**ゲート 4**: 資格の設計（漏洩時に被害を止められるか）と、否定テストの網羅を、人が確認する。**状態: 2026-11-15 にユーザーが承認し、確認点 1〜6 を報告どおりに確定した（選択: 「承認、報告どおりで確定」）。**
 
 #### Step 4 の実施結果（2026-11-15）
 
@@ -523,6 +523,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] 8.2 全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、`web` の検証が緑。CI で、GitHub Actions 上の実行を確認する（**push は人の判断**。ローカルだけの結果を「CI で動く」と書かない）
 - [ ] 8.3 設計書・ADR の更新（変更表）と、`validating-design`（完了時）。新しい ADR（判断項目 3・4）は**提案として記録し、承認は人**
 - [ ] 8.4 🟢 **Living Documentation の用語集・イベント一覧の生成（H1）**。H1 を B5 に含める決定（2026-11-15）で追加した。[開発戦略](./development_strategy.md)が「B1〜B2 で決める」とした未決（**注釈の語彙と生成の仕組み**）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、**ADR を提案として書く**（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の `EventCodec` の種別の一覧、`@SerialName`、ドメインモデルの EV 表を突き合わせる検査を含める。**生成物と設計書の ID（EV-G*、EV-S*）の不一致で CI が落ちる**形を目指す）。(c) 生成物を `docs/` に置く導線を作る（新規ファイルの作成は確認必須）。**B5 で足す 6 種類のイベントが、一覧に載る**ことを、完了条件とする。**未確認**: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）
+- [ ] 8.4b 🔴🟢 **実 DB（PostgreSQL 18）の並行テスト**: 資格の失効と復帰の同時実行が、ゲームのストリームの版の競合で直列化されることを確かめる（ゲート 4 の確認点 1 で未実施と報告。2026-11-15 のゲート 4 の承認の際に、Step 8 までに追加する扱いとした）
 - [ ] 8.5 Bolt 終了報告（`bolt_5_report.md`）。**デモ項目の実操作の申告欄**（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
 
 **ゲート 8**（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。**状態: 人の確認待ち（未承認）。**
@@ -655,6 +656,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 | 2026-11-15 | **Step 3.5.1（役割の入れ替えの仕様と設計書）を実施**（ゲート 3.5 は人の確認待ち。**承認は記録していない**。3.5.2 以降は着手していない。Kotlin のコードとマイグレーションは書いていない）。`openapi.yaml` の `assignRole` に規則を書き（新しい `code` なし、`LobbyParticipant.replaced` を条件付きで追加）、`api:generate`・`api:check`・`api:lint` を実行（差分 0・有効）。設計書（`domain-model.md` の「役割の入れ替え」・イベント EV-G12・EV-S09・差の表 37、`data-model.md` の「役割の入れ替えと永続化」ほか）と `credentials.feature` の 6 シナリオを追加。**確認した事実: Kotlin 版に `participants.replaced_at` に当たる列は無い（スキーマ変更の要否は確認必須の人の判断）。`session` の割り当ての写し（D4）の更新が要るため、入れ替えは 2 ストリームにまたがる**。`ApiContractSpec` は 13 件中 7 件 failed（Step 3 と同じ。新しい Red なし）。人が確認する 8 点は「Step 3.5.1 の結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3（Game の資格: 失効・再発行・復帰。3.1〜3.3）を実施**（ゲート 3 は人の確認待ち。**承認は記録していない**。Step 3.5 以降は未着手）。テストを先に書き、コンパイルエラー 119 件の Red を確認してから実装。`Credential.kt`（新規）に `CredentialSubject`・`CredentialValidity`・資格の decide を、`Game.kt` に `RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`、`game.credential_already_revoked`・`game.credential_not_revoked` を追加。仕様に `game.credential_not_revoked` を足し型を再生成。永続化の DTO を最小で前倒し。実測: `:domain:test` 357 件・失敗 0、domain の行 970/970（100%）、`:app:test` は想定の 7 件の Red（Step 1 の `ApiContractSpec`）、静的解析は違反 0。ゲート 3 で人が確認する 6 点は「Step 3 の実施結果」。設計書（domain-model の差の表 35・36 ほか）を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施**（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。`SessionState.Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`、`Editor.ByFacilitator`、`session.paused`・`session.not_paused`・`session.save_limit_reached` を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。`evolveSession` を `SessionEvolve.kt` へ分割（detekt の指摘の解消）。`InvalidTransition` の性質テスト（500 回）。永続化の DTO を最小で前倒し。**実測**: domain 300 件・失敗 0・行 879/879（100%）、`:app:test` は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の `code` の表・不変条件・差の表を更新 | claude-code/claude-sonnet-5-5 |
+| 2026-11-15 | **ゲート 4 をユーザーが承認し、確認点 1〜6 を報告どおりに確定**（選択: 「承認、報告どおりで確定」）。進行役の資格は失効・再発行の対象外のまま、設定名と既定の期限（24 時間・30 日。運営者との合意 R11 は未取得）、資格の値の長さ 46 文字・冪等記録の本文形式 `v2`・`CredentialCommands.kt` の `internal`、新規ファイル（`CredentialKeyRing.kt`、`CredentialCommands.kt`、`JdbcPeripheralRows.kt`、試験 3 件）、`replaced_at` の保留（Step 5.5 まで）。実 DB の並行テストは Step 8（8.4b）に追加。ゲート 5〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 3.5（入れ替えの実装 3.5.3）をユーザーが承認し、確認点 1〜5 を報告どおりに確定**（選択: 「承認、報告どおりで確定」）。あわせて、`lobby_participants` の投影と入れ替えイベント 2 種類の golden を Step 4.6・4.7 に追加すると決定（選択: 「Step 4.6・4.7 に追加」）。ゲート 4〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3.5.1 の仕様をユーザーが承認**（選択: 「案 A と構造追加を承認」「ゲート 3.5 を承認、提案どおり」）。スキーマ変更は案 A（`lobby_participants.replaced_at` の追加。マイグレーション追加は確認済み）、構造は `assignRoleAfterStart`（2 ストリーム）と `ParticipantReplaced`・`RoleHolderReplaced`、確認点 3〜8 は提案どおり。実装（3.5.2〜3.5.4）の結果の確認は、実装後に再度人が行う。ゲート 4〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 3 をユーザーが承認し、確認点 1〜6 を報告どおりに確定**（選択: 「承認、報告どおり・期限の検査なし」）。失効・再発行の対象は参加者のみ、期限切れで未失効の資格は失効後に再発行、`CredentialValidity` は `expiresAt` と `revoked`、復帰の失敗は同一の `Forbidden`、復帰は期限を更新、新規 `Credential.kt` ほか。**再発行・復帰の新しい期限の検査はドメインに足さない**。ゲート 3.5〜8 は未承認 | claude-code/claude-sonnet-5-5 |
