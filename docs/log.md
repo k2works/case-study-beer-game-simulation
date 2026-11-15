@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Verification**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を human:kakimomokuri が検証
+* **Update**: B5 ゲート 0 承認を記録
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Verification**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を human:kakimomokuri が検証
 * **Update**: B5 計画の承認と判断項目 16 件の決定を記録
