@@ -11,16 +11,21 @@ import kotlinx.coroutines.runBlocking
  * （detekt 1.23.8 は、別のモジュールの suspend 関数の呼び出しを検出できず、suspend の修飾を冗長と誤判定するため）。
  */
 
-/** 1 人の参加者。生の資格は、応答だけが運んだ値（世界には、そのダイジェストだけがある）。 */
+/**
+ * 1 人の参加者。生の資格は、応答だけが運んだ値（世界には、そのダイジェストだけがある）。
+ * [credential] はブラウザセッションの値、[recovery] は復帰資格の値（別の乱数・別のダイジェスト）。
+ */
 data class Seat(
     val participantId: ParticipantId,
     val credential: String,
+    val recovery: String,
 )
 
 data class Created(
     val gameId: GameId,
     val facilitator: String,
     val joinCode: String,
+    val facilitatorRecovery: String,
 )
 
 data class Prepared(
@@ -42,7 +47,7 @@ fun World.createGame(
             store.joinCodes.entries
                 .first { it.value == outcome.gameId }
                 .key
-        Created(outcome.gameId, checkNotNull(outcome.issued).raw, code)
+        Created(outcome.gameId, checkNotNull(outcome.issued).raw, code, checkNotNull(outcome.recovery).raw)
     }
 
 fun World.join(
@@ -53,7 +58,7 @@ fun World.join(
     runBlocking {
         val outcome = ports.joinGame(JoinGameInput(created.joinCode, name), meta(key)).ok()
         val issued = checkNotNull(outcome.issued)
-        Seat(ParticipantId(checkNotNull(issued.actor.id)), issued.raw)
+        Seat(ParticipantId(checkNotNull(issued.actor.id)), issued.raw, checkNotNull(outcome.recovery).raw)
     }
 
 /** 4 人が参加し、役割（工場、一次卸、二次卸、小売店）に 1 人ずつ割り当て済み。開始前。 */

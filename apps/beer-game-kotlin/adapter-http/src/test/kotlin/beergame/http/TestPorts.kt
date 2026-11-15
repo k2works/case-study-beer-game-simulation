@@ -4,6 +4,7 @@ import arrow.core.Either
 import beergame.application.AppFailure
 import beergame.application.AppSettings
 import beergame.application.ChangeNotifier
+import beergame.application.CredentialKeyRing
 import beergame.application.EventStore
 import beergame.application.Generators
 import beergame.application.IdempotencyStore
@@ -68,6 +69,7 @@ fun stubPorts(
                     PeripheralStore(
                         write = { _, _ -> unreachable("peripheral.write") },
                         authenticate = { _, _, _ -> unreachable("peripheral.authenticate") },
+                        authenticateRecovery = { _, _, _ -> unreachable("peripheral.authenticateRecovery") },
                         findGameByJoinCode = { _, _ -> unreachable("peripheral.findGameByJoinCode") },
                     ),
                 reader = ProjectionReader { unreachable("reader") },
@@ -87,10 +89,14 @@ fun stubPorts(
             AppSettings(
                 maxAttempts = 3,
                 idempotencyTtl = Duration.ofHours(24),
+                sessionTtl = Duration.ofHours(24),
                 participantCredentialTtl = Duration.ofDays(30),
-                credentialKeyVersion = 1,
                 idempotencySecret = ByteArray(32) { it.toByte() },
-                credentialSecret = ByteArray(32) { (it + 7).toByte() },
+                credentialKeys =
+                    when (val ring = CredentialKeyRing.of(1, mapOf(1 to ByteArray(32) { (it + 7).toByte() }))) {
+                        is Either.Right -> ring.value
+                        is Either.Left -> unreachable("credentialKeys: ${ring.value}")
+                    },
             ),
     )
 

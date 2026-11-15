@@ -123,7 +123,7 @@ fun startApi(
         )
     val deps =
         HttpDeps(
-            ports = appPorts(persistence, config.secrets, config.maxAttempts),
+            ports = appPorts(persistence, config.secrets, config.maxAttempts, ttls = CredentialTtls.of(config)),
             database = databaseProbe(dataSource),
             settings =
                 HttpSettings(

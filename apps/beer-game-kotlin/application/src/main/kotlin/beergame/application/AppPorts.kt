@@ -12,19 +12,22 @@ typealias NewId = suspend () -> UUID
 
 /**
  * アプリケーション層の設定。値は外から注入する（`app` が読む）。
- * 値の根拠のうち設計書にあるのは、冪等記録の 24 時間（NF-R6）と、復帰資格の 30 日（NF-S4 の例）だけ。
+ * 値の根拠のうち設計書にあるのは、冪等記録の 24 時間（NF-R6）と、ブラウザセッションの 24 時間・復帰資格の 30 日
+ * （NF-S4 の例）だけ。運営者との合意（R11）は未取得で、合意の前に永続環境へ出さない（B5 判断項目 2）。
  * [maxAttempts]（競合の再試行の上限）は、設計書が「実装開始時に決める」とする未決で、既定を置かない。
  */
 class AppSettings(
     /** 追記の競合の再試行を含む、1 つのコマンドの試行回数の上限（1 以上。1 未満は 1 として扱う）。 */
     val maxAttempts: Int,
     val idempotencyTtl: Duration,
+    /** ブラウザセッション（`browser_sessions`）の期限。 */
+    val sessionTtl: Duration,
+    /** 参加者の復帰資格の期限（作成・参加・復帰で新しくする）。進行役の復帰資格は、ゲームの保持期間が決める。 */
     val participantCredentialTtl: Duration,
-    val credentialKeyVersion: Int,
     /** 冪等キーと要求の digest の鍵（32 バイト）。 */
     val idempotencySecret: ByteArray,
-    /** 資格の digest の鍵（32 バイト）。冪等記録の鍵とは別にする。 */
-    val credentialSecret: ByteArray,
+    /** 資格の digest の鍵束（版ごとの 32 バイトの鍵）。冪等記録の鍵とは別にする。 */
+    val credentialKeys: CredentialKeyRing,
 )
 
 /**

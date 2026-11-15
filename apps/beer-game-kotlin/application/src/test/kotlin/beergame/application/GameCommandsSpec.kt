@@ -44,25 +44,29 @@ class GameCommandsSpec :
 
             val outcome = world.ports.createGame(VALID, meta("create-1")).ok()
             val raw = checkNotNull(outcome.issued).raw
+            val recoveryRaw = checkNotNull(outcome.recovery).raw
 
-            val digest = CredentialDigest.of(world.settings.credentialSecret, raw)
-            digest shouldBe
-                world.store.credentials.keys
-                    .single()
-            (digest == raw) shouldBe false
+            val sessionDigest = CredentialDigest.of(CREDENTIAL_KEY_V1, raw)
+            val recoveryDigest = CredentialDigest.of(CREDENTIAL_KEY_V1, recoveryRaw)
             world.store.browserSessions.keys
-                .single() shouldBe digest
-            val row = world.store.credentials.getValue(digest)
+                .single() shouldBe sessionDigest
+            world.store.credentials.keys
+                .single() shouldBe recoveryDigest
+            (sessionDigest == recoveryDigest) shouldBe false
+            (sessionDigest == raw) shouldBe false
+            val row = world.store.credentials.getValue(recoveryDigest)
             row.kind shouldBe CredentialKind.FACILITATOR
             row.subjectId shouldBe outcome.gameId.value
             row.keyVersion shouldBe 1
             row.expiresAt shouldBe T0.plus(Duration.ofDays(90))
-            world.store.projected
-                .map { it.payload.toString() }
-                .none { it.contains(raw) } shouldBe true
-            world.store.streams.values
-                .flatten()
-                .none { it.payload.toString().contains(raw) } shouldBe true
+            listOf(raw, recoveryRaw).forEach { value ->
+                world.store.projected
+                    .map { it.payload.toString() }
+                    .none { it.contains(value) } shouldBe true
+                world.store.streams.values
+                    .flatten()
+                    .none { it.payload.toString().contains(value) } shouldBe true
+            }
         }
 
         test("[US1.1/AC1.1.1] Given 作成の要求 When 同じキーで再送する Then ゲームは 1 つのままで、同じ応答（同じ進行役の資格）を返す") {
@@ -119,14 +123,15 @@ class GameCommandsSpec :
             issued.kind shouldBe CredentialKind.PARTICIPANT_RECOVERY
             issued.actor.id shouldBe joined.participantId.value
             world.store.displayNames[joined.participantId] shouldBe "田中"
-            val digest = CredentialDigest.of(world.settings.credentialSecret, issued.raw)
+            val recoveryRaw = checkNotNull(outcome.recovery).raw
             world.store.credentials
-                .getValue(digest)
+                .getValue(CredentialDigest.of(CREDENTIAL_KEY_V1, recoveryRaw))
                 .kind shouldBe CredentialKind.PARTICIPANT_RECOVERY
             world.store.browserSessions
-                .getValue(digest)
-                .first shouldBe created.gameId
+                .getValue(CredentialDigest.of(CREDENTIAL_KEY_V1, issued.raw))
+                .gameId shouldBe created.gameId
             (issued.raw in world.store.credentials.keys) shouldBe false
+            (recoveryRaw in world.store.credentials.keys) shouldBe false
             world.store.streams.values
                 .flatten()
                 .none { it.payload.toString().contains("田中") } shouldBe true
@@ -366,7 +371,7 @@ class GameCommandsSpec :
         test("[AC1.2.1] Given 進行役の資格のダイジェスト When 認証する Then 操作者は進行役で、ゲームは資格のゲーム") {
             val world = World()
             val created = world.createGame()
-            val digest = CredentialDigest.of(world.settings.credentialSecret, created.facilitator)
+            val digest = CredentialDigest.of(CREDENTIAL_KEY_V1, created.facilitator)
 
             val verified =
                 world.ports.events
@@ -380,6 +385,6 @@ class GameCommandsSpec :
 
             verified?.actor shouldBe Actor.Facilitator(created.gameId)
             verified?.gameId shouldBe created.gameId
-            world.store.credentials.keys shouldContain digest
+            world.store.browserSessions.keys shouldContain digest
         }
     })

@@ -169,6 +169,37 @@ class RolePrivilegesSpec :
             }
         }
 
+        test(
+            "[B5/4.3] Given 書き込みロール When 資格の失効（credentials の UPDATE、browser_sessions の DELETE）を実行する Then できる。ほかのロールは資格の行を変更できない",
+        ) {
+            val id = UUID.randomUUID()
+            val subject = UUID.randomUUID()
+            asRole(WRITER) { c ->
+                c.exec("INSERT INTO game_roots (game_id, created_at) VALUES ('$id', now())")
+                c.exec(
+                    "INSERT INTO credentials VALUES ('recovery-$id', '$id', 'PARTICIPANT_RECOVERY', '$subject', 1, now(), now() + interval '1 day', NULL)",
+                )
+                c.exec(
+                    "INSERT INTO browser_sessions VALUES ('session-$id', '$id', 'PARTICIPANT', '$subject', 1, now() + interval '1 day')",
+                )
+                c.exec(
+                    "UPDATE credentials SET revoked_at = now() WHERE game_id = '$id' " +
+                        "AND kind = 'PARTICIPANT_RECOVERY' AND subject_id = '$subject' AND revoked_at IS NULL",
+                ) shouldBe 1
+                c.exec(
+                    "DELETE FROM browser_sessions WHERE game_id = '$id' AND actor_kind = 'PARTICIPANT' AND actor_id = '$subject'",
+                ) shouldBe 1
+            }
+
+            listOf(READER, OBSERVER, DELETER).forEach { role ->
+                denied(role, "UPDATE credentials SET revoked_at = now() WHERE game_id = '$id'")
+                denied(role, "DELETE FROM browser_sessions WHERE game_id = '$id'")
+            }
+            val countSql = "SELECT count(*) FROM credentials WHERE game_id = '$id' AND revoked_at IS NOT NULL"
+            val revokedRows = asOwner { c -> c.queryList(countSql) { it.getInt(1) }.single() }
+            revokedRows shouldBe 1
+        }
+
         test("[3.1] Given 4 つのロール When 表の所有者と所有者ロールのメンバーかを調べる Then いずれでもなく、特権も持たない") {
             asOwner { c ->
                 val tables =

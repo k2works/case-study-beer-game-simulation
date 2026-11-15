@@ -19,13 +19,15 @@ data class Versions(
 
 /**
  * コマンドの成功の応答。画面の表示に使う内容は持たない（ストリームごとの版だけ。H8）。
- * [issued] は、資格を発行した操作（作成、参加）の応答だけが持ち、生の値を運ぶ。冪等記録は、これを暗号化して保存する。
+ * [issued] はブラウザセッションの値、[recovery] は復帰資格の値（復帰コード）。どちらも、資格を発行した操作
+ * （作成、参加、復帰、再発行）の応答だけが持ち、生の値を運ぶ（再表示しない）。冪等記録は、これらを暗号化して保存する。
  * [gameId] は、作成の再送が同じゲームを返すために要る。
  */
 data class CommandOutcome(
     val gameId: GameId,
     val versions: Versions,
     val issued: IssuedCredential? = null,
+    val recovery: IssuedCredential? = null,
 )
 
 /**
@@ -33,22 +35,24 @@ data class CommandOutcome(
  * 行ごとの `名前=値` の素朴な形式で、外部の直列化の道具に依存しない。復元の失敗は例外でなく値で返す。
  */
 object OutcomeCodec {
-    private const val HEADER = "v1"
+    /** 形式の版。v2: 復帰資格（`recovery`）の行を足した（B5。v1 の記録は読まない。冪等記録の期限は 24 時間）。 */
+    private const val HEADER = "v2"
     private const val NONE = "-"
 
-    fun encode(outcome: CommandOutcome): ByteArray {
-        val issued =
-            outcome.issued?.let {
-                listOf(it.raw, it.kind.name, it.actor.kind.name, it.actor.id?.toString() ?: NONE).joinToString("|")
-            }
-        return listOf(
+    fun encode(outcome: CommandOutcome): ByteArray =
+        listOf(
             HEADER,
             "gameId=${outcome.gameId.value}",
             "game=${outcome.versions.game?.value ?: NONE}",
             "session=${outcome.versions.session?.value ?: NONE}",
-            "credential=${issued ?: NONE}",
+            "credential=${encodeIssued(outcome.issued)}",
+            "recovery=${encodeIssued(outcome.recovery)}",
         ).joinToString("\n").toByteArray(StandardCharsets.UTF_8)
-    }
+
+    private fun encodeIssued(issued: IssuedCredential?): String =
+        issued?.let {
+            listOf(it.raw, it.kind.name, it.actor.kind.name, it.actor.id?.toString() ?: NONE).joinToString("|")
+        } ?: NONE
 
     fun decode(bytes: ByteArray): Either<AppFailure, CommandOutcome> =
         either {
@@ -63,7 +67,8 @@ object OutcomeCodec {
             val game = ensureNotNull(version(fields["game"])) { broken("game の版が不正") }
             val session = ensureNotNull(version(fields["session"])) { broken("session の版が不正") }
             val issued = ensureNotNull(issued(fields["credential"])) { broken("資格が不正") }
-            CommandOutcome(GameId(gameId), Versions(game.value, session.value), issued.value)
+            val recovery = ensureNotNull(issued(fields["recovery"])) { broken("復帰資格が不正") }
+            CommandOutcome(GameId(gameId), Versions(game.value, session.value), issued.value, recovery.value)
         }
 
     private fun broken(reason: String): AppFailure =

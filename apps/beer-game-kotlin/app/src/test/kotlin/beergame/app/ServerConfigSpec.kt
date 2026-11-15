@@ -146,6 +146,64 @@ class ServerConfigSpec :
                 listOf(ConfigError.InvalidSetting("PORT"), ConfigError.InvalidSetting("COMMAND_MAX_ATTEMPTS"))
         }
 
+        test("[B5/4.2] Given 鍵の版の設定が無い When 読み込む Then 現在の版は 1 で旧版の鍵は無く、期限の既定は 24 時間と 30 日") {
+            val config = configOf(production())
+
+            config.secrets.credentialKeyVersion shouldBe 1
+            config.secrets.previousCredentialKeys shouldBe emptyMap()
+            config.sessionTtlHours shouldBe 24
+            config.participantCredentialTtlDays shouldBe 30
+            val ring = config.secrets.credentialKeyRing()
+            ring.digest("v1.x")?.keyVersion shouldBe 1
+        }
+
+        test("[B5/4.2] Given 現在の版 3 と旧版 2・1 の鍵 When 読み込む Then 鍵束は 3 つの版を持ち、旧版の資格も検証できる") {
+            val config =
+                configOf(
+                    production(
+                        "CREDENTIAL_KEY_VERSION" to "3",
+                        "CREDENTIAL_KEY_PREVIOUS" to "2:${key(4)}, 1:${key(5)}",
+                    ),
+                )
+
+            config.secrets.credentialKeyVersion shouldBe 3
+            config.secrets.previousCredentialKeys.keys shouldBe setOf(1, 2)
+            val ring = config.secrets.credentialKeyRing()
+            listOf(1, 2, 3).forEach { ring.digest("v$it.token")?.keyVersion shouldBe it }
+            ring.digest("v4.token") shouldBe null
+            ring.toString() shouldNotContain key(4)
+        }
+
+        test("[B5/4.2] Given 鍵の版・旧版の鍵が不正 When 読み込む Then 設定の名前だけを示して失敗し、鍵の値は含めない") {
+            val dupVersion = "1:${key(4)},1:${key(5)}"
+            val sameAsCurrent = "1:${key(4)}"
+            val short = "2:${Base64.getEncoder().encodeToString(ByteArray(16))}"
+
+            errorsOf(production("CREDENTIAL_KEY_VERSION" to "0")) shouldBe
+                listOf(ConfigError.InvalidSetting("CREDENTIAL_KEY_VERSION"))
+            errorsOf(production("CREDENTIAL_KEY_VERSION" to "abc")) shouldBe
+                listOf(ConfigError.InvalidSetting("CREDENTIAL_KEY_VERSION"))
+            val broken = listOf("no-colon", "x:${key(4)}", "0:${key(4)}", "2:not-base64!!", " , ")
+            (listOf(dupVersion, sameAsCurrent, short) + broken).forEach {
+                val errors = errorsOf(production("CREDENTIAL_KEY_PREVIOUS" to it))
+                errors shouldBe listOf(ConfigError.InvalidSetting("CREDENTIAL_KEY_PREVIOUS"))
+                errors.toString() shouldNotContain key(4)
+            }
+        }
+
+        test("[B5/4.3] Given ブラウザセッションと復帰資格の期限の設定 When 読み込む Then 反映する。不正な値は失敗する") {
+            val config =
+                configOf(production("SESSION_TTL_HOURS" to "12", "PARTICIPANT_CREDENTIAL_TTL_DAYS" to "7"))
+
+            config.sessionTtlHours shouldBe 12
+            config.participantCredentialTtlDays shouldBe 7
+            errorsOf(production("SESSION_TTL_HOURS" to "0", "PARTICIPANT_CREDENTIAL_TTL_DAYS" to "x")) shouldBe
+                listOf(
+                    ConfigError.InvalidSetting("SESSION_TTL_HOURS"),
+                    ConfigError.InvalidSetting("PARTICIPANT_CREDENTIAL_TTL_DAYS"),
+                )
+        }
+
         test("Given 本番相当で ALLOWED_ORIGINS が無い When 読み込む Then 失敗する（許可するオリジンを明示する）") {
             errorsOf(production() - "ALLOWED_ORIGINS") shouldBe listOf(ConfigError.MissingSetting("ALLOWED_ORIGINS"))
             configOf(mapOf("APP_ENV" to "local", "DB_KIND" to "h2")).allowedOrigins shouldBe

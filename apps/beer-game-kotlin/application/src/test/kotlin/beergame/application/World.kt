@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
 import beergame.domain.Actor
+import beergame.domain.CredentialSubject
 import beergame.domain.DomainEvent
 import beergame.domain.EventEnvelope
 import beergame.domain.GameEvent
@@ -27,14 +28,26 @@ val T0: Instant = Instant.parse("2026-11-16T09:00:00Z")
 
 val CORRELATION: UUID = UUID(9L, 9L)
 
-fun testSettings(maxAttempts: Int = 3): AppSettings =
+val CREDENTIAL_KEY_V1 = ByteArray(32) { (it + 7).toByte() }
+val CREDENTIAL_KEY_V2 = ByteArray(32) { (it + 11).toByte() }
+
+/** 版 1 だけの鍵束（B1 までと同じ）。 */
+fun keyRing(
+    current: Int = 1,
+    vararg keys: Pair<Int, ByteArray> = arrayOf(1 to CREDENTIAL_KEY_V1),
+): CredentialKeyRing = CredentialKeyRing.of(current, keys.toMap()).ok()
+
+fun testSettings(
+    maxAttempts: Int = 3,
+    credentialKeys: CredentialKeyRing = keyRing(),
+): AppSettings =
     AppSettings(
         maxAttempts = maxAttempts,
         idempotencyTtl = Duration.ofHours(24),
+        sessionTtl = Duration.ofHours(24),
         participantCredentialTtl = Duration.ofDays(30),
-        credentialKeyVersion = 1,
         idempotencySecret = ByteArray(32) { it.toByte() },
-        credentialSecret = ByteArray(32) { (it + 7).toByte() },
+        credentialKeys = credentialKeys,
     )
 
 fun meta(
@@ -69,6 +82,7 @@ data class IdempotencyId(
 
 private fun IdempotencyKey.id(): IdempotencyId = IdempotencyId(if (isCreate) null else gameId, scope, keyDigest)
 
+/** `credentials` の行（復帰資格）。 */
 data class CredentialRow(
     val gameId: GameId,
     val kind: CredentialKind,
@@ -81,13 +95,22 @@ data class CredentialRow(
     fun isValidAt(now: Instant): Boolean = !revoked && expiresAt > now
 }
 
+/** `browser_sessions` の行（ブラウザセッション。復帰資格とは別のダイジェスト）。 */
+data class SessionRow(
+    val gameId: GameId,
+    val kind: CredentialKind,
+    val subjectId: UUID,
+    val keyVersion: Int,
+    val expiresAt: Instant,
+)
+
 /** 世界の中身（COMMIT された状態）。不変で、トランザクションごとにコピーして書く。 */
 data class Store(
     val streams: Map<Pair<GameId, StreamType>, List<EventEnvelope<DomainEvent>>> = emptyMap(),
     val projected: List<EventEnvelope<DomainEvent>> = emptyList(),
     val idempotency: Map<IdempotencyId, StoredResponse> = emptyMap(),
     val credentials: Map<String, CredentialRow> = emptyMap(),
-    val browserSessions: Map<String, Pair<GameId, Instant>> = emptyMap(),
+    val browserSessions: Map<String, SessionRow> = emptyMap(),
     val displayNames: Map<ParticipantId, String> = emptyMap(),
     val joinCodes: Map<String, GameId> = emptyMap(),
     val notices: List<VersionNotice> = emptyList(),
@@ -110,8 +133,11 @@ class FakeTx(
 private fun Tx.fake(): FakeTx = this as? FakeTx ?: fail("FakeTx ではない")
 
 class World(
-    val settings: AppSettings = testSettings(),
+    initialSettings: AppSettings = testSettings(),
 ) {
+    /** 鍵の更新（ローテーション）の試験のために、設定は差し替えられる。 */
+    var settings: AppSettings = initialSettings
+
     /** ポートの呼び出しの順（ROLLBACK で消えない）。 */
     val calls = mutableListOf<String>()
 
@@ -276,11 +302,20 @@ class World(
             },
             authenticate = { tx, digest, now ->
                 calls += "authenticate"
-                val row = tx.fake().store.credentials[digest]
-                val session = tx.fake().store.browserSessions[digest]
-                row
-                    ?.takeIf { it.isValidAt(now) && session != null && session.second > now }
-                    ?.let { VerifiedCredential(it.gameId, actorOf(it)) }
+                tx
+                    .fake()
+                    .store.browserSessions[digest]
+                    ?.takeIf { it.expiresAt > now }
+                    ?.let { VerifiedCredential(it.gameId, actorOf(it.gameId, it.kind, it.subjectId)) }
+                    .right()
+            },
+            authenticateRecovery = { tx, digest, now ->
+                calls += "authenticateRecovery"
+                tx
+                    .fake()
+                    .store.credentials[digest]
+                    ?.takeIf { it.isValidAt(now) }
+                    ?.let { VerifiedRecovery(it.gameId, actorOf(it.gameId, it.kind, it.subjectId), it.expiresAt) }
                     .right()
             },
             findGameByJoinCode = { tx, code ->
@@ -292,10 +327,14 @@ class World(
             },
         )
 
-    private fun actorOf(row: CredentialRow): Actor =
-        when (row.kind) {
-            CredentialKind.FACILITATOR -> Actor.Facilitator(row.gameId)
-            CredentialKind.PARTICIPANT_RECOVERY -> Actor.Participant(ParticipantId(row.subjectId))
+    private fun actorOf(
+        gameId: GameId,
+        kind: CredentialKind,
+        subjectId: UUID,
+    ): Actor =
+        when (kind) {
+            CredentialKind.FACILITATOR -> Actor.Facilitator(gameId)
+            CredentialKind.PARTICIPANT_RECOVERY -> Actor.Participant(ParticipantId(subjectId))
         }
 
     private fun applyWrite(
@@ -307,25 +346,54 @@ class World(
                 store.copy(displayNames = store.displayNames + (write.participantId to write.name.value))
             }
 
-            is PeripheralWrite.IssueCredentialRow -> {
+            is PeripheralWrite.IssueRecoveryRow -> {
+                val row =
+                    CredentialRow(
+                        write.gameId,
+                        write.kind,
+                        write.subjectId,
+                        write.keyVersion,
+                        write.issuedAt,
+                        write.expiresAt,
+                        false,
+                    )
+                store.copy(credentials = store.credentials + (write.digest to row))
+            }
+
+            is PeripheralWrite.IssueSessionRow -> {
+                val row = SessionRow(write.gameId, write.kind, write.subjectId, write.keyVersion, write.expiresAt)
+                store.copy(browserSessions = store.browserSessions + (write.digest to row))
+            }
+
+            is PeripheralWrite.ExtendRecoveryRow -> {
                 store.copy(
                     credentials =
-                        store.credentials +
-                            (
-                                write.digest to
-                                    CredentialRow(
-                                        write.gameId,
-                                        write.kind,
-                                        write.subjectId,
-                                        write.keyVersion,
-                                        write.issuedAt,
-                                        write.expiresAt,
-                                        false,
-                                    )
-                            ),
-                    browserSessions = store.browserSessions + (write.digest to (write.gameId to write.expiresAt)),
+                        store.credentials.mapValues { (digest, row) ->
+                            if (digest == write.digest && !row.revoked) row.copy(expiresAt = write.expiresAt) else row
+                        },
                 )
             }
+
+            is PeripheralWrite.RevokeSubject -> {
+                val subjectId = write.subject.rowId()
+                store.copy(
+                    credentials =
+                        store.credentials.mapValues { (_, row) ->
+                            val target = row.gameId == write.gameId && row.subjectId == subjectId
+                            if (target) row.copy(revoked = true) else row
+                        },
+                    browserSessions =
+                        store.browserSessions.filterValues {
+                            !(it.gameId == write.gameId && it.subjectId == subjectId)
+                        },
+                )
+            }
+        }
+
+    private fun CredentialSubject.rowId(): UUID =
+        when (this) {
+            is CredentialSubject.Facilitator -> gameId.value
+            is CredentialSubject.Participant -> id.value
         }
 
     private val notifier =
@@ -349,38 +417,30 @@ class World(
             acquireExclusive = { _, _ -> Unit.right() },
         )
 
-    val ports: Ports =
-        Ports(
-            generators =
-                Generators(
-                    now = { clock },
-                    newId = { UUID(0L, ++idCounter) },
-                    newCredential = { "RAW-CREDENTIAL-" + (++credentialCounter).toString().padStart(6, '0') },
-                    newJoinCode = { "JOIN-" + (++joinCodeCounter).toString().padStart(4, '0') },
-                ),
-            stores =
-                Stores(
-                    events = eventStore,
-                    project = projectionWriter,
-                    idempotency = idempotencyStore,
-                    peripheral = peripheralStore,
-                    reader =
-                        ProjectionReader {
-                            calls += "reader.read"
-                            projectedGame.right()
-                        },
-                ),
-            lock = lock,
-            notifier = notifier,
-            settings = settings,
+    /** 呼ぶたびに現在の設定（[settings]）で組み立てる。ポートの関数は、この世界の状態を見る。 */
+    val ports: Ports
+        get() = Ports(generators, stores, lock, notifier, settings)
+
+    private val generators =
+        Generators(
+            now = { clock },
+            newId = { UUID(0L, ++idCounter) },
+            newCredential = { "RAW-CREDENTIAL-" + (++credentialCounter).toString().padStart(6, '0') },
+            newJoinCode = { "JOIN-" + (++joinCodeCounter).toString().padStart(4, '0') },
         )
 
-    /** 資格を失効させる（役割の入れ替えで旧担当者の資格が失効する場面）。 */
-    fun revoke(rawCredential: String) {
-        val digest = CredentialDigest.of(settings.credentialSecret, rawCredential)
-        val row = store.credentials[digest] ?: fail("資格が無い")
-        store = store.copy(credentials = store.credentials + (digest to row.copy(revoked = true)))
-    }
+    private val stores =
+        Stores(
+            events = eventStore,
+            project = projectionWriter,
+            idempotency = idempotencyStore,
+            peripheral = peripheralStore,
+            reader =
+                ProjectionReader {
+                    calls += "reader.read"
+                    projectedGame.right()
+                },
+        )
 
     fun clearCalls() = calls.clear()
 }

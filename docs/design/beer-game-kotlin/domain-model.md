@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T04:44:45Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -988,6 +988,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 36 | 失効していない資格の再発行の扱いは未決 | 拒否する（`GameError.CredentialNotRevoked`、409）。失効・再発行の対象は参加者だけで、進行役自身は `Forbidden`。未作成も `Forbidden`（進行役になれる人がいない）。復帰は、操作者が主体自身であることも検査し、失敗はすべて同じ `Forbidden("復帰できない")`（2026-11-15、B5 Step 3。ゲート 1 の決定の反映） | 漏洩した資格の被害を止める。有効な資格を黙って置き換えない。資格の存在・期限・失効を、復帰の失敗から推測させない（NF-S12） |
 | 37 | 開始後の入れ替えのコマンド・規則が無い（「開始後の入れ替え」は未決） | 既存の `AssignRole` を開始後も受け付け、**2 ストリームの関数 `assignRoleAfterStart`** が `ParticipantReplaced`・`CredentialRevoked`・`RoleAssigned`（game）と `RoleHolderReplaced`（session）を同一トランザクションで返す。旧担当者の資格を自動失効し、履歴と入力者のラベルは残す（2026-11-15、B5 Step 3.5.1。**提案。ゲート 3.5 で人が確認する**） | 写し（D4）を更新しないと新担当者が保存できない。コマンドと経路を増やさず、準備中の付け替え（D9）と同じ入口にする（ゲート 1 の決定） |
 | 38 | `assignRoleAfterStart` のスケッチ（セッションの状態は `Active`・`Paused` の確認だけ。`evolve` は入れ替えの事実を採用） | **実装**（2026-11-15、B5 Step 3.5.2〜3.5.4。実装の確認はゲート 3.5 で人が行う）: 関数は `ReplaceDecision.kt`（`ReplaceDecision` と同じファイル）。(1) セッションの確認は `openData()` を使い、**未開始は `NotActive`**、終了後は `AlreadyEnded`（スケッチは終了後と同じ扱い）。(2) 新担当者の資格の確認は `credentials[subject]?.revoked == false`（資格の行がない参加者は `CredentialAlreadyRevoked`。参加時に必ず発行されるので到達しない列）。(3) **`evolveGame` の `RoleAssigned` は、開始後も役割を付ける**（準備中と同じ `updateData`。従来は準備中だけで、開始済みでは状態を変えなかった）。`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（準備中・未作成・未知の参加者は状態を変えない）。(4) `RoleHolderReplaced` は進行中・一時停止中だけ写しを更新する（未開始・終了後は状態を変えない） | 開始後の `RoleAssigned` を採用しないと、入れ替えの結果が再生で復元できない。`decide` が作らない列は、これまでどおり状態を変えずに返す（`replay` が検知する） |
+| 39（B5 Step 4.7。2026-11-15） | 投影は `SessionStarted`・`DecisionSaved`・`WeekCommitted` などを購読する（B1） | `SessionPaused`・`SessionResumed`（`session_overview.status` を PAUSED・ACTIVE）、`ProxyDecisionSubmitted`（`current_decisions` に進行役の入力者で書き、`submitted_role_count` を更新）、`ParticipantReplaced`（`lobby_participants` の `role` を NULL、`replaced_at` を書く行の変更。DB の列はマイグレーション（Step 5.5）まで無い）を購読する。**資格のイベント（`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）と `RoleHolderReplaced` は、どの投影も購読しない**（L5。資格の状態の正本は `credentials`、割り当ての写しは session ストリームの再生） | 投影の契約テストで、資格のイベントが行を作らないことを確認 |
 
 ## 未決事項
 

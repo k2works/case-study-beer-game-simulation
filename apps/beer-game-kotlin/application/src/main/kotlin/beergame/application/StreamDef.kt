@@ -116,7 +116,9 @@ private suspend fun Ports.writeSideEffects(
 ): Either<AppFailure, Unit> =
     either {
         project.write(tx, gameId, envelopes).bind()
-        if (writes.isNotEmpty()) peripheral.write(tx, writes).bind()
+        // 失効のイベントには、必ず失効の行の変更が付く（資格の行の変更は、対応するイベントなしに起きない）
+        val peripheralRows = revocationWrites(envelopes) + writes
+        if (peripheralRows.isNotEmpty()) peripheral.write(tx, peripheralRows).bind()
         notifier.publish(tx, noticesOf(gameId, envelopes)).mapLeft(AppFailure::Persistence).bind()
     }
 

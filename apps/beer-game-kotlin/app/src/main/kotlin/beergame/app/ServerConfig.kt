@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.NonEmptyList
 import arrow.core.left
 import arrow.core.right
+import beergame.application.CredentialKeyRing
 import java.security.SecureRandom
 import java.util.Base64
 
@@ -16,16 +17,42 @@ import java.util.Base64
  * - エラーには、設定の名前だけを載せ、値は載せない（秘密を、ログや例外に出さない）。
  */
 
-/** 3 つの鍵（それぞれ 32 バイト）。値は、`toString` に出さない。 */
+/**
+ * 3 つの鍵（それぞれ 32 バイト）。値は、`toString` に出さない。
+ * [credentialKey] は資格の現在の鍵で、その版が [credentialKeyVersion]。ローテーションの間は、旧版の鍵を
+ * [previousCredentialKeys]（版 → 鍵）に残す（旧版の資格は期限まで有効。外すと、その版の資格は使えなくなる）。
+ */
 class Secrets(
     val credentialKey: ByteArray,
     val idempotencyKey: ByteArray,
     val responseKey: ByteArray,
     /** 設定に無く、起動のために作った使い捨ての鍵か。 */
     val ephemeral: Boolean,
+    val credentialKeyVersion: Int = 1,
+    val previousCredentialKeys: Map<Int, ByteArray> = emptyMap(),
 ) {
+    /** 資格の鍵束（現在の版 + 旧版）。設定の読み込みで検査済みなら、必ず作れる。 */
+    fun credentialKeyRing(): CredentialKeyRing {
+        val keys = previousCredentialKeys + (credentialKeyVersion to credentialKey)
+        return when (val ring = CredentialKeyRing.of(credentialKeyVersion, keys)) {
+            is Either.Right -> ring.value
+            is Either.Left -> error("検査を通った設定の鍵束が作れない: ${ring.value}")
+        }
+    }
+
+    internal fun withKeyRing(
+        version: Int,
+        previous: Map<Int, ByteArray>,
+    ): Secrets = Secrets(credentialKey, idempotencyKey, responseKey, ephemeral, version, previous)
+
     override fun toString(): String = "Secrets(***, ephemeral=$ephemeral)"
 }
+
+/** 鍵の版の設定（現在の版と、旧版の鍵）。 */
+private class KeyRingSettings(
+    val version: Int,
+    val previous: Map<Int, ByteArray>,
+)
 
 /** データベースへの接続の設定。パスワードは、`toString` に出さない。 */
 sealed interface DatabaseSettings {
@@ -58,13 +85,24 @@ data class ServerConfig(
     val allowedOrigins: Set<String>,
     val maxAttempts: Int,
     val migrateOnStart: Boolean,
+    /** ブラウザセッションの期限（時間）。仮の既定値で、運営者との合意（R11）の前に永続環境へ出さない。 */
+    val sessionTtlHours: Int = DEFAULT_SESSION_TTL_HOURS,
+    /** 参加者の復帰資格の期限（日）。同上。 */
+    val participantCredentialTtlDays: Int = DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS,
 ) {
     companion object {
         const val DEFAULT_PORT = 8080
         const val DEFAULT_MAX_ATTEMPTS = 5
+        const val DEFAULT_SESSION_TTL_HOURS = 24
+        const val DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS = 30
+        const val MAX_SESSION_TTL_HOURS = 24 * 365
+        const val MAX_PARTICIPANT_CREDENTIAL_TTL_DAYS = 3_650
+        const val MAX_KEY_VERSION = 999_999
         const val MAX_PORT = 65_535
         const val KEY_BYTES = 32
         const val CREDENTIAL_KEY = "CREDENTIAL_KEY"
+        const val CREDENTIAL_KEY_VERSION = "CREDENTIAL_KEY_VERSION"
+        const val CREDENTIAL_KEY_PREVIOUS = "CREDENTIAL_KEY_PREVIOUS"
         const val IDEMPOTENCY_KEY = "IDEMPOTENCY_KEY"
         const val RESPONSE_KEY = "RESPONSE_KEY"
         val LOCAL_ORIGINS = setOf("http://localhost:5173", "http://127.0.0.1:5173")
@@ -84,23 +122,37 @@ data class ServerConfig(
             val origins = readOrigins(variables, local)
             val attempts = readInt(variables, "COMMAND_MAX_ATTEMPTS", DEFAULT_MAX_ATTEMPTS, 1..Int.MAX_VALUE)
             val migrate = readBoolean(variables, "MIGRATE_ON_START", kind == DbKind.H2)
+            val keyRing = readKeyRing(variables)
+            val sessionTtl =
+                readInt(variables, "SESSION_TTL_HOURS", DEFAULT_SESSION_TTL_HOURS, 1..MAX_SESSION_TTL_HOURS)
+            val participantTtl =
+                readInt(
+                    variables,
+                    "PARTICIPANT_CREDENTIAL_TTL_DAYS",
+                    DEFAULT_PARTICIPANT_CREDENTIAL_TTL_DAYS,
+                    1..MAX_PARTICIPANT_CREDENTIAL_TTL_DAYS,
+                )
             val errors =
                 base.leftOrNull().orEmpty().toList() +
                     secrets.errors + database.leftOrEmpty() + port.leftOrEmpty() + origins.leftOrEmpty() +
-                    attempts.leftOrEmpty() + migrate.leftOrEmpty()
+                    attempts.leftOrEmpty() + migrate.leftOrEmpty() + keyRing.leftOrEmpty() +
+                    sessionTtl.leftOrEmpty() + participantTtl.leftOrEmpty()
             return if (errors.isNotEmpty()) {
                 NonEmptyList(errors.first(), errors.drop(1)).left()
             } else {
                 val app = AppConfig(checkNotNull(env), kind)
+                val ring = keyRing.orFail()
                 ServerConfig(
                     app = app,
                     host = variables["HOST"] ?: if (local) "127.0.0.1" else "0.0.0.0",
                     port = port.orFail(),
                     database = database.orFail(),
-                    secrets = checkNotNull(secrets.value),
+                    secrets = checkNotNull(secrets.value).withKeyRing(ring.version, ring.previous),
                     allowedOrigins = origins.orFail(),
                     maxAttempts = attempts.orFail(),
                     migrateOnStart = migrate.orFail(),
+                    sessionTtlHours = sessionTtl.orFail(),
+                    participantCredentialTtlDays = participantTtl.orFail(),
                 ).right()
             }
         }
@@ -217,6 +269,51 @@ private fun readInt(
         raw == null -> default.right()
         parsed != null && parsed in range -> parsed.right()
         else -> listOf<ConfigError>(ConfigError.InvalidSetting(name)).left()
+    }
+}
+
+/**
+ * 資格の鍵の版。現在の版（`CREDENTIAL_KEY_VERSION`。既定は 1）と、旧版の鍵（`CREDENTIAL_KEY_PREVIOUS`。
+ * `版:Base64` のカンマ区切り。32 バイト。版は重複せず、現在の版と違う）。旧版の鍵を残す間、旧版の資格は期限まで有効。
+ * 旧版の鍵を外すと、その版の資格は使えなくなる。エラーには設定の名前だけを載せる（鍵を出さない）。
+ */
+private fun readKeyRing(variables: Map<String, String>): Either<List<ConfigError>, KeyRingSettings> {
+    val version = readInt(variables, ServerConfig.CREDENTIAL_KEY_VERSION, 1, 1..ServerConfig.MAX_KEY_VERSION)
+    val previous = readPreviousKeys(variables[ServerConfig.CREDENTIAL_KEY_PREVIOUS], version.getOrNull())
+    val errors = version.leftOrEmpty() + previous.leftOrEmpty()
+    return if (errors.isNotEmpty()) {
+        errors.left()
+    } else {
+        KeyRingSettings(version.orFail(), previous.orFail()).right()
+    }
+}
+
+private fun readPreviousKeys(
+    raw: String?,
+    currentVersion: Int?,
+): Either<List<ConfigError>, Map<Int, ByteArray>> {
+    val invalid = listOf<ConfigError>(ConfigError.InvalidSetting(ServerConfig.CREDENTIAL_KEY_PREVIOUS)).left()
+    val entries =
+        raw
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            .orEmpty()
+    val parsed =
+        entries.map { entry ->
+            val version = entry.substringBefore(':', "").toIntOrNull()
+            val key =
+                runCatching { Base64.getDecoder().decode(entry.substringAfter(':', "")) }
+                    .getOrNull()
+                    ?.takeIf { it.size == ServerConfig.KEY_BYTES }
+            if (version != null && version in 1..ServerConfig.MAX_KEY_VERSION && key != null) version to key else null
+        }
+    val versions = parsed.map { it?.first }
+    return when {
+        raw == null -> emptyMap<Int, ByteArray>().right()
+        parsed.any { it == null } || entries.isEmpty() -> invalid
+        versions.toSet().size != versions.size || currentVersion in versions -> invalid
+        else -> parsed.filterNotNull().toMap().right()
     }
 }
 

@@ -138,7 +138,107 @@ class ProjectionSpec :
             rows.of(ProjectionTable.SESSION_OVERVIEW).single().valueOf("submitted_role_count") shouldBe Value.Num(2)
         }
 
-        test("[B5] 入力者が進行役のとき、current_decisions の入力者の種別は FACILITATOR（ID はゲーム）。代理入力の投影は Step 4.7") {
+        test("[B5/4.7] Given 停止・再開（SessionPaused・SessionResumed） When 投影する Then status だけを PAUSED・ACTIVE に更新する") {
+            val paused = Projections.project(envelope(SessionEvent.SessionPaused, StreamType.SESSION, 6))
+            val resumed = Projections.project(envelope(SessionEvent.SessionResumed, StreamType.SESSION, 7))
+
+            paused.map { it.table } shouldContainExactly listOf(ProjectionTable.SESSION_OVERVIEW)
+            paused.single().valueOf("status") shouldBe Value.Text("PAUSED")
+            paused.single().keyOf("game_id") shouldBe Value.Id(gid.value)
+            (paused.single() as RowChange.Upsert).values.keys shouldBe setOf(Column("status"))
+            resumed.map { it.table } shouldContainExactly listOf(ProjectionTable.SESSION_OVERVIEW)
+            resumed.single().valueOf("status") shouldBe Value.Text("ACTIVE")
+            (resumed.single() as RowChange.Upsert).values.keys shouldBe setOf(Column("status"))
+        }
+
+        test(
+            "[B5/4.7] Given ProxyDecisionSubmitted When 投影する Then current_decisions に進行役の入力者つきで入り、入力済みの役割数も更新する",
+        ) {
+            val proxy = SessionEvent.ProxyDecisionSubmitted(w(1), Role.FACTORY, q(6), dv(2), facilitatorEditor, 3)
+
+            val rows = Projections.project(envelope(proxy, StreamType.SESSION, 8))
+
+            val decision = rows.of(ProjectionTable.CURRENT_DECISIONS).single()
+            decision.keyOf("role") shouldBe Value.Text("FACTORY")
+            decision.valueOf("week") shouldBe Value.Num(1)
+            decision.valueOf("quantity") shouldBe Value.Num(6)
+            decision.valueOf("decision_version") shouldBe Value.Big(2)
+            decision.valueOf("editor_kind") shouldBe Value.Text("FACILITATOR")
+            decision.valueOf("editor_id") shouldBe Value.Id(gid.value)
+            val overview = rows.of(ProjectionTable.SESSION_OVERVIEW).single()
+            overview.valueOf("submitted_role_count") shouldBe Value.Num(3)
+            overview.valueOf("status") shouldBe null
+            rows.map { it.table }.toSet() shouldBe
+                setOf(ProjectionTable.CURRENT_DECISIONS, ProjectionTable.SESSION_OVERVIEW)
+        }
+
+        test(
+            "[B5/4.7][L5] Given 資格のイベント（失効・再発行・復帰） When 投影する Then どの表の行も作らない（正本は credentials）",
+        ) {
+            val subject = CredentialSubject.Participant(pid(1))
+            val events =
+                listOf<DomainEvent>(
+                    GameEvent.CredentialRevoked(subject),
+                    GameEvent.CredentialReissued(subject, credentialExpiry),
+                    GameEvent.ParticipationRecovered(subject, credentialExpiry),
+                )
+
+            events.forEachIndexed { i, event ->
+                Projections.project(envelope(event, StreamType.GAME, 20L + i)) shouldBe emptyList()
+            }
+        }
+
+        test(
+            "[B5/4.7] Given ParticipantReplaced When 投影する Then 旧担当者の行は、role を NULL にして replaced_at を入れる（行は消さない）",
+        ) {
+            val replaced = GameEvent.ParticipantReplaced(pid(1), Role.RETAILER, pid(2))
+
+            val rows = Projections.project(envelope(replaced, StreamType.GAME, 30, t0))
+
+            val row = rows.single()
+            row.table shouldBe ProjectionTable.LOBBY_PARTICIPANTS
+            row.keyOf("participant_id") shouldBe Value.Id(pid(1).value)
+            row.valueOf("role") shouldBe Value.Null
+            row.valueOf("replaced_at") shouldBe Value.At(t0)
+            (row as RowChange.Upsert).values.keys shouldBe setOf(Column("role"), Column("replaced_at"))
+        }
+
+        test(
+            "[B5/4.7] Given 入れ替えの追記（旧 2 人の ParticipantReplaced・CredentialRevoked、新担当者の RoleAssigned、" +
+                "session の RoleHolderReplaced） When 投影する Then ロビーは旧担当者に replaced_at・新担当者に role を書き、" +
+                "session 側の投影は何も書かない",
+        ) {
+            val gameEvents =
+                listOf(
+                    GameEvent.ParticipantReplaced(pid(1), Role.RETAILER, pid(3)),
+                    GameEvent.CredentialRevoked(CredentialSubject.Participant(pid(1))),
+                    GameEvent.ParticipantReplaced(pid(2), Role.RETAILER, pid(3)),
+                    GameEvent.CredentialRevoked(CredentialSubject.Participant(pid(2))),
+                    GameEvent.RoleAssigned(pid(3), Role.RETAILER),
+                ).mapIndexed { i, event -> envelope(event, StreamType.GAME, 40L + i) }
+            val sessionEvent =
+                envelope(
+                    SessionEvent.RoleHolderReplaced(Role.RETAILER, setOf(pid(1), pid(2)), pid(3)),
+                    StreamType.SESSION,
+                    41,
+                )
+
+            val lobby = Projections.lobbyParticipants.replay(gameEvents)
+
+            lobby.map { it.keyOf("participant_id") } shouldContainExactly
+                listOf(Value.Id(pid(1).value), Value.Id(pid(2).value), Value.Id(pid(3).value))
+            lobby.map { it.valueOf("role") } shouldContainExactly
+                listOf(Value.Null, Value.Null, Value.Text("RETAILER"))
+            lobby.map { it.valueOf("replaced_at") } shouldContainExactly
+                listOf(Value.At(t0), Value.At(t0), null)
+            // 入れ替えの割り当て（RoleAssigned）は、新担当者の replaced_at を変えない（列を書かない）。
+            // session 側の割り当ての写しは、イベントの再生が持つ状態で、読み取りモデルの表を持たない
+            Projections.project(sessionEvent) shouldBe emptyList()
+            gameEvents.flatMap { Projections.project(it) }.map { it.table }.toSet() shouldBe
+                setOf(ProjectionTable.LOBBY_PARTICIPANTS)
+        }
+
+        test("[B5] 入力者が進行役のとき、current_decisions の入力者の種別は FACILITATOR（ID はゲーム）") {
             val saved = SessionEvent.DecisionSaved(w(1), Role.FACTORY, q(6), dv(1), facilitatorEditor, 1)
 
             val decision =

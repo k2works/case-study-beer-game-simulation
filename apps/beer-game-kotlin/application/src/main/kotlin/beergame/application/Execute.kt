@@ -19,8 +19,14 @@ import java.util.UUID
  * 読み込みから追記までの部分（[applySingle]、[applyStart]）は Streams.kt。
  */
 
-/** 認証の要否。匿名の操作（作成、参加）は資格を見ない（認可は参加コード）。 */
-internal enum class Auth { ANONYMOUS, REQUIRED }
+/**
+ * 認証の要否と、確かめる資格。
+ * - [ANONYMOUS]: 匿名の操作（作成、参加）は資格を見ない（認可は参加コード）。
+ * - [REQUIRED]: ブラウザセッション（`browser_sessions`）の有効性が認可。
+ * - [RECOVERY]: **提示した復帰資格（`credentials`）の有効性が認可**（復帰）。冪等記録の照合より前に検証する。
+ *   `ANONYMOUS` で作ると、失効した復帰資格の再送に、保存済みの新しいセッションが返ってしまう（ADR-004、ADR-015）。
+ */
+internal enum class Auth { ANONYMOUS, REQUIRED, RECOVERY }
 
 /** 1 つの要求（冪等キー、資格、相関 ID）。 */
 data class RequestMeta(
@@ -36,22 +42,39 @@ internal class Operation(
     val body: String,
 )
 
-/** 1 つのコマンド処理の入力。[issued] は、資格を発行する操作（作成、参加）だけが持つ。 */
+/**
+ * 1 つのコマンド処理の入力。[issued]（ブラウザセッションの値）と [recovery]（復帰資格の値）は、資格を発行する操作
+ * （作成、参加、復帰、再発行）だけが持つ。復帰は、認証で主体が決まるまで主体を知らないので、操作者から作る関数で渡す。
+ */
 internal class CommandRequest(
     val operation: Operation,
     val auth: Auth,
     val successStatus: Int,
-    val issued: IssuedCredential?,
     val meta: RequestMeta,
+    val issued: (Actor) -> IssuedCredential? = { null },
+    val recovery: (Actor) -> IssuedCredential? = { null },
 )
 
-/** トランザクションの中で、認証を終えた後に使う値。 */
+/** 復帰の認証に使った復帰資格のダイジェストと、現在の期限。 */
+internal class PresentedRecovery(
+    val digest: String,
+    val expiresAt: Instant,
+)
+
+/** トランザクションの中で、認証を終えた後に使う値。[presented] は、復帰（[Auth.RECOVERY]）だけが持つ。 */
 internal class Ctx(
     val gameId: GameId,
     val actor: Actor,
     val at: Instant,
     val commandId: UUID,
     val correlationId: UUID,
+    val presented: PresentedRecovery? = null,
+)
+
+/** 認証の結果。[presented] は、復帰の認証に使った復帰資格。 */
+private class Authenticated(
+    val actor: Actor,
+    val presented: PresentedRecovery? = null,
 )
 
 /**
@@ -93,14 +116,16 @@ internal suspend fun Ports.runCommand(
             either {
                 lock.acquireShared(tx, gameId).bind()
                 val at = now()
-                val actor = authenticate(tx, request, at).bind()
+                val authenticated = authenticate(tx, request, at).bind()
+                val actor = authenticated.actor
                 val requestDigest = requestDigest(request.operation, actor)
                 val stored = idempotency.find(tx, key, at).bind()
                 if (stored != null) {
                     replay(stored, requestDigest).bind()
                 } else {
-                    val versions = handle(tx, Ctx(gameId, actor, at, commandId, request.meta.correlationId)).bind()
-                    val outcome = CommandOutcome(gameId, versions, request.issued)
+                    val ctx = Ctx(gameId, actor, at, commandId, request.meta.correlationId, authenticated.presented)
+                    val versions = handle(tx, ctx).bind()
+                    val outcome = CommandOutcome(gameId, versions, request.issued(actor), request.recovery(actor))
                     val response =
                         StoredResponse(
                             gameId,
@@ -130,34 +155,50 @@ private fun Ports.requestDigest(
 
 private const val ANONYMOUS_ID = "anonymous"
 
-/** 認証と、認可の前提検査（資格の有効性、ゲームの一致）。無効なら、理由を区別せず [AppFailure.Unauthorized]。 */
+/**
+ * 認証と、認可の前提検査（資格の有効性、ゲームの一致）。無効なら、理由（無い・不明・版が違う・鍵が外された・失効・
+ * 期限切れ・別のゲーム）を区別せず [AppFailure.Unauthorized]。
+ */
 private suspend fun Ports.authenticate(
     tx: Tx,
     request: CommandRequest,
     at: Instant,
-): Either<AppFailure, Actor> =
+): Either<AppFailure, Authenticated> =
     when (request.auth) {
         Auth.ANONYMOUS -> {
-            Actor.Anonymous.right()
+            Authenticated(Actor.Anonymous).right()
         }
 
         Auth.REQUIRED -> {
             either {
-                val verified = verified(tx, request.meta.credential, at).bind()
+                val verified = verifiedSession(tx, request.meta.credential, at).bind()
                 ensure(verified.gameId == request.operation.gameId) { AppFailure.Unauthorized }
-                verified.actor
+                Authenticated(verified.actor)
+            }
+        }
+
+        Auth.RECOVERY -> {
+            either {
+                val raw = ensureNotNull(request.meta.credential) { AppFailure.Unauthorized }
+                val keyed = ensureNotNull(settings.credentialKeys.digest(raw)) { AppFailure.Unauthorized }
+                val found = peripheral.authenticateRecovery(tx, keyed.digest, at).bind()
+                val verified = ensureNotNull(found) { AppFailure.Unauthorized }
+                ensure(verified.gameId == request.operation.gameId) { AppFailure.Unauthorized }
+                Authenticated(verified.actor, PresentedRecovery(keyed.digest, verified.expiresAt))
             }
         }
     }
 
-private suspend fun Ports.verified(
+/** ブラウザセッションの検証。鍵が無い版（外された鍵）の値は、ダイジェストを作れないので同じ失敗になる。 */
+internal suspend fun Ports.verifiedSession(
     tx: Tx,
     credential: String?,
     at: Instant,
 ): Either<AppFailure, VerifiedCredential> =
     either {
         val raw = ensureNotNull(credential) { AppFailure.Unauthorized }
-        val verified = peripheral.authenticate(tx, CredentialDigest.of(settings.credentialSecret, raw), at).bind()
+        val keyed = ensureNotNull(settings.credentialKeys.digest(raw)) { AppFailure.Unauthorized }
+        val verified = peripheral.authenticate(tx, keyed.digest, at).bind()
         ensureNotNull(verified) { AppFailure.Unauthorized }
     }
 

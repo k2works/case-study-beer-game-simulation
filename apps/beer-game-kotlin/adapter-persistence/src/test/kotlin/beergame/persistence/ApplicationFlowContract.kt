@@ -1,13 +1,18 @@
 package beergame.persistence
 
 import arrow.core.Either
+import arrow.core.raise.either
 import beergame.application.AppFailure
 import beergame.application.AppSettings
 import beergame.application.CommandOutcome
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
+import beergame.application.CredentialDigest
+import beergame.application.CredentialKeyRing
+import beergame.application.CredentialKind
 import beergame.application.Generators
 import beergame.application.JoinGameInput
+import beergame.application.PeripheralWrite
 import beergame.application.Ports
 import beergame.application.RequestMeta
 import beergame.application.SaveDecisionInput
@@ -15,6 +20,8 @@ import beergame.application.SecureTokens
 import beergame.application.Snapshot
 import beergame.application.SnapshotView
 import beergame.application.Stores
+import beergame.application.VerifiedCredential
+import beergame.application.VerifiedRecovery
 import beergame.application.assignRole
 import beergame.application.commitWeek
 import beergame.application.createGame
@@ -22,6 +29,8 @@ import beergame.application.joinGame
 import beergame.application.saveDecision
 import beergame.application.snapshot
 import beergame.application.startGame
+import beergame.domain.Actor
+import beergame.domain.CredentialSubject
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
@@ -37,14 +46,16 @@ import java.util.UUID
 private val CLOCK: Instant = Instant.parse("2026-11-14T10:00:00Z")
 private val CORRELATION: UUID = UUID(9L, 9L)
 
+private val CREDENTIAL_KEY = ByteArray(32) { (it + 7).toByte() }
+
 private fun appSettings(): AppSettings =
     AppSettings(
         maxAttempts = 5,
         idempotencyTtl = Duration.ofHours(24),
+        sessionTtl = Duration.ofHours(24),
         participantCredentialTtl = Duration.ofDays(30),
-        credentialKeyVersion = 1,
         idempotencySecret = ByteArray(32) { it.toByte() },
-        credentialSecret = ByteArray(32) { (it + 7).toByte() },
+        credentialKeys = CredentialKeyRing.of(1, mapOf(1 to CREDENTIAL_KEY)).orFail(),
     )
 
 /** 実物のアダプターを束ねた Ports（時計だけ固定）。 */
@@ -78,12 +89,14 @@ private fun meta(
 private data class Seat(
     val participantId: ParticipantId,
     val credential: String,
+    val recovery: String,
     val name: String,
 )
 
 private data class Started(
     val gameId: GameId,
     val facilitator: String,
+    val facilitatorRecovery: String,
     val joinCode: String,
     val seats: RoleMap<Seat>,
 )
@@ -100,6 +113,7 @@ private fun Fixture.start(tag: String): Started =
         val ports = ports()
         val created = ports.createGame(CreateGameInput(3, listOf(4, 999, 998), 90), meta("create-$tag")).orFail()
         val facilitator = checkNotNull(created.issued).raw
+        val facilitatorRecovery = checkNotNull(created.recovery).raw
         val joinCode =
             query("SELECT join_code FROM game_join_codes WHERE game_id = ?", created.gameId.value) {
                 it.getString(1)
@@ -113,7 +127,8 @@ private fun Fixture.start(tag: String): Started =
                             meta("join-$tag-${role.name}"),
                         ).orFail()
                 val issued = checkNotNull(outcome.issued)
-                Seat(ParticipantId(checkNotNull(issued.actor.id)), issued.raw, NAMES[role])
+                val recovery = checkNotNull(outcome.recovery).raw
+                Seat(ParticipantId(checkNotNull(issued.actor.id)), issued.raw, recovery, NAMES[role])
             }
         Role.entries.forEach { role ->
             ports
@@ -125,7 +140,7 @@ private fun Fixture.start(tag: String): Started =
                 ).orFail()
         }
         ports.startGame(created.gameId, meta("start-$tag", facilitator)).orFail()
-        Started(created.gameId, facilitator, joinCode, RoleMap.of { seats.getValue(it) })
+        Started(created.gameId, facilitator, facilitatorRecovery, joinCode, RoleMap.of { seats.getValue(it) })
     }
 
 private fun Fixture.playWeekOne(game: Started): CommandOutcome =
@@ -172,6 +187,167 @@ fun FunSpec.applicationFlowContract(fixture: () -> Fixture) {
     peripheralContract(fixture)
     idempotencyFlowContract(fixture)
     authorizationFlowContract(fixture)
+    credentialRowsContract(fixture)
+    credentialRecoveryContract(fixture)
+}
+
+private fun digestOf(raw: String): String = CredentialDigest.of(CREDENTIAL_KEY, raw)
+
+/** 失効の行の変更（イベントの追記と同じトランザクションで書く行）を、周辺ストアへ書く。 */
+private fun Fixture.revoke(
+    gameId: GameId,
+    participantId: ParticipantId,
+) = revokeSubject(gameId, CredentialSubject.Participant(participantId))
+
+private fun Fixture.revokeSubject(
+    gameId: GameId,
+    subject: CredentialSubject,
+) {
+    val write = PeripheralWrite.RevokeSubject(gameId, subject, CLOCK)
+    runBlocking { tx { tx -> persistence.peripheral.write(tx, listOf(write)) }.orFail() }
+}
+
+private fun Fixture.authenticateRecovery(
+    raw: String,
+    at: Instant = CLOCK,
+): VerifiedRecovery? =
+    runBlocking { tx { tx -> persistence.peripheral.authenticateRecovery(tx, digestOf(raw), at) }.orFail() }
+
+private fun Fixture.authenticateSession(
+    raw: String,
+    at: Instant = CLOCK,
+): VerifiedCredential? =
+    runBlocking { tx { tx -> persistence.peripheral.authenticate(tx, digestOf(raw), at) }.orFail() }
+
+private fun Fixture.revokedCount(gameId: GameId): Int =
+    count("credentials WHERE game_id = ? AND revoked_at IS NOT NULL", gameId.value)
+
+/**
+ * 資格の行（`credentials`・`browser_sessions`）の契約（B5 Step 4）。失効は、復帰資格の失効と、同じ主体のブラウザセッションの
+ * 削除を、同じトランザクションで行う（H2 案 A。スキーマ変更なし）。H2 と PostgreSQL の両方で実行する。
+ */
+private fun FunSpec.credentialRowsContract(fixture: () -> Fixture) {
+    test("[B5/4.3] Given 参加者の資格 When 失効する Then 復帰資格の行は revoked_at が入り、ブラウザセッションの行は消え、ほかの主体の行は変わらない") {
+        val fx = fixture()
+        val game = fx.start("revoke-rows")
+        val seat = game.seats[Role.RETAILER]
+
+        fx.revoke(game.gameId, seat.participantId)
+
+        fx.revokedCount(game.gameId) shouldBe 1
+        fx.count(
+            "credentials WHERE credential_digest = ? AND revoked_at IS NOT NULL",
+            digestOf(seat.recovery),
+        ) shouldBe 1
+        fx.count("browser_sessions WHERE credential_digest = ?", digestOf(seat.credential)) shouldBe 0
+        fx.count("browser_sessions WHERE game_id = ?", game.gameId.value) shouldBe 4
+        fx.authenticateSession(seat.credential) shouldBe null
+        fx.authenticateRecovery(seat.recovery) shouldBe null
+        Role.entries.filter { it != Role.RETAILER }.forEach {
+            checkNotNull(fx.authenticateSession(game.seats[it].credential)).gameId shouldBe game.gameId
+            checkNotNull(fx.authenticateRecovery(game.seats[it].recovery)).gameId shouldBe game.gameId
+        }
+    }
+
+    test("[B5/4.3] Given 進行役の主体 When 失効する Then 進行役の復帰資格とブラウザセッションだけが止まる（参加者の行は変わらない）") {
+        val fx = fixture()
+        val game = fx.start("revoke-facilitator")
+
+        fx.revokeSubject(game.gameId, CredentialSubject.Facilitator(game.gameId))
+
+        fx.revokedCount(game.gameId) shouldBe 1
+        fx.authenticateSession(game.facilitator) shouldBe null
+        fx.authenticateRecovery(game.facilitatorRecovery) shouldBe null
+        checkNotNull(fx.authenticateSession(game.seats[Role.RETAILER].credential)).gameId shouldBe game.gameId
+    }
+
+    test("[B5/4.3] Given 失効の書き込みの後に失敗する When ROLLBACK する Then 資格の行は変わらない（追記と同じトランザクション）") {
+        val fx = fixture()
+        val game = fx.start("revoke-rollback")
+        val seat = game.seats[Role.FACTORY]
+
+        val failed =
+            runBlocking {
+                fx.tx { tx ->
+                    either<AppFailure, Unit> {
+                        fx.persistence.peripheral
+                            .write(
+                                tx,
+                                listOf(
+                                    PeripheralWrite.RevokeSubject(
+                                        game.gameId,
+                                        CredentialSubject.Participant(seat.participantId),
+                                        CLOCK,
+                                    ),
+                                ),
+                            ).bind()
+                        raise(AppFailure.RetryExhausted)
+                    }
+                }
+            }
+
+        failed.leftOrFail() shouldBe AppFailure.RetryExhausted
+        fx.revokedCount(game.gameId) shouldBe 0
+        fx.count("browser_sessions WHERE game_id = ?", game.gameId.value) shouldBe 5
+        checkNotNull(fx.authenticateSession(seat.credential)).gameId shouldBe game.gameId
+    }
+}
+
+/** 復帰資格の認証と、復帰（期限の更新・ブラウザセッションの発行）の行の契約。 */
+private fun FunSpec.credentialRecoveryContract(fixture: () -> Fixture) {
+    test("[B5/4.1] Given 復帰資格 When 認証する Then 有効なら主体・ゲーム・期限が返り、不明・期限切れ・別の種類の値は null（区別しない）") {
+        val fx = fixture()
+        val game = fx.start("auth-recovery")
+        val seat = game.seats[Role.WHOLESALER]
+
+        val verified = checkNotNull(fx.authenticateRecovery(seat.recovery))
+        val facilitator = checkNotNull(fx.authenticateRecovery(game.facilitatorRecovery))
+
+        verified.gameId shouldBe game.gameId
+        verified.actor shouldBe Actor.Participant(seat.participantId)
+        verified.expiresAt shouldBe CLOCK.plus(Duration.ofDays(30))
+        facilitator.actor shouldBe Actor.Facilitator(game.gameId)
+        facilitator.expiresAt shouldBe CLOCK.plus(Duration.ofDays(90))
+        fx.authenticateRecovery("v1.unknown") shouldBe null
+        fx.authenticateRecovery(seat.credential) shouldBe null
+        fx.authenticateSession(seat.recovery) shouldBe null
+        fx.authenticateRecovery(seat.recovery, CLOCK.plus(Duration.ofDays(30))) shouldBe null
+        fx.authenticateSession(seat.credential, CLOCK.plus(Duration.ofHours(24))) shouldBe null
+        val justBeforeExpiry = CLOCK.plus(Duration.ofHours(24)).minusSeconds(1)
+        checkNotNull(fx.authenticateSession(seat.credential, justBeforeExpiry)).gameId shouldBe game.gameId
+    }
+
+    test("[B5/4.3] Given 復帰 When 復帰資格の期限を新しくし、セッションを足す Then 失効した行は更新されず、有効な行だけが新しい期限になる") {
+        val fx = fixture()
+        val game = fx.start("extend")
+        val seat = game.seats[Role.DISTRIBUTOR]
+        val other = game.seats[Role.RETAILER]
+        val newExpiry = CLOCK.plus(Duration.ofDays(60))
+        fx.revoke(game.gameId, other.participantId)
+
+        val writes =
+            listOf(
+                PeripheralWrite.ExtendRecoveryRow(digestOf(seat.recovery), newExpiry),
+                PeripheralWrite.ExtendRecoveryRow(digestOf(other.recovery), newExpiry),
+                PeripheralWrite.IssueSessionRow(
+                    game.gameId,
+                    digestOf("v1.recovered-session"),
+                    CredentialKind.PARTICIPANT_RECOVERY,
+                    seat.participantId.value,
+                    1,
+                    CLOCK.plus(Duration.ofHours(24)),
+                ),
+            )
+        runBlocking { fx.tx { tx -> fx.persistence.peripheral.write(tx, writes) }.orFail() }
+
+        checkNotNull(fx.authenticateRecovery(seat.recovery)).expiresAt shouldBe newExpiry
+        fx.authenticateRecovery(other.recovery) shouldBe null
+        fx.query("SELECT expires_at FROM credentials WHERE credential_digest = ?", digestOf(other.recovery)) {
+            it.getInstant("expires_at")
+        } shouldBe listOf(CLOCK.plus(Duration.ofDays(30)))
+        checkNotNull(fx.authenticateSession("v1.recovered-session")).actor shouldBe
+            Actor.Participant(seat.participantId)
+    }
 }
 
 private fun FunSpec.disclosureContract(fixture: () -> Fixture) {
@@ -218,7 +394,9 @@ private fun FunSpec.peripheralContract(fixture: () -> Fixture) {
     test("[#14/NF-S14] Given 実 DB で参加した 4 人 When テーブルを見る Then 資格はダイジェストだけ・ブラウザセッションは同じダイジェスト・表示名はイベントに無い") {
         val fx = fixture()
         val game = fx.start("peripheral")
-        val raws = listOf(game.facilitator) + Role.entries.map { game.seats[it].credential }
+        val raws =
+            listOf(game.facilitator, game.facilitatorRecovery) +
+                Role.entries.flatMap { listOf(game.seats[it].credential, game.seats[it].recovery) }
 
         fx.count("credentials WHERE game_id = ?", game.gameId.value) shouldBe 5
         fx.count("browser_sessions WHERE game_id = ?", game.gameId.value) shouldBe 5
@@ -227,10 +405,17 @@ private fun FunSpec.peripheralContract(fixture: () -> Fixture) {
             fx.count("credentials WHERE credential_digest = ?", raw) shouldBe 0
             fx.count("browser_sessions WHERE credential_digest = ?", raw) shouldBe 0
         }
+        // B5 Step 4: ブラウザセッションと復帰資格は、別の値・別のダイジェスト（B1 は 1 つの値で兼ねた）
         fx.count(
             "credentials c JOIN browser_sessions s ON s.credential_digest = c.credential_digest WHERE c.game_id = ?",
             game.gameId.value,
-        ) shouldBe 5
+        ) shouldBe 0
+        fx.query("SELECT DISTINCT key_version FROM credentials WHERE game_id = ?", game.gameId.value) {
+            it.getInt(1)
+        } shouldBe listOf(1)
+        fx.query("SELECT DISTINCT key_version FROM browser_sessions WHERE game_id = ?", game.gameId.value) {
+            it.getInt(1)
+        } shouldBe listOf(1)
         NAMES.values.forEach { name ->
             fx.count(
                 "events WHERE game_id = ? AND CAST(payload AS VARCHAR) LIKE ?",
@@ -283,7 +468,7 @@ private fun FunSpec.authorizationFlowContract(fixture: () -> Fixture) {
         val seat = game.seats[Role.RETAILER]
         val request = SaveDecisionInput(Role.RETAILER, 1, 4, 0)
         ports.saveDecision(game.gameId, request, meta("save-old-key", seat.credential)).orFail()
-        fx.execute("UPDATE credentials SET revoked_at = CURRENT_TIMESTAMP WHERE game_id = ?", game.gameId.value)
+        fx.revoke(game.gameId, seat.participantId)
 
         val replay = ports.saveDecision(game.gameId, request, meta("save-old-key", seat.credential))
         val snapshot = ports.snapshot(game.gameId, seat.credential)

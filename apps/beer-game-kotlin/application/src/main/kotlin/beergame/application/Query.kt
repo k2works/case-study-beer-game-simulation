@@ -19,11 +19,8 @@ suspend fun Ports.snapshot(
     requestedRole: Role? = null,
 ): Either<AppFailure, Snapshot> =
     either {
-        val raw = ensureNotNull(credential) { AppFailure.Unauthorized }
         val at = now()
-        val digest = CredentialDigest.of(settings.credentialSecret, raw)
-        val verified = events.transaction { tx -> peripheral.authenticate(tx, digest, at) }.bind()
-        ensureNotNull(verified) { AppFailure.Unauthorized }
+        val verified = events.transaction { tx -> verifiedSession(tx, credential, at) }.bind()
         ensure(verified.gameId == gameId) { AppFailure.Unauthorized }
         val game = ensureNotNull(reader.read(gameId).bind()) { AppFailure.Unauthorized }
         when (val actor = verified.actor) {

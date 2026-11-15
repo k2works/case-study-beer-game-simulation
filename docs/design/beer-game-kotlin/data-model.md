@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Kotlin 版のデータモデル。イベントストア（ストリーム・版・楽観的並行制御・冪等キー）、スナップショットの要否、投影テーブル、周辺ストア、保持削除、マイグレーション（PostgreSQL と H2 の配置）、ローカル開発用の H2 版で省略する制約、インデックスを整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -643,10 +643,10 @@ interface TransactionRunner {
 | テーブル | 主キー | 内容 | 制約 |
 | :--- | :--- | :--- | :--- |
 | `display_profiles` | `(game_id, actor_kind, actor_id)` | 参加者と観察者の表示名 | `actor_kind` は `PARTICIPANT`・`OBSERVER`。表示名は 1〜80 文字（前後の空白を除く）。**ログ・イベント・出力に含めない**（NF-S14） |
-| `credentials` | `credential_digest` | 進行役の資格、参加者の復帰資格、観察用の招待のダイジェスト | `kind` は `FACILITATOR`・`PARTICIPANT_RECOVERY`・`OBSERVER_INVITATION`。鍵付き HMAC のダイジェストと**鍵の版**だけを保存（ADR-009）。`expires_at`、`revoked_at` を持つ。**生の値は保存しない** |
-| `browser_sessions` | `credential_digest` | ブラウザセッション（24 時間） | `actor_kind` は `FACILITATOR`・`PARTICIPANT`・`OBSERVER`。`expires_at` で掃除 |
+| `credentials` | `credential_digest` | 進行役の資格、参加者の復帰資格、観察用の招待のダイジェスト | `kind` は `FACILITATOR`・`PARTICIPANT_RECOVERY`・`OBSERVER_INVITATION`。鍵付き HMAC のダイジェストと**鍵の版**だけを保存（ADR-009）。`expires_at`、`revoked_at` を持つ。**生の値は保存しない**。**B5 Step 4 の実装: ブラウザセッションとは別の値・別のダイジェスト**（復帰（`RecoverParticipation`）の認証だけに使う） |
+| `browser_sessions` | `credential_digest` | ブラウザセッション（24 時間。設定値 `SESSION_TTL_HOURS`） | `actor_kind` は `FACILITATOR`・`PARTICIPANT`・`OBSERVER`。`expires_at` で掃除。**B5 Step 4 の実装: 操作の認証は、この表だけを見る**（`expires_at > 現在`。B1 は `credentials` と同じダイジェストで結んでいた）。失効は、行の**削除**で表す（`revoked_at` の列は持たない） |
 
-`credentials.revoked_at` は、`CredentialRevoked` を追記する同じトランザクションで更新します（再発行では、新しい行を挿入し、旧行を失効させます）。**整合のルール**: 「`credentials` の失効・発行が、対応する `Credential*` イベント（または `GameCreated`・`ParticipantJoined`・`ObserverInvited`・`ObserverJoined`・`ParticipationRecovered`）と必ず一緒に起きる」ことを、統合テストで確認します。
+`credentials.revoked_at` は、`CredentialRevoked` を追記する同じトランザクションで更新します（再発行では、新しい行を挿入します。旧行は失効のまま残ります）。**B5 Step 4 の実装**: 同じトランザクションで、**同じ主体（`game_id`、`actor_kind`、`actor_id`）の `browser_sessions` の行を削除**します（ゲート 1 の H2 案 A。スキーマ変更なし。再発行しても、失効前のブラウザセッションは復活しません）。この 2 つの行の変更は、追記したイベントから導きます（`CredentialRevoked` が追記されたら、必ず失効の行の変更が付きます。手動の失効と、役割の入れ替えの `CredentialRevoked` の両方）。`key_version` は、資格の値の接頭辞（`v<版>.`）が示す版で、保存時の検証の鍵を決めます。**整合のルール**: 「`credentials` の失効・発行が、対応する `Credential*` イベント（または `GameCreated`・`ParticipantJoined`・`ObserverInvited`・`ObserverJoined`・`ParticipationRecovered`）と必ず一緒に起きる」ことを、統合テストで確認します。
 
 ### 役割の入れ替えと永続化（B5 Step 3.5。提案。ゲート 3.5 で人が確認する）
 
@@ -888,6 +888,8 @@ db/migration/
 | 32（以降は B2 の実装で変わった点。2026-11-15） | 連鎖削除が `events` に DELETE 権限が無いロールでも動くかは未検証（実装開始時に確認） | **実測済み（動く）**。V101 でロール 4 つ（`beergame_writer`・`reader`・`observer`・`deleter`）と GRANT。否定テスト 11 件（PostgreSQL 18）。`SECURITY DEFINER` は不要 | B2 の Step 3 |
 | 33 | V101 は V102 の前のつもり（番号の順序は考慮なし） | **V101 < V102 のため、V102 まで適用済みの DB に Flyway がそのまま適用できない**。永続環境の前に、`outOfOrder` か番号の付け替えを決める（未決） | Flyway の既定の検証 |
 | 34 | 読み取りロールの表の一覧は無い | `display_profiles` を含める（ロビーの表示名の結合）。`credentials`・`browser_sessions`・`idempotency_records` は含めない（未決） | B2 の判断 |
+| 35（B5 Step 4。2026-11-15） | ブラウザセッションと復帰資格は、同じダイジェストで両表に書く（B1 の仮置き）。認証は両表を結ぶ。失効は `credentials.revoked_at` | **別の値・別のダイジェスト**。認証は `browser_sessions` だけ、復帰の認証は `credentials` だけを見る。失効は `credentials.revoked_at` の更新と、同じ主体の `browser_sessions` の行の**削除**（同じトランザクション。スキーマ変更なし） | ゲート 1 の H2 案 A・ADR-015。失効後の再発行で古いセッションが復活しない。`DELETE` の権限は `beergame_writer` にある（V101。PostgreSQL の統合テストで実行して確認） |
+| 36（同上） | 入れ替えられた旧担当者の `lobby_participants` に `replaced_at` を書く | 投影（`Projections.lobbyParticipants`）は `ParticipantReplaced` で `role` を NULL にし `replaced_at` を書く行の変更を作る（純粋関数の試験まで）。**`replaced_at` の列は、マイグレーション（Step 5.5）まで DB に無い**ため、この投影を DB に適用すると失敗する（H2 で `SQLSTATE 42S22` を実測）。`ParticipantReplaced` を追記する経路は Step 6 の配線まで無い | Step 5.5 で列を足してから、永続化の契約を足す |
 
 ## 未決事項
 

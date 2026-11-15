@@ -1,5 +1,6 @@
 package beergame.application
 
+import beergame.domain.CredentialSubject
 import beergame.domain.GameId
 import beergame.domain.Role
 import beergame.domain.StreamVersion
@@ -236,7 +237,12 @@ class SnapshotSpec :
             val game = world.started(tag = "a")
             val other = world.started(tag = "b")
             world.projectedGame = projectedOf(game, NAMES)
-            world.revoke(game.seats[Role.FACTORY].credential)
+            world.ports
+                .revokeCredential(
+                    game.gameId,
+                    CredentialSubject.Participant(game.seats[Role.FACTORY].participantId),
+                    meta("revoke-factory", game.facilitator),
+                ).ok()
 
             val results =
                 listOf(

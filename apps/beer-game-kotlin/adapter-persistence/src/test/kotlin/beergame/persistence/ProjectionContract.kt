@@ -15,6 +15,8 @@ private fun String.compactJson(): String = filterNot { it.isWhitespace() }
 fun FunSpec.projectionContract(fixture: () -> Fixture) {
     projectedRowsContract(fixture)
     projectedStatesContract(fixture)
+    continuationProjectionContract(fixture)
+    projectedEndContract(fixture)
     checkpointContract(fixture)
     projectionRollbackContract(fixture)
     projectionFailureContract(fixture)
@@ -81,7 +83,63 @@ private fun FunSpec.projectedStatesContract(fixture: () -> Fixture) {
         fx.query("SELECT submitted_role_count FROM session_overview WHERE game_id = ?", id) { it.getInt(1) } shouldBe
             listOf(2)
     }
+}
 
+/** B5 の継続（停止・代理入力・資格）のイベントの投影。 */
+private fun FunSpec.continuationProjectionContract(fixture: () -> Fixture) {
+    test("[B5/4.7] Given 停止・代理入力・再開 When 投影を読む Then PAUSED を経て ACTIVE に戻り、代理入力は進行役の入力者で入る") {
+        val fx = fixture()
+        val script = GameScript().create()
+        val players = script.joinAllRoles()
+        script.startGame()
+        script.save(players.getValue(Role.RETAILER), Role.RETAILER, 7)
+        script.pause()
+        val pausedId = script.gameId.value
+        // 停止中の状態までを投影する
+        fx.appendScript(script)
+
+        fx.query("SELECT status, week, submitted_role_count FROM session_overview WHERE game_id = ?", pausedId) {
+            Triple(it.getString(1), it.getInt(2), it.getInt(3))
+        } shouldBe listOf(Triple("PAUSED", 1, 1))
+        fx.query("SELECT status FROM game_overview WHERE game_id = ?", pausedId) { it.getString(1) } shouldBe
+            listOf("STARTED")
+
+        val second = GameScript().create()
+        val secondPlayers = second.joinAllRoles()
+        second
+            .startGame()
+            .pause()
+            .proxy(Role.FACTORY, 6)
+            .resume()
+        fx.appendScript(second)
+        val id = second.gameId.value
+        secondPlayers.size shouldBe 4
+
+        fx.query("SELECT status, week, submitted_role_count FROM session_overview WHERE game_id = ?", id) {
+            Triple(it.getString(1), it.getInt(2), it.getInt(3))
+        } shouldBe listOf(Triple("ACTIVE", 1, 1))
+        fx.query(
+            "SELECT role, quantity, decision_version, editor_kind, editor_id FROM current_decisions WHERE game_id = ?",
+            id,
+        ) {
+            listOf(it.getString(1), it.getInt(2), it.getLong(3), it.getString(4), it.getString(5))
+        } shouldBe listOf(listOf("FACTORY", 6, 1L, "FACILITATOR", id.toString()))
+    }
+
+    test("[B5/4.7][L5] Given 資格の失効のイベント When 投影する Then ロビー（lobby_participants）は変わらない（資格の状態の正本は credentials）") {
+        val fx = fixture()
+        val script = GameScript().create()
+        val players = script.joinAllRoles()
+        script.revoke(players.getValue(Role.RETAILER))
+        fx.appendScript(script)
+        val id = script.gameId.value
+
+        fx.query("SELECT role FROM lobby_participants WHERE game_id = ? ORDER BY role", id) { it.getString(1) } shouldBe
+            Role.entries.map { it.name }.sorted()
+    }
+}
+
+private fun FunSpec.projectedEndContract(fixture: () -> Fixture) {
     test("[7.2] Given 最終週の確定 When 投影を読む Then セッションもゲームも ENDED") {
         val fx = fixture()
         val script = GameScript().create(finalWeek = 1)

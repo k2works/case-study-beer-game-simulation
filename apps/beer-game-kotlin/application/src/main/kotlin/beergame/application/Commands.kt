@@ -48,12 +48,20 @@ data class CommitWeekInput(
     val basis: RoleMap<Long>,
 )
 
-private fun Ports.issue(
+/** 現在の版の鍵で、新しい資格を作る。値は版の接頭辞つきで、応答だけが運ぶ。保存するのはダイジェストと版だけ。 */
+internal suspend fun Ports.issue(
     kind: CredentialKind,
     actor: ActorRef,
-    raw: String,
-): DigestedCredential =
-    DigestedCredential(CredentialDigest.of(settings.credentialSecret, raw), IssuedCredential(raw, kind, actor))
+): DigestedCredential {
+    val minted = settings.credentialKeys.mint(newCredential())
+    return DigestedCredential(minted.digest, minted.keyVersion, IssuedCredential(minted.raw, kind, actor))
+}
+
+/** ブラウザセッションと復帰資格を、別の乱数・別のダイジェストで、一度に発行する。 */
+private suspend fun Ports.issuance(
+    kind: CredentialKind,
+    actor: ActorRef,
+): Issuance = Issuance(session = issue(kind, actor), recovery = issue(kind, actor))
 
 private fun generated(
     what: String,
@@ -74,10 +82,18 @@ suspend fun Ports.createGame(
                 .bind()
         val gameId = GameId(newId())
         val joinCode = JoinCode.of(newJoinCode()).mapLeft { generated("参加コード", it) }.bind()
-        val issued = issue(CredentialKind.FACILITATOR, Actor.Facilitator(gameId).toRef(), newCredential())
+        val issuance = issuance(CredentialKind.FACILITATOR, Actor.Facilitator(gameId).toRef())
         val body = "kit|${input.finalWeek}|${input.demand.joinToString(",")}|${input.retentionDays}"
         val operation = Operation(gameId, IdempotencyKey.CREATE_SCOPE, body)
-        val request = CommandRequest(operation, Auth.ANONYMOUS, STATUS_CREATED, issued.credential, meta)
+        val request =
+            CommandRequest(
+                operation,
+                Auth.ANONYMOUS,
+                STATUS_CREATED,
+                meta,
+                issued = { issuance.session.credential },
+                recovery = { issuance.recovery.credential },
+            )
         runCommand(request) { tx, ctx ->
             val expiresAt = ctx.at.plus(Duration.ofDays(retention.value.toLong()))
             val command =
@@ -91,7 +107,7 @@ suspend fun Ports.createGame(
                     expiresAt,
                 )
             applySingle(tx, ctx, gameStream, command) {
-                peripheralWrites(gameId, command, issued, settings.credentialKeyVersion, ctx.at)
+                peripheralWrites(gameId, command, issuance, settings.sessionTtl, ctx.at)
             }
         }.bind()
     }
@@ -117,15 +133,22 @@ suspend fun Ports.joinGame(
         val found = events.transaction { tx -> peripheral.findGameByJoinCode(tx, code) }.bind()
         val gameId = ensureNotNull(found) { AppFailure.Domain(GameError.InvitationInvalid) }
         val participantId = ParticipantId(newId())
-        val issued =
-            issue(CredentialKind.PARTICIPANT_RECOVERY, Actor.Participant(participantId).toRef(), newCredential())
+        val issuance = issuance(CredentialKind.PARTICIPANT_RECOVERY, Actor.Participant(participantId).toRef())
         val operation = Operation(gameId, SCOPE_JOIN, "join|${code.value}|${name.value}")
-        val request = CommandRequest(operation, Auth.ANONYMOUS, STATUS_OK, issued.credential, meta)
+        val request =
+            CommandRequest(
+                operation,
+                Auth.ANONYMOUS,
+                STATUS_OK,
+                meta,
+                issued = { issuance.session.credential },
+                recovery = { issuance.recovery.credential },
+            )
         runCommand(request) { tx, ctx ->
             val expiresAt = ctx.at.plus(settings.participantCredentialTtl)
             val command = GameCommand.JoinGame(ctx.actor, ctx.at, participantId, name, expiresAt)
             applySingle(tx, ctx, gameStream, command) {
-                peripheralWrites(gameId, command, issued, settings.credentialKeyVersion, ctx.at)
+                peripheralWrites(gameId, command, issuance, settings.sessionTtl, ctx.at)
             }
         }.bind()
     }
@@ -139,7 +162,7 @@ suspend fun Ports.assignRole(
     meta: RequestMeta,
 ): Either<AppFailure, CommandOutcome> {
     val operation = Operation(gameId, "assign:${participantId.value}", "assign|${participantId.value}|${role.name}")
-    val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, null, meta)
+    val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
     return runCommand(request) { tx, ctx ->
         applySingle(tx, ctx, gameStream, GameCommand.AssignRole(ctx.actor, ctx.at, participantId, role))
     }
@@ -150,7 +173,7 @@ suspend fun Ports.startGame(
     gameId: GameId,
     meta: RequestMeta,
 ): Either<AppFailure, CommandOutcome> {
-    val request = CommandRequest(Operation(gameId, SCOPE_START, SCOPE_START), Auth.REQUIRED, STATUS_OK, null, meta)
+    val request = CommandRequest(Operation(gameId, SCOPE_START, SCOPE_START), Auth.REQUIRED, STATUS_OK, meta)
     return runCommand(request) { tx, ctx -> applyStart(tx, ctx, StartGame(ctx.actor, ctx.at)) }
 }
 
@@ -166,7 +189,7 @@ suspend fun Ports.saveDecision(
         val (week, quantity, expected) = validateSave(input).mapLeft(AppFailure::Invalid).bind()
         val body = "decision|${input.role.name}|${input.week}|${input.quantity}|${input.expectedDecisionVersion}"
         val operation = Operation(gameId, "decision:${input.role.name}", body)
-        val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, null, meta)
+        val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
         runCommand(request) { tx, ctx ->
             val command = SessionCommand.SaveDecision(ctx.actor, ctx.at, input.role, week, quantity, expected)
             applySingle(tx, ctx, sessionStream, command)
@@ -183,7 +206,7 @@ suspend fun Ports.commitWeek(
         val (week, basis) = validateCommit(input).mapLeft(AppFailure::Invalid).bind()
         val versions = Role.entries.joinToString(",") { "${it.name}=${input.basis[it]}" }
         val operation = Operation(gameId, "commit:${input.requestedWeek}", "commit|${input.requestedWeek}|$versions")
-        val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, null, meta)
+        val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
         runCommand(request) { tx, ctx ->
             applySingle(tx, ctx, sessionStream, SessionCommand.CommitWeek(ctx.actor, ctx.at, week, basis))
         }.bind()

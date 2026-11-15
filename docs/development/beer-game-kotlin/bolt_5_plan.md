@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T04:46:59Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -410,15 +410,85 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 > **高リスク（認可と冪等。R5）。否定テストを先に書く。**
 
-- [ ] 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) **失効した資格が、以前に成功したキーを再送しても 403**（保存済みの応答を返さない。ADR-004。**既存のテストが 3 層にある**: `ExecuteSpec`、`ApplicationFlowContract`、`HttpFlowSpec`。いずれも `credentials.revoked_at` を直接更新するか `World.revoke` で失効させる。**本 Bolt は、実際の `RevokeCredential` コマンド経由で失効させて同じことを確かめる**）、(a2) **復帰（`RecoverParticipation`）の再送**: 現状の `Auth` は `ANONYMOUS`・`REQUIRED` の 2 つで、`joinGame` のような `ANONYMOUS` の操作は、同じキー・同じ本文の再送に保存済みの応答（資格の生の値を含む）を返す（参加コードが認可の代わり）。**復帰は、提示した復帰資格の有効性が認可であり、`ANONYMOUS` で実装すると、失効した復帰資格の再送に、保存済みの新しいセッションが返る**。復帰は、冪等記録の照合の前に、提示された復帰資格を検証する（`validating-design` 軸 B の B5）、(b) 期限切れの資格は 403、(c) **鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効**、(d) **旧版の鍵を設定から外したら、その版の資格は 403**、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（`beergame_reader`）が `credentials` を読めない（V101 の権限。設計書は未決。**確認だけを行い、変更が要るなら人に報告**）。失敗を確認する
-- [ ] 4.2 🟢 鍵の複数の版（判断項目 3）。設定の読み込み（本番で必須、未設定なら起動に失敗。**起動時の検査の既存の仕組みを再利用**）、発行は最新の版、検証は保存された版の鍵。資格の値は 256 ビットの乱数、保存は鍵付き HMAC のダイジェストと版
-- [ ] 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。**分けた後に、資格の失効でブラウザセッションを止める結び付き（`browser_sessions` に `revoked_at` または資格の主体への参照を足すか、認証が主体の未失効の資格の存在を確かめるか）を、実装の前に人が決める**（スキーマ変更は確認必須。現状は、認証が同じダイジェストで `browser_sessions` と `credentials` を結ぶ。`JdbcPeripheralStore.kt` の `AUTHENTICATE_SQL`。`validating-design` 軸 B の B3）。期限を設定値にする（判断項目 2。現状は `Wiring.kt` の定数）。`credentials` の失効・発行を、`Credential*` イベントの追記と**同じトランザクション**で行う（`PeripheralWrite.RevokeCredentialRow` の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）
-- [ ] 4.4 🟢 `execute`（`Execute.kt` の `runCommand`）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、**失効後の再送が 403 のテスト（4.1 の a、a2）が通る**ことを確認する。**確認した事実（Step 0.3）**: `Auth.REQUIRED` の操作は、`runCommand` が `authenticate`（資格の有効性とゲームの一致）を `idempotency.find` より前に評価し、無効なら `Unauthorized` を返す。既存の 3 つのテストが、この順序を確かめている。**未確認は、`RecoverParticipation`（a2）と、実際の失効コマンド経由の再送**
-- [ ] 4.5 🟡 リファクタリング。層ごとの静的解析の違反 0 件
-- [ ] 4.6 🔴🟢 **イベントの符号化**: 新しい 6 種類のイベント（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）の DTO を `EventDtos.kt` に足し、`EventCodec`・復号（`DtoDecodingGame.kt`・`DtoDecodingSession.kt`）を拡張する。`EventCodecSpec` の往復と golden（全イベントの種類）に足す。現状の DTO は 9 種類（`@SerialName` で確認）。計画に無かったため追加した（`validating-design` 軸 A の A1）。**入れ替えの 2 種類（`ParticipantReplaced`・`RoleHolderReplaced`）の golden も対象に含める（2026-11-15 にユーザーが決定。Step 3.5 で往復は実装済み）**
-- [ ] 4.7 🔴🟢 **投影**: `SessionOverview`（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`。`status` の `PAUSED` は V004・仕様・`SessionStatus` にすでにある）と `CurrentDecisions`（`ProxyDecisionSubmitted`）を、`Projection.kt` に足す。`Lobby` は資格のイベントを**購読しない**（設計書 L5）ことを、投影の契約テストで確かめる。計画に無かったため追加した（同 A1）。**`lobby_participants` の投影に `ParticipantReplaced` の購読（`replaced_at`。マイグレーションは Step 5.5）と、`RoleHolderReplaced` による `session` 側の反映の確認を足す（2026-11-15 にユーザーが決定）**
+- [x] 4.1 🔴 否定テストを先に書く（統合は PostgreSQL 18 の Testcontainers、純粋な部分は単体）: (a) **失効した資格が、以前に成功したキーを再送しても 403**（保存済みの応答を返さない。ADR-004。**既存のテストが 3 層にある**: `ExecuteSpec`、`ApplicationFlowContract`、`HttpFlowSpec`。いずれも `credentials.revoked_at` を直接更新するか `World.revoke` で失効させる。**本 Bolt は、実際の `RevokeCredential` コマンド経由で失効させて同じことを確かめる**）、(a2) **復帰（`RecoverParticipation`）の再送**: 現状の `Auth` は `ANONYMOUS`・`REQUIRED` の 2 つで、`joinGame` のような `ANONYMOUS` の操作は、同じキー・同じ本文の再送に保存済みの応答（資格の生の値を含む）を返す（参加コードが認可の代わり）。**復帰は、提示した復帰資格の有効性が認可であり、`ANONYMOUS` で実装すると、失効した復帰資格の再送に、保存済みの新しいセッションが返る**。復帰は、冪等記録の照合の前に、提示された復帰資格を検証する（`validating-design` 軸 B の B5）、(b) 期限切れの資格は 403、(c) **鍵のローテーション後、旧版の鍵で発行した資格が期限まで有効**、(d) **旧版の鍵を設定から外したら、その版の資格は 403**、(e) 別のゲームの資格・役割外の資格は 403、(f) 無効な資格の応答は、理由（期限・失効・不明）を区別しない同じ本文、(g) 読み取りロール（`beergame_reader`）が `credentials` を読めない（V101 の権限。設計書は未決。**確認だけを行い、変更が要るなら人に報告**）。失敗を確認する
+- [x] 4.2 🟢 鍵の複数の版（判断項目 3）。設定の読み込み（本番で必須、未設定なら起動に失敗。**起動時の検査の既存の仕組みを再利用**）、発行は最新の版、検証は保存された版の鍵。資格の値は 256 ビットの乱数、保存は鍵付き HMAC のダイジェストと版
+- [x] 4.3 🟢 ブラウザセッションと復帰資格を、別のダイジェストに分ける（B1 は 1 つの値で兼用）。**分けた後に、資格の失効でブラウザセッションを止める結び付き（`browser_sessions` に `revoked_at` または資格の主体への参照を足すか、認証が主体の未失効の資格の存在を確かめるか）を、実装の前に人が決める**（スキーマ変更は確認必須。現状は、認証が同じダイジェストで `browser_sessions` と `credentials` を結ぶ。`JdbcPeripheralStore.kt` の `AUTHENTICATE_SQL`。`validating-design` 軸 B の B3）。期限を設定値にする（判断項目 2。現状は `Wiring.kt` の定数）。`credentials` の失効・発行を、`Credential*` イベントの追記と**同じトランザクション**で行う（`PeripheralWrite.RevokeCredentialRow` の設計。統合テストで「資格の行の変更が、対応するイベントなしに起きない」ことを確認）
+- [x] 4.4 🟢 `execute`（`Execute.kt` の `runCommand`）の順序: 認証 → 認可の前提検査 → 冪等記録の照合 → … を維持し、**失効後の再送が 403 のテスト（4.1 の a、a2）が通る**ことを確認する。**確認した事実（Step 0.3）**: `Auth.REQUIRED` の操作は、`runCommand` が `authenticate`（資格の有効性とゲームの一致）を `idempotency.find` より前に評価し、無効なら `Unauthorized` を返す。既存の 3 つのテストが、この順序を確かめている。**未確認は、`RecoverParticipation`（a2）と、実際の失効コマンド経由の再送**
+- [x] 4.5 🟡 リファクタリング。層ごとの静的解析の違反 0 件
+- [x] 4.6 🔴🟢 **イベントの符号化**: 新しい 6 種類のイベント（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）の DTO を `EventDtos.kt` に足し、`EventCodec`・復号（`DtoDecodingGame.kt`・`DtoDecodingSession.kt`）を拡張する。`EventCodecSpec` の往復と golden（全イベントの種類）に足す。現状の DTO は 9 種類（`@SerialName` で確認）。計画に無かったため追加した（`validating-design` 軸 A の A1）。**入れ替えの 2 種類（`ParticipantReplaced`・`RoleHolderReplaced`）の golden も対象に含める（2026-11-15 にユーザーが決定。Step 3.5 で往復は実装済み）**
+- [x] 4.7 🔴🟢 **投影**: `SessionOverview`（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`。`status` の `PAUSED` は V004・仕様・`SessionStatus` にすでにある）と `CurrentDecisions`（`ProxyDecisionSubmitted`）を、`Projection.kt` に足す。`Lobby` は資格のイベントを**購読しない**（設計書 L5）ことを、投影の契約テストで確かめる。計画に無かったため追加した（同 A1）。**`lobby_participants` の投影に `ParticipantReplaced` の購読（`replaced_at`。マイグレーションは Step 5.5）と、`RoleHolderReplaced` による `session` 側の反映の確認を足す（2026-11-15 にユーザーが決定）**
 
 **ゲート 4**: 資格の設計（漏洩時に被害を止められるか）と、否定テストの網羅を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+#### Step 4 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 4 の承認は記録していない。HTTP・application の新コマンドの公開と配線は Step 6、マイグレーションは Step 5.5 のため行っていない。Step 5 以降には進んでいない。**
+
+**決定の反映**: 鍵の版は値の接頭辞（判断項目 3）、H2 案 A（失効と同じトランザクションで `browser_sessions` の行を削除。スキーマ変更なし）、H3 案 A の下回り（`Auth.RECOVERY` の認可・冪等の順序と検証。`bg_recovery` の Cookie・復帰コードの応答への載せ方・経路は Step 6）、入れ替えの 2 イベントの golden と `lobby_participants` の投影の行の変更（4.6・4.7）。
+
+**手順（TDD）**: テストを先に書いた。application は、`CredentialKeyRing`・`revokeCredential`・`reissueCredential`・`recoverParticipation` などが無い**コンパイルエラー 125 件の Red** を確認してから実装した。domain の投影は、4 件が失敗する Red（`ProjectionSpec`）を確認してから実装した。**順序を守れなかった箇所**: `ServerConfig` の鍵の版・期限の設定は、実装を先に書き、テストをあとに足した（`ServerConfigSpec` に 4 件）。永続化（`JdbcPeripheralStore`）は、テスト（`ApplicationFlowContract` の契約）を先に書いたが、Red は main の型がコンパイルできないエラーの形（`PeripheralWrite` の変更）で、DB の振る舞いが落ちる形ではない。**規則を壊すと否定テストが落ちることを個別に確かめた**（下の「ミューテーションの確認」）。
+
+**実装したもの**:
+
+- `CredentialKeyRing.kt`（新規）: 現在の版と版ごとの鍵。資格は `v<版>.<乱数>`。発行は現在の版、検証は値が示す版の鍵。形式違い・知らない版（鍵が外された版）は、ダイジェストを作れず `null`（理由は区別しない）。鍵は `toString` に出さない。
+- `Credentials.kt`: ブラウザセッションと復帰資格を**別の値・別のダイジェスト**に分けた（`Issuance`）。`PeripheralWrite` を `IssueRecoveryRow`・`IssueSessionRow`・`ExtendRecoveryRow`・`RevokeSubject` に分け、`PeripheralStore` に `authenticateRecovery` を足した。`revocationWrites`: **追記したイベントの `CredentialRevoked` から、必ず失効の行の変更を導く**（`StreamDef.writeSideEffects` が共通に付ける。手動の失効と、入れ替えの `CredentialRevoked` の両方に効く）。
+- `Execute.kt`: `Auth.RECOVERY` を追加。**復帰資格の有効性（`credentials`）を、冪等記録の照合より前に検証する**。認証の順序（認証 → 認可の前提検査 → 冪等記録の照合 → …）は維持。`CommandRequest` の資格の発行は、操作者から作る関数にした（復帰は認証まで主体が決まらない）。
+- `CredentialCommands.kt`（新規。`internal`）: `revokeCredential`・`reissueCredential`・`recoverParticipation`。**公開の関数・HTTP への配線は Step 6**。ここは、失効・復帰の順序と行の変更を、実際のコマンドで試験するための土台。
+- `Outcome.kt`: `CommandOutcome.recovery` を追加。冪等記録の本文の形式を `v2` にした（`v1` の記録は読まない）。
+- `app`: `Secrets` に `credentialKeyVersion`・`previousCredentialKeys`、`ServerConfig` に `CREDENTIAL_KEY_VERSION`・`CREDENTIAL_KEY_PREVIOUS`・`SESSION_TTL_HOURS`・`PARTICIPANT_CREDENTIAL_TTL_DAYS`（**名前は提案**）。期限は `CredentialTtls`（既定 24 時間・30 日）で `appPorts` へ渡す。Terraform（`infra/`）は変更していない。
+- `adapter-persistence`: `JdbcPeripheralStore`（認証は `browser_sessions` だけ、復帰の認証は `credentials` だけ）と `JdbcPeripheralRows`（書き込みの SQL。detekt の `TooManyFunctions` の解消のために分けた）。**失効は、`credentials.revoked_at` の更新と、同じ主体の `browser_sessions` の行の削除**。
+- 4.6: 全 17 種類のイベントの golden（`EventGoldenSpec`。event_type・JSON の全文・復号の往復。ドメインの sealed の直接の部分型と一致する検査つき）。`DecisionSaved` の入力者（進行役）の復号は、すでに実装済みだった。
+- 4.7: `Projections` に `SessionPaused`・`SessionResumed`（`session_overview.status`）、`ProxyDecisionSubmitted`（`current_decisions` に進行役の入力者、`submitted_role_count`）、`ParticipantReplaced`（`lobby_participants` の `role` を NULL、`replaced_at` を書く行の変更）。資格のイベントと `RoleHolderReplaced` はどの投影も購読しない（試験で固定）。
+
+**実測**（`apps/beer-game-kotlin` で実行。静的解析は JDK 21 = Corretto 21.0.12、それ以外は既定の JDK 25）:
+
+| 検査 | 結果 |
+| :--- | :--- |
+| `:domain:test` | **395 件、失敗 0**（Step 3.5 の 390 件から 5 件増。`ProjectionSpec`） |
+| `:domain:koverVerify`（行 100%） | 合格。**行 1038 / 1038（未到達 0）**、分岐 258 / 263。除外・閾値の引き下げなし |
+| `:application:test` | **121 件、失敗 0**（86 件から 35 件増: `CredentialKeyRingSpec` 7、`CredentialLifecycleSpec` 26、`SupportSpec` 2 ほか） |
+| `:adapter-persistence:test`（H2。契約を含む） | **77 件、失敗 0**（52 件から 25 件増: `EventGoldenSpec` 18、資格の行の契約 5、投影の契約 2） |
+| `:adapter-http:test` | 70 件、失敗 0（変更なし） |
+| `:app:test` | **75 件中 7 件 failed**（Step 3.5 と同じ `ApiContractSpec` の想定どおりの Red 7 件。`ServerConfigSpec` に 4 件を足した） |
+| `:adapter-persistence:integrationTest`・`:app:integrationTest`（PostgreSQL 18 の Testcontainers） | `PostgresPersistenceSpec` 51 件、`RolePrivilegesSpec` 12 件、`PostgresHttpSpec` 1 件、**失敗 0**。H2 と同じ資格の契約・投影の契約を PostgreSQL でも実行した |
+| `:app:acceptanceTestH2`・`:app:acceptanceTest`（PostgreSQL 18） | どちらも **68 件中 36 件 failed、1 件 skipped（Step 3.5 の記録と同じ件数）**。配線（Step 6）がなく想定内の Red。**鍵のローテーションの 2 シナリオは、試験の道具の限界の失敗でなく、復帰の経路が無い 404 で落ちる**ようになった |
+| `ktlintCheck`、`detekt`・`detektMain`・`detektTest`、`pmd`（`pmdMain`・`pmdTest`・`pmdAdapter`・`pmdDomainApplication`・fixture） | **違反 0**（`@Suppress` なし、ベースラインなし。`pmdFixtureTest` の 17 件は、期待する違反の検査）。途中で detekt の `TooManyFunctions`・`LongMethod`・`LongParameterList`・行の長さを指摘され、設定を変えずにコードを直した |
+
+**否定テストの網羅**（R5。application の `CredentialLifecycleSpec`・`ExecuteSpec`・`SnapshotSpec`、永続化の契約。H2 と PostgreSQL）:
+
+| 観点 | テスト |
+| :--- | :--- |
+| (a) 失効後の再送が 403 | **実際の `RevokeCredential` のコマンド経由**（application）で、以前に成功した保存のキーを再送して `app.unauthorized`。冪等記録の検索・読み込み・追記が起きない（呼び出しの順で確認）。状況の取得も 403。ほかの参加者の資格は有効のまま。実 DB（永続化の契約）は、失効の書き込み（`PeripheralWrite.RevokeSubject`）を周辺ストアへ直接書いた後の再送で確認 |
+| (a2) 復帰の再送 | 成功した復帰の同じキー・同じ復帰資格の再送は保存済みの応答（同じセッション）を返し追記しない。**復帰資格を失効させた後の再送は `app.unauthorized`（冪等記録を検索しない）**。別の主体の復帰資格で同じキーを送ると `app.idempotency_key_reused` |
+| (b) 期限切れ | ブラウザセッション（24 時間）の期限切れは 403、復帰資格（30 日）は有効で復帰できる。復帰資格の期限切れは 403。復帰で復帰資格の期限が復帰した時刻から新しくなる（進行役は保持期間のまま）。実 DB で、期限の瞬間から使えない |
+| (c)(d) 鍵のローテーション | 現在の版を 2 にしても、版 1 の資格（セッション・復帰）は期限まで有効。新しい資格は `v2.`・版 2 の行。版 1 の鍵を外すと、版 1 の資格は操作も復帰も 403（現行版は有効） |
+| (e) 別のゲーム・別の種類 | 別のゲームの復帰資格は 403。ブラウザセッションの値を復帰に、復帰資格の値を操作に使うと 403（別のダイジェスト・別の表） |
+| (f) 理由を区別しない | 無い・不明・版の無い・知らない版・失効・期限切れの復帰資格が、すべて同じ `AppFailure.Unauthorized` で、冪等記録を検索しない |
+| (g) 読み取りロール | `beergame_reader` が `credentials`・`browser_sessions` を読めないことは、既存の `RolePrivilegesSpec` で確認済み（変更不要。V101 の変更なし）。**`beergame_writer` が失効の SQL（`credentials` の UPDATE、`browser_sessions` の DELETE）を実行できること、ほかのロールはできないこと**を、PostgreSQL で足した |
+| 行の変更とイベント | 失効した行の主体は `CredentialRevoked` の主体と同じ。失効の途中で投影・周辺ストアが失敗すると、イベントも行も取り消される。二重の失効・有効な資格の再発行は、イベントも行も増えない。**再発行しても、失効前のブラウザセッションは復活しない** |
+
+**ミューテーションの確認**（規則を壊すと否定テストが落ちること。壊した後に戻し、緑に戻したことを確認した）: (1) 失効の行の変更を付けない → application の 8 件が失敗。(2) 鍵の検証を、値が示す版でなく現在の版の鍵にする → 4 件が失敗。(3) 復帰で、資格のゲームの一致を検査しない → 1 件が失敗。(4) 冪等記録の照合を認証より前に置く → 12 件が失敗。(5) 失効でブラウザセッションの行を削除しない（`JdbcPeripheralRows`）→ 永続化の 3 件が失敗。
+
+**`replaced_at` の事実**（4.7）: 一時的な試験で、`ParticipantReplaced` の投影を H2 に書くと `SQLSTATE 42S22`（列が無い）で `Left(Persistence)` になることを確かめた（試験は削除した。PostgreSQL では実行していない）。このため、**永続化の契約（`lobby_participants.replaced_at` の読み書き）は、Step 5.5 のマイグレーションまで保留**。保留する範囲: `lobby_participants.replaced_at` の永続化の試験、`ParticipantReplaced` を追記する経路（Step 6 の配線）、API の `LobbyParticipant.replaced`。domain の投影は、行の変更の形まで試験した。
+
+**計画・設計からの差**（設計書は、実装に合わせて更新した。[architecture-backend](../../design/beer-game-kotlin/architecture-backend.md) の差の表 43〜46、[data-model](../../design/beer-game-kotlin/data-model.md) の 35・36、[domain-model](../../design/beer-game-kotlin/domain-model.md) の 39）:
+
+1. 資格の値の長さが 43 文字から、版の接頭辞つき（`v1.` + 43 文字 = 46 文字）になった。Cookie の値・復帰コードの長さ・形式の検査に影響する（Step 6）。
+2. **ブラウザセッションの期限が 24 時間で有効になった**。HTTP の `Set-Cookie` の `Max-Age` は、Step 6 まで `participantCredentialTtl`（30 日）のまま。24 時間後は、Cookie があっても 403 になり、復帰（Step 6）が必要になる。`HttpFlowSpec` の「期限切れ」の試験は、31 日後でなく 25 時間後に、進行役のセッションも 403 になるよう直した。**Step 6 の前に、実運用に出さない**。
+3. 復帰の応答にセッションを返す形（`CommandOutcome.issued` = ブラウザセッション、`recovery` = 復帰コード）で、`IssuedCredential.kind` の `PARTICIPANT_RECOVERY` は、セッションの値にも使う（名前は B1 から変えていない）。
+4. 進行役の復帰は、復帰資格の期限を延ばさない（保持期間のまま）。参加者は復帰した時刻から新しい 30 日。
+5. 失効・再発行・復帰を、`internal` の関数（`CredentialCommands.kt`）にした。計画の「application の新コマンドの配線は Step 6」に従い、公開の関数・入力の検証・HTTP は書いていない。**4.1(a) の「実際のコマンド経由」は application までで、実 DB（永続化）の試験は周辺ストアの失効の書き込みを直接呼ぶ**（`internal` が別モジュールから見えないため）。HTTP から DB までの通しは Step 6 の後。
+
+**ゲート 4 で人が確認すること**:
+
+1. **漏洩時に被害を止められるか**。止められるもの: 参加者の漏れた資格は、失効で、ブラウザセッションの行の削除と復帰資格の失効が**同じトランザクション**で起き、再発行しても復活しない。鍵の版は、版ごとに外せる。**止められない・弱いもの**: (a) **進行役自身の資格は、失効・再発行の対象外**（ゲート 1 の決定 6b。ドメインは `Forbidden`）。進行役の復帰資格（保持期間、既定 90 日）が漏れても、止める手段は、鍵の版を外すこと（その版で発行した**すべて**の資格が使えなくなる）だけ。ブラウザセッションは 24 時間で切れる。(b) 参加者の復帰コードが漏れたとき、進行役が失効させるまでは、期限（30 日）まで使われる。(c) 鍵の版を外すと、漏れていない資格も使えなくなる。(d) 失効と復帰の同時の実行は、ゲームのストリームの追記の版の競合で直列化される設計だが、**実 DB の並行の試験は未実施**（ADR-004 の備考のまま）。
+2. **否定テストの網羅**（上の表）。未実施: HTTP 経由の通し（Step 6）、実 DB の並行、`RecoverParticipation` の HTTP の認可、観察者の資格（B9）、レート制限（Step 5）。
+3. 設定の名前（`CREDENTIAL_KEY_VERSION`・`CREDENTIAL_KEY_PREVIOUS`・`SESSION_TTL_HOURS`・`PARTICIPANT_CREDENTIAL_TTL_DAYS`）と、既定の期限（24 時間・30 日。運営者との合意 R11 は未取得）。
+4. 値の接頭辞（`v<版>.`）による長さの変更、冪等記録の本文の形式 `v2`、`CredentialCommands.kt` を `internal` にしたこと。
+5. 新規ファイル（確認必須）: `CredentialKeyRing.kt`、`CredentialCommands.kt`、`JdbcPeripheralRows.kt`、試験の `CredentialKeyRingSpec.kt`・`CredentialLifecycleSpec.kt`・`EventGoldenSpec.kt`。
+6. `lobby_participants.replaced_at` の保留（Step 5.5 まで）と、その範囲。
+
+**実施中の逸脱**（正直に記録する）: (1) 作業中に、ファイルの編集を禁じられている heredoc・python を、**何も書かない確認のために 2 回誤って起動した**（ファイルの変更は無い）。ファイルの編集は、すべて Write・Edit で行った。(2) 試験の一時ファイル 2 件（`TmpDumpSpec`・`TmpReplacedSpec`）を試験のディレクトリに作り、使った後に削除した（成果物には残っていない）。(3) 上の「順序を守れなかった箇所」。
 
 ### Step 5: 参加・復帰の専用のレート制限（🔴🟢）
 
@@ -580,6 +650,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 4（鍵の版・資格の期限と失効・冪等記録の順序。4.1〜4.7）を実施**（ゲート 4 は人の確認待ち。**承認は記録していない**。Step 5 以降は未着手）。テストを先に書き、application はコンパイルエラー 125 件・domain の投影は 4 件の Red を確認してから実装（`ServerConfig` の設定だけ、実装が先で逸脱）。`CredentialKeyRing`（値の版の接頭辞）、ブラウザセッションと復帰資格を別のダイジェストに分離、`Auth.RECOVERY`（冪等記録の照合より前に検証）、失効（H2 案 A。`credentials.revoked_at` の更新と `browser_sessions` の行の削除を同じトランザクションで。`CredentialRevoked` から必ず導く）、`internal` の失効・再発行・復帰（公開と HTTP は Step 6）、全 17 種類のイベントの golden、停止・再開・代理入力・入れ替えの投影、鍵のローテーションの受入の道具（再起動）。**実測**: domain 395 件・行 1038/1038（100%）、application 121 件、persistence（H2）77 件・PostgreSQL の統合 64 件（51 + 12 + 1）、すべて失敗 0。`:app:test` は想定の 7 件の Red（`ApiContractSpec`）。受入は H2・PostgreSQL とも 68 件中 36 failed（Step 3.5 と同じ）。ktlint・detekt（JDK 21）・PMD は違反 0。ミューテーション 5 件で否定テストが落ちることを確認。**`replaced_at` の永続化は Step 5.5 まで保留**（H2 で `SQLSTATE 42S22` を実測）。設計書（architecture-backend 43〜46、data-model 35・36、domain-model 39）を更新。**逸脱: heredoc・python を何も書かない確認で 2 回誤って起動（ファイルの変更なし）**。人が確認する 6 点は「Step 4 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3.5.2〜3.5.4（役割の入れ替えのドメイン実装）を実施**（ゲート 3.5 の後半〔実装の確認〕は人の確認待ち。**承認は記録していない**。Step 4 以降は未着手）。テストを先に書き、コンパイルエラーの Red を確認してから実装。`ParticipantReplaced`・`RoleHolderReplaced`・`assignRoleAfterStart`（`ReplaceDecision.kt` 新規）、`evolveGame` が開始後の `RoleAssigned` を採用する変更、永続化の DTO・往復を追加。実測: `:domain:test` 390 件・失敗 0、domain の行 1018/1018（100%）、`:app:test` は想定の 7 件の Red（`ApiContractSpec`）、静的解析は違反 0（JDK 21）。マイグレーション（`replaced_at`）は Step 5.5、配線・ステップ定義は Step 6 に残す。**`lobby_participants` の投影を足すステップが計画に無い**ことを記録。人が確認する 5 点は「Step 3.5 の実施結果」。設計書の差の表 38 を追加 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3.5.1（役割の入れ替えの仕様と設計書）を実施**（ゲート 3.5 は人の確認待ち。**承認は記録していない**。3.5.2 以降は着手していない。Kotlin のコードとマイグレーションは書いていない）。`openapi.yaml` の `assignRole` に規則を書き（新しい `code` なし、`LobbyParticipant.replaced` を条件付きで追加）、`api:generate`・`api:check`・`api:lint` を実行（差分 0・有効）。設計書（`domain-model.md` の「役割の入れ替え」・イベント EV-G12・EV-S09・差の表 37、`data-model.md` の「役割の入れ替えと永続化」ほか）と `credentials.feature` の 6 シナリオを追加。**確認した事実: Kotlin 版に `participants.replaced_at` に当たる列は無い（スキーマ変更の要否は確認必須の人の判断）。`session` の割り当ての写し（D4）の更新が要るため、入れ替えは 2 ストリームにまたがる**。`ApiContractSpec` は 13 件中 7 件 failed（Step 3 と同じ。新しい Red なし）。人が確認する 8 点は「Step 3.5.1 の結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 3（Game の資格: 失効・再発行・復帰。3.1〜3.3）を実施**（ゲート 3 は人の確認待ち。**承認は記録していない**。Step 3.5 以降は未着手）。テストを先に書き、コンパイルエラー 119 件の Red を確認してから実装。`Credential.kt`（新規）に `CredentialSubject`・`CredentialValidity`・資格の decide を、`Game.kt` に `RevokeCredential`・`ReissueCredential`・`RecoverParticipation`、`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`、`game.credential_already_revoked`・`game.credential_not_revoked` を追加。仕様に `game.credential_not_revoked` を足し型を再生成。永続化の DTO を最小で前倒し。実測: `:domain:test` 357 件・失敗 0、domain の行 970/970（100%）、`:app:test` は想定の 7 件の Red（Step 1 の `ApiContractSpec`）、静的解析は違反 0。ゲート 3 で人が確認する 6 点は「Step 3 の実施結果」。設計書（domain-model の差の表 35・36 ほか）を更新 | claude-code/claude-sonnet-5-5 |

@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Kotlin 版のバックエンドアーキテクチャ。Ktor と Arrow、ES+CQRS のコマンド側と問い合わせ側、関数の束による依存の表し方、PostgreSQL 固有の機能を隠すポート（ProjectionLock・ChangeNotifier）と PostgreSQL 版・H2 版の 2 実装、ローカル開発のプロファイルと本番での H2 の拒否、コマンド処理の流れ、冪等性、競合の再試行、自動確定、SSE、観測性、セキュリティ、モジュール構成と依存の検査を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T03:29:13Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T05:30:53Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Kotlin 版）
@@ -599,9 +599,9 @@ beer-game2 の設計を引き継ぎ、Kotlin 版での実現方法を加えま�
 
 | 項目 | 設計 |
 | :--- | :--- |
-| 資格 | 256 ビットの乱数（`SecureRandom`）。保存はダイジェスト（**B1 の実装は鍵付き HMAC-SHA256、鍵の版は 1**。冪等キーの digest とは別の鍵で、部分の並びも違う。ADR は B2 で確認）と**鍵の版**。鍵は複数の版を同時に持つ（`KeyRing`）。**本番では鍵の設定を必須にし、未設定なら起動に失敗する**（`AppConfig.load` が `Either` で全項目の誤りを集め、失敗なら終了する。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
+| 資格 | 256 ビットの乱数（`SecureRandom`）。保存はダイジェスト（鍵付き HMAC-SHA256。冪等キーの digest とは別の鍵で、部分の並びも違う）と**鍵の版**。**B5 Step 4 の実装**: 資格の値は `v<版>.<乱数>`（版の接頭辞）で、鍵は複数の版を同時に持つ（`CredentialKeyRing`。発行は現在の版、検証は値が示す版の鍵。旧版の鍵を設定に残す間、旧版の資格は期限まで有効。外すと 403）。設定は `CREDENTIAL_KEY`（現在の鍵）・`CREDENTIAL_KEY_VERSION`（既定 1）・`CREDENTIAL_KEY_PREVIOUS`（旧版の鍵。`版:Base64` のカンマ区切り。名前は提案で、Terraform の秘密の形は変えていない）。ブラウザセッションの値と復帰資格の値は別の乱数・別のダイジェスト。**本番では鍵の設定を必須にし、未設定なら起動に失敗する**（`AppConfig.load` が `Either` で全項目の誤りを集め、失敗なら終了する。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | 有効期限と失効 | 進行役の資格、復帰資格、観察用の招待、ブラウザセッションのすべてが、有効期限と失効を持つ。判定は純粋関数 `CredentialValidity.status(now)` |
-| 認証と認可 | 認証は、Cookie の生の値から `Actor` を決める（`credentials` / `browser_sessions` を引く）。**B1 の実装では、Ktor のプラグインでなく `application` の `execute` の中（トランザクションの中）で行う**（ルートは生の資格を `RequestMeta.credential` に入れて渡す）。ブラウザセッションが有効で、かつ資格が未失効・未期限切れのときだけ成功し、不明・失効・期限切れを区別しない（`app.unauthorized`）。**認可はドメインの `decide` が行う**（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる |
+| 認証と認可 | 認証は、Cookie の生の値から `Actor` を決める（`credentials` / `browser_sessions` を引く）。**B1 の実装では、Ktor のプラグインでなく `application` の `execute` の中（トランザクションの中）で行う**（ルートは生の資格を `RequestMeta.credential` に入れて渡す）。ブラウザセッションが有効（`browser_sessions` の行があり、未期限切れ。失効は行の削除）なときだけ成功し、不明・失効・期限切れ・鍵が外された版を区別しない（`app.unauthorized`）。**B5 Step 4 の実装: 復帰（`RecoverParticipation`）は `Auth.RECOVERY`**（提示した復帰資格が `credentials` で未失効・未期限切れであることが認可）。**冪等記録の照合より前に検証する**（`ANONYMOUS` で作ると、失効した復帰資格の再送に保存済みの新しいセッションが返る。ADR-004、ADR-015。HTTP への配線は Step 6）。**認可はドメインの `decide` が行う**（役割、共同担当、進行役、観察者は読み取りだけ）。ルートの認可の検査は、ゲームの一致までにとどめる |
 | 入力 | DTO のスキーマと、スマートコンストラクタの範囲検査。本文のサイズ上限と数量の上限を設ける |
 | レート制限 | 全体に加え、**参加、復帰、観察用の招待の参加を専用に制限**する（総当たりの対策）。状態の共有は未決事項（設計判断 BD8） |
 | ヘッダー | CSP、HSTS、`nosniff`、Referrer-Policy を、すべての応答に付ける（Ktor のプラグインまたは自前のインターセプタ）。CloudFront のレスポンスヘッダーポリシーとの二重化は許容する |
@@ -746,6 +746,10 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 | 40 | 429・413・500 は、一部の操作にだけ宣言 | 429 は探針を除く全操作、413 は変更系の全操作、500 は問い合わせ系を含む全操作に宣言（HTTP の層の共通の守り） | 同上 |
 | 41 | 作成の範囲（最終週・需要・保持日数）と表示名の長さは、説明文だけ・上限未決 | スキーマに `minimum`・`maximum`（1〜50、0〜1000、1〜3650）、表示名は 1〜80 文字。`GameState.sessionId` は `required` | 同上 |
 | 42 | 関数型の規約は detekt・PMD で守る（PMD の導入は B2） | PMD を導入し、層ごとのルールセット 4 つ。アダプター・`main`・テストは層単位で緩和（承認待ち）。契約テストは `app` の test | B2 の Step 1・5 |
+| 43（以降は B5 Step 4 の実装で変わった点。2026-11-15） | `AppSettings` は `credentialKeyVersion` と `credentialSecret`（鍵は 1 つ）、期限は `participantCredentialTtl` だけ | `credentialKeys: CredentialKeyRing`（版 → 鍵）、`sessionTtl`（ブラウザセッション）、`participantCredentialTtl`。資格の値は `v<版>.<乱数>`。`app` は `CredentialTtls`（`SESSION_TTL_HOURS`・`PARTICIPANT_CREDENTIAL_TTL_DAYS`）を設定から渡す | 判断項目 3（値の版の接頭辞）と 2（期限は設定値）。運営者との合意（R11）は未取得 |
+| 44 | `CommandOutcome(gameId, versions, issued?)`。資格は 1 つの値がセッションと復帰を兼ねる | `CommandOutcome(gameId, versions, issued?, recovery?)`。`issued` はブラウザセッションの値、`recovery` は復帰資格の値（復帰コード）。冪等記録の本文の形式は `v2`（HTTP が応答に載せるのは、Step 6 まで `issued` の `Set-Cookie` と `versions` だけ） | H3 案 A。復帰コードの応答への載せ方は Step 6 |
+| 45 | `Auth` は `ANONYMOUS`・`REQUIRED` | `RECOVERY` を追加。`PeripheralStore` に `authenticateRecovery` を追加。`CommandRequest` の資格の発行は、操作者から作る関数（復帰は認証まで主体が決まらない） | 復帰の認可は復帰資格の有効性（冪等記録の照合より前） |
+| 46 | `PeripheralWrite.IssueCredentialRow`（資格とセッションを 1 行の導出で書く） | `IssueRecoveryRow`・`IssueSessionRow`・`ExtendRecoveryRow`・`RevokeSubject`。**`CredentialRevoked` のイベントには、必ず `RevokeSubject` が付く**（追記の共通の流れが、イベントから導く）。失効・再発行・復帰の内側の操作（`CredentialCommands.kt`。`internal`）は、公開の関数・HTTP への配線を Step 6 が行う | 資格の行の変更が、対応するイベントなしに起きない・イベントだけが書かれて行が残らない、のどちらも防ぐ |
 
 ## 設計判断
 

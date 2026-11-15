@@ -55,10 +55,8 @@ enum class ExpirableTable(
     BROWSER_SESSIONS("UPDATE browser_sessions SET expires_at = ? WHERE game_id = ? AND actor_id = ?"),
 }
 
-private const val ROTATE_UNSUPPORTED =
-    "鍵の複数の版は未実装: 署名鍵を新しい版へ更新する試験用の操作が、アプリケーションに無い（B5 Step 4）"
-private const val DROP_UNSUPPORTED =
-    "鍵の複数の版は未実装: 旧版の鍵を設定から外す試験用の操作が、アプリケーションに無い（B5 Step 4）"
+private const val ROTATED_KEY_VERSION = 2
+private const val ROTATED_KEY_SEED = 21
 
 private const val AUDIT_SQL =
     "SELECT event_type, CAST(payload AS VARCHAR), actor_kind, CAST(actor_id AS VARCHAR), occurred_at " +
@@ -130,11 +128,12 @@ class RunningApp(
     val logs = CapturingLogs()
     val dataSource: HikariDataSource
     private val persistence: Persistence
-    private val server: EmbeddedServer<*, *>
+    private var server: EmbeddedServer<*, *>
+    private var secrets: Secrets = secrets()
+    private val port: Int
     val baseUrl: String
 
     init {
-        val secrets = secrets()
         val dialect: Dialect
         when (db) {
             AcceptanceDb.POSTGRES -> {
@@ -162,6 +161,22 @@ class RunningApp(
                 persistence = Persistence.open(dialect, dataSource, PersistenceConfig(secrets.responseKey))
             }
         }
+        server = startServer(secrets, 0)
+        port =
+            runBlocking {
+                server.engine
+                    .resolvedConnectors()
+                    .first()
+                    .port
+            }
+        baseUrl = "http://127.0.0.1:$port/api/v1"
+    }
+
+    /** 本番と同じ組み立て（appPorts）でサーバーを起動する。[port] が 0 なら空いているポート。 */
+    private fun startServer(
+        secrets: Secrets,
+        port: Int,
+    ): EmbeddedServer<*, *> {
         val deps =
             HttpDeps(
                 ports = appPorts(persistence, secrets, MAX_ATTEMPTS),
@@ -174,16 +189,16 @@ class RunningApp(
                     ),
                 logs = logs,
             )
-        server = embeddedServer(Netty, port = 0, host = "127.0.0.1") { beerGameModule(deps) }
-        server.start(wait = false)
-        val port =
-            runBlocking {
-                server.engine
-                    .resolvedConnectors()
-                    .first()
-                    .port
-            }
-        baseUrl = "http://127.0.0.1:$port/api/v1"
+        return embeddedServer(Netty, port = port, host = "127.0.0.1") { beerGameModule(deps) }.also {
+            it.start(wait = false)
+        }
+    }
+
+    /** 設定（鍵）を替えて、同じポート・同じ DB で再起動する（運営者の鍵の更新と同じ。設定は起動時に読む）。 */
+    private fun restartWith(next: Secrets) {
+        server.stop(SHUTDOWN_GRACE_MILLIS, SHUTDOWN_TIMEOUT_MILLIS)
+        secrets = next
+        server = startServer(next, port)
     }
 
     /** データベースへの接続を失わせる（接続プールを閉じる）。以降、接続の取得は失敗する。 */
@@ -235,13 +250,37 @@ class RunningApp(
     }
 
     /**
-     * 資格の署名鍵を新しい版へ更新する（運営者の操作）。鍵の複数の版は未実装（B5 Step 4）で、試験用の操作もまだ無い。
-     * 未実装であることを、失敗として示す（Pending にしない）。
+     * 資格の署名鍵を新しい版へ更新する（運営者の操作）。現在の版を 2 にして、旧版（1）の鍵を残し、再起動する。
+     * 旧版の資格は、期限まで有効のまま。
      */
-    fun rotateCredentialKey(): Nothing = throw AssertionError(ROTATE_UNSUPPORTED)
+    fun rotateCredentialKey() {
+        val current = secrets
+        restartWith(
+            Secrets(
+                credentialKey = ByteArray(KEY_BYTES) { (it + ROTATED_KEY_SEED).toByte() },
+                idempotencyKey = current.idempotencyKey,
+                responseKey = current.responseKey,
+                ephemeral = false,
+                credentialKeyVersion = ROTATED_KEY_VERSION,
+                previousCredentialKeys = mapOf(current.credentialKeyVersion to current.credentialKey),
+            ),
+        )
+    }
 
-    /** 旧版の鍵を設定から外す（運営者の操作）。未実装のため、失敗として示す。 */
-    fun dropOldCredentialKey(): Nothing = throw AssertionError(DROP_UNSUPPORTED)
+    /** 旧版の鍵を設定から外す（運営者の操作）。再起動する。旧版で発行した資格は、使えなくなる。 */
+    fun dropOldCredentialKey() {
+        val current = secrets
+        restartWith(
+            Secrets(
+                credentialKey = current.credentialKey,
+                idempotencyKey = current.idempotencyKey,
+                responseKey = current.responseKey,
+                ephemeral = false,
+                credentialKeyVersion = current.credentialKeyVersion,
+                previousCredentialKeys = emptyMap(),
+            ),
+        )
+    }
 
     override fun close() {
         server.stop(SHUTDOWN_GRACE_MILLIS, SHUTDOWN_TIMEOUT_MILLIS)

@@ -3,6 +3,7 @@ package beergame.persistence
 import arrow.core.getOrElse
 import beergame.application.NewEvent
 import beergame.domain.Actor
+import beergame.domain.CredentialSubject
 import beergame.domain.DisplayName
 import beergame.domain.DomainEvent
 import beergame.domain.GameCommand
@@ -150,6 +151,50 @@ class GameScript(
         val decided = decideSession(session, command).getOrElse { error("入力に失敗: $it") }
         record(StreamType.SESSION, command.actor, at, decided)
         session = decided.fold(session, ::evolveSession)
+        return this
+    }
+
+    private fun applySession(command: SessionCommand): GameScript {
+        val decided = decideSession(session, command).getOrElse { error("台本の SessionCommand が失敗した: $it") }
+        record(StreamType.SESSION, command.actor, command.at, decided)
+        session = decided.fold(session, ::evolveSession)
+        return this
+    }
+
+    fun pause(): GameScript = now().let { applySession(SessionCommand.PauseSession(facilitator, it)) }
+
+    fun resume(): GameScript = now().let { applySession(SessionCommand.ResumeSession(facilitator, it)) }
+
+    /** 進行役の代理入力。当週・今の版で入力する。 */
+    fun proxy(
+        role: Role,
+        quantity: Int,
+    ): GameScript {
+        val data =
+            when (val state = session) {
+                is SessionState.Active -> state.data
+                is SessionState.Paused -> state.data
+                else -> error("進行中でも一時停止中でもない")
+            }
+        val at = now()
+        return applySession(
+            SessionCommand.SubmitProxyDecision(
+                facilitator,
+                at,
+                role,
+                data.week,
+                Quantity.of(quantity).getOrElse { error("$it") },
+            ),
+        )
+    }
+
+    fun revoke(participant: ParticipantId): GameScript {
+        val at = now()
+        applyGame(
+            facilitator,
+            at,
+            GameCommand.RevokeCredential(facilitator, at, CredentialSubject.Participant(participant)),
+        )
         return this
     }
 

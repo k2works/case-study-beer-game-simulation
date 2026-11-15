@@ -2,6 +2,7 @@ package beergame.application
 
 import arrow.core.Either
 import arrow.core.left
+import beergame.domain.CredentialSubject
 import beergame.domain.GameEvent
 import beergame.domain.Role
 import beergame.domain.SessionEvent
@@ -152,28 +153,22 @@ class ExecuteSpec :
             "[ADR-004][H4] Given 成功した要求の後に資格が失効した When 失効した資格が同じキーを再送する Then 403（app.unauthorized）で、冪等記録を検索せず、応答を返さない",
         ) {
             val world = World()
-            val game = world.prepared()
-            val seat = game.seats[Role.FACTORY]
-            val first =
-                world.ports
-                    .assignRole(
-                        game.gameId,
-                        seat.participantId,
-                        Role.FACTORY,
-                        meta("old-key", game.facilitator),
-                    ).ok()
-            world.revoke(game.facilitator)
+            val game = world.started()
+            val seat = game.seats[Role.RETAILER]
+            val request = SaveDecisionInput(Role.RETAILER, 1, 4, 0)
+            val first = world.ports.saveDecision(game.gameId, request, meta("old-key", seat.credential)).ok()
+            // 実際の失効のコマンド（RevokeCredential）で、進行役が失効させる
+            world.ports
+                .revokeCredential(
+                    game.gameId,
+                    CredentialSubject.Participant(seat.participantId),
+                    meta("revoke-1", game.facilitator),
+                ).ok()
             world.clearCalls()
 
-            val replay =
-                world.ports.assignRole(
-                    game.gameId,
-                    seat.participantId,
-                    Role.FACTORY,
-                    meta("old-key", game.facilitator),
-                )
+            val replay = world.ports.saveDecision(game.gameId, request, meta("old-key", seat.credential))
 
-            first.versions.game shouldNotBe null
+            first.versions.session shouldNotBe null
             replay.err() shouldBe AppFailure.Unauthorized
             world.calls shouldNotContain "idempotency.find"
             world.calls shouldContain "authenticate"

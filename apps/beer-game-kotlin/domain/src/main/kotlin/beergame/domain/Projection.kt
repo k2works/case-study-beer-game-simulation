@@ -241,6 +241,19 @@ object Projections {
                     )
                 }
 
+                // B5: 役割の入れ替えで外れた旧担当者の行は消さず（履歴と入力者のラベルのため）、role を NULL にして入れ替えられた時刻を書く。
+                // `replaced_at` の列は、マイグレーション（B5 Step 5.5）で足す。資格のイベントは購読しない（正本は `credentials`。L5）
+                is GameEvent.ParticipantReplaced -> {
+                    listOf(
+                        upsert(
+                            ProjectionTable.LOBBY_PARTICIPANTS,
+                            mapOf(col("participant_id") to Value.Id(p.participantId.value)),
+                            "role" to Value.Null,
+                            "replaced_at" to Value.At(e.occurredAt),
+                        ),
+                    )
+                }
+
                 else -> {
                     emptyList()
                 }
@@ -275,6 +288,25 @@ object Projections {
                             "submitted_role_count" to num(p.submittedRoleCount),
                         ),
                     )
+                }
+
+                // B5: 代理入力も入力済みの役割数を更新する。確定はしない（週と status は変えない）
+                is SessionEvent.ProxyDecisionSubmitted -> {
+                    listOf(
+                        upsert(
+                            ProjectionTable.SESSION_OVERVIEW,
+                            gameKey(e),
+                            "submitted_role_count" to num(p.submittedRoleCount),
+                        ),
+                    )
+                }
+
+                is SessionEvent.SessionPaused -> {
+                    listOf(upsert(ProjectionTable.SESSION_OVERVIEW, gameKey(e), "status" to text("PAUSED")))
+                }
+
+                is SessionEvent.SessionResumed -> {
+                    listOf(upsert(ProjectionTable.SESSION_OVERVIEW, gameKey(e), "status" to text("ACTIVE")))
                 }
 
                 is SessionEvent.WeekCommitted -> {
@@ -336,28 +368,46 @@ object Projections {
             }
         }
 
-    /** `current_decisions`: 当週の入力。確定で行を消す。 */
+    /** 保存と代理入力に共通の、当週の入力（最後の入力者つき）。 */
+    private class DecisionInput(
+        val role: Role,
+        val week: Week,
+        val quantity: Quantity,
+        val version: DecisionVersion,
+        val editor: Editor,
+    )
+
+    private fun decisionRow(
+        e: EventEnvelope<DomainEvent>,
+        input: DecisionInput,
+    ): RowChange {
+        val (editorKind, editorId) =
+            when (val editor = input.editor) {
+                is Editor.ByParticipant -> "PARTICIPANT" to editor.id.value
+                is Editor.ByFacilitator -> "FACILITATOR" to editor.gameId.value
+            }
+        return upsert(
+            ProjectionTable.CURRENT_DECISIONS,
+            roleKey(e, input.role),
+            "week" to num(input.week.value),
+            "quantity" to num(input.quantity.value),
+            "decision_version" to big(input.version.value),
+            "editor_kind" to text(editorKind),
+            "editor_id" to Value.Id(editorId),
+            "updated_at" to Value.At(e.occurredAt),
+        )
+    }
+
+    /** `current_decisions`: 当週の入力。確定で行を消す。代理入力（B5）は、進行役を入力者として同じ行に書く。 */
     val currentDecisions =
         Projection { e ->
             when (val p = e.payload) {
                 is SessionEvent.DecisionSaved -> {
-                    val (editorKind, editorId) =
-                        when (val editor = p.editor) {
-                            is Editor.ByParticipant -> "PARTICIPANT" to editor.id.value
-                            is Editor.ByFacilitator -> "FACILITATOR" to editor.gameId.value
-                        }
-                    listOf(
-                        upsert(
-                            ProjectionTable.CURRENT_DECISIONS,
-                            roleKey(e, p.role),
-                            "week" to num(p.week.value),
-                            "quantity" to num(p.quantity.value),
-                            "decision_version" to big(p.decisionVersion.value),
-                            "editor_kind" to text(editorKind),
-                            "editor_id" to Value.Id(editorId),
-                            "updated_at" to Value.At(e.occurredAt),
-                        ),
-                    )
+                    listOf(decisionRow(e, DecisionInput(p.role, p.week, p.quantity, p.decisionVersion, p.editor)))
+                }
+
+                is SessionEvent.ProxyDecisionSubmitted -> {
+                    listOf(decisionRow(e, DecisionInput(p.role, p.week, p.quantity, p.decisionVersion, p.editor)))
                 }
 
                 is SessionEvent.WeekCommitted -> {

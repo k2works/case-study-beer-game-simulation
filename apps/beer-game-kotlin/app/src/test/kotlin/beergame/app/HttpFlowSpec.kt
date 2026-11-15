@@ -2,7 +2,11 @@ package beergame.app
 
 import arrow.core.left
 import beergame.application.AppFailure
+import beergame.application.PeripheralWrite
 import beergame.application.Ports
+import beergame.domain.CredentialSubject
+import beergame.domain.GameId
+import beergame.domain.ParticipantId
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -16,9 +20,12 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.ApplicationTestBuilder
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 
 /*
@@ -49,6 +56,20 @@ private class Game(
     val joinCode: String,
     val players: Map<String, Player>,
 )
+
+/**
+ * 参加者の資格を失効させる。HTTP に失効の経路が無い（Step 6）ので、失効のイベントに付く書き込み（復帰資格の失効と、
+ * ブラウザセッションの削除）を、周辺ストアへ直接書く（`credentials` だけの更新では、ブラウザセッションは止まらない）。
+ */
+private fun World.revokeParticipant(
+    game: Game,
+    role: String,
+) {
+    val subject =
+        CredentialSubject.Participant(ParticipantId(UUID.fromString(game.players.getValue(role).participantId)))
+    val write = PeripheralWrite.RevokeSubject(GameId(UUID.fromString(game.id)), subject, Instant.now())
+    runBlocking { persistence.events.transaction { tx -> persistence.peripheral.write(tx, listOf(write)) } }
+}
 
 private suspend fun HttpClient.createGame(
     key: String = "create-1",
@@ -391,25 +412,25 @@ class HttpFlowSpec :
             }
         }
 
-        test("[US2.1/AC2.1.2] 失効した資格・期限切れの資格: 403（再送でも）。進行役の資格は期限内なら有効") {
+        test("[US2.1/AC2.1.2] 失効した資格・期限切れ（ブラウザセッション 24 時間）の資格: 403（再送でも）。期限内の進行役は有効") {
             withWorld { world ->
                 val revoked = started("revoked")
                 val expiring = started("expiring")
-                // 進行役の資格の主体はゲームの ID。参加者の資格（復帰資格）だけを失効させる
-                world.execute(
-                    "UPDATE credentials SET revoked_at = CURRENT_TIMESTAMP " +
-                        "WHERE game_id = '${revoked.id}' AND subject_id <> game_id",
-                )
+                save(revoked, "RETAILER", 4, "before-revoke").status shouldBe HttpStatusCode.OK
                 save(expiring, "RETAILER", 4, "before-expiry").status shouldBe HttpStatusCode.OK
+                // 参加者の資格だけを、失効のコマンドと同じ書き込み（復帰資格の失効とブラウザセッションの削除）で失効させる。
+                // 進行役の資格の主体はゲームの ID
+                world.revokeParticipant(revoked, "RETAILER")
 
                 state(revoked, revoked.players.getValue("RETAILER").cookie).status shouldBe HttpStatusCode.Forbidden
+                save(revoked, "RETAILER", 4, "before-revoke").status shouldBe HttpStatusCode.Forbidden
                 state(revoked, revoked.facilitator).status shouldBe HttpStatusCode.OK
                 state(expiring, expiring.players.getValue("RETAILER").cookie).status shouldBe HttpStatusCode.OK
 
-                world.clock.advance(31L * 24 * 3600)
+                world.clock.advance(25L * 3600)
 
                 state(expiring, expiring.players.getValue("RETAILER").cookie).status shouldBe HttpStatusCode.Forbidden
-                state(expiring, expiring.facilitator).status shouldBe HttpStatusCode.OK
+                state(expiring, expiring.facilitator).status shouldBe HttpStatusCode.Forbidden
                 // 失効・期限切れの資格では、過去に成功した要求の再送（同じキー）も 403
                 save(expiring, "RETAILER", 4, "before-expiry").status shouldBe HttpStatusCode.Forbidden
             }
