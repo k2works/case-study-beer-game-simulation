@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend](/design/beer-game-kotlin/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [ui-design](/design/beer-game-kotlin/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_5_plan](/development/beer-game-kotlin/bolt_5_plan.md) を更新（claude-code/claude-sonnet-5-5）
