@@ -7,6 +7,7 @@
 - `features/<機能領域>/*.feature`。領域は [ユーザーストーリー](../../../docs/requirements/beer-game2/user_story.md) の Epic に合わせる。
   - `game-setup/` : Epic 1 ゲーム準備と参加（US1.1、US1.2）
   - `weekly-play/` : Epic 2 1 週の意思決定（US2.1〜US2.3）
+  - `continuation/` : Epic 3 継続と復旧（US3.1、US3.2）
   - `operations/` : Epic 6 運用と観測性（US6.1）
 - 2 つの処理系（Cucumber-JVM の `app/`、Cucumber-JS の `web/`）が、この 1 か所を参照する。
 

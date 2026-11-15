@@ -51,6 +51,14 @@ class ApiResponse(
     /** problem+json の `code`。 */
     fun code(): String? = if (status >= HTTP_ERROR) json["code"]?.jsonPrimitive?.content else null
 
+    /** `Set-Cookie` の復帰資格（bg_recovery）の値（判断項目 9 の案 A。B5 の提案）。 */
+    fun recoveryCredential(): String? =
+        headers
+            .allValues("Set-Cookie")
+            .firstOrNull { it.startsWith("bg_recovery=") }
+            ?.substringAfter("bg_recovery=")
+            ?.substringBefore(";")
+
     /** `Location`（`/api/v1/games/{gameId}/state`）から取り出したゲームの ID。 */
     fun createdGameId(): String? = header("Location")?.removePrefix("/api/v1/games/")?.removeSuffix("/state")
 
@@ -66,6 +74,12 @@ fun JsonObject.obj(name: String): JsonObject = getValue(name).jsonObject
 fun JsonObject.array(name: String): JsonArray = getValue(name).jsonArray
 
 fun JsonObject.number(name: String): Int = text(name).toInt()
+
+/** 要求に添える、資格の Cookie（bg_session）と冪等キー以外の値。 */
+data class RequestExtras(
+    val recovery: String? = null,
+    val ifMatch: String? = null,
+)
 
 /**
  * 受け入れが、アプリケーションに対して行う操作と問い合わせ。HTTP を呼ぶだけで、業務ロジックを持たない。
@@ -84,10 +98,13 @@ class GamePlayApi(
         body: String?,
         cookie: String?,
         key: String?,
+        extras: RequestExtras = RequestExtras(),
     ): ApiResponse {
         val builder = HttpRequest.newBuilder(URI.create("$baseUrl$path"))
-        cookie?.let { builder.header("Cookie", "bg_session=$it") }
+        val cookies = listOfNotNull(cookie?.let { "bg_session=$it" }, extras.recovery?.let { "bg_recovery=$it" })
+        if (cookies.isNotEmpty()) builder.header("Cookie", cookies.joinToString("; "))
         key?.let { builder.header("Idempotency-Key", it) }
+        extras.ifMatch?.let { builder.header("If-Match", "\"$it\"") }
         val publisher =
             if (body == null) {
                 HttpRequest.BodyPublishers.noBody()
@@ -109,14 +126,16 @@ class GamePlayApi(
         body: String? = null,
         cookie: String? = null,
         key: String? = newKey(),
-    ) = send("POST", path, body, cookie, key)
+        extras: RequestExtras = RequestExtras(),
+    ) = send("POST", path, body, cookie, key, extras)
 
     fun put(
         path: String,
         body: String,
         cookie: String? = null,
         key: String? = newKey(),
-    ) = send("PUT", path, body, cookie, key)
+        extras: RequestExtras = RequestExtras(),
+    ) = send("PUT", path, body, cookie, key, extras)
 
     // ---- ゲームの準備と参加 ----
 
@@ -183,6 +202,73 @@ class GamePlayApi(
         cookie: String?,
         role: Role? = null,
     ) = get("/sessions/$gameId/state${role?.let { "?role=${it.apiName}" } ?: ""}", cookie)
+
+    // ---- 継続と資格（B5。経路は contracts/openapi.yaml の提案） ----
+
+    fun pause(
+        gameId: String,
+        facilitator: String?,
+    ) = post("/sessions/$gameId/pause", cookie = facilitator)
+
+    fun resume(
+        gameId: String,
+        facilitator: String?,
+    ) = post("/sessions/$gameId/resume", cookie = facilitator)
+
+    fun proxyDecision(
+        gameId: String,
+        role: Role,
+        week: Int,
+        quantity: Int,
+        cookie: String?,
+    ) = put(
+        "/sessions/$gameId/proxy-decisions/${role.apiName}",
+        """{"requestedWeek":$week,"quantity":$quantity}""",
+        cookie,
+    )
+
+    /** 版つきの保存（同じ週に複数回保存するときは、直前の版を `If-Match` に付ける）。 */
+    fun saveDecisionAt(
+        gameId: String,
+        week: Int,
+        quantity: Int,
+        version: Int,
+        cookie: String?,
+        key: String = newKey(),
+    ) = put(
+        "/sessions/$gameId/decisions",
+        """{"week":$week,"quantity":$quantity}""",
+        cookie,
+        key,
+        RequestExtras(ifMatch = version.toString()),
+    )
+
+    private fun subjectBody(participantId: String) = """{"subject":{"kind":"PARTICIPANT","id":"$participantId"}}"""
+
+    fun revokeCredential(
+        gameId: String,
+        participantId: String,
+        facilitator: String?,
+    ) = post("/games/$gameId/credentials/revoke", subjectBody(participantId), facilitator)
+
+    fun reissueCredential(
+        gameId: String,
+        participantId: String,
+        facilitator: String?,
+    ) = post("/games/$gameId/credentials/reissue", subjectBody(participantId), facilitator)
+
+    /** 復帰。復帰資格は Cookie（[recovery]）か、本文の復帰コード（[recoveryCode]）で渡す。 */
+    fun recover(
+        gameId: String,
+        recovery: String? = null,
+        recoveryCode: String? = null,
+        key: String = newKey(),
+    ) = post(
+        "/participations/recover",
+        """{"gameId":"$gameId"${recoveryCode?.let { ",\"recoveryCode\":\"$it\"" } ?: ""}}""",
+        key = key,
+        extras = RequestExtras(recovery = recovery),
+    )
 
     // ---- 運用 ----
 

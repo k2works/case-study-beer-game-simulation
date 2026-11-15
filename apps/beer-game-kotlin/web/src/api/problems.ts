@@ -15,6 +15,11 @@ const TEXTS: Record<ErrorCode, string | null> = {
     'session.already_started': 'すでに開始されています。',
     'session.already_ended': '終了しました。入力できません。',
     'session.not_active': null,
+    // B5 の追加（仕様が先。文言は未決で、Step 7 で UI 設計と合わせて決める。それまでは一般の文言）
+    'session.paused': null,
+    'session.not_paused': null,
+    'session.save_limit_reached': null,
+    'game.credential_already_revoked': null,
     'session.incomplete_decisions': null,
     'game.invitation_invalid': null, // 送った資格の種類から選ぶので、下で組み立てる
     // 設計書に文言が無い。受付の終了という理由（Gherkin AC1.2.2）を示す仮置き

@@ -57,6 +57,11 @@ export interface paths {
          * 役割を割り当てる（AssignRole。game ストリーム）
          * @description 認可は進行役。1 人の参加者に同時に複数の役割は持たせない（AC1.2.5）。別の役割にいる人を選んだ場合は、付け替え（D9。移動元の RoleUnassigned と移動先の RoleAssigned）として扱う。
          *     `DELETE` の UnassignRole（単独の解除）は B1 に含めない（bolt_1_plan 判断項目 13。未決）。
+         *
+         *     **B5 の提案（H4。役割の入れ替え。ゲート 1 で人が決める。設計書に規則が無く、Step 3.5 で設計書にも書く）**:
+         *     ゲームの開始後も、この操作を受け付ける。**すでに別の参加者が担当している役割へ、参加済み・未割り当ての参加者を割り当てる**ことを「入れ替え」とし、
+         *     旧担当者の資格（復帰資格とブラウザセッション）は同じ操作で自動的に失効する。旧担当者の履歴と入力者のラベルは残す。
+         *     開始後の、これ以外の割り当て（別の役割にいる人の付け替えなど）は、従来どおり `game.not_preparing`（409）。
          */
         put: operations['assignRole'];
         post?: never;
@@ -152,6 +157,141 @@ export interface paths {
          *     入力が揃っていなければ `session.incomplete_decisions`（422。不足する役割を示す）。確定は 1 週につき一度だけ（AC2.3.2）。
          */
         post: operations['commitWeek'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/sessions/{sessionId}/pause': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * セッションを一時停止する（PauseSession。session ストリーム。B5）
+         * @description 認可は進行役。進行中のセッションを停止する。停止中は、参加者の入力の保存（`saveDecision`）と週の確定（`commitWeek`）を、
+         *     `session.paused`（409）で拒否し、既存の入力を失わない（AC3.1.1）。代理入力（`submitProxyDecision`）は停止中も受け付ける。
+         *     すでに停止中なら `session.paused`（409）。開始前は `session.not_active`、終了後は `session.already_ended`（409）。
+         */
+        post: operations['pauseSession'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/sessions/{sessionId}/resume': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * セッションを再開する（ResumeSession。session ストリーム。B5）
+         * @description 認可は進行役。停止中のセッションを再開し、最後に確定した週から入力できる（AC3.1.3）。
+         *     停止中でなければ `session.not_paused`（409。提案の code）。自動確定の再開時の判定は B8。
+         */
+        post: operations['resumeSession'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/sessions/{sessionId}/proxy-decisions/{role}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 進行役が代理入力する（SubmitProxyDecision。session ストリーム。B5）
+         * @description 認可は進行役。意思決定の版は要求せず（`If-Match` を使わない）、本文の `requestedWeek` で、古い画面からの代理入力を区別する
+         *     （現在の週と違えば `session.week_advanced`）。進行中と一時停止中の両方で受け付け、停止中は週を確定しない（AC3.1.2）。
+         *     保存後の版は 1 増える。イベントに、入力値・操作者・時刻を残す（FR-15）。保存回数に数える（`session.save_limit_reached`。提案の code）。
+         */
+        put: operations['submitProxyDecision'];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/games/{gameId}/credentials/revoke': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 参加者の資格を失効させる（RevokeCredential。game ストリーム。B5）
+         * @description 認可は進行役。漏れた資格を失効させる（AC3.2.5）。対象の参加者の復帰資格と、発行済みのブラウザセッションを、ともに使えなくする
+         *     （ブラウザセッションを止める結び付きの方式は、bolt_5_plan のゲート 1 の項目 2。H2）。以降、その資格での復帰・操作は、
+         *     存在しない資格と区別しない 403（`app.unauthorized`）になり、以前に成功した `Idempotency-Key` を再送しても保存済みの応答を返さない（ADR-004）。
+         *     すでに失効していれば `game.credential_already_revoked`（409。提案の code）。準備中と開始後の両方で受け付ける。
+         */
+        post: operations['revokeCredential'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/games/{gameId}/credentials/reissue': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 参加者の資格を再発行する（ReissueCredential。game ストリーム。B5）
+         * @description 認可は進行役。新しい復帰資格を発行し、**新しい復帰コードを、この応答で一度だけ示す**（保存は鍵付きダイジェストだけ。再表示しない。
+         *     提案: H3 の案 A）。進行役が、参加者へ口頭などで渡す。参加者は `recoverParticipation` の本文の `recoveryCode` で復帰する。
+         *     新しい有効期限（`expiresAt`）を持つ。失効した古い資格は、使えないままである。準備中と開始後の両方で受け付ける。
+         *     失効していない資格の再発行の扱い（拒否するか、置き換えるか）は未決（ゲート 1 の項目 6）。
+         */
+        post: operations['reissueCredential'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/participations/recover': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 復帰資格で、同じゲームと役割へ復帰する（RecoverParticipation。game ストリーム。B5）
+         * @description 認可は復帰資格（進行役を含む）。復帰資格は、Cookie `bg_recovery` か、本文の復帰コード（`recoveryCode`）で渡す（提案: H3 の案 A）。
+         *     有効なら、新しいブラウザセッション（`bg_session`）を Set-Cookie で発行し、復帰資格の期限を更新する。応答にゲームの ID を含める（AC3.2.1）。
+         *     **復帰資格の有効性が認可である**ため、失効した復帰資格での再送に、保存済みの新しいセッションを返さない（ADR-004。R5）。
+         *     不明・失効・期限切れ・別のゲームの復帰資格は、区別しない同じ 403（`app.unauthorized`）（NF-S12。AC3.2.2）。
+         *     参加・復帰の専用のレート制限（NF-S11）は、B5 の Step 5。
+         */
+        post: operations['recoverParticipation'];
         delete?: never;
         options?: never;
         head?: never;
@@ -268,12 +408,16 @@ export interface components {
             | 'session.already_started'
             | 'session.already_ended'
             | 'session.not_active'
+            | 'session.paused'
+            | 'session.not_paused'
+            | 'session.save_limit_reached'
             | 'session.incomplete_decisions'
             | 'game.invitation_invalid'
             | 'game.not_preparing'
             | 'game.already_created'
             | 'game.participant_not_found'
             | 'game.start_condition_not_met'
+            | 'game.credential_already_revoked'
             | 'validation.invalid_input'
             | 'app.retry_exhausted'
             | 'app.idempotency_key_reused'
@@ -346,6 +490,61 @@ export interface components {
         /** @description コマンドの応答は versions だけ。画面の表示は応答から作らず、スナップショットを取得して versions に追いつくまで待つ。 */
         CommandResponse: {
             versions: components['schemas']['StreamVersions'];
+        };
+        /**
+         * @description 作成の応答。`versions` に加え、**進行役の復帰コード**を一度だけ示す（B5 の提案。判断項目 9 の案 A。H3）。
+         *     案 B（Cookie の寿命だけに頼る）を採るときは、`recoveryCode` を外し、`CommandResponse` に戻す。
+         */
+        CreateGameResponse: components['schemas']['CommandResponse'] & {
+            /** @description 進行役の復帰コード。作成のときに一度だけ示す。保存はダイジェストだけで、再表示しない。ログ・URL に含めない。 */
+            recoveryCode: string;
+        };
+        /** @description 参加の応答。`versions` に加え、参加したゲームの ID（`gameId`。B5 の判断項目 7）を返す。 */
+        JoinResponse: components['schemas']['CommandResponse'] & {
+            /** Format: uuid */
+            gameId: string;
+        };
+        /** @description 復帰の応答。復帰したゲームの ID と、復帰した操作者の種別（進行役か参加者）を返す。 */
+        RecoverResponse: components['schemas']['CommandResponse'] & {
+            /** Format: uuid */
+            gameId: string;
+            /** @enum {string} */
+            kind: 'FACILITATOR' | 'PARTICIPANT';
+            /** @description 参加者のとき、担当の役割（未割り当てなら項目ごと付けない）。 */
+            role?: components['schemas']['Role'];
+        };
+        /** @description 再発行の応答。新しい復帰コードを、この応答で一度だけ示す（提案: H3 の案 A）。 */
+        ReissueResponse: components['schemas']['CommandResponse'] & {
+            /** @description 新しい復帰コード。一度だけ示す。保存はダイジェストだけで、再表示しない。ログ・URL に含めない。 */
+            recoveryCode: string;
+            /**
+             * Format: date-time
+             * @description 新しい復帰資格の有効期限。
+             */
+            expiresAt: string;
+        };
+        ProxyDecisionRequest: {
+            /** @description 画面が表示している週。現在の週と違えば `session.week_advanced`（409）。 */
+            requestedWeek: number;
+            quantity: number;
+        };
+        CredentialSubjectRequest: {
+            /** @description 失効・再発行の対象。B5 は参加者だけ（進行役自身の資格は、ゲート 1 の項目 6 で決める。観察者は B9）。 */
+            subject: {
+                /** @enum {string} */
+                kind: 'PARTICIPANT';
+                /**
+                 * Format: uuid
+                 * @description 参加者の ID。
+                 */
+                id: string;
+            };
+        };
+        RecoverRequest: {
+            /** Format: uuid */
+            gameId: string;
+            /** @description 復帰コード（再発行の応答、または作成の応答で示したもの）。省略すると、Cookie `bg_recovery` の復帰資格を使う。 */
+            recoveryCode?: string;
         };
         /**
          * @description キット準拠の作成（B1）。カスタム条件（B7）は含めない。
@@ -586,7 +785,11 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 作成した。応答は versions だけを返す。ゲームの ID は Location で、参加コードは進行役の状態の取得で得る（作成の応答に gameId を含めない。設計書は versions だけと定める）。進行役の資格を Set-Cookie で発行する。 */
+            /**
+             * @description 作成した。ゲームの ID は Location で、参加コードは進行役の状態の取得で得る（作成の応答に gameId を含めない）。進行役の資格を Set-Cookie で発行する。
+             *     **B5 の提案（判断項目 9 の案 A。H3）**: 本文に、進行役の復帰コード `recoveryCode` を一度だけ示す（保存は鍵付きダイジェストだけで、再表示しない）。
+             *     進行役は、これを控えておき、端末を替えたときに `recoverParticipation` で復帰する。復帰資格は Cookie `bg_recovery` でも発行する。
+             */
             201: {
                 headers: {
                     /** @description 作成したゲームの状態の URL（`/api/v1/games/{gameId}/state`） */
@@ -595,7 +798,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['CommandResponse'];
+                    'application/json': components['schemas']['CreateGameResponse'];
                 };
             };
             400: components['responses']['Problem'];
@@ -688,14 +891,18 @@ export interface operations {
             };
         };
         responses: {
-            /** @description 参加した。資格（Cookie）を Set-Cookie で発行する。応答は versions だけ。参加者の ID は、状態の取得（participantId）で得る。 */
+            /**
+             * @description 参加した。資格（Cookie）を Set-Cookie で発行する。参加者の ID は、状態の取得（participantId）で得る。
+             *     **B5 の追加（判断項目 7）**: 応答に、参加したゲームの ID（`gameId`）を含める（参加後の画面が、ゲームを特定できないため）。
+             *     **B5 の提案（H3 の案 A）**: ブラウザセッション（`bg_session`。24 時間）に加え、復帰資格（`bg_recovery`。30 日）を Cookie で発行する。
+             */
             200: {
                 headers: {
                     'Set-Cookie': components['headers']['SetCookie'];
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['CommandResponse'];
+                    'application/json': components['schemas']['JoinResponse'];
                 };
             };
             400: components['responses']['Problem'];
@@ -817,6 +1024,225 @@ export interface operations {
             409: components['responses']['ConflictProblem'];
             413: components['responses']['Problem'];
             422: components['responses']['IncompleteDecisionsProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    pauseSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                /** @description 未決：session ストリームの ID が gameId と同じか別かは、設計書のエンドポイント表から確定できない。 */
+                sessionId: components['parameters']['SessionId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 停止した */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    resumeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                /** @description 未決：session ストリームの ID が gameId と同じか別かは、設計書のエンドポイント表から確定できない。 */
+                sessionId: components['parameters']['SessionId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 再開した */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    submitProxyDecision: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                /** @description 未決：session ストリームの ID が gameId と同じか別かは、設計書のエンドポイント表から確定できない。 */
+                sessionId: components['parameters']['SessionId'];
+                role: components['schemas']['Role'];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['ProxyDecisionRequest'];
+            };
+        };
+        responses: {
+            /** @description 代理入力を保存した */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['ConflictProblem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    revokeCredential: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['CredentialSubjectRequest'];
+            };
+        };
+        responses: {
+            /** @description 失効させた */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    reissueCredential: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['CredentialSubjectRequest'];
+            };
+        };
+        responses: {
+            /** @description 再発行した */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['ReissueResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    recoverParticipation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['RecoverRequest'];
+            };
+        };
+        responses: {
+            /** @description 復帰した。新しいブラウザセッションを Set-Cookie で発行する。 */
+            200: {
+                headers: {
+                    'Set-Cookie': components['headers']['SetCookie'];
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['RecoverResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
             503: components['responses']['Problem'];

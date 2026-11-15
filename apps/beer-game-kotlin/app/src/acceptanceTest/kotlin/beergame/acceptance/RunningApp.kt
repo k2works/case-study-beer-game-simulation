@@ -20,6 +20,7 @@ import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
 import org.testcontainers.postgresql.PostgreSQLContainer
 import java.sql.DriverManager
+import java.time.OffsetDateTime
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -36,6 +37,32 @@ private const val SHUTDOWN_GRACE_MILLIS = 100L
 private const val SHUTDOWN_TIMEOUT_MILLIS = 2_000L
 private const val RATE_LIMIT_PER_MINUTE = 100_000
 private const val MAX_ATTEMPTS = 5
+
+/** 保存されたイベントの 1 件（監査履歴）。 */
+class AuditRow(
+    val eventType: String,
+    val payload: String,
+    val actorKind: String,
+    val actorId: String?,
+    val occurredAt: OffsetDateTime,
+)
+
+/** 期限を過去にできる資格の表。 */
+enum class ExpirableTable(
+    val expireSql: String,
+) {
+    CREDENTIALS("UPDATE credentials SET expires_at = ? WHERE game_id = ? AND subject_id = ?"),
+    BROWSER_SESSIONS("UPDATE browser_sessions SET expires_at = ? WHERE game_id = ? AND actor_id = ?"),
+}
+
+private const val ROTATE_UNSUPPORTED =
+    "鍵の複数の版は未実装: 署名鍵を新しい版へ更新する試験用の操作が、アプリケーションに無い（B5 Step 4）"
+private const val DROP_UNSUPPORTED =
+    "鍵の複数の版は未実装: 旧版の鍵を設定から外す試験用の操作が、アプリケーションに無い（B5 Step 4）"
+
+private const val AUDIT_SQL =
+    "SELECT event_type, CAST(payload AS VARCHAR), actor_kind, CAST(actor_id AS VARCHAR), occurred_at " +
+        "FROM events WHERE game_id = ? ORDER BY seq"
 
 /** 受け入れが使う DB の種類。 */
 enum class AcceptanceDb(
@@ -161,6 +188,60 @@ class RunningApp(
 
     /** データベースへの接続を失わせる（接続プールを閉じる）。以降、接続の取得は失敗する。 */
     fun loseDatabase() = dataSource.close()
+
+    /**
+     * 保存されたイベントの記録（監査履歴）を、保存順に読む。API には監査履歴の読み出しが無いため、試験が保存先を直接読む（B5 Step 1）。
+     * 読むだけで、書き込まない。
+     */
+    fun auditTrail(gameId: String): List<AuditRow> =
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(AUDIT_SQL).use { statement ->
+                statement.setObject(1, UUID.fromString(gameId))
+                statement.executeQuery().use { rows ->
+                    buildList {
+                        while (rows.next()) {
+                            add(
+                                AuditRow(
+                                    eventType = rows.getString(1),
+                                    payload = rows.getString(2),
+                                    actorKind = rows.getString(3),
+                                    actorId = rows.getString(4),
+                                    occurredAt = rows.getObject(5, OffsetDateTime::class.java),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+    /**
+     * 保存された資格の有効期限を過去にして、期限切れを再現する（時計を進める代わり）。
+     * [table] は credentials（復帰資格）か browser_sessions（ブラウザセッション）。B1 は両方に同じダイジェストを書く。
+     */
+    fun expire(
+        table: ExpirableTable,
+        gameId: String,
+        subjectId: String,
+    ) {
+        dataSource.connection.use { connection ->
+            connection.prepareStatement(table.expireSql).use { statement ->
+                statement.setObject(1, OffsetDateTime.now().minusDays(1))
+                statement.setObject(2, UUID.fromString(gameId))
+                statement.setObject(3, UUID.fromString(subjectId))
+                statement.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * 資格の署名鍵を新しい版へ更新する（運営者の操作）。鍵の複数の版は未実装（B5 Step 4）で、試験用の操作もまだ無い。
+     * 未実装であることを、失敗として示す（Pending にしない）。
+     */
+    fun rotateCredentialKey(): Nothing = throw AssertionError(ROTATE_UNSUPPORTED)
+
+    /** 旧版の鍵を設定から外す（運営者の操作）。未実装のため、失敗として示す。 */
+    fun dropOldCredentialKey(): Nothing = throw AssertionError(DROP_UNSUPPORTED)
 
     override fun close() {
         server.stop(SHUTDOWN_GRACE_MILLIS, SHUTDOWN_TIMEOUT_MILLIS)

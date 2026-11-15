@@ -2,6 +2,7 @@ package beergame.acceptance
 
 import io.cucumber.java.After
 import io.cucumber.java.Before
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * キット準拠の設定（最終週 12）。需要系列は、JSD の値が未確認（ASM-01）のため、受け入れ用の系列を使う。
@@ -20,15 +21,20 @@ fun kitGameBody(
 
 class Participant(
     val name: String,
-    val cookie: String,
+    var cookie: String,
     val participantId: String,
     var role: Role?,
+    /** 復帰資格（bg_recovery）。発行されていなければ null（B5 の提案が実装されるまで null）。 */
+    var recovery: String? = null,
 )
 
 class GameContext(
     val id: String,
     val facilitator: String,
     val joinCode: String,
+    /** 進行役の復帰資格（bg_recovery）と、作成の応答で一度だけ示される復帰コード。発行されていなければ null。 */
+    val recovery: String? = null,
+    val recoveryCode: String? = null,
 ) {
     val participants = mutableListOf<Participant>()
 
@@ -64,7 +70,15 @@ class ScenarioContext : AutoCloseable {
             val facilitator = checkNotNull(response.credential()) { "進行役の資格が発行されていない" }
             val state = api.gameState(id, facilitator)
             check(state.status == HTTP_OK) { "作成したゲームの状態を取得できない: ${state.status} ${state.text}" }
-            games += GameContext(id, facilitator, state.json.text("joinCode"))
+            val recoveryCode = response.json["recoveryCode"]?.jsonPrimitive?.content
+            games +=
+                GameContext(
+                    id,
+                    facilitator,
+                    state.json.text("joinCode"),
+                    response.recoveryCredential(),
+                    recoveryCode,
+                )
         }
         return response
     }
@@ -78,7 +92,8 @@ class ScenarioContext : AutoCloseable {
         check(response.status in HTTP_OK..HTTP_CREATED) { "参加できない: ${response.status} ${response.text}" }
         val cookie = checkNotNull(response.credential()) { "復帰資格が発行されていない" }
         val participantId = api.gameState(game.id, cookie).json.text("participantId")
-        return Participant(name, cookie, participantId, null).also { game.participants += it }
+        val participant = Participant(name, cookie, participantId, null, response.recoveryCredential())
+        return participant.also { game.participants += it }
     }
 
     fun assign(

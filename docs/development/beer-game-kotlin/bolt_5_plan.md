@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:13:33Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:44:19Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -168,15 +168,56 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [x] 0.2 `validating-design` を、着手前に実施し、**結果を本書に記録する**（軸 A: 開発戦略 ↔ 本書、軸 B: 本書 ↔ 設計書・ADR、軸 C: 本書 ↔ 過去の Bolt の計画・終了報告。B2・B3 の計画は、この記録が無いことが U1 の逸脱だった）。**2026-11-15 に実施。結果は「[設計整合性の検証結果](#設計整合性の検証結果着手前validating-design)」**（NG。計画側の修正 10 件、人の判断待ち 5 件）
 - [x] 0.3 設計書のスケッチと、実装（B1 の形）の差を確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に `GameData`（B1 は設定・参加者・割り当てだけ。設計書は招待・観察者・資格を含む）と `AppSettings`（資格の鍵）。**2026-11-15 に実ファイルで確認。結果は「[設計書のスケッチと実装の差](#設計書のスケッチと実装の差step-03)」**
 
-**ゲート 0**: 判断項目の決定と、`validating-design` の結果を、人が確認する。**状態: 2026-11-15 にユーザーが承認した（選択: 「ゲート 0 と再承認の両方」）。** 追加ステップ（2.5、4.6、4.7、5.5）を含む計画も再承認された。H1・H4 を B5 に含める決定により、**Step 8.4（Living Documentation の用語集・イベント一覧の生成）と Step 3.5（役割の入れ替えでの自動失効。設計書にコマンド・規則が無いため、仕様と設計書を先に書く）を追加する。この 2 ステップの追加の内容は、ゲート 1 で人が確認する（ステップとしては未記載。次の更新で記載）。**
+**ゲート 0**: 判断項目の決定と、`validating-design` の結果を、人が確認する。**状態: 2026-11-15 にユーザーが承認した（選択: 「ゲート 0 と再承認の両方」）。** 追加ステップ（2.5、4.6、4.7、5.5）を含む計画も再承認された。H1・H4 を B5 に含める決定により、**Step 8.4（Living Documentation の用語集・イベント一覧の生成）と Step 3.5（役割の入れ替えでの自動失効。設計書にコマンド・規則が無いため、仕様と設計書を先に書く）を追加する。この 2 ステップの追加の内容は、ゲート 1 で人が確認する（Step 3.5 と Step 8.4 として記載済み。2026-11-15）。**
 
 ### Step 1: 仕様と受入シナリオ（API 契約が先）（🔴）
 
-- [ ] 1.1 🔴 日本語 Gherkin を `features/continuation/`（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。**失効した資格の再送が 403**、**鍵のローテーション後も旧版の資格が期限まで有効**、**旧版の鍵の削除後は 403**、**期限切れの資格は 403**、**復帰の失敗は存在・期限・失効を区別しない同じ応答**、**停止中の代理入力は確定しない**、**代理入力のイベントに値が残る**、**失効した復帰資格での復帰の再送が 403（保存済みの新しいセッションを返さない）**、**準備中と開始後の両方で、失効・再発行・復帰を受け付ける**（ドメインモデル）、複数タブ（AC3.2.3。判断項目 8）、代理入力の保存回数の上限（判断項目 10。超えたときの `code`・文言は未決で、ゲート 1 で人が決める）を含める。フォルダは `features/continuation/`（名前は判断項目 15）とし、**`features/TAGS.md` の領域の一覧（Epic 3 継続と復旧）に追記する**（`validating-design` 軸 C の C3）
-- [ ] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6 の経路を書く（`Idempotency-Key`、`code` の一覧、`requestedWeek`、`If-Match` の有無）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する
-- [ ] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）
+> **Step 1 の実施結果（2026-11-15。コード変更は、受け入れのステップ定義・試験の道具・仕様・型の生成物・辞書の型の追従だけで、製品の実装は無い）**: 下の 1.1〜1.3 を実施した。結果は「[Step 1 の実施結果](#step-1-の実施結果2026-11-15)」。**ゲート 1 は人の確認待ちで、承認していない。H2・H3 は提案（[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)、[ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)）。**
 
-**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` の名前、応答の形を確認する。**状態: 人の確認待ち（未承認）。**
+- [x] 1.1 🔴 日本語 Gherkin を `features/continuation/`（名前は判断項目 15）に書く（AC3.1.1〜3.1.3、AC3.2.1〜3.2.5。**原文の意味と一致**させる。解釈の差は、シナリオの直前にコメントで書く）。**失効した資格の再送が 403**、**鍵のローテーション後も旧版の資格が期限まで有効**、**旧版の鍵の削除後は 403**、**期限切れの資格は 403**、**復帰の失敗は存在・期限・失効を区別しない同じ応答**、**停止中の代理入力は確定しない**、**代理入力のイベントに値が残る**、**失効した復帰資格での復帰の再送が 403（保存済みの新しいセッションを返さない）**、**準備中と開始後の両方で、失効・再発行・復帰を受け付ける**（ドメインモデル）、複数タブ（AC3.2.3。判断項目 8）、代理入力の保存回数の上限（判断項目 10。超えたときの `code`・文言は未決で、ゲート 1 で人が決める）を含める。フォルダは `features/continuation/`（名前は判断項目 15）とし、**`features/TAGS.md` の領域の一覧（Epic 3 継続と復旧）に追記する**（`validating-design` 軸 C の C3）
+- [x] 1.2 🔴 `contracts/openapi.yaml` に、判断項目 6 の経路を書く（`Idempotency-Key`、`code` の一覧、`requestedWeek`、`If-Match` の有無）。契約テストを回し、**実装が無いので失敗する（Red）**ことを確認する
+- [x] 1.3 🔴 `@api` のシナリオが、Undefined・Pending でなく **Failing** になることを確認する（Undefined → Pending → Failing → Passing の順）
+
+**ゲート 1**（全 Bolt の共通の承認項目）: 受入条件の Gherkin シナリオを、**実装の前に**人が検証して合意する。原文との照合（解釈の差）、`code` の名前、応答の形を確認する。**状態: 人の確認待ち（未承認）。** 人が決めること（H2・H3 を含む）は、下の「[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)」。
+
+#### Step 1 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 1 の承認は記録していない。**
+
+**成果物**: `apps/beer-game-kotlin/features/continuation/` の 3 ファイル（`pause-resume.feature` 12 シナリオ、`recovery.feature` 8 シナリオ〔アウトラインの例 3 を含む〕、`credentials.feature` 14 シナリオ〔例 2 を含む〕。計 34）、`features/TAGS.md`（領域 `continuation/` を追記）、`contracts/openapi.yaml`（6 経路と、`gameId`・`recoveryCode` ほかのスキーマ、4 つの `code` を追加。`npm run api:lint` が通る）、受け入れのステップ定義（`ContinuationSteps.kt` ほか）、`web/src/api/generated/schema.d.ts`（再生成。`api:check` で差分 0）、`web/src/api/problems.ts`（`Record<ErrorCode, …>` の型の追従だけ。文言は未決の `null`）、[ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)（提案中）。
+
+**Red の実測**（コマンドは `apps/beer-game-kotlin` で実行）:
+
+| 検査 | 変更前（ベースライン） | 変更後 |
+| :--- | :--- | :--- |
+| `./gradlew :app:acceptanceTestH2`（H2） | 27 シナリオ・209 ステップ、すべて緑 | **61 シナリオ: 30 passed、31 failed**。519 ステップ: 414 passed、74 skipped、31 failed。**Undefined・Pending は 0** |
+| `./gradlew :app:acceptanceTest`（PostgreSQL 18 の Testcontainers） | 同上（27 緑） | **H2 と同じ（30 passed、31 failed）** |
+| `./gradlew test`（単体・契約） | 緑（up-to-date） | `:app:test` が **71 件中 8 件 failed**（下記）。ほかのモジュールの test は緑 |
+| `web`: `npm run verify`（format・lint・typecheck・test 70 件・build）、`acceptance:dry-run` | — | 緑（型の追従後）。最初は `problems.ts` が型エラーになったため、4 つの `code` を `null` で足した |
+
+- 新規 34 のうち **31 が Failing**。内訳: 経路が無い（404 `request.not_found`）27、参加の応答に `gameId` が無い（`NoSuchElementException`）1、開始後の入れ替えが `game.not_preparing`（409）で拒否される 1、保存回数の上限が無く 10 回目が 200 になる 1、**署名鍵の更新の試験用の操作が無い（`AssertionError`。試験の道具の限界で、振る舞いの Red ではない）1**。**鍵のローテーションの 2 シナリオのうち、1 つ目は復帰の 404 で先に落ち、鍵の操作に届かない**。
+- **新規 34 のうち 3 つは、最初から Passing**（Red にならない）: 「期限が切れたブラウザセッションでは、状況を取得できない」（B1 の保証）、「複数のタブで一方が週を確定すると…」（AC3.2.3。判断項目 8 の見込みどおり、版の仕組みで足りる確認）、「進行役が画面を再読み込みしても…」（Cookie が残る場合）。**これらは実装の前から成り立つ振る舞いの確認で、Step 2 以降で壊さないための回帰として残す**。
+- `:app:test` の 8 件の failed は、すべて `ApiContractSpec`（仕様を先に変えたことによる、予期した Red）: 「応答の適合」「全体の守り（500）」「全体の守り（503）」「リクエストの適合（2 件）」は、**`POST /games` の 201 に必須の `recoveryCode`（H3 の提案）が無い**という同じ原因で落ちる（**このため、これら 5 件は、ほかの違反を隠している**。H3 を決めたあと、実装の Step で個別に確かめる）。残り 3 件は、「要求の表が仕様の全操作を含む」（表に 6 操作が無い）、「エラー code の一致」（仕様にあって実装に無い 4 件: `session.paused`・`session.not_paused`・`session.save_limit_reached`・`game.credential_already_revoked`）、「ルートの網羅」（仕様にあって実装に無い 6 経路）。**HttpFlowSpec など ApiContractSpec 以外のテストは、すべて緑のまま**。
+- 静的解析: `ktlintCheck`、`detekt`、`detektMain`、`detektTest`、`pmd`（`pmdMain`・`pmdTest`・`pmdAdapter`・`pmdDomainApplication`）は違反 0（JDK 21 で実行。`@Suppress` なし、ベースラインなし）。実験的な `:app:detektAcceptanceTest`（`check` に含まれない）は、既存の受け入れの道具を含めて指摘があり（26 件。うち新規のファイルの分: `ContinuationSteps`・`GamePlayApi` の `TooManyFunctions`、`GamePlayApi.send` と `saveDecisionAt` の引数の数）、**本 Bolt では、`check` の対象でないため直していない**（人の判断）。
+- 試験の道具に足したもの: `RunningApp.auditTrail`（`events` を読むだけ。API に監査履歴の読み出しが無いため）、`RunningApp.expire`（保存された期限を過去にして、時計を進める代わりにする。**テストの道具だけで、本番のコードにも DB のスキーマにも触らない**）、`rotateCredentialKey`・`dropOldCredentialKey`（鍵の複数の版が無いため、`AssertionError` で失敗する。Step 4 で実装する）。
+
+**シナリオ側の仮定（ゲート 1 で確認）**: 「期限切れ」の再現は、保存された期限の更新による（時計の注入ではない）。「ブラウザセッションを失う」は、以降のステップがその資格を使わないことで表す。`recovery.feature` の復帰コードのシナリオと `bg_recovery` の Cookie は H3 の案 A による（案 B なら外す）。入れ替えは、既存の `assignRole` を開始後に使う形（提案）。
+
+### ゲート 1 で決めること（2026-11-15 提案）
+
+**以下は AI の提案で、決定ではない。人が決める。決まるまで Step 2 以降に進まない。** スキーマ変更・認証・認可に関わる項目（2、3、6、7）は、確認必須。
+
+| # | 決めること | 提案（案と推奨） | 影響 |
+| :--- | :--- | :--- | :--- |
+| 1 | **原文との解釈の差**。(a) AC3.1.1 の「新規の確定」を、参加者の入力の保存（`SaveDecision`）と、進行役の週の確定（`CommitWeek`）の両方の拒否として書いた。(b) AC3.2.2 の「進行役への確認方法を示す」は、画面（S03）の責務とし、API は理由を区別しない同じ 403 を返す。「削除済み」の資格は B11 のあとに足す | 提案どおり。(a) は設計書（停止中は `SaveDecision` も拒否）に合わせた。原文は「確定」だけ | シナリオの期待値。違う解釈なら、Gherkin を直す |
+| 2 | **H2: 失効でブラウザセッションを止める結び付き**（[ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)）。**案 A（推奨）**: 失効と同じトランザクションで、対象の主体の `browser_sessions` の行を削除する（スキーマ変更なし）。案 B: `browser_sessions` に `revoked_at`（または参照）を追加する（**スキーマ変更。確認必須**）。案 C（不採用）: 認証が未失効の資格の存在を確かめる（再発行で、失効した古いセッションが復活する） | 案 A | Step 4.3。A なら新しいマイグレーションは要らない（`DELETE` の GRANT は Step 4 で確認） |
+| 3 | **H3: 復帰資格の受け渡し**（ADR-015）。**案 A（推奨）**: `bg_recovery` の Cookie（30 日）と、作成・再発行の応答の本文に一度だけ示す復帰コード。`recover` の本文は `{gameId, recoveryCode?}`、応答は `{gameId, kind, role?, versions}`。復帰は冪等記録の照合より前に、復帰資格を検証する（`Auth` に `RECOVERY` を足す）。案 B: Cookie の寿命だけ（端末の変更で復帰できず、再発行した資格を渡せない。AC3.2.5 が成り立たない）。案 C（不採用）: URL で渡す | 案 A。**設計書の「応答は `versions` だけ」「DTO に資格の値を持たせない」に、2 つの例外ができる**（アーキテクチャ設計・UI 設計の更新は Step 8.3） | 仕様（`createGame`・`joinGame`・`reissueCredential`・`recoverParticipation`）、Step 6.2。**B なら、`recovery.feature` の復帰コードのシナリオと `bg_recovery` の Cookie を外す** |
+| 4 | **保存回数の上限（9 回）の `code`・文言**。NF-C8 は未決のまま | `session.save_limit_reached`（409。`InvalidState`）。文言は「この週の保存回数の上限（9 回）に達しました。」の仮置き | 仕様、ドメインのエラー、UI の辞書 |
+| 5 | **新しい `code` の名前と状態**（仕様に追加済み）: `session.paused`（409。停止中の保存・確定、二重の停止）、`session.not_paused`（409。停止中でない再開。**派生の提案**）、`game.credential_already_revoked`（409。`CredentialAlreadyRevoked`） | 提案どおり。`session.not_paused` は、再開を冪等にして 200 にする案もある（その場合は code を足さない） | ADR-008 の一覧、設計書の更新（Step 8.3） |
+| 6 | **失効・再発行の対象**: (a) 失効していない資格の再発行を、拒否するか、置き換えるか。(b) 進行役自身の資格を対象にするか（B5 の仕様は参加者だけ）。(c) 観察者は B9 | (a) 拒否（`game.credential_not_revoked`。または失効 → 再発行の順を必須）、(b) 対象外（自分の資格を失効させると復帰できなくなる）、(c) 範囲外 | 仕様の `CredentialSubjectRequest`、Step 3 のドメイン |
+| 7 | **H4: 役割の入れ替えの形**（Step 3.5）。提案: 既存の `PUT /games/{gameId}/participants/{participantId}/role` を、開始後も受け付け、**すでに担当がいる役割へ、参加済み・未割り当ての参加者を割り当てる**ことを入れ替えとする。旧担当者の資格（復帰資格・ブラウザセッション）は同じ操作で失効し、履歴と入力者のラベルは残す。代替: 専用の経路（`POST …/roles/{role}/replace` など） | 既存の経路を使う案（新しい経路が要らず、準備中の付け替え D9 と同じ入口）。設計書（ドメインモデル・データモデル）に、規則と `participants.replaced_at` を書く | Step 3.5.1 の仕様、データモデルの変更（`participants.replaced_at` は beer-game3 の実績。Kotlin 版の列の有無は未確認） |
+| 8 | **試験の道具の方式**: (a) 期限切れを、保存された期限の更新で再現する（時計を注入しない）。(b) 鍵のローテーションの試験用の操作（`RunningApp.rotateCredentialKey`）を、Step 4 で実装する。(c) 3 つの Passing のシナリオ（Step 1 の実施結果）を回帰として残す | 提案どおり | 受け入れの道具（Step 4） |
+| 9 | **契約テストの Red の扱い**。`POST /games` の 201 に必須の `recoveryCode` で、5 件が同じ原因で落ちている | H3 を決めたあと、Step 6 で解消する。H3 が案 B なら、`recoveryCode` を仕様から外して、5 件を緑に戻す | 契約テスト |
 
 ### Step 2: ドメイン — Session の停止・再開・代理入力（🔴🟢🟡）
 
@@ -195,6 +236,17 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] 3.3 🟡 リファクタリング。domain の行 100% を維持
 
 **ゲート 3**: 資格の規則（有効期限・失効・再発行・復帰）と、domain の行 100% を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+### Step 3.5: ドメイン — 役割の入れ替えでの資格の自動失効（H4）（🔴🟢🟡）
+
+> H4 を B5 に含める決定（2026-11-15）で追加した。**設計書に、開始後の入れ替えのコマンドと規則が無い**（[ドメインモデル](../../design/beer-game-kotlin/domain-model.md)の「開始後の入れ替え」は未決）ため、**仕様と設計書を先に書き、人が確認してから実装する**。入れ替えの形は、Step 1 の提案（[ゲート 1 で決めること](#ゲート-1-で決めること2026-11-15-提案)の項目 7）による。
+
+- [ ] 3.5.1 仕様と設計書を先に書く（📝）: 入れ替えの経路（提案: 既存の `PUT /games/{gameId}/participants/{participantId}/role`〔`assignRole`〕を、開始後も受け付け、**すでに別の参加者が担当している役割へ、参加済み・未割り当ての参加者を割り当てる**ことを「入れ替え」とする）と規則（旧担当者の資格の自動失効、旧担当者の履歴・入力者のラベルは残す、旧担当者のブラウザセッションを止める）を、`contracts/openapi.yaml`、ドメインモデル（コマンド・イベント・不変条件）、データモデル（`participants.replaced_at`、`credentials.revoked_at`）に書く。**人が確認してから 3.5.2 へ進む**（ゲート 3.5 の前半。ゲート 1 でも入れ替えのシナリオ（Step 1.1）とともに確認する）
+- [ ] 3.5.2 🔴 Kotest を先に書く: 入れ替えで、旧担当者の資格が失効し（`CredentialRevoked` を同じ追記で返す）、新担当者が役割を持つ。同じ役割への割り当て直し（何も変わらない）は履歴に足さない。進行役以外は `Forbidden`。**準備中の付け替え（B1 の D9）の振る舞いを変えない**ことの回帰。失敗を確認する
+- [ ] 3.5.3 🟢 `decideGame` の `AssignRole`（開始後の分岐）、イベント、`evolveGame`（`credentials` の失効）を実装する。永続化（`credentials.revoked_at` と `participants.replaced_at` を同じコミットで更新。旧担当者のブラウザセッションの扱いは Step 4.3 の決定による）は Step 4.3 と 6 で実装する
+- [ ] 3.5.4 🟡 リファクタリング。domain の行 100% を維持
+
+**ゲート 3.5**: 入れ替えの仕様（3.5.1）と、規則の実装（3.5.3）を、人が確認する。**状態: 人の確認待ち（未承認）。**
 
 ### Step 4: 鍵の版・資格の期限と失効・冪等記録の順序（🔴🟢🟡）
 
@@ -242,7 +294,8 @@ Active --> Ended : SessionEnded（最終週の確定）
 - [ ] 8.1 `@api` の AC3.1.*、AC3.2.* が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403
 - [ ] 8.2 全テスト、静的解析（ktlint、detekt（JDK 21）、PMD、fixture）、Kover（domain 100%、全体 85%・75%）、契約テスト、`web` の検証が緑。CI で、GitHub Actions 上の実行を確認する（**push は人の判断**。ローカルだけの結果を「CI で動く」と書かない）
 - [ ] 8.3 設計書・ADR の更新（変更表）と、`validating-design`（完了時）。新しい ADR（判断項目 3・4）は**提案として記録し、承認は人**
-- [ ] 8.4 Bolt 終了報告（`bolt_5_report.md`）。**デモ項目の実操作の申告欄**（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
+- [ ] 8.4 🟢 **Living Documentation の用語集・イベント一覧の生成（H1）**。H1 を B5 に含める決定（2026-11-15）で追加した。[開発戦略](./development_strategy.md)が「B1〜B2 で決める」とした未決（**注釈の語彙と生成の仕組み**）を、本ステップで決める。(a) ドメインの型・イベントに付ける注釈の語彙（用語集の項目: 名前・定義・出典。イベント一覧の項目: 名前・ストリーム・発生するコマンド・ペイロード・購読する投影）を決め、**ADR を提案として書く**（人が承認）。(b) コードから用語集とイベント一覧を生成する仕組みを作る（既存の `EventCodec` の種別の一覧、`@SerialName`、ドメインモデルの EV 表を突き合わせる検査を含める。**生成物と設計書の ID（EV-G*、EV-S*）の不一致で CI が落ちる**形を目指す）。(c) 生成物を `docs/` に置く導線を作る（新規ファイルの作成は確認必須）。**B5 で足す 6 種類のイベントが、一覧に載る**ことを、完了条件とする。**未確認**: 仕組みの規模（B5 の所要に収まるか。判断項目 14 の予備 B16 の対象にしうる）
+- [ ] 8.5 Bolt 終了報告（`bolt_5_report.md`）。**デモ項目の実操作の申告欄**（人が行う）、未達・未実施、人の判断項目、B6 への申し送り。**承認を捏造しない**
 
 **ゲート 8**（Bolt の承認）: 人が、B5 全体とコードの全行理解を検証する。**状態: 人の確認待ち（未承認）。**
 
@@ -369,6 +422,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 1（仕様と受入シナリオ）を実施**（ゲート 1 は人の確認待ち。承認は記録していない）。ユーザーの決定（ゲート 0 の承認、H1・H4 を B5 に含める、H2・H3 はゲート 1 で決める）を受けて、**Step 3.5（H4。入れ替えでの自動失効）と Step 8.4（H1。用語集・イベント一覧の生成）を追加**し、旧 8.4 を 8.5 に繰り下げた。日本語 Gherkin 34 シナリオ（`features/continuation/`）、`contracts/openapi.yaml` に 6 経路・4 つの `code`、受け入れのステップ定義、型の再生成を追加。**Red を実測**: 受け入れは 61 シナリオ中 30 passed・31 failed（H2・PostgreSQL 18 とも。Undefined・Pending は 0）、契約テストは `:app:test` が 71 件中 8 件 failed、ほかは緑。**H2・H3 は提案**として [ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)（提案中）に書き、ゲート 1 で人が決めることを「ゲート 1 で決めること」に整理 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 0 と、追加ステップを含む計画の再承認（H6）をユーザーが承認**（選択: 「ゲート 0 と再承認の両方」）。**H1（Living Documentation の重点）と H4（役割の入れ替えでの自動失効）は B5 に含める**。**H2（資格失効とブラウザセッションの結び付け）と H3（進行役の復帰用の値・再発行の受け渡し）は、Step 1 のゲート 1 で決める**。**H5（B2 の申し送り）は B16（予備）へ送る**。ゲート 1〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 0.1〜0.3 を実施**（コード変更なし。**ゲート 0 は人の確認待ちのまま。承認は記録していない**）。`validating-design`（着手前）の結果を記録: 軸 A・B・C はいずれも NG で、計画側の修正 12 件と、人の判断待ち 6 件（H1〜H6）。設計書のスケッチと実装の差を、実ファイルで確認して記録。**修正の内容: Step 1.1、2.2、2.3、3.1、4.1、4.3、4.4 の記述を直し、Step 2.5、4.6、4.7、5.5 と完了条件 3 件を追加。概要の日程、資格の状態の表、ER 図の節、範囲外の表（4 行）を修正。承認済みのステップ計画への追加のため、人の再確認を求める** | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ステップ計画をユーザーが承認**（選択: 「計画を承認」。ゲートは含まない） | claude-code/claude-sonnet-5-5 |

@@ -20,6 +20,7 @@ beer-game-kotlin プロジェクトの ADR ドキュメントです。
 | [ADR-012](./012-gherkin-and-cucumber.md) | 受入条件を日本語 Gherkin と Cucumber で表し、細部は Kotest で書く | 承認済み |
 | [ADR-013](./013-tech-stack-versions.md) | 技術スタックの版を、確認済みの値で固定する（JDK 25 LTS、Kotlin 2.4、PostgreSQL 18） | 提案中 |
 | [ADR-014](./014-h2-for-local-development.md) | ローカル開発だけ H2（PostgreSQL モード）を使い、PostgreSQL 固有の機能をポートで抽象化する | 提案中 |
+| [ADR-015](./015-credential-handover-and-session-revocation.md) | 復帰資格の受け渡しと、失効でブラウザセッションを止める結び付き（B5 の H2・H3。人のゲート 1 で決める） | 提案中 |
 
 ## 補足
 
