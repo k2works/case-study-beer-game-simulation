@@ -9897,7 +9897,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.3 設計書のスケッチと実装の差を、実ファイルで確認する（B1 の学び 6: スケッチは型でなく責務で書く）。特に: (a)〜(e)。<strong>結果は下の「Step 0.3 の実施結果」</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 0.4 <strong>現状のベースラインを実測して記録する</strong>（コード変更なし）。<strong>結果は下の「Step 0.4 の実施結果（ベースライン）」</strong>。<code>:app:acceptanceTest</code>（PostgreSQL 18）と <code>:app:acceptanceTestH2</code> の <code>@api</code> は各 70、<code>@ui</code> は 7（JVM では skipped）で、B5 終了時と一致</li>
 </ul>
-<p><strong>ゲート 0</strong>: 判断項目の決定と、<code>validating-design</code> の結果を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 0</strong>: 判断項目の決定と、<code>validating-design</code> の結果を、人が確認する。<strong>状態: 2026-11-15 にユーザーが承認した（選択: 「ゲート 0 と再確認を承認、推奨で決定」）。人の判断 1〜6 は推奨どおり: 4 図は表のまま、<code>@AC2.3.1</code> のタグの扱いは Step 1 のゲート 1 で決める、開発戦略の対象ストーリー表は変更しない、開示表の差は Step 3 で埋める、B5 終了報告の #2 を承認済みに更新、検証による計画の修正を再承認。</strong></p>
 <h3 id="step-0-2026-11-15-claude-codeclaude-sonnet-5-5">Step 0 の実施結果（2026-11-15。実施者: claude-code/claude-sonnet-5-5。コード変更なし）<a class="headerlink" href="#step-0-2026-11-15-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
 <p><strong>実測の事実だけを書く。ゲート 0 の承認は記録していない。Step 1 以降には進んでいない。</strong></p>
 <h4 id="step-03">Step 0.3 の実施結果（設計書のスケッチと実装の差）<a class="headerlink" href="#step-03" title="Permanent link">&para;</a></h4>
@@ -10439,6 +10439,11 @@
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 0（0.1〜0.4）を実施</strong>（コード変更なし。<strong>ゲート 0 は人の確認待ち（未承認）。承認は記録していない。Step 1 以降には進んでいない</strong>）。0.1: 判断項目 17 件の決定は上の記録のとおり（チェック）。0.2: <code>validating-design</code> を実施（軸 A: OK（観察 2）、軸 B: NG 2、軸 C: NG 2。重大なずれは無し。残る人の判断は 5 項目）。0.3: 設計書のスケッチと実装の差を実ファイルで確認（参加者の投影が共同担当の表示名を含まない、<code>current_decisions</code> の保存者の列が読まれていない、<code>PlayPage</code> に競合の分岐が無い、など）。0.4: ベースラインを JDK 21 で実測（<code>check</code> 緑、domain 402・application 149・adapter-http 80・adapter-persistence 92+80・app 98+1、受け入れ <code>@api</code> 70 × 2・<code>@ui</code> 7、Kover 全体 98.1%・81.6%・domain 100%、PMD fixture 17 件・違反 0、<code>web</code> verify 緑（vitest 109）、<code>api:check</code> 差分 0、<code>@Suppress</code> 0・ベースライン無し）。<strong>検証による修正</strong>（承認済みの計画への修正のため、<strong>人に再確認を求める</strong>）: ①取り込み表に B5 申し送り 7・判断項目 3(c)・U1 #23 の残りを追加（#C2）、②入れ替えの回帰の「未確認」を事実に置き換え（Gherkin に無い→Step 1.1 で足す）、③ER 図の節の「未確認」を事実に置き換え、④Step 1.1 に <code>@AC2.3.1</code> の原文との差の注記（#B2）、⑤Step 1.2 に <code>openapi.yaml</code> 217 行の古い注記の修正を追加、⑥事実 #4・#11 を現状に更新。<strong>計画の範囲・Step・判断項目・ゲートは変えていない</strong></td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>ゲート 0 と、検証による計画の修正の再確認をユーザーが承認し、人の判断 1〜6 を推奨どおりに決定</strong>（選択: 「ゲート 0 と再確認を承認、推奨で決定」）。ゲート 1〜8 は未承認</td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
 </tr>
 <tr>
