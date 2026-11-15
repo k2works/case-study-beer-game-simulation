@@ -1,6 +1,17 @@
 # Docs Update Log
 
 ## 2026-11-15
+* **Verification**: [bolt_3_plan](/development/beer-game-kotlin/bolt_3_plan.md) を human:kakimomokuri が検証
+* **Verification**: [bolt_2_plan](/development/beer-game-kotlin/bolt_2_plan.md) を human:kakimomokuri が検証
+* **Verification**: [bolt_1_plan](/development/beer-game-kotlin/bolt_1_plan.md) を human:kakimomokuri が検証
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
+* **Update**: B1〜B3 のゲート承認（ユーザー指示の範囲）を記録
 * **Update**: [unit_u1_summary](/development/beer-game-kotlin/unit_u1_summary.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [unit_u1_review_guide](/development/beer-game-kotlin/unit_u1_review_guide.md) を更新（claude-code/claude-sonnet-5-5）
 * **Verification**: [bolt_3_plan](/development/beer-game-kotlin/bolt_3_plan.md) を human:kakimomokuri が検証

@@ -4,7 +4,7 @@ title: "Unit U1 人のゲート確認手順（B1〜B3、Kotlin 版）"
 description: "beer-game-kotlin の Unit U1（B1〜B3）の人のゲートを、ユーザーが確認するための手順。再現コマンドとその期待結果、ゲートごとの確認表（見るファイル・再現・判断）、人の判断が要る項目と推奨、AWS 適用前の確認、承認の記録の依頼例。"
 tags: [report, plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:34:20Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:51:46Z }
 ---
 
 # Unit U1 人のゲート確認手順（B1〜B3、Kotlin 版）
@@ -16,6 +16,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:34:20Z }
 ### 1.1 承認の意味
 
 - ゲートの承認は、**ユーザー自身がコードとテストを確認する**ことで意味を持ちます。AI が代わりに「承認済み」と記録することはありません。
+- **2026-11-15 に、ユーザーが B1（ゲート 1〜12）・B2（ゲート 1〜6）・B3（ゲート 1〜4）を承認した。** 以下の「未承認」の記述は承認前のもの。コードの全行理解の個別の承認と、AWS への適用（B3 ゲート 5）は含まれない。
 - 状態の根拠は [Unit U1 総括](./unit_u1_summary.md)、[Bolt 1](./bolt_1_report.md)・[Bolt 2](./bolt_2_report.md)・[Bolt 3](./bolt_3_report.md) の終了報告です。いずれも「人の確認待ち（未承認）」と記録されています。
 
 ### 1.2 承認の記録方法
