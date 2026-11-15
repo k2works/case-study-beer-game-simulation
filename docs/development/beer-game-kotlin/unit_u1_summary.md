@@ -4,7 +4,7 @@ title: "Unit U1 総括 - ウォーキングスケルトン（B1〜B3、Kotlin �
 description: "beer-game-kotlin の Unit U1（B1〜B3）の終了の記録。達成の全体像、テスト件数の推移、成果物、未達・未実施・未承認の一覧、人の判断が要る項目の統合一覧、U1 が完了と言える範囲と言えない範囲、次への申し送り。"
 tags: [report, plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:03:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:34:20Z }
 ---
 
 # Unit U1 総括（ウォーキングスケルトン。B1〜B3、Kotlin 版）
@@ -17,6 +17,14 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:03:31Z }
 | 個別の報告 | [Bolt 1 終了報告](./bolt_1_report.md)、[Bolt 2 終了報告](./bolt_2_report.md)、[Bolt 3 終了報告](./bolt_3_report.md) |
 
 この総括は、事実と、人が判断・検証すべき点を示すものです。**承認の記録ではありません。「U1 が承認された」とは書けません。**
+
+### 追記（2026-11-15。この総括と各終了報告の作成後に、状況が変わった点）
+
+各終了報告と、本総括の本文は、**作成時点の事実**を記録したものです。作成後に、次の 3 点が変わりました（本文は、当時の記録として書き換えていません）。
+
+1. **GitHub Actions 上の実行（本文の「未実行・未確認」は古い）**: `develop` を push し、`beer-game-kotlin` の CI が実際に動きました。初回（`907c206`）は **failure** でした。原因は、`web` の `package-lock.json` を、ローカルの Node 24 の npm で作ったために、CI の Node 26 の npm の `npm ci` が `@emnapi/core`・`@emnapi/runtime` の不足で失敗したことです。Node 26.13.1 の npm でロックを更新して解消し（`6d9625a`）、続く 2 回（`6d9625a`・`d0f36d2`）は、**8 ジョブすべて success**（contract、test、detekt（JDK 21）、pmd、web、ui、container、n1）でした。**ローカルでは見えなかった不具合を、CI が見つけた**例です。`n1` は雛形（直前のリリースのタグが無い間は実行しない）で、本実装は未です。デプロイ・ロールバックのワークフローは、手動起動のみで、実行していません。
+2. **domain の行カバレッジ 100%（本文の「未達（97.5%）」は古い）**: 除外・閾値の引き下げ・`@Suppress` を使わず、54 件のテストで未到達の行を実際に実行して到達させました。**802/802 = 100%**（分岐 98.2%）。Kover のゲートも 100% に上げました（`d0f36d2`）。`-jvm-default=no-compatibility` というビルド設定を 1 つ加えた点は、人の確認待ちです。
+3. **B2・B3 のステップ計画の承認**: 2026-11-15 に、ユーザーが承認しました（事後の承認）。**ゲート（B1 の 1〜12、B2 の 1〜6、B3 の 1〜4）は、承認の対象に含まれず、人の確認待ちのままです。** 確認の手順は [U1 ゲート確認の手順](./unit_u1_review_guide.md) にあります。
 
 ## 1. 達成の全体像
 
