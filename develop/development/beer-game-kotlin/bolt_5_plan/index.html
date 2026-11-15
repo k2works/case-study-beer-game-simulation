@@ -10832,12 +10832,181 @@
 </ol>
 <p><strong>実施中の逸脱</strong>（正直に記録する）: (1) 作業中に、ファイルの編集を禁じられている python の heredoc を、<strong>何も書かない確認のために 1 回誤って起動した</strong>（<code>print</code> だけ。ファイルの変更は無い）。あわせて、出力の件数を数えるコマンドに <code>awk</code> を 1 回混ぜた（読み取りだけ。ファイルの変更は無い）。ファイルの編集は、Write・Edit と、書式の自動修正の <code>./gradlew ktlintFormat</code>、計測用の一時の試験の削除（<code>rm</code>）だけで行った。(2) 上の「順序を守れなかった箇所」。(3) 受け入れのステップ定義 11 個の追加（Step 3.5.1 からの持ち越し）。(4) <strong>既存の不安定な試験</strong>: <code>ApplicationFlowContract</code>・<code>HttpFlowSpec</code>・<code>PostgresHttpSpec</code> は、「将来の需要 <code>998</code> が応答に含まれない」を、本文の文字列の検索（<code>shouldNotContain "998"</code>）で確かめるが、<strong>ランダムな UUID（例: <code>…-998d-…</code>）に <code>998</code> が現れると失敗する</strong>。<code>./gradlew check</code> の 1 回で <code>ApplicationFlowContract</code> が失敗した（再実行は緑）。Step 6 の変更とは無関係で、<strong>直していない</strong>（範囲外。直すなら、値の出現を <code>\b998\b</code> や項目単位の検査にする。人が決める）。(5) 復帰で <code>bg_recovery</code> の Cookie を延長しない点（上のゲート 6 の確認点 3）は、設計書に定めが無く、実装しなかった。</p>
 <h3 id="step-7-ui-13">Step 7: UI（最小）（🔴🟢。判断項目 13 の決定による）<a class="headerlink" href="#step-7-ui-13" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p><strong>Step 7 の実施結果（2026-11-15。ゲート 7 は人の確認待ちで、承認していない）</strong>: 7.1〜7.3 を実施した。結果は「<a href="#step-7-の実施結果2026-11-15">Step 7 の実施結果</a>」。Step 8 以降には進んでいない。</p>
+</blockquote>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 7.1 🔴 <code>@ui</code> のシナリオ（復帰、停止 → 再開）と、コンポーネントのテストを先に書く</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 7.2 🟢 S03 の復帰、S06 の停止・再開、S05 の停止中の表示。文言は一般の文言に統一し、失敗の文言は送った資格の種類から選ぶ（UI 設計）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 7.3 🟡 アクセシビリティ（WCAG 2.2 AA）の確認。<strong>手動の確認は人</strong>（B15 で網羅。ここでは対象の画面だけ）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 7.1 🔴 <code>@ui</code> のシナリオ（復帰、停止 → 再開）と、コンポーネントのテストを先に書く</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 7.2 🟢 S03 の復帰、S06 の停止・再開、S05 の停止中の表示。文言は一般の文言に統一し、失敗の文言は送った資格の種類から選ぶ（UI 設計）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 7.3 🟡 アクセシビリティ（WCAG 2.2 AA）の確認。<strong>手動の確認は人</strong>（B15 で網羅。ここでは対象の画面だけ）。<strong>自動確認は、axe を導入せず（依存の追加は確認必須）、DOM の構造の検査（自前）にとどめた</strong>。コントラスト比・200% 拡大・キーボードの順序・スクリーンリーダーは未実施（人・B15）</li>
 </ul>
 <p><strong>ゲート 7</strong>: UI の範囲と文言を、人が確認する。判断項目 13 で UI を含めない場合、このステップは<strong>範囲外</strong>とし、理由を記録する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<h4 id="step-7-2026-11-15">Step 7 の実施結果（2026-11-15）<a class="headerlink" href="#step-7-2026-11-15" title="Permanent link">&para;</a></h4>
+<p>実施者: claude-code/claude-sonnet-5-5。<strong>実測の事実だけを書く。ゲート 7 の承認は記録していない。Step 8 以降には進んでいない。バックエンド・仕様・スキーマの変更は無い</strong>（<code>openapi.yaml</code> と生成した型は変えていない。<code>api:check</code> の再実行は不要だった）。</p>
+<p><strong>手順（TDD・BDD）</strong>: 先に、コンポーネントのテスト（<code>web/src</code> の 6 ファイル）と、<code>@ui</code> の日本語 Gherkin 6 シナリオ（ステップ定義・窓口を含む）を書き、<strong>失敗を確認</strong>してから実装した。Red の実測: <code>npx vitest run</code> は 109 件中 <strong>39 件が失敗</strong>（既存の 70 件は通る）。<code>npm run acceptance</code>（<code>@ui</code>）は 7 シナリオ中 <strong>6 件が失敗</strong>（新しい 6 件。既存のウォーキングスケルトンの 1 件は通る。画面に操作が無く、待ち時間の超過で失敗）。実装のあと、すべて緑。<strong>順序を守れなかった箇所は無い</strong>（テスト補助 <code>fakeApi</code> の新メソッドと、構造の検査 <code>a11y.ts</code> は、テストと同時に書いた道具）。</p>
+<p><strong>範囲（判断項目 13: 最小の UI）</strong>: 含める — S03 の復帰、S06 の停止・再開、S05 の停止中の表示。<strong>含めない（理由つき）</strong>:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">含めない画面・操作</th>
+<th style="text-align: left;">理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">代理入力（S06）</td>
+<td style="text-align: left;">判断項目 13「代理入力と資格の失効・再発行の画面は B6 以降に回す案」と、今回の指示（UI は復帰・停止再開の最小限）。API・ドメインは Step 6 で実装済み</td>
+</tr>
+<tr>
+<td style="text-align: left;">資格の失効・再発行（S06）</td>
+<td style="text-align: left;">同上。<strong>帰結（人が確認する）: 進行役が復帰コードを再発行する画面が無い。S03 の案内「進行役に、復帰コードの再発行を依頼してください。」を受けた進行役は、B6 までは画面で再発行できない（API だけ）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">手動の終了（S06 の「終了する」）</td>
+<td style="text-align: left;">判断項目 11（<code>EndSession</code> は B5 の範囲外）</td>
+</tr>
+<tr>
+<td style="text-align: left;">停止中の代理入力の案内「停止中のため、再開するまで確定されません。」</td>
+<td style="text-align: left;">代理入力の画面が無いため。停止中は、週の確定ができない旨（<code>停止中です。再開するまで、週を確定できません。</code>）だけ示す</td>
+</tr>
+<tr>
+<td style="text-align: left;">自動更新（SSE）</td>
+<td style="text-align: left;">B1 から未実装。S05 の停止中の表示は、手動更新・保存・確定のあとの取得で切り替わる（参加者が、再開を、自動では知れない）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>実装したもの</strong>（<code>apps/beer-game-kotlin/web</code>）:</p>
+<ul>
+<li><code>api/</code>: <code>ApiClient</code> に <code>pauseSession</code>・<code>resumeSession</code>・<code>recoverParticipation</code>。<code>createGame</code> の結果に <code>recoveryCode</code>、<code>joinGame</code> の結果に <code>gameId</code>（型は生成した <code>CreateGameResponse</code>・<code>JoinResponse</code>・<code>RecoverResponse</code> から）。<code>problems.ts</code> の文言（下の表）。資格を送った操作（参加・復帰）の 403 は、<code>app.unauthorized</code>（復帰）と <code>game.invitation_invalid</code>（参加）のどちらでも、送った資格の種類から文言を選ぶ。</li>
+<li>S03（<code>JoinPage.tsx</code>）: 見出しを「参加・復帰」にし、「参加する」と「復帰する」の 2 つの領域。参加は、応答の <code>gameId</code> でプレイの画面（<code>/games/:id/play</code>）へ進む（<strong>参加後の画面が止まる問題の解消</strong>）。復帰は、ゲーム ID（URL の <code>?gameId=</code> で事前に入る）と任意の復帰コード（空なら Cookie <code>bg_recovery</code>）。復帰のあとに <code>getGameState</code> で、行き先を決める（進行役: 準備中はロビー、開始後はコンソール。参加者: プレイ）。</li>
+<li><code>ErrorNotice.tsx</code>: 権限が無いときの導線を「参加・復帰の画面へ」にし、いまの URL のゲームの ID を <code>?gameId=</code> に持たせる（復帰の画面で入れ直さずに済む）。参加・復帰の画面の失敗には、導線を出さない。</li>
+<li>S02（<code>CreateGamePage.tsx</code>）: 作成の応答の <code>recoveryCode</code> を、ゲーム ID とともに、<strong>この画面でだけ</strong>示す（控える促し付き。再表示しない。保存しない）。<strong>計画の「S03 の復帰」には明示が無いが、復帰コードで進行役が戻る経路（AC3.2.4）に必要なため足した（人が確認する）</strong>。</li>
+<li>S06（<code>ConsolePage.tsx</code>）: 進行中は「停止する」、停止中は「再開する」。確認ダイアログ（対象の週と影響を示す。フォーカスは見出しへ）。応答は <code>versions</code> だけなので、取得し直した状態から表示する。<code>session.paused</code>・<code>session.not_paused</code> の失敗は、文言を示して最新の状態へ切り替える。停止中は「週を確定」を出さない。</li>
+<li>S05（<code>PlayPage.tsx</code>）: 停止中は、文言（<code>role="status"</code>）を示し、入力欄と保存ボタンを無効にし、入力中の値は保持する。保存の瞬間に停止された（<code>session.paused</code>）ときは、文言を示し、最新の状態（停止中）へ切り替える。</li>
+<li><code>@ui</code>（<code>features/continuation/pause-resume-ui.feature</code>、<code>recovery-ui.feature</code>、<code>features/game-setup/joining-ui.feature</code>。ステップ定義 <code>web/steps/continuation-ui.steps.mjs</code>、窓口 <code>web/support/console-window.mjs</code>）。</li>
+</ul>
+<p><strong>文言</strong>（正本は <a href="../../../design/beer-game-kotlin/ui-design/">UI 設計</a>。<strong>提案</strong>は、ゲート 7 で人が決める）:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;"><code>code</code>・場面</th>
+<th style="text-align: left;">文言</th>
+<th style="text-align: left;">出典</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>session.paused</code>（停止中の保存・確定、二重の停止）</td>
+<td style="text-align: left;">停止中です。進行役の再開を待ってください。</td>
+<td style="text-align: left;">UI 設計の競合の表（停止中の保存）。決定済み</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>app.unauthorized</code>（復帰。送った資格＝復帰用の資格）</td>
+<td style="text-align: left;">復帰用の資格が無効です。進行役に確認してください。</td>
+<td style="text-align: left;">UI 設計の辞書（資格の種類から選ぶ）。決定済み</td>
+</tr>
+<tr>
+<td style="text-align: left;">復帰の画面の案内（AC3.2.2「進行役への確認方法」）</td>
+<td style="text-align: left;">復帰コードが分からない場合は、進行役に、復帰コードの再発行を依頼してください。</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session.not_paused</code></td>
+<td style="text-align: left;">停止中ではありません。</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session.not_active</code>（未開始）</td>
+<td style="text-align: left;">ゲームはまだ開始されていません。</td>
+<td style="text-align: left;"><strong>提案</strong>（停止中は <code>session.paused</code> に分けたため）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session.save_limit_reached</code></td>
+<td style="text-align: left;">この週の保存回数の上限に達しました。進行役に確認してください。</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>game.credential_already_revoked</code></td>
+<td style="text-align: left;">この資格はすでに失効しています。</td>
+<td style="text-align: left;"><strong>提案</strong>（画面は B6 以降。辞書だけ先に定めた）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>game.credential_not_revoked</code></td>
+<td style="text-align: left;">失効していない資格は再発行できません。</td>
+<td style="text-align: left;"><strong>提案</strong>（同上）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>app.rate_limited</code>（参加・復帰の試行が多すぎる 429）</td>
+<td style="text-align: left;">試行が多すぎます。しばらく待って、もう一度お試しください。</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">停止中の S06</td>
+<td style="text-align: left;">停止中です。再開するまで、週を確定できません。</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">停止・再開の確認ダイアログ</td>
+<td style="text-align: left;">停止: 「停止すると、参加者は入力できなくなり、週を確定できなくなります。再開するまで、第 N 週のままです。入力済みの値は、失われません。」／再開: 「再開すると、参加者は第 N 週の入力を再開できます。」</td>
+<td style="text-align: left;"><strong>提案</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">作成後の復帰コード</td>
+<td style="text-align: left;">「この画面でだけ表示します。控えてください。」「端末を替えたときなどに、ゲーム ID と復帰コードで、進行役のコンソールへ戻れます。」</td>
+<td style="text-align: left;"><strong>提案</strong>（UI 設計の「控えるよう促し、再表示しない」に従う）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>実測</strong>（<code>apps/beer-game-kotlin/web</code>、Node 24.11.0。バックエンドは <code>APP_ENV=local DB_KIND=h2 PORT=3100 ALLOWED_ORIGINS=http://localhost:5273 ./gradlew :app:run</code>、画面は Vite の 5273。人の開発サーバー 3000・5173 は使わず、停止もしていない。実行のあと、起動した 3100 のプロセスだけを止めた）:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">検査</th>
+<th style="text-align: left;">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>npm run verify</code>（format:check・lint・typecheck・test・build）</td>
+<td style="text-align: left;"><strong>緑</strong>（2 回。lint 警告 0、<code>@ts-ignore</code>・eslint-disable なし）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run test</code>（vitest）</td>
+<td style="text-align: left;"><strong>109 件、失敗 0</strong>（70 件から 39 件増: <code>problems</code> 9、<code>client</code> 4、<code>JoinPage</code> 13、<code>CreateGamePage</code> 1、<code>ConsolePage</code> 8、<code>PlayPage</code> 4）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run acceptance:dry-run</code></td>
+<td style="text-align: left;">7 シナリオ・53 ステップ、Undefined なし</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>npm run acceptance</code>（<code>@ui</code>。H2 のバックエンド）</td>
+<td style="text-align: left;"><strong>7 シナリオ・53 ステップ、すべて passed、failed 0</strong>（2 回続けて同じ。1 回約 10 秒）。内訳: 既存のウォーキングスケルトン 1、停止 → 再開 1、復帰 4（進行役の Cookie・進行役の復帰コード・参加者・無効な復帰コード）、参加 1</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>@ui</code> を PostgreSQL 18 のバックエンドで実行</td>
+<td style="text-align: left;"><strong>未実施</strong>（<code>@ui</code> の既存の運用は H2 のバックエンド。PostgreSQL での <code>@ui</code> は、今回は確かめていない）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>アクセシビリティ（WCAG 2.2 AA。対象の画面: S03、S05 の停止中、S06 の停止・再開のダイアログ）</strong>: <strong>自動確認は構造だけ</strong>。<code>src/testing/a11y.ts</code>（自前。コンポーネントのテスト 3 本が使う）が、入力欄・ボタン・リンクの名前、<code>aria-labelledby</code>・<code>aria-describedby</code> の参照先、<code>id</code> の重複、<code>h1</code> が 1 つ、題名、ダイアログの <code>aria-modal</code> と名前を検査する（WCAG 1.3.1・2.4.2・4.1.2 の一部）。<strong>axe は導入していない</strong>（外部ライブラリの導入は確認必須。テスト戦略は axe を予定している）。<strong>未実施（人が確認）</strong>: コントラスト比、200% 拡大、キーボードだけの操作の順序とフォーカスの見え方、スクリーンリーダー、色以外での状態表示の目視。確認した事実としては、停止中は文言（テキスト）で示し、色だけに頼らない。</p>
+<p><strong>実施中の逸脱</strong>（正直に記録する）:</p>
+<ol>
+<li><strong>heredoc を 1 回誤って起動した</strong>（<code>cat &gt; /dev/null &lt;&lt;'EOF'</code>。何も書かない確認のため。ファイルの変更なし）。ファイルの編集は、Write・Edit と、書式の自動整形 <code>npx prettier --write src support steps</code>（自分が書いた・直したファイルだけが変わることを <code>git status</code> で確認）だけで行った。</li>
+<li><strong>自分のテストが不安定だった（修正済み）</strong>: <code>JoinPage.test.tsx</code> の 2 件が <code>findByRole('status')</code> を使い、読み込み中の <code>status</code> を先に拾って 1 回失敗した。文言の検索（<code>findByText</code>）に直した。直したあと、<code>verify</code> を 2 回通して緑。</li>
+<li><strong>計画に明示のない足し</strong>（人が確認する）: S02 の復帰コード・ゲーム ID の表示、S01 の「参加」を「参加・復帰」に変えた、権限の導線の名称と <code>?gameId=</code>、<code>app.rate_limited</code> の文言。</li>
+<li><strong>新規ファイル</strong>（確認必須）: <code>features/continuation/pause-resume-ui.feature</code>、<code>features/continuation/recovery-ui.feature</code>、<code>features/game-setup/joining-ui.feature</code>、<code>web/steps/continuation-ui.steps.mjs</code>、<code>web/src/testing/a11y.ts</code>。画面の新しいコンポーネントのファイルは作っていない（S03 は <code>JoinPage.tsx</code> に収めた）。</li>
+<li><code>ConsoleWindow</code>（窓口）の変更は大きい（122 → 306 行）。<code>@ui</code> の前提の準備（参加者の別のブラウザの文脈、Cookie の削除）を足した。</li>
+</ol>
+<p><strong>ゲート 7 で人が確認すること</strong>:</p>
+<ol>
+<li><strong>UI の範囲</strong>: 上の「含める・含めない」の表のとおりでよいか。特に、<strong>進行役の再発行の画面が無い</strong>ため、S03 の案内（再発行の依頼）を実行できない点（B6 で足すか、案内を変えるか）。</li>
+<li><strong>復帰の入口</strong>: 復帰にはゲーム ID が要る（API の仕様）。ゲームの画面で権限が無いときの導線（<code>?gameId=</code>）と、作成直後の表示（復帰コードとゲーム ID）で足りるか。ブラウザを閉じたあとに、ゲーム ID を知る手段（履歴・控え）が足りるか。<strong>ゲーム ID を localStorage に覚える案は、個人情報・範囲の判断が要るため実装していない</strong>。</li>
+<li><strong>文言</strong>: 「提案」の行（上の表）。</li>
+<li><strong>復帰の行き先</strong>: 進行役は準備中ならロビー、開始後はコンソール。参加者は、準備中でもプレイの画面（開始を待つ旨。API が参加者にロビーを返さないため）。</li>
+<li><strong>参加後の画面の遷移</strong>: 参加の直後に、プレイの画面へ自動で進む（B1 の「止まる」問題の解消）。</li>
+<li><strong>アクセシビリティ</strong>: axe の導入（新しい依存。承認が要る）をするか。手動の確認の範囲（B15）。</li>
+<li>新規ファイル 5 点と、計画に明示のない足し（逸脱 3）。</li>
+</ol>
 <h3 id="step-8-green">Step 8: 受け入れの green と検証・終了（✅）<a class="headerlink" href="#step-8-green" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.1 <code>@api</code> の AC3.1.<em>、AC3.2.</em> が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。デモ項目: 進行役が停止 → 代理入力 → 再開、参加者が切断 → 復帰、漏れた資格の失効 → 再発行 → 旧資格の再送が 403</li>
@@ -11280,6 +11449,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-15</td>
+<td style="text-align: left;"><strong>Step 7（UI 最小。7.1〜7.3）を実施</strong>（ゲート 7 は人の確認待ち。<strong>承認は記録していない</strong>。Step 8 は未着手。バックエンド・仕様・スキーマの変更なし）。判断項目 13 の最小の UI: S03 の復帰（ゲーム ID と任意の復帰コード。Cookie の復帰資格）と、参加後のプレイ画面への遷移（応答の <code>gameId</code>）、S06 の停止・再開（確認ダイアログ）、S05 の停止中の表示、S02 の復帰コード表示。<strong>代理入力・資格の失効・再発行・終了の画面は範囲外</strong>（理由は「Step 7 の実施結果」）。テストを先に書き、<strong>vitest 39 件・<code>@ui</code> 6 シナリオの Red を確認</strong>してから実装。<strong>実測</strong>: <code>web</code> の <code>verify</code> 緑、vitest 109 件・失敗 0（70 件から 39 件増）、<code>@ui</code> は 7 シナリオ・53 ステップすべて passed（H2 のバックエンド。2 回）。アクセシビリティの自動確認は自前の DOM 構造の検査のみ（axe は未導入）。<strong>逸脱: heredoc を何も書かない確認で 1 回誤って起動（ファイルの変更なし）。自分のテスト 2 件が不安定で修正。計画に明示のない足し（S02 の復帰コード表示ほか）。新規ファイル 5 点</strong>。人が確認する点は「Step 7 の実施結果」</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-15</td>
 <td style="text-align: left;"><strong>Step 6（アプリケーションと HTTP。6.1〜6.4）を実施</strong>（ゲート 6 は人の確認待ち。<strong>承認は記録していない</strong>。Step 7 以降は未着手。スキーマ変更なし）。HTTP の統合テスト 19 件を先に書き、<strong>19 件の失敗を確認</strong>してから実装。停止・再開・代理入力・失効・再発行・復帰の 6 経路と、開始後の <code>assignRole</code>（入れ替え）を実装。作成・再発行の応答に復帰コード、参加・復帰の応答に <code>gameId</code>（復帰は <code>kind</code>・<code>role?</code>）。<code>bg_session</code> の <code>Max-Age</code> を <code>sessionTtl</code>（24 時間）にし、Step 4 の不一致を解消。<code>bg_recovery</code>（30 日。Path は復帰の経路だけ）を発行。ロビーの <code>replaced</code>。設計書の例外 2 つと ADR-015 の未確認 2 点を更新。<strong>冪等な再送で <code>recoveryCode</code> を返せることを実測</strong>。<strong>実測</strong>: domain 395・application 149・adapter-http 80・persistence 92（H2）/ 79（PostgreSQL）・app 97（<code>ApiContractSpec</code> 13 件は緑）・integration 1、すべて失敗 0。受け入れは H2・PostgreSQL 18 とも 71 シナリオ、failed 0、skipped 1。<code>api:check</code> 差分 0、<code>web</code> の <code>verify</code> 緑。ktlint・detekt（JDK 21）・PMD は違反 0。<strong>性能（ローカル。PostgreSQL 18 の Testcontainers、逐次）: p95 は停止 37.7 ms・再開 36.2 ms・代理入力 38.1 ms（実環境の値ではない）</strong>。<strong>逸脱: python の heredoc を何も書かない確認で 1 回誤って起動（ファイルの変更なし）。受け入れのステップ定義 11 個を追加（3.5.1 の持ち越し）。一部の単体試験は実装のあとに書いた。既存の不安定な試験（UUID に <code>998</code>）を 1 回踏んだ（未修正）</strong>。人が確認する点は「Step 6 の実施結果」</td>
