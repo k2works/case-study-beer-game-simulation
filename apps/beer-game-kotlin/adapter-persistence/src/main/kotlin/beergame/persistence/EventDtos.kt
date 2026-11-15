@@ -113,6 +113,25 @@ internal data class DecisionSavedDto(
 )
 
 @Serializable
+@SerialName("SessionPaused")
+internal data object SessionPausedDto
+
+@Serializable
+@SerialName("SessionResumed")
+internal data object SessionResumedDto
+
+@Serializable
+@SerialName("ProxyDecisionSubmitted")
+internal data class ProxyDecisionSubmittedDto(
+    val week: Int,
+    val role: String,
+    val quantity: Int,
+    val decisionVersion: Long,
+    val editor: EditorDto,
+    val submittedRoleCount: Int,
+)
+
+@Serializable
 @SerialName("WeekCommitted")
 internal data class WeekCommittedDto(
     val week: Int,

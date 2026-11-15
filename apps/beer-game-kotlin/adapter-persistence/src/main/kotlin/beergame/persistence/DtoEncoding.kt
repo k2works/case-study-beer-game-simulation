@@ -83,6 +83,27 @@ internal fun encodeSessionEvent(event: SessionEvent): EventCodec.Encoded =
             enc(DecisionSavedDto.serializer(), dto)
         }
 
+        is SessionEvent.SessionPaused -> {
+            enc(SessionPausedDto.serializer(), SessionPausedDto)
+        }
+
+        is SessionEvent.SessionResumed -> {
+            enc(SessionResumedDto.serializer(), SessionResumedDto)
+        }
+
+        is SessionEvent.ProxyDecisionSubmitted -> {
+            val dto =
+                ProxyDecisionSubmittedDto(
+                    event.week.value,
+                    event.role.name,
+                    event.quantity.value,
+                    event.decisionVersion.value,
+                    event.editor.toDto(),
+                    event.submittedRoleCount,
+                )
+            enc(ProxyDecisionSubmittedDto.serializer(), dto)
+        }
+
         is SessionEvent.WeekCommitted -> {
             val dto =
                 WeekCommittedDto(
@@ -131,4 +152,5 @@ private fun RoleWeekResult.toDto() =
 private fun Editor.toDto(): EditorDto =
     when (this) {
         is Editor.ByParticipant -> EditorDto("PARTICIPANT", id.value.toString())
+        is Editor.ByFacilitator -> EditorDto("FACILITATOR", gameId.value.toString())
     }

@@ -55,19 +55,35 @@ internal fun SessionStartedDto.toSessionStarted(): Either<String, DomainEvent> =
         )
     }
 
+private fun EditorDto.toEditor(): Either<String, Editor> =
+    either {
+        when (kind) {
+            "PARTICIPANT" -> Editor.ByParticipant(ParticipantId(uuid(id).bind()))
+            "FACILITATOR" -> Editor.ByFacilitator(GameId(uuid(id).bind()))
+            else -> raise("入力者の種別が不正: $kind")
+        }
+    }
+
 internal fun DecisionSavedDto.toDecisionSaved(): Either<String, DomainEvent> =
     either {
-        val editorDomain =
-            when (editor.kind) {
-                "PARTICIPANT" -> Editor.ByParticipant(ParticipantId(uuid(editor.id).bind()))
-                else -> raise("入力者の種別が不正: ${editor.kind}")
-            }
         SessionEvent.DecisionSaved(
             week(week).bind(),
             enumOf<Role>(role, "役割").bind(),
             quantity(quantity).bind(),
             DecisionVersion.of(decisionVersion).mapLeft { it.toString() }.bind(),
-            editorDomain,
+            editor.toEditor().bind(),
+            submittedRoleCount,
+        )
+    }
+
+internal fun ProxyDecisionSubmittedDto.toProxyDecisionSubmitted(): Either<String, DomainEvent> =
+    either {
+        SessionEvent.ProxyDecisionSubmitted(
+            week(week).bind(),
+            enumOf<Role>(role, "役割").bind(),
+            quantity(quantity).bind(),
+            DecisionVersion.of(decisionVersion).mapLeft { it.toString() }.bind(),
+            editor.toEditor().bind(),
             submittedRoleCount,
         )
     }

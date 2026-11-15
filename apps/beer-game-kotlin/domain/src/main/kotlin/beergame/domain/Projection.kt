@@ -344,6 +344,7 @@ object Projections {
                     val (editorKind, editorId) =
                         when (val editor = p.editor) {
                             is Editor.ByParticipant -> "PARTICIPANT" to editor.id.value
+                            is Editor.ByFacilitator -> "FACILITATOR" to editor.gameId.value
                         }
                     listOf(
                         upsert(

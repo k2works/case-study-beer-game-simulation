@@ -12,9 +12,17 @@ private val allSessionEvents: List<SessionEvent> =
         sessionStarted(settings),
         decisionSaved(Role.FACTORY, 4),
         SessionEvent.SessionEnded(EndReason.FINAL_WEEK),
-    ) + allSavedEvents(fours).take(1)
+    ) + allSavedEvents(fours).take(1) +
+        listOf(
+            SessionEvent.SessionPaused,
+            SessionEvent.SessionResumed,
+            proxyDecisionSubmitted(Role.FACTORY, 6),
+            committedWithDifferentNextStates(),
+        )
 
 private fun activeAtStart(): SessionState = sessionOf(sessionStarted(settings))
+
+private fun pausedAtStart(): SessionState = sessionOf(sessionStarted(settings), SessionEvent.SessionPaused)
 
 /** 週次計算の結果とは違う `nextStates`（小売店の在庫を 999 にした）を持つ、第 1 週の確定。 */
 private fun committedWithDifferentNextStates(): SessionEvent.WeekCommitted {
@@ -73,6 +81,59 @@ class SessionEvolveSpec :
             }
         }
 
+        context("[US3.1] 停止・再開・代理入力の畳み込み") {
+            test("SessionPaused は、進行中を一時停止（データはそのまま、版は 1 進む）にする") {
+                val active = sessionOf(sessionStarted(settings), decisionSaved(Role.RETAILER, 4))
+                evolveSession(active, SessionEvent.SessionPaused) shouldBe
+                    SessionState.Paused(sessionDataOf(active), sv(3))
+            }
+            test("SessionResumed は、一時停止中を進行中（データはそのまま、版は 1 進む）にする") {
+                val pausedWithInput =
+                    sessionOf(sessionStarted(settings), decisionSaved(Role.RETAILER, 4), SessionEvent.SessionPaused)
+                evolveSession(pausedWithInput, SessionEvent.SessionResumed) shouldBe
+                    SessionState.Active(sessionDataOf(pausedWithInput), sv(4))
+            }
+            test("停止して再開しても、週・入力・版は変わらない") {
+                val active = sessionOf(sessionStarted(settings), decisionSaved(Role.RETAILER, 4))
+                val resumed =
+                    evolveSession(evolveSession(active, SessionEvent.SessionPaused), SessionEvent.SessionResumed)
+                sessionDataOf(resumed) shouldBe sessionDataOf(active)
+            }
+            test("ProxyDecisionSubmitted は、進行中でも一時停止中でも、進行役の入力として保存し、状態の種類を変えない") {
+                val event = proxyDecisionSubmitted(Role.FACTORY, 6, version = 1, submittedRoleCount = 1)
+                val entry = DecisionEntry(q(6), dv(1), facilitatorEditor)
+                val fromActive = evolveSession(activeAtStart(), event)
+                val fromPaused = evolveSession(pausedAtStart(), event)
+                (fromActive is SessionState.Active) shouldBe true
+                (fromPaused is SessionState.Paused) shouldBe true
+                listOf(fromActive, fromPaused).forEach { state ->
+                    sessionDataOf(state).decisions shouldBe mapOf(Role.FACTORY to entry)
+                    sessionDataOf(state).decisionVersions shouldBe RoleMap(dv(1), dv(0), dv(0), dv(0))
+                }
+                fromActive.version shouldBe sv(2)
+                fromPaused.version shouldBe sv(3)
+            }
+            test("一時停止中でも、SessionEnded は終了にする（一時停止から終了への遷移）") {
+                evolveSession(pausedAtStart(), SessionEvent.SessionEnded(EndReason.FINAL_WEEK)) shouldBe
+                    SessionState.Ended(sessionDataOf(pausedAtStart()), sv(3))
+            }
+            test("SessionPaused は進行中だけ、SessionResumed は一時停止中だけに効く（それ以外は状態を変えない）") {
+                val (ended, _) = sessionPlayed(3, settings = settings)
+                listOf(SessionState.NotStarted, pausedAtStart(), ended).forEach { state ->
+                    evolveSession(state, SessionEvent.SessionPaused) shouldBe state
+                }
+                listOf(SessionState.NotStarted, activeAtStart(), ended).forEach { state ->
+                    evolveSession(state, SessionEvent.SessionResumed) shouldBe state
+                }
+            }
+            test("未開始・終了後への ProxyDecisionSubmitted、一時停止中への SessionStarted は、状態を変えない") {
+                val (ended, _) = sessionPlayed(3, settings = settings)
+                val proxy = proxyDecisionSubmitted(Role.FACTORY, 6)
+                listOf(SessionState.NotStarted, ended).forEach { state -> evolveSession(state, proxy) shouldBe state }
+                evolveSession(pausedAtStart(), sessionStarted(settings)) shouldBe pausedAtStart()
+            }
+        }
+
         context("[設計 D5] WeekCommitted の nextStates は事実。evolve は採用するだけで、simulateWeek を呼び直さない") {
             test("simulateWeek の結果と違う nextStates を持つイベントを Given にすると、状態はイベントの値になる") {
                 val before = sessionOf(sessionStarted(settings), *allSavedEvents(fours).toTypedArray())
@@ -112,7 +173,7 @@ class SessionEvolveSpec :
             }
             test("すべての状態 × すべてのイベントで、例外を投げず、版は変わらないか 1 だけ進む") {
                 val (ended, _) = sessionPlayed(3, settings = settings)
-                listOf(SessionState.NotStarted, activeAtStart(), ended).forEach { state ->
+                listOf(SessionState.NotStarted, activeAtStart(), pausedAtStart(), ended).forEach { state ->
                     allSessionEvents.forEach { event ->
                         val next = evolveSession(state, event)
                         (next.version == state.version || next.version == state.version.next()) shouldBe true
@@ -139,6 +200,29 @@ class SessionEvolveSpec :
                         InvalidTransition(StreamType.SESSION, "NotStarted", "DecisionSaved"),
                         InvalidTransition(StreamType.SESSION, "Active", "SessionStarted"),
                     )
+            }
+            test("停止・再開・代理入力を含む正しい列は、検知 0 件。停止していない再開などは検知する") {
+                val valid =
+                    replaySession(
+                        listOf(
+                            sessionStarted(settings),
+                            SessionEvent.SessionPaused,
+                            proxyDecisionSubmitted(Role.FACTORY, 6),
+                            SessionEvent.SessionResumed,
+                        ),
+                    )
+                valid.invalid shouldBe emptyList()
+                valid.state shouldBe
+                    sessionOf(
+                        sessionStarted(settings),
+                        SessionEvent.SessionPaused,
+                        proxyDecisionSubmitted(Role.FACTORY, 6),
+                        SessionEvent.SessionResumed,
+                    )
+                replaySession(listOf(sessionStarted(settings), SessionEvent.SessionResumed)).invalid shouldBe
+                    listOf(InvalidTransition(StreamType.SESSION, "Active", "SessionResumed"))
+                replaySession(listOf(proxyDecisionSubmitted(Role.FACTORY, 6))).invalid shouldBe
+                    listOf(InvalidTransition(StreamType.SESSION, "NotStarted", "ProxyDecisionSubmitted"))
             }
         }
     })

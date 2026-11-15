@@ -138,6 +138,20 @@ class ProjectionSpec :
             rows.of(ProjectionTable.SESSION_OVERVIEW).single().valueOf("submitted_role_count") shouldBe Value.Num(2)
         }
 
+        test("[B5] 入力者が進行役のとき、current_decisions の入力者の種別は FACILITATOR（ID はゲーム）。代理入力の投影は Step 4.7") {
+            val saved = SessionEvent.DecisionSaved(w(1), Role.FACTORY, q(6), dv(1), facilitatorEditor, 1)
+
+            val decision =
+                Projections
+                    .project(
+                        envelope(saved, StreamType.SESSION, 5),
+                    ).of(ProjectionTable.CURRENT_DECISIONS)
+                    .single()
+
+            decision.valueOf("editor_kind") shouldBe Value.Text("FACILITATOR")
+            decision.valueOf("editor_id") shouldBe Value.Id(gid.value)
+        }
+
         test("[7.2] Given WeekCommitted When 投影する Then 確定の事実・役割別の結果・次週の状態が入り、入力はクリアされ、チーム合計は書かない（#12）") {
             val rows = Projections.project(envelope(weekCommitted, StreamType.SESSION, 12))
 

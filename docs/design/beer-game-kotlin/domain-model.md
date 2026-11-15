@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Kotlin 版のドメインモデル。イベントソーシングに合わせ、Game・Session の 2 ストリームごとに State・Command・Event・DomainError を sealed interface で定義し、decide / evolve、simulateWeek、値オブジェクト、投影、全イベント一覧を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T02:17:41Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Kotlin 版）
@@ -276,7 +276,10 @@ enum class ErrorCategory { Forbidden, NotFound, InvalidState, Conflict, RuleViol
 | `game.participant_not_found` | `GameError.ParticipantNotFound` | `NotFound` | 404 |
 | `game.start_condition_not_met` | `GameError.StartConditionNotMet` | `RuleViolation` | 422（`missingRoles` を添える） |
 | `game.invitation_invalid` | `GameError.InvitationInvalid` | `Forbidden` | 403。**参加コードの不明・形式不正を区別しない**。`decide` は返さず、境界が参加コードからゲームを引けなかったときに使う。`DomainError` が封印されているため `domain` に置く |
-| `session.not_active` | `SessionError.NotActive` | `InvalidState` | 409（B1 は **未開始 → `NotActive`**。停止中の `NotActive` は B5） |
+| `session.not_active` | `SessionError.NotActive` | `InvalidState` | 409（**未開始**だけ。B5 で、停止中は下の `session.paused` に分けた） |
+| `session.paused` | `SessionError.Paused` | `InvalidState` | 409（B5。一時停止中の保存・確定、二重の停止。ゲート 1 の決定で新設） |
+| `session.not_paused` | `SessionError.NotPaused` | `InvalidState` | 409（B5。一時停止中でない再開。冪等な 200 にしない決定） |
+| `session.save_limit_reached` | `SessionError.SaveLimitReached` | `InvalidState` | 409（B5。1 役割・1 週あたり 9 回〔代理入力を含む〕を超える保存。NF-C8） |
 | `session.already_ended` | `SessionError.AlreadyEnded` | `InvalidState` | 409 |
 | `session.already_started` | `SessionError.AlreadyStarted` | `InvalidState` | 409（開始済みのゲームの再開始） |
 | `session.forbidden` | `SessionError.Forbidden` | `Forbidden` | 403（HTTP では `app.unauthorized` と同じ本文） |
@@ -554,7 +557,8 @@ fun evolveSession(state: SessionState, event: SessionEvent): SessionState = when
 
 | 不変条件 | 内容 | 根拠 | 違反時の `SessionError`（分類） |
 | :--- | :--- | :--- | :--- |
-| 意思決定の条件 | 参加者の `SaveDecision` は進行中のときだけ、0〜上限の整数を、役割ごとに 1 件保存できる。**一時停止中の `SaveDecision` は拒否する**。進行役の代理入力は例外で、一時停止中も受け付ける（下の「代理入力」） | BR-10 | `NotActive`（`InvalidState`） |
+| 意思決定の条件 | 参加者の `SaveDecision` は進行中のときだけ、0〜上限の整数を、役割ごとに 1 件保存できる。**一時停止中の `SaveDecision` は拒否する**。進行役の代理入力は例外で、一時停止中も受け付ける（下の「代理入力」） | BR-10 | `NotActive`（未開始）、`Paused`（停止中）、`AlreadyEnded`（いずれも `InvalidState`） |
+| 保存回数の上限 | 同じ週に、同じ役割へ保存できるのは **9 回まで**（参加者の保存と進行役の代理入力を合わせて数える）。確定で数え直す。**回数は意思決定の版と同じ**（保存のたびに 1 増え、確定で 0 に戻る）ので、別の項目を持たず `decisionVersions[role] < 9` で判定する。判定順は、権限 → 週（`WeekAdvanced`）→ 版（`DecisionConflict`）→ 上限 | NF-C8 | `SaveLimitReached`（`InvalidState`） |
 | 共同入力 | 同じ役割の意思決定は、1 つの値と 1 つの**意思決定の版**を、共同担当で共有する。版が古い保存は拒否し、**最新値と最後の保存者**を返す（変更を黙って失わない） | FR-16、BR-15 | `DecisionConflict(role, latest)`（`Conflict`） |
 | 代理入力 | 進行役だけが任意の役割へ入力できる。**進行中と一時停止中の両方で受け付ける**（UC-09、AC3.1.1: 停止 → 代理入力 → 再開）。`requestedWeek` を持ち、現在の週と違えば `WeekAdvanced`。入力値、操作者、時刻をイベントに残す。意思決定の版は要求しないが 1 増やすので、古い版を持つ参加者の保存は拒否される。一時停止中の代理入力では自動確定しない | FR-15 | `Forbidden`、`WeekAdvanced`（`Conflict`）、`AlreadyEnded` / `NotStarted`（`InvalidState`） |
 | 役割の確認 | 保存できるのは、`SessionStarted` の割り当ての写しに含まれる参加者だけ。観察者は常に拒否 | FR-04、FR-17 | `Forbidden` |
@@ -915,6 +919,9 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 30 | `SessionStarted` のペイロードに `gameId` が無い | `gameId` を足す（2026-11-14、B1） | `evolve` が `SessionData.gameId` を作れない。封筒の `gameId` は `evolve` に渡らない（Step 5・6） |
 | 31 | `startGame` は `Either<StartError, StartDecision>`。判定順は、準備中でなければ `NotPreparing` が先 | `StartError` を作らず `Either<DomainError, StartDecision>`。判定順は 権限 → 開始済み（`AlreadyStarted`）→ 開始条件。`SessionError` は `NotActive`・`AlreadyEnded` で、`NotStarted` は作らない（2026-11-14、B1） | 型の重複を避ける。権限のない人に開始済みかを知らせない（Step 5・6） |
 | 32 | `DomainError` の `code` に一覧が無い | 14 件の一覧と、受付終了後の参加は 409 `game.not_preparing`、参加コードの不明・形式不正は 403 `game.invitation_invalid`（`GameError.InvitationInvalid` を追加）（2026-11-14、B1） | AC1.2.2 は受付終了の理由を示す。`DomainError` は封印されている（Step 8・9） |
+
+| 33 | `SessionState.Paused(data)`、`Editor` は参加者と進行役、停止中の拒否は `NotActive` | `Paused(data, version)`（ほかの状態と同じく版を持つ）。`Editor.ByFacilitator(gameId)`（表示名を含まない）。停止中の保存・確定は新しい `SessionError.Paused`（`session.paused`、ゲート 1 の決定）。`evolveSession` は `SessionEvolve.kt` に分けた（2026-11-15、B5 Step 2） | 停止中を未開始と区別して画面に示す。状態が 4 つになり、1 つの関数では静的解析の複雑さの上限を超える |
+| 34 | 保存回数の上限は、`SessionData` に役割ごとの回数を持つ（B5 計画 2.5） | 回数は**意思決定の版と同じ**ため、`SessionData` に項目を足さない。`SaveDecision` と `SubmitProxyDecision` の判定に `hasSaveCapacity(role)` を使う（2026-11-15、B5 Step 2） | 同じ事実を二重に持たない。共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける |
 
 ## 未決事項
 

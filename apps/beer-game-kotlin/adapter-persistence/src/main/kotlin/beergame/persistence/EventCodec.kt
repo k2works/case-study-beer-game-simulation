@@ -3,6 +3,7 @@ package beergame.persistence
 import arrow.core.Either
 import arrow.core.flatMap
 import arrow.core.left
+import arrow.core.right
 import beergame.domain.DomainEvent
 import beergame.domain.GameEvent
 import beergame.domain.SessionEvent
@@ -80,6 +81,22 @@ object EventCodec {
 
             "DecisionSaved" -> {
                 json.decodeFromString(DecisionSavedDto.serializer(), payloadJson).toDecisionSaved()
+            }
+
+            "SessionPaused" -> {
+                json.decodeFromString(SessionPausedDto.serializer(), payloadJson)
+                SessionEvent.SessionPaused.right()
+            }
+
+            "SessionResumed" -> {
+                json.decodeFromString(SessionResumedDto.serializer(), payloadJson)
+                SessionEvent.SessionResumed.right()
+            }
+
+            "ProxyDecisionSubmitted" -> {
+                json
+                    .decodeFromString(ProxyDecisionSubmittedDto.serializer(), payloadJson)
+                    .toProxyDecisionSubmitted()
             }
 
             "WeekCommitted" -> {

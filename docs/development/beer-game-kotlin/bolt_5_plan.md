@@ -4,7 +4,7 @@ title: "Bolt 5 計画 - 進行の継続と資格（Kotlin 版）"
 description: "beer-game-kotlin の Bolt 5（Unit U2 の最初の Bolt）のステップ計画。停止・再開・代理入力、参加者・進行役の復帰、資格の期限・失効・再発行、鍵の複数の版、参加・復帰の専用のレート制限、冪等記録の照合を認可の後に置く。提案。人の承認待ち。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T01:51:51Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T02:17:41Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-15T01:04:10Z }
   - { by: human:kakimomokuri, at: 2026-11-15T01:13:34Z }
@@ -221,13 +221,57 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 ### Step 2: ドメイン — Session の停止・再開・代理入力（🔴🟢🟡）
 
-- [ ] 2.1 🔴 Kotest（Given: 過去のイベント / When: コマンド / Then: イベントまたはエラー）を先に書く。`PauseSession`・`ResumeSession`・`SubmitProxyDecision` の正常系と否定（参加者の実行は `Forbidden`、`requestedWeek` が違えば `WeekAdvanced`、停止中の `SaveDecision`・`CommitWeek` は拒否、`Ended` は `AlreadyEnded`）。**失敗を確認**する
-- [ ] 2.2 🟢 `SessionState.Paused`、コマンド・イベント・エラーを、`decideSession`・`evolve` に実装する（`updateData` は `Active`・`Paused` に適用）。代理入力は版を 1 増やし、`editor`・値を残す。停止中の代理入力は確定しない。**停止中の参加者の拒否は、判断項目 6 の決定どおり新しい `SessionError`（`session.paused`、409、`InvalidState`）で返す**（現状の設計書は「停止中の `NotActive`」で、食い違うため Step 8.3 で設計書を更新する。`validating-design` 軸 B の B1）
-- [ ] 2.3 🟡 `InvalidTransition` の性質テスト（**設計書の定義: 有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない**。判断項目 12。`validating-design` 軸 B の B6 で、計画の記述を設計書に合わせた）。リファクタリング。**domain の行 100% のゲートを守る**（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）
-- [ ] 2.4 イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。新しいイベントの種別の一覧を記録（N-1 互換の影響。B12）
-- [ ] 2.5 🔴🟢 **代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回。判断項目 10 の決定）**。`SessionData` に、役割ごとの当週の保存回数を持たせる（現状は持たない）。確定でクリアする。超えたときの `code`・文言は未決（ゲート 1 で決める）。**B6 の共同入力（`DecisionConflict` の拡張）と同じ `SaveDecision` に触れるため、B6 の前提を壊さないことを確認する**。更新履歴の決定が、ステップに反映されていなかったため追加した（`validating-design` 軸 B の B8）
+> **Step 2 の実施結果（2026-11-15。ゲート 2 は人の確認待ちで、承認していない）**: 2.1〜2.5 を実施した。結果は「[Step 2 の実施結果](#step-2-の実施結果2026-11-15)」。
+
+- [x] 2.1 🔴 Kotest（Given: 過去のイベント / When: コマンド / Then: イベントまたはエラー）を先に書く。`PauseSession`・`ResumeSession`・`SubmitProxyDecision` の正常系と否定（参加者の実行は `Forbidden`、`requestedWeek` が違えば `WeekAdvanced`、停止中の `SaveDecision`・`CommitWeek` は拒否、`Ended` は `AlreadyEnded`）。**失敗を確認**する
+- [x] 2.2 🟢 `SessionState.Paused`、コマンド・イベント・エラーを、`decideSession`・`evolve` に実装する（`updateData` は `Active`・`Paused` に適用）。代理入力は版を 1 増やし、`editor`・値を残す。停止中の代理入力は確定しない。**停止中の参加者の拒否は、判断項目 6 の決定どおり新しい `SessionError`（`session.paused`、409、`InvalidState`）で返す**（現状の設計書は「停止中の `NotActive`」で、食い違うため Step 8.3 で設計書を更新する。`validating-design` 軸 B の B1）
+- [x] 2.3 🟡 `InvalidTransition` の性質テスト（**設計書の定義: 有効なコマンド列を `decide` と `evolve` で回し、`InvalidTransition` が 1 件も出ない**。判断項目 12。`validating-design` 軸 B の B6 で、計画の記述を設計書に合わせた）。リファクタリング。**domain の行 100% のゲートを守る**（除外・閾値の引き下げをしない。B2 の追補で 100% に到達済み。新しい行は、実際のテストで到達させる）
+- [x] 2.4 イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。新しいイベントの種別の一覧を記録（N-1 互換の影響。B12）
+- [x] 2.5 🔴🟢 **代理入力を含む保存回数の上限（1 役割・1 週あたり 9 回。判断項目 10 の決定）**。`SessionData` に、役割ごとの当週の保存回数を持たせる（現状は持たない）。確定でクリアする。超えたときの `code`・文言は未決（ゲート 1 で決める）。**B6 の共同入力（`DecisionConflict` の拡張）と同じ `SaveDecision` に触れるため、B6 の前提を壊さないことを確認する**。更新履歴の決定が、ステップに反映されていなかったため追加した（`validating-design` 軸 B の B8）
 
 **ゲート 2**: Session の停止・再開・代理入力の振る舞いと、domain の行 100% を、人が確認する。**状態: 人の確認待ち（未承認）。**
+
+#### Step 2 の実施結果（2026-11-15）
+
+実施者: claude-code/claude-sonnet-5-5。**実測の事実だけを書く。ゲート 2 の承認は記録していない。HTTP・application への配線は Step 6 のため行っていない。**
+
+**Red の確認（2.1）**: 先にテストと補助（`DomainFixtures.kt`、`SessionPauseProxySpec.kt`、`SessionEvolveSpec.kt`、`SessionTransitionPropertySpec.kt`、`ProjectionSpec.kt`）を書き、`:domain:test` を実行して、**テストのコンパイルが 61 件のエラー（`PauseSession`・`SessionPaused`・`Editor.ByFacilitator` などが未定義）で失敗する**ことを確認した（Kotlin では未定義の型の参照が Red になる）。そのあと最小の実装で Green にした。
+
+**実装（2.2・2.5）**:
+
+- `Session.kt`: `SessionState.Paused(data, version)`、コマンド 3 つ（`PauseSession`・`ResumeSession`・`SubmitProxyDecision`）、イベント 3 つ（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`）、`Editor.ByFacilitator(gameId)`、エラー 3 つ。`decideSession` は、保存・確定・停止は進行中だけ、再開は停止中だけ、代理入力は進行中と停止中で受け付ける。**停止中の代理入力は 1 件だけ返し、確定しない**。
+- `SessionEvolve.kt`（新規。`evolveSession` を `Session.kt` から移動し、状態ごとの遷移を小さな関数に分けた）。**理由は、detekt の `LongMethod`・`CyclomaticComplexMethod`・`TooManyFunctions` が、状態が 4 つになった `evolveSession` と 12 関数になった `Session.kt` で出たため**（設定の引き下げや `@Suppress` はしていない）。
+- **ゲート 1 の決定の反映**: 停止中の保存・確定・二重の停止は `session.paused`（409、`InvalidState`）、停止中でない再開は `session.not_paused`（409）、保存回数の上限は `session.save_limit_reached`（409）。代理入力は、イベントに値・役割・週・版・入力者（`Editor.ByFacilitator`。表示名を含まない）を残し、操作者と時刻は封筒が持つ。
+- **判定順**: 保存は 状態 → 権限 → 週 → 版（`DecisionConflict`）→ 上限、代理入力は 状態 → 権限 → 週 → 上限、停止・再開は 状態 → 権限。状態を先に判定するのは、既存の `SaveDecision`・`CommitWeek`（未開始・終了後を先に返す）と同じ。
+- **保存回数の上限の実装（2.5。計画からの差）**: 計画は「`SessionData` に役割ごとの当週の保存回数を持たせる」だったが、**意思決定の版が、保存のたびに 1 増え、確定で 0 に戻る、つまり当週の保存回数そのもの**であるため、項目を足さず `decisionVersions[role] < 9`（`SessionData.hasSaveCapacity`、定数 `SAVE_LIMIT_PER_ROLE_WEEK = 9`）で判定した（同じ事実を二重に持たない）。**共同入力（B6）が版の意味を変えるなら、そのとき回数を分ける**（設計書の差の表 34 に記録）。B6 の前提（`SaveDecision` の `DecisionConflict` の判定）は変えていない。
+
+**性質テスト（2.3）**: `SessionTransitionPropertySpec`（Kotest の `checkAll` 500 回。乱数の列は、有効な手・古い週や版の手・権限のない手・停止・再開・代理入力・確定を含む）。(1) 受け付けたコマンドの列の再生が `InvalidTransition` を 1 件も出さず、再生した状態が実行時の状態と一致する、(2) 受け付けるたびに版がイベントの数だけ進む（`evolve` が無視していない）、(3) 同じ列は同じ結果（純粋）、(4) 当週の保存回数が 9 を超えない。**性質テストが空振りでない確認**として、停止中の拒否・40 回保存の上限・停止 → 代理入力 → 再開の 3 つの具体例も置いた。定義は設計書のとおり（「許されない状態・コマンドの組がすべて拒否される」ではなく「有効なコマンド列で `InvalidTransition` が出ない」。B6 の修正済み）。
+
+**イベントの検査（2.4）**: 新しいイベントは 3 種類（`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`）で、ペイロードは週・役割・数量・版・入力者・入力済みの数だけ（表示名・資格を持つ項目の型が無い。ADR-002）。永続化の符号化の往復で、`displayName` を含まないことを確かめた。**N-1 互換の影響**: 旧版のアプリケーションは未知の `event_type` を「未知の event_type」の `Left` で拒否する。**停止・代理入力を使った後に旧版へ戻すと、そのゲームの `session` ストリームが読めなくなる**（配線 Step 6 より前は、コマンドが無いので起きない。ロールバック手順は B12 で扱う）。
+
+**ドメイン以外への追従（最小）**: `Editor`・`SessionEvent` の追加で、永続化の網羅した `when` がコンパイルできなくなったため、`adapter-persistence` に、3 つのイベントの DTO・符号化・復号と `ByFacilitator` の入力者を足した（Step 4.6 の一部の前倒し）。`EventCodecSpec` に往復・不正な入力者の種別の試験を 2 件足した。**4.6 の golden（全イベントの種類の JSON の固定）と、`DecisionSaved` の入力者の復号の拡張は、4.6 に残す**。`Projection.kt` は、`Editor.ByFacilitator` を `current_decisions` の `editor_kind`（`FACILITATOR`）に写す 1 行だけを足した（`ProjectionSpec` に 1 件）。**`ProxyDecisionSubmitted`・`SessionPaused`・`SessionResumed` の投影は、Step 4.7 に残す**。
+
+**実測**（`apps/beer-game-kotlin` で実行。静的解析は JDK 21）:
+
+| 検査 | 結果 |
+| :--- | :--- |
+| `:domain:test` | **300 件、失敗 0**（Step 2 で 45 件を追加。内訳: `SessionPauseProxySpec` 30、`SessionTransitionPropertySpec` 6、`SessionEvolveSpec` +8、`ProjectionSpec` +1） |
+| `:domain:koverVerify`（行 100%） | 合格。**行 879 / 879（未到達 0）**。除外・閾値の引き下げなし |
+| `:application:test`・`:adapter-http:test`・`:adapter-persistence:test` | 86 件・70 件・48 件、すべて失敗 0（永続化は +2 件） |
+| `:app:test`（`./gradlew test` の一部） | **71 件中 8 件 failed。Step 1 と同じ `ApiContractSpec` の 8 件で、想定どおり**（`recoveryCode` が無い 5 件、要求の表、ルートの網羅、エラー code の一致）。**エラー code の一致の食い違いは、4 件から 1 件（`game.credential_already_revoked`。Step 3）に減った**。ほかの失敗なし |
+| `:app:acceptanceTestH2` | 61 シナリオ中 **31 passed、30 failed**（Step 1 は 30 passed、31 failed）。**増えた 1 件は、「同じ週に同じ役割で 10 回目の保存をしようとすると、拒否し…」**（既存の HTTP の経路に `SaveLimitReached` が 409 で写るため。配線なしで通る）。Undefined・Pending は 0。既存の 27 シナリオは緑のまま。PostgreSQL 18（`:app:acceptanceTest`）は、この Step では実行していない（ドメインのみの変更で、Step 6 の配線のあとに実行する） |
+| `ktlintCheck`、`detekt`・`detektMain`・`detektTest`、`pmdMain`・`pmdTest`・`pmdAdapter`・`pmdDomainApplication` | **違反 0**（`@Suppress` なし、ベースラインなし）。途中で detekt が `evolveSession`（長さ 62、複雑度 17）と `Session.kt`（関数 12 個）を指摘し、上の `SessionEvolve.kt` への分割で解消した |
+
+**注意**: `app:test`・受け入れの Red の残りは、HTTP・application への配線（Step 6）と資格（Step 3 以降）で解消する。Step 3 以降には進んでいない。
+
+**ゲート 2 で人が確認すること**:
+
+1. 停止中の保存・確定の `session.paused`、停止中でない再開の `session.not_paused` の判定順（状態 → 権限）。**未開始・終了後を先に返す既存の順に合わせたが、権限のない人に状態（停止中か）を知らせる点は、確認してください**
+2. **保存回数を別の項目でなく意思決定の版で数える**（計画 2.5 からの差）こと
+3. 代理入力が 9 回の上限に数えられ、**上限に達した役割へは進行役も入力できない**こと
+4. `evolveSession` の `Paused` の扱い: `DecisionSaved`・`WeekCommitted` も、設計書どおり停止中のデータに適用する（`decide` は停止中に作らない）。**より厳しく、停止中の `DecisionSaved` を不正な遷移として検知する案もある**（再生で不具合を見つけやすい。設計書の状態遷移図は、停止中に `ProxyDecisionSubmitted` だけを許す）
+5. `Editor.ByFacilitator(gameId)` の形（進行役を `gameId` で表す。表示名なし）と、永続化の入力者の種別 `FACILITATOR`
+6. `SessionEvolve.kt` の新設（確認必須の新規ファイル）と、4.6 の前倒し部分（永続化の DTO）
 
 ### Step 3: ドメイン — Game の資格（失効・再発行・復帰）（🔴🟢🟡）
 
@@ -422,6 +466,7 @@ Active --> Ended : SessionEnded（最終週の確定）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-15 | **Step 2（Session の停止・再開・代理入力。2.1〜2.5）を実施**（ゲート 2 は人の確認待ち。承認は記録していない。Step 3 以降は未着手）。テストを先に書き、コンパイルエラー 61 件の Red を確認してから実装。`SessionState.Paused`、`PauseSession`・`ResumeSession`・`SubmitProxyDecision`、`SessionPaused`・`SessionResumed`・`ProxyDecisionSubmitted`、`Editor.ByFacilitator`、`session.paused`・`session.not_paused`・`session.save_limit_reached` を追加。保存回数は意思決定の版で数える（計画 2.5 からの差）。`evolveSession` を `SessionEvolve.kt` へ分割（detekt の指摘の解消）。`InvalidTransition` の性質テスト（500 回）。永続化の DTO を最小で前倒し。**実測**: domain 300 件・失敗 0・行 879/879（100%）、`:app:test` は想定どおりの 8 件 Red のみ、受け入れ（H2）は 31 passed・30 failed、ktlint・detekt・PMD は違反 0。設計書（domain-model.md）の `code` の表・不変条件・差の表を更新 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 1 をユーザーが承認し、「ゲート 1 で決めること」9 項目を提案どおりに決定**（選択: 「承認し、提案どおり決定」）。H2=案 A（失効と同じトランザクションで `browser_sessions` の行を削除。スキーマ変更なし）、H3=案 A（`bg_recovery` Cookie と一度だけ示す復帰コード。`Auth.RECOVERY` を冪等照合の前に検証。設計書の例外 2 つを許容）、保存上限の code=`session.save_limit_reached`（409）、`session.not_paused`=409 のまま、失効していない資格の再発行は拒否・進行役自身は対象外、H4=`assignRole` を開始後も受け付ける、原文の解釈の差と試験道具の方式は記載どおり、契約テストの Red は Step 6 で解消。ゲート 2〜8 は未承認 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **Step 1（仕様と受入シナリオ）を実施**（ゲート 1 は人の確認待ち。承認は記録していない）。ユーザーの決定（ゲート 0 の承認、H1・H4 を B5 に含める、H2・H3 はゲート 1 で決める）を受けて、**Step 3.5（H4。入れ替えでの自動失効）と Step 8.4（H1。用語集・イベント一覧の生成）を追加**し、旧 8.4 を 8.5 に繰り下げた。日本語 Gherkin 34 シナリオ（`features/continuation/`）、`contracts/openapi.yaml` に 6 経路・4 つの `code`、受け入れのステップ定義、型の再生成を追加。**Red を実測**: 受け入れは 61 シナリオ中 30 passed・31 failed（H2・PostgreSQL 18 とも。Undefined・Pending は 0）、契約テストは `:app:test` が 71 件中 8 件 failed、ほかは緑。**H2・H3 は提案**として [ADR-015](../../adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md)（提案中）に書き、ゲート 1 で人が決めることを「ゲート 1 で決めること」に整理 | claude-code/claude-sonnet-5-5 |
 | 2026-11-15 | **ゲート 0 と、追加ステップを含む計画の再承認（H6）をユーザーが承認**（選択: 「ゲート 0 と再承認の両方」）。**H1（Living Documentation の重点）と H4（役割の入れ替えでの自動失効）は B5 に含める**。**H2（資格失効とブラウザセッションの結び付け）と H3（進行役の復帰用の値・再発行の受け渡し）は、Step 1 のゲート 1 で決める**。**H5（B2 の申し送り）は B16（予備）へ送る**。ゲート 1〜8 は未承認 | claude-code/claude-sonnet-5-5 |

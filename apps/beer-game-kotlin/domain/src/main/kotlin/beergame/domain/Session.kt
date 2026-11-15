@@ -11,25 +11,34 @@ import arrow.core.right
 import java.time.Instant
 
 /*
- * Session 集約（進行。ストリーム `session`）。B1 の範囲: 入力の保存、手動の確定、最終週での終了。
- * 停止・再開・代理入力・確定方式の変更・自動確定は後続の Bolt（B5、B8）。
+ * Session 集約（進行。ストリーム `session`）。B1: 入力の保存、手動の確定、最終週での終了。
+ * B5: 停止・再開、進行役の代理入力、1 役割・1 週あたりの保存回数の上限。
+ * 確定方式の変更・自動確定は後続の Bolt（B8）、進行役による終了は範囲外。
  * 開始（SessionStarted）は startGame が作る。
  */
+
+/** 1 役割・1 週あたりの保存回数の上限（NF-C8。代理入力を含む）。 */
+const val SAVE_LIMIT_PER_ROLE_WEEK = 9
 
 /** 確定の方式（イベントに残す）。B1 は手動だけ。 */
 enum class CommitKind {
     MANUAL,
 }
 
-/** 終了の理由。B1 は最終週の確定だけ（進行役による終了は B5）。 */
+/** 終了の理由。B1 は最終週の確定だけ（進行役による終了は範囲外）。 */
 enum class EndReason {
     FINAL_WEEK,
 }
 
-/** 入力した人。B1 は参加者だけ（進行役の代理入力は B5）。 */
+/** 入力した人。参加者の保存と、進行役の代理入力（B5）。 */
 sealed interface Editor {
     data class ByParticipant(
         val id: ParticipantId,
+    ) : Editor
+
+    /** 進行役の代理入力。表示名を含まず、ゲームの識別子だけを持つ。 */
+    data class ByFacilitator(
+        val gameId: GameId,
     ) : Editor
 }
 
@@ -57,20 +66,20 @@ data class SessionData(
     fun completeDecisions(): RoleMap<Quantity>? =
         nullable { RoleMap.of { role -> ensureNotNull(decisions[role]?.quantity) } }
 
-    internal fun withDecision(event: SessionEvent.DecisionSaved): SessionData {
-        val saved = DecisionEntry(event.quantity, event.decisionVersion, event.editor)
-        val versions =
-            decisionVersions.map { role, version ->
-                if (role ==
-                    event.role
-                ) {
-                    event.decisionVersion
-                } else {
-                    version
-                }
-            }
-        return copy(decisions = decisions + (event.role to saved), decisionVersions = versions)
+    /**
+     * 保存の事実（参加者の保存も進行役の代理入力も同じ）を採用する。意思決定の版は、当週の保存回数と同じ
+     * （保存のたびに 1 増え、確定で 0 に戻る）なので、回数は別に持たない。
+     */
+    internal fun withDecision(
+        role: Role,
+        saved: DecisionEntry,
+    ): SessionData {
+        val versions = decisionVersions.map { r, version -> if (r == role) saved.version else version }
+        return copy(decisions = decisions + (role to saved), decisionVersions = versions)
     }
+
+    /** 当週に、この役割へ保存できる回数が残っているか。 */
+    fun hasSaveCapacity(role: Role): Boolean = decisionVersions[role].value < SAVE_LIMIT_PER_ROLE_WEEK
 
     /** 確定の事実（結果と次週の状態）を採用する。計算し直さない（D5）。最終週は週を進めない。 */
     internal fun afterCommit(event: SessionEvent.WeekCommitted): SessionData =
@@ -94,6 +103,12 @@ sealed interface SessionState {
         override val version: StreamVersion,
     ) : SessionState
 
+    /** 一時停止中。参加者の保存と週の確定を受け付けない。進行役の代理入力は受け付ける（確定はしない）。 */
+    data class Paused(
+        val data: SessionData,
+        override val version: StreamVersion,
+    ) : SessionState
+
     data class Ended(
         val data: SessionData,
         override val version: StreamVersion,
@@ -101,6 +116,27 @@ sealed interface SessionState {
 }
 
 sealed interface SessionCommand : Command {
+    /** 進行役が、進行中のセッションを一時停止する。 */
+    data class PauseSession(
+        override val actor: Actor,
+        override val at: Instant,
+    ) : SessionCommand
+
+    /** 進行役が、一時停止中のセッションを再開する。 */
+    data class ResumeSession(
+        override val actor: Actor,
+        override val at: Instant,
+    ) : SessionCommand
+
+    /** 進行役が、画面の週 [requestedWeek] で、[role] の数量を代わりに入力する。意思決定の版は要求しない（最終決定）。 */
+    data class SubmitProxyDecision(
+        override val actor: Actor,
+        override val at: Instant,
+        val role: Role,
+        val requestedWeek: Week,
+        val quantity: Quantity,
+    ) : SessionCommand
+
     /** 画面が表示している週 [requestedWeek] と、期待する意思決定の版を持つ。 */
     data class SaveDecision(
         override val actor: Actor,
@@ -139,6 +175,22 @@ sealed interface SessionEvent : DomainEvent {
         val submittedRoleCount: Int,
     ) : SessionEvent
 
+    /** 進行役が一時停止した。 */
+    data object SessionPaused : SessionEvent
+
+    /** 進行役が再開した。 */
+    data object SessionResumed : SessionEvent
+
+    /** 進行役の代理入力。値・入力者（進行役）を残す。操作者と時刻は封筒が持つ（FR-15）。 */
+    data class ProxyDecisionSubmitted(
+        val week: Week,
+        val role: Role,
+        val quantity: Quantity,
+        val decisionVersion: DecisionVersion,
+        val editor: Editor,
+        val submittedRoleCount: Int,
+    ) : SessionEvent
+
     /** 1 週の事実のすべて。結果と次週の状態を含み、evolve はそれを採用するだけ（D5）。 */
     data class WeekCommitted(
         val week: Week,
@@ -155,9 +207,27 @@ sealed interface SessionEvent : DomainEvent {
 }
 
 sealed interface SessionError : DomainError {
-    /** 進行中でない（未開始）。一時停止中も含む（停止は B5）。 */
+    /** セッションが始まっていない（未開始）。一時停止中は [Paused]。 */
     data object NotActive : SessionError {
         override val code: String = "session.not_active"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
+    }
+
+    /** 一時停止中で、保存・確定・二重の停止はできない。 */
+    data object Paused : SessionError {
+        override val code: String = "session.paused"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
+    }
+
+    /** 一時停止中でないセッションの再開。 */
+    data object NotPaused : SessionError {
+        override val code: String = "session.not_paused"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
+    }
+
+    /** 1 役割・1 週あたりの保存回数の上限（[SAVE_LIMIT_PER_ROLE_WEEK] 回。代理入力を含む）に達した。 */
+    data object SaveLimitReached : SessionError {
+        override val code: String = "session.save_limit_reached"
         override val category: ErrorCategory = ErrorCategory.InvalidState
     }
 
@@ -214,9 +284,29 @@ sealed interface SessionError : DomainError {
     }
 }
 
+/** 進行中のときだけデータを返す。一時停止中は [SessionError.Paused]。 */
 private fun SessionState.activeData(): Either<SessionError, SessionData> =
     when (this) {
         is SessionState.Active -> data.right()
+        is SessionState.Paused -> SessionError.Paused.left()
+        is SessionState.NotStarted -> SessionError.NotActive.left()
+        is SessionState.Ended -> SessionError.AlreadyEnded.left()
+    }
+
+/** 一時停止中のときだけデータを返す。進行中は [SessionError.NotPaused]。 */
+private fun SessionState.pausedData(): Either<SessionError, SessionData> =
+    when (this) {
+        is SessionState.Paused -> data.right()
+        is SessionState.Active -> SessionError.NotPaused.left()
+        is SessionState.NotStarted -> SessionError.NotActive.left()
+        is SessionState.Ended -> SessionError.AlreadyEnded.left()
+    }
+
+/** 進行中でも一時停止中でもデータを返す（進行役の代理入力が使う）。 */
+private fun SessionState.openData(): Either<SessionError, SessionData> =
+    when (this) {
+        is SessionState.Active -> data.right()
+        is SessionState.Paused -> data.right()
         is SessionState.NotStarted -> SessionError.NotActive.left()
         is SessionState.Ended -> SessionError.AlreadyEnded.left()
     }
@@ -251,10 +341,47 @@ private fun Raise<SessionError>.saveDecisionEvents(
     ensure(command.expectedDecisionVersion == current) {
         SessionError.DecisionConflict(command.role, data.decisions[command.role])
     }
+    ensure(data.hasSaveCapacity(command.role)) { SessionError.SaveLimitReached }
     val submitted = (data.decisions.keys + command.role).size
     return listOf(
         SessionEvent.DecisionSaved(data.week, command.role, command.quantity, current.next(), editor, submitted),
     )
+}
+
+private fun Raise<SessionError>.proxyDecisionEvents(
+    data: SessionData,
+    command: SessionCommand.SubmitProxyDecision,
+): List<SessionEvent> {
+    ensure(command.actor.isFacilitatorOf(data.gameId)) { SessionError.Forbidden("代理入力は進行役だけができる") }
+    ensure(command.requestedWeek == data.week) { SessionError.WeekAdvanced(command.requestedWeek, data.week) }
+    ensure(data.hasSaveCapacity(command.role)) { SessionError.SaveLimitReached }
+    val submitted = (data.decisions.keys + command.role).size
+    return listOf(
+        SessionEvent.ProxyDecisionSubmitted(
+            data.week,
+            command.role,
+            command.quantity,
+            data.decisionVersions[command.role].next(),
+            Editor.ByFacilitator(data.gameId),
+            submitted,
+        ),
+    )
+}
+
+private fun Raise<SessionError>.pauseEvents(
+    data: SessionData,
+    command: SessionCommand.PauseSession,
+): List<SessionEvent> {
+    ensure(command.actor.isFacilitatorOf(data.gameId)) { SessionError.Forbidden("一時停止は進行役だけができる") }
+    return listOf(SessionEvent.SessionPaused)
+}
+
+private fun Raise<SessionError>.resumeEvents(
+    data: SessionData,
+    command: SessionCommand.ResumeSession,
+): List<SessionEvent> {
+    ensure(command.actor.isFacilitatorOf(data.gameId)) { SessionError.Forbidden("再開は進行役だけができる") }
+    return listOf(SessionEvent.SessionResumed)
 }
 
 private fun Raise<SessionError>.commitWeekEvents(
@@ -285,74 +412,20 @@ private fun Raise<SessionError>.commitWeekEvents(
 }
 
 /**
- * 入力の保存と手動の確定の規則は、すべてここに集まる。`simulateWeek`（純粋）は確定のときだけ呼び、
+ * 入力の保存、代理入力、停止・再開、手動の確定の規則は、すべてここに集まる。`simulateWeek`（純粋）は確定のときだけ呼び、
  * 結果と次週の状態を `WeekCommitted` に事実として固定する。最終週の確定は `SessionEnded` も返す。
+ * 保存・確定は進行中だけ、代理入力は進行中と一時停止中、停止は進行中だけ、再開は一時停止中だけ。
  */
 fun decideSession(
     state: SessionState,
     command: SessionCommand,
 ): Either<SessionError, List<SessionEvent>> =
     either {
-        val data = state.activeData().bind()
         when (command) {
-            is SessionCommand.SaveDecision -> saveDecisionEvents(data, command)
-            is SessionCommand.CommitWeek -> commitWeekEvents(data, command)
-        }
-    }
-
-/** 進行中のときだけデータを更新して版を進める。decide が作らない列は、状態を変えずに返す。 */
-private fun SessionState.updateActive(update: (SessionData) -> SessionData): SessionState =
-    when (this) {
-        is SessionState.Active -> SessionState.Active(update(data), version.next())
-        is SessionState.NotStarted, is SessionState.Ended -> this
-    }
-
-/**
- * イベントを状態へ畳み込む。全域（例外を投げない。強制キャストを使わない）。
- * `WeekCommitted` の `nextStates` はそのまま採用し、`simulateWeek` を呼ばない（D5）。
- * decide が作らない列は、状態を変えずに返す（版も増えない。検知は [replaySession]）。
- */
-fun evolveSession(
-    state: SessionState,
-    event: SessionEvent,
-): SessionState =
-    when (event) {
-        is SessionEvent.SessionStarted -> {
-            when (state) {
-                is SessionState.NotStarted -> {
-                    SessionState.Active(
-                        SessionData(
-                            gameId = event.gameId,
-                            settings = event.settings,
-                            assignments = event.assignments,
-                            week = Week.FIRST,
-                            roleStates = event.initialStates,
-                            decisions = emptyMap(),
-                            decisionVersions = RoleMap.all(DecisionVersion.ZERO),
-                            commitMode = event.commitMode,
-                        ),
-                        state.version.next(),
-                    )
-                }
-
-                is SessionState.Active, is SessionState.Ended -> {
-                    state
-                }
-            }
-        }
-
-        is SessionEvent.DecisionSaved -> {
-            state.updateActive { it.withDecision(event) }
-        }
-
-        is SessionEvent.WeekCommitted -> {
-            state.updateActive { it.afterCommit(event) }
-        }
-
-        is SessionEvent.SessionEnded -> {
-            when (state) {
-                is SessionState.Active -> SessionState.Ended(state.data, state.version.next())
-                is SessionState.NotStarted, is SessionState.Ended -> state
-            }
+            is SessionCommand.SaveDecision -> saveDecisionEvents(state.activeData().bind(), command)
+            is SessionCommand.CommitWeek -> commitWeekEvents(state.activeData().bind(), command)
+            is SessionCommand.PauseSession -> pauseEvents(state.activeData().bind(), command)
+            is SessionCommand.ResumeSession -> resumeEvents(state.pausedData().bind(), command)
+            is SessionCommand.SubmitProxyDecision -> proxyDecisionEvents(state.openData().bind(), command)
         }
     }

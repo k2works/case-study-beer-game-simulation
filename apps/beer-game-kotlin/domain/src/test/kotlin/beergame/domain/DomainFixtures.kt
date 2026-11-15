@@ -110,7 +110,38 @@ fun commitWeek(
     actor: Actor = facilitatorActor,
 ): SessionCommand.CommitWeek = SessionCommand.CommitWeek(actor, t0, w(week), basis)
 
+fun pauseSession(actor: Actor = facilitatorActor): SessionCommand.PauseSession = SessionCommand.PauseSession(actor, t0)
+
+fun resumeSession(actor: Actor = facilitatorActor): SessionCommand.ResumeSession =
+    SessionCommand.ResumeSession(actor, t0)
+
+fun submitProxy(
+    role: Role,
+    quantity: Int,
+    week: Int = 1,
+    actor: Actor = facilitatorActor,
+): SessionCommand.SubmitProxyDecision = SessionCommand.SubmitProxyDecision(actor, t0, role, w(week), q(quantity))
+
 // ---- Session: イベントと状態 ----
+
+/** 進行役の代理入力（入力者は、そのゲームの進行役）。 */
+val facilitatorEditor: Editor = Editor.ByFacilitator(gid)
+
+fun proxyDecisionSubmitted(
+    role: Role,
+    quantity: Int,
+    version: Long = 1,
+    submittedRoleCount: Int = 1,
+    week: Int = 1,
+): SessionEvent.ProxyDecisionSubmitted =
+    SessionEvent.ProxyDecisionSubmitted(w(week), role, q(quantity), dv(version), facilitatorEditor, submittedRoleCount)
+
+/** 同じ役割が、同じ週に [times] 回保存した事実（版は 1 から [times] まで。入力済みの数は 1）。 */
+fun savedTimes(
+    role: Role,
+    times: Int,
+    week: Int = 1,
+): List<SessionEvent> = (1..times).map { decisionSaved(role, it, version = it.toLong(), week = week) }
 
 /** 役割ごとの参加者（工場 = 参加者 1 … 小売店 = 参加者 4）。 */
 val assignedParticipants: RoleMap<Set<ParticipantId>> = RoleMap.of { setOf(pid(it.ordinal + 1)) }
@@ -146,6 +177,7 @@ fun sessionOf(vararg events: SessionEvent): SessionState =
 fun sessionDataOf(state: SessionState): SessionData =
     when (state) {
         is SessionState.Active -> state.data
+        is SessionState.Paused -> state.data
         is SessionState.Ended -> state.data
         is SessionState.NotStarted -> fail("セッションが開始されていない")
     }
