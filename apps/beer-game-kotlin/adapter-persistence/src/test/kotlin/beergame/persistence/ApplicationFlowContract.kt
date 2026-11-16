@@ -20,6 +20,7 @@ import beergame.application.Generators
 import beergame.application.JoinGameInput
 import beergame.application.PeripheralWrite
 import beergame.application.Ports
+import beergame.application.ProjectionLock
 import beergame.application.ProxyDecisionInput
 import beergame.application.RequestMeta
 import beergame.application.RoleStatus
@@ -86,6 +87,7 @@ internal fun appSettings(maxAttempts: Int = 5): AppSettings =
 internal fun Fixture.ports(
     events: EventStore = persistence.events,
     maxAttempts: Int = 5,
+    lock: ProjectionLock = persistence.lock,
 ): Ports =
     Ports(
         generators =
@@ -104,7 +106,7 @@ internal fun Fixture.ports(
                 attempts = persistence.attempts,
                 reader = persistence.reader,
             ),
-        lock = persistence.lock,
+        lock = lock,
         notifier = persistence.notifier,
         settings = appSettings(maxAttempts),
     )
@@ -115,14 +117,14 @@ internal fun meta(
     source: AttemptSource? = null,
 ) = RequestMeta(key, credential, CORRELATION, source)
 
-private data class Seat(
+internal data class Seat(
     val participantId: ParticipantId,
     val credential: String,
     val recovery: String,
     val name: String,
 )
 
-private data class Started(
+internal data class Started(
     val gameId: GameId,
     val facilitator: String,
     val facilitatorRecovery: String,
@@ -130,18 +132,38 @@ private data class Started(
     val seats: RoleMap<Seat>,
     /** 小売店の共同担当（[start] の `coHolderName` を渡したときだけ）。 */
     val coHolder: Seat? = null,
+    /** 小売店の、さらに追加の共同担当（[start] の `extraCoHolders`。計測の道具だけが使う）。 */
+    val extraHolders: List<Seat> = emptyList(),
 )
 
 private val NAMES = RoleMap("工場の花子", "一次卸の次郎", "二次卸の三郎", "小売の四郎")
+
+/** 参加して、小売店に割り当てられた（共同担当になる）参加者。 */
+private fun Ports.joinRetailerHolder(
+    gameId: GameId,
+    joinCode: String,
+    facilitator: String,
+    tag: String,
+    name: String,
+): Seat =
+    runBlocking {
+        val outcome = joinGame(JoinGameInput(joinCode, name), meta("join-$tag")).orFail()
+        val issued = checkNotNull(outcome.issued)
+        val seat =
+            Seat(ParticipantId(checkNotNull(issued.actor.id)), issued.raw, checkNotNull(outcome.recovery).raw, name)
+        assignRole(gameId, seat.participantId, Role.RETAILER, meta("assign-$tag", facilitator)).orFail()
+        seat
+    }
 
 /**
  * 作成 → 4 人が参加 → 割り当て → 開始。需要は第 2 週が 999、第 3 週が 998（将来の需要の目印）。
  * 実 DB の待ちは IO のディスパッチャーの中にあるので、場面づくりは runBlocking で同期的に書く
  * （detekt 1.23.8 は、別のモジュールの suspend 関数の呼び出しを検出できず、suspend の修飾を冗長と誤判定するため）。
  */
-private fun Fixture.start(
+internal fun Fixture.start(
     tag: String,
     coHolderName: String? = null,
+    extraCoHolders: Int = 0,
 ): Started =
     runBlocking {
         val ports = ports()
@@ -174,27 +196,21 @@ private fun Fixture.start(
                 ).orFail()
         }
         val coHolder =
-            coHolderName?.let { name ->
-                val outcome = ports.joinGame(JoinGameInput(joinCode, name), meta("join-$tag-co")).orFail()
-                val issued = checkNotNull(outcome.issued)
-                val seat =
-                    Seat(
-                        ParticipantId(checkNotNull(issued.actor.id)),
-                        issued.raw,
-                        checkNotNull(outcome.recovery).raw,
-                        name,
-                    )
-                ports
-                    .assignRole(
-                        created.gameId,
-                        seat.participantId,
-                        Role.RETAILER,
-                        meta("assign-$tag-co", facilitator),
-                    ).orFail()
-                seat
+            coHolderName?.let { ports.joinRetailerHolder(created.gameId, joinCode, facilitator, "$tag-co", it) }
+        val extraHolders =
+            (1..extraCoHolders).map {
+                ports.joinRetailerHolder(created.gameId, joinCode, facilitator, "$tag-x$it", "追加の共同担当$it")
             }
         ports.startGame(created.gameId, meta("start-$tag", facilitator)).orFail()
-        Started(created.gameId, facilitator, facilitatorRecovery, joinCode, RoleMap.of { seats.getValue(it) }, coHolder)
+        Started(
+            created.gameId,
+            facilitator,
+            facilitatorRecovery,
+            joinCode,
+            RoleMap.of { seats.getValue(it) },
+            coHolder,
+            extraHolders,
+        )
     }
 
 private fun Fixture.playWeekOne(game: Started): CommandOutcome =

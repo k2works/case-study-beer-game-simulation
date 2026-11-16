@@ -227,6 +227,8 @@ class PostgresPersistenceSpec :
         applicationFlowContract { fx }
         credentialConcurrencyContract { fx }
         coInputConcurrencyContract { fx }
+        // 計測は、環境変数 BEERGAME_MEASURE=1 のときだけ（既定では実行しない。B6 Step 5）
+        if (System.getenv("BEERGAME_MEASURE") == "1") retryMeasurementContract { fx }
         attemptStoreContract { fx }
         attemptFlowContract { fx }
 
