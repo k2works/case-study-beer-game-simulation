@@ -1,0 +1,49 @@
+# beer-game-kotlin の開発環境タスク。`just` で一覧を表示する。
+# 実行は apps/beer-game-kotlin で行う（リポジトリのルートからは `just -f apps/beer-game-kotlin/justfile <タスク>`）。
+
+# 開発用のポート。vite.config.ts の既定（UI 5173、API 3000）と合わせる。
+# 専用のポートで動かすときは環境変数で上書きする（例: API_PORT=3100 UI_PORT=5273 just dev）。
+api_port := env("API_PORT", "3000")
+ui_port := env("UI_PORT", "5173")
+
+default:
+    @just --list
+
+# ---- バックエンド（Kotlin / Ktor）----
+
+# バックエンドを起動する（APP_ENV=local・H2。DB 不要）
+backend:
+    APP_ENV=local DB_KIND=h2 PORT={{ api_port }} ./gradlew :app:run
+
+# バックエンドの単体テスト
+backend-test:
+    ./gradlew test
+
+# バックエンドの検査（ktlint・detekt・PMD・テスト）
+backend-check:
+    ./gradlew check
+
+# ---- フロントエンド（React + Vite）----
+
+# フロントエンドの依存を入れる
+web-install:
+    cd web && npm ci
+
+# フロントエンドの開発サーバーを起動する（/api は API_PORT へ中継）
+web:
+    cd web && UI_PORT={{ ui_port }} API_PORT={{ api_port }} npm run dev
+
+# フロントエンドの検証（format・lint・typecheck・test・build）
+web-verify:
+    cd web && npm run verify
+
+# ---- 両方 ----
+
+# バックエンドとフロントエンドを同時に起動する（Ctrl-C で両方止まる）
+dev:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill 0' EXIT
+    just backend &
+    just web &
+    wait
