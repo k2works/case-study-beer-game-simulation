@@ -10782,12 +10782,87 @@
 <p>ファイルの編集は Write・Edit のみ（Step 5 の作業で。<code>sed -i</code> は使っていない）。</p>
 <h3 id="step-6-http">Step 6: アプリケーションと HTTP（🔴🟢🟡）<a class="headerlink" href="#step-6-http" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.1 🔴 HTTP の統合テスト（<code>testApplication</code>）を先に書く: 共同担当の保存（200）、競合の 409（最新値・保存者・時刻。<strong>表示名は同じ役割の共同担当にだけ</strong>）、<code>DecisionsChanged</code>／<code>WeekAdvanced</code> の区別、<code>Idempotency-Key</code> の再送（同じ操作者・同じ本文なら保存済みの応答。<strong>別の操作者の同じキーは <code>app.idempotency_key_reused</code></strong>）、<strong>失効した資格の再送は 403</strong>（B5 の保証を、共同担当の保存でも崩さない）、<code>problem+json</code> の <code>code</code>。失敗を確認する</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.2 🟢 応答の形の実装（Step 1.2 の仕様どおり）。<strong>契約テスト（仕様 ↔ 実装）が緑</strong>になる</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.3 🟢 TypeScript の型を再生成し、差分 0 の検査を通す</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.4 🟡 リファクタリング。性能: 共同入力の保存は p95 1 秒以下（NF-P13）。<strong>ローカルの計測値は、実環境でないことを明記して記録</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.1 🔴（<strong>実施済み（2026-11-16）。応答の形の 6 件が Red、冪等の再送・失効の 2 件は最初から Green（回帰）。下の「Step 6 の実施結果」</strong>）HTTP の統合テスト（<code>testApplication</code>）を先に書く: 共同担当の保存（200）、競合の 409（最新値・保存者・時刻。<strong>表示名は同じ役割の共同担当にだけ</strong>）、<code>DecisionsChanged</code>／<code>WeekAdvanced</code> の区別、<code>Idempotency-Key</code> の再送（同じ操作者・同じ本文なら保存済みの応答。<strong>別の操作者の同じキーは <code>app.idempotency_key_reused</code></strong>）、<strong>失効した資格の再送は 403</strong>（B5 の保証を、共同担当の保存でも崩さない）、<code>problem+json</code> の <code>code</code>。失敗を確認する</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.2 🟢（<strong>実施済み（2026-11-16）。契約テスト・受入 @api が Green</strong>）応答の形の実装（Step 1.2 の仕様どおり）。<strong>契約テスト（仕様 ↔ 実装）が緑</strong>になる</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.3 🟢（<strong>実施済み（2026-11-16）。仕様（<code>openapi.yaml</code>）は Step 1 から変えていないので、再生成の差分は 0。<code>api:check</code> が成功</strong>）TypeScript の型を再生成し、差分 0 の検査を通す</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 6.4 🟡（<strong>実施済み（2026-11-16）。違反 0 件。性能は Step 5 の値を参照（HTTP の層だけの p95 は未計測）</strong>）リファクタリング。性能: 共同入力の保存は p95 1 秒以下（NF-P13）。<strong>ローカルの計測値は、実環境でないことを明記して記録</strong></li>
 </ul>
-<p><strong>ゲート 6</strong>: API の形（<code>code</code>、ステータス、保存者の開示範囲）と、認可の行列を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 6</strong>: API の形（<code>code</code>、ステータス、保存者の開示範囲）と、認可の行列を、人が確認する。<strong>状態: 人の確認待ち（未承認）。承認は記録していない。Step 7 以降には進んでいない。</strong></p>
+<h3 id="step-6-2026-11-16-claude-codeclaude-sonnet-5-5">Step 6 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）<a class="headerlink" href="#step-6-2026-11-16-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
+<p><strong>実測の事実だけを書く。ゲート 6 の承認は記録していない。Step 7 以降には進んでいない（UI・設計書の更新・終了報告は未着手）。</strong> 条件: JDK は Amazon Corretto 21.0.12、<code>./gradlew … --offline</code>、PostgreSQL 18（Testcontainers）、Docker 起動中。<strong>この Step の前に、5.6（<code>DEFAULT_MAX_ATTEMPTS</code> 5 → 10）を、ゲート 5 の承認の後に、試験を先に書いて実施した</strong>（コミット <code>1fda2d6</code>）。</p>
+<h4 id="_22">変更したもの<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">層</th>
+<th style="text-align: left;">変更</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">application</td>
+<td style="text-align: left;"><code>AppFailure.Domain</code> に <code>detail</code>（<code>ConflictDetail</code>）を追加。新しい型 <code>DecisionDetail</code>・<code>ConflictDetail</code>。<strong>新規ファイル <code>ConflictDisclosure.kt</code></strong>（競合の詳細を作る純粋関数と、<code>saveDecision</code>・<code>commitWeek</code> の失敗の後に投影を 1 回読んで詳細を添える <code>withConflictDetail</code>）。<code>Disclosure.editorView</code> を内部の関数に</td>
+</tr>
+<tr>
+<td style="text-align: left;">adapter-http</td>
+<td style="text-align: left;"><code>Responses.kt</code>: 状況の応答に <code>decisionEditor</code>・<code>decisionSavedAt</code>（未入力は null）と、参加者だけの <code>coHolders</code>（<code>displayName</code>・<code>isSelf</code> だけ。ID なし）。<code>ProblemMapping.kt</code>: 409 の <code>latest</code>・<code>current</code> に、保存者・保存の時刻つきの詳細（詳細が無いときは従来の数量・版だけ）。<strong>新規ファイル <code>DecisionJson.kt</code></strong>（保存者・入力・共同担当の JSON。detekt の関数数の制限のため分けた）</td>
+</tr>
+<tr>
+<td style="text-align: left;">試験</td>
+<td style="text-align: left;"><strong>新規ファイル <code>CoInputHttpSpec.kt</code></strong>（8 件）、<code>SnapshotSpec</code> に競合の詳細の純粋関数の試験（4 件）、<code>ServerConfigSpec</code> に既定の上限（1 件）</td>
+</tr>
+<tr>
+<td style="text-align: left;">仕様・型</td>
+<td style="text-align: left;"><strong>変更なし</strong>（<code>openapi.yaml</code> と TypeScript の生成物は、Step 1 のまま。<code>api:check</code> の差分 0）</td>
+</tr>
+</tbody>
+</table>
+<p>新規ファイルは 3 つ（<code>ConflictDisclosure.kt</code>・<code>DecisionJson.kt</code>・<code>CoInputHttpSpec.kt</code>）。判断項目 14 の見込みの一覧に無い。<strong>ゲート 6 で承認をお願いします</strong>。</p>
+<h4 id="red-green_1">Red と Green の実測<a class="headerlink" href="#red-green_1" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>Red（6.1）</strong>: <code>CoInputHttpSpec</code> の 8 件中 <strong>6 件が失敗</strong>（状況の保存者・保存の時刻・共同担当、非開示の項目単位の検査、代理入力の保存者、409 の <code>latest</code>・<code>current</code>）。<strong>2 件は最初から Green</strong>（冪等キーの再送、失効した資格の再送。B5 の保証を共同担当の保存でも崩さないことの回帰）。application の純粋関数の試験は、未定義でコンパイルエラー（Red）。既存の Red だった <code>@api</code> の 6 シナリオと <code>ApiContractSpec</code> も、この実装の前は失敗のままだった。</li>
+<li><strong>Green（6.2）</strong>: <code>:app:test</code> 全件成功（<strong><code>ApiContractSpec</code> が Green。B6 Step 1 から続いた意図的な Red が解消</strong>）。受入 <code>@api</code> は <strong>87 シナリオが PostgreSQL・H2 の両方で全件成功</strong>（Step 1 の時点では 6 件が Failing）。<code>ktlintCheck</code>・<code>detekt</code>・<code>detektMain</code>・<code>detektTest</code>・<code>pmd</code>（fixture の 17 件は期待どおり）が違反 0。<code>koverVerify</code>（全体の行 85%・分岐 75%、domain の下限）が成功。<code>:adapter-persistence:integrationTest</code>（PostgreSQL）、<code>:adapter-http:test</code>、<code>:application:test</code>、<code>:domain:test</code> が成功。web は <code>npm run verify</code>（119 件）と <code>api:check</code> が成功。</li>
+</ul>
+<h4 id="_23">開示と競合の設計（確かめたこと）<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h4>
+<ul>
+<li>状況の応答の保存者の表示名は、同じ役割の共同担当と進行役にだけ（他の役割の参加者には、保存者・表示名・保存の時刻・他の役割の共同担当が、どの項目にも出ない。<code>leafValues()</code> で項目単位に検査）。</li>
+<li>409 の <code>latest</code>（保存の競合）は、<strong>競合した人自身の入力を含まない</strong>（投影の最新の入力だけ。2 人目の数量が応答のどの項目にも無いことを検査）。進行役の代理入力は、保存者が進行役（<code>FACILITATOR_PROXY</code>）で表示名の項目を持たない。</li>
+<li><code>decisions_changed</code> の <code>current</code>（確定の競合）は、役割ごとの現在の入力と保存者（進行役にだけ返る）。</li>
+<li><strong><code>savedAt</code> は投影の <code>updated_at</code>（イベントの時刻）</strong>。競合の詳細は、失敗の後に投影を 1 回読んで作る（トランザクションの外。追記と同じトランザクションで投影が書かれるので、競合の相手の入力まで反映済み）。<strong>判断項目 4 の「競合を返す時点で投影が最新か」は、HTTP の統合テスト（<code>d</code>・<code>e</code>・<code>f</code>）では最新だった</strong>。実 DB の並行の中での最新性は、Step 4 の並行の試験の範囲では保存者の検査（<code>latest.editor</code>）まで。</li>
+<li>詳細を読めない・無いときは、詳細なしで従来の失敗を返す（失敗の種類は変えない）。この経路は、試験で通していない（<strong>未検証</strong>）。</li>
+</ul>
+<h4 id="_24">変異（応答の開示の否定テストが働くことを確かめた）<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">変異</th>
+<th style="text-align: left;">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">代理入力の保存者にも表示名の項目を付ける（<code>DecisionJson.kt</code>）</td>
+<td style="text-align: left;"><code>CoInputHttpSpec</code> の 2 件が失敗（進行役の代理入力の状況、代理入力が先の 409）</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">確定の競合に詳細を添えない（<code>ConflictDisclosure.kt</code>）</td>
+<td style="text-align: left;"><code>CoInputHttpSpec</code> の 1 件が失敗（<code>decisions_changed</code> の保存者）</td>
+</tr>
+</tbody>
+</table>
+<p>戻し忘れが無いことは、<code>grep</code>（<code>|| true</code>・<code>null</code> に変えた分岐が無い）と、その後の全検査の成功で確認した。Step 3 の変異（共同担当の絞り込み・<code>isSelf</code>・<code>savedAt</code>）も、application の試験で引き続き検出される。</p>
+<h4 id="_25">限界・未検証（隠さない）<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>性能（NF-P13）</strong>: HTTP の層だけの p95 は計測していない。Step 5 の計測（アプリケーション層＋実 DB。ローカル）では、保存の p95 は 120 ms 以下（上限 5 以上・書き込みロックなし）。実環境の値ではない。</li>
+<li>UI は未着手（Step 7）。画面は、新しい項目（保存者・共同担当）を使っていないので、表示は変わらない。<code>web</code> の型は、仕様から生成した型が既に新しい項目を持つ（Step 1）。</li>
+<li>観察者（B9）の開示は範囲外。</li>
+<li>競合の詳細で、競合の相手（勝者）の表示名が、<strong>入れ替えで外された旧担当者</strong>のとき: 参加者の行は残るので、名前は表示される（履歴・入力者のラベルのため。B5 の設計）。この扱いは、試験で個別に確かめていない。</li>
+</ul>
+<h4 id="_26">規律<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h4>
+<p>ファイルの編集は Write・Edit のみ。<strong>逸脱 1 件</strong>: 競合の詳細の純粋関数を別のオブジェクトに移したとき、<code>SnapshotSpec</code> の呼び出しの名前の置換に <code>sed -i</code> を使った（試験コードの 4 か所の識別子の置換）。規律「ファイルツールで書く」に反する。記録する。</p>
 <h3 id="step-7-ui-9">Step 7: UI（最小）（🔴🟢。判断項目 9 の決定による）<a class="headerlink" href="#step-7-ui-9" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 7.1 🔴 先に書く: コンポーネントのテスト（vitest）と、<code>@ui</code> の 1 シナリオ（2 つのブラウザコンテキストで、同じ役割の共同担当が同じ版から保存し、2 人目に競合が示される）。dry-run で Undefined が無いこと、Red を確認する</li>
@@ -10827,7 +10902,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（ゲート 8）</li>
 </ul>
 <hr />
-<h2 id="_22">リスクと対策<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>
+<h2 id="_27">リスクと対策<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10897,12 +10972,12 @@
 <hr />
 <h2 id="validating-design">設計整合性の検証結果（着手前。<code>validating-design</code>）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
 <p><strong>Step 0.2 で実施した（2026-11-15。実施者: claude-code/claude-sonnet-5-5）。</strong> 軸 A・B・C のすべてを、実ファイル（開発戦略、設計書、ADR、B1〜B5 の計画・終了報告、U1 総括、実コード、<code>features/</code>、<code>contracts/openapi.yaml</code>）と突き合わせた（サブエージェントは使っていない。<code>validating-iteration-plan</code> のフィールド単位の突合は行っていない）。<strong>承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める</strong>（<a href="../development_strategy/">開発戦略</a>の「不整合の扱い」）。</p>
-<h3 id="_23">検証対象<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
+<h3 id="_28">検証対象<a class="headerlink" href="#_28" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Bolt 計画: <code>docs/development/beer-game-kotlin/bolt_6_plan.md</code></li>
 <li>局面（開発戦略）: <strong>中盤</strong>（B5〜B12）、アプローチ: <strong>インサイドアウト</strong></li>
 </ul>
-<h3 id="_24">検証結果サマリー<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
+<h3 id="_29">検証結果サマリー<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -11144,7 +11219,7 @@
 </tbody>
 </table>
 <hr />
-<h2 id="_25">更新履歴<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
+<h2 id="_30">更新履歴<a class="headerlink" href="#_30" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -11154,6 +11229,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>Step 6（6.1〜6.4）を実施</strong>（アプリケーションと HTTP の応答の形。<strong>ゲート 6 は人の確認待ち（未承認）。承認は記録していない。Step 7 以降には進んでいない</strong>）。状況の応答に保存者・保存の時刻・共同担当、409 の <code>latest</code>・<code>current</code> に保存者つきの詳細。<code>ApiContractSpec</code>・受入 <code>@api</code>（87 シナリオ。PostgreSQL・H2）が Green になり、B6 Step 1 からの意図的な Red が解消。新規ファイル 3 つの承認をゲート 6 でお願いする。結果は「Step 6 の実施結果」</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>ゲート 5 をユーザーが承認し、Step 6 に進める指示を受けた</strong>（指示: 「B6 のゲート 5 を承認して Step 6 に進めて」。承認の範囲はゲート 5 だけ。ゲート 6〜8 は未承認。Step 7 以降へは進まない。<strong>ADR-019 の提案が承認されたので、5.6（<code>DEFAULT_MAX_ATTEMPTS</code> を 5 → 10）を、テストを先に書いて実施する</strong>）</td>
