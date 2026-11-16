@@ -10920,13 +10920,13 @@
 </ul>
 <h4 id="_29">規律<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h4>
 <p>ファイルの編集は Write・Edit のみ（Step 7 の作業で。<code>sed -i</code>・heredoc は使っていない。<strong>ただし、作業の途中に、何も書かない空の heredoc を 1 回起動した</strong>（ファイルは変えていない）。規律「heredoc を使わない」に反するので記録する）。<code>prettier --write</code> は、整形のツールとして使った。</p>
-<h3 id="step-8-green">Step 8: 受け入れの green と検証・終了（未実施）<a class="headerlink" href="#step-8-green" title="Permanent link">&para;</a></h3>
+<h3 id="step-8-green-2026-11-16-8">Step 8: 受け入れの green と検証・終了（実施済み・2026-11-16。ゲート 8 は人の確認待ち）<a class="headerlink" href="#step-8-green-2026-11-16-8" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.1 <code>@api</code> の AC1.2.4・AC2.1.4・AC2.2.3・AC2.2.4（と <code>@AC2.3.1</code> の区別のシナリオ）が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。<code>@ui</code> を H2 で実行し、<strong>PostgreSQL のバックエンドでも 1 回実行する</strong>（B5 の未実施項目。判断項目 9・16）。デモ項目: 2 人の共同担当が同じ役割に入り、片方が先に保存し、もう片方に競合が示され、最新の値を確認して保存し直す</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.2 全テスト・静的解析（ktlint、detekt（JDK 21）、PMD、fixture）・Kover（domain 100%、全体 85%・75%）・契約テスト・<code>web</code> の検証が緑。<strong>GitHub Actions 上の実行は、push が人の判断なので、確認できなければ「未確認」と書く</strong>（ローカルだけの結果を「CI で動く」と書かない）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.3 設計書・ADR の更新（変更表）と、<code>validating-design</code>（完了時。<strong>スキルの全手順を実施したか、機械で確認できる項目に絞ったかを、正直に書く</strong>）。ADR-019・ADR-005 の更新は<strong>提案として記録し、承認は人</strong>。設計書への反映: ドメインモデル（版の意味、<code>DecisionConflict</code> の応答）、データモデル・バックエンド（再試行の上限・間隔の値）、テスト戦略（並行の試験と計測の結果、変更の表）、UI 設計（競合の文言の確定）、非機能要件（NF-P13・NF-C8 の結果と未決）。生成物（用語集・イベント一覧）: 足したイベント・用語に <code>@EventSpec</code>・<code>@Term</code> を付け、<code>./gradlew :domain:generateLivingDocs</code> で再生成（足さない場合は変更なしと記録）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.4 <strong>規律の機械確認</strong>: <code>@Suppress</code>・ベースラインの有無、成果物の存在、heredoc・python・sed・perl・awk を使っていないこと（使った場合は正直に記録）、変異で確かめた試験の一覧、Red を観察できなかった試験の一覧</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 8.5 Bolt 終了報告（<code>bolt_6_report.md</code>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う。<strong>空のまま</strong>）、未達・未実施、人の判断項目、B7 への申し送り、計測の結果と限界、仮説の検証結果、Release 0.2 への影響。<strong>承認を捏造しない</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.1（<strong>実施済み（2026-11-16）。<code>@api</code> 87 シナリオが PostgreSQL・H2 で成功。<code>@ui</code> 8 シナリオが H2 と PostgreSQL 18.7 のバックエンドで成功。AC2.2.4 の自動反映は未達（案 C）。デモ項目の人の実操作は未実施</strong>）<code>@api</code> の AC1.2.4・AC2.1.4・AC2.2.3・AC2.2.4（と <code>@AC2.3.1</code> の区別のシナリオ）が、PostgreSQL 18 と H2 の両方で green（Undefined・Pending なし）。<code>@ui</code> を H2 で実行し、<strong>PostgreSQL のバックエンドでも 1 回実行する</strong>（B5 の未実施項目。判断項目 9・16）。デモ項目: 2 人の共同担当が同じ役割に入り、片方が先に保存し、もう片方に競合が示され、最新の値を確認して保存し直す</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.2（<strong>実施済み（2026-11-16）。ローカルで全緑。コードの最新のコミット <code>c0d372f</code> の GitHub Actions は全 8 ジョブ成功（確認済み）</strong>）全テスト・静的解析（ktlint、detekt（JDK 21）、PMD、fixture）・Kover（domain 100%、全体 85%・75%）・契約テスト・<code>web</code> の検証が緑。<strong>GitHub Actions 上の実行は、push が人の判断なので、確認できなければ「未確認」と書く</strong>（ローカルだけの結果を「CI で動く」と書かない）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.3（<strong>実施済み（2026-11-16）。変更表を更新。<code>validating-design</code> は機械で確認できる項目に絞った（スキルの全手順の再実行ではない）。生成物は変更なし</strong>）設計書・ADR の更新（変更表）と、<code>validating-design</code>（完了時。<strong>スキルの全手順を実施したか、機械で確認できる項目に絞ったかを、正直に書く</strong>）。ADR-019・ADR-005 の更新は<strong>提案として記録し、承認は人</strong>。設計書への反映: ドメインモデル（版の意味、<code>DecisionConflict</code> の応答）、データモデル・バックエンド（再試行の上限・間隔の値）、テスト戦略（並行の試験と計測の結果、変更の表）、UI 設計（競合の文言の確定）、非機能要件（NF-P13・NF-C8 の結果と未決）。生成物（用語集・イベント一覧）: 足したイベント・用語に <code>@EventSpec</code>・<code>@Term</code> を付け、<code>./gradlew :domain:generateLivingDocs</code> で再生成（足さない場合は変更なしと記録）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.4（<strong>実施済み（2026-11-16）。<code>@Suppress</code>・ベースラインは無い（grep）。シェル操作の逸脱は、機械で網羅できず、記憶にもとづく既知の分を終了報告に記録</strong>）<strong>規律の機械確認</strong>: <code>@Suppress</code>・ベースラインの有無、成果物の存在、heredoc・python・sed・perl・awk を使っていないこと（使った場合は正直に記録）、変異で確かめた試験の一覧、Red を観察できなかった試験の一覧</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 8.5（<strong>実施済み（2026-11-16）。<a href="../bolt_6_report/">bolt_6_report</a>。デモ項目の申告欄は空。承認は記録していない</strong>）Bolt 終了報告（<code>bolt_6_report.md</code>）。<strong>デモ項目の実操作の申告欄</strong>（人が行う。<strong>空のまま</strong>）、未達・未実施、人の判断項目、B7 への申し送り、計測の結果と限界、仮説の検証結果、Release 0.2 への影響。<strong>承認を捏造しない</strong></li>
 </ul>
 <p><strong>ゲート 8</strong>（Bolt の承認）: 人が、B6 全体とコードの全行理解を検証する。<strong>状態: 人の確認待ち（未承認）。</strong> デモ項目の人の実操作は、申告があるまで未記録。</p>
 <hr />
@@ -11278,6 +11278,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>Step 8（8.1〜8.5）を実施</strong>（受け入れの確認、設計書の更新、規律の機械確認、Bolt 終了報告 <a href="../bolt_6_report/">bolt_6_report</a>。<strong>ゲート 8（Bolt の承認）は人の確認待ち（未承認）。承認は記録していない。デモ項目の申告欄は空</strong>）。<code>@ui</code> を PostgreSQL 18.7 のバックエンドでも 1 回実行（成功）。AC2.2.4 の自動反映・NF-C2 の合否は未達・未解決として記録。B7 には進んでいない</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>ゲート 7 をユーザーが承認し、Step 8 に進める指示を受けた</strong>（指示: 「B6 のゲート 7 を承認して Step 8 に進めて」。承認の範囲はゲート 7 だけ。<strong>ゲート 8（Bolt の承認）は未承認</strong>。Bolt 終了報告のデモ項目の実操作の申告欄は、空のまま）</td>

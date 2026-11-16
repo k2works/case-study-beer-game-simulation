@@ -10320,6 +10320,12 @@
 <td style="text-align: left;">B2 の Step 5。「コミットしない」とした設計と異なる（人の確認が要る）</td>
 </tr>
 <tr>
+<td style="text-align: left;">20（B6 Step 7 の実装。2026-11-16）</td>
+<td style="text-align: left;">競合（<code>session.decision_conflict</code>）は、一般の失敗の通知（<code>ErrorNotice</code>）で示す。状況の応答に保存者・共同担当は無い</td>
+<td style="text-align: left;"><code>PlayPage</code> に競合の状態（最新の入力と、入力した値の保持）と、保存の共通化（<code>submit</code>）を足し、競合は <code>ConflictNotice</code> で示す。<code>latestOf</code>（競合の本文の <code>latest</code> を、形を確かめて取り出す。応答は信頼できない入力）、<code>formatClock</code>（保存の時刻を、ブラウザの時刻帯で「時:分」）、<code>editorName</code>。仕様と生成した型は変えない（<code>decisionEditor</code>・<code>coHolders</code>・<code>DecisionEntry</code> は Step 1 から型にある）</td>
+<td style="text-align: left;">B6 Step 7。<code>PlayPage.test.tsx</code>・<code>@ui</code></td>
+</tr>
+<tr>
 <td style="text-align: left;">19（B5 Step 7 の実装。2026-11-15）</td>
 <td style="text-align: left;"><code>ApiClient</code> は B1 の操作だけ。参加の応答は <code>versions</code> だけ（変更表 16 の「参加者は参加後に進めない」）</td>
 <td style="text-align: left;"><code>ApiClient</code> に <code>pauseSession</code>・<code>resumeSession</code>・<code>recoverParticipation</code> を足し、<code>createGame</code> の結果に <code>recoveryCode</code>、<code>joinGame</code> の結果に <code>gameId</code> を持たせた（型は生成物の <code>CreateGameResponse</code>・<code>JoinResponse</code>・<code>RecoverResponse</code>）。S03 は、参加後に <code>gameId</code> でプレイの画面へ進み、復帰（ゲーム ID と任意の復帰コード。復帰のあとに <code>getGameState</code> で行き先を決める）を持つ。<code>ErrorNotice</code> の権限の導線は「参加・復帰の画面へ」で、URL のゲームの ID を <code>?gameId=</code> に持たせる。<code>problems.ts</code> の <code>describeProblem</code> は、資格を送った操作（<code>context.credential</code>）の 403 を、<code>app.unauthorized</code>（復帰）でも <code>game.invitation_invalid</code>（参加）でも、送った資格の種類から選ぶ。<code>Record&lt;ErrorCode, ...&gt;</code> の辞書の B5 の <code>code</code>（<code>session.paused</code> ほか 8 件）に文言を加えた。<strong><code>features/</code> の新しいディレクトリ・コンポーネントは作らず</strong>、S03 は <code>participation/JoinPage.tsx</code> に収めた。構造のアクセシビリティの自前の検査 <code>src/testing/a11y.ts</code>（コンポーネントのテスト用。axe の代わりではない）</td>

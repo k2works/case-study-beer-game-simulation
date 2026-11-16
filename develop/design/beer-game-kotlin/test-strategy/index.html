@@ -12715,6 +12715,12 @@
 <td style="text-align: left;">B5 の Step 6 の既知の不安定な試験（ゲート 7 で修正を決定）</td>
 </tr>
 <tr>
+<td style="text-align: left;">38（B6 Step 4・5。2026-11-16）</td>
+<td style="text-align: left;">並行の試験は、資格の失効と復帰の 1 つ（B5）。再試行の上限の値は未計測</td>
+<td style="text-align: left;"><strong>共同入力の並行の統合テスト（PostgreSQL 18 のみ。H2 では実行しない）</strong> <code>coInputConcurrencyContract</code> を足した（追記の直前で待ち合わせて競合を確実に作り、どちらの順でも成り立つ不変条件で判定。7 件: 同じ役割の 2 人、5 人同時、再試行の枯渇で部分更新なし、同じキーの同時再送（同じ本文・違う本文）、確定と保存、代理入力と保存）。SQLSTATE の写像は単体（<code>SqlFailuresSpec</code>）。<strong>検査が働くことは変異 4 種で個別に確認、20 回の反復で不安定 0 件</strong>。計測は <code>RetryMeasurement.kt</code>（<code>BEERGAME_MEASURE=1</code> のときだけ。CI では実行しない）。<strong>実 DB で起こしていない範囲</strong>: 40001・40P01・55P03 の実際の発生、ゲーム作成の <code>uq_idempotency_create</code> の同時の違反</td>
+<td style="text-align: left;">B6 Step 4・5。計画書の「Step 4・5 の実施結果」</td>
+</tr>
+<tr>
 <td style="text-align: left;">37（B5 Step 8.4。2026-11-15）</td>
 <td style="text-align: left;">用語・イベントの一覧の生成は未決（開発戦略の Living Documentation）</td>
 <td style="text-align: left;"><code>LivingDocumentationSpec</code>（domain の試験 7 件。<code>check</code> に含まれる）が、注釈の漏れ・設計書の EV 表との ID と名前の不一致・コミット済みの生成物との差を失敗にする。再生成は <code>./gradlew :domain:generateLivingDocs</code>（<a href="../../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>、提案）。<strong>設計書だけの変更では、CI のパスフィルターに当たらない</strong>（人の判断）</td>

@@ -11186,6 +11186,12 @@
 <td style="text-align: left;">判断項目 9 の案 A。端末を替えた進行役の復帰（AC3.2.4）</td>
 </tr>
 <tr>
+<td style="text-align: left;">31（B6 Step 7 の実装。2026-11-16）</td>
+<td style="text-align: left;">S05 の共同担当・保存者・競合は画面イメージのみ（「共同担当: 田中、鈴木」「鈴木さんが 10:42 に保存」「他の人が先に保存しました。」）</td>
+<td style="text-align: left;"><strong>実装した</strong>。共同担当の行は 2 人以上のときだけ（自分に「あなた」）。現在の入力に最後の保存者と時刻（「あなたが」「進行役（代理入力）が」を含む）。競合の通知は、見出し（代理入力が先なら「進行役が代理で入力しました。」）、最新の入力、保存者と時刻（自分なら「あなたが 時刻 に保存した値があります。」）、あなたの入力（未保存。保持）、「最新の値を使う」「この値で保存し直す」。<strong>版は画面に出さない</strong>。見出しへフォーカス（<code>aria-live</code> は付けない）。辞書の <code>session.decision_conflict</code>（409）の文言「他の人が先に保存しました。」は、<strong>この見出しで確定</strong>。S06 の保存者の表示（「鈴木さん（共同担当 2 人）」）と、SSE による自動反映は<strong>未実装</strong>（判断項目 9・8 の案 C）</td>
+<td style="text-align: left;">判断項目 9。<code>ConflictNotice.tsx</code>・<code>PlayPage.tsx</code>、<code>@ui</code>（<code>co-input-ui.feature</code>）。コントラスト比・200% 拡大・キーボード・スクリーンリーダーは未確認</td>
+</tr>
+<tr>
 <td style="text-align: left;">30</td>
 <td style="text-align: left;">停止中の保存・確定は <code>InvalidState</code>（<code>code</code> 未決）</td>
 <td style="text-align: left;">409 <code>session.paused</code>。辞書に、<code>session.paused</code>・<code>session.not_paused</code>・<code>session.save_limit_reached</code>・<code>game.credential_already_revoked</code>・<code>game.credential_not_revoked</code>・<code>app.rate_limited</code>・<code>session.not_active</code> の文言を加えた（<strong>提案</strong>の文言あり。ゲート 7 で人が決める）</td>

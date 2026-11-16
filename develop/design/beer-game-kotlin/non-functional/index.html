@@ -2715,6 +2715,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#nf-p13nf-c2b6-step-52026-11-16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        共同入力の競合の計測の結果（NF-P13、NF-C2。B6 Step 5。2026-11-16）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#nf-p3nf-p15-m21" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -10254,6 +10265,14 @@
 </tr>
 </tbody>
 </table>
+<h3 id="nf-p13nf-c2b6-step-52026-11-16">共同入力の競合の計測の結果（NF-P13、NF-C2。B6 Step 5。2026-11-16）<a class="headerlink" href="#nf-p13nf-c2b6-step-52026-11-16" title="Permanent link">&para;</a></h3>
+<p>ローカルの PostgreSQL 18（Testcontainers、接続プール 12）での計測で、<strong>実環境（ECS・RDS・ALB）の値ではない</strong>。詳細は <a href="../../../adr/beer-game-kotlin/019-retry-limit-and-serialization/">ADR-019</a>。</p>
+<ul>
+<li><strong>NF-P13（保存の p95 1 秒以下）</strong>: 標本 200 以上の p95 は、すべて 323 ms 以下（上限 5・間隔なしは 99〜120 ms）。<strong>ローカルの結果としては満たした</strong>。HTTP の層だけの p95、実環境の値は<strong>未計測</strong>。</li>
+<li><strong>NF-C2（60 の書き手を 10 秒の窓で、エラー率 1% 未満。枯渇を含める）</strong>: 計測は全試行で 0 件だったが、<strong>標本が 60 件で 1% の差を検出できず、合否は言えない（未解決）</strong>。B13 の監視、またはより大きな標本での再計測で決める。</li>
+<li><strong>再試行の上限</strong>: 既定を 5 から <strong>10</strong> にした（4 人同時の保存での枯渇は、上限 3 で 2.8%、5 以上で 0 件。同時の書き手が 6 人以上では上限 5 に余裕が無い）。</li>
+<li>NF-C8（保存回数の上限 9 回）は、共同担当で役割ごとに共有される（B6 Step 2 の試験）。</li>
+</ul>
 <h3 id="nf-p3nf-p15-m21">ストリームの最大の長さ（NF-P3、NF-P15 の前提。M21）<a class="headerlink" href="#nf-p3nf-p15-m21" title="Permanent link">&para;</a></h3>
 <p>NF-P3 と NF-P15 の「最大の長さ」は、<strong>最悪ケースで <code>SESSION</code> のストリームが到達する件数</strong>です。共同担当が同じ週に保存を繰り返しても、次の見積もりを超えないよう、保存回数に上限を置きます（NF-C8）。</p>
 <table>

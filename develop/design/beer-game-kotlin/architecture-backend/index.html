@@ -11538,6 +11538,12 @@
 <td style="text-align: left;">資格の行の変更が、対応するイベントなしに起きない・イベントだけが書かれて行が残らない、のどちらも防ぐ</td>
 </tr>
 <tr>
+<td style="text-align: left;">49（B6 Step 3〜6。2026-11-16）</td>
+<td style="text-align: left;">状況の応答に保存者・共同担当は無い。競合（409）は <code>latest</code>・<code>current</code> が数量・版だけ。再試行の上限 5 は仮置き</td>
+<td style="text-align: left;">状況の応答に <code>decisionEditor</code>・<code>decisionSavedAt</code>（参加者は <code>coHolders</code> も）。<strong>表示名は、同じ役割の共同担当と進行役にだけ</strong>（他の役割・役割なしには、項目ごと出さない）。409 の <code>latest</code>・<code>current</code> に、保存者・保存の時刻を添える（<code>AppFailure.Domain.detail</code>、<code>ConflictDisclosure</code>。競合した人自身の入力は含めない）。<strong>再試行の上限の既定は 10</strong>（ADR-019。計測: ローカルの PostgreSQL。上限 3 は 4 人同時で 2.8% 枯渇、5 以上は 0 件。同時の書き手が 6 人以上では上限 5 に余裕が無い）。ジッターと書き込みの直列化は採らない</td>
+<td style="text-align: left;">ADR-019、<code>RetryMeasurement.kt</code>、<code>CoInputHttpSpec</code>、<code>coInputConcurrencyContract</code>。<strong>実環境の値は未計測</strong></td>
+</tr>
+<tr>
 <td style="text-align: left;">48（B5 Step 6。2026-11-15）</td>
 <td style="text-align: left;">応答は <code>versions</code> だけ。失効・再発行・復帰の内側の操作は <code>internal</code> で、HTTP への配線は Step 6</td>
 <td style="text-align: left;">作成の応答は <code>recoveryCode</code>、参加は <code>gameId</code>、再発行は <code>recoveryCode</code>・<code>expiresAt</code>、復帰は <code>gameId</code>・<code>kind</code>・<code>role?</code> を足す（<code>Reply</code>。ほかは <code>versions</code> だけ）。<code>revokeCredential</code>・<code>reissueCredential</code> は公開、復帰は <code>recover</code>（担当の役割を添える）を公開（<code>recoverParticipation</code> は <code>internal</code> のまま）。<code>pauseSession</code>・<code>resumeSession</code>・<code>submitProxyDecision</code>（<code>SessionControl.kt</code>）。開始後の <code>assignRole</code> は <code>applyAssign</code> が、準備中は <code>game</code> だけ、開始後は入れ替えとして <code>game</code> と <code>session</code> の 2 ストリームへ 1 回の追記で書く。<code>IssuedCredential.expiresAt</code>（再発行の応答に示す期限。冪等記録に含める。4 項目の形も読める）。<code>CommandRequest.recovery</code> は <code>(Actor, Instant)</code>（時刻を受け取る）。ブラウザセッションの Cookie の <code>Max-Age</code> は <code>sessionTtl</code>（B1・Step 4 は復帰資格の期限を流用。Step 4 の逸脱の解消）。<code>bg_recovery</code>（Path は復帰の経路だけ）を作成・参加で発行。ロビーの参加者に <code>replaced</code>（入れ替えで外された旧担当者）。<strong>停止中の参加者の保存・確定を判定する順は「状態 → 権限」（ゲート 2）のため、資格のある参加者が停止中でないゲームを再開しようとすると 403 でなく 409 <code>session.not_paused</code></strong></td>
