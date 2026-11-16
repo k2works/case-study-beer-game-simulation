@@ -172,7 +172,7 @@ internal suspend fun <A> ApplicationCall.command(
             val key = idempotencyKey().bind()
             val body = readBody(deps.settings.maxBodyBytes).bind()
             val input = parse(body).bind()
-            val meta = RequestMeta(key, request.cookies[policy.credentialCookie], correlationId, source)
+            val meta = RequestMeta(key, request.cookies[cookieName(policy.credentialCookie)], correlationId, source)
             run(input, meta).mapLeft { it.toProblem() }.bind()
         }
     result.fold({ respondProblem(it) }, { respondReply(deps, status, it) })
@@ -201,7 +201,7 @@ private suspend fun ApplicationCall.respondReply(
     outcome.issued?.let { issued ->
         response.header(
             HttpHeaders.SetCookie,
-            credentialCookie(deps, COOKIE_NAME, issued.raw, settings.sessionTtl.seconds, "/"),
+            credentialCookie(deps, cookieName(COOKIE_NAME), issued.raw, settings.sessionTtl.seconds, "/"),
         )
     }
     if (reply.recoveryCookie) {
@@ -210,7 +210,7 @@ private suspend fun ApplicationCall.respondReply(
                 HttpHeaders.SetCookie,
                 credentialCookie(
                     deps,
-                    RECOVERY_COOKIE_NAME,
+                    cookieName(RECOVERY_COOKIE_NAME),
                     recovery.raw,
                     settings.participantCredentialTtl.seconds,
                     RECOVERY_COOKIE_PATH,
