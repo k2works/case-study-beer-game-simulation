@@ -9576,7 +9576,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<strong>Step 0（0.1〜0.4）は 2026-11-15 に実施済み</strong>（<code>validating-design</code>（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。<strong>ゲート 0 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 1（1.1〜1.3）は 2026-11-15 に実施済み</strong>（Gherkin・仕様・Red の実測は「Step 1 の実施結果」。<strong>ゲート 1 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 2（2.1〜2.4）は 2026-11-16 に実施済み</strong>（ドメインの本番コードは変更なし。試験・設計書のみ。結果は「Step 2 の実施結果」。<strong>ゲート 2 は人の確認待ち（未承認）。Step 3 以降には進んでいない</strong>）</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<strong>Step 0（0.1〜0.4）は 2026-11-15 に実施済み</strong>（<code>validating-design</code>（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。<strong>ゲート 0 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 1（1.1〜1.3）は 2026-11-15 に実施済み</strong>（Gherkin・仕様・Red の実測は「Step 1 の実施結果」。<strong>ゲート 1 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 2（2.1〜2.4）は 2026-11-16 に実施済み</strong>（ドメインの本番コードは変更なし。試験・設計書のみ。結果は「Step 2 の実施結果」。<strong>ゲート 2 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 3（永続化・投影・開示）は 2026-11-16 に着手した</strong>（結果は「Step 3 の実施結果」。ゲート 3〜8 は未承認）</td>
 </tr>
 </tbody>
 </table>
@@ -10219,7 +10219,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2.3 🟡（<strong>実施済み（2026-11-16）。<code>CoInputPropertySpec</code> に性質 (1)〜(5) と追加の (6)〜(8)。domain の行 100%（<code>koverVerify</code> 成功）</strong>）性質テスト（Kotest の <code>checkAll</code>）: 共同担当の乱数の保存の列（有効な版・古い版・代理入力・別の役割・確定を含む）で、(1) <strong>受理された最後の保存の値が、状態の入力として残る（更新を失わない）</strong>、(2) 版は受理のたびに連続して 1 増える、(3) <strong>拒否は状態を変えない</strong>、(4) 保存回数が 9 を超えない、(5) 再生が <code>InvalidTransition</code> を出さない。リファクタリング。<strong>domain の行 100% のゲートを守る</strong>（除外・閾値の引き下げをしない）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 2.4（<strong>実施済み（2026-11-16）。新しいイベントは足していない。ペイロードの検査を足した</strong>）イベントの検査: ペイロードに表示名・資格が含まれない（ADR-002）。<strong>新しいイベントを足す場合は、種別の一覧を記録</strong>（N-1 互換。B12）。足さない場合は「足していない」と記録する</li>
 </ul>
-<p><strong>ゲート 2</strong>: 共同入力の判定と、版の意味（判断項目 5 の結論）と、domain の行 100% を、人が確認する。<strong>状態: 人の確認待ち（未承認）。承認は記録していない。Step 3 以降には進んでいない。</strong></p>
+<p><strong>ゲート 2</strong>: 共同入力の判定と、版の意味（判断項目 5 の結論）と、domain の行 100% を、人が確認する。<strong>状態: 2026-11-16 にユーザーが承認した（指示: 「B6 のゲート 2 を承認して Step 3 に進めて」）。</strong> 下の「ゲート 2 で人が確認すること」の 5 項目は、提示したとおり（現状の記述のまま）で承認された。個別の変更の指示はなかった。承認の範囲はゲート 2 だけで、<strong>ゲート 3〜8 は未承認</strong>。</p>
 <h3 id="step-2-2026-11-16-claude-codeclaude-sonnet-5-5">Step 2 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）<a class="headerlink" href="#step-2-2026-11-16-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
 <p><strong>実測の事実だけを書く。ゲート 2 の承認は記録していない。Step 3 以降には進んでいない（永続化・投影・アプリケーション・HTTP・UI は変更していない）。</strong> 条件: JDK は Amazon Corretto 21.0.12、<code>./gradlew … --offline</code>。</p>
 <h4 id="_11">結論（何も変わらない）<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h4>
@@ -10852,6 +10852,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>ゲート 2 をユーザーが承認し、Step 3 に進める指示を受けた</strong>（指示: 「B6 のゲート 2 を承認して Step 3 に進めて」。承認の範囲はゲート 2 だけ。ゲート 3〜8 は未承認。Step 4 以降へは進まない）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>Step 2（2.1〜2.4）を実施</strong>（ドメイン: 共同入力の判定と版の意味。<strong><code>domain/src/main</code> は変更なし（何も変わらない）</strong>。<strong>ゲート 2 は人の確認待ち（未承認）。承認は記録していない。Step 3 以降には進んでいない</strong>）。試験: <code>SessionCoInputSpec</code>（24）・<code>CoInputPropertySpec</code>（8）を新規、<code>GameDecideSpec</code> に 1 件、<code>DomainFixtures</code> に共同担当の補助。<strong>Red はコンパイルだけ観察し、振る舞いは最初から緑（Red 未観察）</strong>。変異 7 種で個別に確認（性質テストの不足を 2 件見つけて補強）。<code>:domain:test</code> 435 件（ベースライン 402 + 33）、<code>:domain:koverVerify</code> 成功（行 100%）、ktlint・detekt（JDK 21）・PMD 違反 0、<code>@Suppress</code> 注釈 0。他のモジュールの <code>test</code> は、<code>ApiContractSpec</code> の意図的な Red 1 件（Step 1 から）以外が緑。設計書: <code>domain-model.md</code> の差の表 41 と未決事項の更新。<strong>逸脱</strong>: <code>sed</code>・<code>awk</code> を含むコマンドを各 1 回送ったが、分類器が拒否し起動していない。新規ファイル 2 件は判断項目 14 の一覧に無い（ゲート 2 で確認）</td>
