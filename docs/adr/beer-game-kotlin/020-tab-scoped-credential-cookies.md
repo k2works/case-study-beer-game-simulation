@@ -1,13 +1,13 @@
 ---
 type: ADR
-title: "ADR-019: 資格の Cookie の名前をタブごとにする（提案）"
+title: "ADR-020: 資格の Cookie の名前をタブごとにする（提案）"
 description: "同じブラウザの複数のタブが別の人として操作できるよう、タブの識別子（X-Tab-Id）で資格の Cookie の名前を決める案。資格は HttpOnly の Cookie のまま。"
 tags: [adr]
 status: draft
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-16T02:30:00Z }
 ---
 
-# ADR-019: 資格の Cookie の名前をタブごとにする（提案）
+# ADR-020: 資格の Cookie の名前をタブごとにする（提案）
 
 日付: 2026-11-16
 

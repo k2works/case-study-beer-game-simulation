@@ -585,12 +585,12 @@ components:
       type: apiKey
       in: cookie
       name: bg_session
-      description: 資格の Cookie（HttpOnly、SameSite=Strict、HTTPS の環境では Secure）。Cookie 名 `bg_session` は B1 の仮置き（設計書に無い）。参加（join）・作成・復帰（recover）の応答で発行する。値は 256 ビットの乱数で、URL・ログ・本文に含めない。B5 の提案は、ブラウザセッション（24 時間）として、復帰資格と別のダイジェストで持つ。リクエストヘッダー `X-Tab-Id`（英数字 16〜64 文字。画面がタブごとに作る。秘密ではない）があれば、Cookie の名前は `bg_session_<X-Tab-Id>` になる（発行も読み取りも。ADR-019）。ヘッダーが無い・形が不正なら `bg_session`。
+      description: 資格の Cookie（HttpOnly、SameSite=Strict、HTTPS の環境では Secure）。Cookie 名 `bg_session` は B1 の仮置き（設計書に無い）。参加（join）・作成・復帰（recover）の応答で発行する。値は 256 ビットの乱数で、URL・ログ・本文に含めない。B5 の提案は、ブラウザセッション（24 時間）として、復帰資格と別のダイジェストで持つ。リクエストヘッダー `X-Tab-Id`（英数字 16〜64 文字。画面がタブごとに作る。秘密ではない）があれば、Cookie の名前は `bg_session_<X-Tab-Id>` になる（発行も読み取りも。ADR-020）。ヘッダーが無い・形が不正なら `bg_session`。
     recoveryCookie:
       type: apiKey
       in: cookie
       name: bg_recovery
-      description: "復帰資格の Cookie（提案: H3 の案 A。HttpOnly、SameSite=Strict、HTTPS の環境では Secure、Path は復帰の経路だけ、30 日）。参加・作成の応答で発行し、復帰（recover）でだけ使う。値は 256 ビットの乱数で、URL・ログ・本文に含めない。`X-Tab-Id` があれば、名前は `bg_recovery_<X-Tab-Id>` になる（ADR-019）。"
+      description: "復帰資格の Cookie（提案: H3 の案 A。HttpOnly、SameSite=Strict、HTTPS の環境では Secure、Path は復帰の経路だけ、30 日）。参加・作成の応答で発行し、復帰（recover）でだけ使う。値は 256 ビットの乱数で、URL・ログ・本文に含めない。`X-Tab-Id` があれば、名前は `bg_recovery_<X-Tab-Id>` になる（ADR-020）。"
   parameters:
     GameId:
       name: gameId

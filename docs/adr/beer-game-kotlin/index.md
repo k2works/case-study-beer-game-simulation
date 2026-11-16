@@ -24,7 +24,7 @@ beer-game-kotlin プロジェクトの ADR ドキュメントです。
 | [ADR-016](./016-credential-key-versions.md) | 資格の鍵の版を、値の接頭辞（`v<版>.<乱数>`）で持つ（B5 の判断項目 3） | 承認済み |
 | [ADR-017](./017-attempt-window-in-database.md) | 参加・復帰の失敗の窓を DB に持ち、複数のインスタンスで合算する（B5 の判断項目 4） | 承認済み |
 | [ADR-018](./018-living-documentation-annotations.md) | 用語集とイベント一覧を、型の注釈とソースから生成する（B5 の H1） | 承認済み |
-| [ADR-019](./019-tab-scoped-credential-cookies.md) | 資格の Cookie の名前をタブごとにする（同じブラウザの複数タブで別の人として操作） | 提案 |
+| [ADR-020](./020-tab-scoped-credential-cookies.md) | 資格の Cookie の名前をタブごとにする（同じブラウザの複数タブで別の人として操作） | 提案 |
 
 ## 補足
 

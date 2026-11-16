@@ -55,7 +55,7 @@ export interface ApiClient {
 const TAB_ID_KEY = 'beergame.tabId';
 
 /**
- * このタブの識別子（ADR-019）。タブ（sessionStorage）ごとに一度作る。サーバーは、これで資格の Cookie の名前を決める
+ * このタブの識別子（ADR-020）。タブ（sessionStorage）ごとに一度作る。サーバーは、これで資格の Cookie の名前を決める
  * （`bg_session_<識別子>`）ので、同じブラウザの複数のタブが、別の人として操作できる。秘密ではない（資格は HttpOnly の Cookie）。
  * sessionStorage が使えないとき（拒否された環境）は、このページの読み込みの間だけ有効な値を返す。
  */

@@ -3,7 +3,7 @@ package beergame.http
 import io.ktor.server.application.ApplicationCall
 
 /*
- * 資格の Cookie の名前の解決（ADR-019）。同じブラウザの複数のタブが、別の人として操作できるようにする。
+ * 資格の Cookie の名前の解決（ADR-020）。同じブラウザの複数のタブが、別の人として操作できるようにする。
  * Cookie は、ブラウザの中でタブに関係なく共有されるので、タブごとに名前を変える。
  */
 

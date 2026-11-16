@@ -12,7 +12,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 
 /*
- * タブごとの資格（ADR-019）。画面が `X-Tab-Id` ヘッダーで送るタブの識別子から、資格の Cookie の名前を決める
+ * タブごとの資格（ADR-020）。画面が `X-Tab-Id` ヘッダーで送るタブの識別子から、資格の Cookie の名前を決める
  * （`bg_session_<識別子>`・`bg_recovery_<識別子>`）。同じブラウザの複数のタブが、別の人として操作できる。
  * ヘッダーが無い・形が不正なときは、従来の名前（`bg_session`・`bg_recovery`）のまま。
  */
