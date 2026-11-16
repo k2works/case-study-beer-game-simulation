@@ -10520,7 +10520,7 @@
 <p><strong>高リスク（並行性。R4）。並行の試験を実装より先に書く。</strong> ADR-005 のコンプライアンス（B6）の 3 項目を、そのまま完了条件にする。</p>
 </blockquote>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.1 🔴 <code>credentialConcurrencyContract</code> の道具（<code>Barrier</code>・<code>racing</code>）を再利用し、<strong>追記の直前で待ち合わせて、競合を確実に作る</strong>（確率に頼らない）。勝者は実行ごとに決まらないので、<strong>両方の順で成り立つ不変条件</strong>で判定する:</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.1 🔴（<strong>実施済み（2026-11-16）。最初から Green（Red 未観察）。変異で個別に確かめた。下の「Step 4 の実施結果」</strong>）<code>credentialConcurrencyContract</code> の道具（<code>Barrier</code>・<code>racing</code>）を再利用し、<strong>追記の直前で待ち合わせて、競合を確実に作る</strong>（確率に頼らない）。勝者は実行ごとに決まらないので、<strong>両方の順で成り立つ不変条件</strong>で判定する:</li>
 <li>(a) <strong>同じ役割の 2 人が同時に保存</strong>: 自動再試行の後、一方が成功、他方が <code>DecisionConflict</code> と最新値・最後の保存者を受け取り、<strong>保存された値が失われない</strong>（NF-R14）。版が連続し欠番が無い</li>
 <li>(b) <strong>4 役割 + 共同担当の同時の保存</strong>（<code>session</code> ストリームを取り合う）: 受理された書き込みがすべて残り、500 が 0 件</li>
 <li>(c) <strong>競合を意図的に続ける</strong>（<code>maxAttempts</code> を小さくする）: 上限で止まり、<code>app.retry_exhausted</code>（503・<code>Retry-After</code>）を返す。<strong>部分更新が残らない</strong>（<code>events</code>・投影・冪等記録のどれにも）</li>
@@ -10529,11 +10529,113 @@
 <li>(f) <strong>代理入力と共同担当の保存</strong>: 競合し、保存者は進行役と示される</li>
 <li>(g) 40001・40P01 の写像（<code>ConcurrencyConflict</code>）と 55P03（<code>RetryExhausted</code>）: 実 DB で起こせない部分は、写像の単体試験で補う（実 DB で起こした範囲と起こしていない範囲を、結果に分けて書く）</li>
 <li><strong>失敗（Red）を確認する</strong>。最初から緑のものは、Red を観察していないと記録し、<strong>変異</strong>（再試行を外す、競合の写像を外す、冪等記録の再照合を外す、保存者を返さない）で、その試験が落ちることを個別に確かめる（B5 の 8.4b で、変異の 4 件の失敗に新しい試験が含まれるかを確かめていなかった。<strong>今回は個別に確かめる</strong>）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.2 🟢 不足があれば最小の実装（制約ごとの再照合。上限は<strong>共通のまま</strong>。判断項目 13）。<strong><code>main</code> に直列化（ロック）を入れない</strong>（判断項目 12）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.3 🟡 リファクタリング。層ごとの静的解析の違反 0 件（自分が書いた試験を含む）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 4.4 <strong>実行時間と不安定さの確認</strong>: 並行の試験を同じ条件で複数回（例: 20 回）実行し、<strong>不安定でない</strong>ことを記録する（B5 では UUID の <code>998</code> の検査が不安定だった）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.2 🟢（<strong>実施済み（2026-11-16）。不足なし。<code>main</code> の変更はなし</strong>）不足があれば最小の実装（制約ごとの再照合。上限は<strong>共通のまま</strong>。判断項目 13）。<strong><code>main</code> に直列化（ロック）を入れない</strong>（判断項目 12）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.3 🟡（<strong>実施済み（2026-11-16）。違反 0 件</strong>）リファクタリング。層ごとの静的解析の違反 0 件（自分が書いた試験を含む）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 4.4（<strong>実施済み（2026-11-16）。20 回すべて成功</strong>）<strong>実行時間と不安定さの確認</strong>: 並行の試験を同じ条件で複数回（例: 20 回）実行し、<strong>不安定でない</strong>ことを記録する（B5 では UUID の <code>998</code> の検査が不安定だった）</li>
 </ul>
-<p><strong>ゲート 4</strong>: 並行の試験の網羅（各制約、各競合の種類）と、<strong>変異で検査が働くこと</strong>を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong></p>
+<p><strong>ゲート 4</strong>: 並行の試験の網羅（各制約、各競合の種類）と、<strong>変異で検査が働くこと</strong>を、人が確認する。<strong>状態: 人の確認待ち（未承認）。承認は記録していない。Step 5 以降には進んでいない。</strong></p>
+<h3 id="step-4-2026-11-16-claude-codeclaude-sonnet-5-5">Step 4 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）<a class="headerlink" href="#step-4-2026-11-16-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
+<p><strong>実測の事実だけを書く。ゲート 4 の承認は記録していない。Step 5 以降には進んでいない（計測・上限と間隔の決定・HTTP の JSON・UI は変更していない）。</strong> 条件: JDK は Amazon Corretto 21.0.12、<code>./gradlew … --offline</code>、PostgreSQL 18（Testcontainers。Docker 起動中）。</p>
+<h4 id="main">変更したもの（<strong><code>main</code> の変更はなし</strong>。試験だけ）<a class="headerlink" href="#main" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>ApplicationFlowContract.kt</code>: 並行の契約 <code>coInputConcurrencyContract</code>（6 関数・7 テスト）。道具は B5 の <code>Barrier</code>・<code>racing</code> を再利用（追記の直前で待ち合わせ、競合を確実に作る。確率に頼らない）。<code>appSettings</code>・<code>Fixture.ports</code> に <code>maxAttempts</code> の引数を追加。各テストは <code>RACE_ROUNDS</code>（8）回を繰り返す。<code>PostgresPersistenceSpec.kt</code> に配線（<strong>PostgreSQL だけ。H2 では実行しない</strong>）。</li>
+<li><strong>新規ファイル 1 つ</strong>: <code>SqlFailuresSpec.kt</code>（4.1g の写像の単体試験。5 件）。判断項目 14 の見込みの一覧に無い。<strong>ゲート 4 で承認をお願いします</strong>（既存のファイルに足す案もある）。</li>
+</ul>
+<h4 id="db-7">実 DB で確かめた範囲（7 テスト。いずれも「両方の順で成り立つ不変条件」で判定）<a class="headerlink" href="#db-7" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">状況</th>
+<th style="text-align: left;">確かめたこと</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">a</td>
+<td style="text-align: left;">同じ役割の共同担当 2 人が、同じ版から同時に保存</td>
+<td style="text-align: left;">一方だけ成功、他方は <code>session.decision_conflict</code>（<code>latest</code> の保存者は勝者）、競合はちょうど 1 回、保存された値は勝者のもの（失われない）、版は連続（NF-R14）</td>
+</tr>
+<tr>
+<td style="text-align: left;">b</td>
+<td style="text-align: left;">4 役割 + 共同担当の 5 人が同時に保存</td>
+<td style="text-align: left;">成功 4、失敗は共同担当の敗者の <code>decision_conflict</code> 1 件だけ（再試行の枯渇・保存の失敗は 0 件）、投影 4 行、版に欠番なし</td>
+</tr>
+<tr>
+<td style="text-align: left;">c</td>
+<td style="text-align: left;">再試行の上限 1 回で 2 役割が競合</td>
+<td style="text-align: left;">敗者は <code>RetryExhausted</code>。イベント・<code>current_decisions</code>・<code>idempotency_records</code> に部分更新なし（勝者の分だけ）</td>
+</tr>
+<tr>
+<td style="text-align: left;">d</td>
+<td style="text-align: left;">同じ冪等キー・同じ本文の保存が同時</td>
+<td style="text-align: left;">どちらも成功して同じ版の応答、イベントは 1 件</td>
+</tr>
+<tr>
+<td style="text-align: left;">d'</td>
+<td style="text-align: left;">同じ冪等キー・違う本文の保存が同時</td>
+<td style="text-align: left;">敗者は <code>IdempotencyKeyReused</code>、勝者の値だけが残る</td>
+</tr>
+<tr>
+<td style="text-align: left;">e</td>
+<td style="text-align: left;">確定と共同担当の保存が同時（4 役割が入力済み）</td>
+<td style="text-align: left;">確定が先なら保存は <code>WeekAdvanced</code>、保存が先なら確定は <code>DecisionsChanged</code>。500・枯渇にならない</td>
+</tr>
+<tr>
+<td style="text-align: left;">f</td>
+<td style="text-align: left;">進行役の代理入力と共同担当の保存が同時</td>
+<td style="text-align: left;">代理入力は必ず成功、保存は成功か競合（<code>latest</code> の保存者は進行役）、最後の値は代理入力</td>
+</tr>
+</tbody>
+</table>
+<h4 id="41gsqlstate-db">4.1g（SQLSTATE・制約名の写像。単体）と、<strong>実 DB で起こしていない範囲</strong><a class="headerlink" href="#41gsqlstate-db" title="Permanent link">&para;</a></h4>
+<ul>
+<li>単体で確かめた: 40001・40P01 → <code>ConcurrencyConflict</code>、55P03 → <code>RetryExhausted</code>、再試行の対象の一意制約 3 種（<code>uq_events_stream_version</code>・<code>uq_idempotency_create</code>・<code>pk_idempotency_records</code>）の違反 → <code>ConcurrencyConflict</code>、それ以外の一意違反・想定外の SQLSTATE → <code>Persistence</code>（行の値を載せない）。</li>
+<li><strong>実 DB で起こしていない</strong>: 40001・40P01・55P03 の実際の発生。冪等記録の同時の重複（<code>uq_idempotency_create</code>・<code>pk_idempotency_records</code> の実際の違反）は、<strong>同じキーの同時の再送（d・d'）で、<code>find</code> が競合の後に記録を見つける経路</strong>を確かめたが、<strong>ゲーム作成の <code>uq_idempotency_create</code> の同時の違反は起こしていない</strong>（作成は gameId が新規で、同じキーの同時の作成の競合は未検証。B1 の持ち越しのまま）。H2 は部分一意索引を省略しているので、ローカルでは守られない（ADR-014。この契約を H2 で実行しない理由）。</li>
+</ul>
+<h4 id="edit-1-green">変異（本番コードを Edit で 1 か所ずつ壊して戻した。<strong>最初から Green だったので、検査が働くことをこれで確かめた</strong>）<a class="headerlink" href="#edit-1-green" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">変異</th>
+<th style="text-align: left;">結果（PostgreSQL の契約）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">追記の競合の再試行を外す（<code>Execute.kt</code>）</td>
+<td style="text-align: left;">B6 の 7 件中 <strong>6 件が失敗</strong>（a・b・d・d'・e・f）。c は上限 1 回の前提で再試行に依存しないので通る（期待どおり）。B5 の失効と復帰の並行の試験も失敗</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">一意違反を競合に写像しない（<code>SqlFailures.kt</code>）</td>
+<td style="text-align: left;">B6 の <strong>7 件すべて失敗</strong>（ほか 6 件の既存の試験も失敗）</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">冪等記録の再照合（リクエストの digest の比較）を外す（<code>Execute.kt</code>）</td>
+<td style="text-align: left;"><strong>d' の 1 件だけが失敗</strong>（狙いどおり。他は影響しない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">競合の応答に最新値・保存者を入れない（<code>Session.kt</code> の <code>DecisionConflict</code>）</td>
+<td style="text-align: left;"><strong>a と f の 2 件が失敗</strong>（<code>latest</code> の保存者を確かめる試験）</td>
+</tr>
+</tbody>
+</table>
+<p>戻し忘れが無いことは、<code>git diff --stat</code>（<code>domain</code>・<code>application/src/main</code>・<code>adapter-*/src/main</code> が空）で確認した。</p>
+<h4 id="44">不安定さ（4.4）<a class="headerlink" href="#44" title="Permanent link">&para;</a></h4>
+<p><code>PostgresPersistenceSpec</code>（77 件）を <code>--rerun</code> で <strong>20 回</strong>同じ条件で実行: <strong>20 回すべて成功。B6 の 7 テストの実行時間の合計は 15.7〜29.5 秒（各回）</strong>。失敗・不安定は 0 件。<strong>限界</strong>: ローカルの PostgreSQL（Testcontainers）・逐次に近い負荷の値で、実環境（ECS・RDS・ALB）の値ではない。標本は 20 回（各回の中で 8 ラウンド）で、p95 などの分位点は主張しない。</p>
+<h4 id="_15">全検査<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h4>
+<p><code>ktlintCheck</code>・<code>detekt</code>・<code>detektMain</code>・<code>detektTest</code>・<code>pmd</code>（fixture の 17 件は期待どおり）が違反 0。<code>:application:test</code>・<code>:adapter-persistence:test</code>（H2）・<code>:adapter-persistence:integrationTest</code>（PostgreSQL）・<code>:adapter-http:test</code>・<code>:domain:test</code> が成功。<strong>修正の経緯</strong>: 初版は detekt の <code>LongParameterList</code>（<code>save</code> の引数 6）・<code>LongMethod</code>（契約 1 関数 168 行）・<code>MaxLineLength</code> に違反した。引数を 5 に減らし、契約を 6 関数に分け、名前を短くして解消した（<code>@Suppress</code> は使っていない）。</p>
+<h4 id="_16">規律・仮置き<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h4>
+<ul>
+<li>ファイルの編集は Write・Edit のみ（Step 4 の作業で）。<strong>逸脱 1 件</strong>: 計画書のゲート 3 の承認の記録の一部を <code>sed -i</code>（文言の置換）で書いた（Step 4 の着手の記録。<code>docs</code> のみ）。規律「ファイルツールで書く」に反する。記録して、以降は守る。</li>
+<li>並行の試験は、追記の直前の待ち合わせで競合を作る。<strong>勝者は実行ごとに決まる</strong>ので、不変条件（成功の数、失敗の種類、版の連続、最後の値）で判定した。</li>
+<li><code>maxAttempts</code>（既定 5。判断項目 13）は、Step 5 の計測まで変えていない。<strong>5 人が同時に書く（b）と、最後の書き手は 5 回目の試行で成功する</strong>ので、上限 5 は余裕が無い。Step 5 で、上限の値を計測して決める（R4）。</li>
+</ul>
 <h3 id="step-5-retryexhausted-r4">Step 5: <code>RetryExhausted</code> の発生率の計測と、上限・間隔の決定（R4）（🔴🟢）<a class="headerlink" href="#step-5-retryexhausted-r4" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.1 🔴 <strong>計測の設計を先に書く</strong>（判断項目 10〜12）: 再試行の回数・結果を数えるポートの包み（テスト用の道具）、シナリオ、記録する項目、合格の基準。<strong>基準はリリース計画の測定基準</strong>: 「4 人同時の保存で <code>RetryExhausted</code> 0 件」。ほかに NF-P13（共同入力の保存 p95 1 秒以下）、NF-C2（全 60 役割が 10 秒以内に確定の入力をしても、エラー率 1% 未満。<strong>再試行の枯渇も含める</strong>）</li>
@@ -10596,7 +10698,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（ゲート 8）</li>
 </ul>
 <hr />
-<h2 id="_15">リスクと対策<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<h2 id="_17">リスクと対策<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10666,12 +10768,12 @@
 <hr />
 <h2 id="validating-design">設計整合性の検証結果（着手前。<code>validating-design</code>）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
 <p><strong>Step 0.2 で実施した（2026-11-15。実施者: claude-code/claude-sonnet-5-5）。</strong> 軸 A・B・C のすべてを、実ファイル（開発戦略、設計書、ADR、B1〜B5 の計画・終了報告、U1 総括、実コード、<code>features/</code>、<code>contracts/openapi.yaml</code>）と突き合わせた（サブエージェントは使っていない。<code>validating-iteration-plan</code> のフィールド単位の突合は行っていない）。<strong>承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める</strong>（<a href="../development_strategy/">開発戦略</a>の「不整合の扱い」）。</p>
-<h3 id="_16">検証対象<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<h3 id="_18">検証対象<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Bolt 計画: <code>docs/development/beer-game-kotlin/bolt_6_plan.md</code></li>
 <li>局面（開発戦略）: <strong>中盤</strong>（B5〜B12）、アプローチ: <strong>インサイドアウト</strong></li>
 </ul>
-<h3 id="_17">検証結果サマリー<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
+<h3 id="_19">検証結果サマリー<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -10913,7 +11015,7 @@
 </tbody>
 </table>
 <hr />
-<h2 id="_18">更新履歴<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
+<h2 id="_20">更新履歴<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10923,6 +11025,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>Step 4（4.1〜4.4）を実施</strong>（共同入力の並行の統合テスト。PostgreSQL 18。<strong><code>main</code> の変更なし。試験だけ</strong>。<strong>ゲート 4 は人の確認待ち（未承認）。承認は記録していない。Step 5 以降には進んでいない</strong>）。実 DB の並行 7 テスト（a〜f）と、SQLSTATE の写像の単体 5 件を追加。最初から Green のため、変異 4 種で検査が働くことを個別に確認。20 回の反復で不安定 0 件。新規ファイル 1 つ（<code>SqlFailuresSpec.kt</code>）の承認をゲート 4 でお願いする。結果は「Step 4 の実施結果」</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>ゲート 3 をユーザーが承認し、Step 4 に進める指示を受けた</strong>（指示: 「B6 のゲート 3 を承認して Step 4 に進めて」。承認の範囲はゲート 3 だけ。ゲート 4〜8 は未承認。Step 5 以降へは進まない）</td>
