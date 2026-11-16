@@ -83,7 +83,10 @@ class TabScopedCredentialSpec :
 
                 response.status shouldBe HttpStatusCode.Created
                 response.cookieValue("bg_session") shouldNotBe null
-                response.headers.getAll("Set-Cookie").orEmpty().none { it.contains("a b") } shouldBe true
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("a b") } shouldBe true
             }
         }
 
@@ -96,6 +99,30 @@ class TabScopedCredentialSpec :
                 client.stateAs(id, cookie, TAB_A).status shouldBe HttpStatusCode.OK
                 client.stateAs(id, cookie, TAB_B).status shouldBe HttpStatusCode.Forbidden
                 client.stateAs(id, cookie, null).status shouldBe HttpStatusCode.Forbidden
+            }
+        }
+
+        test("従来の名前（bg_session）の Cookie しか無いときは、タブの識別子つきの要求でも、それで認可する（移行）") {
+            withWorld {
+                val created = client.createIn(null, "create-legacy")
+                val cookie = "bg_session=${checkNotNull(created.cookieValue("bg_session"))}"
+
+                client.stateAs(created.gameId(), cookie, TAB_A).status shouldBe HttpStatusCode.OK
+            }
+        }
+
+        test("タブの名前の Cookie と従来の名前の Cookie が両方あれば、タブの名前の Cookie を優先する") {
+            withWorld {
+                val legacy = client.createIn(null, "create-legacy")
+                val legacyId = legacy.gameId()
+                val tabbed = client.createIn(TAB_A, "create-a")
+                val jar =
+                    "bg_session=${checkNotNull(legacy.cookieValue("bg_session"))}; " +
+                        "bg_session_$TAB_A=${checkNotNull(tabbed.cookieValue("bg_session_$TAB_A"))}"
+
+                // タブの資格は、別のゲームの進行役。従来の資格のゲームは、タブの資格では読めない（403）
+                client.stateAs(tabbed.gameId(), jar, TAB_A).status shouldBe HttpStatusCode.OK
+                client.stateAs(legacyId, jar, TAB_A).status shouldBe HttpStatusCode.Forbidden
             }
         }
 

@@ -201,9 +201,9 @@ export class ConsoleWindow {
         });
     }
 
-    /** ブラウザセッション（Cookie bg_session）だけを失う。復帰資格（bg_recovery）は残る。 */
+    /** ブラウザセッション（Cookie bg_session、タブ名つきの bg_session_<識別子> を含む）だけを失う。復帰資格（bg_recovery）は残る。 */
     async loseFacilitatorSession() {
-        await this.browserContext.clearCookies({ name: 'bg_session' });
+        await this.browserContext.clearCookies({ name: /^bg_session/ });
     }
 
     /** 端末を替える（ブラウザに保存した資格をすべて失う）。 */
@@ -212,7 +212,7 @@ export class ConsoleWindow {
     }
 
     async loseParticipantSession(role) {
-        await this.players.get(role).context.clearCookies({ name: 'bg_session' });
+        await this.players.get(role).context.clearCookies({ name: /^bg_session/ });
     }
 
     /** 資格が無いまま、コンソールの URL を直接開く。 */

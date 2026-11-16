@@ -172,7 +172,7 @@ internal suspend fun <A> ApplicationCall.command(
             val key = idempotencyKey().bind()
             val body = readBody(deps.settings.maxBodyBytes).bind()
             val input = parse(body).bind()
-            val meta = RequestMeta(key, request.cookies[cookieName(policy.credentialCookie)], correlationId, source)
+            val meta = RequestMeta(key, cookieValue(policy.credentialCookie), correlationId, source)
             run(input, meta).mapLeft { it.toProblem() }.bind()
         }
     result.fold({ respondProblem(it) }, { respondReply(deps, status, it) })
