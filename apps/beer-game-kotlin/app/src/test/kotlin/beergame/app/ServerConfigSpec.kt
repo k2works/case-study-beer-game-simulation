@@ -146,6 +146,10 @@ class ServerConfigSpec :
                 listOf(ConfigError.InvalidSetting("PORT"), ConfigError.InvalidSetting("COMMAND_MAX_ATTEMPTS"))
         }
 
+        test("[B6/5.6][ADR-019] Given COMMAND_MAX_ATTEMPTS が無い When 読み込む Then 再試行の上限の既定は 10（計測にもとづく）") {
+            configOf(production()).maxAttempts shouldBe 10
+        }
+
         test("[B5/4.2] Given 鍵の版の設定が無い When 読み込む Then 現在の版は 1 で旧版の鍵は無く、期限の既定は 24 時間と 30 日") {
             val config = configOf(production())
 

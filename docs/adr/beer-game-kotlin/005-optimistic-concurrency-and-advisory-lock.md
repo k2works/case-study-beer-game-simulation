@@ -42,7 +42,7 @@ ES + CQRS では、状態はイベントの列であり、集約の行がない�
   この 3 つ以外の一意制約違反は、設計上起きないはずなので、500 と相関 ID で返す。
 - トランザクションの終わり（COMMIT と ROLLBACK）は `NonCancellable` で行い、`CancellationException` は握りつぶさず再送出する。クライアントの切断でコルーチンがキャンセルされても、トランザクションを必ず閉じる。`Left` を返したら ROLLBACK する。分離レベルは READ COMMITTED とする。
 - **暫定の決定**: 研修中の再構築は、運営者を通じて進行役に「停止」を依頼し、停止中に再構築して再開する。停止を依頼する理由は、再構築中の入力の待ちを避けるためで、データの整合のためではない。
-- **未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待つか、すぐ 503 を返すか）。再試行の上限の値と、間隔（ジッター）の要否も、計測して決める。
+- **未決**: ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答（短く待つか、すぐ 503 を返すか）。再試行の上限の値と、間隔（ジッター）の要否も、計測して決める（**→ [ADR-019](./019-retry-limit-and-serialization.md) で決定: 上限 10、ジッターなし、書き込みの直列化なし**）。
 
 詳細は [バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md) の「競合の再試行」と設計判断 BD6・BD7、[データモデル](../../design/beer-game-kotlin/data-model.md) の「追記と楽観的並行制御」と「再構築の同時実行制御」を参照。
 
@@ -63,7 +63,7 @@ ES + CQRS では、状態はイベントの列であり、集約の行がない�
 
 ### ネガティブ
 
-- 競合が続くと、再試行が上限に達し、利用者に 503 が見える（`RetryExhausted`）。上限の値は、実測するまで決まらない。
+- 競合が続くと、再試行が上限に達し、利用者に 503 が見える（`RetryExhausted`）。上限の値は、実測して 10 に決めた（[ADR-019](./019-retry-limit-and-serialization.md)）。
 - 再構築中は、コマンドが排他ロックの解放を待つ。待ちが上限を超えると 503 になりうる。研修中は、停止の依頼を先に行う運用が必要になる。
 - アドバイザリロックのキーは、UUID から導いた 64 ビット整数に写すため、衝突すると不要な待ちが生まれる（整合性は損なわない）。
 - 複数の投影の行を更新するため、デッドロックを避けるロックの順序の規則に従う必要がある。なお、設計判断 BD6 の `game_overview` の `FOR UPDATE` は、今のイベント構成では実際には競合を防がない（残すかは実装時に判断）。
@@ -84,6 +84,6 @@ ES + CQRS では、状態はイベントの列であり、集約の行がない�
 ## 備考
 
 - 著者: claude-code
-- 再試行の上限の値、ジッターの要否、`lock_timeout` の値は未確認（実装開始時に計測して決める）。
+- 再試行の上限の値とジッターの要否は、B6 Step 5 の計測で決めた（[ADR-019](./019-retry-limit-and-serialization.md)。上限 10・ジッターなし）。`lock_timeout` の値は未確認（実装開始時に計測して決める）。
 - 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-014](./014-h2-for-local-development.md)（ローカル開発の H2 版では、アドバイザリロックをプロセス内のロックに置き換える）
 - 参照: [バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[データモデル](../../design/beer-game-kotlin/data-model.md)、[運用要件](../../design/beer-game-kotlin/operation.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[設計レビュー（2026-11-14）](../../review/beer-game-kotlin/design_review_20261114.md) の H5・H7・M23、[リリース計画](../../development/beer-game-kotlin/release_plan.md)

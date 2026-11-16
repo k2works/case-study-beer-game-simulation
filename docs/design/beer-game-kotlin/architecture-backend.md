@@ -890,7 +890,7 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 - **参加者が、参加後に `gameId` を知る手段が無い。** 参加の応答は `versions` だけで、`gameId` も `Location` も返さない。参加者の画面が、ロビー・プレイの画面へ進めない。対応案は、参加の応答に `gameId`（と `Location`）を足すこと（バックエンドと仕様の変更。決めるまで、API は変えない）。
 - **参加者向けのロビー**（`GET /games/:id/lobby` の参加者への開放）。投影の型に項目が無く、B1 は進行役だけ。
 - **レート制限の値と範囲。** 接続元（`remoteHost`）ごとの固定窓、既定 600 件/分は**根拠なし（未計測）**の仮置き。プロセス内の状態（BD8 は未決。タスク数が増えれば実効の上限が増える）。ALB の背後では接続元が ALB になるが、`X-Forwarded-For` は信頼しない（信頼の範囲が未決）。参加・復帰の専用の制限は B5 Step 5 で実装した（DB の窓。上の「レート制限」と BD8）。
-- **競合の再試行の上限 `maxAttempts`**は 5 を仮置き（`AppSettings` に既定を置かず、`COMMAND_MAX_ATTEMPTS` で注入。未計測）。競合の再試行の遅延は無し。`lock_timeout` の既定 5 秒も仮置き。
+- **競合の再試行の上限 `maxAttempts`**は、B6 Step 5 の計測で 10 に決めた（[ADR-019](../../adr/beer-game-kotlin/019-retry-limit-and-serialization.md)。`AppSettings` に既定を置かず、`ServerConfig.DEFAULT_MAX_ATTEMPTS`（10）と `COMMAND_MAX_ATTEMPTS` で注入。実環境の値は未計測）。競合の再試行の遅延は無し。`lock_timeout` の既定 5 秒も仮置き。
 - **Origin の検査。** 許可リスト（`ALLOWED_ORIGINS`。`local` 以外は必須）か、Host と同じ権限。Origin も Referer も無い要求は許す（ブラウザの外のクライアントのため）。拒否は `app.unauthorized`（専用の `code` は置かなかった）。Vite の開発用の中継は Host と Origin が一致しないため、`ALLOWED_ORIGINS` の指定が要る（開発手順書への反映は未実施）。
 - **ログ。** `LogRecord` は項目の許可リスト（試験で固定）。`message` はコードの固定文だけ。予期しない例外はクラス名とスタックの各行を記録し、**メッセージは書かない**（接続文字列などが入りうる）。CloudWatch での収集、EMF のメトリクスは未確認・未実装。
 - **`Persistence.open` のブロッキング**（PostgreSQL では最初の LISTEN まで最大 10 秒。起動時に 1 回）が、Ktor の起動で問題にならないかは未確認。
