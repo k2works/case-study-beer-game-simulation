@@ -9544,7 +9544,7 @@
 <p>Bolt 6（共同担当と共同入力）で、同じゲームの <code>session</code> ストリームへの書き込みの競合が増える。リスク R4（再試行の枯渇で 503 が見える）に対し、再試行の上限の値、間隔（ジッター）の要否、書き込みの直列化の要否を、<strong>計測してから決める</strong>ことにしていた（<a href="../005-optimistic-concurrency-and-advisory-lock/">ADR-005</a> の「未決」、B6 計画の判断項目 10〜13）。本書は、<strong>AI の提案であって、決定ではない</strong>。人が <a href="../../../development/beer-game-kotlin/bolt_6_plan/">bolt_6_plan</a> のゲート 5 で決める。</p>
 <p>日付: 2026-11-16</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>提案（人の確認待ち）。本書の決定は、<code>main</code> のコードをまだ変えていない（既定値は上限 5・間隔なしのまま）。</p>
+<p><strong>2026-11-16 にユーザーが承認した（B6 ゲート 5。指示: 「B6 のゲート 5 を承認して Step 6 に進めて」）。</strong> 決定は、楽観的並行制御の維持、上限 5 → 10、ジッターなし、書き込みの直列化なし。<strong><code>ServerConfig.DEFAULT_MAX_ATTEMPTS</code> を 10 に変更した</strong>（試験を先に書いた。<code>COMMAND_MAX_ATTEMPTS</code> で上書き可能なまま）。NF-C2 の合否は、計測の標本が足りず未解決（B13 の監視、またはより大きな標本での再計測に委ねる）。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>
 <li>書き込みは、<code>events</code> のストリームの版の一意制約による楽観的並行制御で、競合（<code>ConcurrencyConflict</code>）は上限つきで自動に再試行する（認証・冪等記録の照合から全体をやり直す）。上限に達すると <code>RetryExhausted</code>（503・<code>Retry-After</code>）。現状の上限は 5（<code>COMMAND_MAX_ATTEMPTS</code>。<code>ServerConfig.DEFAULT_MAX_ATTEMPTS</code>）、間隔なし。</li>
