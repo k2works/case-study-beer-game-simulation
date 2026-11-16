@@ -10638,19 +10638,148 @@
 </ul>
 <h3 id="step-5-retryexhausted-r4">Step 5: <code>RetryExhausted</code> の発生率の計測と、上限・間隔の決定（R4）（🔴🟢）<a class="headerlink" href="#step-5-retryexhausted-r4" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.1 🔴 <strong>計測の設計を先に書く</strong>（判断項目 10〜12）: 再試行の回数・結果を数えるポートの包み（テスト用の道具）、シナリオ、記録する項目、合格の基準。<strong>基準はリリース計画の測定基準</strong>: 「4 人同時の保存で <code>RetryExhausted</code> 0 件」。ほかに NF-P13（共同入力の保存 p95 1 秒以下）、NF-C2（全 60 役割が 10 秒以内に確定の入力をしても、エラー率 1% 未満。<strong>再試行の枯渇も含める</strong>）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.2 計測するシナリオ（<strong>標本の数・同時数・試行回数を、結果に書く</strong>）:</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.1 🔴（<strong>実施済み（2026-11-16）。計測の設計は <code>RetryMeasurement.kt</code> の冒頭と下の結果に記録</strong>）<strong>計測の設計を先に書く</strong>（判断項目 10〜12）: 再試行の回数・結果を数えるポートの包み（テスト用の道具）、シナリオ、記録する項目、合格の基準。<strong>基準はリリース計画の測定基準</strong>: 「4 人同時の保存で <code>RetryExhausted</code> 0 件」。ほかに NF-P13（共同入力の保存 p95 1 秒以下）、NF-C2（全 60 役割が 10 秒以内に確定の入力をしても、エラー率 1% 未満。<strong>再試行の枯渇も含める</strong>）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.2（<strong>実施済み（2026-11-16）。同じ条件で 2 回</strong>）計測するシナリオ（<strong>標本の数・同時数・試行回数を、結果に書く</strong>）:</li>
 <li>S1: 1 ゲーム・4 役割が同時に保存（リリース計画の基準）</li>
 <li>S2: 1 ゲーム・同じ役割に共同担当が複数人（2〜4 人）× 4 役割が同時に保存</li>
 <li>S3: 15 ゲーム × 4 役割（60 の書き手）を 10 秒の窓で送る（NF-C2 の形。<strong>ゲーム間はストリームが別なので、競合しない</strong>ことの確認）</li>
 <li>S4: 1 役割の共同担当だけが連続して保存し続ける（最悪の場合。NF-C8 の保存回数の上限との関係）</li>
 <li>各シナリオを、上限 3・5・10、間隔なし・ジッターあり、で比較する</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.3 🟢 <strong>アドバイザリロック（ゲーム単位の書き込み用）の試作</strong>を、<strong>計測の道具の中だけ</strong>で行い、再試行の調整と比べる（判断項目 12。<strong><code>main</code> に入れない</strong>）。比較の軸: <code>RetryExhausted</code> の発生率、p95・p99 の遅延、同じゲームの他のコマンド（確定・停止など）の待ち、再構築の排他ロック（B12）との相互作用、H2 版での扱い</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.4 結果を表にまとめる。<strong>ローカルの PostgreSQL（Testcontainers）・逐次に近い負荷の値であり、実環境（ECS・RDS・ALB）の値でない</strong>ことを書く。標本が少ない値から p95 を言わない（B3 の学び）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.5 <strong>ADR-019（提案）</strong>を書く: 再試行の上限・間隔の値（計測の結果）と、直列化の要否（比較の結果）。ADR-005 の「未決」（再試行の上限の値、ジッターの要否）を更新する。<strong>承認は人</strong>。<strong>採用が「直列化する」になった場合は、<code>main</code> の実装を別の作業（本 Bolt の範囲外か、予備 B16）として人が決める</strong></li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.6 既定値の変更が要るなら、<code>ServerConfig</code>（<code>COMMAND_MAX_ATTEMPTS</code>）の既定値と、ジッターの実装（時計・乱数は注入。ドメインに入れない）を、<strong>テストを先に書いて</strong>行う。<strong>値は計測の後に決める</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.3 🟢（<strong>実施済み（2026-11-16）。<code>main</code> には入れていない</strong>）<strong>アドバイザリロック（ゲーム単位の書き込み用）の試作</strong>を、<strong>計測の道具の中だけ</strong>で行い、再試行の調整と比べる（判断項目 12。<strong><code>main</code> に入れない</strong>）。比較の軸: <code>RetryExhausted</code> の発生率、p95・p99 の遅延、同じゲームの他のコマンド（確定・停止など）の待ち、再構築の排他ロック（B12）との相互作用、H2 版での扱い</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.4（<strong>実施済み（2026-11-16）</strong>）結果を表にまとめる。<strong>ローカルの PostgreSQL（Testcontainers）・逐次に近い負荷の値であり、実環境（ECS・RDS・ALB）の値でない</strong>ことを書く。標本が少ない値から p95 を言わない（B3 の学び）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.5（<strong>実施済み（2026-11-16）。ADR-019 を提案として書いた（<code>status: draft</code>）。ADR-005 の更新は、ADR-019 の承認後</strong>）<strong>ADR-019（提案）</strong>を書く: 再試行の上限・間隔の値（計測の結果）と、直列化の要否（比較の結果）。ADR-005 の「未決」（再試行の上限の値、ジッターの要否）を更新する。<strong>承認は人</strong>。<strong>採用が「直列化する」になった場合は、<code>main</code> の実装を別の作業（本 Bolt の範囲外か、予備 B16）として人が決める</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.6（<strong>未実施。意図的</strong>。現状の既定値（上限 5）でリリース計画の基準（4 人同時で 0 件）を満たしたので、変更は必須ではない。<strong>上限を 10 に上げる提案は ADR-019 にあり、承認は人（ゲート 5）。承認されたら、テストを先に書いて <code>ServerConfig.DEFAULT_MAX_ATTEMPTS</code> を変える</strong>）既定値の変更が要るなら、<code>ServerConfig</code>（<code>COMMAND_MAX_ATTEMPTS</code>）の既定値と、ジッターの実装（時計・乱数は注入。ドメインに入れない）を、<strong>テストを先に書いて</strong>行う。<strong>値は計測の後に決める</strong></li>
 </ul>
-<p><strong>ゲート 5</strong>: 計測の設計・結果・限界、上限と間隔の決定、ADR-019 を、人が確認する。<strong>状態: 人の確認待ち（未承認）。</strong> 未達（<code>RetryExhausted</code> が基準を超える）の場合は、<strong>未達として記録</strong>し、対策（上限・間隔・直列化）を人が決める（隠さない）。</p>
+<p><strong>ゲート 5</strong>: 計測の設計・結果・限界、上限と間隔の決定、ADR-019 を、人が確認する。<strong>状態: 人の確認待ち（未承認）。承認は記録していない。Step 6 以降には進んでいない。</strong> 未達（<code>RetryExhausted</code> が基準を超える）の場合は、<strong>未達として記録</strong>し、対策（上限・間隔・直列化）を人が決める（隠さない）。</p>
+<h3 id="step-5-2026-11-16-claude-codeclaude-sonnet-5-5">Step 5 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）<a class="headerlink" href="#step-5-2026-11-16-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
+<p><strong>実測の事実だけを書く。ゲート 5 の承認は記録していない。Step 6 以降には進んでいない（HTTP の JSON・UI は変更していない）。<code>main</code> の変更はなし</strong>（既定値は上限 5・間隔なしのまま）。条件: JDK は Amazon Corretto 21.0.12、PostgreSQL 18（Testcontainers）、接続プール 12、<code>BEERGAME_MEASURE=1</code> で、同じ条件の計測を <strong>2 回</strong>実行。<strong>ローカルの値であり、実環境（ECS・RDS・ALB）の値ではない。</strong></p>
+<h4 id="_17">変更したもの（試験の道具だけ）<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>新規ファイル 1 つ</strong>: <code>adapter-persistence/src/test/kotlin/beergame/persistence/RetryMeasurement.kt</code>（計測の道具。環境変数 <code>BEERGAME_MEASURE=1</code> のときだけ実行し、既定・CI では実行しない。結果は <code>build/reports/retry-measurement.md</code>）。判断項目 14 の見込みの一覧に無い。<strong>ゲート 5 で承認をお願いします</strong>。</li>
+<li><code>ApplicationFlowContract.kt</code>: <code>start</code> に共同担当を増やす引数（<code>extraCoHolders</code>）、<code>Seat</code>・<code>Started</code>・<code>start</code> を <code>internal</code> に、<code>Fixture.ports</code> にロックの差し替え。<code>PostgresPersistenceSpec.kt</code> に、環境変数が立っているときだけ計測を配線。</li>
+<li><strong>ADR-019（提案、<code>status: draft</code>）</strong>: <a href="../../../adr/beer-game-kotlin/019-retry-limit-and-serialization/">再試行の上限と間隔、書き込みの直列化の要否</a>。ADR-005 の「未決」の更新は、ADR-019 の承認後。</li>
+</ul>
+<h4 id="_18">計測の設計（先に決めたもの）<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h4>
+<p>試行 7 種（上限 3・5・10 × 間隔なし・ジッター 0〜20 ms、と、ゲーム単位の書き込みロックの試作）。間隔は再試行のトランザクションを始める前（トランザクションの外）に入れた。ロックの試作は、既存の共有ロックに続けて別のキーのアドバイザリロックを取る（道具の中だけ）。数えるもの: 結果（成功・同じ役割の競合（期待どおりの失敗）・枯渇・その他）、試行回数、遅延。合格の基準: S1 の枯渇 0 件（リリース計画）、保存の p95 1 秒以下（NF-P13）、S3 のエラー率 1% 未満（NF-C2）。標本が 200 未満のときは p95・p99 を言わない。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">シナリオ</th>
+<th style="text-align: left;">同時の書き手</th>
+<th style="text-align: left;">標本（1 試行）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">S1</td>
+<td style="text-align: left;">1 ゲーム・4 役割が同じ版から同時（12 ゲーム × 9 反復）</td>
+<td style="text-align: left;">432</td>
+</tr>
+<tr>
+<td style="text-align: left;">S2</td>
+<td style="text-align: left;">小売店に共同担当 4 人 + 他の 3 役割の計 7 人が同時（12 ゲーム × 9 反復）</td>
+<td style="text-align: left;">756</td>
+</tr>
+<tr>
+<td style="text-align: left;">S3</td>
+<td style="text-align: left;">15 ゲーム × 4 役割 = 60 の書き手を、10 秒の窓にばらまく</td>
+<td style="text-align: left;">60</td>
+</tr>
+<tr>
+<td style="text-align: left;">S4</td>
+<td style="text-align: left;">1 役割の共同担当 3 人が、版を読んでは保存を 3 回ずつ（12 ゲーム）</td>
+<td style="text-align: left;">108</td>
+</tr>
+</tbody>
+</table>
+<h4 id="2-1-2">結果（枯渇の件数。2 回の計測。数字は 1 回目 / 2 回目）<a class="headerlink" href="#2-1-2" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">試行</th>
+<th style="text-align: left;">S1</th>
+<th style="text-align: left;">S2</th>
+<th style="text-align: left;">S3</th>
+<th style="text-align: left;">S4</th>
+<th style="text-align: left;">判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">上限 3・間隔なし</td>
+<td style="text-align: left;"><strong>12 / 12</strong></td>
+<td style="text-align: left;"><strong>47 / 40</strong></td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;"><strong>S1 の基準（0 件）を満たさない</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>上限 5・間隔なし（現状）</strong></td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">基準を満たす。<strong>使った試行の最大が 5（上限）に達した回がある</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">上限 10・間隔なし</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">遅延も上限 5 と同等</td>
+</tr>
+<tr>
+<td style="text-align: left;">上限 3・ジッター 20 ms</td>
+<td style="text-align: left;">12 / 12</td>
+<td style="text-align: left;">29 / 23</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">基準を満たさない</td>
+</tr>
+<tr>
+<td style="text-align: left;">上限 5・ジッター 20 ms</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">平均の試行は減るが、遅延は大きくなる</td>
+</tr>
+<tr>
+<td style="text-align: left;">上限 10・ジッター 20 ms</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0 / 0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">1 回目の S1 で p99 434 ms・最大 920 ms と、裾が伸びた</td>
+</tr>
+<tr>
+<td style="text-align: left;">上限 5・書き込みロック（試作）</td>
+<td style="text-align: left;">0 / 0（試行は常に 1 回）</td>
+<td style="text-align: left;">0 / 0（試行は常に 1 回）</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;">0</td>
+<td style="text-align: left;"><strong>S2 の p95 が 323 ms（1 回目）と 98 ms（2 回目）で、裾への影響を確定できない</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>NF-P13</strong>: 標本 200 以上の p95 は、2 回とも全試行で <strong>323 ms 以下</strong>（書き込みロックの試作の 1 回目の S2。それ以外は 172 ms 以下。上限 5・間隔なしは 99〜120 ms）。1 秒を下回った。</li>
+<li><strong>NF-C2</strong>: S3 は全試行で枯渇・その他の失敗が 0 件。<strong>標本は 60 件で、1% の差を検出できる大きさではない</strong>。<strong>この基準の合否は、この計測では言えない</strong>（隠さない）。</li>
+<li>「その他」の失敗は、全試行で 0 件。</li>
+<li>全 28 行（7 試行 × 4 シナリオ）の表は、<code>retry-measurement.md</code>（実行のたびに出力。リポジトリには置いていない）。</li>
+</ul>
+<h4 id="_19">解釈と限界（隠さない）<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h4>
+<ul>
+<li>同じストリームに同時に書く人数が N のとき、最後の書き手は最大 N 回の試行が要る。上限 5 は、4 人同時（S1）では十分だが、<strong>6 人以上（共同担当あり）では枯渇しうる</strong>。S2（7 人）で枯渇が 0 件だったのは、2 回・計 1,512 標本での観察で、<strong>理論上の余裕があるわけではない</strong>（使った試行の最大が上限の 5 に達した）。ADR-019 は、上限を 10 に上げる案を提案する（人の判断）。</li>
+<li>計測の道具は、2 回目の実行の後に、静的解析の指摘（<code>NoNestedFlatMap</code>・関数の長さ）を直すため、反復の部分を <code>runIterations</code> に整理した（<strong>測定の論理は同じ</strong>。直した後は、計測を再実行していない。ただし、枯渇の件数と遅延に影響しない整理）。</li>
+<li>ローカルの PostgreSQL（Testcontainers）・接続プール 12・1 台のクライアントからの擬似的な同時性。ジッターは再試行のトランザクションの外に入れた近似。ロックの試作は、既存の共有ロックの取得の直後に取る簡易版。</li>
+<li><strong>本番の監視（B13）が無いので、実環境の <code>RetryExhausted</code> の発生率は未確認</strong>。</li>
+</ul>
+<h4 id="_20">全検査<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h4>
+<p><code>ktlintCheck</code>・<code>detekt</code>・<code>detektMain</code>・<code>detektTest</code>・<code>pmd</code> が違反 0。<code>:application:test</code>・<code>:adapter-persistence:test</code>・<code>:adapter-persistence:integrationTest</code>（計測は既定で実行されない）・<code>:adapter-http:test</code>・<code>:domain:test</code> が成功。<strong>修正の経緯</strong>: 初版は detekt（<code>LongMethod</code>・<code>MatchingDeclarationName</code>）と PMD（<code>NoNestedFlatMap</code>）に違反した。関数を分け、型を <code>private</code> にし、反復を関数にして解消した（<code>@Suppress</code> は使っていない）。</p>
+<h4 id="_21">規律<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h4>
+<p>ファイルの編集は Write・Edit のみ（Step 5 の作業で。<code>sed -i</code> は使っていない）。</p>
 <h3 id="step-6-http">Step 6: アプリケーションと HTTP（🔴🟢🟡）<a class="headerlink" href="#step-6-http" title="Permanent link">&para;</a></h3>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 6.1 🔴 HTTP の統合テスト（<code>testApplication</code>）を先に書く: 共同担当の保存（200）、競合の 409（最新値・保存者・時刻。<strong>表示名は同じ役割の共同担当にだけ</strong>）、<code>DecisionsChanged</code>／<code>WeekAdvanced</code> の区別、<code>Idempotency-Key</code> の再送（同じ操作者・同じ本文なら保存済みの応答。<strong>別の操作者の同じキーは <code>app.idempotency_key_reused</code></strong>）、<strong>失効した資格の再送は 403</strong>（B5 の保証を、共同担当の保存でも崩さない）、<code>problem+json</code> の <code>code</code>。失敗を確認する</li>
@@ -10698,7 +10827,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> コードを、人が全行理解して承認した（ゲート 8）</li>
 </ul>
 <hr />
-<h2 id="_17">リスクと対策<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<h2 id="_22">リスクと対策<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -10768,12 +10897,12 @@
 <hr />
 <h2 id="validating-design">設計整合性の検証結果（着手前。<code>validating-design</code>）<a class="headerlink" href="#validating-design" title="Permanent link">&para;</a></h2>
 <p><strong>Step 0.2 で実施した（2026-11-15。実施者: claude-code/claude-sonnet-5-5）。</strong> 軸 A・B・C のすべてを、実ファイル（開発戦略、設計書、ADR、B1〜B5 の計画・終了報告、U1 総括、実コード、<code>features/</code>、<code>contracts/openapi.yaml</code>）と突き合わせた（サブエージェントは使っていない。<code>validating-iteration-plan</code> のフィールド単位の突合は行っていない）。<strong>承認済みの計画を、検証の結果で修正したときは、更新履歴に「検証による修正」と記録し、人に再確認を求める</strong>（<a href="../development_strategy/">開発戦略</a>の「不整合の扱い」）。</p>
-<h3 id="_18">検証対象<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<h3 id="_23">検証対象<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Bolt 計画: <code>docs/development/beer-game-kotlin/bolt_6_plan.md</code></li>
 <li>局面（開発戦略）: <strong>中盤</strong>（B5〜B12）、アプローチ: <strong>インサイドアウト</strong></li>
 </ul>
-<h3 id="_19">検証結果サマリー<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h3>
+<h3 id="_24">検証結果サマリー<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -11015,7 +11144,7 @@
 </tbody>
 </table>
 <hr />
-<h2 id="_20">更新履歴<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
+<h2 id="_25">更新履歴<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -11025,6 +11154,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>Step 5（5.1〜5.5）を実施</strong>（<code>RetryExhausted</code> の発生率の計測。<strong><code>main</code> の変更なし</strong>。<strong>ゲート 5 は人の確認待ち（未承認）。承認は記録していない。Step 6 以降には進んでいない</strong>）。計測の道具（<code>RetryMeasurement.kt</code>。新規ファイル）で、7 試行 × 4 シナリオを 2 回計測。上限 3 は S1 の基準を満たさず（2.8%）、上限 5 以上は 0 件。ADR-019（提案）を書いた。<strong>5.6（既定値の変更）は意図的に未実施</strong>（承認待ち）。NF-C2 の合否はこの計測では言えない。結果は「Step 5 の実施結果」</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>ゲート 4 をユーザーが承認し、Step 5 に進める指示を受けた</strong>（指示: 「B6 のゲート 4 を承認して Step 5 に進めて」。承認の範囲はゲート 4 だけ。ゲート 5〜8 は未承認。Step 6 以降へは進まない）</td>
