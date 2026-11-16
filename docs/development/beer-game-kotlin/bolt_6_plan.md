@@ -664,7 +664,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 | `web/src/api/problems.ts`・`types.ts`・`labels.ts` | 競合の本文の `latest` を、形を確かめて取り出す `latestOf`、競合・代理入力の見出しの文言、`DecisionEditor`・`DecisionEntry` の型、`formatClock`（保存の時刻を「時:分」で。時刻帯を指定可能）、`editorName` |
 | 試験 | `PlayPage.test.tsx`（新規 12）、`LobbyPage.test.tsx`（新規 1）、**新規 `features/weekly-play/co-input-ui.feature`（`@ui` 1 シナリオ）**、**新規 `web/steps/co-input-ui.steps.mjs`**、`web/support/console-window.mjs`（共同担当の準備と、共同入力の操作・確認の窓口） |
 
-新規ファイルは 4 つ（`ConflictNotice.tsx`・`co-input-ui.feature`・`co-input-ui.steps.mjs` と、`PlayPage.test.tsx` への追加は既存）。判断項目 14 の見込みの一覧に無い。**ゲート 7 で承認をお願いします**。
+新規ファイルは 3 つ（`ConflictNotice.tsx`・`co-input-ui.feature`・`co-input-ui.steps.mjs`。ほかは既存ファイルへの追加）。判断項目 14 の見込みの一覧に無い。**ゲート 7 で承認をお願いします**。
 
 S04（ロビー）の共同担当の表示は、**元から**、同じ役割の行に全員を「、」で並べていた（変更なし。回帰の試験を 1 件足した。最初から Green）。
 
