@@ -17,6 +17,7 @@ import beergame.application.ProjectedWeekResult
 import beergame.application.ProjectionReader
 import beergame.application.SessionStatus
 import beergame.application.Versions
+import beergame.domain.Editor
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
@@ -167,9 +168,21 @@ internal class JdbcProjectionReader(
     ): Either<AppFailure, Map<Role, ProjectedDecision>> =
         c
             .query(DECISIONS_SQL, gameId) { rs ->
-                roleOf(rs.getString("role")) to
-                    ProjectedDecision(rs.getInt("week"), rs.getInt("quantity"), rs.getLong("decision_version"))
-            }.map { (role, decision) -> if (role == null) failure("役割が不正").left() else (role to decision).right() }
+                val role = roleOf(rs.getString("role"))
+                val editor = editorOf(rs.getString("editor_kind"), rs.getUuid("editor_id"))
+                if (role == null || editor == null) {
+                    null
+                } else {
+                    role to
+                        ProjectedDecision(
+                            week = rs.getInt("week"),
+                            quantity = rs.getInt("quantity"),
+                            version = rs.getLong("decision_version"),
+                            editor = editor,
+                            savedAt = rs.getInstant("updated_at"),
+                        )
+                }
+            }.map { it?.right() ?: failure("役割または入力者が不正").left() }
             .sequence()
             .map { it.toMap() }
 
@@ -228,7 +241,8 @@ internal class JdbcProjectionReader(
             "SELECT role, inventory, backlog, arrivals, orders, cumulative_cost_minor, as_of_week " +
                 "FROM role_current_states WHERE game_id = ?"
         const val DECISIONS_SQL =
-            "SELECT role, week, quantity, decision_version FROM current_decisions WHERE game_id = ?"
+            "SELECT role, week, quantity, decision_version, editor_kind, editor_id, updated_at " +
+                "FROM current_decisions WHERE game_id = ?"
         const val RESULTS_SQL =
             "SELECT role, week, demand, shipped, ordered, ending_inventory, ending_backlog, weekly_cost_minor, " +
                 "cumulative_cost_minor FROM week_role_results WHERE game_id = ? ORDER BY week"
@@ -239,6 +253,18 @@ internal class JdbcProjectionReader(
 private const val OP = "projection.read"
 
 private fun roleOf(name: String): Role? = Role.entries.firstOrNull { it.name == name }
+
+/** `current_decisions.editor_kind`（`PARTICIPANT`・`FACILITATOR`）と `editor_id` から、入力者を復元する。不明な種別は null。 */
+private fun editorOf(
+    kind: String,
+    id: UUID?,
+): Editor? =
+    when {
+        id == null -> null
+        kind == "PARTICIPANT" -> Editor.ByParticipant(ParticipantId(id))
+        kind == "FACILITATOR" -> Editor.ByFacilitator(GameId(id))
+        else -> null
+    }
 
 private fun failure(message: String): AppFailure = AppFailure.Persistence(PersistenceFailure(OP, message))
 

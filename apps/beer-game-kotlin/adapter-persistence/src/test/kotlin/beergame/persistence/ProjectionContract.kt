@@ -2,8 +2,10 @@ package beergame.persistence
 
 import arrow.core.raise.either
 import beergame.application.AppFailure
+import beergame.domain.Editor
 import beergame.domain.GameEvent
 import beergame.domain.Role
+import beergame.domain.SessionEvent
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
 import io.kotest.core.spec.style.FunSpec
@@ -19,6 +21,7 @@ fun FunSpec.projectionContract(fixture: () -> Fixture) {
     projectedStatesContract(fixture)
     continuationProjectionContract(fixture)
     replacedRoleProjectionContract(fixture)
+    coHolderProjectionContract(fixture)
     projectedEndContract(fixture)
     checkpointContract(fixture)
     projectionRollbackContract(fixture)
@@ -196,6 +199,58 @@ private fun FunSpec.replacedRoleProjectionContract(fixture: () -> Fixture) {
         replaced.single().role shouldBe null
         game.participants.single { it.participantId == newcomer }.role shouldBe Role.RETAILER
         game.participants.size shouldBe 5
+    }
+}
+
+private fun FunSpec.coHolderProjectionContract(fixture: () -> Fixture) {
+    test(
+        "[B6/3.1c] Given 同じ役割に共同担当がいて、共同担当が保存した When 問い合わせ用の投影を読む " +
+            "Then 入力の保存者（参加者）・保存の時刻（イベントの時刻）が読め、同じ役割の共同担当が参加の順に並ぶ",
+    ) {
+        val fx = fixture()
+        val script = GameScript().create()
+        val players = script.joinAllRoles()
+        val first = script.join("花子")
+        val second = script.join("次郎")
+        script.assign(first, Role.RETAILER).assign(second, Role.RETAILER)
+        script.startGame().save(second, Role.RETAILER, 9)
+        fx.appendScript(script)
+        val savedAt = script.events.last { it.payload is SessionEvent.DecisionSaved }.occurredAt
+
+        val game =
+            checkNotNull(
+                fx.persistence.reader
+                    .read(script.gameId)
+                    .getOrNull(),
+            )
+
+        val decision = game.decisions.getValue(Role.RETAILER)
+        decision.editor shouldBe Editor.ByParticipant(second)
+        decision.savedAt shouldBe savedAt
+        decision.quantity shouldBe 9
+        // 表示名は周辺ストア（display_profiles）の結合で、この契約の台本（投影だけ）は書かない。結合は、application の流れの契約が確かめる
+        game.participants.filter { it.role == Role.RETAILER }.map { it.participantId } shouldBe
+            listOf(players.getValue(Role.RETAILER), first, second)
+    }
+
+    test("[B6/3.1c] Given 進行役の代理入力 When 問い合わせ用の投影を読む Then 入力の保存者は進行役（ゲームの識別子）で、保存の時刻が読める") {
+        val fx = fixture()
+        val script = GameScript().create()
+        script.joinAllRoles()
+        script.startGame().proxy(Role.FACTORY, 6)
+        fx.appendScript(script)
+        val savedAt = script.events.last { it.payload is SessionEvent.ProxyDecisionSubmitted }.occurredAt
+
+        val game =
+            checkNotNull(
+                fx.persistence.reader
+                    .read(script.gameId)
+                    .getOrNull(),
+            )
+
+        val decision = game.decisions.getValue(Role.FACTORY)
+        decision.editor shouldBe Editor.ByFacilitator(script.gameId)
+        decision.savedAt shouldBe savedAt
     }
 }
 

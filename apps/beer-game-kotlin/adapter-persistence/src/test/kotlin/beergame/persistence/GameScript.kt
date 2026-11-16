@@ -93,7 +93,7 @@ class GameScript(
         return this
     }
 
-    fun join(): ParticipantId {
+    fun join(name: String = "参加者"): ParticipantId {
         val id = ParticipantId(UUID.randomUUID())
         val at = now()
         applyGame(
@@ -103,7 +103,7 @@ class GameScript(
                 Actor.Anonymous,
                 at,
                 id,
-                DisplayName.of("参加者").getOrElse { error("$it") },
+                DisplayName.of(name).getOrElse { error("$it") },
                 at.plusSeconds(86_400),
             ),
         )

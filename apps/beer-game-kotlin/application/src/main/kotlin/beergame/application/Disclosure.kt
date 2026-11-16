@@ -3,6 +3,7 @@ package beergame.application
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
+import beergame.domain.Editor
 import beergame.domain.GameError
 import beergame.domain.ParticipantId
 import beergame.domain.Role
@@ -33,7 +34,11 @@ object Disclosure {
                                 it.replaced,
                             )
                         },
-                    roles = Role.entries.mapNotNull { role -> game.statusOf(role)?.let { role to it } }.toMap(),
+                    roles =
+                        Role.entries
+                            .mapNotNull { role ->
+                                game.statusOf(role) { it is Editor.ByFacilitator }?.let { role to it }
+                            }.toMap(),
                     results = game.results.sortedWith(compareBy({ it.week }, { it.role.ordinal })).map { it.view() },
                 ),
         )
@@ -41,6 +46,7 @@ object Disclosure {
     /**
      * 参加者。[requestedRole] が自分の役割と違えば、値を返さず `game.forbidden`（AC2.1.2）。
      * 小売店だけが当週の顧客需要を持つ（AC2.1.3）。
+     * 保存者の表示名と共同担当は、自分の役割のものだけ（同じ役割の共同担当にだけ見せる。B6）。
      */
     fun forParticipant(
         game: ProjectedGame,
@@ -56,17 +62,61 @@ object Disclosure {
                 status = game.status,
                 session = game.session.summary(),
                 versions = game.versions,
-                view = SnapshotView.Participant(participantId, role, role?.let { game.statusOf(it) }),
+                view =
+                    SnapshotView.Participant(
+                        participantId,
+                        role,
+                        role?.let { game.statusOf(it) { editor -> editor.isParticipant(participantId) } },
+                        game.coHoldersOf(role, participantId),
+                    ),
             ).right()
         }
     }
+
+    private fun Editor.isParticipant(participantId: ParticipantId): Boolean =
+        this is Editor.ByParticipant && id == participantId
+
+    /** 自分の役割の共同担当（自分を含む）。役割が無ければ空。入れ替えで外れた旧担当者は、役割が無いので含まれない。 */
+    private fun ProjectedGame.coHoldersOf(
+        role: Role?,
+        participantId: ParticipantId,
+    ): List<CoHolderView> =
+        if (role == null) {
+            emptyList()
+        } else {
+            participants
+                .filter { it.role == role && !it.replaced }
+                .map { CoHolderView(it.displayName, it.participantId == participantId) }
+        }
+
+    /** 保存者。表示名は参加者の行から結合する（進行役の代理入力は持たない）。 */
+    private fun ProjectedGame.editorView(
+        editor: Editor,
+        isSelf: (Editor) -> Boolean,
+    ): DecisionEditorView =
+        when (editor) {
+            is Editor.ByParticipant -> {
+                DecisionEditorView(
+                    EditorKind.PARTICIPANT,
+                    isSelf(editor),
+                    participants.firstOrNull { it.participantId == editor.id }?.displayName,
+                )
+            }
+
+            is Editor.ByFacilitator -> {
+                DecisionEditorView(EditorKind.FACILITATOR_PROXY, isSelf(editor), null)
+            }
+        }
 
     private fun ProjectedSession?.summary(): SessionSummary? =
         this?.let {
             SessionSummary(it.status, it.week, it.submittedRoleCount)
         }
 
-    private fun ProjectedGame.statusOf(role: Role): RoleStatus? =
+    private fun ProjectedGame.statusOf(
+        role: Role,
+        isSelf: (Editor) -> Boolean,
+    ): RoleStatus? =
         roleStates[role]?.let { state ->
             val decision = decisions[role]
             RoleStatus(
@@ -77,6 +127,8 @@ object Disclosure {
                 customerDemand = if (role.downstream == null) state.orders else null,
                 decision = decision?.quantity,
                 decisionVersion = decision?.version ?: 0L,
+                decisionEditor = decision?.let { editorView(it.editor, isSelf) },
+                decisionSavedAt = decision?.savedAt,
             )
         }
 

@@ -13,6 +13,8 @@ import beergame.application.CreateGameInput
 import beergame.application.CredentialDigest
 import beergame.application.CredentialKeyRing
 import beergame.application.CredentialKind
+import beergame.application.DecisionEditorView
+import beergame.application.EditorKind
 import beergame.application.EventStore
 import beergame.application.Generators
 import beergame.application.JoinGameInput
@@ -46,6 +48,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotContain
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -116,6 +119,8 @@ private data class Started(
     val facilitatorRecovery: String,
     val joinCode: String,
     val seats: RoleMap<Seat>,
+    /** 小売店の共同担当（[start] の `coHolderName` を渡したときだけ）。 */
+    val coHolder: Seat? = null,
 )
 
 private val NAMES = RoleMap("工場の花子", "一次卸の次郎", "二次卸の三郎", "小売の四郎")
@@ -125,7 +130,10 @@ private val NAMES = RoleMap("工場の花子", "一次卸の次郎", "二次卸�
  * 実 DB の待ちは IO のディスパッチャーの中にあるので、場面づくりは runBlocking で同期的に書く
  * （detekt 1.23.8 は、別のモジュールの suspend 関数の呼び出しを検出できず、suspend の修飾を冗長と誤判定するため）。
  */
-private fun Fixture.start(tag: String): Started =
+private fun Fixture.start(
+    tag: String,
+    coHolderName: String? = null,
+): Started =
     runBlocking {
         val ports = ports()
         val created = ports.createGame(CreateGameInput(3, listOf(4, 999, 998), 90), meta("create-$tag")).orFail()
@@ -156,8 +164,28 @@ private fun Fixture.start(tag: String): Started =
                     meta("assign-$tag-${role.name}", facilitator),
                 ).orFail()
         }
+        val coHolder =
+            coHolderName?.let { name ->
+                val outcome = ports.joinGame(JoinGameInput(joinCode, name), meta("join-$tag-co")).orFail()
+                val issued = checkNotNull(outcome.issued)
+                val seat =
+                    Seat(
+                        ParticipantId(checkNotNull(issued.actor.id)),
+                        issued.raw,
+                        checkNotNull(outcome.recovery).raw,
+                        name,
+                    )
+                ports
+                    .assignRole(
+                        created.gameId,
+                        seat.participantId,
+                        Role.RETAILER,
+                        meta("assign-$tag-co", facilitator),
+                    ).orFail()
+                seat
+            }
         ports.startGame(created.gameId, meta("start-$tag", facilitator)).orFail()
-        Started(created.gameId, facilitator, facilitatorRecovery, joinCode, RoleMap.of { seats.getValue(it) })
+        Started(created.gameId, facilitator, facilitatorRecovery, joinCode, RoleMap.of { seats.getValue(it) }, coHolder)
     }
 
 private fun Fixture.playWeekOne(game: Started): CommandOutcome =
@@ -398,6 +426,37 @@ private fun FunSpec.credentialRecoveryContract(fixture: () -> Fixture) {
 }
 
 private fun FunSpec.disclosureContract(fixture: () -> Fixture) {
+    test("[B6/3.1c] Given 実 DB で小売店に共同担当がいて、共同担当が保存した When 各人が取得する Then 保存者の表示名・保存の時刻・共同担当が、同じ役割と進行役にだけ返る") {
+        val fx = fixture()
+        val game = fx.start("co", coHolderName = "共同の花子")
+        val coHolder = checkNotNull(game.coHolder)
+        val ports = fx.ports()
+        ports
+            .saveDecision(
+                game.gameId,
+                SaveDecisionInput(Role.RETAILER, 1, 7, 0),
+                meta("save-co", coHolder.credential),
+            ).orFail()
+
+        val owner = ports.snapshot(game.gameId, game.seats[Role.RETAILER].credential).orFail().participant()
+        val partner = ports.snapshot(game.gameId, coHolder.credential).orFail().participant()
+        val other = ports.snapshot(game.gameId, game.seats[Role.WHOLESALER].credential).orFail().participant()
+        val facilitator = ports.snapshot(game.gameId, game.facilitator).orFail().facilitator()
+
+        checkNotNull(owner.status).decisionEditor shouldBe DecisionEditorView(EditorKind.PARTICIPANT, false, "共同の花子")
+        checkNotNull(partner.status).decisionEditor shouldBe DecisionEditorView(EditorKind.PARTICIPANT, true, "共同の花子")
+        checkNotNull(owner.status).decisionSavedAt shouldNotBe null
+        // 並びは、参加の時刻（この試験では固定の時計で同じ）→ 参加者 ID の順なので、名前から自分かどうかへの対応で比べる
+        owner.coHolders.associate { it.displayName to it.isSelf } shouldBe
+            mapOf(NAMES[Role.RETAILER] to true, "共同の花子" to false)
+        facilitator.roles.getValue(Role.RETAILER).decisionEditor shouldBe
+            DecisionEditorView(EditorKind.PARTICIPANT, false, "共同の花子")
+        // 他の役割の参加者には、共同担当の表示名も保存の時刻も、どの項目にも出ない
+        other.toString() shouldNotContain "共同の花子"
+        other.toString() shouldNotContain checkNotNull(owner.status).decisionSavedAt.toString()
+        other.coHolders.map { it.displayName } shouldBe listOf(NAMES[Role.WHOLESALER])
+    }
+
     test("[B1/Step8] Given 実 DB When 作成から確定までを通す Then 役割ごとの投影が開示の規則どおりに返り、版は DB の最大の版と一致する") {
         val fx = fixture()
         val game = fx.start("flow")

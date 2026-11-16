@@ -1,8 +1,10 @@
 package beergame.application
 
+import beergame.domain.Editor
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
+import java.time.Instant
 
 /*
  * 問い合わせ側の型。`ProjectedGame` は投影の表から読んだままの行（開示の規則は掛けていない）、
@@ -43,6 +45,10 @@ data class ProjectedDecision(
     val week: Int,
     val quantity: Int,
     val version: Long,
+    /** 最後に保存した人（`current_decisions.editor_kind`・`editor_id`）。表示名は持たない（結合は開示の規則）。 */
+    val editor: Editor,
+    /** 保存の時刻（`current_decisions.updated_at`。イベントの時刻）。 */
+    val savedAt: Instant,
 )
 
 data class ProjectedWeekResult(
@@ -80,7 +86,28 @@ data class SessionSummary(
     val submittedRoleCount: Int,
 )
 
-/** 1 役割の状況。[customerDemand] は小売店だけが持つ当週の顧客需要（他の役割は null）。 */
+enum class EditorKind { PARTICIPANT, FACILITATOR_PROXY }
+
+/**
+ * 入力を保存した人（B6）。[displayName] は参加者のときだけ（進行役の代理入力は持たない）。
+ * 表示名は、同じ役割の共同担当と進行役にだけ返す（他の役割・観察者・無資格には、この値を持つ状況そのものを返さない）。
+ */
+data class DecisionEditorView(
+    val kind: EditorKind,
+    val isSelf: Boolean,
+    val displayName: String?,
+)
+
+/** 同じ役割の共同担当（B6）。参加者の ID は含めない。 */
+data class CoHolderView(
+    val displayName: String?,
+    val isSelf: Boolean,
+)
+
+/**
+ * 1 役割の状況。[customerDemand] は小売店だけが持つ当週の顧客需要（他の役割は null）。
+ * [decisionEditor]・[decisionSavedAt] は、当週の入力を最後に保存した人と時刻（入力が無ければ null）。
+ */
 data class RoleStatus(
     val inventory: Int,
     val backlog: Int,
@@ -89,6 +116,8 @@ data class RoleStatus(
     val customerDemand: Int?,
     val decision: Int?,
     val decisionVersion: Long,
+    val decisionEditor: DecisionEditorView? = null,
+    val decisionSavedAt: Instant? = null,
 )
 
 data class LobbyEntry(
@@ -111,11 +140,15 @@ data class WeekResultView(
 )
 
 sealed interface SnapshotView {
-    /** 参加者: 自分の役割の状況だけ。他の役割の値、参加コード、他の参加者の表示名、将来の需要は含まない。 */
+    /**
+     * 参加者: 自分の役割の状況だけ。他の役割の値、参加コード、他の役割の参加者の表示名、将来の需要は含まない。
+     * [coHolders] は、同じ役割の共同担当（自分を含む。入れ替えで外れた旧担当者は含まない）。
+     */
     data class Participant(
         val participantId: ParticipantId,
         val role: Role?,
         val status: RoleStatus?,
+        val coHolders: List<CoHolderView> = emptyList(),
     ) : SnapshotView
 
     /** 進行役: 全役割の状況と入力、参加コード、ロビー、確定した週の結果。 */
