@@ -8,6 +8,7 @@ import type { GameState, Role, RoleWeekResult, SessionState } from '../../api/ty
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
+import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER, SESSION_STATUS_LABELS, WEEK_SEPARATOR } from '../../labels';
 
@@ -235,6 +236,7 @@ export function ConsolePage() {
     return (
         <>
             <PageHeading title="進行役のコンソール" />
+            <SettingsNote kind={game.settingsKind} changed={game.changedSettings} />
             {failure ? (
                 <ErrorNotice error={failure} extra="最新状態を確認して、再度操作してください。" />
             ) : null}

@@ -588,14 +588,18 @@ export interface components {
             recoveryCode?: string;
         };
         /**
-         * @description キット準拠の作成（B1）。カスタム条件（B7）は含めない。
-         *     **最終週と需要系列は必須**（キットの既定の系列は ASM-01 のとおり JSD の値が未確定のため、B1 では既定を置かない。custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
+         * @description ゲームの作成。種別 `KIT`（キット準拠）か `CUSTOM`（カスタム条件。B7 の提案）。
+         *     **最終週と需要系列は必須**（キットの既定の系列は ASM-01 のとおり JSD の値が未確定のため、既定を置かない。custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
          *     範囲（週 1〜50、需要 0〜1000、保持日数 1〜3650）の検証は domain が持つ。範囲外は 422 で、需要の誤りは対象の週（1 始まり）と修正内容を示す。
          *     整数でない値（小数・文字・null）は、形の誤りとして 422（需要は対象の週つき）。JSON として不正な本文は 400。
+         *     **カスタム条件（B7）**: `conditions`（任意）で、初期在庫・遅延・費用単価・公開範囲を変える。省略した項目は、キットの値。
+         *     `KIT` に `conditions` を付けると 422（`conditions`。カスタムで作成するよう示す）。範囲外の値は 422 で、対象（`conditions.<項目>`）と修正内容を、すべて集めて示す。
+         *     **設定の種別は、値から導出**する（キットの値と同じなら、`CUSTOM` で送っても `KIT`）。結果は、状態の `settingsKind`・`changedSettings` に示す（AC1.1.3）。
          */
         CreateGameRequest: {
             /** @enum {string} */
-            kind: 'KIT';
+            kind: 'KIT' | 'CUSTOM';
+            conditions?: components['schemas']['CustomConditions'];
             /** @description 最終週（AC1.1.5。1〜50）。 */
             finalWeek: number;
             /** @description 需要系列（最終週以上の長さ、各 0〜1000）。長さの下限は最終週に依存するので、スキーマでは表さない（domain が検証する）。 */
@@ -603,6 +607,51 @@ export interface components {
             /** @description 保持日数（1〜3650）。未指定は 90（NF-S16）。 */
             retentionDays?: number;
         };
+        /**
+         * @description カスタム条件（B7 の提案。範囲は仮置きで、人が決める）。省略した項目は、キットの値（初期在庫 12、初期の流れ 4、遅延 2 週、在庫単価 50・受注残単価 100（最小単位）、公開範囲 `TEAM_TOTAL`）。
+         *     公開範囲の実際の開示（観察者への表示・抑止）は B9。ここでは、設定として保存するだけ。
+         */
+        CustomConditions: {
+            /** @description 役割ごとの初期在庫（0〜1000）。省略した役割は 12。 */
+            initialInventory?: {
+                [key: string]: number;
+            };
+            /** @description 初期の流れ（遅延の各段にある注文・品物の数量。0〜1000）。キットは 4。 */
+            initialFlow?: number;
+            /** @description 注文の遅延（週。1〜8）。キットは 2。 */
+            orderDelayWeeks?: number;
+            /** @description 配送の遅延（週。1〜8）。キットは 2。 */
+            shipmentDelayWeeks?: number;
+            /** @description 工場の生産の遅延（週。1〜8）。キットは 2。 */
+            productionDelayWeeks?: number;
+            /** @description 在庫の単価（1 単位・1 週。最小単位）。キットは 50。 */
+            holdingCostMinor?: number;
+            /** @description 受注残の単価（1 単位・1 週。最小単位）。キットは 100。 */
+            backlogCostMinor?: number;
+            /**
+             * @description プレイ中に観察者へ見せる範囲。キットは `TEAM_TOTAL`。
+             * @enum {string}
+             */
+            disclosurePolicy?: 'TEAM_TOTAL' | 'NONE';
+        };
+        /**
+         * @description 設定の種別。キットの値と同じなら `KIT`、違えば `CUSTOM`（最終週と需要系列は、ASM-01 が確定するまで判定に含めない）。
+         * @enum {string}
+         */
+        SettingsKind: 'KIT' | 'CUSTOM';
+        /**
+         * @description キットの値から変えた項目。
+         * @enum {string}
+         */
+        SettingsField:
+            | 'INITIAL_INVENTORY'
+            | 'INITIAL_FLOW'
+            | 'ORDER_DELAY'
+            | 'SHIPMENT_DELAY'
+            | 'PRODUCTION_DELAY'
+            | 'HOLDING_COST'
+            | 'BACKLOG_COST'
+            | 'DISCLOSURE';
         JoinGameRequest: {
             joinCode: string;
             /** @description 表示名。前後の空白を除いて 1〜80 文字（コードポイントの数。domain の `DisplayName`。空白だけの表示名は domain が拒否する）。 */
@@ -646,6 +695,9 @@ export interface components {
             status: 'PREPARING' | 'STARTED' | 'ENDED';
             /** @description 進行役にだけ返す。 */
             joinCode: string;
+            settingsKind: components['schemas']['SettingsKind'];
+            /** @description キットの値から変えた項目（`settingsKind` が `KIT` なら空）。 */
+            changedSettings: components['schemas']['SettingsField'][];
             participants: components['schemas']['LobbyParticipant'][];
             versions: components['schemas']['StreamVersions'];
         };
@@ -660,6 +712,9 @@ export interface components {
             sessionId: string | null;
             /** @enum {string} */
             status: 'PREPARING' | 'STARTED' | 'ENDED';
+            settingsKind: components['schemas']['SettingsKind'];
+            /** @description キットの値から変えた項目（`settingsKind` が `KIT` なら空）。進行役・参加者のどちらにも返す（値そのものは返さない）。 */
+            changedSettings: components['schemas']['SettingsField'][];
             /** @description 進行役だけ。 */
             joinCode?: string;
             /** @description 進行役だけ。 */

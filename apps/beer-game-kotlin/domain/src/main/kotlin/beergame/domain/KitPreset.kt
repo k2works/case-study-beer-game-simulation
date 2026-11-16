@@ -10,25 +10,48 @@ object KitPreset {
     /** 在庫単価 $0.50、受注残単価 $1.00（最小単位はセント）。 */
     val costPolicy: CostPolicy = CostPolicy(Money(HOLDING_COST_MINOR), Money(BACKLOG_COST_MINOR))
 
+    private const val KIT_DELAY_WEEKS = 2
+
+    /** 在庫は各役割 12、流れ（入荷・受注・待ち行列の各段）は 4。 */
+    val initialConditions: InitialConditions =
+        InitialConditions(RoleMap.all(Units(INITIAL_INVENTORY)), Units(INITIAL_FLOW))
+
+    /** 注文・配送・生産の遅延は、いずれも 2 週。 */
+    val delays: Delays = Delays(Delay(KIT_DELAY_WEEKS), Delay(KIT_DELAY_WEEKS), Delay(KIT_DELAY_WEEKS))
+
     /**
-     * 第 1 週の開始時の状態: 在庫 12、入荷と受注 4、遅延 2 週（待ち行列は 1 段）の各段 4。
-     * 小売店の受注は第 1 週の顧客需要。工場は上流が無いので、注文の待ち行列は空。
+     * 第 1 週の開始時の状態。既定はキットの値: 在庫 12、入荷と受注 4、遅延 2 週（待ち行列は 1 段）の各段 4。
+     * 小売店の受注は第 1 週の顧客需要。工場は上流が無いので、注文の待ち行列は空。待ち行列の長さは「遅延 − 1」。
      */
-    fun initialStates(demand: DemandSeries): RoleMap<RoleState> =
+    fun initialStates(
+        demand: DemandSeries,
+        initial: InitialConditions = initialConditions,
+        delays: Delays = KitPreset.delays,
+    ): RoleMap<RoleState> =
         RoleMap.of { role ->
+            val deliveryDelay = if (role.upstream == null) delays.production else delays.shipment
             RoleState(
-                inventory = Units(INITIAL_INVENTORY),
+                inventory = initial.inventory[role],
                 backlog = Units(0),
-                orderPipeline = orderPipelineOf(role),
-                deliveryPipeline = Pipeline(listOf(Units(INITIAL_FLOW))),
+                orderPipeline =
+                    if (role.upstream ==
+                        null
+                    ) {
+                        Pipeline(emptyList())
+                    } else {
+                        flowOf(initial.flow, delays.order)
+                    },
+                deliveryPipeline = flowOf(initial.flow, deliveryDelay),
                 cumulativeCost = Money.ZERO,
-                arrivals = Units(INITIAL_FLOW),
-                orders = if (role.downstream == null) demand.at(FIRST_WEEK) else Units(INITIAL_FLOW),
+                arrivals = initial.flow,
+                orders = if (role.downstream == null) demand.at(FIRST_WEEK) else initial.flow,
             )
         }
 
-    private fun orderPipelineOf(role: Role): Pipeline =
-        if (role.upstream == null) Pipeline(emptyList()) else Pipeline(listOf(Units(INITIAL_FLOW)))
+    private fun flowOf(
+        flow: Units,
+        delay: Delay,
+    ): Pipeline = Pipeline(List(delay.weeks - 1) { flow })
 
     private val FIRST_WEEK: Week = Week(1)
 }

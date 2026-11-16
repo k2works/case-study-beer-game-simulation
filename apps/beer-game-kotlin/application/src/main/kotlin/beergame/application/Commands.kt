@@ -5,6 +5,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensureNotNull
 import beergame.domain.Actor
 import beergame.domain.ActorRef
+import beergame.domain.ConditionInputs
 import beergame.domain.DisplayName
 import beergame.domain.GameCommand
 import beergame.domain.GameError
@@ -29,6 +30,8 @@ data class CreateGameInput(
     val finalWeek: Int,
     val demand: List<Int>,
     val retentionDays: Int,
+    /** カスタム条件。null ならキット準拠（B7）。 */
+    val conditions: ConditionInputs? = null,
 )
 
 data class JoinGameInput(
@@ -84,13 +87,13 @@ suspend fun Ports.createGame(
 ): Either<AppFailure, CommandOutcome> =
     either {
         val (gameSettings, retention) =
-            (GameSettings.kit(input.finalWeek, input.demand) and RetentionDays.of(input.retentionDays).nel())
+            (input.settings() and RetentionDays.of(input.retentionDays).nel())
                 .mapLeft(AppFailure::Invalid)
                 .bind()
         val gameId = GameId(newId())
         val joinCode = JoinCode.of(newJoinCode()).mapLeft { generated("参加コード", it) }.bind()
         val issuance = issuance(CredentialKind.FACILITATOR, Actor.Facilitator(gameId).toRef())
-        val body = "kit|${input.finalWeek}|${input.demand.joinToString(",")}|${input.retentionDays}"
+        val body = input.idempotencyBody()
         val operation = Operation(gameId, IdempotencyKey.CREATE_SCOPE, body)
         val request =
             CommandRequest(

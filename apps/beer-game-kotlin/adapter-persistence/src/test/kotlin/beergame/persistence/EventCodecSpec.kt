@@ -2,11 +2,13 @@ package beergame.persistence
 
 import arrow.core.Either
 import arrow.core.getOrElse
+import beergame.domain.ConditionInputs
 import beergame.domain.CredentialSubject
 import beergame.domain.DecisionVersion
 import beergame.domain.Editor
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.GameSettings
 import beergame.domain.ParticipantId
 import beergame.domain.Quantity
 import beergame.domain.Role
@@ -197,6 +199,61 @@ class EventCodecSpec :
                 it.payloadJson shouldNotContain "参加者"
                 it.payloadJson shouldNotContain "displayName"
             }
+        }
+
+        test("[B7] カスタム条件の GameCreated を変換して戻すと、元と等しい。キット準拠の JSON には conditions が無い（過去のイベントと同じ形）") {
+            val facilitator = GameScript().create(finalWeek = 3)
+            val kitEvent =
+                facilitator.events
+                    .map { it.payload }
+                    .filterIsInstance<GameEvent.GameCreated>()
+                    .single()
+            val custom =
+                kitEvent.copy(
+                    settings =
+                        GameSettings
+                            .custom(
+                                3,
+                                listOf(4, 4, 4),
+                                ConditionInputs(
+                                    initialInventory = mapOf(Role.RETAILER to 20),
+                                    orderDelayWeeks = 3,
+                                    shipmentDelayWeeks = 1,
+                                    disclosurePolicy = "NONE",
+                                ),
+                            ).getOrElse { fail("カスタムの設定が作れない: $it") },
+                )
+
+            val encodedKit = EventCodec.encode(kitEvent)
+            encodedKit.payloadJson shouldNotContain "conditions"
+            EventCodec.decode(encodedKit.eventType, encodedKit.schemaVersion, encodedKit.payloadJson) shouldBe
+                Either.Right(kitEvent)
+            val encodedCustom = EventCodec.encode(custom)
+            encodedCustom.payloadJson shouldContain "\"conditions\""
+            EventCodec.decode(encodedCustom.eventType, encodedCustom.schemaVersion, encodedCustom.payloadJson) shouldBe
+                Either.Right(custom)
+        }
+
+        test("[B7] 遅延が 1 週未満の条件を持つ GameCreated は、復号できず Left") {
+            val kitEvent =
+                GameScript()
+                    .create(finalWeek = 3)
+                    .events
+                    .map {
+                        it.payload
+                    }.filterIsInstance<GameEvent.GameCreated>()
+                    .single()
+            val json = EventCodec.encode(kitEvent).payloadJson
+            val broken =
+                json.replace(
+                    "\"commitMode\":\"MANUAL\"",
+                    "\"commitMode\":\"MANUAL\",\"conditions\":{\"initialInventory\":{\"factory\":1,\"distributor\":1," +
+                        "\"wholesaler\":1,\"retailer\":1},\"initialFlow\":1,\"orderDelayWeeks\":0," +
+                        "\"shipmentDelayWeeks\":2," +
+                        "\"productionDelayWeeks\":2,\"disclosurePolicy\":\"TEAM_TOTAL\"}",
+                )
+
+            EventCodec.decode("GameCreated", 1, broken).shouldBeInstanceOf<Either.Left<String>>()
         }
 
         test("[7.2] golden: GameStarted と SessionEnded の JSON は固定の形") {

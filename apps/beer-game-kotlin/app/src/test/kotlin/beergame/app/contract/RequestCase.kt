@@ -75,7 +75,33 @@ private fun createCases(): List<RequestCase> {
     ) = b.case(label, "{$fields}", valid)
     return listOf(
         game("\"kind\":\"KIT\",\"finalWeek\":3", false, "需要系列が欠けている"),
-        game("\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8]", false, "kind が KIT でない"),
+        game("\"kind\":\"OTHER\",\"finalWeek\":3,\"demand\":[4,4,8]", false, "kind が KIT・CUSTOM のどちらでもない"),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8],\"conditions\":{\"shipmentDelayWeeks\":0}",
+            false,
+            "配送の遅延が 0（下限 1 の外）",
+        ),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8],\"conditions\":{\"orderDelayWeeks\":9}",
+            false,
+            "注文の遅延が 9（上限 8 の外）",
+        ),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8],\"conditions\":{\"holdingCostMinor\":-1}",
+            false,
+            "在庫の単価が -1（下限 0 の外）",
+        ),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8]," +
+                "\"conditions\":{\"initialInventory\":{\"RETAILER\":1001}}",
+            false,
+            "初期在庫が 1001（上限の外）",
+        ),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8],\"conditions\":{\"disclosurePolicy\":\"ALL\"}",
+            false,
+            "公開範囲が列挙の外",
+        ),
         game("\"kind\":\"KIT\",\"finalWeek\":\"3\",\"demand\":[4,4,8]", false, "最終週が文字列"),
         game("\"kind\":\"KIT\",\"finalWeek\":3,\"demand\":[4,\"x\",8]", false, "需要に文字列が混じる"),
         game("\"kind\":\"KIT\",\"finalWeek\":0,\"demand\":[4,4,8]", false, "最終週が 0（下限 1 の外）"),
@@ -85,6 +111,15 @@ private fun createCases(): List<RequestCase> {
         game("\"kind\":\"KIT\",\"finalWeek\":3,\"demand\":[4,4,8],\"retentionDays\":3651", false, "保持日数が 3651（上限の外）"),
         game("\"kind\":\"KIT\",\"finalWeek\":3,\"demand\":[4,4,8],\"retentionDays\":0", false, "保持日数が 0（下限の外）"),
         b.case("正しい要求", KIT_GAME, true),
+        game("\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8]", true, "条件の無いカスタム"),
+        game(
+            "\"kind\":\"CUSTOM\",\"finalWeek\":3,\"demand\":[4,4,8]," +
+                "\"conditions\":{\"initialInventory\":{\"RETAILER\":20},\"initialFlow\":6,\"orderDelayWeeks\":3," +
+                "\"shipmentDelayWeeks\":1,\"productionDelayWeeks\":8,\"holdingCostMinor\":80," +
+                "\"backlogCostMinor\":0,\"disclosurePolicy\":\"NONE\"}",
+            true,
+            "すべての条件を指定したカスタム",
+        ),
         game("\"kind\":\"KIT\",\"finalWeek\":3,\"demand\":[4,4,8],\"retentionDays\":90", true, "保持日数つきの正しい要求"),
         game("\"kind\":\"KIT\",\"finalWeek\":3,\"demand\":[4,4,8],\"extra\":1", true, "仕様に無い項目（仕様は許す）"),
     )

@@ -4,6 +4,7 @@ import beergame.application.CommandOutcome
 import beergame.application.GameStatus
 import beergame.application.LobbyEntry
 import beergame.application.RoleStatus
+import beergame.application.SettingsSummary
 import beergame.application.Snapshot
 import beergame.application.SnapshotView
 import beergame.application.Versions
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -124,6 +126,7 @@ internal fun Snapshot.toGameStateJson(): JsonObject =
         put("gameId", gameId.value.toString())
         put("sessionId", if (status == GameStatus.PREPARING) JsonNull else JsonPrimitive(gameId.value.toString()))
         put("status", status.name)
+        putSettings(settings)
         when (val current = view) {
             is SnapshotView.Participant -> {
                 put("participantId", current.participantId.value.toString())
@@ -144,6 +147,13 @@ internal fun Snapshot.toLobbyJson(facilitator: SnapshotView.Facilitator): JsonOb
         put("gameId", gameId.value.toString())
         put("status", status.name)
         put("joinCode", facilitator.joinCode)
+        putSettings(settings)
         put("participants", JsonArray(facilitator.lobby.map(::lobbyEntryJson)))
         put("versions", versions.toJson())
     }
+
+/** 設定の種別と、変更した項目（B7）。 */
+private fun JsonObjectBuilder.putSettings(settings: SettingsSummary) {
+    put("settingsKind", settings.kind)
+    put("changedSettings", JsonArray(settings.changes.map(::JsonPrimitive)))
+}

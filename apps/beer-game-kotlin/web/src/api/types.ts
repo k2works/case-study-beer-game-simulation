@@ -52,7 +52,24 @@ export interface CreateGameRequest {
     finalWeek: number | string;
     demand: ReadonlyArray<number | string>;
     retentionDays?: number | string;
+    conditions?: CustomConditionsInput;
 }
+
+/** カスタム条件の入力。仕様（CustomConditions）と同じ項目で、値は整数に読めない入力も文字列のまま送れる。 */
+export interface CustomConditionsInput {
+    initialInventory?: Partial<Record<Role, number | string>>;
+    initialFlow?: number | string;
+    orderDelayWeeks?: number | string;
+    shipmentDelayWeeks?: number | string;
+    productionDelayWeeks?: number | string;
+    holdingCostMinor?: number | string;
+    backlogCostMinor?: number | string;
+    disclosurePolicy?: Schemas['CustomConditions']['disclosurePolicy'];
+}
+
+export type SettingsKind = Schemas['SettingsKind'];
+
+export type SettingsField = Schemas['SettingsField'];
 
 // 仕様の作成の要求が、画面の型に代入できること（画面の型が、仕様より狭くならないことの検査）。
 const createRequestIsAccepted = (request: Schemas['CreateGameRequest']): CreateGameRequest =>

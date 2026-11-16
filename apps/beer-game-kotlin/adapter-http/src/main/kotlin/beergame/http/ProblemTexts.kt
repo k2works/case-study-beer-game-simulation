@@ -5,15 +5,49 @@ import beergame.domain.ValidationError
 /** 入力の誤りを、項目と修正内容にする。文言は、画面の辞書が持つ文言と別（API の `message` は修正内容の要点）。 */
 internal fun ValidationError.toFieldError(): FieldError =
     when (this) {
-        is ValidationError.QuantityOutOfRange -> FieldError("quantity", "数量は 0 以上 $max 以下の整数にしてください。")
-        is ValidationError.WeekOutOfRange -> FieldError("week", "週は 1 以上 $max 以下の整数にしてください。")
-        is ValidationError.UnitsNegative -> FieldError("units", "数量は 0 以上の整数にしてください。")
-        is ValidationError.MoneyNegative -> FieldError("money", "金額は 0 以上にしてください。")
-        is ValidationError.VersionNegative -> FieldError("version", "版は 0 以上の整数にしてください。")
-        is ValidationError.DisplayNameInvalid -> FieldError("displayName", "表示名は 1 文字以上 80 文字以下にしてください。")
-        is ValidationError.JoinCodeInvalid -> FieldError("joinCode", "参加コードの形式が正しくありません。")
-        is ValidationError.RetentionOutOfRange -> FieldError("retentionDays", "保持日数は 1 以上 3650 以下の整数にしてください。")
-        is ValidationError.DemandSeriesInvalid -> FieldError("demand", reason, weekIndex)
+        is ValidationError.QuantityOutOfRange -> {
+            FieldError("quantity", "数量は 0 以上 $max 以下の整数にしてください。")
+        }
+
+        is ValidationError.WeekOutOfRange -> {
+            FieldError("week", "週は 1 以上 $max 以下の整数にしてください。")
+        }
+
+        is ValidationError.UnitsNegative -> {
+            FieldError("units", "数量は 0 以上の整数にしてください。")
+        }
+
+        is ValidationError.MoneyNegative -> {
+            FieldError("money", "金額は 0 以上にしてください。")
+        }
+
+        is ValidationError.VersionNegative -> {
+            FieldError("version", "版は 0 以上の整数にしてください。")
+        }
+
+        is ValidationError.DisplayNameInvalid -> {
+            FieldError("displayName", "表示名は 1 文字以上 80 文字以下にしてください。")
+        }
+
+        is ValidationError.JoinCodeInvalid -> {
+            FieldError("joinCode", "参加コードの形式が正しくありません。")
+        }
+
+        is ValidationError.RetentionOutOfRange -> {
+            FieldError("retentionDays", "保持日数は 1 以上 3650 以下の整数にしてください。")
+        }
+
+        is ValidationError.DemandSeriesInvalid -> {
+            FieldError("demand", reason, weekIndex)
+        }
+
+        is ValidationError.ConditionOutOfRange -> {
+            FieldError("conditions.$field", "${field.substringBefore('.')} は $min 以上 $max 以下の整数にしてください。")
+        }
+
+        is ValidationError.DisclosureUnknown -> {
+            FieldError("conditions.disclosurePolicy", "公開範囲は TEAM_TOTAL か NONE にしてください。")
+        }
     }
 
 private val TITLES =

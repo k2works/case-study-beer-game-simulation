@@ -39,6 +39,19 @@ sealed interface ValidationError {
         val actual: Int,
     ) : ValidationError
 
+    /** カスタム条件の範囲外（B7）。[field] は `initialInventory.RETAILER` のような項目名。 */
+    data class ConditionOutOfRange(
+        val field: String,
+        val min: Long,
+        val max: Long,
+        val actual: Long,
+    ) : ValidationError
+
+    /** 公開範囲が TEAM_TOTAL でも NONE でもない（B7）。 */
+    data class DisclosureUnknown(
+        val actual: String,
+    ) : ValidationError
+
     /** 需要系列の誤り。[weekIndex] は対象の週（1 始まり）で、利用者に修正すべき週を示す（AC1.1.2）。 */
     data class DemandSeriesInvalid(
         val weekIndex: Int,

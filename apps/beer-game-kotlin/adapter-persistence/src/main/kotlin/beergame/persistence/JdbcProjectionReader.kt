@@ -16,6 +16,7 @@ import beergame.application.ProjectedSession
 import beergame.application.ProjectedWeekResult
 import beergame.application.ProjectionReader
 import beergame.application.SessionStatus
+import beergame.application.SettingsSummary
 import beergame.application.Versions
 import beergame.domain.Editor
 import beergame.domain.GameId
@@ -26,6 +27,9 @@ import beergame.domain.StreamVersion
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -70,7 +74,14 @@ internal class JdbcProjectionReader(
                 c.query(
                     HEAD_SQL,
                     gameId,
-                ) { rs -> Head(rs.getString("status"), rs.getInt("final_week"), rs.getString("join_code")) }
+                ) { rs ->
+                    Head(
+                        rs.getString("status"),
+                        rs.getInt("final_week"),
+                        rs.getString("join_code"),
+                        SettingsSummary(rs.getString("settings_kind"), changesOf(rs.getString("settings_changes"))),
+                    )
+                }
             val first = head.firstOrNull()
             if (first == null) {
                 null
@@ -82,6 +93,7 @@ internal class JdbcProjectionReader(
                     status = status,
                     finalWeek = first.finalWeek,
                     joinCode = first.joinCode,
+                    settings = first.settings,
                     participants = participants(c, gameId).bind(),
                     session = session(c, gameId).bind(),
                     roleStates = roleStates(c, gameId).bind(),
@@ -225,11 +237,12 @@ internal class JdbcProjectionReader(
         val status: String,
         val finalWeek: Int,
         val joinCode: String,
+        val settings: SettingsSummary,
     )
 
     private companion object {
         const val HEAD_SQL =
-            "SELECT o.status, o.final_week, j.join_code FROM game_overview o " +
+            "SELECT o.status, o.final_week, o.settings_kind, o.settings_changes, j.join_code FROM game_overview o " +
                 "JOIN game_join_codes j ON j.game_id = o.game_id WHERE o.game_id = ?"
         const val PARTICIPANTS_SQL =
             "SELECT l.participant_id, l.role, d.display_name, (l.replaced_at IS NOT NULL) AS replaced " +
@@ -251,6 +264,10 @@ internal class JdbcProjectionReader(
 }
 
 private const val OP = "projection.read"
+
+/** `game_overview.settings_changes`（項目名の JSON 配列）を読む。読めなければ空（種別だけで足りる）。 */
+private fun changesOf(raw: String?): List<String> =
+    raw?.let { Json.parseToJsonElement(it).jsonArray.map { e -> e.jsonPrimitive.content } }.orEmpty()
 
 private fun roleOf(name: String): Role? = Role.entries.firstOrNull { it.name == name }
 

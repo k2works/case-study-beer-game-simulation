@@ -63,12 +63,23 @@ data class ProjectedWeekResult(
     val cumulativeCostMinor: Long,
 )
 
+/** 設定の種別（`KIT`・`CUSTOM`）と、キットの値から変えた項目の名前（B7）。 */
+data class SettingsSummary(
+    val kind: String,
+    val changes: List<String>,
+) {
+    companion object {
+        val KIT = SettingsSummary("KIT", emptyList())
+    }
+}
+
 /** 1 ゲームの投影の行。将来の週の需要（`game_settings.demand`）は読まない（読み取りの型に持たせない）。 */
 data class ProjectedGame(
     val gameId: GameId,
     val status: GameStatus,
     val finalWeek: Int,
     val joinCode: String,
+    val settings: SettingsSummary = SettingsSummary.KIT,
     val participants: List<ProjectedParticipant>,
     val session: ProjectedSession?,
     val roleStates: Map<Role, ProjectedRoleState>,
@@ -191,4 +202,5 @@ data class Snapshot(
     val session: SessionSummary?,
     val versions: Versions,
     val view: SnapshotView,
+    val settings: SettingsSummary = SettingsSummary.KIT,
 )

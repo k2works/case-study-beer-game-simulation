@@ -21,17 +21,19 @@ internal typealias FieldErrors = NonEmptyList<FieldError>
 
 internal const val REQUIRED = "必須の項目です。"
 internal const val NOT_AN_INTEGER = "整数で指定してください。"
-private const val NOT_A_STRING = "文字列で指定してください。"
+internal const val NOT_A_STRING = "文字列で指定してください。"
 private const val KIT = "KIT"
+private const val CUSTOM = "CUSTOM"
 
 internal fun single(
     field: String,
     message: String,
 ): FieldErrors = nonEmptyListOf(FieldError(field, message))
 
-internal fun JsonObject.kind(): Either<FieldErrors, Unit> =
+/** 作成の種別。KIT（キット準拠）か CUSTOM（カスタム条件）。 */
+internal fun JsonObject.kind(): Either<FieldErrors, String> =
     string("kind").flatMap { value ->
-        if (value == KIT) Unit.right() else single("kind", "キット準拠（KIT）だけを指定できます。").left()
+        if (value == KIT || value == CUSTOM) value.right() else single("kind", "KIT か CUSTOM を指定してください。").left()
     }
 
 internal fun JsonObject.string(name: String): Either<FieldErrors, String> =

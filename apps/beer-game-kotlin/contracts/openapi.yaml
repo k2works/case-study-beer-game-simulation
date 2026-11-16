@@ -940,15 +940,19 @@ components:
     CreateGameRequest:
       type: object
       description: |
-        キット準拠の作成（B1）。カスタム条件（B7）は含めない。
-        **最終週と需要系列は必須**（キットの既定の系列は ASM-01 のとおり JSD の値が未確定のため、B1 では既定を置かない。custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
+        ゲームの作成。種別 `KIT`（キット準拠）か `CUSTOM`（カスタム条件。B7 の提案）。
+        **最終週と需要系列は必須**（キットの既定の系列は ASM-01 のとおり JSD の値が未確定のため、既定を置かない。custom series で技術検証できるが、JSD 準拠の受入判定は保留）。
         範囲（週 1〜50、需要 0〜1000、保持日数 1〜3650）の検証は domain が持つ。範囲外は 422 で、需要の誤りは対象の週（1 始まり）と修正内容を示す。
         整数でない値（小数・文字・null）は、形の誤りとして 422（需要は対象の週つき）。JSON として不正な本文は 400。
+        **カスタム条件（B7）**: `conditions`（任意）で、初期在庫・遅延・費用単価・公開範囲を変える。省略した項目は、キットの値。
+        `KIT` に `conditions` を付けると 422（`conditions`。カスタムで作成するよう示す）。範囲外の値は 422 で、対象（`conditions.<項目>`）と修正内容を、すべて集めて示す。
+        **設定の種別は、値から導出**する（キットの値と同じなら、`CUSTOM` で送っても `KIT`）。結果は、状態の `settingsKind`・`changedSettings` に示す（AC1.1.3）。
       required: [kind, finalWeek, demand]
       properties:
         kind:
           type: string
-          enum: [KIT]
+          enum: [KIT, CUSTOM]
+        conditions: { $ref: "#/components/schemas/CustomConditions" }
         finalWeek:
           type: integer
           minimum: 1
@@ -963,6 +967,39 @@ components:
           minimum: 1
           maximum: 3650
           description: 保持日数（1〜3650）。未指定は 90（NF-S16）。
+    CustomConditions:
+      type: object
+      description: |
+        カスタム条件（B7 の提案。範囲は仮置きで、人が決める）。省略した項目は、キットの値（初期在庫 12、初期の流れ 4、遅延 2 週、在庫単価 50・受注残単価 100（最小単位）、公開範囲 `TEAM_TOTAL`）。
+        公開範囲の実際の開示（観察者への表示・抑止）は B9。ここでは、設定として保存するだけ。
+      properties:
+        initialInventory:
+          type: object
+          description: 役割ごとの初期在庫（0〜1000）。省略した役割は 12。
+          additionalProperties: { type: integer, minimum: 0, maximum: 1000 }
+        initialFlow:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: 初期の流れ（遅延の各段にある注文・品物の数量。0〜1000）。キットは 4。
+        orderDelayWeeks: { type: integer, minimum: 1, maximum: 8, description: 注文の遅延（週。1〜8）。キットは 2。 }
+        shipmentDelayWeeks: { type: integer, minimum: 1, maximum: 8, description: 配送の遅延（週。1〜8）。キットは 2。 }
+        productionDelayWeeks: { type: integer, minimum: 1, maximum: 8, description: 工場の生産の遅延（週。1〜8）。キットは 2。 }
+        holdingCostMinor: { type: integer, minimum: 0, maximum: 100000, description: 在庫の単価（1 単位・1 週。最小単位）。キットは 50。 }
+        backlogCostMinor: { type: integer, minimum: 0, maximum: 100000, description: 受注残の単価（1 単位・1 週。最小単位）。キットは 100。 }
+        disclosurePolicy:
+          type: string
+          enum: [TEAM_TOTAL, NONE]
+          description: プレイ中に観察者へ見せる範囲。キットは `TEAM_TOTAL`。
+    SettingsKind:
+      type: string
+      enum: [KIT, CUSTOM]
+      description: 設定の種別。キットの値と同じなら `KIT`、違えば `CUSTOM`（最終週と需要系列は、ASM-01 が確定するまで判定に含めない）。
+    SettingsField:
+      type: string
+      enum:
+        [INITIAL_INVENTORY, INITIAL_FLOW, ORDER_DELAY, SHIPMENT_DELAY, PRODUCTION_DELAY, HOLDING_COST, BACKLOG_COST, DISCLOSURE]
+      description: キットの値から変えた項目。
     JoinGameRequest:
       type: object
       required: [joinCode, displayName]
@@ -1028,7 +1065,7 @@ components:
     Lobby:
       type: object
       description: ロビーの投影（lobby_*）から書き出した、進行役向けの一覧。
-      required: [gameId, status, joinCode, participants, versions]
+      required: [gameId, status, joinCode, settingsKind, changedSettings, participants, versions]
       properties:
         gameId: { type: string, format: uuid }
         status:
@@ -1037,6 +1074,11 @@ components:
         joinCode:
           type: string
           description: 進行役にだけ返す。
+        settingsKind: { $ref: "#/components/schemas/SettingsKind" }
+        changedSettings:
+          type: array
+          description: キットの値から変えた項目（`settingsKind` が `KIT` なら空）。
+          items: { $ref: "#/components/schemas/SettingsField" }
         participants:
           type: array
           items: { $ref: "#/components/schemas/LobbyParticipant" }
@@ -1044,7 +1086,7 @@ components:
     GameState:
       type: object
       description: 呼び出した人ごとの投影。進行役は `joinCode`・`finalWeek`、参加者は `participantId`・`role` を受け取る。
-      required: [gameId, sessionId, status, versions]
+      required: [gameId, sessionId, status, settingsKind, changedSettings, versions]
       properties:
         gameId: { type: string, format: uuid }
         sessionId:
@@ -1056,6 +1098,11 @@ components:
         status:
           type: string
           enum: [PREPARING, STARTED, ENDED]
+        settingsKind: { $ref: "#/components/schemas/SettingsKind" }
+        changedSettings:
+          type: array
+          description: キットの値から変えた項目（`settingsKind` が `KIT` なら空）。進行役・参加者のどちらにも返す（値そのものは返さない）。
+          items: { $ref: "#/components/schemas/SettingsField" }
         joinCode:
           type: string
           description: 進行役だけ。

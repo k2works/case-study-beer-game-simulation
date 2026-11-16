@@ -64,6 +64,22 @@ export class ConsoleWindow {
         return state;
     }
 
+    /** 作成の画面（S02）で、カスタム条件を入れてゲームを作成し、ロビーへ進む（features/game-setup/custom-conditions-ui.feature）。 */
+    async createCustomGameOnScreen() {
+        await this.page.goto('/new');
+        await this.page.getByLabel('条件').selectOption('CUSTOM');
+        await this.page.getByLabel('小売店の初期在庫').fill('20');
+        await this.page.getByLabel('配送の遅延（週）').fill('3');
+        await this.page.getByRole('button', { name: 'ゲームを作成' }).click({ timeout: WAIT_MS });
+        await this.page.getByRole('link', { name: 'ロビーへ' }).click({ timeout: WAIT_MS });
+        await this.page.getByRole('heading', { name: 'ロビー' }).waitFor({ timeout: WAIT_MS });
+    }
+
+    /** ロビーに、設定の種別（「条件: …」）が示される。 */
+    async lobbyShowsSettings(text) {
+        await this.page.getByText(`条件: ${text}`).waitFor({ timeout: WAIT_MS });
+    }
+
     /** 進行役の資格は、ブラウザの文脈（Cookie の入れ物）に持たせる。参加者は、別々の入れ物にする。 */
     async seedStartedGame({ retailerCoHolder = false } = {}) {
         const facilitator = this.browserContext.request;

@@ -7,6 +7,7 @@ import type { FieldError, GameState } from '../../api/types';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { ValidationSummary, fieldProps } from '../../components/ValidationSummary';
+import { CustomConditionsFields, EMPTY_DRAFT, toConditions } from './CustomConditionsFields';
 
 /** 画面イメージ（S02）の初期値。キットの既定の需要系列は未確定（ASM-01）なので、これは例として置く値。 */
 const DEFAULT_FINAL_WEEK = '12';
@@ -26,6 +27,8 @@ export function CreateGamePage() {
     const [finalWeek, setFinalWeek] = useState(DEFAULT_FINAL_WEEK);
     const [demand, setDemand] = useState(DEFAULT_DEMAND);
     const [retentionDays, setRetentionDays] = useState(DEFAULT_RETENTION_DAYS);
+    const [custom, setCustom] = useState(false);
+    const [draft, setDraft] = useState(EMPTY_DRAFT);
     const [busy, setBusy] = useState(false);
     const [errors, setErrors] = useState<FieldError[]>([]);
     const [failure, setFailure] = useState<unknown>(null);
@@ -40,10 +43,11 @@ export function CreateGamePage() {
         setFailure(null);
         try {
             const result = await api.createGame({
-                kind: 'KIT',
+                kind: custom ? 'CUSTOM' : 'KIT',
                 finalWeek: toNumberOrRaw(finalWeek),
                 demand: demand.split(',').map(toNumberOrRaw),
                 retentionDays: toNumberOrRaw(retentionDays),
+                ...(custom ? { conditions: toConditions(draft) } : {}),
             });
             // 応答は versions だけ。参加コードは、追いついた取得の結果から表示する
             const { snapshot } = await fetchCaughtUp(
@@ -99,7 +103,20 @@ export function CreateGamePage() {
             <ValidationSummary errors={errors} />
             {failure ? <ErrorNotice error={failure} /> : null}
             <form onSubmit={submit} noValidate>
-                <p>条件: キット準拠</p>
+                <div className="field">
+                    <label htmlFor="kind">条件</label>
+                    <select
+                        id="kind"
+                        value={custom ? 'CUSTOM' : 'KIT'}
+                        onChange={(event) => setCustom(event.target.value === 'CUSTOM')}
+                    >
+                        <option value="KIT">キット準拠</option>
+                        <option value="CUSTOM">カスタム</option>
+                    </select>
+                </div>
+                {custom ? (
+                    <CustomConditionsFields draft={draft} onChange={setDraft} errors={errors} />
+                ) : null}
                 <div className="field">
                     <label htmlFor="finalWeek">最終週</label>
                     <input

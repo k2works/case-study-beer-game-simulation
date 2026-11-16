@@ -120,3 +120,11 @@ When('参加者が、画面で、有効な参加コードと表示名「田中�
 Then('プレイの画面で、進行役が開始するまでお待ちください、と表示される', async function () {
     await this.console.waitingForStartShown();
 });
+
+When('進行役が、画面で、小売店の初期在庫を 20、配送の遅延を 3 週に変えて、ゲームを作成する', async function () {
+    await this.console.createCustomGameOnScreen();
+});
+
+Then('ロビーに、{string}と表示される', async function (text) {
+    await this.console.lobbyShowsSettings(text);
+});

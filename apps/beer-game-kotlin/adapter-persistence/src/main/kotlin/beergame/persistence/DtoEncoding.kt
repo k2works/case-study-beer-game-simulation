@@ -154,9 +154,6 @@ private fun SessionEvent.WeekCommitted.toDto() =
         contributors,
     )
 
-private fun GameSettings.toDto() =
-    SettingsDto(finalWeek.value, demand.asInts(), costPolicy.holding.minor, costPolicy.backlog.minor, commitMode.name)
-
 private fun <A, B> RoleMap<A>.toDto(f: (A) -> B) = RoleMapDto(f(factory), f(distributor), f(wholesaler), f(retailer))
 
 private fun RoleState.toDto() =

@@ -21,6 +21,7 @@ object Disclosure {
             status = game.status,
             session = game.session.summary(),
             versions = game.versions,
+            settings = game.settings,
             view =
                 SnapshotView.Facilitator(
                     joinCode = game.joinCode,
@@ -62,6 +63,7 @@ object Disclosure {
                 status = game.status,
                 session = game.session.summary(),
                 versions = game.versions,
+                settings = game.settings,
                 view =
                     SnapshotView.Participant(
                         participantId,

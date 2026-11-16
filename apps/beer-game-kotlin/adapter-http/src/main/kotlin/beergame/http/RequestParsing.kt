@@ -10,6 +10,7 @@ import arrow.core.right
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
 import beergame.application.JoinGameInput
+import beergame.domain.ConditionInputs
 import beergame.domain.Role
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -33,17 +34,37 @@ internal data class DecisionBody(
 )
 
 internal fun parseCreateGame(body: ByteArray): Either<Problem, CreateGameInput> =
-    parseObject(body).flatMap { obj ->
-        collect {
-            zipOrAccumulate(
-                ::combine,
-                { obj.kind().bind() },
-                { obj.int("finalWeek").bind() },
-                { obj.intList("demand").bind() },
-                { obj.optionalInt("retentionDays", DEFAULT_RETENTION_DAYS).bind() },
-            ) { _, finalWeek, demand, retention -> CreateGameInput(finalWeek, demand, retention) }
+    parseObject(body)
+        .flatMap { obj ->
+            collect {
+                zipOrAccumulate(
+                    ::combine,
+                    { obj.kind().bind() },
+                    { obj.int("finalWeek").bind() },
+                    { obj.intList("demand").bind() },
+                    { obj.optionalInt("retentionDays", DEFAULT_RETENTION_DAYS).bind() },
+                    { obj.conditions().bind() },
+                ) { kind, finalWeek, demand, retention, conditions ->
+                    Triple(kind, conditions, CreateGameInput(finalWeek, demand, retention))
+                }
+            }
+        }.flatMap { (kind, conditions, input) ->
+            when {
+                kind == "KIT" && conditions != null -> {
+                    validationProblem(
+                        listOf(FieldError("conditions", "条件を指定するときは、kind を CUSTOM にして、カスタムで作成してください。")),
+                    ).left()
+                }
+
+                kind == "CUSTOM" -> {
+                    input.copy(conditions = conditions ?: ConditionInputs()).right()
+                }
+
+                else -> {
+                    input.right()
+                }
+            }
         }
-    }
 
 internal fun parseJoinGame(body: ByteArray): Either<Problem, JoinGameInput> =
     parseObject(body).flatMap { obj ->

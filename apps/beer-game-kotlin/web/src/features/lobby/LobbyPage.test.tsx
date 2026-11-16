@@ -28,6 +28,30 @@ describe('S04 ロビー（進行役）', () => {
         expect(within(rowOf('田中')).getByText('未割り当て')).toBeInTheDocument();
     });
 
+    it('B7/S04: 設定の種別を示す。キット準拠はそのまま、カスタムは変更した項目の名前を添える', async () => {
+        const api = fakeApi({
+            getLobby: () =>
+                Promise.resolve(
+                    lobby({
+                        settingsKind: 'CUSTOM',
+                        changedSettings: ['INITIAL_INVENTORY', 'SHIPMENT_DELAY'],
+                    }),
+                ),
+        });
+        renderApp(api, `/games/${GAME_ID}/lobby`);
+
+        expect(
+            await screen.findByText('条件: カスタム（変更: 初期在庫、配送の遅延）'),
+        ).toBeInTheDocument();
+    });
+
+    it('B7/S04: キット準拠の設定は、「条件: キット準拠」と示す', async () => {
+        const api = fakeApi({ getLobby: () => Promise.resolve(lobby()) });
+        renderApp(api, `/games/${GAME_ID}/lobby`);
+
+        expect(await screen.findByText('条件: キット準拠')).toBeInTheDocument();
+    });
+
     it('B6/S04: 同じ役割に共同担当（複数人）がいるときは、その役割の行に全員を並べる', async () => {
         const co: LobbyParticipant = {
             participantId: 'p-3',

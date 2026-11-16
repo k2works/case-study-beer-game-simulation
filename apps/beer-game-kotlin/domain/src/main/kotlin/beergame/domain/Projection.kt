@@ -130,8 +130,8 @@ object Projections {
                             "status" to text("PREPARING"),
                             "final_week" to num(p.settings.finalWeek.value),
                             "commit_mode" to text(p.settings.commitMode.name),
-                            "settings_kind" to text("KIT"),
-                            "settings_changes" to Value.Json("[]"),
+                            "settings_kind" to text(if (p.settings.changedFields().isEmpty()) "KIT" else "CUSTOM"),
+                            "settings_changes" to settingsChangesJson(p.settings),
                             "retention_days" to num(p.retentionDays.value),
                             "created_at" to Value.At(e.occurredAt),
                         ),
@@ -180,10 +180,7 @@ object Projections {
             }
         }
 
-    /**
-     * `game_settings`: 需要系列と費用。初期条件・遅延・公開範囲は、B1 のイベントに無い（キット準拠の固定値で、
-     * `GameCreated` に載らない）ので書かない（列は NULL。カスタム条件の B7 で書く）。
-     */
+    /** `game_settings`: 需要系列、費用、初期条件、遅延、公開範囲（B7 でカスタム条件を足した。キット準拠はキットの値を書く）。 */
     val gameSettings =
         Projection { e ->
             when (val p = e.payload) {
@@ -195,6 +192,11 @@ object Projections {
                             "demand" to jsonInts(p.settings.demand.asInts()),
                             "holding_cost_minor" to big(p.settings.costPolicy.holding.minor),
                             "backlog_cost_minor" to big(p.settings.costPolicy.backlog.minor),
+                            "initial_conditions" to initialConditionsJson(p.settings.initial),
+                            "order_delay_weeks" to num(p.settings.delays.order.weeks),
+                            "shipment_delay_weeks" to num(p.settings.delays.shipment.weeks),
+                            "production_delay_weeks" to num(p.settings.delays.production.weeks),
+                            "disclosure_policy" to text(p.settings.disclosure.name),
                         ),
                     )
                 }

@@ -45,6 +45,8 @@ export function gameState(overrides: Partial<GameState> = {}): GameState {
         gameId: GAME_ID,
         sessionId: GAME_ID,
         status: 'STARTED',
+        settingsKind: 'KIT',
+        changedSettings: [],
         versions: versions(1, 10),
         ...overrides,
     };
@@ -55,6 +57,8 @@ export function lobby(overrides: Partial<Lobby> = {}): Lobby {
         gameId: GAME_ID,
         status: 'PREPARING',
         joinCode: 'ABCDEFGH2345',
+        settingsKind: 'KIT',
+        changedSettings: [],
         participants: [],
         versions: versions(null, 3),
         ...overrides,

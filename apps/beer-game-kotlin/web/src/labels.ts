@@ -1,4 +1,11 @@
-import { ROLES, type DecisionEditor, type Role, type SessionStatus } from './api/types';
+import {
+    ROLES,
+    type DecisionEditor,
+    type Role,
+    type SessionStatus,
+    type SettingsField,
+    type SettingsKind,
+} from './api/types';
 
 /** 利用者に見せる語は、日本語の表示名の辞書から取る（英語の列挙値を直接表示しない）。 */
 export const ROLE_LABELS: Record<Role, string> = {
@@ -45,3 +52,21 @@ export const editorName = (editor: DecisionEditor): string => {
 /** 入力欄の名称。工場は「生産要請数」、流通役は「発注数」。 */
 export const decisionFieldLabel = (role: Role): string =>
     role === 'FACTORY' ? '生産要請数' : '発注数';
+
+/** 設定の種別と、変更した項目の呼び名（B7）。 */
+export const SETTINGS_FIELD_LABELS: Record<SettingsField, string> = {
+    INITIAL_INVENTORY: '初期在庫',
+    INITIAL_FLOW: '初期の流れ',
+    ORDER_DELAY: '注文の遅延',
+    SHIPMENT_DELAY: '配送の遅延',
+    PRODUCTION_DELAY: '生産の遅延',
+    HOLDING_COST: '在庫の単価',
+    BACKLOG_COST: '受注残の単価',
+    DISCLOSURE: '公開範囲',
+};
+
+/** 「キット準拠」か、「カスタム（変更: 初期在庫、配送の遅延）」。 */
+export const settingsText = (kind: SettingsKind, changed: readonly SettingsField[]): string =>
+    kind === 'KIT'
+        ? 'キット準拠'
+        : `カスタム（変更: ${changed.map((field) => SETTINGS_FIELD_LABELS[field]).join('、')}）`;

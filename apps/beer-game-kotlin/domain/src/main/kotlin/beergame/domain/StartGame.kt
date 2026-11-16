@@ -42,7 +42,7 @@ fun startGame(
                         data.gameId,
                         data.settings,
                         assignments,
-                        KitPreset.initialStates(data.settings.demand),
+                        KitPreset.initialStates(data.settings.demand, data.settings.initial, data.settings.delays),
                         data.settings.commitMode,
                     ),
                 ),

@@ -1,5 +1,7 @@
 package beergame.persistence
 
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -17,6 +19,18 @@ internal data class RoleMapDto<T>(
     val retailer: T,
 )
 
+/** カスタム条件（B7）。キットの値のままのときは書かない（`SettingsDto.conditions` が無い。過去のイベントはそのまま読める）。 */
+@Serializable
+internal data class ConditionsDto(
+    val initialInventory: RoleMapDto<Int>,
+    val initialFlow: Int,
+    val orderDelayWeeks: Int,
+    val shipmentDelayWeeks: Int,
+    val productionDelayWeeks: Int,
+    val disclosurePolicy: String,
+)
+
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class SettingsDto(
     val finalWeek: Int,
@@ -24,6 +38,8 @@ internal data class SettingsDto(
     val holdingCostMinor: Long,
     val backlogCostMinor: Long,
     val commitMode: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val conditions: ConditionsDto? = null,
 )
 
 @Serializable

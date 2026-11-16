@@ -9,6 +9,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import arrow.core.right
+import arrow.core.toNonEmptyListOrNull
 import java.time.Instant
 
 /*
@@ -30,10 +31,42 @@ data class GameSettings(
     val demand: DemandSeries,
     val costPolicy: CostPolicy,
     val commitMode: CommitMode,
+    val initial: InitialConditions = KitPreset.initialConditions,
+    val delays: Delays = KitPreset.delays,
+    val disclosure: DisclosurePolicy = DisclosurePolicy.TEAM_TOTAL,
 ) {
     fun simulation(): SimulationSettings = SimulationSettings(finalWeek, demand, costPolicy)
 
+    /** 設定の種別。キットの値と違う項目があればカスタム（値から導出する）。 */
+    fun kind(): SettingsKind = changedFields().let { if (it.isEmpty()) SettingsKind.Kit else SettingsKind.Custom(it) }
+
     companion object {
+        /**
+         * カスタム条件の設定（AC1.1.3・AC1.1.4）。最終週・需要系列の誤りと、条件の誤りを、すべて集めて返す。
+         * 条件の指定が無い項目はキットの値で、すべてキットの値なら [kit] と同じ設定になる。
+         */
+        fun custom(
+            finalWeek: Int,
+            demand: List<Int>,
+            inputs: ConditionInputs,
+        ): Either<NonEmptyList<ValidationError>, GameSettings> {
+            val base = kit(finalWeek, demand)
+            val conditions = inputs.validate()
+            return if (base is Either.Right && conditions is Either.Right) {
+                val c = conditions.value
+                base.value
+                    .copy(
+                        costPolicy = c.costPolicy,
+                        initial = c.initial,
+                        delays = c.delays,
+                        disclosure = c.disclosure,
+                    ).right()
+            } else {
+                val errors = base.leftOrNull().orEmpty() + conditions.leftOrNull().orEmpty()
+                checkNotNull(errors.toNonEmptyListOrNull()) { "誤りが無いのに検証が通っていない" }.left()
+            }
+        }
+
         /**
          * キット準拠の設定を、入力の形（最終週 1〜50、需要系列の各週 0〜1000 で長さは最終週以上）を検証して作る。
          * 誤りは項目ごとにすべて集める（最終週の誤りがあっても、需要系列の各週の誤りも返す）。AC1.1.2。

@@ -4,6 +4,7 @@ import arrow.core.Either
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
 import beergame.application.JoinGameInput
+import beergame.domain.ConditionInputs
 import beergame.domain.CredentialSubject
 import beergame.domain.ParticipantId
 import beergame.domain.Role
@@ -64,10 +65,60 @@ class RequestParsingSpec :
         }
 
         test("[US1.1/AC1.1.2] Given 必須の項目が無い・型が違う本文 When 解釈する Then 422 で、項目ごとの誤りをすべて集める") {
-            val problem = parseCreateGame(bytes("""{"kind":"CUSTOM","finalWeek":"12"}""")).problem()
+            val problem = parseCreateGame(bytes("""{"kind":"OTHER","finalWeek":"12"}""")).problem()
 
             problem.status shouldBe 422
             problem.fields().map { it.first } shouldBe listOf("kind", "finalWeek", "demand")
+        }
+
+        test("[B7/AC1.1.3] Given kind が CUSTOM で conditions がある本文 When 解釈する Then 条件を取り出す（指定の無い項目は null）") {
+            val body =
+                """{"kind":"CUSTOM","finalWeek":2,"demand":[4,4],"conditions":""" +
+                    """{"initialInventory":{"RETAILER":20},"shipmentDelayWeeks":3,""" +
+                    """"holdingCostMinor":80,"disclosurePolicy":"NONE"}}"""
+
+            parseCreateGame(bytes(body)).ok() shouldBe
+                CreateGameInput(
+                    2,
+                    listOf(4, 4),
+                    90,
+                    ConditionInputs(
+                        initialInventory = mapOf(Role.RETAILER to 20),
+                        shipmentDelayWeeks = 3,
+                        holdingCostMinor = 80,
+                        disclosurePolicy = "NONE",
+                    ),
+                )
+        }
+
+        test("[B7/AC1.1.3] Given kind が CUSTOM で conditions が無い本文 When 解釈する Then 空の条件（キットの値のまま）") {
+            parseCreateGame(bytes("""{"kind":"CUSTOM","finalWeek":1,"demand":[4]}""")).ok().conditions shouldBe
+                ConditionInputs()
+        }
+
+        test("[B7/AC1.1.3] Given kind が KIT で conditions がある本文 When 解釈する Then 422 で conditions を示す") {
+            val problem =
+                parseCreateGame(
+                    bytes("""{"kind":"KIT","finalWeek":1,"demand":[4],"conditions":{"orderDelayWeeks":3}}"""),
+                ).problem()
+
+            problem.status shouldBe 422
+            problem.fields() shouldBe listOf("conditions" to null)
+        }
+
+        test("[B7/AC1.1.4] Given 条件の型が違う・未知の役割 When 解釈する Then 項目ごとに conditions.<名前> の誤りをすべて集める") {
+            val body =
+                """{"kind":"CUSTOM","finalWeek":1,"demand":[4],"conditions":""" +
+                    """{"initialInventory":{"CLERK":1},"orderDelayWeeks":"3",""" +
+                    """"holdingCostMinor":1.5,"disclosurePolicy":7}}"""
+
+            parseCreateGame(bytes(body)).problem().fields().map { it.first } shouldBe
+                listOf(
+                    "conditions.initialInventory",
+                    "conditions.orderDelayWeeks",
+                    "conditions.holdingCostMinor",
+                    "conditions.disclosurePolicy",
+                )
         }
 
         test("[US1.1/AC1.1.2] Given 需要系列に小数・文字・null が混ざる When 解釈する Then 対象の週（1 始まり）を示す") {

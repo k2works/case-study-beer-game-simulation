@@ -7,6 +7,7 @@ import type { Lobby, LobbyParticipant, Role, StreamVersions } from '../../api/ty
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
+import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER } from '../../labels';
 
@@ -169,6 +170,7 @@ export function LobbyPage() {
     return (
         <>
             <PageHeading title="ロビー" />
+            <SettingsNote kind={lobby.settingsKind} changed={lobby.changedSettings} />
             <p>
                 参加コード: <strong>{lobby.joinCode}</strong>
             </p>

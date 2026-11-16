@@ -51,6 +51,7 @@ class ProjectionSpec :
             overview.valueOf("status") shouldBe Value.Text("PREPARING")
             overview.valueOf("final_week") shouldBe Value.Num(3)
             overview.valueOf("settings_kind") shouldBe Value.Text("KIT")
+            overview.valueOf("settings_changes") shouldBe Value.Json("[]")
             overview.valueOf("retention_days") shouldBe Value.Num(90)
             overview.valueOf("join_code") shouldBe null
             rows.of(ProjectionTable.GAME_JOIN_CODES).single().valueOf("join_code") shouldBe Value.Text("K7M2Q9XW")
@@ -58,6 +59,37 @@ class ProjectionSpec :
             gs.valueOf("demand") shouldBe Value.Json("[4,5,6]")
             gs.valueOf("holding_cost_minor") shouldBe Value.Big(50)
             gs.valueOf("backlog_cost_minor") shouldBe Value.Big(100)
+        }
+
+        test("[B7/AC1.1.3] Given カスタム条件の GameCreated When 投影する Then 種別 CUSTOM・変更項目・初期条件・遅延・公開範囲が入る") {
+            val custom =
+                GameSettings
+                    .custom(
+                        3,
+                        listOf(4, 5, 6),
+                        ConditionInputs(
+                            initialInventory = mapOf(Role.RETAILER to 20),
+                            shipmentDelayWeeks = 3,
+                            holdingCostMinor = 80,
+                            disclosurePolicy = "NONE",
+                        ),
+                    ).valid("カスタムの設定")
+            val rows = Projections.project(envelope(gameCreated(custom), StreamType.GAME, 1))
+
+            val overview = rows.of(ProjectionTable.GAME_OVERVIEW).single()
+            overview.valueOf("settings_kind") shouldBe Value.Text("CUSTOM")
+            overview.valueOf("settings_changes") shouldBe
+                Value.Json("[\"INITIAL_INVENTORY\",\"SHIPMENT_DELAY\",\"HOLDING_COST\",\"DISCLOSURE\"]")
+            val gs = rows.of(ProjectionTable.GAME_SETTINGS).single()
+            gs.valueOf("initial_conditions") shouldBe
+                Value.Json(
+                    "{\"inventory\":{\"FACTORY\":12,\"DISTRIBUTOR\":12,\"WHOLESALER\":12,\"RETAILER\":20},\"flow\":4}",
+                )
+            gs.valueOf("order_delay_weeks") shouldBe Value.Num(2)
+            gs.valueOf("shipment_delay_weeks") shouldBe Value.Num(3)
+            gs.valueOf("production_delay_weeks") shouldBe Value.Num(2)
+            gs.valueOf("disclosure_policy") shouldBe Value.Text("NONE")
+            gs.valueOf("holding_cost_minor") shouldBe Value.Big(80)
         }
 
         test("[7.2] Given 参加・割り当て・付け替えの解除 When 投影する Then lobby_participants の role が入り、解除で NULL に戻る") {

@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/errors';
 import { GAME_ID, fakeApi, gameState, versions } from '../../testing/fakeApi';
 import { renderApp } from '../../testing/render';
@@ -36,6 +36,89 @@ describe('S02 ゲーム作成', () => {
             '端末を替えたときなどに、ゲーム ID と復帰コードで、進行役のコンソールへ戻れます。',
         );
         expect(region).toHaveTextContent(`ゲーム ID: ${GAME_ID}`);
+    });
+
+    it('カスタムを選ぶと、入力のある条件だけを conditions に載せて送る（空欄はキットの値のまま）', async () => {
+        const user = userEvent.setup();
+        const createGame = vi.fn(() => Promise.resolve(created));
+        const api = fakeApi({
+            createGame,
+            getGameState: () =>
+                Promise.resolve(
+                    gameState({
+                        status: 'PREPARING',
+                        sessionId: null,
+                        joinCode: 'A1B2C3D4',
+                        versions: versions(null, 1),
+                    }),
+                ),
+        });
+        renderApp(api, '/new');
+
+        await user.selectOptions(screen.getByLabelText('条件'), 'CUSTOM');
+        await user.type(screen.getByLabelText('小売店の初期在庫'), '20');
+        await user.type(screen.getByLabelText('配送の遅延（週）'), '3');
+        await user.selectOptions(screen.getByLabelText('公開範囲'), 'NONE');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+
+        await screen.findByText('A1B2C3D4');
+        expect(createGame).toHaveBeenCalledWith(
+            expect.objectContaining({
+                kind: 'CUSTOM',
+                conditions: {
+                    initialInventory: { RETAILER: 20 },
+                    shipmentDelayWeeks: 3,
+                    disclosurePolicy: 'NONE',
+                },
+            }),
+        );
+    });
+
+    it('キット準拠のままなら、conditions を送らない', async () => {
+        const user = userEvent.setup();
+        const createGame = vi.fn(() => Promise.resolve(created));
+        const api = fakeApi({
+            createGame,
+            getGameState: () =>
+                Promise.resolve(
+                    gameState({ status: 'PREPARING', sessionId: null, joinCode: 'A1B2C3D4' }),
+                ),
+        });
+        renderApp(api, '/new');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+
+        await screen.findByText('A1B2C3D4');
+        expect(createGame).toHaveBeenCalledWith(expect.objectContaining({ kind: 'KIT' }));
+        expect(createGame.mock.lastCall).not.toBeUndefined();
+        expect(createGame).not.toHaveBeenCalledWith(
+            expect.objectContaining({ conditions: expect.anything() }),
+        );
+    });
+
+    it('条件の範囲外（422）は、誤りの要約と、対象の入力欄の aria-invalid で示す', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            createGame: () =>
+                Promise.reject(
+                    new ApiError(422, {
+                        code: 'validation.invalid_input',
+                        errors: [
+                            {
+                                field: 'conditions.shipmentDelayWeeks',
+                                message:
+                                    'shipmentDelayWeeks は 1 以上 8 以下の整数にしてください。',
+                            },
+                        ],
+                    }),
+                ),
+        });
+        renderApp(api, '/new');
+        await user.selectOptions(screen.getByLabelText('条件'), 'CUSTOM');
+        await user.type(screen.getByLabelText('配送の遅延（週）'), '0');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+
+        expect(await screen.findByText(/shipmentDelayWeeks は 1 以上 8 以下/)).toBeInTheDocument();
+        expect(screen.getByLabelText('配送の遅延（週）')).toHaveAttribute('aria-invalid', 'true');
     });
 
     it('キット準拠の入力でゲームを作成し、参加コードを大きく表示して、ロビーへの導線を出す', async () => {
