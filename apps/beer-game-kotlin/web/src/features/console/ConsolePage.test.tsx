@@ -54,6 +54,49 @@ const ROLE_LABELS: Array<[Role, string]> = [
     ['FACTORY', '工場'],
 ];
 
+describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
+    it('未入力の役割だけを、現在の週で代理入力し、状態を取り直して週を確定できるようにする', async () => {
+        const user = userEvent.setup();
+        let roles = decisions({ RETAILER: 4 });
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () =>
+                Promise.resolve(consoleState({ week: 3, roles, versions: versions(6, 10) })),
+            submitProxyDecision: (_sessionId, role, request) => {
+                roles = { ...roles, [role]: roleStatus({ decision: request.quantity }) };
+                return Promise.resolve({ versions: versions(6, 10) });
+            },
+        });
+        renderApp(api, PATH);
+
+        await user.click(
+            await screen.findByRole('button', { name: /ダミーの役割を代理入力で埋める/ }),
+        );
+
+        await waitFor(() => expect(api.submitProxyDecision).toHaveBeenCalledTimes(3));
+        expect(api.submitProxyDecision).toHaveBeenCalledWith(GAME_ID, 'WHOLESALER', {
+            requestedWeek: 3,
+            quantity: 4,
+        });
+        expect(api.submitProxyDecision).not.toHaveBeenCalledWith(
+            GAME_ID,
+            'RETAILER',
+            expect.anything(),
+        );
+        expect(await screen.findByRole('button', { name: '週を確定' })).toBeEnabled();
+    });
+
+    it('全役割が入力済みなら、代理入力のボタンを出さない', async () => {
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () => Promise.resolve(consoleState()),
+        });
+        renderApp(api, PATH);
+        await screen.findByRole('button', { name: '週を確定' });
+        expect(screen.queryByRole('button', { name: /代理入力/ })).not.toBeInTheDocument();
+    });
+});
+
 describe('S06 進行役のコンソール', () => {
     it('第 N 週・状態・各役割の入力状況（入力値つき）を示す', async () => {
         const api = fakeApi({

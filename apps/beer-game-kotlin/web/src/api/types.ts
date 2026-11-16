@@ -61,6 +61,8 @@ void createRequestIsAccepted;
 
 export type JoinGameRequest = Schemas['JoinGameRequest'];
 
+export type ProxyDecisionRequest = Schemas['ProxyDecisionRequest'];
+
 export type SaveDecisionRequest = Schemas['SaveDecisionRequest'];
 
 export type CommitWeekRequest = Schemas['CommitWeekRequest'];

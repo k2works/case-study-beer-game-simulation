@@ -36,6 +36,9 @@ function confirmFrom(session: SessionState, reopened: boolean): Confirm {
     return { week: session.week, values, basis, reopened };
 }
 
+/** 開発用の代理入力の数量。キットの需要の既定（4）。 */
+const DUMMY_QUANTITY = 4;
+
 const resultText = (r: RoleWeekResult) =>
     `${ROLE_LABELS[r.role]} 第 ${r.week} 週の結果: 受注 ${r.orders}、発注 ${r.order}、在庫 ${r.inventory}、受注残 ${r.backlog}、出荷 ${r.shipment}、費用 ${r.cost}（累計 ${r.cumulativeCost}）`;
 
@@ -174,6 +177,33 @@ export function ConsolePage() {
         }
     }
 
+    /** 開発用。未入力の役割を、現在の週の需要の既定（4）で代理入力する。1 人で週を進めるため。 */
+    async function fillWithProxyDecisions(current: SessionState) {
+        setBusy(true);
+        setFailure(null);
+        setAdvancedText(null);
+        try {
+            let latest = current.versions;
+            for (const role of ROLE_ORDER.filter((r) => !decided.includes(r))) {
+                const result = await api.submitProxyDecision(sessionId, role, {
+                    requestedWeek: current.week,
+                    quantity: DUMMY_QUANTITY,
+                });
+                latest = result.versions;
+            }
+            const { snapshot } = await fetchCaughtUp(
+                () => api.getSessionState(sessionId),
+                latest,
+                catchUp,
+            );
+            setData({ game, session: snapshot });
+        } catch (error) {
+            setFailure(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
     async function handleCommitFailure(error: unknown, target: Confirm) {
         if (error instanceof ApiError && error.code === 'session.decisions_changed') {
             // 更新した値で、確認ダイアログを開き直す（確認してから、もう一度確定する）
@@ -240,6 +270,22 @@ export function ConsolePage() {
                         停止する
                     </button>
                 </>
+            ) : null}
+            {import.meta.env.DEV && session.status === 'ACTIVE' && !allDecided ? (
+                <section aria-labelledby="dev-tools-heading">
+                    <h2 id="dev-tools-heading">開発用</h2>
+                    <p className="muted">
+                        1 人で試すための代理入力です（各 {DUMMY_QUANTITY}
+                        ）。開発サーバーでだけ表示します。
+                    </p>
+                    <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void fillWithProxyDecisions(session)}
+                    >
+                        未入力のダミーの役割を代理入力で埋める
+                    </button>
+                </section>
             ) : null}
             {session.status === 'PAUSED' ? (
                 <>

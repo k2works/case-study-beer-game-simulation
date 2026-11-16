@@ -10,6 +10,7 @@ import type {
     JoinResponse,
     Lobby,
     ProblemBody,
+    ProxyDecisionRequest,
     RecoverRequest,
     RecoverResponse,
     Role,
@@ -24,12 +25,23 @@ export interface ApiClient {
     getLobby(gameId: string): Promise<Lobby>;
     assignRole(gameId: string, participantId: string, role: Role): Promise<CommandResponse>;
     joinGame(request: JoinGameRequest): Promise<JoinResponse>;
+    /**
+     * 開発用。応答の Cookie を受け取らずに参加する（credentials: omit）。進行役のブラウザで参加者を作っても、
+     * 進行役の資格を上書きしない。ロビーの「ダミー参加者」だけが使う。
+     */
+    joinWithoutSession(request: JoinGameRequest): Promise<JoinResponse>;
     /** 復帰。復帰コードを省くと、Cookie の復帰資格で復帰する。新しいブラウザセッションは Set-Cookie で発行される。 */
     recoverParticipation(request: RecoverRequest): Promise<RecoverResponse>;
     startGame(gameId: string): Promise<CommandResponse>;
     /** 進行役だけ。停止中は、参加者の保存と週の確定を受け付けない。 */
     pauseSession(sessionId: string): Promise<CommandResponse>;
     resumeSession(sessionId: string): Promise<CommandResponse>;
+    /** 進行役の代理入力。意思決定の版（If-Match）は要らない。requestedWeek は、画面が見ている週。 */
+    submitProxyDecision(
+        sessionId: string,
+        role: Role,
+        request: ProxyDecisionRequest,
+    ): Promise<CommandResponse>;
     getSessionState(sessionId: string): Promise<SessionState>;
     /** expectedVersion は、画面が見ている意思決定の版（If-Match）。 */
     saveDecision(
@@ -40,8 +52,31 @@ export interface ApiClient {
     commitWeek(sessionId: string, request: CommitWeekRequest): Promise<CommandResponse>;
 }
 
+const TAB_ID_KEY = 'beergame.tabId';
+
+/**
+ * このタブの識別子（ADR-019）。タブ（sessionStorage）ごとに一度作る。サーバーは、これで資格の Cookie の名前を決める
+ * （`bg_session_<識別子>`）ので、同じブラウザの複数のタブが、別の人として操作できる。秘密ではない（資格は HttpOnly の Cookie）。
+ * sessionStorage が使えないとき（拒否された環境）は、このページの読み込みの間だけ有効な値を返す。
+ */
+let memoryTabId: string | undefined;
+export function tabCredentialId(): string {
+    try {
+        const stored = sessionStorage.getItem(TAB_ID_KEY);
+        if (stored) return stored;
+        const created = crypto.randomUUID().replaceAll('-', '');
+        sessionStorage.setItem(TAB_ID_KEY, created);
+        return created;
+    } catch {
+        memoryTabId ??= crypto.randomUUID().replaceAll('-', '');
+        return memoryTabId;
+    }
+}
+
 export interface HttpApiClientOptions {
     fetch?: typeof fetch;
+    /** タブの識別子。既定は [tabCredentialId]。 */
+    tabId?: string;
     /** 冪等キーの作り方。操作（呼び出し）ごとに 1 つ作り、自動の再送でも同じキーを使う。 */
     newKey?: () => string;
     /** 結果が不明なときの再送の間隔（ミリ秒）と、再送の回数の上限。 */
@@ -50,6 +85,7 @@ export interface HttpApiClientOptions {
 }
 
 const BASE = '/api/v1';
+const TAB_HEADER = 'X-Tab-Id';
 
 function parseBody(text: string): ProblemBody {
     if (text === '') return {};
@@ -63,6 +99,7 @@ function parseBody(text: string): ProblemBody {
 }
 
 export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClient {
+    const tabId = options.tabId ?? tabCredentialId();
     const doFetch: typeof fetch = options.fetch ?? ((input, init) => fetch(input, init));
     const newKey = options.newKey ?? (() => crypto.randomUUID());
     const resendDelayMs = options.resendDelayMs ?? 500;
@@ -74,7 +111,14 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
     async function send(path: string, init: RequestInit): Promise<Response> {
         let response: Response;
         try {
-            response = await doFetch(`${BASE}${path}`, { credentials: 'same-origin', ...init });
+            response = await doFetch(`${BASE}${path}`, {
+                credentials: 'same-origin',
+                ...init,
+                headers: {
+                    ...(init.headers as Record<string, string> | undefined),
+                    [TAB_HEADER]: tabId,
+                },
+            });
         } catch (cause) {
             throw new NetworkError('通信に失敗しました', { cause });
         }
@@ -98,6 +142,7 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         path: string,
         body: unknown,
         extraHeaders: Record<string, string> = {},
+        credentials?: RequestCredentials,
     ): Promise<Response> {
         const headers = {
             'Content-Type': 'application/json',
@@ -108,6 +153,7 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
             method,
             headers,
             body: body === undefined ? undefined : JSON.stringify(body),
+            ...(credentials === undefined ? {} : { credentials }),
         };
         for (let resends = 0; ; resends++) {
             try {
@@ -154,6 +200,11 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
                 await command('POST', '/participations/join', request),
             );
         },
+        async joinWithoutSession(request) {
+            return commandResponse<JoinResponse>(
+                await command('POST', '/participations/join', request, {}, 'omit'),
+            );
+        },
         async recoverParticipation(request) {
             return commandResponse<RecoverResponse>(
                 await command('POST', '/participations/recover', request),
@@ -171,6 +222,11 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         },
         async startGame(gameId) {
             return commandResponse(await command('POST', `/games/${gameId}/start`, undefined));
+        },
+        async submitProxyDecision(sessionId, role, request) {
+            return commandResponse(
+                await command('PUT', `/sessions/${sessionId}/proxy-decisions/${role}`, request),
+            );
         },
         getSessionState: (sessionId) => query<SessionState>(`/sessions/${sessionId}/state`),
         async saveDecision(sessionId, request, expectedVersion) {

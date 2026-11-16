@@ -1,9 +1,9 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
-import type { Lobby, LobbyParticipant, Role } from '../../api/types';
+import type { Lobby, LobbyParticipant, Role, StreamVersions } from '../../api/types';
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
@@ -14,6 +14,9 @@ const missingRolesText = (roles: readonly Role[]) =>
     `各役割に 1 人以上が必要です。（不足: ${roles.map((role) => ROLE_LABELS[role]).join('、')}）`;
 
 const nameOf = (participant: LobbyParticipant) => participant.displayName ?? '（表示名なし）';
+
+/** 他の人の参加を反映するため、準備中のロビーを取り直す間隔（ミリ秒）。 */
+export const LOBBY_POLL_MS = 3000;
 
 interface Pending {
     participant: LobbyParticipant;
@@ -32,6 +35,33 @@ export function LobbyPage() {
     const [failure, setFailure] = useState<unknown>(null);
     const [busy, setBusy] = useState(false);
     const idPrefix = useId();
+
+    // 準備中は、他の人の参加を反映するため、一定の間隔でロビーを取り直す。
+    // 操作中（busy）と確認ダイアログの表示中は取り直さない。失敗は黙って次の回へ回す（表示中のロビーを消さない）。
+    // 資格がなくなった（403）ときは、黙らず失敗を示し、取り直しをやめる（別の人として参加したブラウザなど）。
+    const unauthorized = failure instanceof ApiError && failure.status === 403;
+    const polling = state.status === 'ready' && state.data.status === 'PREPARING' && !unauthorized;
+    const paused = busy || pending !== null;
+    useEffect(() => {
+        if (!polling || paused) return undefined;
+        let cancelled = false;
+        const timer = setInterval(() => {
+            api.getLobby(gameId).then(
+                (latest) => {
+                    if (!cancelled) setData(latest);
+                },
+                (error: unknown) => {
+                    if (!cancelled && error instanceof ApiError && error.status === 403) {
+                        setFailure(error);
+                    }
+                },
+            );
+        }, LOBBY_POLL_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [api, gameId, polling, paused, setData]);
 
     if (state.status === 'loading') return <p role="status">ロビーを読み込み中…</p>;
     if (state.status === 'error') {
@@ -74,6 +104,49 @@ export function LobbyPage() {
             setPending({ participant, target }); // 黙って付け替えず、移動元と移動先を示す確認を挟む
         } else {
             void assign(participant, target);
+        }
+    }
+
+    /**
+     * 開発用。不足する役割ごとにダミーの参加者を作り、その役割に割り当てる。
+     * 参加は Cookie を受け取らない窓口で行う（進行役の資格を上書きしないため）。
+     */
+    async function fillWithDummies() {
+        setBusy(true);
+        setFailure(null);
+        try {
+            const dummyName = (role: Role) => `ダミー${ROLE_LABELS[role]}`;
+            let latest: StreamVersions | undefined;
+            for (const role of missing) {
+                const joined = await api.joinWithoutSession({
+                    joinCode: lobby.joinCode ?? '',
+                    displayName: dummyName(role),
+                });
+                latest = joined.versions;
+            }
+            const { snapshot: joinedLobby } = await fetchCaughtUp<Lobby>(
+                () => api.getLobby(gameId),
+                latest ?? lobby.versions,
+                catchUp,
+            );
+            for (const role of missing) {
+                const dummy = joinedLobby.participants.find(
+                    (p) => p.displayName === dummyName(role) && p.role === null,
+                );
+                if (dummy) {
+                    latest = (await api.assignRole(gameId, dummy.participantId, role)).versions;
+                }
+            }
+            const { snapshot } = await fetchCaughtUp<Lobby>(
+                () => api.getLobby(gameId),
+                latest ?? joinedLobby.versions,
+                catchUp,
+            );
+            setData(snapshot);
+        } catch (error) {
+            setFailure(error);
+        } finally {
+            setBusy(false);
         }
     }
 
@@ -179,6 +252,18 @@ export function LobbyPage() {
             >
                 開始する
             </button>
+
+            {import.meta.env.DEV && missing.length > 0 ? (
+                <section aria-labelledby="dev-tools-heading">
+                    <h2 id="dev-tools-heading">開発用</h2>
+                    <p className="muted">
+                        1 人で試すためのダミー参加者です。開発サーバーでだけ表示します。
+                    </p>
+                    <button type="button" disabled={busy} onClick={() => void fillWithDummies()}>
+                        ダミー参加者で不足の役割を埋める
+                    </button>
+                </section>
+            ) : null}
 
             {pending ? (
                 <Dialog labelledBy={dialogTitleId} onClose={() => setPending(null)}>

@@ -1,6 +1,7 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { LOBBY_POLL_MS } from './LobbyPage';
 import { ApiError } from '../../api/errors';
 import type { LobbyParticipant } from '../../api/types';
 import { GAME_ID, fakeApi, gameState, lobby, roleStatus, versions } from '../../testing/fakeApi';
@@ -108,6 +109,117 @@ describe('S04 ロビー（進行役）', () => {
         await user.click(await screen.findByRole('button', { name: '戻って確認' }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(api.assignRole).not.toHaveBeenCalled();
+    });
+
+    it('他の人が参加すると、更新しなくても、一定の間隔でロビーを取り直して参加者を示す', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            let participants: LobbyParticipant[] = [yamamoto];
+            const api = fakeApi({
+                getLobby: () => Promise.resolve(lobby({ participants })),
+            });
+            renderApp(api, `/games/${GAME_ID}/lobby`);
+            expect(await screen.findByRole('listitem', { name: '山本' })).toBeInTheDocument();
+            expect(screen.queryByRole('listitem', { name: '田中' })).not.toBeInTheDocument();
+
+            participants = [yamamoto, tanaka];
+            await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
+
+            expect(await screen.findByRole('listitem', { name: '田中' })).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('取り直しの失敗では、表示中のロビーを消さない', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            let calls = 0;
+            const api = fakeApi({
+                getLobby: () =>
+                    ++calls === 1
+                        ? Promise.resolve(lobby({ participants: [yamamoto] }))
+                        : Promise.reject(new Error('通信の失敗')),
+            });
+            renderApp(api, `/games/${GAME_ID}/lobby`);
+            await screen.findByRole('listitem', { name: '山本' });
+
+            await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
+
+            expect(calls).toBeGreaterThan(1);
+            expect(screen.getByRole('listitem', { name: '山本' })).toBeInTheDocument();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('取り直しで資格がなくなった（403）ときは、黙らず、失敗を示して取り直しをやめる', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+            let calls = 0;
+            const api = fakeApi({
+                getLobby: () =>
+                    ++calls === 1
+                        ? Promise.resolve(lobby({ participants: [yamamoto] }))
+                        : Promise.reject(
+                              new ApiError(403, { code: 'app.unauthorized', correlationId: 'c-9' }),
+                          ),
+            });
+            renderApp(api, `/games/${GAME_ID}/lobby`);
+            await screen.findByRole('listitem', { name: '山本' });
+
+            await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
+            expect(await screen.findByRole('alert')).toHaveTextContent('c-9');
+
+            const seen = calls;
+            await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS * 3));
+            expect(calls).toBe(seen);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('開発用: 不足する役割のダミー参加者を、進行役の資格を保ったまま作り、割り当てる', async () => {
+        const user = userEvent.setup();
+        let participants: LobbyParticipant[] = [yamamoto];
+        const api = fakeApi({
+            getLobby: () => Promise.resolve(lobby({ participants })),
+            joinWithoutSession: (request) => {
+                participants = [
+                    ...participants,
+                    {
+                        participantId: `d-${participants.length}`,
+                        displayName: request.displayName,
+                        role: null,
+                    },
+                ];
+                return Promise.resolve({ gameId: GAME_ID, versions: versions(null, 4) });
+            },
+            assignRole: (_gameId, participantId, role) => {
+                participants = participants.map((p) =>
+                    p.participantId === participantId ? { ...p, role } : p,
+                );
+                return Promise.resolve({ versions: versions(null, 5) });
+            },
+        });
+        renderApp(api, `/games/${GAME_ID}/lobby`);
+
+        await user.click(
+            await screen.findByRole('button', { name: /ダミー参加者で不足の役割を埋める/ }),
+        );
+
+        expect(await screen.findByText('二次卸: ダミー二次卸')).toBeInTheDocument();
+        expect(screen.getByText('一次卸: ダミー一次卸')).toBeInTheDocument();
+        expect(screen.getByText('工場: ダミー工場')).toBeInTheDocument();
+        expect(screen.getByText('小売店: 山本')).toBeInTheDocument();
+        expect(api.joinWithoutSession).toHaveBeenCalledTimes(3);
+        expect(api.joinWithoutSession).toHaveBeenCalledWith({
+            joinCode: 'ABCDEFGH2345',
+            displayName: 'ダミー二次卸',
+        });
+        expect(api.joinGame).not.toHaveBeenCalled();
+        expect(screen.getByRole('button', { name: '開始する' })).toBeEnabled();
     });
 
     it('4 役割がそろうと開始でき、開始すると進行役のコンソールへ進む', async () => {

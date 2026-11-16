@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createHttpApiClient } from './client';
+import { createHttpApiClient, tabCredentialId } from './client';
 import { ApiError, NetworkError } from './errors';
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -222,6 +222,63 @@ describe('ApiClient（fetch の薄い包み）', () => {
             displayName: '田中',
         });
         expect(result.gameId).toBe('g-7');
+    });
+
+    it('joinWithoutSession は、参加の応答の Cookie を受け取らない（credentials: omit）ので、進行役の資格を上書きしない', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(json(200, { versions: { game: 2, session: null }, gameId: 'g-7' }));
+        const result = await clientWith(fetchMock).joinWithoutSession({
+            joinCode: 'ABCDEFGH2345',
+            displayName: 'ダミー小売店',
+        });
+        expect(result.gameId).toBe('g-7');
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe('/api/v1/participations/join');
+        expect(init.credentials).toBe('omit');
+        expect(headerOf(fetchMock.mock.calls[0] as unknown[], 'Idempotency-Key')).toBe('key-1');
+    });
+
+    it('submitProxyDecision は、役割の URL へ PUT し、冪等キーを付け、If-Match は付けない', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(json(200, { versions: { game: null, session: 6 } }));
+        const result = await clientWith(fetchMock).submitProxyDecision('s-1', 'FACTORY', {
+            requestedWeek: 2,
+            quantity: 4,
+        });
+        expect(result.versions.session).toBe(6);
+        const call = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(call[0]).toBe('/api/v1/sessions/s-1/proxy-decisions/FACTORY');
+        expect(call[1].method).toBe('PUT');
+        expect(JSON.parse(call[1].body as string)).toEqual({ requestedWeek: 2, quantity: 4 });
+        expect(headerOf(call, 'Idempotency-Key')).toBe('key-1');
+        expect(headerOf(call, 'If-Match')).toBeNull();
+    });
+
+    it('すべての要求に、タブの識別子（X-Tab-Id）を付ける（読み取りにも、変更にも）', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockImplementation(() => Promise.resolve(json(200, { versions: { game: 1 } })));
+        const client = createHttpApiClient({
+            fetch: fetchMock,
+            newKey: () => 'k',
+            tabId: 'tabid0123456789ab',
+        });
+        await client.getLobby('g-1');
+        await client.startGame('g-1');
+        for (const call of fetchMock.mock.calls as unknown[][]) {
+            expect(headerOf(call, 'X-Tab-Id')).toBe('tabid0123456789ab');
+        }
+    });
+
+    it('tabCredentialId は、タブ（sessionStorage）ごとに一度作り、以後は同じ値を返す。形は英数字 32 文字', () => {
+        sessionStorage.clear();
+        const first = tabCredentialId();
+        expect(first).toMatch(/^[A-Za-z0-9]{32}$/);
+        expect(tabCredentialId()).toBe(first);
+        sessionStorage.clear();
+        expect(tabCredentialId()).not.toBe(first);
     });
 
     it('pauseSession・resumeSession は、本文なしで POST し、冪等キーを付ける', async () => {
