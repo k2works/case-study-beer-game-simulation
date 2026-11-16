@@ -20,6 +20,7 @@ import beergame.application.Generators
 import beergame.application.JoinGameInput
 import beergame.application.PeripheralWrite
 import beergame.application.Ports
+import beergame.application.ProxyDecisionInput
 import beergame.application.RequestMeta
 import beergame.application.RoleStatus
 import beergame.application.SaveDecisionInput
@@ -38,18 +39,23 @@ import beergame.application.revokeCredential
 import beergame.application.saveDecision
 import beergame.application.snapshot
 import beergame.application.startGame
+import beergame.application.submitProxyDecision
 import beergame.domain.Actor
 import beergame.domain.CredentialSubject
+import beergame.domain.DomainError
+import beergame.domain.Editor
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
 import beergame.domain.RoleMap
+import beergame.domain.SessionError
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldNotContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
@@ -67,9 +73,9 @@ private val CREDENTIAL_KEY = ByteArray(32) { (it + 7).toByte() }
 /** 試験用の窓の上限と長さ（失敗 3 回まで、10 分。時計は固定なので、同じ窓に入る）。 */
 internal val FLOW_ATTEMPT_POLICY: AttemptPolicy = AttemptPolicy.of(3, Duration.ofMinutes(10)).orFail()
 
-internal fun appSettings(): AppSettings =
+internal fun appSettings(maxAttempts: Int = 5): AppSettings =
     AppSettings(
-        maxAttempts = 5,
+        maxAttempts = maxAttempts,
         ttls = AppTtls(Duration.ofHours(24), Duration.ofHours(24), Duration.ofDays(30)),
         idempotencySecret = ByteArray(32) { it.toByte() },
         credentialKeys = CredentialKeyRing.of(1, mapOf(1 to CREDENTIAL_KEY)).orFail(),
@@ -77,7 +83,10 @@ internal fun appSettings(): AppSettings =
     )
 
 /** 実物のアダプターを束ねた Ports（時計だけ固定）。[events] は、並行の試験が追記の直前に割り込むための差し替え。 */
-internal fun Fixture.ports(events: EventStore = persistence.events): Ports =
+internal fun Fixture.ports(
+    events: EventStore = persistence.events,
+    maxAttempts: Int = 5,
+): Ports =
     Ports(
         generators =
             Generators(
@@ -97,7 +106,7 @@ internal fun Fixture.ports(events: EventStore = persistence.events): Ports =
             ),
         lock = persistence.lock,
         notifier = persistence.notifier,
-        settings = appSettings(),
+        settings = appSettings(maxAttempts),
     )
 
 internal fun meta(
@@ -725,5 +734,308 @@ fun FunSpec.credentialConcurrencyContract(fixture: () -> Fixture) {
 
         // 追記の直前に待ち合わせるので、毎回、ちょうど 1 回の競合が起きる（敗者の再試行は競合しない）
         rounds.map { it.conflicts } shouldBe List(RACE_ROUNDS) { 1 }
+    }
+}
+
+// ---- B6 Step 4: 共同入力の並行（session ストリームの取り合い）。勝者は実行ごとに決まるので、どちらの順でも成り立つ不変条件で判定する ----
+
+private typealias Command = suspend (Ports) -> Either<AppFailure, CommandOutcome>
+
+private class RacedCommands(
+    val results: List<Either<AppFailure, CommandOutcome>>,
+    val conflicts: Int,
+)
+
+/** [jobs] を同時に走らせる。各要求の最初の追記は、全員がそろうまで待たせる（同じ版を読んでから追記する状況を、確実に作る）。 */
+private fun Fixture.raceCommands(
+    maxAttempts: Int,
+    jobs: List<Command>,
+): RacedCommands {
+    val barrier = Barrier(jobs.size)
+    val conflicts = AtomicInteger()
+    val results =
+        runBlocking {
+            val go = CompletableDeferred<Unit>()
+            val running =
+                jobs.map { job ->
+                    async {
+                        go.await()
+                        job(ports(persistence.events.racing(barrier, conflicts), maxAttempts))
+                    }
+                }
+            go.complete(Unit)
+            running.map { it.await() }
+        }
+    return RacedCommands(results, conflicts.get())
+}
+
+private fun Fixture.sessionVersionsAfter(
+    game: GameId,
+    before: Long,
+): List<Long> =
+    query(
+        "SELECT stream_version FROM events WHERE game_id = ? AND stream_type = 'SESSION' AND stream_version > ? " +
+            "ORDER BY stream_version",
+        game.value,
+        before,
+    ) { it.getLong(1) }
+
+private data class DecisionRow(
+    val quantity: Int,
+    val version: Long,
+    val editorKind: String,
+)
+
+private fun Fixture.decisionRow(
+    game: GameId,
+    role: Role,
+): DecisionRow? =
+    query(
+        "SELECT quantity, decision_version, editor_kind FROM current_decisions WHERE game_id = ? AND role = ?",
+        game.value,
+        role.name,
+    ) { DecisionRow(it.getInt(1), it.getLong(2), it.getString(3)) }.singleOrNull()
+
+private fun Either<AppFailure, *>.domainError(): DomainError =
+    (leftOrFail() as? AppFailure.Domain)?.error ?: error("業務のエラーではない: ${leftOrFail()}")
+
+private fun save(
+    game: Started,
+    credential: String,
+    key: String,
+    role: Role,
+    quantity: Int,
+): Command =
+    { ports ->
+        ports.saveDecision(game.gameId, SaveDecisionInput(role, 1, quantity, 0), meta(key, credential))
+    }
+
+/** 4 役割が、当週（第 1 週）の入力を保存する（各役割の版は 1）。 */
+private fun Fixture.saveAllRoles(game: Started) =
+    runBlocking {
+        Role.entries.forEach { role ->
+            ports()
+                .saveDecision(
+                    game.gameId,
+                    SaveDecisionInput(role, 1, 4, 0),
+                    meta("setup-${game.gameId.value}-${role.name}", game.seats[role].credential),
+                ).orFail()
+        }
+    }
+
+/**
+ * 実 DB（PostgreSQL）の、共同入力の並行の契約（B6 Step 4。ADR-005 のコンプライアンス）。追記の直前で待ち合わせて、競合を確実に作る。
+ * 失敗は 500・再試行の枯渇にならず、保存された値は失われず、版は欠けず、部分更新が残らないことを確かめる。H2 では実行しない。
+ */
+fun FunSpec.coInputConcurrencyContract(fixture: () -> Fixture) {
+    sameRoleRaceContract(fixture)
+    fiveWritersRaceContract(fixture)
+    retryExhaustedContract(fixture)
+    sameKeyRaceContract(fixture)
+    commitAndSaveRaceContract(fixture)
+    proxyAndSaveRaceContract(fixture)
+}
+
+private fun FunSpec.sameRoleRaceContract(fixture: () -> Fixture) {
+    test(
+        "[B6/4.1a][NF-R14] Given 実 DB で同じ役割の 2 人が同じ版から同時に保存 When 追記が競合する Then 一方だけ成功し、他方は最新値・保存者つきの競合になり、保存された値は失われない",
+    ) {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-a-$round", coHolderName = "共同の花子")
+            val coHolder = checkNotNull(game.coHolder)
+            val owner = game.seats[Role.RETAILER]
+            val before = fx.maxVersion(game.gameId, "SESSION")
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        save(game, owner.credential, "a-owner-$round", Role.RETAILER, 3),
+                        save(game, coHolder.credential, "a-co-$round", Role.RETAILER, 8),
+                    ),
+                )
+
+            val winner = raced.results.indexOfFirst { it.isRight() }
+            raced.results.count { it.isRight() } shouldBe 1
+            val conflict = raced.results[1 - winner].domainError() as SessionError.DecisionConflict
+            conflict.role shouldBe Role.RETAILER
+            conflict.latest?.editor shouldBe Editor.ByParticipant(listOf(owner, coHolder)[winner].participantId)
+            raced.conflicts shouldBe 1
+            fx.decisionRow(game.gameId, Role.RETAILER) shouldBe DecisionRow(listOf(3, 8)[winner], 1L, "PARTICIPANT")
+            fx.sessionVersionsAfter(game.gameId, before) shouldBe listOf(before + 1)
+        }
+    }
+}
+
+private fun FunSpec.fiveWritersRaceContract(fixture: () -> Fixture) {
+    test("[B6/4.1b] Given 実 DB で 4 役割と共同担当の 5 人が同時に保存 Then 受理分はすべて残り、失敗は共同担当の敗者だけ") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-b-$round", coHolderName = "共同の花子")
+            val coHolder = checkNotNull(game.coHolder)
+            val before = fx.maxVersion(game.gameId, "SESSION")
+            val jobs =
+                Role.entries.map { save(game, game.seats[it].credential, "b-${it.name}-$round", it, 4) } +
+                    save(game, coHolder.credential, "b-co-$round", Role.RETAILER, 9)
+
+            val raced = fx.raceCommands(5, jobs)
+
+            val failures = raced.results.filter { it.isLeft() }
+            // 失敗は、小売店の共同担当の敗者（1 件）だけ。再試行の枯渇・保存の失敗（500）は 0 件
+            failures.size shouldBe 1
+            (failures.single().domainError() as SessionError.DecisionConflict).role shouldBe Role.RETAILER
+            raced.results.count { it.isRight() } shouldBe 4
+            fx.count("current_decisions WHERE game_id = ?", game.gameId.value) shouldBe 4
+            fx.sessionVersionsAfter(game.gameId, before) shouldBe (1L..4L).map { before + it }
+        }
+    }
+}
+
+private fun FunSpec.retryExhaustedContract(fixture: () -> Fixture) {
+    test("[B6/4.1c] Given 実 DB で再試行の上限が 1 回 When 2 役割が競合 Then 敗者は枯渇（503）で、部分更新が残らない") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-c-$round")
+            val before = fx.maxVersion(game.gameId, "SESSION")
+            val idempotencyBefore = fx.count("idempotency_records WHERE game_id = ?", game.gameId.value)
+
+            val raced =
+                fx.raceCommands(
+                    1,
+                    listOf(
+                        save(game, game.seats[Role.RETAILER].credential, "c-r-$round", Role.RETAILER, 4),
+                        save(game, game.seats[Role.FACTORY].credential, "c-f-$round", Role.FACTORY, 4),
+                    ),
+                )
+
+            raced.results.count { it.isRight() } shouldBe 1
+            raced.results.single { it.isLeft() }.leftOrFail() shouldBe AppFailure.RetryExhausted
+            fx.sessionVersionsAfter(game.gameId, before) shouldBe listOf(before + 1)
+            fx.count("current_decisions WHERE game_id = ?", game.gameId.value) shouldBe 1
+            fx.count("idempotency_records WHERE game_id = ?", game.gameId.value) shouldBe idempotencyBefore + 1
+        }
+    }
+}
+
+private fun FunSpec.sameKeyRaceContract(fixture: () -> Fixture) {
+    test("[B6/4.1d] Given 実 DB で同じキー・同じ本文の保存が同時に 2 つ Then どちらも成功して同じ応答で、イベントは 1 件") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-d-$round")
+            val credential = game.seats[Role.RETAILER].credential
+            val before = fx.maxVersion(game.gameId, "SESSION")
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        save(game, credential, "d-same-$round", Role.RETAILER, 5),
+                        save(game, credential, "d-same-$round", Role.RETAILER, 5),
+                    ),
+                )
+
+            raced.results[0].orFail().versions shouldBe raced.results[1].orFail().versions
+            fx.sessionVersionsAfter(game.gameId, before) shouldBe listOf(before + 1)
+            fx.decisionRow(game.gameId, Role.RETAILER) shouldBe DecisionRow(5, 1L, "PARTICIPANT")
+        }
+    }
+
+    test("[B6/4.1d][ADR-004] Given 実 DB で同じキー・違う本文の保存が同時に 2 つ Then 敗者は key_reused で、勝者の値だけが残る") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-d2-$round")
+            val credential = game.seats[Role.RETAILER].credential
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        save(game, credential, "d2-key-$round", Role.RETAILER, 5),
+                        save(game, credential, "d2-key-$round", Role.RETAILER, 6),
+                    ),
+                )
+
+            val winner = raced.results.indexOfFirst { it.isRight() }
+            raced.results.count { it.isRight() } shouldBe 1
+            raced.results[1 - winner].leftOrFail() shouldBe AppFailure.IdempotencyKeyReused
+            fx.decisionRow(game.gameId, Role.RETAILER) shouldBe DecisionRow(listOf(5, 6)[winner], 1L, "PARTICIPANT")
+        }
+    }
+}
+
+private fun FunSpec.commitAndSaveRaceContract(fixture: () -> Fixture) {
+    test("[B6/4.1e] Given 実 DB で確定と共同担当の保存が同時 Then 確定が先なら WeekAdvanced、保存が先なら DecisionsChanged") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-e-$round", coHolderName = "共同の花子")
+            val coHolder = checkNotNull(game.coHolder)
+            fx.saveAllRoles(game)
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        { ports ->
+                            ports.commitWeek(
+                                game.gameId,
+                                CommitWeekInput(1, RoleMap.all(1L)),
+                                meta("e-commit-$round", game.facilitator),
+                            )
+                        },
+                        { ports ->
+                            // 4 役割の入力（版 1）を見た後の、共同担当の保存（期待する版は 1）
+                            ports.saveDecision(
+                                game.gameId,
+                                SaveDecisionInput(Role.RETAILER, 1, 9, 1),
+                                meta("e-save-$round", coHolder.credential),
+                            )
+                        },
+                    ),
+                )
+
+            val committed = raced.results[0].isRight()
+            raced.results.count { it.isRight() } shouldBe 1
+            if (committed) {
+                raced.results[1].domainError().shouldBeInstanceOf<SessionError.WeekAdvanced>()
+            } else {
+                raced.results[0].domainError().shouldBeInstanceOf<SessionError.DecisionsChanged>()
+                fx.decisionRow(game.gameId, Role.RETAILER) shouldBe DecisionRow(9, 2L, "PARTICIPANT")
+            }
+        }
+    }
+}
+
+private fun FunSpec.proxyAndSaveRaceContract(fixture: () -> Fixture) {
+    test("[B6/4.1f] Given 実 DB で代理入力と共同担当の保存が同時 Then 代理入力は必ず成功し、保存は成功か競合で、最後の値は代理入力") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("co-f-$round", coHolderName = "共同の花子")
+            val coHolder = checkNotNull(game.coHolder)
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        { ports ->
+                            ports.submitProxyDecision(
+                                game.gameId,
+                                ProxyDecisionInput(Role.RETAILER, 1, 6),
+                                meta("f-proxy-$round", game.facilitator),
+                            )
+                        },
+                        save(game, coHolder.credential, "f-save-$round", Role.RETAILER, 8),
+                    ),
+                )
+
+            raced.results[0].isRight() shouldBe true
+            val saved = raced.results[1].isRight()
+            if (!saved) {
+                val conflict = raced.results[1].domainError() as SessionError.DecisionConflict
+                conflict.latest?.editor shouldBe Editor.ByFacilitator(game.gameId)
+            }
+            // 保存が先なら代理入力が上書きして版 2、代理入力が先なら保存は競合して版 1。どちらも最後の値は代理入力
+            fx.decisionRow(game.gameId, Role.RETAILER) shouldBe DecisionRow(6, if (saved) 2L else 1L, "FACILITATOR")
+        }
     }
 }

@@ -226,6 +226,7 @@ class PostgresPersistenceSpec :
         changeNotifierContract { fx }
         applicationFlowContract { fx }
         credentialConcurrencyContract { fx }
+        coInputConcurrencyContract { fx }
         attemptStoreContract { fx }
         attemptFlowContract { fx }
 
