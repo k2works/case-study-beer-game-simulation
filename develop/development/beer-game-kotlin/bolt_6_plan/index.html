@@ -9576,7 +9576,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<strong>Step 0（0.1〜0.4）は 2026-11-15 に実施済み</strong>（<code>validating-design</code>（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。<strong>ゲート 0 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 1（1.1〜1.3）は 2026-11-15 に実施済み</strong>（Gherkin・仕様・Red の実測は「Step 1 の実施結果」。<strong>ゲート 1 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 2（2.1〜2.4）は 2026-11-16 に実施済み</strong>（ドメインの本番コードは変更なし。試験・設計書のみ。結果は「Step 2 の実施結果」。<strong>ゲート 2 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 3（永続化・投影・開示）は 2026-11-16 に実施済み</strong>（結果は「Step 3 の実施結果」。<strong>ゲート 3 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 4 は 2026-11-16 に実施済み</strong>（共同入力の並行の統合テスト。本番コードの変更なし。結果は「Step 4 の実施結果」。<strong>ゲート 4 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 5 に着手した</strong>（ゲート 5〜8 は未承認）</td>
+<td style="text-align: left;"><strong>ステップ計画は、2026-11-15 にユーザーが承認した（選択: 「計画を承認し、17 件を提案どおりに決定」）。着手前の判断項目 17 件は、同日に提案どおりに決定された（更新履歴）。ゲート 0〜8 は人の確認待ち（未承認）。</strong> 実装・コード変更は未着手。<strong>Step 0（0.1〜0.4）は 2026-11-15 に実施済み</strong>（<code>validating-design</code>（着手前）の結果、設計と実装の差、ベースラインの実測は本書に記録。<strong>ゲート 0 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 1（1.1〜1.3）は 2026-11-15 に実施済み</strong>（Gherkin・仕様・Red の実測は「Step 1 の実施結果」。<strong>ゲート 1 は 2026-11-15 にユーザーが承認済み</strong>）。<strong>Step 2（2.1〜2.4）は 2026-11-16 に実施済み</strong>（ドメインの本番コードは変更なし。試験・設計書のみ。結果は「Step 2 の実施結果」。<strong>ゲート 2 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 3（永続化・投影・開示）は 2026-11-16 に実施済み</strong>（結果は「Step 3 の実施結果」。<strong>ゲート 3 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 4 は 2026-11-16 に実施済み</strong>（共同入力の並行の統合テスト。本番コードの変更なし。結果は「Step 4 の実施結果」。<strong>ゲート 4 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 5 は 2026-11-16 に実施済み</strong>（結果は「Step 5 の実施結果」。<strong>ゲート 5 は 2026-11-16 にユーザーが承認済み</strong>）。<strong>Step 6 に着手した</strong>（ゲート 6〜8 は未承認）</td>
 </tr>
 </tbody>
 </table>
@@ -10650,7 +10650,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 5.5（<strong>実施済み（2026-11-16）。ADR-019 を提案として書いた（<code>status: draft</code>）。ADR-005 の更新は、ADR-019 の承認後</strong>）<strong>ADR-019（提案）</strong>を書く: 再試行の上限・間隔の値（計測の結果）と、直列化の要否（比較の結果）。ADR-005 の「未決」（再試行の上限の値、ジッターの要否）を更新する。<strong>承認は人</strong>。<strong>採用が「直列化する」になった場合は、<code>main</code> の実装を別の作業（本 Bolt の範囲外か、予備 B16）として人が決める</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 5.6（<strong>未実施。意図的</strong>。現状の既定値（上限 5）でリリース計画の基準（4 人同時で 0 件）を満たしたので、変更は必須ではない。<strong>上限を 10 に上げる提案は ADR-019 にあり、承認は人（ゲート 5）。承認されたら、テストを先に書いて <code>ServerConfig.DEFAULT_MAX_ATTEMPTS</code> を変える</strong>）既定値の変更が要るなら、<code>ServerConfig</code>（<code>COMMAND_MAX_ATTEMPTS</code>）の既定値と、ジッターの実装（時計・乱数は注入。ドメインに入れない）を、<strong>テストを先に書いて</strong>行う。<strong>値は計測の後に決める</strong></li>
 </ul>
-<p><strong>ゲート 5</strong>: 計測の設計・結果・限界、上限と間隔の決定、ADR-019 を、人が確認する。<strong>状態: 人の確認待ち（未承認）。承認は記録していない。Step 6 以降には進んでいない。</strong> 未達（<code>RetryExhausted</code> が基準を超える）の場合は、<strong>未達として記録</strong>し、対策（上限・間隔・直列化）を人が決める（隠さない）。</p>
+<p><strong>ゲート 5</strong>: 計測の設計・結果・限界、上限と間隔の決定、ADR-019 を、人が確認する。<strong>状態: 2026-11-16 にユーザーが承認した（指示: 「B6 のゲート 5 を承認して Step 6 に進めて」）。</strong> 承認の範囲はゲート 5 だけで、ゲート 5 の確認事項として提示したもの（計測の設計・結果・限界、<code>RetryMeasurement.kt</code> の新規ファイル、ADR-019 の提案（楽観的並行制御の維持、上限 5 → 10、ジッターなし、書き込みロックなし））を、<strong>提示したとおりに</strong>承認した。個別の変更の指示はなかった。<strong>NF-C2 の合否は、計測の標本が足りず言えないまま（承認は、この点を解決したものではない。B13 の監視、またはより大きな標本での再計測に委ねる）</strong>。<strong>ゲート 6〜8 は未承認</strong>。未達（<code>RetryExhausted</code> が基準を超える）の場合は、<strong>未達として記録</strong>し、対策（上限・間隔・直列化）を人が決める（隠さない）。</p>
 <h3 id="step-5-2026-11-16-claude-codeclaude-sonnet-5-5">Step 5 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）<a class="headerlink" href="#step-5-2026-11-16-claude-codeclaude-sonnet-5-5" title="Permanent link">&para;</a></h3>
 <p><strong>実測の事実だけを書く。ゲート 5 の承認は記録していない。Step 6 以降には進んでいない（HTTP の JSON・UI は変更していない）。<code>main</code> の変更はなし</strong>（既定値は上限 5・間隔なしのまま）。条件: JDK は Amazon Corretto 21.0.12、PostgreSQL 18（Testcontainers）、接続プール 12、<code>BEERGAME_MEASURE=1</code> で、同じ条件の計測を <strong>2 回</strong>実行。<strong>ローカルの値であり、実環境（ECS・RDS・ALB）の値ではない。</strong></p>
 <h4 id="_17">変更したもの（試験の道具だけ）<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h4>
@@ -11154,6 +11154,11 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align: left;">2026-11-16</td>
+<td style="text-align: left;"><strong>ゲート 5 をユーザーが承認し、Step 6 に進める指示を受けた</strong>（指示: 「B6 のゲート 5 を承認して Step 6 に進めて」。承認の範囲はゲート 5 だけ。ゲート 6〜8 は未承認。Step 7 以降へは進まない。<strong>ADR-019 の提案が承認されたので、5.6（<code>DEFAULT_MAX_ATTEMPTS</code> を 5 → 10）を、テストを先に書いて実施する</strong>）</td>
+<td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
 <tr>
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;"><strong>Step 5（5.1〜5.5）を実施</strong>（<code>RetryExhausted</code> の発生率の計測。<strong><code>main</code> の変更なし</strong>。<strong>ゲート 5 は人の確認待ち（未承認）。承認は記録していない。Step 6 以降には進んでいない</strong>）。計測の道具（<code>RetryMeasurement.kt</code>。新規ファイル）で、7 試行 × 4 シナリオを 2 回計測。上限 3 は S1 の基準を満たさず（2.8%）、上限 5 以上は 0 件。ADR-019（提案）を書いた。<strong>5.6（既定値の変更）は意図的に未実施</strong>（承認待ち）。NF-C2 の合否はこの計測では言えない。結果は「Step 5 の実施結果」</td>
