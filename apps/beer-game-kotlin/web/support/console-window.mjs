@@ -65,26 +65,49 @@ export class ConsoleWindow {
     }
 
     /** 進行役の資格は、ブラウザの文脈（Cookie の入れ物）に持たせる。参加者は、別々の入れ物にする。 */
-    async seedStartedGame() {
+    async seedStartedGame({ retailerCoHolder = false } = {}) {
         const facilitator = this.browserContext.request;
         const state = await this.createGame();
 
         for (const role of ROLES) {
-            const context = await request.newContext({ baseURL: this.baseURL });
-            await call(context, 'POST', '/participations/join', {
-                joinCode: state.joinCode,
-                displayName: `${ROLE_LABELS[role]}の担当`,
-            });
-            const mine = await (await call(context, 'GET', `/games/${this.gameId}/state`)).json();
-            await call(
+            await this.joinAndAssign(
                 facilitator,
-                'PUT',
-                `/games/${this.gameId}/participants/${mine.participantId}/role`,
-                { role },
+                state.joinCode,
+                role,
+                role,
+                `${ROLE_LABELS[role]}の担当`,
             );
-            this.participants.set(role, { context, participantId: mine.participantId });
+        }
+        // 共同担当は、準備中に小売店へ割り当てる（開始後の追加は範囲外）。画面の窓口のキーは RETAILER_CO
+        if (retailerCoHolder) {
+            await this.joinAndAssign(
+                facilitator,
+                state.joinCode,
+                'RETAILER_CO',
+                'RETAILER',
+                `${ROLE_LABELS.RETAILER}の共同担当`,
+            );
         }
         await call(facilitator, 'POST', `/games/${this.gameId}/start`);
+    }
+
+    /** 別の Cookie の入れ物で参加し、進行役が [role] に割り当てる。窓口では [key] で引く。 */
+    async joinAndAssign(facilitator, joinCode, key, role, displayName) {
+        const context = await request.newContext({ baseURL: this.baseURL });
+        await call(context, 'POST', '/participations/join', { joinCode, displayName });
+        const mine = await (await call(context, 'GET', `/games/${this.gameId}/state`)).json();
+        await call(
+            facilitator,
+            'PUT',
+            `/games/${this.gameId}/participants/${mine.participantId}/role`,
+            { role },
+        );
+        this.participants.set(key, {
+            context,
+            participantId: mine.participantId,
+            role,
+            displayName,
+        });
     }
 
     async seedDecisions(week, quantities) {
@@ -157,18 +180,67 @@ export class ConsoleWindow {
     }
 
     /** 参加者の画面（別のブラウザの文脈）を、参加者の資格で開く。 */
-    async openPlayAs(role) {
-        const { context: apiContext } = this.participants.get(role);
+    async openPlayAs(key) {
+        const { context: apiContext, role: assigned } = this.participants.get(key);
+        const role = assigned ?? key;
         const context = await this.browser.newContext({
             baseURL: this.baseURL,
             locale: 'ja-JP',
             storageState: await apiContext.storageState(),
         });
         const page = await context.newPage();
-        this.players.set(role, { context, page });
+        this.players.set(key, { context, page });
         await page.goto(`/games/${this.gameId}/play`);
         await page.getByRole('heading', { name: 'プレイ' }).waitFor({ timeout: WAIT_MS });
         await page.getByLabel(decisionLabel(role)).waitFor({ timeout: WAIT_MS });
+    }
+
+    // ---- 共同入力（features/weekly-play/co-input-ui.feature）。窓口のキーは、1 人目が RETAILER、2 人目が RETAILER_CO ----
+
+    /** 入力欄に数量を入れて、保存を押す。 */
+    async savePlay(key, quantity) {
+        const { page } = this.players.get(key);
+        await page.getByLabel(decisionLabel('RETAILER')).fill(String(quantity));
+        await page.getByRole('button', { name: '発注を保存' }).click({ timeout: WAIT_MS });
+    }
+
+    /** 自分の保存が反映された（「現在の入力」が、自分の保存として示される）。 */
+    async savedAsSelf(key, quantity) {
+        const { page } = this.players.get(key);
+        await page
+            .getByText(new RegExp(`^現在の入力: ${quantity}（あなたが \\d{2}:\\d{2} に保存）$`))
+            .waitFor({ timeout: WAIT_MS });
+    }
+
+    /** 競合の通知: 見出し、最新の値、保存者（[savedBy] の表示名。時刻つき）。版は出ない。 */
+    async conflictShown(key, latest, savedBy) {
+        const { page } = this.players.get(key);
+        const notice = page.getByRole('region', { name: '他の人が先に保存しました。' });
+        await notice.waitFor({ timeout: WAIT_MS });
+        await notice.getByText(`最新の入力: ${latest}`).waitFor({ timeout: WAIT_MS });
+        await notice
+            .getByText(new RegExp(`^保存者: ${savedBy}さん（\\d{2}:\\d{2}）$`))
+            .waitFor({ timeout: WAIT_MS });
+        assert.doesNotMatch((await notice.textContent()) ?? '', /版/);
+    }
+
+    /** 入力した値が、入力欄にも通知にも残っている。 */
+    async inputKept(key, value) {
+        const { page } = this.players.get(key);
+        assert.equal(await page.getByLabel(decisionLabel('RETAILER')).inputValue(), String(value));
+        await page
+            .getByText(`あなたの入力: ${value}（未保存。保持しています）`)
+            .waitFor({ timeout: WAIT_MS });
+    }
+
+    async resave(key) {
+        const { page } = this.players.get(key);
+        await page.getByRole('button', { name: 'この値で保存し直す' }).click({ timeout: WAIT_MS });
+    }
+
+    /** 表示名（窓口が参加させたときの名前）。 */
+    displayNameOf(key) {
+        return this.participants.get(key).displayName;
     }
 
     /** 自動更新が無い（手動更新だけ）ので、条件を満たすまで「手動更新」を押して確かめる。 */

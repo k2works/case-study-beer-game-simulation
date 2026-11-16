@@ -28,6 +28,21 @@ describe('S04 ロビー（進行役）', () => {
         expect(within(rowOf('田中')).getByText('未割り当て')).toBeInTheDocument();
     });
 
+    it('B6/S04: 同じ役割に共同担当（複数人）がいるときは、その役割の行に全員を並べる', async () => {
+        const co: LobbyParticipant = {
+            participantId: 'p-3',
+            displayName: '鈴木',
+            role: 'RETAILER',
+        };
+        const api = fakeApi({
+            getLobby: () => Promise.resolve(lobby({ participants: [yamamoto, co] })),
+        });
+        renderApp(api, `/games/${GAME_ID}/lobby`);
+
+        expect(await screen.findByText('小売店: 山本、鈴木')).toBeInTheDocument();
+        expect(screen.getByText('二次卸: （未割り当て）')).toBeInTheDocument();
+    });
+
     it('各役割に 1 人以上が要ることと、不足している役割を示し、開始を押せなくする', async () => {
         const api = fakeApi({
             getLobby: () => Promise.resolve(lobby({ participants: [yamamoto] })),

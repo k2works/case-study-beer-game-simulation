@@ -65,6 +65,12 @@ export type ProxyDecisionRequest = Schemas['ProxyDecisionRequest'];
 
 export type SaveDecisionRequest = Schemas['SaveDecisionRequest'];
 
+/** 保存した人（B6）。表示名は、同じ役割の共同担当と進行役にだけ届く。進行役の代理入力は表示名を持たない。 */
+export type DecisionEditor = Schemas['DecisionEditor'];
+
+/** 保存済みの入力（数量・版・保存者・保存の時刻）。競合の 409 の `latest` の形。 */
+export type DecisionEntry = Schemas['DecisionEntry'];
+
 export type CommitWeekRequest = Schemas['CommitWeekRequest'];
 
 export type GameStatus = Schemas['Lobby']['status'];

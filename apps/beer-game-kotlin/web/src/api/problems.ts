@@ -1,5 +1,5 @@
 import { ApiError, NetworkError } from './errors';
-import type { ErrorCode } from './types';
+import type { DecisionEditor, DecisionEntry, ErrorCode } from './types';
 
 /**
  * エラーの code から、画面の文言を引く辞書。正本は docs/design/beer-game-kotlin/ui-design.md の
@@ -8,8 +8,11 @@ import type { ErrorCode } from './types';
  */
 export const DECISIONS_CHANGED_TEXT = '確定の前に入力が変わりました。最新の値を確認してください。';
 
+/** 競合の見出し（同じ役割の共同担当が先に保存した）。 */
+export const DECISION_CONFLICT_TEXT = '他の人が先に保存しました。';
+
 const TEXTS: Record<ErrorCode, string | null> = {
-    'session.decision_conflict': '他の人が先に保存しました。',
+    'session.decision_conflict': DECISION_CONFLICT_TEXT,
     'session.week_advanced': null, // 週が要るので、下で組み立てる
     'session.decisions_changed': DECISIONS_CHANGED_TEXT,
     'session.already_started': 'すでに開始されています。',
@@ -62,6 +65,29 @@ export interface ShownProblem {
     correlationId?: string;
     /** 権限が無い（参加の画面への導線を出す）。 */
     unauthorized: boolean;
+}
+
+/** 競合の見出し。最新の値の保存者が進行役の代理入力のとき（ui-design「代理入力が上書きした場合」）。 */
+export const PROXY_OVERWRITE_TEXT = '進行役が代理で入力しました。';
+
+/**
+ * 競合（session.decision_conflict）の本文の `latest`（最新の入力）を、形を確かめて取り出す。
+ * 応答は信頼できない入力なので、数量・版・保存者の種別・保存の時刻が揃っていなければ null（一般の失敗として扱う）。
+ */
+export function latestOf(error: ApiError): DecisionEntry | null {
+    const latest: unknown = error.body['latest'];
+    if (typeof latest !== 'object' || latest === null) return null;
+    const entry = latest as Partial<DecisionEntry>;
+    const editor = entry.editor as Partial<DecisionEditor> | undefined;
+    const valid =
+        typeof entry.quantity === 'number' &&
+        typeof entry.version === 'number' &&
+        typeof entry.savedAt === 'string' &&
+        typeof editor === 'object' &&
+        editor !== null &&
+        (editor.kind === 'PARTICIPANT' || editor.kind === 'FACILITATOR_PROXY') &&
+        typeof editor.isSelf === 'boolean';
+    return valid ? (entry as DecisionEntry) : null;
 }
 
 export const weekAdvancedText = (week: number): string => `第 ${week} 週はすでに確定されています。`;

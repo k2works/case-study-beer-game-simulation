@@ -3,11 +3,18 @@ import { useParams } from 'react-router';
 import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
-import { weekAdvancedText } from '../../api/problems';
-import type { GameState, SessionState } from '../../api/types';
+import { latestOf, weekAdvancedText } from '../../api/problems';
+import type { GameState, Role, SessionState } from '../../api/types';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
-import { ROLE_LABELS, WEEK_SEPARATOR, decisionFieldLabel } from '../../labels';
+import {
+    ROLE_LABELS,
+    WEEK_SEPARATOR,
+    decisionFieldLabel,
+    editorName,
+    formatClock,
+} from '../../labels';
+import { ConflictNotice, type Conflict } from './ConflictNotice';
 
 const STEPS = ['1. 状況を確認', '2. 入力', '3. 確定待ち'] as const;
 
@@ -15,6 +22,22 @@ interface Carried {
     week: number;
     value: string;
 }
+
+/** 共同担当の行（2 人以上のときだけ）。自分には「あなた」を添える。 */
+const coHoldersText = (coHolders: SessionState['coHolders']): string | null =>
+    coHolders !== undefined && coHolders.length >= 2
+        ? `共同担当: ${coHolders
+              .map((h) => `${h.displayName ?? '共同担当'}${h.isSelf ? '（あなた）' : ''}`)
+              .join('、')}`
+        : null;
+
+/** 現在の入力の行。最後の保存者と時刻があれば添える（「鈴木さんが 10:42 に保存」）。 */
+const currentDecisionText = (status: NonNullable<SessionState['roleStatus']>): string => {
+    const base = `現在の入力: ${status.decision ?? '未入力'}`;
+    return status.decisionEditor && status.decisionSavedAt
+        ? `${base}（${editorName(status.decisionEditor)}が ${formatClock(status.decisionSavedAt)} に保存）`
+        : base;
+};
 
 /**
  * S05 プレイ（参加者）。B1 の範囲: 自分の役割の状況、数量の入力と保存、確定待ち、週が進んだ場合の表示。
@@ -35,12 +58,14 @@ export function PlayPage() {
     const [advancedWeek, setAdvancedWeek] = useState<number | null>(null);
     const [slow, setSlow] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [conflict, setConflict] = useState<Conflict | null>(null);
 
     // 週が変わったときの判定に、描画の値でなく最新の値を使う
     const sessionRef = useRef<SessionState | null>(null);
     const draftRef = useRef('');
     draftRef.current = draft;
     const noticeRef = useRef<HTMLHeadingElement>(null);
+    const conflictRef = useRef<HTMLHeadingElement>(null);
 
     /** 取得したスナップショットを反映する。週が変わっていたら、入力欄を空にし、直前の値を参考に残す。 */
     const applySession = useCallback((next: SessionState) => {
@@ -50,6 +75,7 @@ export function PlayPage() {
             setCarried(typed === '' ? null : { week: previous.week, value: typed });
             setDraft('');
             setFieldError(null);
+            setConflict(null); // 競合は、その週の入力の話。週が進んだら閉じる
         }
         sessionRef.current = next;
         setSession(next);
@@ -79,6 +105,12 @@ export function PlayPage() {
         if (advancedWeek !== null) noticeRef.current?.focus();
     }, [advancedWeek]);
 
+    // 競合の通知が出たら、見出しへフォーカスを移す（気づけるように）
+    const conflicted = conflict !== null;
+    useEffect(() => {
+        if (conflicted) conflictRef.current?.focus();
+    }, [conflicted]);
+
     async function save(event: FormEvent) {
         event.preventDefault();
         if (session === null || session.roleStatus === undefined) return;
@@ -88,17 +120,22 @@ export function PlayPage() {
             setFieldError(`${decisionFieldLabel(role)}は 0〜1000 の整数で入力してください。`);
             return;
         }
+        await submit(session, role, Number(draft), session.roleStatus.decisionVersion);
+    }
+
+    /** 数量を、期待する意思決定の版を添えて保存する。競合したときは、入力した値を保持して、競合の通知を出す。 */
+    async function submit(at: SessionState, role: Role, quantity: number, expectedVersion: number) {
         setBusy(true);
         setFieldError(null);
         setFailure(null);
         setAdvancedWeek(null);
         setSlow(false);
-        const sessionId = session.sessionId;
+        const sessionId = at.sessionId;
         try {
             const result = await api.saveDecision(
                 sessionId,
-                { week: session.week, quantity: Number(draft) },
-                session.roleStatus.decisionVersion,
+                { week: at.week, quantity },
+                expectedVersion,
             );
             // 応答は versions だけ。表示は、追いついた取得の結果から作る
             const { snapshot, caughtUp } = await fetchCaughtUp(
@@ -108,8 +145,9 @@ export function PlayPage() {
             );
             applySession(snapshot);
             setSlow(!caughtUp);
+            setConflict(null);
         } catch (error) {
-            await handleSaveFailure(error, role, session);
+            await handleSaveFailure(error, role, at, quantity);
         } finally {
             setBusy(false);
         }
@@ -119,8 +157,21 @@ export function PlayPage() {
         error: unknown,
         role: NonNullable<SessionState['role']>,
         at: SessionState,
+        quantity: number,
     ) {
-        if (
+        const latest =
+            error instanceof ApiError && error.code === 'session.decision_conflict'
+                ? latestOf(error)
+                : null;
+        if (latest !== null) {
+            // 共同担当が先に保存した。黙って上書きせず、最新の値・保存者を示し、入力した値は保持する
+            setConflict({ latest, mine: quantity });
+            try {
+                applySession(await api.getSessionState(at.sessionId));
+            } catch (reloadError) {
+                setFailure(reloadError);
+            }
+        } else if (
             error instanceof ApiError &&
             error.status === 422 &&
             error.errors.some((e) => e.field === 'quantity')
@@ -182,6 +233,9 @@ export function PlayPage() {
                         </section>
                     ) : null}
                     <p>{`第 ${session.week} 週${WEEK_SEPARATOR}${ROLE_LABELS[role]}`}</p>
+                    {coHoldersText(session.coHolders) ? (
+                        <p>{coHoldersText(session.coHolders)}</p>
+                    ) : null}
                     <ol aria-label="週の進行" className="steps">
                         {STEPS.map((step, index) => {
                             // 入力前は「入力」、保存した後は「確定待ち」（進行役の確定を待つ）
@@ -227,7 +281,27 @@ export function PlayPage() {
                             {status === 'PAUSED' ? (
                                 <p role="status">停止中です。進行役の再開を待ってください。</p>
                             ) : null}
-                            <p>{`現在の入力: ${roleStatus.decision ?? '未入力'}`}</p>
+                            <p>{currentDecisionText(roleStatus)}</p>
+                            {conflict ? (
+                                <ConflictNotice
+                                    conflict={conflict}
+                                    busy={busy}
+                                    headingRef={conflictRef}
+                                    onUseLatest={() => {
+                                        setDraft(String(conflict.latest.quantity));
+                                        setFieldError(null);
+                                        setConflict(null);
+                                    }}
+                                    onResave={() =>
+                                        void submit(
+                                            session,
+                                            role,
+                                            conflict.mine,
+                                            conflict.latest.version,
+                                        )
+                                    }
+                                />
+                            ) : null}
                             {carried ? (
                                 <p>{`第 ${carried.week} 週に入力していた値: ${carried.value}（未保存）`}</p>
                             ) : null}
