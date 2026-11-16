@@ -35,9 +35,10 @@ sealed interface AppFailure {
         val errors: NonEmptyList<ValidationError>,
     ) : AppFailure
 
-    /** decide が返した業務上の失敗。 */
+    /** decide が返した業務上の失敗。競合（入力の競合・確定の根拠の変化）には、最新の入力の詳細を [detail] に添える（B6）。 */
     data class Domain(
         val error: DomainError,
+        val detail: ConflictDetail? = null,
     ) : AppFailure
 
     /** 追記の競合。`uq_events_stream_version` の違反、40001、40P01。冪等記録の重複（再照合のための再試行）も含む。 */

@@ -57,6 +57,8 @@ private fun roleStatusJson(status: RoleStatus): JsonObject =
         status.customerDemand?.let { put("customerDemand", it) }
         put("decision", status.decision?.let(::JsonPrimitive) ?: JsonNull)
         put("decisionVersion", status.decisionVersion)
+        put("decisionEditor", status.decisionEditor?.let(::editorJson) ?: JsonNull)
+        put("decisionSavedAt", status.decisionSavedAt?.toString()?.let(::JsonPrimitive) ?: JsonNull)
     }
 
 private fun weekResultJson(result: WeekResultView): JsonObject =
@@ -95,6 +97,8 @@ internal fun Snapshot.toSessionStateJson(): JsonObject =
                 put("participantId", current.participantId.value.toString())
                 current.role?.let { put("role", it.name) }
                 current.status?.let { put("roleStatus", roleStatusJson(it)) }
+                // 同じ役割の共同担当（自分を含む）。役割が無い参加者には付けない
+                if (current.role != null) put("coHolders", JsonArray(current.coHolders.map(::coHolderJson)))
             }
 
             is SnapshotView.Facilitator -> {

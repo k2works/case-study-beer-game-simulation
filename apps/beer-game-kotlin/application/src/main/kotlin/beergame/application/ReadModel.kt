@@ -98,6 +98,30 @@ data class DecisionEditorView(
     val displayName: String?,
 )
 
+/** 保存済みの入力 1 件（数量・版・保存者・保存の時刻）。競合の 409 の `latest`・`current` の項目（B6）。 */
+data class DecisionDetail(
+    val quantity: Int,
+    val version: Long,
+    val editor: DecisionEditorView,
+    val savedAt: Instant,
+)
+
+/**
+ * 競合の失敗（`session.decision_conflict`・`session.decisions_changed`）に添える、最新の入力の詳細（B6）。
+ * 投影から作り、呼び出した人ごとの開示の規則を掛けてある（[Disclosure.conflictDetail]）。
+ */
+sealed interface ConflictDetail {
+    /** `decision_conflict` の最新の入力。入力がまだ無ければ null。 */
+    data class Latest(
+        val entry: DecisionDetail?,
+    ) : ConflictDetail
+
+    /** `decisions_changed` の、役割ごとの現在の入力。 */
+    data class Current(
+        val entries: Map<Role, DecisionDetail>,
+    ) : ConflictDetail
+}
+
 /** 同じ役割の共同担当（B6）。参加者の ID は含めない。 */
 data class CoHolderView(
     val displayName: String?,

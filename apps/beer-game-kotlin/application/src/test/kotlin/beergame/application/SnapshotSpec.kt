@@ -1,11 +1,14 @@
 package beergame.application
 
+import beergame.domain.Actor
 import beergame.domain.CredentialSubject
 import beergame.domain.Editor
 import beergame.domain.GameId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
+import beergame.domain.SessionError
 import beergame.domain.StreamVersion
+import beergame.domain.Week
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -480,6 +483,76 @@ class SnapshotSpec :
 
             view.roles.getValue(Role.WHOLESALER).decisionEditor shouldBe
                 DecisionEditorView(EditorKind.FACILITATOR_PROXY, isSelf = true, displayName = null)
+        }
+
+        // ---- B6 Step 6: 競合の 409 の詳細（最新値・保存者・保存の時刻）。表示名は、同じ役割の共同担当と進行役にだけ ----
+
+        test("[B6/6.1][AC2.2.3] Given 共同担当が保存した When 競合した別の共同担当に返す詳細を作る Then 最新値・版・保存者（表示名つき・自分でない）・保存の時刻") {
+            val world = World()
+            val game = world.started()
+            val coHolder = ParticipantId(UUID.randomUUID())
+            val owner = game.seats[Role.WHOLESALER].participantId
+            val projected = withCoHolder(game, coHolder, Editor.ByParticipant(owner))
+            val error = SessionError.DecisionConflict(Role.WHOLESALER, null)
+
+            val detail = ConflictDisclosure.conflictDetail(projected, error, Actor.Participant(coHolder))
+
+            detail shouldBe
+                ConflictDetail.Latest(
+                    DecisionDetail(
+                        3399,
+                        5,
+                        DecisionEditorView(EditorKind.PARTICIPANT, false, NAMES.getValue(Role.WHOLESALER)),
+                        SAVED_AT,
+                    ),
+                )
+        }
+
+        test("[B6/6.1][AC2.2.4] Given 進行役が代理入力した When 競合した共同担当に返す詳細を作る Then 保存者は進行役（代理入力。表示名なし）") {
+            val world = World()
+            val game = world.started()
+            val coHolder = ParticipantId(UUID.randomUUID())
+            val projected = withCoHolder(game, coHolder, Editor.ByFacilitator(game.gameId))
+            val error = SessionError.DecisionConflict(Role.WHOLESALER, null)
+
+            val detail = ConflictDisclosure.conflictDetail(projected, error, Actor.Participant(coHolder))
+
+            detail shouldBe
+                ConflictDetail.Latest(
+                    DecisionDetail(3399, 5, DecisionEditorView(EditorKind.FACILITATOR_PROXY, false, null), SAVED_AT),
+                )
+        }
+
+        test("[B6/6.1][AC2.3.1] Given 共同担当が保存し直した When 確定した進行役に返す詳細を作る Then 役割ごとの現在の入力（保存者つき）が返る") {
+            val world = World()
+            val game = world.started()
+            val coHolder = ParticipantId(UUID.randomUUID())
+            val projected = withCoHolder(game, coHolder, Editor.ByParticipant(coHolder))
+            val error = SessionError.DecisionsChanged(Week.of(2).ok(), emptyMap())
+
+            val detail = ConflictDisclosure.conflictDetail(projected, error, Actor.Facilitator(game.gameId))
+
+            detail shouldBe
+                ConflictDetail.Current(
+                    mapOf(
+                        Role.WHOLESALER to
+                            DecisionDetail(
+                                3399,
+                                5,
+                                DecisionEditorView(EditorKind.PARTICIPANT, false, CO_NAME),
+                                SAVED_AT,
+                            ),
+                    ),
+                )
+        }
+
+        test("[B6/6.1] Given 競合でない失敗 When 詳細を作る Then null（詳細を付けない）") {
+            val world = World()
+            val game = world.started()
+            val projected = withCoHolder(game, ParticipantId(UUID.randomUUID()), Editor.ByFacilitator(game.gameId))
+
+            ConflictDisclosure.conflictDetail(projected, SessionError.Paused, Actor.Facilitator(game.gameId)) shouldBe
+                null
         }
 
         test("[B6/3.1a] Given 二次卸の参加者の入力がある When 資格つきで取得する（ポート経由）Then 保存者と保存の時刻まで返る") {

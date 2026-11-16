@@ -96,6 +96,7 @@ data class ServerConfig(
 ) {
     companion object {
         const val DEFAULT_PORT = 8080
+
         /** 再試行の上限の既定。同時に 6 人以上が書くと上限 5 では枯渇しうるため 10（ADR-019。B6 Step 5 の計測）。 */
         const val DEFAULT_MAX_ATTEMPTS = 10
         const val DEFAULT_ATTEMPT_MAX_FAILURES = 10

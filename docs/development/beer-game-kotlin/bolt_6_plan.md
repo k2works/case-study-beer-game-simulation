@@ -587,12 +587,60 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 ### Step 6: アプリケーションと HTTP（🔴🟢🟡）
 
-- [ ] 6.1 🔴 HTTP の統合テスト（`testApplication`）を先に書く: 共同担当の保存（200）、競合の 409（最新値・保存者・時刻。**表示名は同じ役割の共同担当にだけ**）、`DecisionsChanged`／`WeekAdvanced` の区別、`Idempotency-Key` の再送（同じ操作者・同じ本文なら保存済みの応答。**別の操作者の同じキーは `app.idempotency_key_reused`**）、**失効した資格の再送は 403**（B5 の保証を、共同担当の保存でも崩さない）、`problem+json` の `code`。失敗を確認する
-- [ ] 6.2 🟢 応答の形の実装（Step 1.2 の仕様どおり）。**契約テスト（仕様 ↔ 実装）が緑**になる
-- [ ] 6.3 🟢 TypeScript の型を再生成し、差分 0 の検査を通す
-- [ ] 6.4 🟡 リファクタリング。性能: 共同入力の保存は p95 1 秒以下（NF-P13）。**ローカルの計測値は、実環境でないことを明記して記録**
+- [x] 6.1 🔴（**実施済み（2026-11-16）。応答の形の 6 件が Red、冪等の再送・失効の 2 件は最初から Green（回帰）。下の「Step 6 の実施結果」**）HTTP の統合テスト（`testApplication`）を先に書く: 共同担当の保存（200）、競合の 409（最新値・保存者・時刻。**表示名は同じ役割の共同担当にだけ**）、`DecisionsChanged`／`WeekAdvanced` の区別、`Idempotency-Key` の再送（同じ操作者・同じ本文なら保存済みの応答。**別の操作者の同じキーは `app.idempotency_key_reused`**）、**失効した資格の再送は 403**（B5 の保証を、共同担当の保存でも崩さない）、`problem+json` の `code`。失敗を確認する
+- [x] 6.2 🟢（**実施済み（2026-11-16）。契約テスト・受入 @api が Green**）応答の形の実装（Step 1.2 の仕様どおり）。**契約テスト（仕様 ↔ 実装）が緑**になる
+- [x] 6.3 🟢（**実施済み（2026-11-16）。仕様（`openapi.yaml`）は Step 1 から変えていないので、再生成の差分は 0。`api:check` が成功**）TypeScript の型を再生成し、差分 0 の検査を通す
+- [x] 6.4 🟡（**実施済み（2026-11-16）。違反 0 件。性能は Step 5 の値を参照（HTTP の層だけの p95 は未計測）**）リファクタリング。性能: 共同入力の保存は p95 1 秒以下（NF-P13）。**ローカルの計測値は、実環境でないことを明記して記録**
 
-**ゲート 6**: API の形（`code`、ステータス、保存者の開示範囲）と、認可の行列を、人が確認する。**状態: 人の確認待ち（未承認）。**
+**ゲート 6**: API の形（`code`、ステータス、保存者の開示範囲）と、認可の行列を、人が確認する。**状態: 人の確認待ち（未承認）。承認は記録していない。Step 7 以降には進んでいない。**
+
+### Step 6 の実施結果（2026-11-16。実施者: claude-code/claude-sonnet-5-5）
+
+**実測の事実だけを書く。ゲート 6 の承認は記録していない。Step 7 以降には進んでいない（UI・設計書の更新・終了報告は未着手）。** 条件: JDK は Amazon Corretto 21.0.12、`./gradlew … --offline`、PostgreSQL 18（Testcontainers）、Docker 起動中。**この Step の前に、5.6（`DEFAULT_MAX_ATTEMPTS` 5 → 10）を、ゲート 5 の承認の後に、試験を先に書いて実施した**（コミット `1fda2d6`）。
+
+#### 変更したもの
+
+| 層 | 変更 |
+| :--- | :--- |
+| application | `AppFailure.Domain` に `detail`（`ConflictDetail`）を追加。新しい型 `DecisionDetail`・`ConflictDetail`。**新規ファイル `ConflictDisclosure.kt`**（競合の詳細を作る純粋関数と、`saveDecision`・`commitWeek` の失敗の後に投影を 1 回読んで詳細を添える `withConflictDetail`）。`Disclosure.editorView` を内部の関数に |
+| adapter-http | `Responses.kt`: 状況の応答に `decisionEditor`・`decisionSavedAt`（未入力は null）と、参加者だけの `coHolders`（`displayName`・`isSelf` だけ。ID なし）。`ProblemMapping.kt`: 409 の `latest`・`current` に、保存者・保存の時刻つきの詳細（詳細が無いときは従来の数量・版だけ）。**新規ファイル `DecisionJson.kt`**（保存者・入力・共同担当の JSON。detekt の関数数の制限のため分けた） |
+| 試験 | **新規ファイル `CoInputHttpSpec.kt`**（8 件）、`SnapshotSpec` に競合の詳細の純粋関数の試験（4 件）、`ServerConfigSpec` に既定の上限（1 件） |
+| 仕様・型 | **変更なし**（`openapi.yaml` と TypeScript の生成物は、Step 1 のまま。`api:check` の差分 0） |
+
+新規ファイルは 3 つ（`ConflictDisclosure.kt`・`DecisionJson.kt`・`CoInputHttpSpec.kt`）。判断項目 14 の見込みの一覧に無い。**ゲート 6 で承認をお願いします**。
+
+#### Red と Green の実測
+
+- **Red（6.1）**: `CoInputHttpSpec` の 8 件中 **6 件が失敗**（状況の保存者・保存の時刻・共同担当、非開示の項目単位の検査、代理入力の保存者、409 の `latest`・`current`）。**2 件は最初から Green**（冪等キーの再送、失効した資格の再送。B5 の保証を共同担当の保存でも崩さないことの回帰）。application の純粋関数の試験は、未定義でコンパイルエラー（Red）。既存の Red だった `@api` の 6 シナリオと `ApiContractSpec` も、この実装の前は失敗のままだった。
+- **Green（6.2）**: `:app:test` 全件成功（**`ApiContractSpec` が Green。B6 Step 1 から続いた意図的な Red が解消**）。受入 `@api` は **87 シナリオが PostgreSQL・H2 の両方で全件成功**（Step 1 の時点では 6 件が Failing）。`ktlintCheck`・`detekt`・`detektMain`・`detektTest`・`pmd`（fixture の 17 件は期待どおり）が違反 0。`koverVerify`（全体の行 85%・分岐 75%、domain の下限）が成功。`:adapter-persistence:integrationTest`（PostgreSQL）、`:adapter-http:test`、`:application:test`、`:domain:test` が成功。web は `npm run verify`（119 件）と `api:check` が成功。
+
+#### 開示と競合の設計（確かめたこと）
+
+- 状況の応答の保存者の表示名は、同じ役割の共同担当と進行役にだけ（他の役割の参加者には、保存者・表示名・保存の時刻・他の役割の共同担当が、どの項目にも出ない。`leafValues()` で項目単位に検査）。
+- 409 の `latest`（保存の競合）は、**競合した人自身の入力を含まない**（投影の最新の入力だけ。2 人目の数量が応答のどの項目にも無いことを検査）。進行役の代理入力は、保存者が進行役（`FACILITATOR_PROXY`）で表示名の項目を持たない。
+- `decisions_changed` の `current`（確定の競合）は、役割ごとの現在の入力と保存者（進行役にだけ返る）。
+- **`savedAt` は投影の `updated_at`（イベントの時刻）**。競合の詳細は、失敗の後に投影を 1 回読んで作る（トランザクションの外。追記と同じトランザクションで投影が書かれるので、競合の相手の入力まで反映済み）。**判断項目 4 の「競合を返す時点で投影が最新か」は、HTTP の統合テスト（`d`・`e`・`f`）では最新だった**。実 DB の並行の中での最新性は、Step 4 の並行の試験の範囲では保存者の検査（`latest.editor`）まで。
+- 詳細を読めない・無いときは、詳細なしで従来の失敗を返す（失敗の種類は変えない）。この経路は、試験で通していない（**未検証**）。
+
+#### 変異（応答の開示の否定テストが働くことを確かめた）
+
+| # | 変異 | 結果 |
+| :--- | :--- | :--- |
+| 1 | 代理入力の保存者にも表示名の項目を付ける（`DecisionJson.kt`） | `CoInputHttpSpec` の 2 件が失敗（進行役の代理入力の状況、代理入力が先の 409） |
+| 2 | 確定の競合に詳細を添えない（`ConflictDisclosure.kt`） | `CoInputHttpSpec` の 1 件が失敗（`decisions_changed` の保存者） |
+
+戻し忘れが無いことは、`grep`（`|| true`・`null` に変えた分岐が無い）と、その後の全検査の成功で確認した。Step 3 の変異（共同担当の絞り込み・`isSelf`・`savedAt`）も、application の試験で引き続き検出される。
+
+#### 限界・未検証（隠さない）
+
+- **性能（NF-P13）**: HTTP の層だけの p95 は計測していない。Step 5 の計測（アプリケーション層＋実 DB。ローカル）では、保存の p95 は 120 ms 以下（上限 5 以上・書き込みロックなし）。実環境の値ではない。
+- UI は未着手（Step 7）。画面は、新しい項目（保存者・共同担当）を使っていないので、表示は変わらない。`web` の型は、仕様から生成した型が既に新しい項目を持つ（Step 1）。
+- 観察者（B9）の開示は範囲外。
+- 競合の詳細で、競合の相手（勝者）の表示名が、**入れ替えで外された旧担当者**のとき: 参加者の行は残るので、名前は表示される（履歴・入力者のラベルのため。B5 の設計）。この扱いは、試験で個別に確かめていない。
+
+#### 規律
+
+ファイルの編集は Write・Edit のみ。**逸脱 1 件**: 競合の詳細の純粋関数を別のオブジェクトに移したとき、`SnapshotSpec` の呼び出しの名前の置換に `sed -i` を使った（試験コードの 4 か所の識別子の置換）。規律「ファイルツールで書く」に反する。記録する。
 
 ### Step 7: UI（最小）（🔴🟢。判断項目 9 の決定による）
 
@@ -733,6 +781,7 @@ X --> A : WeekAdvanced\n（週が違う。DecisionsChanged ではない）
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
+| 2026-11-16 | **Step 6（6.1〜6.4）を実施**（アプリケーションと HTTP の応答の形。**ゲート 6 は人の確認待ち（未承認）。承認は記録していない。Step 7 以降には進んでいない**）。状況の応答に保存者・保存の時刻・共同担当、409 の `latest`・`current` に保存者つきの詳細。`ApiContractSpec`・受入 `@api`（87 シナリオ。PostgreSQL・H2）が Green になり、B6 Step 1 からの意図的な Red が解消。新規ファイル 3 つの承認をゲート 6 でお願いする。結果は「Step 6 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-16 | **ゲート 5 をユーザーが承認し、Step 6 に進める指示を受けた**（指示: 「B6 のゲート 5 を承認して Step 6 に進めて」。承認の範囲はゲート 5 だけ。ゲート 6〜8 は未承認。Step 7 以降へは進まない。**ADR-019 の提案が承認されたので、5.6（`DEFAULT_MAX_ATTEMPTS` を 5 → 10）を、テストを先に書いて実施する**） | claude-code/claude-sonnet-5-5 |
 | 2026-11-16 | **Step 5（5.1〜5.5）を実施**（`RetryExhausted` の発生率の計測。**`main` の変更なし**。**ゲート 5 は人の確認待ち（未承認）。承認は記録していない。Step 6 以降には進んでいない**）。計測の道具（`RetryMeasurement.kt`。新規ファイル）で、7 試行 × 4 シナリオを 2 回計測。上限 3 は S1 の基準を満たさず（2.8%）、上限 5 以上は 0 件。ADR-019（提案）を書いた。**5.6（既定値の変更）は意図的に未実施**（承認待ち）。NF-C2 の合否はこの計測では言えない。結果は「Step 5 の実施結果」 | claude-code/claude-sonnet-5-5 |
 | 2026-11-16 | **ゲート 4 をユーザーが承認し、Step 5 に進める指示を受けた**（指示: 「B6 のゲート 4 を承認して Step 5 に進めて」。承認の範囲はゲート 4 だけ。ゲート 5〜8 は未承認。Step 6 以降へは進まない） | claude-code/claude-sonnet-5-5 |

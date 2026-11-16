@@ -209,10 +209,12 @@ suspend fun Ports.saveDecision(
         val body = "decision|${input.role.name}|${input.week}|${input.quantity}|${input.expectedDecisionVersion}"
         val operation = Operation(gameId, "decision:${input.role.name}", body)
         val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
+        var actor: Actor = Actor.Anonymous
         runCommand(request) { tx, ctx ->
+            actor = ctx.actor
             val command = SessionCommand.SaveDecision(ctx.actor, ctx.at, input.role, week, quantity, expected)
             applySingle(tx, ctx, sessionStream, command)
-        }.bind()
+        }.withConflictDetail(this@saveDecision, gameId, actor).bind()
     }
 
 /** 1 週を確定する（session ストリーム）。判定の順（週 → 根拠の版 → 入力の揃い）は decide が持つ。 */
@@ -226,9 +228,11 @@ suspend fun Ports.commitWeek(
         val versions = Role.entries.joinToString(",") { "${it.name}=${input.basis[it]}" }
         val operation = Operation(gameId, "commit:${input.requestedWeek}", "commit|${input.requestedWeek}|$versions")
         val request = CommandRequest(operation, Auth.REQUIRED, STATUS_OK, meta)
+        var actor: Actor = Actor.Anonymous
         runCommand(request) { tx, ctx ->
+            actor = ctx.actor
             applySingle(tx, ctx, sessionStream, SessionCommand.CommitWeek(ctx.actor, ctx.at, week, basis))
-        }.bind()
+        }.withConflictDetail(this@commitWeek, gameId, actor).bind()
     }
 
 private const val SCOPE_JOIN = "join"

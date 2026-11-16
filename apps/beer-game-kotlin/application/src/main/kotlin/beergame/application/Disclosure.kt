@@ -90,7 +90,8 @@ object Disclosure {
         }
 
     /** 保存者。表示名は参加者の行から結合する（進行役の代理入力は持たない）。 */
-    private fun ProjectedGame.editorView(
+    internal fun editorView(
+        game: ProjectedGame,
         editor: Editor,
         isSelf: (Editor) -> Boolean,
     ): DecisionEditorView =
@@ -99,7 +100,7 @@ object Disclosure {
                 DecisionEditorView(
                     EditorKind.PARTICIPANT,
                     isSelf(editor),
-                    participants.firstOrNull { it.participantId == editor.id }?.displayName,
+                    game.participants.firstOrNull { it.participantId == editor.id }?.displayName,
                 )
             }
 
@@ -127,7 +128,7 @@ object Disclosure {
                 customerDemand = if (role.downstream == null) state.orders else null,
                 decision = decision?.quantity,
                 decisionVersion = decision?.version ?: 0L,
-                decisionEditor = decision?.let { editorView(it.editor, isSelf) },
+                decisionEditor = decision?.let { editorView(this, it.editor, isSelf) },
                 decisionSavedAt = decision?.savedAt,
             )
         }

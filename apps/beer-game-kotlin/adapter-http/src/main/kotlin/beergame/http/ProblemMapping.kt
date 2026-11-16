@@ -1,6 +1,7 @@
 package beergame.http
 
 import beergame.application.AppFailure
+import beergame.application.ConflictDetail
 import beergame.domain.DecisionEntry
 import beergame.domain.DomainError
 import beergame.domain.ErrorCategory
@@ -23,7 +24,7 @@ private const val RETRY_AFTER_SECONDS = 1
 internal fun AppFailure.toProblem(): Problem =
     when (this) {
         is AppFailure.Invalid -> validationProblem(errors.map { it.toFieldError() })
-        is AppFailure.Domain -> error.toProblem()
+        is AppFailure.Domain -> error.toProblem(detail)
         is AppFailure.ConcurrencyConflict, is AppFailure.RetryExhausted -> retryExhaustedProblem()
         is AppFailure.IdempotencyKeyReused -> idempotencyKeyReusedProblem()
         is AppFailure.Unauthorized -> unauthorizedProblem()
@@ -56,7 +57,7 @@ internal fun internalProblem(): Problem =
         detail = "相関 ID を添えて、運営者へお知らせください。",
     )
 
-private fun DomainError.toProblem(): Problem =
+private fun DomainError.toProblem(detail: ConflictDetail? = null): Problem =
     when (category) {
         ErrorCategory.Forbidden -> {
             forbiddenProblem()
@@ -71,7 +72,7 @@ private fun DomainError.toProblem(): Problem =
         }
 
         ErrorCategory.Conflict -> {
-            Problem(HttpStatusCodes.CONFLICT, code, titleOf(code), extras = conflictExtras())
+            Problem(HttpStatusCodes.CONFLICT, code, titleOf(code), extras = conflictExtras(detail))
         }
 
         ErrorCategory.RuleViolation -> {
@@ -87,7 +88,11 @@ private fun DomainError.forbiddenProblem(): Problem =
         unauthorizedProblem()
     }
 
-private fun DomainError.conflictExtras(): Map<String, JsonElement> =
+/**
+ * 競合の拡張メンバー。保存者・保存の時刻つきの最新の入力は、application が呼び出した人ごとの開示の規則を掛けた [detail] から書く
+ * （ここで表示名を足さない）。[detail] が無いとき（投影を読めなかった）は、decide が返した数量・版だけ。
+ */
+private fun DomainError.conflictExtras(detail: ConflictDetail?): Map<String, JsonElement> =
     when (this) {
         is SessionError.WeekAdvanced -> {
             mapOf("requestedWeek" to JsonPrimitive(requested.value), "currentWeek" to JsonPrimitive(current.value))
@@ -96,15 +101,18 @@ private fun DomainError.conflictExtras(): Map<String, JsonElement> =
         is SessionError.DecisionConflict -> {
             buildMap {
                 put("role", JsonPrimitive(role.name))
-                latest?.let { put("latest", entryJson(it)) }
+                val entry =
+                    (detail as? ConflictDetail.Latest)?.entry?.let(::decisionDetailJson) ?: latest?.let(::entryJson)
+                entry?.let { put("latest", it) }
             }
         }
 
         is SessionError.DecisionsChanged -> {
-            mapOf(
-                "week" to JsonPrimitive(week.value),
-                "current" to JsonObject(current.entries.associate { (role, entry) -> role.name to entryJson(entry) }),
-            )
+            val entries =
+                (detail as? ConflictDetail.Current)?.entries?.entries?.associate { (role, entry) ->
+                    role.name to decisionDetailJson(entry)
+                } ?: current.entries.associate { (role, entry) -> role.name to entryJson(entry) }
+            mapOf("week" to JsonPrimitive(week.value), "current" to JsonObject(entries))
         }
 
         else -> {
