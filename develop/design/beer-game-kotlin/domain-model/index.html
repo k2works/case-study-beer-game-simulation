@@ -11388,7 +11388,8 @@
 </tr>
 </tbody>
 </table>
-<p>| EV-S09 | <code>RoleHolderReplaced</code>（<strong>提案。ゲート 3.5 で人が確認する</strong>） | <code>AssignRole</code>（開始後の入れ替え。<code>game</code> の <code>ParticipantReplaced</code> などと同一トランザクション）。進行中または一時停止中 | <code>role</code>、<code>removed</code>（外れた旧担当者の <code>Set&lt;ParticipantId&gt;</code>）、<code>added</code>（新担当者の <code>ParticipantId</code>）。<code>SessionData.assignments[role]</code> を更新する |</p>
+<p>| EV-S09 | <code>RoleHolderReplaced</code>（<strong>提案。ゲート 3.5 で人が確認する</strong>） | <code>AssignRole</code>（開始後の入れ替え。<code>game</code> の <code>ParticipantReplaced</code> などと同一トランザクション）。進行中または一時停止中 | <code>role</code>、<code>removed</code>（外れた旧担当者の <code>Set&lt;ParticipantId&gt;</code>）、<code>added</code>（新担当者の <code>ParticipantId</code>）。<code>SessionData.assignments[role]</code> を更新する |
+| EV-S10 | <code>CommitModeChanged</code>（<strong>B8 の提案。人の確認待ち</strong>） | <code>SetCommitMode</code>（進行役。進行中または一時停止中） | <code>commitMode</code>（<code>MANUAL</code>／<code>AUTO</code>）。<code>SessionData.commitMode</code> を更新する。有効にしたとき、進行中で 4 役割がそろっていれば、同じ追記で <code>WeekCommitted</code>（<code>AUTO</code>）を足す |</p>
 <p><code>RoleWeekResult</code> は、受注（需要）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用を持ちます。<code>WeekCommitted</code> は 1 件で、1 週の事実のすべてを含みます。</p>
 <h3 id="beer-game2">beer-game2 のイベントとの対応<a class="headerlink" href="#beer-game2" title="Permanent link">&para;</a></h3>
 <p>beer-game2 のイベントの名称は、すべて維持しました。変更は、<code>ParticipantJoined</code> と <code>ObserverJoined</code> から表示名と資格の値を除いたこと、および <code>GameEnded</code> を持たないことです（設計判断 D2）。</p>
