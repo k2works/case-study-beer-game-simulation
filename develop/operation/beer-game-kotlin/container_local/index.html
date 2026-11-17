@@ -9702,8 +9702,8 @@
 <td style="text-align: left;"><code>APP_ENV=production DB_KIND=h2</code> は終了コード 78。<code>local</code> の H2 も、ドライバが無く起動できない（終了コード 70）</td>
 </tr>
 <tr>
-<td style="text-align: left;">未実装のモード</td>
-<td style="text-align: left;"><code>retention</code>・<code>rebuild-projections</code> は、未実装の旨を出して終了コード 69</td>
+<td style="text-align: left;">投影の再構築・検査（B12）</td>
+<td style="text-align: left;">ゲームの無い PostgreSQL に対して、<code>rebuild-projections</code>・<code>verify-projections</code> が終了コード 0（結果を記録する）。形が不正なゲーム ID は終了コード 64。<code>retention</code>（B11）のコンテナでの確認は、削除用のロールが要るので範囲外</td>
 </tr>
 <tr>
 <td style="text-align: left;">イメージの内容</td>

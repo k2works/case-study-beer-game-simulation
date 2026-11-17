@@ -10621,7 +10621,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">形</td>
-<td style="text-align: left;">永続化用の DTO（<strong>kotlinx.serialization</strong>。<code>@Serializable</code>、<code>@SerialName</code> で <code>event_type</code> を固定。決定済み）と、ドメインイベントの相互変換（<code>EventCodec</code>）。<code>schema_version</code> を持つ。<strong>アップキャストは <code>adapter-persistence</code> が持つ</strong></td>
+<td style="text-align: left;">永続化用の DTO（<strong>kotlinx.serialization</strong>。<code>@Serializable</code>、<code>@SerialName</code> で <code>event_type</code> を固定。決定済み）と、ドメインイベントの相互変換（<code>EventCodec</code>）。<code>schema_version</code> を持つ。<strong>アップキャストは <code>adapter-persistence</code> が持つ</strong>（B12 で実装: <code>EventUpcast.kt</code> の <code>Upcast</code>・<code>UpcastChain</code>。書く版 <code>CURRENT_SCHEMA_VERSION</code> と読める最新の版 <code>LATEST_READABLE_SCHEMA_VERSION</code> を分け、現在は両方 1 で、変換は 0 個。書く版の切り替えの持ち方は未決のまま）</td>
 </tr>
 <tr>
 <td style="text-align: left;">アップキャスト</td>

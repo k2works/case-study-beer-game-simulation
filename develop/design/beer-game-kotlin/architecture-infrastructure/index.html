@@ -10403,14 +10403,19 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <td style="text-align: left;">保持削除の掃引を 1 回行って終了する。期限に達したゲームを <code>game_roots</code> の連鎖削除で削除し、結果を記録する。削除用のロールで動かすには <code>DB_DELETER_ROLE</code>（<code>SET ROLE</code>。観察者の <code>DB_OBSERVER_ROLE</code> と同じ仕組み）。放棄したゲームがあれば <strong>1</strong>、掃引の失敗は <strong>70</strong></td>
 </tr>
 <tr>
-<td style="text-align: left;"><code>rebuild-projections</code></td>
-<td style="text-align: left;"><strong>名前だけ定義</strong>（B12 で実装）</td>
-<td style="text-align: left;">同上、<strong>69</strong></td>
+<td style="text-align: left;"><code>rebuild-projections [ゲーム ID ...]</code></td>
+<td style="text-align: left;">実装済み（B12）</td>
+<td style="text-align: left;">投影を <code>events</code> から作り直す（省くと全ゲーム。ゲームごとに排他のアドバイザリロック）。再構築できなかったゲームがあれば <strong>1</strong>、ゲームの一覧を読めなければ <strong>70</strong>、形が不正なゲーム ID は <strong>64</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>verify-projections</code></td>
+<td style="text-align: left;">実装済み（B12）</td>
+<td style="text-align: left;">投影が、イベントから作り直した結果と一致するかを検査する（日次の定期タスク。投影は変えない）。不一致があれば <strong>1</strong>。ロックを取れず検査できなかったゲームは、不一致に数えず警告に残す</td>
 </tr>
 <tr>
 <td style="text-align: left;">不明なモード</td>
 <td style="text-align: left;">—</td>
-<td style="text-align: left;">使い方（4 モードを列挙）を示して <strong>64</strong></td>
+<td style="text-align: left;">使い方（5 モードを列挙）を示して <strong>64</strong></td>
 </tr>
 </tbody>
 </table>
@@ -10424,19 +10429,19 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <tbody>
 <tr>
 <td style="text-align: left;">0</td>
-<td style="text-align: left;">1 回限りの処理（migrate、retention の掃引）の成功</td>
+<td style="text-align: left;">1 回限りの処理（migrate、retention の掃引、投影の再構築・検査）の成功</td>
 </tr>
 <tr>
 <td style="text-align: left;">1</td>
-<td style="text-align: left;">retention の掃引で、再試行の上限（5 回）に達して、削除をやめたゲームがある（エラーのログを残す。通知の経路は B14）</td>
+<td style="text-align: left;">retention の掃引で、再試行の上限（5 回）に達して、削除をやめたゲームがある（エラーのログを残す。通知の経路は B14）。または、投影の再構築ができなかったゲーム・投影の不一致がある（B12）</td>
 </tr>
 <tr>
 <td style="text-align: left;">64</td>
-<td style="text-align: left;">使い方の誤り（不明なモード）</td>
+<td style="text-align: left;">使い方の誤り（不明なモード、形が不正なゲーム ID）</td>
 </tr>
 <tr>
 <td style="text-align: left;">69</td>
-<td style="text-align: left;">未実装のモード（<code>rebuild-projections</code>）</td>
+<td style="text-align: left;">（欠番。未実装のモードは無くなった）</td>
 </tr>
 <tr>
 <td style="text-align: left;">70</td>
