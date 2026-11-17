@@ -11,7 +11,8 @@ name: beer-game-kotlin
 #   web     : フロントエンド（format・lint・typecheck・コンポーネント・build）と、Cucumber-JS の Undefined 検査
 #   ui      : 受け入れ @ui（Cucumber-JS + Playwright。H2 のバックエンドを起動する）
 #   container: コンテナのスモークテスト（docker build と scripts/container-smoke.sh。Bolt 3 Step 3。検証のみ・AWS 無関係）
-#   n1      : N-1 互換（雛形。直前のリリースのタグが無い間は、中身を実行しない）
+#   n1      : N-1 互換（B12。直前のリリースのタグの読み取り側で、現在の golden を読む。タグが無い間は、中身を実行しない。
+#             旧版が書いた過去の golden を現在の読み取り側で読む検査は、test ジョブの N1CompatibilitySpec が毎回行う）
 #
 # actions の版: checkout・setup-node・upload-artifact は、beer-game3.yml と同じ SHA 固定（コメントの版）。
 # setup-java・gradle/actions は、固定する SHA を確認できていないため、版のタグのまま（未固定）。
@@ -222,9 +223,9 @@ jobs:
         run: ./scripts/container-smoke.sh
 
   n1:
-    name: N-1 互換（雛形）
+    name: N-1 互換（直前のリリースの読み取り側で、現在の golden を読む）
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -237,12 +238,16 @@ jobs:
           tag=$(git tag --list 'beer-game-kotlin-v*' --sort=-v:refname | head -n 1)
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           if [ -z "$tag" ]; then echo "直前のリリースが無いため、N-1 互換の検査は実行しません。"; fi
-      - name: 雛形（本実装は未着手。タグが有るときだけ到達する）
+      - uses: actions/setup-java@v4
         if: steps.previous.outputs.tag != ''
-        run: |
-          # 本実装の手順（設計: test-strategy.md の「N-1 互換のジョブ（M22）」）:
-          #   1. 直前のリリースのタグ（${{ steps.previous.outputs.tag }}）を git worktree で取り出し、読み取り側（アップキャストと evolve）をビルドする
-          #   2. 現在の書く版が作る golden（各イベントの種類を網羅したイベント列の JSON）を、旧版の読み取り側で再生する
-          #   3. 期待する状態にならなければ失敗にする（読む側を先にリリースする規則に従う）
-          echo "::error::N-1 互換の検査は未実装です（タグ ${{ steps.previous.outputs.tag }} が存在するため、実装が必要です）"
-          exit 1
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.previous.outputs.tag != ''
+      # 直前のリリースのタグを git worktree で取り出し、その読み取り側（EventCodec とアップキャスト）で、現在の版が書く golden
+      # （全イベントの種類の JSON）をすべて読めることを確かめる。読めなければ失敗（読む側を先にリリースする規則に従う）。
+      # 手順の本体は scripts/n1-compat.sh（B12）。タグが存在しないため、この工程の GitHub Actions 上の実行は未確認。
+      - name: 直前のリリースの読み取り側で、現在の golden を読む
+        if: steps.previous.outputs.tag != ''
+        run: ./scripts/n1-compat.sh "${{ steps.previous.outputs.tag }}"

@@ -35,7 +35,7 @@ PostgreSQL は、スクリプトが `postgres:18-alpine` のコンテナを専�
 | migrate | マイグレーションを適用し、終了コード 0。適用の記録が残る |
 | 秘密情報が無い | `APP_ENV=production` で秘密が無いと、終了コード 78 で起動に失敗。足りない設定の名前をログに出し、秘密の値は出さない |
 | H2 の拒否 | `APP_ENV=production DB_KIND=h2` は終了コード 78。`local` の H2 も、ドライバが無く起動できない（終了コード 70） |
-| 未実装のモード | `retention`・`rebuild-projections` は、未実装の旨を出して終了コード 69 |
+| 投影の再構築・検査（B12） | ゲームの無い PostgreSQL に対して、`rebuild-projections`・`verify-projections` が終了コード 0（結果を記録する）。形が不正なゲーム ID は終了コード 64。`retention`（B11）のコンテナでの確認は、削除用のロールが要るので範囲外 |
 | イメージの内容 | 非 root（uid 10001）で実行する |
 | 起動時間 | コンテナの開始から `/ready` が 200 になるまで（マイグレーションの適用を除く）を計測して表示する |
 
