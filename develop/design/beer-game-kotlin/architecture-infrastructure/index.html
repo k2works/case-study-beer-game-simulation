@@ -10399,8 +10399,8 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 </tr>
 <tr>
 <td style="text-align: left;"><code>retention</code></td>
-<td style="text-align: left;"><strong>名前だけ定義</strong>（B11 で実装）</td>
-<td style="text-align: left;">設定を読む前に「未実装です」を ERROR で記録して <strong>69</strong></td>
+<td style="text-align: left;">実装済み（B11）</td>
+<td style="text-align: left;">保持削除の掃引を 1 回行って終了する。期限に達したゲームを <code>game_roots</code> の連鎖削除で削除し、結果を記録する。削除用のロールで動かすには <code>DB_DELETER_ROLE</code>（<code>SET ROLE</code>。観察者の <code>DB_OBSERVER_ROLE</code> と同じ仕組み）。放棄したゲームがあれば <strong>1</strong>、掃引の失敗は <strong>70</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>rebuild-projections</code></td>
@@ -10424,7 +10424,11 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 <tbody>
 <tr>
 <td style="text-align: left;">0</td>
-<td style="text-align: left;">1 回限りの処理（migrate）の成功</td>
+<td style="text-align: left;">1 回限りの処理（migrate、retention の掃引）の成功</td>
+</tr>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">retention の掃引で、再試行の上限（5 回）に達して、削除をやめたゲームがある（エラーのログを残す。通知の経路は B14）</td>
 </tr>
 <tr>
 <td style="text-align: left;">64</td>
@@ -10432,7 +10436,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble … JRE と、ビルド済み�
 </tr>
 <tr>
 <td style="text-align: left;">69</td>
-<td style="text-align: left;">未実装のモード（<code>retention</code>・<code>rebuild-projections</code>）</td>
+<td style="text-align: left;">未実装のモード（<code>rebuild-projections</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">70</td>

@@ -10560,7 +10560,7 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 </tr>
 <tr>
 <td style="text-align: left;"><code>beergame_deleter</code></td>
-<td style="text-align: left;"><code>game_roots</code> の SELECT・DELETE のみ（WHERE 句の列の参照に SELECT が要る）。<code>deletion_*</code> の GRANT は、その表を作る B11 のマイグレーションで書く</td>
+<td style="text-align: left;"><code>game_roots</code> の SELECT・DELETE（WHERE 句の列の参照に SELECT が要る）。<strong>B11 の V103 で、<code>retention_policies</code> の SELECT、<code>deletion_runs</code>・<code>deletion_attempts</code> の SELECT・INSERT・UPDATE・DELETE、<code>deletion_receipts</code> の SELECT・INSERT・DELETE を足した</strong>（<code>events</code> ほかの DELETE は持たない）。V103 は、<code>beergame_writer</code> に <code>retention_policies</code>（投影）の読み書き、<code>beergame_reader</code> に <code>retention_policies</code>・<code>deletion_runs</code> の SELECT も与える（<code>deletion_attempts</code>・<code>deletion_receipts</code> は読めない）</td>
 </tr>
 </tbody>
 </table>
@@ -11128,7 +11128,12 @@ append:  INSERT INTO events (...stream_version = expected + 1 .. expected + n ..
 <tr>
 <td style="text-align: left;">006</td>
 <td style="text-align: left;">共通</td>
-<td style="text-align: left;">保持: <code>retention_policies</code>、<code>deletion_runs</code>、<code>deletion_attempts</code>、<code>deletion_receipts</code>。<strong>B11 の予約として空けてある（B5 は使わない。下の「B5 Step 5.5 の番号」）</strong></td>
+<td style="text-align: left;">保持: <code>retention_policies</code>、<code>deletion_runs</code>、<code>deletion_attempts</code>、<code>deletion_receipts</code>。<strong>B11 で実装した（<code>V006__retention.sql</code>。B5 は使わず空けてあった番号）。承認は未取得</strong>。<code>retention_policies</code> は <code>GameCreated</code> の投影（<code>delete_after</code> = 作成時 + 保持日数）。<code>deletion_attempts</code> は <code>deletion_runs</code> への外部キー（<code>CASCADE</code>）。<code>status</code> が <code>FAILED</code> で <code>next_attempt_at</code> が無い行は、再試行の上限に達して再試行をやめた状態（サガの <code>Abandoned</code>）。<code>IN_PROGRESS</code> の <code>next_attempt_at</code> は、貸出の期限（30 分。過ぎると次の試行として再開する）</td>
+</tr>
+<tr>
+<td style="text-align: left;">103</td>
+<td style="text-align: left;">PostgreSQL</td>
+<td style="text-align: left;"><strong>B11</strong>（<code>V103__retention_roles.sql</code>）。保持の表の GRANT（書き込み・読み取り・削除の 3 ロール。上の表）。<strong>承認は未取得</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">007</td>

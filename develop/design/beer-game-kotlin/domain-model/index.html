@@ -11243,6 +11243,7 @@
 </tr>
 </tbody>
 </table>
+<p><strong>B11 の実装（<code>RetentionSaga.kt</code>。承認は未取得）。</strong> 状態に <code>Abandoned(attempt, failureCode)</code>（5 回目の失敗の後。永続化は <code>FAILED</code> で次の試行の時刻が無い）を足し、<code>InProgress</code> に貸出の期限（<code>leaseUntil</code>。停止で取り残された試行を、期限の後に次の試行として再開する）を持たせた。<code>decide(state, command)</code> は <code>Either&lt;RetentionRejection, RetentionEvent&gt;</code>（拒否は <code>AlreadyCompleted</code>・<code>RetriesExhausted</code>・<code>NotYetDue</code>・<code>NotInProgress</code>）。<code>evolve(event)</code> は、イベントが遷移の先を決めるので、前の状態を取らない。バックオフは 5 分 × 2^(試行-1) に、呼び出し側が引いた揺らぎを足す（ドメインは乱数・時計を読まない）。保持方針 <code>RetentionPolicy</code> は <code>starting(days, startsAt)</code> で削除期限を求め、<code>Projections.retentionPolicies</code>（<code>GameCreated</code> の投影）が <code>retention_policies</code> に書く。</p>
 <h2 id="_13">ドメインイベント<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <blockquote>
 <p><strong>コードから生成した一覧</strong>: <a href="../generated/events/">イベント一覧（生成）</a>（ID・イベント・ストリーム・条件・ペイロードの項目・購読する投影）。下の表は、意図・発生条件の詳細を手で書いたもので、<strong>ID と名前が生成物と一致しないと、試験 <code>LivingDocumentationSpec</code> が失敗する</strong>（変更の表 40）。</p>
