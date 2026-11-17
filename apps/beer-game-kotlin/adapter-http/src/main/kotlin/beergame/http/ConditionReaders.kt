@@ -1,6 +1,7 @@
 package beergame.http
 
 import arrow.core.Either
+import arrow.core.flatMap
 import arrow.core.left
 import arrow.core.mapOrAccumulate
 import arrow.core.raise.either
@@ -41,6 +42,13 @@ private fun JsonObject.conditionInputs(): Either<FieldErrors, ConditionInputs> =
         ) { inventory, flow, order, shipment, production, holding, backlog, disclosure ->
             ConditionInputs(inventory, flow, order, shipment, production, holding, backlog, disclosure)
         }
+    }
+
+/** 確定方式。MANUAL か AUTO。 */
+internal fun JsonObject.commitMode(name: String): Either<FieldErrors, CommitMode> =
+    string(name).flatMap { text ->
+        CommitMode.entries.firstOrNull { it.name == text }?.right()
+            ?: single(name, "確定方式は MANUAL か AUTO にしてください。").left()
     }
 
 /** `commitMode`（任意。省略は MANUAL）。 */

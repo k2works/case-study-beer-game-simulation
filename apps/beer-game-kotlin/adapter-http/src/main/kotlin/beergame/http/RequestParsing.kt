@@ -10,6 +10,7 @@ import arrow.core.right
 import beergame.application.CommitWeekInput
 import beergame.application.CreateGameInput
 import beergame.application.JoinGameInput
+import beergame.domain.CommitMode
 import beergame.domain.ConditionInputs
 import beergame.domain.Role
 import kotlinx.serialization.json.Json
@@ -96,6 +97,10 @@ internal fun parseSaveDecision(
             ) { week, quantity, version -> DecisionBody(week, quantity, version) }
         }
     }
+
+/** 確定方式の変更（`MANUAL`・`AUTO`。B8）。 */
+internal fun parseSetCommitMode(body: ByteArray): Either<Problem, CommitMode> =
+    parseObject(body).flatMap { obj -> collect { obj.commitMode("commitMode").bind() } }
 
 internal fun parseCommitWeek(body: ByteArray): Either<Problem, CommitWeekInput> =
     parseObject(body).flatMap { obj ->
