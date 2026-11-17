@@ -48,14 +48,22 @@ internal class PlayedGame(
     val players: Map<String, Player>,
     /** 進行役の復帰コード（作成の応答の `recoveryCode`）。 */
     val facilitatorCode: String = "placeholder-recovery",
-    /** 発行した観察用の招待（B9）。招待の ID と、招待コード（発行の応答だけが運ぶ）。 */
-    val invitationId: String = "00000000-0000-0000-0000-0000000000c1",
-    val invitationCode: String = "placeholder-invitation",
-    /** 招待で参加した観察者のブラウザセッション（B9）。 */
-    val observer: String = "placeholder",
+    /** 観察用の招待と、招待で参加した観察者（B9）。 */
+    val observerSeat: ObserverSeat = ObserverSeat(),
 ) {
+    val invitationId: String get() = observerSeat.invitationId
+    val invitationCode: String get() = observerSeat.invitationCode
+    val observer: String get() = observerSeat.session
+
     fun cookieOf(role: String): String = players.getValue(role).cookie
 }
+
+/** 発行した観察用の招待（招待の ID と、発行の応答だけが運ぶ招待コード）と、招待で参加した観察者のブラウザセッション。 */
+internal class ObserverSeat(
+    val invitationId: String = "00000000-0000-0000-0000-0000000000c1",
+    val invitationCode: String = "placeholder-invitation",
+    val session: String = "placeholder",
+)
 
 private fun HttpResponse.cookieValue(name: String): String? =
     headers
@@ -186,9 +194,11 @@ internal class ContractClient(
             joinCode,
             players,
             created.body().str("recoveryCode"),
-            invited.body().str("invitationId"),
-            code,
-            checkNotNull(observer.credential()) { "観察者の資格が発行されていない" },
+            ObserverSeat(
+                invited.body().str("invitationId"),
+                code,
+                checkNotNull(observer.credential()) { "観察者の資格が発行されていない" },
+            ),
         )
     }
 

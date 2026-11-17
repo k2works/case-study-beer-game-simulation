@@ -507,6 +507,26 @@ private fun GameState.updatePreparing(update: (GameData) -> GameData?): GameStat
         is GameState.NotCreated, is GameState.Started -> this
     }
 
+/** 観察用の招待・観察者の参加（B9）の事実を採用する。それ以外のイベントは、状態を変えずに返す。 */
+internal fun GameState.evolveObserver(event: GameEvent): GameState =
+    when (event) {
+        is GameEvent.ObserverInvited -> {
+            updateData { it.invited(event.invitationId, event.expiresAt) }
+        }
+
+        is GameEvent.ObserverInvitationRevoked -> {
+            updateData { it.invitationRevoked(event.invitationId) }
+        }
+
+        is GameEvent.ObserverJoined -> {
+            updateData { it.observerJoined(event.observerId, event.invitationId, event.credentialExpiresAt) }
+        }
+
+        else -> {
+            this
+        }
+    }
+
 /**
  * イベントを状態へ畳み込む。全域（例外を投げない。強制キャストを使わない）。
  * decide が作らない列は、状態を変えずに返す（版も増えない。検知は [replayGame]）。
@@ -552,16 +572,8 @@ fun evolveGame(
             }
         }
 
-        is GameEvent.ObserverInvited -> {
-            state.updateData { it.invited(event.invitationId, event.expiresAt) }
-        }
-
-        is GameEvent.ObserverInvitationRevoked -> {
-            state.updateData { it.invitationRevoked(event.invitationId) }
-        }
-
-        is GameEvent.ObserverJoined -> {
-            state.updateData { it.observerJoined(event.observerId, event.invitationId, event.credentialExpiresAt) }
+        is GameEvent.ObserverInvited, is GameEvent.ObserverInvitationRevoked, is GameEvent.ObserverJoined -> {
+            state.evolveObserver(event)
         }
 
         is GameEvent.CredentialRevoked -> {

@@ -99,6 +99,17 @@ data class CredentialRow(
     val revoked: Boolean,
 ) {
     fun isValidAt(now: Instant): Boolean = !revoked && expiresAt > now
+
+    /** [write] が指す観察用の招待の行なら、失効させた行。そうでなければそのまま。 */
+    fun revokedIfInvitation(write: PeripheralWrite.RevokeInvitationRow): CredentialRow =
+        if (kind == CredentialKind.OBSERVER_INVITATION &&
+            gameId == write.gameId &&
+            subjectId == write.invitationId.value
+        ) {
+            copy(revoked = true)
+        } else {
+            this
+        }
 }
 
 /** `browser_sessions` の行（ブラウザセッション。復帰資格とは別のダイジェスト）。 */
@@ -430,16 +441,7 @@ class World(
             }
 
             is PeripheralWrite.RevokeInvitationRow -> {
-                store.copy(
-                    credentials =
-                        store.credentials.mapValues { (_, row) ->
-                            val target =
-                                row.kind == CredentialKind.OBSERVER_INVITATION &&
-                                    row.gameId == write.gameId &&
-                                    row.subjectId == write.invitationId.value
-                            if (target) row.copy(revoked = true) else row
-                        },
-                )
+                store.copy(credentials = store.credentials.mapValues { (_, row) -> row.revokedIfInvitation(write) })
             }
 
             is PeripheralWrite.RevokeSubject -> {

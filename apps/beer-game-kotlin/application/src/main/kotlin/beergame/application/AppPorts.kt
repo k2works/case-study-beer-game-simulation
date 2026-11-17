@@ -81,8 +81,25 @@ class Stores(
     val idempotency: IdempotencyStore,
     val peripheral: PeripheralStore,
     val attempts: AttemptStore,
-    val reader: ProjectionReader,
-    /** 観察者用の読み取り。無ければ（null）、[reader] から導く（観察者のロール・接続プールを分けない構成）。 */
+    val readers: Readers,
+) {
+    /** 観察者用の読み取りを分けない構成（主の読み取りだけ）。 */
+    constructor(
+        events: EventStore,
+        project: ProjectionWriter,
+        idempotency: IdempotencyStore,
+        peripheral: PeripheralStore,
+        attempts: AttemptStore,
+        reader: ProjectionReader,
+    ) : this(events, project, idempotency, peripheral, attempts, Readers(reader))
+
+    val reader: ProjectionReader get() = readers.projection
+    val observation: ObservationReader? get() = readers.observation
+}
+
+/** 読み取りのポート。主の読み取りと、観察者用の読み取り（無ければ null。主の読み取りから導く）。 */
+class Readers(
+    val projection: ProjectionReader,
     val observation: ObservationReader? = null,
 )
 

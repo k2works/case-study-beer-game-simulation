@@ -5,6 +5,7 @@ import beergame.application.AppFailure
 import beergame.application.ObservationReader
 import beergame.application.Ports
 import beergame.application.ProjectionReader
+import beergame.application.Readers
 import beergame.application.Stores
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -45,11 +46,13 @@ internal fun throwingPorts(
                     },
                 ),
             attempts = stores.attempts,
-            reader = ProjectionReader { id -> if (broken.get()) explode() else stores.reader.read(id) },
-            observation =
-                stores.observation?.let { observation ->
-                    ObservationReader { id -> if (broken.get()) explode() else observation.read(id) }
-                },
+            readers =
+                Readers(
+                    ProjectionReader { id -> if (broken.get()) explode() else stores.reader.read(id) },
+                    stores.observation?.let { observation ->
+                        ObservationReader { id -> if (broken.get()) explode() else observation.read(id) }
+                    },
+                ),
         ),
         ports.lock,
         ports.notifier,
@@ -77,8 +80,7 @@ internal fun conflictingPorts(
             idempotency = stores.idempotency,
             peripheral = stores.peripheral,
             attempts = stores.attempts,
-            reader = stores.reader,
-            observation = stores.observation,
+            readers = stores.readers,
         ),
         ports.lock,
         ports.notifier,

@@ -8,6 +8,7 @@ import beergame.application.PeripheralStore
 import beergame.application.ProjectionLock
 import beergame.application.ProjectionReader
 import beergame.application.ProjectionWriter
+import beergame.application.Readers
 import beergame.application.Stores
 import java.sql.Connection
 import javax.sql.DataSource
@@ -71,9 +72,12 @@ class Persistence internal constructor(
                     idempotency = JdbcIdempotencyStore(dialect, ResponseCipher(config.responseKey)).port(),
                     peripheral = JdbcPeripheralStore().port(),
                     attempts = JdbcAttemptStore().port(),
-                    reader = JdbcProjectionReader(dataSource),
                     // 観察者の読み取りは、3 表だけを読む専用のポート。観察者用の接続プール（DB のロールを絞った）があれば、それを使う
-                    observation = JdbcObservationReader(observerDataSource ?: dataSource),
+                    readers =
+                        Readers(
+                            JdbcProjectionReader(dataSource),
+                            JdbcObservationReader(observerDataSource ?: dataSource),
+                        ),
                 )
             return when (dialect) {
                 Dialect.POSTGRES -> {
