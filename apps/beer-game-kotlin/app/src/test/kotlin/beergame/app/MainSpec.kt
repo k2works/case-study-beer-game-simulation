@@ -98,19 +98,58 @@ class MainSpec :
             logs.records.single().operation shouldBe "retention"
         }
 
-        listOf("rebuild-projections").forEach { mode ->
-            test("[B3-1] Given 未実装の起動モード「$mode」 When 起動する Then 未実装の旨を記録し、終了コード 69 で終わる（設定を読む前に断る）") {
+        test("[B12/NF-R15] Given マイグレーション済みの local When rebuild-projections モードを実行する Then ゲームが無くても 0 で終わり、結果を記録する") {
+            val env = local()
+            runMain(listOf("migrate"), env, Logs()) shouldBe 0
+            val logs = Logs()
+
+            runMain(listOf("rebuild-projections"), env, logs) shouldBe 0
+
+            logs.records.single().operation shouldBe "rebuild-projections"
+            logs.text() shouldContain "再構築 0 ゲーム"
+        }
+
+        test("[B12] Given 形が不正なゲーム ID When rebuild-projections モードを実行する Then DB に触れず 64 で終わる") {
+            val logs = Logs()
+
+            runMain(listOf("rebuild-projections", "not-a-uuid"), local(), logs) shouldBe 64
+
+            logs.records.single().result shouldBe "usage"
+            logs.text() shouldContain "not-a-uuid"
+        }
+
+        test("[B12] Given 存在しないゲーム ID When rebuild-projections モードを実行する Then そのゲームの失敗を記録し 1 で終わる") {
+            val env = local()
+            runMain(listOf("migrate"), env, Logs()) shouldBe 0
+            val logs = Logs()
+
+            runMain(listOf("rebuild-projections", UUID.randomUUID().toString()), env, logs) shouldBe 1
+
+            logs.records.map { it.result } shouldBe listOf("game.failed", "ok")
+        }
+
+        test(
+            "[B12/NF-R12] Given マイグレーション前の local When 再構築と検査のモードを実行する Then 一覧を読めず 70 で終わる",
+        ) {
+            listOf("rebuild-projections", "verify-projections").forEach { mode ->
                 val logs = Logs()
 
-                val exit = runMain(listOf(mode), emptyMap(), logs)
+                runMain(listOf(mode), local(), logs) shouldBe 70
 
-                exit shouldBe 69
-                val text = logs.text()
-                text shouldContain mode
-                text shouldContain "未実装"
-                logs.records.single().result shouldBe "unimplemented"
                 logs.records.single().level shouldBe "ERROR"
+                logs.records.single().operation shouldBe mode
             }
+        }
+
+        test("[B12/NF-R15] Given マイグレーション済みの local When verify-projections モードを実行する Then ゲームが無ければ不一致 0 で、0 で終わる") {
+            val env = local()
+            runMain(listOf("migrate"), env, Logs()) shouldBe 0
+            val logs = Logs()
+
+            runMain(listOf("verify-projections"), env, logs) shouldBe 0
+
+            logs.records.single().operation shouldBe "verify-projections"
+            logs.text() shouldContain "不一致 0"
         }
 
         test("Given 不明な起動モード When 起動する Then 使えるモードを全て案内する") {
@@ -119,7 +158,9 @@ class MainSpec :
             runMain(listOf("unknown"), local(), logs) shouldBe 64
 
             val text = logs.text()
-            listOf("api", "migrate", "retention", "rebuild-projections").forEach { text shouldContain it }
+            listOf("api", "migrate", "retention", "rebuild-projections", "verify-projections").forEach {
+                text shouldContain it
+            }
         }
 
         test("[US6.1] Given local の migrate モード When 実行する Then マイグレーションを適用して 0 で終わる") {

@@ -227,6 +227,7 @@ class PostgresPersistenceSpec :
         eventStoreContract { fx }
         transactionContract { fx }
         projectionContract { fx }
+        projectionMaintenanceContract { fx }
         retentionContract { fx }
         idempotencyContract { fx }
         projectionLockContract { fx }

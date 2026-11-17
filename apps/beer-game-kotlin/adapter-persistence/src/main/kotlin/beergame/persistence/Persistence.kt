@@ -6,6 +6,7 @@ import beergame.application.EventStore
 import beergame.application.IdempotencyStore
 import beergame.application.PeripheralStore
 import beergame.application.ProjectionLock
+import beergame.application.ProjectionMaintenance
 import beergame.application.ProjectionReader
 import beergame.application.ProjectionWriter
 import beergame.application.Readers
@@ -34,6 +35,7 @@ class Coordination(
 /** 永続化のポートの束。方言ごとの実装を、設定（[Dialect]）で選んで組み立てる。 */
 class Persistence internal constructor(
     val dialect: Dialect,
+    private val dataSource: DataSource,
     val stores: Stores,
     private val coordination: Coordination,
     private val onClose: () -> Unit,
@@ -46,6 +48,9 @@ class Persistence internal constructor(
     val reader: ProjectionReader get() = stores.reader
     val lock: ProjectionLock get() = coordination.lock
     val notifier: ChangeNotifier get() = coordination.notifier
+
+    /** 投影の再構築と整合の検査（B12）。API と同じロック（再構築は排他）を使う。 */
+    val maintenance: ProjectionMaintenance by lazy { projectionMaintenance(dialect, dataSource, coordination.lock) }
 
     override fun close() = onClose()
 
@@ -85,12 +90,12 @@ class Persistence internal constructor(
                     val notifier = PostgresChangeNotifier(connect, config.listenReconnectMillis)
                     notifier.start(LISTEN_READY_TIMEOUT_MILLIS)
                     val lock = PostgresProjectionLock(config.lockTimeoutMillis).port()
-                    Persistence(dialect, stores, Coordination(lock, notifier.port()), notifier::close)
+                    Persistence(dialect, dataSource, stores, Coordination(lock, notifier.port()), notifier::close)
                 }
 
                 Dialect.H2 -> {
                     val lock = LocalProjectionLock(config.lockTimeoutMillis).port()
-                    Persistence(dialect, stores, Coordination(lock, LocalChangeNotifier().port())) {}
+                    Persistence(dialect, dataSource, stores, Coordination(lock, LocalChangeNotifier().port())) {}
                 }
             }
         }

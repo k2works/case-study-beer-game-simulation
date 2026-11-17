@@ -68,6 +68,7 @@ class H2PersistenceSpec :
         eventStoreContract { fx }
         transactionContract { fx }
         projectionContract { fx }
+        projectionMaintenanceContract { fx }
         retentionContract { fx }
         idempotencyContract { fx }
         projectionLockContract { fx }

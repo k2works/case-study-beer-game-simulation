@@ -79,7 +79,7 @@ private const val RESULT_JSON =
     """{"orders":4,"shipped":4,"ordered":4,"endingInventory":12,"endingBacklog":0,""" +
         """"weeklyCostMinor":600,"cumulativeCostMinor":600}"""
 
-private val GOLDEN: List<Triple<String, DomainEvent, String>> =
+internal val GOLDEN: List<Triple<String, DomainEvent, String>> =
     listOf(
         Triple(
             "GameCreated",

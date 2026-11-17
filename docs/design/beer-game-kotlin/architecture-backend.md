@@ -419,7 +419,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 項目 | 設計 |
 | :--- | :--- |
 | 場所 | `adapter-persistence` の `EventCodec`。**ドメインのイベントには、シリアライズの注釈を付けない**（設計判断 BD5） |
-| 形 | 永続化用の DTO（**kotlinx.serialization**。`@Serializable`、`@SerialName` で `event_type` を固定。決定済み）と、ドメインイベントの相互変換（`EventCodec`）。`schema_version` を持つ。**アップキャストは `adapter-persistence` が持つ** |
+| 形 | 永続化用の DTO（**kotlinx.serialization**。`@Serializable`、`@SerialName` で `event_type` を固定。決定済み）と、ドメインイベントの相互変換（`EventCodec`）。`schema_version` を持つ。**アップキャストは `adapter-persistence` が持つ**（B12 で実装: `EventUpcast.kt` の `Upcast`・`UpcastChain`。書く版 `CURRENT_SCHEMA_VERSION` と読める最新の版 `LATEST_READABLE_SCHEMA_VERSION` を分け、現在は両方 1 で、変換は 0 個。書く版の切り替えの持ち方は未決のまま） |
 | アップキャスト | 旧版の DTO を新版へ変換する純粋関数の列。読み込み時に、`evolve` へ渡す前に適用する（[データモデル](./data-model.md) の規則） |
 | 網羅の検査 | 変換は `when` で網羅し、イベントの追加でコンパイルが失敗する。全イベントの往復（`encode` -> `decode`）の性質テストを置く |
 | 秘匿 | **永続化の DTO（イベント）** に、表示名・資格の値・招待コードの値のフィールドを**持たせない**（型で防ぐ）。応答の本文には、再発行・作成の復帰コードを一度だけ載せる例外がある（上の「応答とスナップショット」。HTTP の応答の層だけで、イベントには入らない） |

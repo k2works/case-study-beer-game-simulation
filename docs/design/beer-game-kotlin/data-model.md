@@ -597,6 +597,8 @@ interface TransactionRunner {
 - これにより、「研修中は再構築しない」という制約は不要になります（停止は業務上の運用であり、データの整合のためのものではなくなる。停止を依頼する理由は、再構築中の入力の待ちを避けるため）。
 - ロック待ちの上限（`lock_timeout`）と、待ちが上限を超えたときのコマンドの応答は、未決事項です（短く待って再試行、または 503 `app.retry_exhausted` と `Retry-After`）。
 
+**B12 の実装（2026-11-17。スキーマの変更なし）**: 再構築は、ゲームごとに 1 トランザクションで、排他のロックを先頭で取り、投影の 13 表と `projection_checkpoints` の当該ゲームの行を消し（子の表から）、`events` を**追記順（`seq`）**に読み直して、同期投影と同じ書き込み（`ProjectionWriter`）で作り直す。対象は投影の表だけで、削除の進行（`deletion_*`）と周辺ストア（資格・ブラウザセッション・冪等記録など）は、イベントから導けないので対象外。整合の検査は、(a) `projected_version` と `MAX(stream_version)` の一致、(b) 全行が、作り直した行と一致、の 2 つで、(b) は同じトランザクションで作り直して比べたあとに**取り消す**（投影は変わらない）。起動モードは `rebuild-projections [ゲーム ID ...]` と `verify-projections`（[Bolt 12 終了報告](../../development/beer-game-kotlin/bolt_12_report.md)）。
+
 #### 複数の投影の行を更新する順序（L3）
 
 同期投影が複数の行を更新するとき、デッドロックを避けるため、**更新の順序を固定**します。表の順序は、`game_overview` → `game_join_codes` → `game_settings` → `lobby_participants` → `lobby_observer_invitations` → `lobby_observers` → `session_overview` → `role_current_states` → `current_decisions` → `week_commits` → `week_role_results` → `week_team_totals` → `retention_policies` です。同じ表の中では、主キーの昇順（`role` は FACTORY、DISTRIBUTOR、WHOLESALER、RETAILER の順）で更新します。1 件の `WeekCommitted` の変更（`RowChange` の列）も、この順序に並べ替えてから適用します。
@@ -961,7 +963,7 @@ db/migration/
 - JSON のシリアライズ方式とアップキャストの置き場所（解決済み: kotlinx.serialization と `EventCodec`。アップキャストは adapter-persistence。[バックエンドアーキテクチャ](./architecture-backend.md)、[技術スタック](./tech-stack.md)）。
 - **H2 の PostgreSQL モードで動く範囲の実測: B1 の Step 1・7 で完了**（結果は「方言の差分」。共通の DDL と省略の一覧、プレースホルダを確定した）。残り: H2 での性能、分離レベルの動作の同一性、表の所有者の扱い（`GRANT` まわり）。**H2 の版の確認と導入の承認は、B1 の Gate 2 の記録**（[技術スタック](./tech-stack.md)）。
 - **`session_overview.week` が最終週 + 1 になる（B1 で判明。未解決）。** 確定で週を「次の週」へ進めるが、最終週（`finalWeek`）が `WeekCommitted` の封筒にもペイロードにも無いため、最終週が 50 未満のゲームが最終週を確定すると `week` が最終週 + 1 になる（`SessionEnded` は週を持たない）。確定のイベントか投影が最終週を知る手段（`SessionStarted` の設定を投影が覚える、`WeekCommitted` に最終週を載せる、など）の決定が要る。ENDED の表示は `status` で判断できるので、B1 の受入条件には影響しない。
-- **投影の整合性の検査**（`projected_version` と `MAX(stream_version)` の照合の運用）、投影の再構築（B12）、`LISTEN` の切断中の欠落を `projection_checkpoints` の数秒ごとの照合で補う処理、冪等記録の掃除の定期タスクは、B1 では**未実装**。
+- **投影の整合性の検査と投影の再構築は B12 で実装した（上記）。** `LISTEN` の切断中の欠落を `projection_checkpoints` の数秒ごとの照合で補う処理、冪等記録の掃除の定期タスクは、B1 では**未実装**。
 - 参加者のロビーの並び（`joined_at`、同時刻なら `participant_id` の順）。参加の順を保つ規則は未決（B1 の受入条件に無い）。
 - H2 版の `ProjectionLock` が `lock_timeout` 相当の待ちの上限をどう扱うか（PostgreSQL 版は SQLSTATE 55P03 を `RetryExhausted` に写す。H2 版は待ちの上限つきの取得で同じ契約を満たす）。
 - 観察者の DB ロールに SELECT を与える表（`game_overview`・`session_overview`・`week_team_totals`）の権限の否定テスト（`game_join_codes` を読めないこと）は、B2 の `RolePrivilegesSpec` で確認した（観察者が SELECT できる表が 3 表と完全に一致）。観察者の接続プールの配線の検査（H13）は B3 以降（[テスト戦略](./test-strategy.md)）。

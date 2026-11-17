@@ -9,13 +9,13 @@ import beergame.http.Slf4jLogSink
 import kotlin.system.exitProcess
 
 /*
- * 起動モード: `api`（既定）、`migrate`、`retention`（B11。保持削除の掃引を 1 回行う）。`rebuild-projections` は名前だけ定義（実装は B12）。
- * 終了コード: 0 正常、1 保持削除が再試行の上限に達したゲームがある、64 使い方の誤り、69 未実装のモード、70 起動の失敗（接続できないなど）、
- * 78 設定の誤り（BSD の sysexits に倣う）。
+ * 起動モード: `api`（既定）、`migrate`、`retention`（B11。保持削除の掃引を 1 回行う）、
+ * `rebuild-projections [ゲーム ID ...]`（B12。投影をイベントから作り直す）、`verify-projections`（B12。投影の整合の日次検査）。
+ * 終了コード: 0 正常、1 保持削除が再試行の上限に達したゲームがある・投影の再構築ができなかった・投影の不一致が見つかった、
+ * 64 使い方の誤り、70 起動の失敗（接続できないなど）、78 設定の誤り（BSD の sysexits に倣う）。
  */
 
 private const val EXIT_USAGE = 64
-private const val EXIT_UNIMPLEMENTED = 69
 internal const val EXIT_SOFTWARE = 70
 private const val EXIT_CONFIG = 78
 private const val MAX_STACK_FRAMES = 40
@@ -31,54 +31,32 @@ fun runMain(
     logs: LogSink,
 ): Int {
     val mode = args.firstOrNull() ?: "api"
-    return when {
-        mode !in MODES + UNIMPLEMENTED_MODES -> {
-            usage(mode, logs)
-        }
-
-        mode in UNIMPLEMENTED_MODES -> {
-            unimplemented(mode, logs)
-        }
-
-        else -> {
-            when (val loaded = ServerConfig.load(env)) {
-                is Either.Left -> configInvalid(loaded.value.map(::describe), logs)
-                is Either.Right -> execute(mode, loaded.value, logs)
-            }
+    return if (mode !in MODES) {
+        usage(mode, logs)
+    } else {
+        when (val loaded = ServerConfig.load(env)) {
+            is Either.Left -> configInvalid(loaded.value.map(::describe), logs)
+            is Either.Right -> execute(mode, args.drop(1), loaded.value, logs)
         }
     }
 }
 
-private val MODES = setOf("api", "migrate", "retention")
-
-/** 名前だけ定義した、未実装のモード（`rebuild-projections` は B12 で実装する）。 */
-private val UNIMPLEMENTED_MODES = setOf("rebuild-projections")
+private val MODES = setOf("api", "migrate", "retention", "rebuild-projections", "verify-projections")
 
 private fun usage(
     mode: String,
     logs: LogSink,
 ): Int {
-    val available = (MODES + UNIMPLEMENTED_MODES).joinToString("、")
+    val available = MODES.joinToString("、")
     logs.emit(
         operationalRecord(
             LEVEL_ERROR,
             "startup",
             "usage",
-            "起動モード「$mode」は使えません。$available のいずれかを指定してください（rebuild-projections は未実装）。",
+            "起動モード「$mode」は使えません。$available のいずれかを指定してください。",
         ),
     )
     return EXIT_USAGE
-}
-
-/** 設定を読む前に断る（未実装のモードのために、本番の秘密情報や DB を要求しない）。 */
-private fun unimplemented(
-    mode: String,
-    logs: LogSink,
-): Int {
-    logs.emit(
-        operationalRecord(LEVEL_ERROR, "startup", "unimplemented", "起動モード「$mode」は未実装です（モード名の定義のみ）。何も実行しません。"),
-    )
-    return EXIT_UNIMPLEMENTED
 }
 
 private fun configInvalid(
@@ -93,6 +71,7 @@ private fun configInvalid(
 
 private fun execute(
     mode: String,
+    modeArgs: List<String>,
     config: ServerConfig,
     logs: LogSink,
 ): Int =
@@ -101,6 +80,8 @@ private fun execute(
             when (mode) {
                 "migrate" -> migrateOnly(config, logs)
                 "retention" -> runRetention(config, logs)
+                "rebuild-projections" -> runRebuild(config, modeArgs, logs)
+                "verify-projections" -> runVerify(config, logs)
                 else -> serve(config, logs)
             }
         }.fold(

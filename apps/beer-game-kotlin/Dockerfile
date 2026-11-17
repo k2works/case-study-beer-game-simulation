@@ -1,8 +1,9 @@
 # 本番用イメージ（マルチステージ）。設計: docs/design/beer-game-kotlin/architecture-infrastructure.md「コンテナと JVM」
 # ビルド: docker build -t beer-game-kotlin apps/beer-game-kotlin
-# 起動:   docker run ... beer-game-kotlin [api|migrate|retention|rebuild-projections]（既定 api）
+# 起動:   docker run ... beer-game-kotlin [api|migrate|retention|rebuild-projections|verify-projections]（既定 api）
 #         retention は保持削除の掃引を 1 回行って終了する（B11。終了コード 0、放棄したゲームがあれば 1）。
-#         rebuild-projections は名前だけ定義（未実装。終了コード 69）。
+#         rebuild-projections [ゲーム ID ...] は投影をイベントから作り直す（B12。省くと全ゲーム。終了コード 0、失敗したゲームがあれば 1）。
+#         verify-projections は投影の整合を検査する（B12。日次。終了コード 0、不一致があれば 1）。
 
 # ---- ビルド: JDK 25 で Gradle の installDist ----
 FROM eclipse-temurin:25-jdk-noble AS build

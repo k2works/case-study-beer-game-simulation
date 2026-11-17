@@ -251,6 +251,9 @@ class RunningApp(
     /** 保持削除の掃引（B11）。時計を進め、削除の処理に障害を注入できる。 */
     val retention: RetentionHarness by lazy { RetentionHarness(dataSource) }
 
+    /** 投影の再構築と整合の検査（B12）。投影を壊すことができる。 */
+    val projection: ProjectionHarness by lazy { ProjectionHarness(dataSource, persistence.maintenance) }
+
     /** 削除の受領記録のダイジェストの一覧（ゲームを特定しない証跡。API には読み出しが無いので、試験が保存先を直接読む）。 */
     fun receiptDigests(): List<String> =
         dataSource.connection.use { connection ->

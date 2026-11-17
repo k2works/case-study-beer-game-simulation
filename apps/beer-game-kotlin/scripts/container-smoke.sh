@@ -6,7 +6,7 @@
 #   (b) migrate が、マイグレーションを適用して終了コード 0 で終わる
 #   (c) APP_ENV=production で秘密情報が無いと、終了コード 78 で起動に失敗する
 #   (d) APP_ENV=production DB_KIND=h2 は、終了コード 78 で起動に失敗する
-#   (e) 未実装のモード（rebuild-projections。B12 で実装）は、未実装の旨を出して終了コード 69 で終わる
+#   (e) rebuild-projections・verify-projections（B12）が、ゲームの無い PostgreSQL に対して終了コード 0 で終わり、形が不正なゲーム ID は 64 で断る
 #       （retention は B11 で実装した。コンテナでの実行の確認は、PostgreSQL と削除用のロールが要るので、このスクリプトの範囲外）
 #   (f) イメージは、非 root で実行し、H2 のドライバを含まない（APP_ENV=local DB_KIND=h2 も起動できない）
 #   (g) 起動時間: コンテナの開始から /ready が 200 になるまで（RUNS 回。マイグレーションの適用を除く）
@@ -138,13 +138,18 @@ run_once -e APP_ENV=production -e DB_KIND=h2 \
 expect_exit "production の H2 は起動に失敗する" 78 "$code"
 expect_log "H2 の拒否をログに出す" "H2"
 
-echo "== (e) 未実装のモード =="
-for mode in rebuild-projections; do
-  code=0
-  run_once "${PROD[@]}" "$IMAGE" "$mode" || code=$?
-  expect_exit "$mode は未実装として終わる" 69 "$code"
-  expect_log "$mode の未実装の旨をログに出す" "未実装"
-done
+echo "== (e) 投影の再構築と整合の検査（ゲームが無い DB） =="
+code=0
+run_once "${PROD[@]}" "$IMAGE" rebuild-projections || code=$?
+expect_exit "rebuild-projections はゲームが無くても 0 で終わる" 0 "$code"
+expect_log "rebuild-projections が結果を記録する" "再構築 0 ゲーム"
+code=0
+run_once "${PROD[@]}" "$IMAGE" verify-projections || code=$?
+expect_exit "verify-projections は不一致 0 で 0 で終わる" 0 "$code"
+expect_log "verify-projections が結果を記録する" "不一致 0"
+code=0
+run_once "${PROD[@]}" "$IMAGE" rebuild-projections not-a-uuid || code=$?
+expect_exit "rebuild-projections は形が不正なゲーム ID を 64 で断る" 64 "$code"
 
 echo "== (f) イメージの内容 =="
 uid="$(docker run --rm --entrypoint id "$IMAGE" -u)"

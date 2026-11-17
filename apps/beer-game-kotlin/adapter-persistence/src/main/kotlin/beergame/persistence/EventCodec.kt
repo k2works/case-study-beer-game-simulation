@@ -8,14 +8,21 @@ import beergame.domain.DomainEvent
 import beergame.domain.GameEvent
 import beergame.domain.SessionEvent
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /**
  * イベントの JSON 変換。永続化用の DTO（`EventDtos.kt`）とドメインのイベントを相互に変換する。
  * 変換は `when` で網羅し、イベントの追加でコンパイルが失敗する。復号の失敗は例外でなく Left（理由の文字列）で返す。
- * アップキャスト（旧版の DTO から新版への変換）は、版が増えたときにここへ足す（今は版 1 だけ）。
+ * アップキャスト（旧版の JSON から新版への変換。[Upcast]）は、版が増えたときに `EventUpcast.kt` へ足す（今は版 1 だけで、変換は 0 個）。
+ * 書く版（[CURRENT_SCHEMA_VERSION]）と、読める最新の版（[LATEST_READABLE_SCHEMA_VERSION]）は別の定数にする
+ * （読む版 → 書く版の 2 段階のリリース。書く版は、読める最新の版以下）。
  */
 object EventCodec {
+    /** 書く版。新しいイベントに付ける `schema_version`。 */
     const val CURRENT_SCHEMA_VERSION = 1
+
+    /** 読める最新の版。1 から、この版までの `schema_version` を読める（旧版はアップキャストして読む）。書く版以上。 */
+    const val LATEST_READABLE_SCHEMA_VERSION = 1
 
     data class Encoded(
         val eventType: String,
@@ -36,14 +43,38 @@ object EventCodec {
         eventType: String,
         schemaVersion: Int,
         payloadJson: String,
+    ): Either<String, DomainEvent> = decodeWith(PRODUCTION_UPCASTS, eventType, schemaVersion, payloadJson)
+
+    /** [chain] のアップキャストを通して、最新の版の形にしてから復号する。試験が、合成の版の連なりで確かめるために切り出した。 */
+    internal fun decodeWith(
+        chain: UpcastChain,
+        eventType: String,
+        schemaVersion: Int,
+        payloadJson: String,
     ): Either<String, DomainEvent> =
-        if (schemaVersion != CURRENT_SCHEMA_VERSION) {
+        if (!chain.canRead(schemaVersion)) {
             "未対応の schema_version: $schemaVersion（$eventType）".left()
         } else {
             Either
-                .catch { decodeByType(eventType, payloadJson) }
+                .catch { decodeByType(eventType, upcasted(chain, eventType, schemaVersion, payloadJson)) }
                 .mapLeft { "イベントを復号できない: $eventType（${it::class.simpleName}）" }
                 .flatMap { it }
+        }
+
+    /** 最新の版なら、そのまま。旧版なら、JSON のオブジェクトとして読み、最新の版まで直す。 */
+    private fun upcasted(
+        chain: UpcastChain,
+        eventType: String,
+        schemaVersion: Int,
+        payloadJson: String,
+    ): String =
+        if (schemaVersion == chain.latest) {
+            payloadJson
+        } else {
+            json.encodeToString(
+                JsonObject.serializer(),
+                chain.toLatest(eventType, schemaVersion, json.decodeFromString(JsonObject.serializer(), payloadJson)),
+            )
         }
 
     /** game ストリームの種別なら復号し、そうでなければ session ストリームの種別を試す。どちらでもなければ Left。 */

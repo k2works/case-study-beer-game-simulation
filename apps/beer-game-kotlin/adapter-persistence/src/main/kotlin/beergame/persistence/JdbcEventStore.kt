@@ -75,33 +75,6 @@ internal class JdbcEventStore(
             StreamRead(events.toList(), expected)
         }
 
-    private fun ResultSet.toEnvelope(
-        gameId: GameId,
-        streamType: StreamType,
-        version: StreamVersion,
-    ): Either<AppFailure, EventEnvelope<DomainEvent>> =
-        either {
-            val kind = ActorKind.entries.firstOrNull { it.name == getString("actor_kind") }
-            ensureNotNull(kind) { failure(OP_READ, "操作者の種別が不正: ${getString("actor_kind")}") }
-            val payload =
-                EventCodec
-                    .decode(getString("event_type"), getInt("schema_version"), getString("payload_json"))
-                    .mapLeft { failure(OP_READ, it) }
-                    .bind()
-            EventEnvelope(
-                eventId = checkNotNull(getUuid("event_id")),
-                gameId = gameId,
-                streamType = streamType,
-                streamVersion = version,
-                schemaVersion = getInt("schema_version"),
-                actor = ActorRef(kind, getUuid("actor_id")),
-                correlationId = checkNotNull(getUuid("correlation_id")),
-                commandId = checkNotNull(getUuid("command_id")),
-                occurredAt = getInstant("occurred_at"),
-                payload = payload,
-            )
-        }
-
     private fun append(
         tx: Tx,
         expected: Map<StreamType, StreamVersion>,
