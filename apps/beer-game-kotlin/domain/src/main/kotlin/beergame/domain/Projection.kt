@@ -27,6 +27,7 @@ enum class ProjectionTable(
     WEEK_COMMITS("week_commits"),
     WEEK_ROLE_RESULTS("week_role_results"),
     WEEK_TEAM_TOTALS("week_team_totals"),
+    RETENTION_POLICIES("retention_policies"),
 }
 
 @JvmInline
@@ -560,6 +561,32 @@ object Projections {
             }
         }
 
+    /**
+     * `retention_policies`（B11）: 保持日数・保持開始（暫定で作成時。M5）・削除期限。削除の期限の検出（RetentionSaga）が読む。
+     * 方針は作成後に変わらないので、`GameCreated` だけが書く。
+     */
+    val retentionPolicies =
+        Projection { e ->
+            when (val p = e.payload) {
+                is GameEvent.GameCreated -> {
+                    val policy = RetentionPolicy.starting(p.retentionDays, e.occurredAt)
+                    listOf(
+                        upsert(
+                            ProjectionTable.RETENTION_POLICIES,
+                            gameKey(e),
+                            "retention_days" to num(p.retentionDays.value),
+                            "retention_starts_at" to Value.At(policy.startsAt),
+                            "delete_after" to Value.At(policy.deleteAfter),
+                        ),
+                    )
+                }
+
+                else -> {
+                    emptyList()
+                }
+            }
+        }
+
     /** 書く投影。宣言の順は、表の順序（[ProjectionTable]）と同じ。 */
     val all: List<Projection> =
         listOf(
@@ -575,6 +602,7 @@ object Projections {
             weekCommits,
             weekRoleResults,
             weekTeamTotals,
+            retentionPolicies,
         )
 
     /** 1 件のイベントの行の変更を、固定の順序（表の順。同じ表では発行の順＝役割の順）で返す。 */

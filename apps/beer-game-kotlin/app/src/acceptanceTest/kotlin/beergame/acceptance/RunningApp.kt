@@ -58,6 +58,13 @@ enum class ExpirableTable(
 private const val ROTATED_KEY_VERSION = 2
 private const val ROTATED_KEY_SEED = 21
 
+private val DISCARD_SQL =
+    listOf(
+        "DELETE FROM deletion_attempts WHERE deletion_id IN (SELECT deletion_id FROM deletion_runs WHERE game_id = ?)",
+        "DELETE FROM deletion_runs WHERE game_id = ?",
+        "DELETE FROM game_roots WHERE game_id = ?",
+    )
+
 private const val AUDIT_SQL =
     "SELECT event_type, CAST(payload AS VARCHAR), actor_kind, CAST(actor_id AS VARCHAR), occurred_at " +
         "FROM events WHERE game_id = ? ORDER BY seq"
@@ -240,6 +247,55 @@ class RunningApp(
                 }
             }
         }
+
+    /** 保持削除の掃引（B11）。時計を進め、削除の処理に障害を注入できる。 */
+    val retention: RetentionHarness by lazy { RetentionHarness(dataSource) }
+
+    /** 削除の受領記録のダイジェストの一覧（ゲームを特定しない証跡。API には読み出しが無いので、試験が保存先を直接読む）。 */
+    fun receiptDigests(): List<String> =
+        dataSource.connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.executeQuery("SELECT game_reference_digest FROM deletion_receipts").use { rows ->
+                    buildList { while (rows.next()) add(rows.getString(1)) }
+                }
+            }
+        }
+
+    /**
+     * `game_id` 列を持つ全表（`information_schema` から取得する。表の一覧を手で持たない）の、当該ゲームの行数。
+     * 削除の網羅の検査（AC5.1.4）。
+     */
+    fun rowsByTable(gameId: String): Map<String, Int> =
+        dataSource.connection.use { connection ->
+            val tables =
+                connection.createStatement().use { statement ->
+                    statement
+                        .executeQuery(
+                            "SELECT DISTINCT table_name FROM information_schema.columns " +
+                                "WHERE column_name = 'game_id' AND LOWER(table_schema) = 'public' ORDER BY table_name",
+                        ).use { rows -> buildList { while (rows.next()) add(rows.getString(1)) } }
+                }
+            tables.associateWith { table ->
+                connection.prepareStatement("SELECT COUNT(*) FROM $table WHERE game_id = ?").use { statement ->
+                    statement.setObject(1, UUID.fromString(gameId))
+                    statement.executeQuery().use { rows -> if (rows.next()) rows.getInt(1) else 0 }
+                }
+            }
+        }
+
+    /** 共有の DB に、シナリオのゲームを残さない（後のシナリオの掃引に巻き込まれないように。試験の分離）。 */
+    fun discardGames(gameIds: List<String>) {
+        dataSource.connection.use { connection ->
+            gameIds.forEach { id ->
+                DISCARD_SQL.forEach { sql ->
+                    connection.prepareStatement(sql).use { statement ->
+                        statement.setObject(1, UUID.fromString(id))
+                        statement.executeUpdate()
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * 保存された資格の有効期限を過去にして、期限切れを再現する（時計を進める代わり）。

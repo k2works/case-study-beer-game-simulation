@@ -58,6 +58,16 @@ internal class Params(
 
     fun instant(value: Instant) = apply { ps.setObject(next++, value.atOffset(ZoneOffset.UTC)) }
 
+    /** 時刻（無ければ NULL）。 */
+    fun instantOrNull(value: Instant?) =
+        apply {
+            if (value == null) {
+                ps.setNull(next++, Types.TIMESTAMP_WITH_TIMEZONE)
+            } else {
+                instant(value)
+            }
+        }
+
     /** 投影の値。JSON は文字列として結び、方言ごとの式（[Dialect.jsonParam]）が列へ書く。 */
     fun value(value: Value) =
         apply {

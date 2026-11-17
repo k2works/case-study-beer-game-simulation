@@ -209,6 +209,12 @@ class GamePlayApi(
         cookie: String?,
     ) = get("/games/$gameId/exports${format?.let { "?format=$it" } ?: ""}", cookie)
 
+    /** 保持状態（B11）。 */
+    fun retention(
+        gameId: String,
+        cookie: String?,
+    ) = get("/games/$gameId/retention", cookie)
+
     fun sessionState(
         gameId: String,
         cookie: String?,

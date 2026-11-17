@@ -20,6 +20,7 @@ fun Application.beerGameModule(deps: HttpDeps) {
             observerRoutes(deps)
             queryRoutes(deps)
             exportRoutes(deps)
+            retentionRoutes(deps)
         }
     }
 }

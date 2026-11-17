@@ -276,6 +276,29 @@ paths:
         "422": { $ref: "#/components/responses/ValidationProblem" }
         "429": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/retention:
+    get:
+      tags: [ゲーム]
+      operationId: getRetention
+      summary: 保持状態（保持日数・削除予定日・削除の進行。B11。US5.1。S09）
+      description: |
+        認可は**進行役だけ**。参加者・観察者・資格の無い人・別のゲーム・存在しないゲームは、区別せず 403（`app.unauthorized`）。
+        保持期間は作成時に指定する（未指定は 90 日。AC5.1.1）。削除は、`retention` モードの定期のタスクが、期限に達したゲームを
+        `game_roots` の連鎖削除で行う（AC5.1.2）。失敗したら何も消さず、最大 5 回、指数バックオフで再試行する（AC5.1.3）。
+        `backupRetentionDays` は、削除の後も、自動バックアップに削除前のデータが残る最大の日数（AC5.1.5）。
+        手動の再試行（`POST …/retry`）は、実装していない。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: 保持状態
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Retention"
+        "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/participants/{participantId}/role:
     put:
       tags: [ゲーム]
@@ -1561,6 +1584,32 @@ components:
               endingBacklog: { type: integer, description: 週末の受注残 }
               weeklyCostMinor: { type: integer, description: その週の費用（最小単位） }
               cumulativeCostMinor: { type: integer, description: 累計の費用（最小単位） }
+    Retention:
+      type: object
+      description: |
+        保持状態（B11。S09）。保持の起点は、暫定で作成時（M5。人の確認が要る）。削除が完了したゲームは、記録ごと無くなる
+        ので、完了の状態は無い。
+      required:
+        [retentionDays, startsAt, deleteAfter, status, attempt, nextAttemptAt, lastFailureCode, backupRetentionDays]
+      properties:
+        retentionDays: { type: integer, minimum: 1, maximum: 3650, description: 保持日数 }
+        startsAt: { type: string, format: date-time, description: 保持の開始（暫定で作成時） }
+        deleteAfter: { type: string, format: date-time, description: 削除予定日（保持の開始 + 保持日数） }
+        status:
+          type: string
+          enum: [SCHEDULED, IN_PROGRESS, RETRY_PENDING, ABANDONED]
+          description: 予定、削除中、再試行待ち、再試行の上限に達して再試行をやめた
+        attempt: { type: integer, minimum: 0, description: 試行の回数（まだ試行していなければ 0） }
+        nextAttemptAt:
+          type: [string, "null"]
+          format: date-time
+          description: 次の試行の時刻（`status` が `RETRY_PENDING` のときだけ）
+        lastFailureCode:
+          type: [string, "null"]
+          description: 直前の失敗の分類（値は含まない）
+        backupRetentionDays:
+          type: integer
+          description: 削除の後も、自動バックアップに削除前のデータが残る最大の日数（AC5.1.5）
     SessionState:
       type: object
       description: 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。

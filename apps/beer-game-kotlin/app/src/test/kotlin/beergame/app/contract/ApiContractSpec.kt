@@ -156,6 +156,19 @@ private suspend fun ContractClient.reviewPhase() {
     expect(200, get("/games/${game.id}/review", game.cookieOf("FACTORY")))
     expect(403, get("/games/${game.id}/review"))
     exportPhase(game)
+    retentionPhase(game)
+}
+
+/** 保持状態の経路（B11）: 進行役だけ 200（予定の状態、既定の 90 日）、参加者・観察者・無資格は 403。 */
+private suspend fun ContractClient.retentionPhase(game: PlayedGame) {
+    val retention = "/games/${game.id}/retention"
+    val body = expect(200, get(retention, game.facilitator)).body()
+    body.str("status") shouldBe "SCHEDULED"
+    body.str("backupRetentionDays") shouldBe "7"
+    body.str("retentionDays") shouldBe "90"
+    expect(403, get(retention, game.cookieOf("RETAILER")))
+    expect(403, get(retention, game.observer))
+    expect(403, get(retention))
 }
 
 /**

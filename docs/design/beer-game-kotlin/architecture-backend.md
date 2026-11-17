@@ -469,7 +469,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | 通知 | `GET /games/:id/events`（SSE） | — | ゲームに属する操作者 |
 | 学習 | `GET /games/:id/{observation,review}`、`GET /games/:id/exports` | （問い合わせ。出力は要求時に `buildExport` で生成） | 観察は**観察者と進行役**（B9。参加者は開けない。BR-17）、振り返りは進行役・参加者・観察者で終了後（B4・B9）、出力は終了後 |
 | 資格 | `POST /games/:id/credentials/revoke`、`POST …/reissue` | `RevokeCredential`、`ReissueCredential`（`game`） | 進行役 |
-| 保持 | `GET /games/:id/retention`、`POST …/retry` | （問い合わせ。`retry` は保持の手続きへ） | 進行役 |
+| 保持 | `GET /games/:id/retention`、`POST …/retry` | （問い合わせ。`retry` は保持の手続きへ） | 進行役。**B11 は `GET` だけ実装した（`POST …/retry` は未実装。再試行は、定期のタスクが自動で行う）** |
 | 運用 | `GET /health`、`GET /ready` | — | なし。**B1 の実装は `/api/v1` の配下**（`/api/v1/health`、`/api/v1/ready`。OpenAPI の servers のとおり）。負荷分散のヘルスチェックのパスの設定が要る（[インフラストラクチャ](./architecture-infrastructure.md)） |
 
 **B1 の実装で確定した、経路の補足（2026-11-14）。** (1) `SaveDecision` の `role` は本文に持たせず、**認証つきの `snapshot` で参加者の役割を引いてから** `saveDecision` を呼ぶ（認証が 2 回走る。別のトランザクション）。役割の無い操作者は 403。(2) `GET /sessions/:id/state` の `?role=`（他の役割の取得。AC2.1.2）は、自分の役割と違えば `game.forbidden`（HTTP では `app.unauthorized`）。(3) `POST /games` の応答は `versions` だけで、ゲームの ID は `Location`（`/api/v1/games/{id}/state`）、資格は `Set-Cookie`。参加の応答は `versions` だけで、`gameId` を含まない（**参加者が、参加後に `gameId` を知る手段が無い。未決事項** → **B5 Step 6 で解消**: 参加の応答に `gameId`、作成の応答に復帰コード `recoveryCode` を足した。「応答とスナップショット」を参照）。(4) 作成の入力は `finalWeek` と `demand` を必須とし、`retentionDays` は未指定で 90。(5) `UnassignRole`（`DELETE …/role`）は B1 に実装していない。

@@ -329,6 +329,9 @@ export function ConsolePage() {
                     </button>
                 </section>
             ) : null}
+            <p>
+                <Link to={`/games/${game.gameId}/retention`}>保持状態を見る</Link>
+            </p>
             {session.status === 'ENDED' ? (
                 <p>
                     終了しました。<Link to={`/games/${game.gameId}/review`}>振り返りを見る</Link>

@@ -17,7 +17,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 | ID | イベント | ストリーム | 発生する条件（コマンド） | ペイロードの項目 | 購読する投影（`Projections`） |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| EV-G01 | `GameCreated` | game | CreateGame。ストリームが空 | `gameId`、`joinCode`、`settings`、`retentionDays`、`facilitatorCredentialExpiresAt` | `gameOverview`、`gameJoinCodes`、`gameSettings` |
+| EV-G01 | `GameCreated` | game | CreateGame。ストリームが空 | `gameId`、`joinCode`、`settings`、`retentionDays`、`facilitatorCredentialExpiresAt` | `gameOverview`、`gameJoinCodes`、`gameSettings`、`retentionPolicies` |
 | EV-G02 | `ParticipantJoined` | game | JoinGame。準備中 | `participantId`、`credentialExpiresAt` | `lobbyParticipants` |
 | EV-G03 | `RoleAssigned` | game | AssignRole。進行役、役割が変わる（準備中。開始後は入れ替えの新担当者） | `participantId`、`role` | `lobbyParticipants` |
 | EV-G04 | `RoleUnassigned` | game | AssignRole による付け替え（解除の側）。単独の UnassignRole は未実装 | `participantId`、`role` | `lobbyParticipants` |

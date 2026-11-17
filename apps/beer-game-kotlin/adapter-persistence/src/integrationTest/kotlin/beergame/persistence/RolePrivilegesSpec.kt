@@ -1,5 +1,7 @@
 package beergame.persistence
 
+import beergame.application.DeletionReceipt
+import beergame.domain.RetentionEvent
 import beergame.domain.Role
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
@@ -8,9 +10,11 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.runBlocking
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
+import java.time.Instant
 import java.util.UUID
 
 private const val DATABASE = "beergame_roles"
@@ -24,6 +28,9 @@ private val APP_ROLES = listOf(WRITER, READER, OBSERVER, DELETER)
 
 /** 観察者のロールが読める表（設計書 data-model.md の読み取りの規則。NF-S18）。 */
 private val OBSERVER_READABLE = listOf("game_overview", "session_overview", "week_team_totals")
+
+/** 削除ロールが DELETE できる表（B11。`game_roots` の連鎖削除の根と、削除の進行・受領記録）。 */
+private val DELETER_DELETABLE = listOf("game_roots", "deletion_runs", "deletion_attempts", "deletion_receipts")
 
 /** 所有者（スーパーユーザー）の接続を `SET ROLE` で用途別のロールに切り替えて実行する。ロールの権限だけが効く。 */
 private fun <T> asRole(
@@ -262,11 +269,13 @@ class RolePrivilegesSpec :
             }
         }
 
-        test("[3.1] Given 削除ロール When game_roots 以外の表を DELETE する Then 拒否される。持つ DELETE 権限は game_roots だけ") {
-            for (table in publicTables().filter { it != "game_roots" }) {
+        test(
+            "[3.1/B11] Given 削除ロール When 表を DELETE する Then 持つ DELETE 権限は game_roots と、削除の進行の 3 表（deletion_*）だけ。それ以外は拒否される",
+        ) {
+            for (table in publicTables().filter { it !in DELETER_DELETABLE }) {
                 hasPrivilege(DELETER, table, "DELETE") shouldBe false
             }
-            hasPrivilege(DELETER, "game_roots", "DELETE") shouldBe true
+            DELETER_DELETABLE.forEach { hasPrivilege(DELETER, it, "DELETE") shouldBe true }
             denied(DELETER, "DELETE FROM events")
             denied(DELETER, "DELETE FROM game_join_codes")
             denied(DELETER, "TRUNCATE game_roots")
@@ -328,9 +337,17 @@ class RolePrivilegesSpec :
             val id = script.gameId.value
             seedPeripheralRows(id)
 
-            val tables = gameIdTables()
+            // deletion_runs は game_roots への外部キーを持たない（連鎖削除の対象でない）。削除の進行の行は、別のテストで確かめる
+            val tables = gameIdTables().filter { it != "deletion_runs" }
             tables shouldContainAll
-                listOf("events", "game_join_codes", "week_role_results", "credentials", "idempotency_records")
+                listOf(
+                    "events",
+                    "game_join_codes",
+                    "week_role_results",
+                    "credentials",
+                    "idempotency_records",
+                    "retention_policies",
+                )
             // 空の表が混じると、「行が残らない」の検査が空振りになる。事前に、全表に行があることを確かめる。
             tables.filter { fx.count("$it WHERE game_id = ?", id) == 0 }.shouldBeEmpty()
             hasPrivilege(DELETER, "events", "DELETE") shouldBe false
@@ -341,5 +358,81 @@ class RolePrivilegesSpec :
             tables.filter { fx.count("$it WHERE game_id = ?", id) != 0 }.shouldBeEmpty()
             fx.count("events WHERE game_id = ?", other.gameId.value) shouldBe other.events.size
             fx.count("game_roots WHERE game_id = ?", other.gameId.value) shouldBe 1
+        }
+
+        test("[B11] Given 保持と削除の表 When ロールごとに操作する Then 書き込みは方針だけ、読み取りは方針と進行だけ、削除ロールは進行と受領記録を操作できる") {
+            val id = UUID.randomUUID()
+            asOwner { c ->
+                c.exec("INSERT INTO game_roots (game_id, created_at) VALUES ('$id', now())")
+                c.exec("INSERT INTO retention_policies VALUES ('$id', 90, now(), now() + interval '90 days')")
+            }
+
+            asRole(WRITER) { c ->
+                c.queryList("SELECT count(*) FROM retention_policies WHERE game_id = '$id'") { it.getInt(1) } shouldBe
+                    listOf(1)
+                c.exec("UPDATE retention_policies SET retention_days = 90 WHERE game_id = '$id'") shouldBe 1
+            }
+            listOf("deletion_runs", "deletion_attempts", "deletion_receipts").forEach { deniedQuery(WRITER, it) }
+
+            asRole(READER) { c ->
+                c.queryList("SELECT count(*) FROM retention_policies") { it.getInt(1) }
+                c.queryList("SELECT count(*) FROM deletion_runs") { it.getInt(1) }
+            }
+            listOf("deletion_attempts", "deletion_receipts").forEach { deniedQuery(READER, it) }
+            denied(READER, "UPDATE retention_policies SET retention_days = 1")
+            listOf("retention_policies", "deletion_runs", "deletion_attempts", "deletion_receipts").forEach {
+                deniedQuery(OBSERVER, it)
+            }
+
+            denied(DELETER, "UPDATE retention_policies SET retention_days = 1")
+            denied(DELETER, "DELETE FROM retention_policies")
+            val run = UUID.randomUUID()
+            asRole(DELETER) { c ->
+                c.queryList("SELECT count(*) FROM retention_policies") { it.getInt(1) }
+                c.exec("INSERT INTO deletion_runs VALUES ('$run', '$id', 'IN_PROGRESS', 1, now(), now(), NULL)")
+                c.exec("INSERT INTO deletion_attempts VALUES ('$run', 1, now(), NULL)")
+                c.exec("UPDATE deletion_runs SET status = 'FAILED' WHERE deletion_id = '$run'") shouldBe 1
+                c.exec("DELETE FROM deletion_runs WHERE deletion_id = '$run'") shouldBe 1
+            }
+            denied(DELETER, "TRUNCATE deletion_runs")
+            denied(DELETER, "UPDATE deletion_receipts SET outcome = outcome")
+            denied(
+                WRITER,
+                "INSERT INTO deletion_receipts VALUES ('${UUID.randomUUID()}', '${"a".repeat(
+                    64,
+                )}', 'COMPLETED', now(), now() + interval '1 day')",
+            )
+            asOwner { c -> c.exec("DELETE FROM game_roots WHERE game_id = '$id'") }
+        }
+
+        test(
+            "[B11/AC5.1.4] Given 削除用のロールの接続プール When 削除の永続化で削除する Then events に DELETE 権限が無くても、game_id を持つ全表から行が消え、受領記録が残る",
+        ) {
+            val script = GameScript().create(finalWeek = 2)
+            val players = script.joinAllRoles()
+            script.startGame().playWeek(players).save(players.getValue(Role.RETAILER), Role.RETAILER, 4)
+            fx.appendScript(script)
+            val other = GameScript().create()
+            fx.appendScript(other)
+            val id = script.gameId.value
+            seedPeripheralRows(id)
+            val deletionId = UUID.randomUUID()
+            val at = Instant.parse("2027-03-01T00:00:00Z")
+            PostgresSupport.dataSourceAs(DATABASE, DELETER).use { pool ->
+                val store = retentionStore(pool)
+                val started = RetentionEvent.DeletionStarted(1, at, at.plusSeconds(1800))
+                runBlocking {
+                    store.begin(script.gameId, deletionId, started).orFail()
+                    // 空の表が混じると、「行が残らない」の検査が空振りになる。事前に、全表に行があることを確かめる
+                    gameIdTables().filter { fx.count("$it WHERE game_id = ?", id) == 0 }.shouldBeEmpty()
+                    val receipt = DeletionReceipt(deletionId, "b".repeat(64), at, at.plusSeconds(86_400))
+                    store.delete(script.gameId, receipt).orFail()
+                }
+            }
+
+            gameIdTables().filter { fx.count("$it WHERE game_id = ?", id) != 0 }.shouldBeEmpty()
+            fx.count("deletion_attempts WHERE deletion_id = ?", deletionId) shouldBe 0
+            fx.count("deletion_receipts WHERE deletion_id = ?", deletionId) shouldBe 1
+            fx.count("events WHERE game_id = ?", other.gameId.value) shouldBe other.events.size
         }
     })

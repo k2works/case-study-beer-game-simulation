@@ -533,7 +533,7 @@ interface TransactionRunner {
 | `beergame_writer` | `events`・`game_roots` は SELECT・INSERT のみ。投影・周辺ストア・冪等記録・`projection_checkpoints` は SELECT・INSERT・UPDATE・DELETE（再構築が行を消すため） |
 | `beergame_reader` | 投影の表（`projection_checkpoints`・`game_join_codes`・`game_settings` を含む）と `display_profiles`（ロビーの表示名の結合）の SELECT のみ。`credentials`・`browser_sessions`・`idempotency_records` は含めない（用途別のプールの配線で確定。未決） |
 | `beergame_observer` | `game_overview`・`session_overview`・`week_team_totals` の SELECT のみ（`game_join_codes`・役割別の表には到達できない） |
-| `beergame_deleter` | `game_roots` の SELECT・DELETE のみ（WHERE 句の列の参照に SELECT が要る）。`deletion_*` の GRANT は、その表を作る B11 のマイグレーションで書く |
+| `beergame_deleter` | `game_roots` の SELECT・DELETE（WHERE 句の列の参照に SELECT が要る）。**B11 の V103 で、`retention_policies` の SELECT、`deletion_runs`・`deletion_attempts` の SELECT・INSERT・UPDATE・DELETE、`deletion_receipts` の SELECT・INSERT・DELETE を足した**（`events` ほかの DELETE は持たない）。V103 は、`beergame_writer` に `retention_policies`（投影）の読み書き、`beergame_reader` に `retention_policies`・`deletion_runs` の SELECT も与える（`deletion_attempts`・`deletion_receipts` は読めない） |
 
 **B9: 観察者の接続プール（スキーマの変更なし）。** 観察の問い合わせ（`ObservationReader`。`JdbcObservationReader`）は、この 3 表だけを読む。PostgreSQL では、設定 `DB_OBSERVER_ROLE`（例: `beergame_observer`）を指定すると、観察者用の別の接続プール（接続のたびに `SET ROLE`）を使い、観察は DB の権限でも 3 表に限られる（統合テスト `PostgresPersistenceSpec` が、3 表は読めて、`game_join_codes`・役割別の表・`game_settings` は 42501 になることを確かめる）。未指定は主のプールと同じ接続（コードの上では同じく 3 表だけを読む）。ログイン用のユーザーの作成（`beergame_observer` のメンバーにする）は、B3 以降の運用で、未実施。観察者のロールは `game_settings` と `projection_checkpoints` を読めないため、公開範囲と版は、主の読み取りから、行より先に読む。招待コードは `credentials`（`kind = OBSERVER_INVITATION`、`subject_id` は招待の ID）にダイジェストだけを持ち、観察者の表示名は `display_profiles`（`actor_kind = OBSERVER`）、ブラウザセッションは `browser_sessions`（`actor_kind = OBSERVER`）に持つ。
 
@@ -779,7 +779,8 @@ end
 | 003 | 共通 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_*` |
 | 004 | 共通 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | 005 | 共通 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
-| 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts`。**B11 の予約として空けてある（B5 は使わない。下の「B5 Step 5.5 の番号」）** |
+| 006 | 共通 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts`。**B11 で実装した（`V006__retention.sql`。B5 は使わず空けてあった番号）。承認は未取得**。`retention_policies` は `GameCreated` の投影（`delete_after` = 作成時 + 保持日数）。`deletion_attempts` は `deletion_runs` への外部キー（`CASCADE`）。`status` が `FAILED` で `next_attempt_at` が無い行は、再試行の上限に達して再試行をやめた状態（サガの `Abandoned`）。`IN_PROGRESS` の `next_attempt_at` は、貸出の期限（30 分。過ぎると次の試行として再開する） |
+| 103 | PostgreSQL | **B11**（`V103__retention_roles.sql`）。保持の表の GRANT（書き込み・読み取り・削除の 3 ロール。上の表）。**承認は未取得** |
 | 007 | 共通 | **B5 Step 5.5**（`V007__lobby_participants_replaced_at.sql`）: `lobby_participants.replaced_at timestamptz`（NULL 可）の追加（拡張だけ） |
 | 008 | 共通 | **B5 Step 5.5**（`V008__participation_attempts.sql`）: 参加・復帰の失敗の窓 `participation_attempts`（主キー `pk_participation_attempts`、`CHECK`、索引 `ix_participation_attempts_window`） |
 | 101 | PostgreSQL | **B5 Step 5.5 で付け替え**（`V101__idempotency_create_unique_index.sql`。B1 で 102 として作った）。部分一意索引 `uq_idempotency_create`（`WHERE scope = 'create'`）、`jsonb` の列に依存する検査 |

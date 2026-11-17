@@ -13,7 +13,7 @@ import java.util.UUID
 import javax.sql.DataSource
 
 /**
- * 共通のマイグレーション（H2・PostgreSQL の両方に適用）の、適用される順。**006 は B11（保持）の予約として空けてある**
+ * 共通のマイグレーション（H2・PostgreSQL の両方に適用）の、適用される順。006 は B11（保持と削除）が使った
  * （B5 Step 5.5: 007 は `lobby_participants.replaced_at`、008 は参加・復帰の窓 `participation_attempts`）。
  */
 val COMMON_MIGRATIONS =
@@ -23,6 +23,7 @@ val COMMON_MIGRATIONS =
         "V003__projections_lobby.sql",
         "V004__projections_session.sql",
         "V005__projections_results.sql",
+        "V006__retention.sql",
         "V007__lobby_participants_replaced_at.sql",
         "V008__participation_attempts.sql",
     )
@@ -33,7 +34,12 @@ val COMMON_MIGRATIONS =
  * （作った順と番号の順を合わせる。ロールの GRANT は、共通の表がすべて揃った後に適用される）。
  */
 val POSTGRES_MIGRATIONS =
-    COMMON_MIGRATIONS + listOf("V101__idempotency_create_unique_index.sql", "V102__database_roles.sql")
+    COMMON_MIGRATIONS +
+        listOf(
+            "V101__idempotency_create_unique_index.sql",
+            "V102__database_roles.sql",
+            "V103__retention_roles.sql",
+        )
 
 /** 試験用の鍵（32 バイト。試験の外では使わない）。 */
 val TEST_RESPONSE_KEY: ByteArray = ByteArray(32) { it.toByte() }

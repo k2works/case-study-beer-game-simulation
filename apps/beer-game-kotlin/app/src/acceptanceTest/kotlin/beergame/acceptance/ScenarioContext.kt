@@ -142,7 +142,11 @@ class ScenarioContext : AutoCloseable {
         cookie: String? = game.facilitator,
     ) = api.sessionState(game.id, cookie)
 
-    override fun close() = app.close()
+    override fun close() {
+        // 共有の DB に、このシナリオのゲームを残さない（保持の掃引は、期限に達した全ゲームを対象にするため）
+        runCatching { app.discardGames(games.map { it.id }) }
+        app.close()
+    }
 
     companion object {
         const val HTTP_OK = 200

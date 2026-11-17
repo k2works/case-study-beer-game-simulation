@@ -45,7 +45,12 @@ class ProjectionSpec :
             val rows = Projections.project(envelope(gameCreated(settings), StreamType.GAME, 1))
 
             rows.map { it.table } shouldContainExactly
-                listOf(ProjectionTable.GAME_OVERVIEW, ProjectionTable.GAME_JOIN_CODES, ProjectionTable.GAME_SETTINGS)
+                listOf(
+                    ProjectionTable.GAME_OVERVIEW,
+                    ProjectionTable.GAME_JOIN_CODES,
+                    ProjectionTable.GAME_SETTINGS,
+                    ProjectionTable.RETENTION_POLICIES,
+                )
             val overview = rows.of(ProjectionTable.GAME_OVERVIEW).single()
             overview.keyOf("game_id") shouldBe Value.Id(gid.value)
             overview.valueOf("status") shouldBe Value.Text("PREPARING")
@@ -59,6 +64,19 @@ class ProjectionSpec :
             gs.valueOf("demand") shouldBe Value.Json("[4,5,6]")
             gs.valueOf("holding_cost_minor") shouldBe Value.Big(50)
             gs.valueOf("backlog_cost_minor") shouldBe Value.Big(100)
+        }
+
+        test("[B11/AC5.1.1] Given GameCreated When 投影する Then 保持方針は、作成の時刻を起点に、保持日数後を削除期限とする") {
+            val policy =
+                Projections
+                    .project(envelope(gameCreated(settings), StreamType.GAME, 1))
+                    .of(ProjectionTable.RETENTION_POLICIES)
+                    .single()
+
+            policy.keyOf("game_id") shouldBe Value.Id(gid.value)
+            policy.valueOf("retention_days") shouldBe Value.Num(90)
+            policy.valueOf("retention_starts_at") shouldBe Value.At(t0)
+            policy.valueOf("delete_after") shouldBe Value.At(Instant.parse("2027-02-14T09:00:00Z"))
         }
 
         test("[B7/AC1.1.3] Given カスタム条件の GameCreated When 投影する Then 種別 CUSTOM・変更項目・初期条件・遅延・公開範囲が入る") {
@@ -411,6 +429,7 @@ class ProjectionSpec :
                     Projections.weekCommits to ProjectionTable.WEEK_COMMITS,
                     Projections.weekRoleResults to ProjectionTable.WEEK_ROLE_RESULTS,
                     Projections.weekTeamTotals to ProjectionTable.WEEK_TEAM_TOTALS,
+                    Projections.retentionPolicies to ProjectionTable.RETENTION_POLICIES,
                 )
             expected.forEach { (projection, table) ->
                 test("${table.sqlName} の投影は、その表の行だけを 1 行以上作る") {

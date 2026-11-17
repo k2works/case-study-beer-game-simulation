@@ -135,6 +135,24 @@ data class ProjectedGame(
     val invitations: List<ProjectedInvitation> = emptyList(),
     /** 参加した観察者（B9）。進行役にだけ開示する。 */
     val observers: List<ProjectedObserver> = emptyList(),
+    /** 保持方針と、削除の進行（B11）。方針の行が無いゲーム（B11 より前に作った行）は null。進行役にだけ開示する。 */
+    val retention: ProjectedRetention? = null,
+)
+
+/** 保持方針（`retention_policies`）と、削除の進行（`deletion_runs`。まだ試行していなければ null）。B11。 */
+data class ProjectedRetention(
+    val retentionDays: Int,
+    val startsAt: Instant,
+    val deleteAfter: Instant,
+    val run: ProjectedDeletionRun?,
+)
+
+/** 削除の進行の行。[status] は `PENDING`・`IN_PROGRESS`・`FAILED`（[nextAttemptAt] が無ければ、再試行をやめた）。 */
+data class ProjectedDeletionRun(
+    val status: String,
+    val attempt: Int,
+    val nextAttemptAt: Instant?,
+    val lastFailureCode: String?,
 )
 
 // ---- 呼び出した人ごとの投影 ----

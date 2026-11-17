@@ -167,6 +167,26 @@ export class ConsoleWindow {
         };
     }
 
+    /** 進行役のコンソールの「保持状態を見る」から、保持状態（S09）を開く（B11）。 */
+    async openRetentionFromConsole() {
+        await this.open();
+        await this.page.getByRole('link', { name: '保持状態を見る' }).click({ timeout: WAIT_MS });
+        await this.page.getByRole('heading', { name: '保持状態' }).waitFor({ timeout: WAIT_MS });
+        this.retentionPage = this.page;
+    }
+
+    /** 保持状態の本文（削除予定日・保持期間・バックアップの注記）。 */
+    async retentionText() {
+        await this.retentionPage.getByText(/^削除予定日:/).waitFor({ timeout: WAIT_MS });
+        return this.retentionPage.locator('main').innerText();
+    }
+
+    /** 振り返りの本文。削除予定日の注記（進行役にだけ。取得してから示す）を待つ。 */
+    async reviewText() {
+        await this.reviewPage.getByText(/^削除予定日:/).waitFor({ timeout: WAIT_MS });
+        return this.reviewPage.locator('main').innerText();
+    }
+
     /** 振り返りの表の列見出し。 */
     async reviewColumns() {
         const table = this.reviewPage.getByRole('table', { name: '週次推移の表' });

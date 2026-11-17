@@ -108,6 +108,7 @@ internal class JdbcProjectionReader(
                     teamTotals = ObservationRows.teamTotals(c, gameId),
                     invitations = ObservationRows.invitations(c, gameId).bind(),
                     observers = ObservationRows.observers(c, gameId).bind(),
+                    retention = RetentionRows.read(c, gameId),
                 )
             }
         }

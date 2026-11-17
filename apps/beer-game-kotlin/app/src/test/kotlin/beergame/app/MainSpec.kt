@@ -78,7 +78,27 @@ class MainSpec :
             runMain(listOf("unknown"), local(), Logs()) shouldBe 64
         }
 
-        listOf("retention", "rebuild-projections").forEach { mode ->
+        test("[B11/AC5.1.2] Given マイグレーション済みの local When retention モードを実行する Then 削除する対象が無くても 0 で終わり、結果を記録する") {
+            val env = local()
+            runMain(listOf("migrate"), env, Logs()) shouldBe 0
+            val logs = Logs()
+
+            runMain(listOf("retention"), env, logs) shouldBe 0
+
+            logs.records.single().operation shouldBe "retention"
+            logs.text() shouldContain "削除 0 件"
+        }
+
+        test("[B11/NF-R12] Given マイグレーション前の local When retention モードを実行する Then 掃引できず 70 で終わる（次の起動で再試行する）") {
+            val logs = Logs()
+
+            runMain(listOf("retention"), local(), logs) shouldBe 70
+
+            logs.records.single().level shouldBe "ERROR"
+            logs.records.single().operation shouldBe "retention"
+        }
+
+        listOf("rebuild-projections").forEach { mode ->
             test("[B3-1] Given 未実装の起動モード「$mode」 When 起動する Then 未実装の旨を記録し、終了コード 69 で終わる（設定を読む前に断る）") {
                 val logs = Logs()
 

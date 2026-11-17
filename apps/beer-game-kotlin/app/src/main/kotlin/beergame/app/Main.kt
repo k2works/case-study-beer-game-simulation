@@ -9,13 +9,14 @@ import beergame.http.Slf4jLogSink
 import kotlin.system.exitProcess
 
 /*
- * 起動モード: `api`（既定）と `migrate`。`retention`、`rebuild-projections` は名前だけ定義（実装は B11、B12）。
- * 終了コード: 0 正常、64 使い方の誤り、69 未実装のモード、70 起動の失敗（接続できないなど）、78 設定の誤り（BSD の sysexits に倣う）。
+ * 起動モード: `api`（既定）、`migrate`、`retention`（B11。保持削除の掃引を 1 回行う）。`rebuild-projections` は名前だけ定義（実装は B12）。
+ * 終了コード: 0 正常、1 保持削除が再試行の上限に達したゲームがある、64 使い方の誤り、69 未実装のモード、70 起動の失敗（接続できないなど）、
+ * 78 設定の誤り（BSD の sysexits に倣う）。
  */
 
 private const val EXIT_USAGE = 64
 private const val EXIT_UNIMPLEMENTED = 69
-private const val EXIT_SOFTWARE = 70
+internal const val EXIT_SOFTWARE = 70
 private const val EXIT_CONFIG = 78
 private const val MAX_STACK_FRAMES = 40
 
@@ -48,10 +49,10 @@ fun runMain(
     }
 }
 
-private val MODES = setOf("api", "migrate")
+private val MODES = setOf("api", "migrate", "retention")
 
-/** 名前だけ定義した、未実装のモード（`retention` は B11、`rebuild-projections` は B12 で実装する）。 */
-private val UNIMPLEMENTED_MODES = setOf("retention", "rebuild-projections")
+/** 名前だけ定義した、未実装のモード（`rebuild-projections` は B12 で実装する）。 */
+private val UNIMPLEMENTED_MODES = setOf("rebuild-projections")
 
 private fun usage(
     mode: String,
@@ -63,7 +64,7 @@ private fun usage(
             LEVEL_ERROR,
             "startup",
             "usage",
-            "起動モード「$mode」は使えません。$available のいずれかを指定してください（retention、rebuild-projections は未実装）。",
+            "起動モード「$mode」は使えません。$available のいずれかを指定してください（rebuild-projections は未実装）。",
         ),
     )
     return EXIT_USAGE
@@ -96,8 +97,13 @@ private fun execute(
     logs: LogSink,
 ): Int =
     Either
-        .catch { if (mode == "migrate") migrateOnly(config, logs) else serve(config, logs) }
-        .fold(
+        .catch {
+            when (mode) {
+                "migrate" -> migrateOnly(config, logs)
+                "retention" -> runRetention(config, logs)
+                else -> serve(config, logs)
+            }
+        }.fold(
             { failure ->
                 logs.emit(failureRecord(failure))
                 EXIT_SOFTWARE

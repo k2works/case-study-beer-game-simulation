@@ -53,6 +53,21 @@ object PostgresSupport {
         }
     }
 
+    /** [database] へ接続のたびに `SET ROLE` する接続プール（用途別のプール。本番の `DB_DELETER_ROLE` と同じ仕組み）。 */
+    fun dataSourceAs(
+        database: String,
+        role: String,
+    ): HikariDataSource =
+        HikariDataSource(
+            HikariConfig().apply {
+                jdbcUrl = jdbcUrlFor(database)
+                username = container.username
+                password = container.password
+                maximumPoolSize = 2
+                connectionInitSql = "SET ROLE $role"
+            },
+        )
+
     fun dataSourceFor(database: String): HikariDataSource =
         HikariDataSource(
             HikariConfig().apply {

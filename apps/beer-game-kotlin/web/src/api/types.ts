@@ -120,6 +120,9 @@ export type ObservationWeek = Schemas['ObservationWeek'];
 
 export type Review = Schemas['Review'];
 
+/** 保持状態（B11。S09）。保持日数・削除予定日・削除の進行・バックアップの残存日数。進行役だけが取得できる。 */
+export type Retention = Schemas['Retention'];
+
 /** 出力の形式（B10）。`GET /games/{gameId}/exports?format=` の値。 */
 export type ExportFormat = 'csv' | 'json';
 

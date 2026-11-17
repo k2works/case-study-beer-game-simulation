@@ -6,7 +6,8 @@
 #   (b) migrate が、マイグレーションを適用して終了コード 0 で終わる
 #   (c) APP_ENV=production で秘密情報が無いと、終了コード 78 で起動に失敗する
 #   (d) APP_ENV=production DB_KIND=h2 は、終了コード 78 で起動に失敗する
-#   (e) 未実装のモード（retention・rebuild-projections）は、未実装の旨を出して終了コード 69 で終わる
+#   (e) 未実装のモード（rebuild-projections。B12 で実装）は、未実装の旨を出して終了コード 69 で終わる
+#       （retention は B11 で実装した。コンテナでの実行の確認は、PostgreSQL と削除用のロールが要るので、このスクリプトの範囲外）
 #   (f) イメージは、非 root で実行し、H2 のドライバを含まない（APP_ENV=local DB_KIND=h2 も起動できない）
 #   (g) 起動時間: コンテナの開始から /ready が 200 になるまで（RUNS 回。マイグレーションの適用を除く）
 #
@@ -138,7 +139,7 @@ expect_exit "production の H2 は起動に失敗する" 78 "$code"
 expect_log "H2 の拒否をログに出す" "H2"
 
 echo "== (e) 未実装のモード =="
-for mode in retention rebuild-projections; do
+for mode in rebuild-projections; do
   code=0
   run_once "${PROD[@]}" "$IMAGE" "$mode" || code=$?
   expect_exit "$mode は未実装として終わる" 69 "$code"

@@ -94,6 +94,21 @@ class ServerConfigSpec :
             config.migrateOnStart shouldBe false
         }
 
+        test("[B11] Given DB_DELETER_ROLE When 読み込む Then 識別子の形だけを許し、未指定は null") {
+            val role = (
+                configOf(
+                    production("DB_DELETER_ROLE" to "beergame_deleter"),
+                ).database as DatabaseSettings.Postgres
+            )
+            role.deleterRole shouldBe "beergame_deleter"
+            (configOf(production()).database as DatabaseSettings.Postgres).deleterRole shouldBe null
+            (configOf(production("DB_DELETER_ROLE" to "  ")).database as DatabaseSettings.Postgres).deleterRole shouldBe
+                null
+            errorsOf(production("DB_DELETER_ROLE" to "x; DROP TABLE games")) shouldBe
+                listOf(ConfigError.InvalidSetting("DB_DELETER_ROLE"))
+            role.toString() shouldNotContain "s3cr3t-password"
+        }
+
         test("[7.6] Given production で H2 を選ぶ When 読み込む Then 失敗する（H2NotAllowed）。他の誤りも一緒に集める") {
             val errors = errorsOf(mapOf("APP_ENV" to "production", "DB_KIND" to "h2"))
 

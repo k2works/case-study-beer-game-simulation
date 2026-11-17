@@ -184,6 +184,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/games/{gameId}/retention': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 保持状態（保持日数・削除予定日・削除の進行。B11。US5.1。S09）
+         * @description 認可は**進行役だけ**。参加者・観察者・資格の無い人・別のゲーム・存在しないゲームは、区別せず 403（`app.unauthorized`）。
+         *     保持期間は作成時に指定する（未指定は 90 日。AC5.1.1）。削除は、`retention` モードの定期のタスクが、期限に達したゲームを
+         *     `game_roots` の連鎖削除で行う（AC5.1.2）。失敗したら何も消さず、最大 5 回、指数バックオフで再試行する（AC5.1.3）。
+         *     `backupRetentionDays` は、削除の後も、自動バックアップに削除前のデータが残る最大の日数（AC5.1.5）。
+         *     手動の再試行（`POST …/retry`）は、実装していない。
+         */
+        get: operations['getRetention'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/games/{gameId}/participants/{participantId}/role': {
         parameters: {
             query?: never;
@@ -1076,6 +1100,40 @@ export interface components {
                 cumulativeCostMinor: number;
             }[];
         };
+        /**
+         * @description 保持状態（B11。S09）。保持の起点は、暫定で作成時（M5。人の確認が要る）。削除が完了したゲームは、記録ごと無くなる
+         *     ので、完了の状態は無い。
+         */
+        Retention: {
+            /** @description 保持日数 */
+            retentionDays: number;
+            /**
+             * Format: date-time
+             * @description 保持の開始（暫定で作成時）
+             */
+            startsAt: string;
+            /**
+             * Format: date-time
+             * @description 削除予定日（保持の開始 + 保持日数）
+             */
+            deleteAfter: string;
+            /**
+             * @description 予定、削除中、再試行待ち、再試行の上限に達して再試行をやめた
+             * @enum {string}
+             */
+            status: 'SCHEDULED' | 'IN_PROGRESS' | 'RETRY_PENDING' | 'ABANDONED';
+            /** @description 試行の回数（まだ試行していなければ 0） */
+            attempt: number;
+            /**
+             * Format: date-time
+             * @description 次の試行の時刻（`status` が `RETRY_PENDING` のときだけ）
+             */
+            nextAttemptAt: string | null;
+            /** @description 直前の失敗の分類（値は含まない） */
+            lastFailureCode: string | null;
+            /** @description 削除の後も、自動バックアップに削除前のデータが残る最大の日数（AC5.1.5） */
+            backupRetentionDays: number;
+        };
         /** @description 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。 */
         SessionState: {
             /**
@@ -1450,6 +1508,31 @@ export interface operations {
             403: components['responses']['Problem'];
             409: components['responses']['Problem'];
             422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+        };
+    };
+    getRetention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 保持状態 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Retention'];
+                };
+            };
+            403: components['responses']['Problem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
         };

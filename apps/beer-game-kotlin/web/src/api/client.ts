@@ -18,6 +18,7 @@ import type {
     Observation,
     ProblemBody,
     ProxyDecisionRequest,
+    Retention,
     Review,
     RecoverRequest,
     RecoverResponse,
@@ -33,6 +34,8 @@ export interface ApiClient {
     getLobby(gameId: string): Promise<Lobby>;
     /** 終了後の振り返り（全役割の全週の結果）。終了前は 409（game.not_ended）。 */
     getReview(gameId: string): Promise<Review>;
+    /** 進行役だけ。保持状態（保持日数・削除予定日・削除の進行・バックアップの残存日数。B11）。 */
+    getRetention(gameId: string): Promise<Retention>;
     /** 進行役だけ。終了後の結果の出力（CSV か JSON）。全体を受け取れたときだけファイルを返す（部分的な結果を返さない）。 */
     exportResult(gameId: string, format: ExportFormat): Promise<ExportFile>;
     /** プレイ中の観察（現在週・完了状況・チーム合計）。観察者と進行役だけ（B9）。 */
@@ -217,6 +220,7 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         getGameState: (gameId) => query<GameState>(`/games/${gameId}/state`),
         getLobby: (gameId) => query<Lobby>(`/games/${gameId}/lobby`),
         getReview: (gameId) => query<Review>(`/games/${gameId}/review`),
+        getRetention: (gameId) => query<Retention>(`/games/${gameId}/retention`),
         async exportResult(gameId, format) {
             const response = await send(`/games/${gameId}/exports?format=${format}`, {
                 method: 'GET',

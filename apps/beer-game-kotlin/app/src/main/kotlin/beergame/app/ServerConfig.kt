@@ -72,9 +72,16 @@ sealed interface DatabaseSettings {
          * メンバーであること（B3 以降の運用）。未指定は、主の接続プールと同じ接続。
          */
         val observerRole: String? = null,
+        /**
+         * 保持削除（`retention` モード）の接続が、接続のたびに `SET ROLE` するロール（`DB_DELETER_ROLE`。例: `beergame_deleter`。B11）。
+         * 指定すると、削除は、削除用のロールの権限（`game_roots` の DELETE と `deletion_*` だけ。`events` の DELETE は持たない）で動く。
+         * 未指定は、接続のユーザーのまま。
+         */
+        val deleterRole: String? = null,
     ) : DatabaseSettings {
         override fun toString(): String =
-            "Postgres(url=$url, user=$user, password=***, observerRole=${observerRole ?: "なし"})"
+            "Postgres(url=$url, user=$user, password=***, observerRole=${observerRole ?: "なし"}, " +
+                "deleterRole=${deleterRole ?: "なし"})"
     }
 
     companion object {
@@ -279,6 +286,7 @@ private fun readPostgres(
             .map { (name, _) -> ConfigError.MissingSetting(name) }
     val h2Url = url?.startsWith(DatabaseSettings.H2_URL_PREFIX) == true
     val observerRole = variables["DB_OBSERVER_ROLE"]?.trim()?.takeIf { it.isNotEmpty() }
+    val deleterRole = variables["DB_DELETER_ROLE"]?.trim()?.takeIf { it.isNotEmpty() }
     return when {
         missing.isNotEmpty() -> {
             missing.left()
@@ -297,6 +305,10 @@ private fun readPostgres(
             listOf<ConfigError>(ConfigError.InvalidSetting("DB_OBSERVER_ROLE")).left()
         }
 
+        deleterRole != null && !ROLE_NAME.matches(deleterRole) -> {
+            listOf<ConfigError>(ConfigError.InvalidSetting("DB_DELETER_ROLE")).left()
+        }
+
         else -> {
             DatabaseSettings
                 .Postgres(
@@ -304,6 +316,7 @@ private fun readPostgres(
                     checkNotNull(user),
                     checkNotNull(password),
                     observerRole,
+                    deleterRole,
                 ).right()
         }
     }

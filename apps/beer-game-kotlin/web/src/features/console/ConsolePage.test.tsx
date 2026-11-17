@@ -97,6 +97,21 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
     });
 });
 
+describe('S06 進行役のコンソール: 保持状態への導線（B11）', () => {
+    it('「保持状態を見る」から、保持状態（S09）へ進める', async () => {
+        renderApp(
+            fakeApi({
+                getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+                getSessionState: () => Promise.resolve(consoleState()),
+            }),
+            PATH,
+        );
+
+        const link = await screen.findByRole('link', { name: '保持状態を見る' });
+        expect(link).toHaveAttribute('href', `/games/${GAME_ID}/retention`);
+    });
+});
+
 describe('S06 進行役のコンソール', () => {
     it('第 N 週・状態・各役割の入力状況（入力値つき）を示す', async () => {
         const api = fakeApi({

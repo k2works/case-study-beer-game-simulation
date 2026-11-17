@@ -738,6 +738,8 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | 完了の定義 | **`game_roots` の削除（全データの連鎖削除）が成功したとき**だけ完了とする。半分の削除を完了としない |
 | 網羅 | 削除後に、ゲームの ID を含む行が、どの表にも残らない（NFR-07、AC5.1.4） |
 
+**B11 の実装（`RetentionSaga.kt`。承認は未取得）。** 状態に `Abandoned(attempt, failureCode)`（5 回目の失敗の後。永続化は `FAILED` で次の試行の時刻が無い）を足し、`InProgress` に貸出の期限（`leaseUntil`。停止で取り残された試行を、期限の後に次の試行として再開する）を持たせた。`decide(state, command)` は `Either<RetentionRejection, RetentionEvent>`（拒否は `AlreadyCompleted`・`RetriesExhausted`・`NotYetDue`・`NotInProgress`）。`evolve(event)` は、イベントが遷移の先を決めるので、前の状態を取らない。バックオフは 5 分 × 2^(試行-1) に、呼び出し側が引いた揺らぎを足す（ドメインは乱数・時計を読まない）。保持方針 `RetentionPolicy` は `starting(days, startsAt)` で削除期限を求め、`Projections.retentionPolicies`（`GameCreated` の投影）が `retention_policies` に書く。
+
 ## ドメインイベント
 
 > **コードから生成した一覧**: [イベント一覧（生成）](./generated/events.md)（ID・イベント・ストリーム・条件・ペイロードの項目・購読する投影）。下の表は、意図・発生条件の詳細を手で書いたもので、**ID と名前が生成物と一致しないと、試験 `LivingDocumentationSpec` が失敗する**（変更の表 40）。

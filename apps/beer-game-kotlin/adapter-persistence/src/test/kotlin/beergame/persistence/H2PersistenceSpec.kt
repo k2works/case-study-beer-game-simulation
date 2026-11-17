@@ -40,6 +40,10 @@ class H2PersistenceSpec :
                     "week_commits",
                     "week_role_results",
                     "week_team_totals",
+                    "retention_policies",
+                    "deletion_runs",
+                    "deletion_attempts",
+                    "deletion_receipts",
                     "participation_attempts",
                 )
             Migrations.migrate(fx.dataSource, Dialect.H2) shouldBe 0
@@ -64,6 +68,7 @@ class H2PersistenceSpec :
         eventStoreContract { fx }
         transactionContract { fx }
         projectionContract { fx }
+        retentionContract { fx }
         idempotencyContract { fx }
         projectionLockContract { fx }
         changeNotifierContract { fx }

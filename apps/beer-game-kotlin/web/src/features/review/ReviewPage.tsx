@@ -7,6 +7,7 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
+import { RetentionNotice } from '../retention/RetentionNotice';
 import { ExportButtons } from './ExportButtons';
 import { METRICS, seriesOf, weeksOf, type Metric, type SeriesKey } from './reviewData';
 import { TrendChart, seriesLabel } from './TrendChart';
@@ -74,6 +75,7 @@ export function ReviewPage() {
     return (
         <>
             <PageHeading title="振り返り" />
+            {whoAmI.status === 'ready' && whoAmI.data ? <RetentionNotice gameId={gameId} /> : null}
             <SettingsNote kind={review.settingsKind} changed={review.changedSettings} />
 
             <fieldset>
