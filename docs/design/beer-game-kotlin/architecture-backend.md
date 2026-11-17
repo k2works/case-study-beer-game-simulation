@@ -456,9 +456,9 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | | `DELETE /games/:id/participants/:pid/role` | `UnassignRole`（`game`） | 進行役 |
 | 参加 | `POST /participations/join` | `JoinGame`（`game`） | 参加コード |
 | | `POST /participations/recover` | `RecoverParticipation`（`game`） | 復帰資格（進行役を含む） |
-| 観察 | `POST /games/:id/observer-invitations` | `InviteObserver`（`game`） | 進行役 |
-| | `DELETE /games/:id/observer-invitations/:invid` | `RevokeObserverInvitation`（`game`） | 進行役 |
-| | `POST /observers/join` | `JoinAsObserver`（`game`） | 観察用の招待コード |
+| 観察 | `POST /games/:id/observer-invitations` | `InviteObserver`（`game`）。**B9 の実装**: 招待コードと招待の ID・期限を、この応答だけが運ぶ | 進行役 |
+| | `POST /games/:id/observer-invitations/:invid/revoke` | `RevokeObserverInvitation`（`game`）。**B9 の実装は `DELETE` でなく `POST …/revoke`**（資格の失効と同じ形。冪等キーを持つ） | 進行役 |
+| | `POST /participations/observe` | `JoinAsObserver`（`game`）。**B9 の実装は `/observers/join` でなく `/participations/observe`**（参加の経路と同じ場所。接続元の窓の対象）。ブラウザセッションだけを発行し、復帰資格は発行しない | 観察用の招待コード |
 | 進行 | `POST /games/:id/start` | `startGame`（`game` + `session`） | 進行役 |
 | | `POST /sessions/:id/{pause,resume,end}` | `PauseSession`、`ResumeSession`、`EndSession`（`session`） | 進行役 |
 | | `POST /sessions/:id/weeks/:week/commit` | `CommitWeek(requestedWeek, basis)`（`session`）。本文に `requestedWeek` と `basis` | 進行役 |
@@ -467,7 +467,7 @@ JDBC のブロッキング I/O は、`withContext(Dispatchers.IO)` に閉じ込�
 | | `PUT /sessions/:id/proxy-decisions/:role` | `SubmitProxyDecision(requestedWeek, …)`（`session`）。一時停止中も受け付ける | 進行役 |
 | | `GET /sessions/:id/state` | （問い合わせ） | 役割に応じた投影 |
 | 通知 | `GET /games/:id/events`（SSE） | — | ゲームに属する操作者 |
-| 学習 | `GET /games/:id/{observation,review}`、`GET /games/:id/exports` | （問い合わせ。出力は要求時に `buildExport` で生成） | 観察は参加者・進行役・観察者、振り返りと出力は終了後 |
+| 学習 | `GET /games/:id/{observation,review}`、`GET /games/:id/exports` | （問い合わせ。出力は要求時に `buildExport` で生成） | 観察は**観察者と進行役**（B9。参加者は開けない。BR-17）、振り返りは進行役・参加者・観察者で終了後（B4・B9）、出力は終了後 |
 | 資格 | `POST /games/:id/credentials/revoke`、`POST …/reissue` | `RevokeCredential`、`ReissueCredential`（`game`） | 進行役 |
 | 保持 | `GET /games/:id/retention`、`POST …/retry` | （問い合わせ。`retry` は保持の手続きへ） | 進行役 |
 | 運用 | `GET /health`、`GET /ready` | — | なし。**B1 の実装は `/api/v1` の配下**（`/api/v1/health`、`/api/v1/ready`。OpenAPI の servers のとおり）。負荷分散のヘルスチェックのパスの設定が要る（[インフラストラクチャ](./architecture-infrastructure.md)） |

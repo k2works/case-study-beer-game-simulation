@@ -57,7 +57,34 @@ internal fun operationRequests(game: PlayedGame): List<OperationRequest> =
         OperationRequest("getSessionState", HttpMethod.Get, "/sessions/${game.id}/state", null, game.facilitator),
         OperationRequest("getReview", HttpMethod.Get, "/games/${game.id}/review", null, game.facilitator),
         OperationRequest("getGameState", HttpMethod.Get, "/games/${game.id}/state", null, game.facilitator),
-    ) + continuationRequests(game)
+    ) + continuationRequests(game) + observerRequests(game)
+
+/** B9 の観察者の操作（招待の発行・失効、観察者の参加、観察）。 */
+private fun observerRequests(game: PlayedGame): List<OperationRequest> =
+    listOf(
+        OperationRequest(
+            "inviteObserver",
+            HttpMethod.Post,
+            "/games/${game.id}/observer-invitations",
+            "{}",
+            game.facilitator,
+        ),
+        OperationRequest(
+            "revokeObserverInvitation",
+            HttpMethod.Post,
+            "/games/${game.id}/observer-invitations/${game.invitationId}/revoke",
+            null,
+            game.facilitator,
+        ),
+        OperationRequest(
+            "joinAsObserver",
+            HttpMethod.Post,
+            "/participations/observe",
+            """{"invitationCode":"${game.invitationCode}","displayName":"契約の観察者"}""",
+            null,
+        ),
+        OperationRequest("getObservation", HttpMethod.Get, "/games/${game.id}/observation", null, game.facilitator),
+    )
 
 /** 失効・再発行の本文（参加者を指す）。 */
 internal fun subjectBody(participantId: String): String = """{"subject":{"kind":"PARTICIPANT","id":"$participantId"}}"""

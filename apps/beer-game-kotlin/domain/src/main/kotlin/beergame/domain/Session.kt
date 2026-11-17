@@ -368,7 +368,7 @@ private fun Raise<SessionError>.editorOf(
             }
         }
 
-        is Actor.Facilitator, is Actor.Anonymous -> {
+        is Actor.Facilitator, is Actor.Observer, is Actor.Anonymous -> {
             raise(SessionError.Forbidden("その役割の参加者だけが入力できる"))
         }
     }

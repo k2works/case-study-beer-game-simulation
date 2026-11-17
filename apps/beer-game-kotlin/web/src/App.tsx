@@ -3,6 +3,8 @@ import { ApiProvider } from './api/ApiContext';
 import { PageHeading } from './components/PageHeading';
 import { ConsolePage } from './features/console/ConsolePage';
 import { LobbyPage } from './features/lobby/LobbyPage';
+import { ObservationPage } from './features/observer/ObservationPage';
+import { ObserverJoinPage } from './features/observer/ObserverJoinPage';
 import { JoinPage } from './features/participation/JoinPage';
 import { PlayPage } from './features/play/PlayPage';
 import { ReviewPage } from './features/review/ReviewPage';
@@ -34,7 +36,7 @@ function NotFoundPage() {
     );
 }
 
-/** 画面の URL。B1 の範囲（S01〜S06）。ID は docs/design/beer-game-kotlin/ui-design.md の画面一覧。 */
+/** 画面の URL。S01〜S08、S10（B9 で観察 S07・観察者の参加 S10 を足した）。ID は docs/design/beer-game-kotlin/ui-design.md の画面一覧。 */
 export function AppRoutes() {
     return (
         <Routes>
@@ -42,7 +44,9 @@ export function AppRoutes() {
                 <Route path="/" element={<WelcomePage />} />
                 <Route path="/new" element={<CreateGamePage />} />
                 <Route path="/join" element={<JoinPage />} />
+                <Route path="/observe" element={<ObserverJoinPage />} />
                 <Route path="/games/:gameId/lobby" element={<LobbyPage />} />
+                <Route path="/games/:gameId/observation" element={<ObservationPage />} />
                 <Route path="/games/:gameId/play" element={<PlayPage />} />
                 <Route path="/games/:gameId/console" element={<ConsolePage />} />
                 <Route path="/games/:gameId/review" element={<ReviewPage />} />

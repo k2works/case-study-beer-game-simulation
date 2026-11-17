@@ -5,6 +5,7 @@ import arrow.core.flatMap
 import arrow.core.right
 import beergame.application.AppFailure
 import beergame.application.CredentialKind
+import beergame.application.FoundInvitation
 import beergame.application.PeripheralStore
 import beergame.application.PeripheralWrite
 import beergame.application.Tx
@@ -12,7 +13,9 @@ import beergame.application.VerifiedCredential
 import beergame.application.VerifiedRecovery
 import beergame.domain.Actor
 import beergame.domain.GameId
+import beergame.domain.InvitationId
 import beergame.domain.JoinCode
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import java.sql.ResultSet
 import java.time.Instant
@@ -29,7 +32,8 @@ import java.util.UUID
  * 不明・失効・期限切れは区別せず、どれも null を返す。
  */
 internal class JdbcPeripheralStore {
-    fun port(): PeripheralStore = PeripheralStore(::write, ::authenticate, ::authenticateRecovery, ::findGameByJoinCode)
+    fun port(): PeripheralStore =
+        PeripheralStore(::write, ::authenticate, ::authenticateRecovery, ::findGameByJoinCode, ::findInvitation)
 
     private fun write(
         tx: Tx,
@@ -102,10 +106,34 @@ internal class JdbcPeripheralStore {
                 Actor.Participant(ParticipantId(actorId))
             }
 
+            actorKind == JdbcPeripheralRows.ACTOR_OBSERVER && actorId != null -> {
+                Actor.Observer(ObserverId(actorId))
+            }
+
             else -> {
                 null
             }
         }
+
+    /** 招待コードのダイジェストから、ゲームと招待を引く。有効性は decide が判定する（失効・期限切れでも、行は見つかる）。 */
+    private fun findInvitation(
+        tx: Tx,
+        digest: String,
+    ): Either<AppFailure, FoundInvitation?> =
+        tx.jdbc(OP_INVITATION).flatMap { jdbcTx ->
+            jdbcCall(OP_INVITATION) {
+                jdbcTx.connection.prepareStatement(INVITATION_SQL).use { ps ->
+                    ps.params().string(digest).string(CredentialKind.OBSERVER_INVITATION.name)
+                    ps.executeQuery().use { rs -> (if (rs.next()) rs.toInvitation() else null).right() }
+                }
+            }
+        }
+
+    private fun ResultSet.toInvitation(): FoundInvitation? {
+        val gameId = getUuid("game_id")?.let(::GameId)
+        val invitationId = getUuid("subject_id")?.let(::InvitationId)
+        return if (gameId != null && invitationId != null) FoundInvitation(gameId, invitationId) else null
+    }
 
     private fun findGameByJoinCode(
         tx: Tx,
@@ -133,5 +161,8 @@ internal class JdbcPeripheralStore {
             "SELECT game_id, kind, subject_id, expires_at FROM credentials " +
                 "WHERE credential_digest = ? AND expires_at > ? AND revoked_at IS NULL"
         const val JOIN_CODE_SQL = "SELECT game_id FROM game_join_codes WHERE join_code = ?"
+        const val OP_INVITATION = "peripheral.findInvitation"
+        const val INVITATION_SQL =
+            "SELECT game_id, subject_id FROM credentials WHERE credential_digest = ? AND kind = ?"
     }
 }

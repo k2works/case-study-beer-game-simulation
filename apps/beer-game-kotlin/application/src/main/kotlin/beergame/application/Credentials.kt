@@ -10,7 +10,9 @@ import beergame.domain.EventEnvelope
 import beergame.domain.GameCommand
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.InvitationId
 import beergame.domain.JoinCode
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import java.time.Duration
 import java.time.Instant
@@ -28,8 +30,11 @@ import java.util.UUID
  * （H2 案 A。失効後の再発行で、古いセッションが復活しない）。
  */
 
-/** 資格の種別。観察用の招待（B9）は含めない。 */
-enum class CredentialKind { FACILITATOR, PARTICIPANT_RECOVERY }
+/**
+ * 資格の種別。[OBSERVER] は観察者のブラウザセッション（復帰資格は持たない）、[OBSERVER_INVITATION] は観察用の招待コード
+ * （`credentials` の行。主体の ID は招待の ID。B9）。
+ */
+enum class CredentialKind { FACILITATOR, PARTICIPANT_RECOVERY, OBSERVER, OBSERVER_INVITATION }
 
 /**
  * 応答だけが運ぶ、資格の生の値と主体。[expiresAt] は、再発行した復帰資格の有効期限（応答に示す。冪等な再送でも同じ値を返すため、
@@ -85,7 +90,22 @@ sealed interface PeripheralWrite {
         val at: Instant,
     ) : PeripheralWrite
 
-    /** `credentials` の行（復帰資格）を足す。作成・参加・再発行で発行する。 */
+    /** 観察者の表示名（B9）。`display_profiles` に、観察者の種別で書く。 */
+    data class SaveObserverName(
+        val gameId: GameId,
+        val observerId: ObserverId,
+        val name: DisplayName,
+        val at: Instant,
+    ) : PeripheralWrite
+
+    /** 観察用の招待の行（`credentials`。`kind = OBSERVER_INVITATION`）を失効させる（B9）。 */
+    data class RevokeInvitationRow(
+        val gameId: GameId,
+        val invitationId: InvitationId,
+        val at: Instant,
+    ) : PeripheralWrite
+
+    /** `credentials` の行（復帰資格、または観察用の招待）を足す。作成・参加・再発行・招待の発行で発行する。 */
     data class IssueRecoveryRow(
         val gameId: GameId,
         val digest: String,
@@ -126,12 +146,20 @@ sealed interface PeripheralWrite {
  * - [authenticate]: ブラウザセッションのダイジェストから操作者を引く。不明・期限切れ・失効（行の削除）は null（区別しない）。
  * - [authenticateRecovery]: 復帰資格のダイジェストから主体を引く。不明・失効・期限切れは null（区別しない）。
  * - [findGameByJoinCode]: 参加コードからゲームを引く（投影 `game_join_codes`）。
+ * - [findInvitation]: 観察用の招待コードのダイジェストから、ゲームと招待を引く（B9）。有効性（失効・期限）は decide が判定する。
  */
 data class PeripheralStore(
     val write: suspend (Tx, List<PeripheralWrite>) -> Either<AppFailure, Unit>,
     val authenticate: suspend (Tx, String, Instant) -> Either<AppFailure, VerifiedCredential?>,
     val authenticateRecovery: suspend (Tx, String, Instant) -> Either<AppFailure, VerifiedRecovery?>,
     val findGameByJoinCode: suspend (Tx, JoinCode) -> Either<AppFailure, GameId?>,
+    val findInvitation: suspend (Tx, String) -> Either<AppFailure, FoundInvitation?> = { _, _ -> Either.Right(null) },
+)
+
+/** 招待コードから引いた、招待の持ち主のゲームと、招待の ID。 */
+data class FoundInvitation(
+    val gameId: GameId,
+    val invitationId: InvitationId,
 )
 
 /**

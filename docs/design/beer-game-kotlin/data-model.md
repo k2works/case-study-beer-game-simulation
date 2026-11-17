@@ -535,6 +535,8 @@ interface TransactionRunner {
 | `beergame_observer` | `game_overview`・`session_overview`・`week_team_totals` の SELECT のみ（`game_join_codes`・役割別の表には到達できない） |
 | `beergame_deleter` | `game_roots` の SELECT・DELETE のみ（WHERE 句の列の参照に SELECT が要る）。`deletion_*` の GRANT は、その表を作る B11 のマイグレーションで書く |
 
+**B9: 観察者の接続プール（スキーマの変更なし）。** 観察の問い合わせ（`ObservationReader`。`JdbcObservationReader`）は、この 3 表だけを読む。PostgreSQL では、設定 `DB_OBSERVER_ROLE`（例: `beergame_observer`）を指定すると、観察者用の別の接続プール（接続のたびに `SET ROLE`）を使い、観察は DB の権限でも 3 表に限られる（統合テスト `PostgresPersistenceSpec` が、3 表は読めて、`game_join_codes`・役割別の表・`game_settings` は 42501 になることを確かめる）。未指定は主のプールと同じ接続（コードの上では同じく 3 表だけを読む）。ログイン用のユーザーの作成（`beergame_observer` のメンバーにする）は、B3 以降の運用で、未実施。観察者のロールは `game_settings` と `projection_checkpoints` を読めないため、公開範囲と版は、主の読み取りから、行より先に読む。招待コードは `credentials`（`kind = OBSERVER_INVITATION`、`subject_id` は招待の ID）にダイジェストだけを持ち、観察者の表示名は `display_profiles`（`actor_kind = OBSERVER`）、ブラウザセッションは `browser_sessions`（`actor_kind = OBSERVER`）に持つ。
+
 **否定テスト（`RolePrivilegesSpec`、11 件）**: 書き込みロールが `events` を UPDATE・DELETE・TRUNCATE できない、`game_roots` を DELETE・UPDATE・TRUNCATE（`CASCADE` つきを含む）できない、4 ロールが表の所有者でも所有者ロールのメンバーでもなく特権属性が無い、削除ロールの DELETE 権限が `game_roots` だけ、観察者が SELECT できる表が設計の 3 表と完全に一致し書き込み権限が無い、連鎖削除、書き込みロールが過剰に絞られていない（INSERT・SELECT ができる）こと、全ロールが `flyway_schema_history` を読めないこと。拒否は SQLSTATE 42501 で確認する。権限を変異で足す（`GRANT UPDATE, DELETE, TRUNCATE ON events TO beergame_writer` など）と 11 件中 6 件が失敗することを確認した。
 - **この保護（ロール、GRANT、`TRUNCATE` の拒否）は PostgreSQL の統合テストでだけ検証します。H2 版（ローカル）では省略し、単一の接続ユーザーで動かします。ローカルでは追記専用は守られません**（下記「ローカル開発（H2 の PostgreSQL モード）」）。
 

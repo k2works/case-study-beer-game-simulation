@@ -31,6 +31,7 @@ import java.util.UUID
 private const val CONNECTION_TIMEOUT_MILLIS = 3_000L
 private const val POOL_SIZE = 10
 private const val H2_POOL_SIZE = 8
+private const val OBSERVER_POOL_SIZE = 4
 private const val SHUTDOWN_GRACE_MILLIS = 1_000L
 private const val SHUTDOWN_TIMEOUT_MILLIS = 5_000L
 private const val LISTEN_APPLICATION_NAME = "beergame-listen"
@@ -41,10 +42,12 @@ class RunningApi internal constructor(
     private val server: EmbeddedServer<*, *>,
     private val persistence: Persistence,
     private val dataSource: HikariDataSource,
+    private val observerDataSource: HikariDataSource? = null,
 ) : AutoCloseable {
     override fun close() {
         server.stop(SHUTDOWN_GRACE_MILLIS, SHUTDOWN_TIMEOUT_MILLIS)
         persistence.close()
+        observerDataSource?.close()
         dataSource.close()
     }
 }
@@ -80,6 +83,27 @@ internal fun openDataSource(database: DatabaseSettings): HikariDataSource =
         },
     )
 
+/**
+ * 観察者の読み取り用の接続プール（B9）。`DB_OBSERVER_ROLE` を指定した PostgreSQL だけが持つ。接続のたびに `SET ROLE` して、
+ * 観察の問い合わせを、観察者のロールの権限（`game_overview`・`session_overview`・`week_team_totals` の SELECT だけ）で動かす。
+ * 指定が無ければ null（主の接続プールを使う）。ロール名は設定の読み込みで識別子の形を検査済み。
+ */
+internal fun openObserverDataSource(database: DatabaseSettings): HikariDataSource? =
+    (database as? DatabaseSettings.Postgres)?.observerRole?.let { role ->
+        HikariDataSource(
+            HikariConfig().apply {
+                jdbcUrl = database.url
+                username = database.user
+                password = database.password
+                poolName = "beergame-observer"
+                maximumPoolSize = OBSERVER_POOL_SIZE
+                connectionTimeout = CONNECTION_TIMEOUT_MILLIS
+                isReadOnly = true
+                connectionInitSql = "SET ROLE $role"
+            },
+        )
+    }
+
 internal fun dialectOf(database: DatabaseSettings): Dialect =
     when (database) {
         is DatabaseSettings.H2 -> Dialect.H2
@@ -114,11 +138,13 @@ fun startApi(
         val applied = Migrations.migrate(dataSource, dialect)
         logs.emit(operationalRecord(LEVEL_INFO, "migrate", "ok", "マイグレーションを適用しました（$applied 件）"))
     }
+    val observerDataSource = openObserverDataSource(config.database)
     val persistence =
         Persistence.open(
             dialect,
             dataSource,
             PersistenceConfig(config.secrets.responseKey),
+            observerDataSource,
             listenConnection(config.database),
         )
     val deps =
@@ -148,7 +174,7 @@ fun startApi(
                 .port
         }
     logs.emit(startupRecord(config, port))
-    return RunningApi(port, server, persistence, dataSource)
+    return RunningApi(port, server, persistence, dataSource, observerDataSource)
 }
 
 /** 起動した環境とデータベースの種類を記録する。H2 は警告（ローカル開発専用。守られない制約がある）。 */

@@ -281,6 +281,31 @@ class GamePlayApi(
         extras = RequestExtras(recovery = recovery),
     )
 
+    // ---- 観察者（B9） ----
+
+    /** 観察用の招待を発行する（進行役）。応答に、招待の ID と招待コード（一度だけ）が載る。 */
+    fun inviteObserver(
+        gameId: String,
+        cookie: String?,
+    ) = post("/games/$gameId/observer-invitations", "{}", cookie)
+
+    fun revokeInvitation(
+        gameId: String,
+        invitationId: String,
+        cookie: String?,
+    ) = post("/games/$gameId/observer-invitations/$invitationId/revoke", cookie = cookie)
+
+    /** 観察用の招待コードと表示名で、観察者として参加する。 */
+    fun observe(
+        invitationCode: String,
+        displayName: String,
+    ) = post("/participations/observe", """{"invitationCode":"$invitationCode","displayName":"$displayName"}""")
+
+    fun observation(
+        gameId: String,
+        cookie: String?,
+    ) = get("/games/$gameId/observation", cookie)
+
     // ---- 運用 ----
 
     fun health() = get("/health")

@@ -31,7 +31,7 @@ sealed interface DomainError {
 }
 
 /** 操作者の種別。 */
-enum class ActorKind { FACILITATOR, PARTICIPANT, ANONYMOUS }
+enum class ActorKind { FACILITATOR, PARTICIPANT, OBSERVER, ANONYMOUS }
 
 /** 封筒に載せる操作者の参照。種別と ID だけで、表示名を含めない。 */
 data class ActorRef(
@@ -49,6 +49,11 @@ sealed interface Actor {
         val id: ParticipantId,
     ) : Actor
 
+    /** 観察用の招待で参加した人。役割を持たず、状態を変更できない（B9）。 */
+    data class Observer(
+        val id: ObserverId,
+    ) : Actor
+
     data object Anonymous : Actor
 
     fun isFacilitatorOf(gameId: GameId): Boolean = this is Facilitator && this.gameId == gameId
@@ -57,6 +62,7 @@ sealed interface Actor {
         when (this) {
             is Facilitator -> ActorRef(ActorKind.FACILITATOR, gameId.value)
             is Participant -> ActorRef(ActorKind.PARTICIPANT, id.value)
+            is Observer -> ActorRef(ActorKind.OBSERVER, id.value)
             is Anonymous -> ActorRef(ActorKind.ANONYMOUS, null)
         }
 }

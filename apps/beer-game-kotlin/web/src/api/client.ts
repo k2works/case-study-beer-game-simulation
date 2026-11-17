@@ -7,9 +7,13 @@ import type {
     CreateGameResult,
     GameState,
     CreateGameResponse,
+    InviteObserverResponse,
     JoinGameRequest,
+    JoinObserverRequest,
+    JoinObserverResponse,
     JoinResponse,
     Lobby,
+    Observation,
     ProblemBody,
     ProxyDecisionRequest,
     Review,
@@ -27,6 +31,14 @@ export interface ApiClient {
     getLobby(gameId: string): Promise<Lobby>;
     /** 終了後の振り返り（全役割の全週の結果）。終了前は 409（game.not_ended）。 */
     getReview(gameId: string): Promise<Review>;
+    /** プレイ中の観察（現在週・完了状況・チーム合計）。観察者と進行役だけ（B9）。 */
+    getObservation(gameId: string): Promise<Observation>;
+    /** 進行役。観察用の招待を発行する。招待コードは、この応答だけが運ぶ（再表示しない）。 */
+    inviteObserver(gameId: string): Promise<InviteObserverResponse>;
+    /** 進行役。招待を失効させる。すでに参加した観察者は、観察を続けられる。 */
+    revokeObserverInvitation(gameId: string, invitationId: string): Promise<CommandResponse>;
+    /** 観察用の招待コードで、観察者として参加する。ブラウザセッションは Set-Cookie で発行される（復帰資格は無い）。 */
+    joinAsObserver(request: JoinObserverRequest): Promise<JoinObserverResponse>;
     assignRole(gameId: string, participantId: string, role: Role): Promise<CommandResponse>;
     joinGame(request: JoinGameRequest): Promise<JoinResponse>;
     /**
@@ -195,6 +207,26 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         getGameState: (gameId) => query<GameState>(`/games/${gameId}/state`),
         getLobby: (gameId) => query<Lobby>(`/games/${gameId}/lobby`),
         getReview: (gameId) => query<Review>(`/games/${gameId}/review`),
+        getObservation: (gameId) => query<Observation>(`/games/${gameId}/observation`),
+        async inviteObserver(gameId) {
+            return commandResponse<InviteObserverResponse>(
+                await command('POST', `/games/${gameId}/observer-invitations`, {}),
+            );
+        },
+        async revokeObserverInvitation(gameId, invitationId) {
+            return commandResponse(
+                await command(
+                    'POST',
+                    `/games/${gameId}/observer-invitations/${invitationId}/revoke`,
+                    undefined,
+                ),
+            );
+        },
+        async joinAsObserver(request) {
+            return commandResponse<JoinObserverResponse>(
+                await command('POST', '/participations/observe', request),
+            );
+        },
         async assignRole(gameId, participantId, role) {
             return commandResponse(
                 await command('PUT', `/games/${gameId}/participants/${participantId}/role`, {

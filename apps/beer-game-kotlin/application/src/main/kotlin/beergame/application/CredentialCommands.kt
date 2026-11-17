@@ -26,24 +26,28 @@ private fun CredentialSubject.rowId(): UUID =
     when (this) {
         is CredentialSubject.Facilitator -> gameId.value
         is CredentialSubject.Participant -> id.value
+        is CredentialSubject.Observer -> id.value
     }
 
 private fun CredentialSubject.operationKey(): String =
     when (this) {
         is CredentialSubject.Facilitator -> "facilitator"
         is CredentialSubject.Participant -> id.value.toString()
+        is CredentialSubject.Observer -> id.value.toString()
     }
 
 private fun CredentialSubject.actorRef(): ActorRef =
     when (this) {
         is CredentialSubject.Facilitator -> Actor.Facilitator(gameId).toRef()
         is CredentialSubject.Participant -> Actor.Participant(id).toRef()
+        is CredentialSubject.Observer -> Actor.Observer(id).toRef()
     }
 
 private fun Actor.subject(): CredentialSubject? =
     when (this) {
         is Actor.Facilitator -> CredentialSubject.Facilitator(gameId)
         is Actor.Participant -> CredentialSubject.Participant(id)
+        is Actor.Observer -> CredentialSubject.Observer(id)
         is Actor.Anonymous -> null
     }
 
@@ -51,6 +55,7 @@ private fun CredentialSubject.kind(): CredentialKind =
     when (this) {
         is CredentialSubject.Facilitator -> CredentialKind.FACILITATOR
         is CredentialSubject.Participant -> CredentialKind.PARTICIPANT_RECOVERY
+        is CredentialSubject.Observer -> CredentialKind.OBSERVER
     }
 
 /** 進行役が、参加者の資格を失効させる。復帰資格を失効させ、そのブラウザセッションを止める（同じトランザクション）。 */
@@ -168,7 +173,11 @@ private suspend fun Ports.runRecovery(
             val expiresAt =
                 when (subject) {
                     is CredentialSubject.Participant -> ctx.at.plus(settings.participantCredentialTtl)
+
                     is CredentialSubject.Facilitator -> presented.expiresAt
+
+                    // 観察者は復帰資格を持たない（観察者の復帰は設計の未決）。ここへは届かない
+                    is CredentialSubject.Observer -> raise(AppFailure.Unauthorized)
                 }
             val command = GameCommand.RecoverParticipation(ctx.actor, ctx.at, subject, expiresAt)
             applySingle(tx, ctx, gameStream, command) {

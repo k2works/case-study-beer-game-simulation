@@ -2,8 +2,6 @@ package beergame.http
 
 import beergame.application.CommandOutcome
 import beergame.application.GameStatus
-import beergame.application.LobbyEntry
-import beergame.application.Review
 import beergame.application.RoleStatus
 import beergame.application.SettingsSummary
 import beergame.application.Snapshot
@@ -64,7 +62,7 @@ private fun roleStatusJson(status: RoleStatus): JsonObject =
         put("decisionSavedAt", status.decisionSavedAt?.toString()?.let(::JsonPrimitive) ?: JsonNull)
     }
 
-private fun weekResultJson(result: WeekResultView): JsonObject =
+internal fun weekResultJson(result: WeekResultView): JsonObject =
     buildJsonObject {
         put("role", result.role.name)
         put("week", result.week)
@@ -75,15 +73,6 @@ private fun weekResultJson(result: WeekResultView): JsonObject =
         put("shipment", result.shipped)
         put("cost", result.weeklyCostMinor)
         put("cumulativeCost", result.cumulativeCostMinor)
-    }
-
-private fun lobbyEntryJson(entry: LobbyEntry): JsonObject =
-    buildJsonObject {
-        put("participantId", entry.participantId.value.toString())
-        put("displayName", entry.displayName?.let(::JsonPrimitive) ?: JsonNull)
-        put("role", entry.role?.name?.let(::JsonPrimitive) ?: JsonNull)
-        // 入れ替えで外された旧担当者だけに付ける（それ以外は省略 = false。仕様の LobbyParticipant.replaced）
-        if (entry.replaced) put("replaced", true)
     }
 
 /** `GET /sessions/{id}/state`。参加者は自分の役割だけ、進行役は全役割と確定した週の結果。 */
@@ -142,29 +131,8 @@ internal fun Snapshot.toGameStateJson(): JsonObject =
         put("versions", versions.toJson())
     }
 
-/** `GET /games/{id}/lobby`（進行役向け）。参加コード・表示名・割り当てを返す。 */
-internal fun Snapshot.toLobbyJson(facilitator: SnapshotView.Facilitator): JsonObject =
-    buildJsonObject {
-        put("gameId", gameId.value.toString())
-        put("status", status.name)
-        put("joinCode", facilitator.joinCode)
-        putSettings(settings)
-        put("participants", JsonArray(facilitator.lobby.map(::lobbyEntryJson)))
-        put("versions", versions.toJson())
-    }
-
-/** `GET /games/{id}/review`（B4）。全役割の全週の結果。 */
-internal fun Review.toReviewJson(): JsonObject =
-    buildJsonObject {
-        put("gameId", gameId.value.toString())
-        put("finalWeek", finalWeek)
-        putSettings(settings)
-        put("results", JsonArray(results.map(::weekResultJson)))
-        put("versions", versions.toJson())
-    }
-
 /** 設定の種別と、変更した項目（B7）。 */
-private fun JsonObjectBuilder.putSettings(settings: SettingsSummary) {
+internal fun JsonObjectBuilder.putSettings(settings: SettingsSummary) {
     put("settingsKind", settings.kind)
     put("changedSettings", JsonArray(settings.changes.map(::JsonPrimitive)))
     put("commitMode", settings.commitMode)

@@ -31,6 +31,7 @@ tags:
   - name: 進行
   - name: 意思決定
   - name: 資格
+  - name: 観察
   - name: 運用
 paths:
   /games:
@@ -90,13 +91,130 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/observation:
+    get:
+      tags: [観察]
+      operationId: getObservation
+      summary: プレイ中の観察（現在週・完了状況・チーム合計。B9）
+      description: |
+        認可は**観察者と進行役**（AC4.1.4）。参加者・資格の無い人・別のゲーム・存在しないゲームは、資格の失敗と同じ 403（`app.unauthorized`）。
+        内容は、現在週・入力済みの役割数・確定した週のチーム合計（注文・在庫・受注残）だけ。**役割別の値・将来の需要・参加コード・入力者は含まない**
+        （BR-17。DB のロール `beergame_observer` が読める 3 表だけから作る）。
+        公開範囲が「なし」（`NONE`）なら合計を出さず、`totals.hiddenReason` に理由（`DISCLOSURE_NONE`）を示す。
+        寄与者が 2 未満の週は、値を出さず、`hidden` と理由（`CONTRIBUTORS_BELOW_MINIMUM`）だけを返す（逆算の防止。AC4.1.3）。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: 観察の内容
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Observation"
+        "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/observer-invitations:
+    post:
+      tags: [観察]
+      operationId: inviteObserver
+      summary: 観察用の招待を発行する（InviteObserver。game ストリーム。B9）
+      description: |
+        認可は進行役（AC1.3.2。進行役以外は 403）。参加コードとは別の乱数・別のダイジェストの**招待コード**を発行し、
+        **招待コードと招待の ID・有効期限を、この応答で一度だけ示す**（保存はダイジェストだけ。再表示しない。イベントには招待の ID と期限だけを入れる）。
+        招待の有効期間は 7 日（設計の未決の仮置き）。準備中と開始後の両方で受け付ける。本文は空か `{}`。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: 発行した
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteObserverResponse"
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/observer-invitations/{invitationId}/revoke:
+    post:
+      tags: [観察]
+      operationId: revokeObserverInvitation
+      summary: 観察用の招待を失効させる（RevokeObserverInvitation。game ストリーム。B9）
+      description: |
+        認可は進行役。以降、その招待での新しい参加はできない（AC1.3.4。`game.invitation_invalid`）。**すでに参加した観察者は、そのまま観察を続けられる**。
+        すでに失効していれば `game.credential_already_revoked`（409）。このゲームに無い招待は `game.invitation_not_found`（404）。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+        - $ref: "#/components/parameters/InvitationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: 失効させた
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
+  /participations/observe:
+    post:
+      tags: [観察]
+      operationId: joinAsObserver
+      summary: 観察用の招待コードで、観察者として参加する（JoinAsObserver。game ストリーム。B9）
+      description: |
+        認可は招待コード。有効な招待コードと表示名で、観察者として参加する（AC1.3.3。役割を持たず、状態を変更できない）。
+        不明・失効・期限切れ・形式不正の招待コードは、区別しない同じ 403（`game.invitation_invalid`。AC1.3.4。列挙の防止）。
+        参加と同じ接続元ごとの失敗の窓で数える（NF-S11。上限を超えると 429）。
+        観察者には、ブラウザセッション（`bg_session`）だけを Set-Cookie で発行する。**復帰資格は発行しない**（観察者の復帰は設計の未決）。
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinObserverRequest"
+      responses:
+        "200":
+          description: 観察者として参加した。ブラウザセッションを Set-Cookie で発行する。
+          headers:
+            Set-Cookie: { $ref: "#/components/headers/SetCookie" }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinObserverResponse"
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/review:
     get:
       tags: [ゲーム]
       operationId: getReview
       summary: 終了後の振り返り（全役割の全週の結果。B4）
       description: |
-        認可は進行役と参加者（終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
+        認可は進行役・参加者・観察者（B9。終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
         資格が無い・別のゲーム・存在しないゲームは、資格の失敗と同じ 403。需要は、小売店の `orders`（顧客からの注文）と同じ値。
       parameters:
         - $ref: "#/components/parameters/GameId"
@@ -663,6 +781,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    InvitationId:
+      name: invitationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -759,6 +882,7 @@ components:
         - game.credential_already_revoked
         - game.credential_not_revoked
         - game.not_ended
+        - game.invitation_not_found
         - validation.invalid_input
         - app.retry_exhausted
         - app.idempotency_key_reused
@@ -1134,7 +1258,7 @@ components:
     Lobby:
       type: object
       description: ロビーの投影（lobby_*）から書き出した、進行役向けの一覧。
-      required: [gameId, status, joinCode, settingsKind, changedSettings, commitMode, participants, versions]
+      required: [gameId, status, joinCode, settingsKind, changedSettings, commitMode, participants, invitations, observers, versions]
       properties:
         gameId: { type: string, format: uuid }
         status:
@@ -1152,6 +1276,115 @@ components:
         participants:
           type: array
           items: { $ref: "#/components/schemas/LobbyParticipant" }
+        invitations:
+          type: array
+          description: 観察用の招待（B9）。招待コードの値は含まない（発行の応答だけが運ぶ）。
+          items: { $ref: "#/components/schemas/LobbyInvitation" }
+        observers:
+          type: array
+          description: 参加した観察者（B9）。役割を持たない。
+          items: { $ref: "#/components/schemas/LobbyObserver" }
+        versions: { $ref: "#/components/schemas/StreamVersions" }
+    LobbyInvitation:
+      type: object
+      required: [invitationId, expiresAt, revoked, createdAt]
+      properties:
+        invitationId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        revoked:
+          type: boolean
+          description: 失効させたら true。失効していなくて `expiresAt` を過ぎていれば、期限切れ（画面が現在時刻と比べる）。
+        createdAt: { type: string, format: date-time }
+    LobbyObserver:
+      type: object
+      required: [observerId, displayName, joinedAt]
+      properties:
+        observerId: { type: string, format: uuid }
+        displayName:
+          type: [string, "null"]
+          description: 表示名（周辺ストアの値）。観察者は役割を持たないので、`role` の項目は無い。
+        joinedAt: { type: string, format: date-time }
+    InviteObserverResponse:
+      description: 招待の発行の応答。招待コードと招待の ID・有効期限を、一度だけ示す（再表示しない）。
+      allOf:
+        - $ref: "#/components/schemas/CommandResponse"
+        - type: object
+          required: [invitationId, invitationCode, expiresAt]
+          properties:
+            invitationId: { type: string, format: uuid }
+            invitationCode:
+              type: string
+              description: 観察用の招待コード。参加コードとは別の値。一度だけ示す。保存はダイジェストだけで、再表示しない。ログ・URL に含めない。
+            expiresAt: { type: string, format: date-time }
+    JoinObserverRequest:
+      type: object
+      required: [invitationCode, displayName]
+      properties:
+        invitationCode: { type: string }
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: 表示名。前後の空白を除いて 1〜80 文字（domain の `DisplayName`）。
+    JoinObserverResponse:
+      description: 観察者の参加の応答。参加したゲームの ID と、種別（`OBSERVER`）を返す。
+      allOf:
+        - $ref: "#/components/schemas/CommandResponse"
+        - type: object
+          required: [gameId, kind]
+          properties:
+            gameId: { type: string, format: uuid }
+            kind:
+              type: string
+              enum: [OBSERVER]
+    ObservationWeek:
+      type: object
+      description: 確定した 1 週のチーム合計。寄与者が 2 未満の週は、値を持たず `hidden` と理由だけ。
+      required: [week]
+      properties:
+        week: { type: integer, minimum: 1 }
+        order: { type: integer, description: 4 役割の注文の合計。 }
+        inventory: { type: integer, description: 4 役割の在庫の合計。 }
+        backlog: { type: integer, description: 4 役割の受注残の合計。 }
+        hidden:
+          type: boolean
+          description: 値を出さない週なら true。
+        reason:
+          type: string
+          enum: [CONTRIBUTORS_BELOW_MINIMUM]
+    ObservationTotals:
+      type: object
+      required: [policy, weeks]
+      properties:
+        policy:
+          type: string
+          enum: [TEAM_TOTAL, NONE]
+          description: 公開範囲（ゲームの作成時に決める）。
+        hiddenReason:
+          type: string
+          enum: [DISCLOSURE_NONE]
+          description: 合計を出さない理由。公開範囲が `NONE` のときだけ付く（`weeks` は空）。
+        weeks:
+          type: array
+          items: { $ref: "#/components/schemas/ObservationWeek" }
+    Observation:
+      type: object
+      description: |
+        観察の内容（B9）。現在週・完了状況（入力済みの役割数）・チーム合計だけ。役割別の値・将来の需要・参加コード・入力者を含まない。
+        `sessionStatus`・`week`・`submittedRoleCount` は、ゲームの開始後だけ付く。
+      required: [gameId, status, finalWeek, totals, versions]
+      properties:
+        gameId: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [PREPARING, STARTED, ENDED]
+        finalWeek: { type: integer }
+        sessionStatus:
+          type: string
+          enum: [ACTIVE, PAUSED, ENDED]
+        week: { type: integer, minimum: 1 }
+        submittedRoleCount: { type: integer, minimum: 0, maximum: 4 }
+        totals: { $ref: "#/components/schemas/ObservationTotals" }
         versions: { $ref: "#/components/schemas/StreamVersions" }
     Review:
       type: object

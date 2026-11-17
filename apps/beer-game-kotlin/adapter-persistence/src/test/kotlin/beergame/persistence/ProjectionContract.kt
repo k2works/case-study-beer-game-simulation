@@ -268,17 +268,28 @@ private fun FunSpec.projectedEndContract(fixture: () -> Fixture) {
         fx.query("SELECT status FROM game_overview WHERE game_id = ?", id) { it.getString(1) } shouldBe listOf("ENDED")
     }
 
-    test("[7.2] 判断項目 #12 Given 確定した週 When 観察者向けの表を読む Then B1 は書かない（表は作るが、書き込みは B9 まで省く）") {
+    test("[B9] Given 確定した週・招待・観察者 When 観察者向けの表を読む Then チーム合計・招待・観察者が、同じトランザクションで書かれる") {
         val fx = fixture()
         val script = GameScript().create()
         val players = script.joinAllRoles()
+        val invitation = script.invite()
+        val observer = script.observerJoins(invitation)
+        val other = script.invite()
+        script.revokeInvitation(other)
         script.startGame().playWeek(players)
         fx.appendScript(script)
         val id = script.gameId.value
 
-        fx.count("week_team_totals WHERE game_id = ?", id) shouldBe 0
-        fx.count("lobby_observer_invitations WHERE game_id = ?", id) shouldBe 0
-        fx.count("lobby_observers WHERE game_id = ?", id) shouldBe 0
+        fx.query("SELECT week, total_ordered, contributors FROM week_team_totals WHERE game_id = ?", id) {
+            Triple(it.getInt(1), it.getInt(2), it.getInt(3))
+        } shouldBe listOf(Triple(1, 16, 4))
+        fx.query("SELECT invitation_id FROM lobby_observer_invitations WHERE game_id = ? AND revoked_at IS NULL", id) {
+            it.getString(1)
+        } shouldBe listOf(invitation.value.toString())
+        fx.count("lobby_observer_invitations WHERE game_id = ? AND revoked_at IS NOT NULL", id) shouldBe 1
+        fx.query("SELECT observer_id, invitation_id FROM lobby_observers WHERE game_id = ?", id) {
+            it.getString(1) to it.getString(2)
+        } shouldBe listOf(observer.value.toString() to invitation.value.toString())
     }
 }
 

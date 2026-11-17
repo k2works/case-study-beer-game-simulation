@@ -85,6 +85,20 @@ object EventCodec {
                 json.decodeFromString(GameStartedDto.serializer(), payloadJson).toGameStarted()
             }
 
+            "ObserverInvited" -> {
+                json.decodeFromString(ObserverInvitedDto.serializer(), payloadJson).toObserverInvited()
+            }
+
+            "ObserverInvitationRevoked" -> {
+                json
+                    .decodeFromString(ObserverInvitationRevokedDto.serializer(), payloadJson)
+                    .toObserverInvitationRevoked()
+            }
+
+            "ObserverJoined" -> {
+                json.decodeFromString(ObserverJoinedDto.serializer(), payloadJson).toObserverJoined()
+            }
+
             "CredentialRevoked" -> {
                 json.decodeFromString(CredentialRevokedDto.serializer(), payloadJson).toCredentialRevoked()
             }

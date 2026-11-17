@@ -9,6 +9,8 @@ import beergame.domain.DomainEvent
 import beergame.domain.EventEnvelope
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.InvitationId
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
@@ -116,6 +118,7 @@ data class Store(
     val credentials: Map<String, CredentialRow> = emptyMap(),
     val browserSessions: Map<String, SessionRow> = emptyMap(),
     val displayNames: Map<ParticipantId, String> = emptyMap(),
+    val observerNames: Map<ObserverId, String> = emptyMap(),
     val joinCodes: Map<String, GameId> = emptyMap(),
     val notices: List<VersionNotice> = emptyList(),
     /** 参加・復帰の窓ごとの失敗の数（`participation_attempts`）。 */
@@ -334,6 +337,15 @@ class World(
                     .store.joinCodes[code.value]
                     .right()
             },
+            findInvitation = { tx, digest ->
+                calls += "findInvitation"
+                tx
+                    .fake()
+                    .store.credentials[digest]
+                    ?.takeIf { it.kind == CredentialKind.OBSERVER_INVITATION }
+                    ?.let { FoundInvitation(it.gameId, InvitationId(it.subjectId)) }
+                    .right()
+            },
         )
 
     private val attemptStore =
@@ -372,6 +384,8 @@ class World(
         when (kind) {
             CredentialKind.FACILITATOR -> Actor.Facilitator(gameId)
             CredentialKind.PARTICIPANT_RECOVERY -> Actor.Participant(ParticipantId(subjectId))
+            CredentialKind.OBSERVER -> Actor.Observer(ObserverId(subjectId))
+            CredentialKind.OBSERVER_INVITATION -> Actor.Anonymous
         }
 
     private fun applyWrite(
@@ -411,6 +425,23 @@ class World(
                 )
             }
 
+            is PeripheralWrite.SaveObserverName -> {
+                store.copy(observerNames = store.observerNames + (write.observerId to write.name.value))
+            }
+
+            is PeripheralWrite.RevokeInvitationRow -> {
+                store.copy(
+                    credentials =
+                        store.credentials.mapValues { (_, row) ->
+                            val target =
+                                row.kind == CredentialKind.OBSERVER_INVITATION &&
+                                    row.gameId == write.gameId &&
+                                    row.subjectId == write.invitationId.value
+                            if (target) row.copy(revoked = true) else row
+                        },
+                )
+            }
+
             is PeripheralWrite.RevokeSubject -> {
                 val subjectId = write.subject.rowId()
                 store.copy(
@@ -431,6 +462,7 @@ class World(
         when (this) {
             is CredentialSubject.Facilitator -> gameId.value
             is CredentialSubject.Participant -> id.value
+            is CredentialSubject.Observer -> id.value
         }
 
     private val notifier =

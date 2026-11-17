@@ -38,7 +38,8 @@ suspend fun Ports.snapshot(
                     .bind()
             }
 
-            is Actor.Anonymous -> {
+            // 観察者は、役割別の値・参加コード・将来の需要を含む状態を取得できない（AC4.1.2）。観察は [observe]
+            is Actor.Observer, is Actor.Anonymous -> {
                 raise(AppFailure.Unauthorized)
             }
         }
@@ -59,4 +60,23 @@ suspend fun Ports.review(
         ensure(verified.actor !is Actor.Anonymous) { AppFailure.Unauthorized }
         val game = ensureNotNull(reader.read(gameId).bind()) { AppFailure.Unauthorized }
         Disclosure.forReview(game).mapLeft(AppFailure::Domain).bind()
+    }
+
+/**
+ * 観察（`GET /games/{id}/observation`。B9）。観察者と進行役だけが開ける（参加者・無資格・別のゲーム・存在しないゲームは、
+ * 区別せず [AppFailure.Unauthorized]。AC4.1.4）。観察者が読める 3 表の行（[ObservationReader]）と、公開範囲・版を使う。
+ * 版と公開範囲は、行より先に読む（版は行より新しくならない。画面が通知を捨てて古い表示のまま残るのを防ぐ）。
+ */
+suspend fun Ports.observe(
+    gameId: GameId,
+    credential: String?,
+): Either<AppFailure, Observation> =
+    either {
+        val at = now()
+        val verified = events.transaction { tx -> verifiedSession(tx, credential, at) }.bind()
+        ensure(verified.gameId == gameId) { AppFailure.Unauthorized }
+        ensure(verified.actor is Actor.Observer || verified.actor is Actor.Facilitator) { AppFailure.Unauthorized }
+        val head = ensureNotNull(reader.read(gameId).bind()) { AppFailure.Unauthorized }
+        val rows = ensureNotNull(observation.read(gameId).bind()) { AppFailure.Unauthorized }
+        Disclosure.forObservation(gameId, head.disclosure, rows, head.versions)
     }

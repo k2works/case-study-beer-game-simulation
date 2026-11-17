@@ -8,7 +8,7 @@ import java.util.UUID
  * SQL を知らず、他の投影も読まない。変更の適用（SQL）は adapter-persistence の責務。
  *
  * 判断項目 #12（B1）: 観察者向けの表（`lobby_observer_invitations`、`lobby_observers`）と、観察者向けの
- * `week_team_totals` は、表は作るが、B1 の投影は書かない（観察者のイベントが無く、B9 で公開範囲と一緒に書く）。
+ * `week_team_totals` は、B1 では書かなかった。B9 で、観察者のイベントと一緒に書くようにした。
  */
 
 /** 投影の表。宣言の順が、複数の行を更新するときの固定の順序（data-model.md L3）。 */
@@ -19,11 +19,14 @@ enum class ProjectionTable(
     GAME_JOIN_CODES("game_join_codes"),
     GAME_SETTINGS("game_settings"),
     LOBBY_PARTICIPANTS("lobby_participants"),
+    LOBBY_OBSERVER_INVITATIONS("lobby_observer_invitations"),
+    LOBBY_OBSERVERS("lobby_observers"),
     SESSION_OVERVIEW("session_overview"),
     ROLE_CURRENT_STATES("role_current_states"),
     CURRENT_DECISIONS("current_decisions"),
     WEEK_COMMITS("week_commits"),
     WEEK_ROLE_RESULTS("week_role_results"),
+    WEEK_TEAM_TOTALS("week_team_totals"),
 }
 
 @JvmInline
@@ -476,18 +479,102 @@ object Projections {
             }
         }
 
-    /** B1 が書く投影。宣言の順は、表の順序（[ProjectionTable]）と同じ。 */
+    /** `lobby_observer_invitations`（B9）: 招待の発行・失効。招待コードの値は持たない。 */
+    val lobbyObserverInvitations =
+        Projection { e ->
+            when (val p = e.payload) {
+                is GameEvent.ObserverInvited -> {
+                    listOf(
+                        upsert(
+                            ProjectionTable.LOBBY_OBSERVER_INVITATIONS,
+                            mapOf(col("invitation_id") to Value.Id(p.invitationId.value)),
+                            "game_id" to Value.Id(e.gameId.value),
+                            "expires_at" to Value.At(p.expiresAt),
+                            "created_at" to Value.At(e.occurredAt),
+                        ),
+                    )
+                }
+
+                is GameEvent.ObserverInvitationRevoked -> {
+                    listOf(
+                        upsert(
+                            ProjectionTable.LOBBY_OBSERVER_INVITATIONS,
+                            mapOf(col("invitation_id") to Value.Id(p.invitationId.value)),
+                            "revoked_at" to Value.At(e.occurredAt),
+                        ),
+                    )
+                }
+
+                else -> {
+                    emptyList()
+                }
+            }
+        }
+
+    /** `lobby_observers`（B9）: 観察者の参加。役割を持たない。表示名は周辺ストアから結合する。 */
+    val lobbyObservers =
+        Projection { e ->
+            when (val p = e.payload) {
+                is GameEvent.ObserverJoined -> {
+                    listOf(
+                        upsert(
+                            ProjectionTable.LOBBY_OBSERVERS,
+                            mapOf(col("observer_id") to Value.Id(p.observerId.value)),
+                            "game_id" to Value.Id(e.gameId.value),
+                            "invitation_id" to Value.Id(p.invitationId.value),
+                            "joined_at" to Value.At(e.occurredAt),
+                        ),
+                    )
+                }
+
+                else -> {
+                    emptyList()
+                }
+            }
+        }
+
+    /**
+     * `week_team_totals`（B9）: 確定した週のチーム合計（注文・在庫・受注残）と寄与者数。**役割別の値を持たない**。
+     * 観察者の問い合わせは、この表だけを読み、役割別の表に到達しない（最小権限。BR-17）。
+     */
+    val weekTeamTotals =
+        Projection { e ->
+            when (val p = e.payload) {
+                is SessionEvent.WeekCommitted -> {
+                    val results = Role.entries.map { p.results[it] }
+                    listOf(
+                        upsert(
+                            ProjectionTable.WEEK_TEAM_TOTALS,
+                            gameKey(e) + (col("week") to num(p.week.value)),
+                            "total_ordered" to num(results.sumOf { it.ordered.value }),
+                            "total_inventory" to num(results.sumOf { it.endingInventory.value }),
+                            "total_backlog" to num(results.sumOf { it.endingBacklog.value }),
+                            "contributors" to num(p.contributors),
+                        ),
+                    )
+                }
+
+                else -> {
+                    emptyList()
+                }
+            }
+        }
+
+    /** 書く投影。宣言の順は、表の順序（[ProjectionTable]）と同じ。 */
     val all: List<Projection> =
         listOf(
             gameOverview,
             gameJoinCodes,
             gameSettings,
             lobbyParticipants,
+            lobbyObserverInvitations,
+            lobbyObservers,
             sessionOverview,
             roleCurrentStates,
             currentDecisions,
             weekCommits,
             weekRoleResults,
+            weekTeamTotals,
         )
 
     /** 1 件のイベントの行の変更を、固定の順序（表の順。同じ表では発行の順＝役割の順）で返す。 */

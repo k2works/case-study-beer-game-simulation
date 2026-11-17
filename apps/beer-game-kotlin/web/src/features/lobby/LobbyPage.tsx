@@ -10,6 +10,7 @@ import { PageHeading } from '../../components/PageHeading';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER } from '../../labels';
+import { InvitationsPanel } from './InvitationsPanel';
 
 const missingRolesText = (roles: readonly Role[]) =>
     `各役割に 1 人以上が必要です。（不足: ${roles.map((role) => ROLE_LABELS[role]).join('、')}）`;
@@ -245,6 +246,8 @@ export function LobbyPage() {
                     );
                 })}
             </ul>
+
+            <InvitationsPanel gameId={gameId} lobby={lobby} onLobby={setData} />
 
             {missing.length > 0 ? <p>{missingRolesText(missing)}</p> : null}
             <button

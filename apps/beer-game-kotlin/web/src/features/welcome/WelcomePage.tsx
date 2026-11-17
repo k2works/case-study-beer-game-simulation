@@ -19,6 +19,11 @@ export function WelcomePage() {
                             参加・復帰
                         </Link>
                     </li>
+                    <li>
+                        <Link to="/observe" className="button">
+                            観察者として参加
+                        </Link>
+                    </li>
                 </ul>
             </nav>
         </>

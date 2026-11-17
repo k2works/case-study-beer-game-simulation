@@ -66,8 +66,15 @@ sealed interface DatabaseSettings {
         override val url: String,
         val user: String,
         val password: String,
+        /**
+         * 観察者の読み取り用の接続プールが、接続のたびに `SET ROLE` するロール（`DB_OBSERVER_ROLE`。例: `beergame_observer`。B9）。
+         * 指定すると、観察の問い合わせは、観察者のロールの権限（3 表の SELECT だけ）で動く。ログイン用のユーザーが、そのロールの
+         * メンバーであること（B3 以降の運用）。未指定は、主の接続プールと同じ接続。
+         */
+        val observerRole: String? = null,
     ) : DatabaseSettings {
-        override fun toString(): String = "Postgres(url=$url, user=$user, password=***)"
+        override fun toString(): String =
+            "Postgres(url=$url, user=$user, password=***, observerRole=${observerRole ?: "なし"})"
     }
 
     companion object {
@@ -271,13 +278,38 @@ private fun readPostgres(
             .filter { (_, value) -> value == null }
             .map { (name, _) -> ConfigError.MissingSetting(name) }
     val h2Url = url?.startsWith(DatabaseSettings.H2_URL_PREFIX) == true
+    val observerRole = variables["DB_OBSERVER_ROLE"]?.trim()?.takeIf { it.isNotEmpty() }
     return when {
-        missing.isNotEmpty() -> missing.left()
-        h2Url && env != AppEnv.Local -> listOf<ConfigError>(ConfigError.H2NotAllowed(env)).left()
-        h2Url -> listOf<ConfigError>(ConfigError.InvalidSetting("DB_URL")).left()
-        else -> DatabaseSettings.Postgres(checkNotNull(url), checkNotNull(user), checkNotNull(password)).right()
+        missing.isNotEmpty() -> {
+            missing.left()
+        }
+
+        h2Url && env != AppEnv.Local -> {
+            listOf<ConfigError>(ConfigError.H2NotAllowed(env)).left()
+        }
+
+        h2Url -> {
+            listOf<ConfigError>(ConfigError.InvalidSetting("DB_URL")).left()
+        }
+
+        // SET ROLE に連結するので、識別子の形だけを許す（SQL を差し込めない）
+        observerRole != null && !ROLE_NAME.matches(observerRole) -> {
+            listOf<ConfigError>(ConfigError.InvalidSetting("DB_OBSERVER_ROLE")).left()
+        }
+
+        else -> {
+            DatabaseSettings
+                .Postgres(
+                    checkNotNull(url),
+                    checkNotNull(user),
+                    checkNotNull(password),
+                    observerRole,
+                ).right()
+        }
     }
 }
+
+private val ROLE_NAME = Regex("[a-z_][a-z0-9_]{0,62}")
 
 private fun readInt(
     variables: Map<String, String>,

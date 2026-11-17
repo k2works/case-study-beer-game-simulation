@@ -11,8 +11,8 @@ import java.time.Instant
  * 規則は decide（このファイルの decideRevoke・decideReissue・decideRecover）に集まり、evolve は事実を採用するだけ。
  */
 
-/** 資格の主体。B5 は進行役と参加者（観察者は B9）。 */
-@Term("資格の主体", "資格を持つ人。進行役（ゲーム単位）か参加者。資格の失効・再発行・復帰は、主体ごとに行う（観察者は未実装）", "ドメインモデル 資格、AC3.2.5")
+/** 資格の主体。進行役・参加者・観察者（B9）。失効・再発行・復帰の対象は、参加者（復帰は進行役も）だけ。 */
+@Term("資格の主体", "資格を持つ人。進行役（ゲーム単位）、参加者、観察者。資格の失効・再発行・復帰は、主体ごとに行う（観察者は対象外）", "ドメインモデル 資格、AC3.2.5")
 sealed interface CredentialSubject {
     data class Facilitator(
         val gameId: GameId,
@@ -20,6 +20,11 @@ sealed interface CredentialSubject {
 
     data class Participant(
         val id: ParticipantId,
+    ) : CredentialSubject
+
+    /** 観察者。参加（`ObserverJoined`）で資格を持つが、失効・再発行・復帰の対象ではない（観察者の復帰は設計の未決）。 */
+    data class Observer(
+        val id: ObserverId,
     ) : CredentialSubject
 }
 
@@ -48,6 +53,7 @@ internal fun Actor.asSubject(): CredentialSubject? =
     when (this) {
         is Actor.Facilitator -> CredentialSubject.Facilitator(gameId)
         is Actor.Participant -> CredentialSubject.Participant(id)
+        is Actor.Observer -> CredentialSubject.Observer(id)
         is Actor.Anonymous -> null
     }
 
@@ -70,8 +76,13 @@ private fun GameState.participantCredential(
         ensure(actor.isFacilitatorOf(data.gameId)) { GameError.Forbidden(FACILITATOR_ONLY) }
         val participantId =
             when (subject) {
-                is CredentialSubject.Facilitator -> raise(GameError.Forbidden(FACILITATOR_NOT_TARGET))
-                is CredentialSubject.Participant -> subject.id
+                is CredentialSubject.Facilitator, is CredentialSubject.Observer -> {
+                    raise(GameError.Forbidden(FACILITATOR_NOT_TARGET))
+                }
+
+                is CredentialSubject.Participant -> {
+                    subject.id
+                }
             }
         ensureNotNull(data.credentials[subject]) { GameError.ParticipantNotFound(participantId) }
     }
@@ -105,6 +116,7 @@ internal fun decideRecover(
 ): Either<GameError, List<GameEvent>> =
     either {
         val validity = ensureNotNull(state.dataOrNull()?.credentials?.get(command.subject)) { recoveryRefused }
+        ensure(command.subject !is CredentialSubject.Observer) { recoveryRefused }
         ensure(command.actor.asSubject() == command.subject) { recoveryRefused }
         ensure(validity.status(command.at) == CredentialStatus.VALID) { recoveryRefused }
         listOf(GameEvent.ParticipationRecovered(command.subject, command.credentialExpiresAt))

@@ -16,6 +16,18 @@ value class ParticipantId(
     val value: UUID,
 )
 
+/** 観察者の識別子。観察用の招待で参加した人（役割を持たない）。 */
+@JvmInline
+value class ObserverId(
+    val value: UUID,
+)
+
+/** 観察用の招待の識別子。招待コードの値とは別（コードの値はイベントに入れない）。 */
+@JvmInline
+value class InvitationId(
+    val value: UUID,
+)
+
 /** 週。1〜50（AC1.1.5）。 */
 @Term("週", "ゲームの進行の単位。1〜50 の整数。週ごとに、4 役割の発注量を確定して在庫・受注残・費用を更新する", "AC1.1.5")
 @JvmInline

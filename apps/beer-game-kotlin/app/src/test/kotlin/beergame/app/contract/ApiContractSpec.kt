@@ -1,6 +1,7 @@
 package beergame.app.contract
 
 import beergame.app.World
+import beergame.app.array
 import beergame.app.body
 import beergame.app.credential
 import beergame.app.str
@@ -155,6 +156,66 @@ private suspend fun ContractClient.reviewPhase() {
     expect(403, get("/games/${game.id}/review"))
 }
 
+/**
+ * 観察者の経路（B9）: 招待の発行・失効、観察者の参加、観察、観察者の権限。
+ * 準備で発行した招待と、その招待で参加した観察者（[PlayedGame.observer]）を使う。
+ */
+private suspend fun ContractClient.observerPhase() {
+    val game = started()
+    val invitations = "/games/${game.id}/observer-invitations"
+    val observation = "/games/${game.id}/observation"
+    val retailer = game.cookieOf("RETAILER")
+    val invited = expect(200, post(invitations, "{}", game.facilitator)).body()
+    val invitationId = invited.str("invitationId")
+
+    // 発行は進行役だけ。参加は、有効な招待コードだけ（形式の誤りは 422）
+    expect(403, post(invitations, "{}", retailer))
+    expect(403, post(invitations, "{}", game.observer))
+    expect(403, post(invitations, "{}"))
+    expect(400, post(invitations, "{ここは JSON ではない", game.facilitator))
+    expect(422, post("/participations/observe", """{"displayName":"x"}"""))
+    expect(403, post("/participations/observe", """{"invitationCode":"v1.WRONG-CODE","displayName":"x"}"""))
+    expect(403, post("/participations/observe", """{"invitationCode":"${game.joinCode}","displayName":"x"}"""))
+    val joined =
+        expect(
+            200,
+            post("/participations/observe", """{"invitationCode":"${game.invitationCode}","displayName":"見学"}"""),
+        )
+    joined.body().str("kind") shouldBe "OBSERVER"
+    val observer = checkNotNull(joined.credential()) { "観察者の資格が発行されていない" }
+
+    // 観察は、観察者と進行役だけ。観察者は、役割別の状態・ロビー・入力・確定・進行・招待ができない
+    expect(200, get(observation, observer))
+    expect(200, get(observation, game.facilitator))
+    expect(403, get(observation, retailer))
+    expect(403, get(observation))
+    expect(403, get("/games/${game.id}/state", observer))
+    expect(403, get("/games/${game.id}/lobby", observer))
+    expect(403, get("/sessions/${game.id}/state", observer))
+    expect(403, put("/sessions/${game.id}/decisions", """{"week":1,"quantity":4}""", observer))
+    expect(403, post("/sessions/${game.id}/weeks/1/commit", commitBody(1, 1), observer))
+    expect(403, post("/sessions/${game.id}/pause", cookie = observer))
+    expect(409, get("/games/${game.id}/review", observer))
+
+    // ロビー（進行役）に、招待と観察者が載る。失効は進行役だけ。失効済みは 409、知らない招待は 404
+    val lobby = expect(200, get("/games/${game.id}/lobby", game.facilitator)).body()
+    lobby.array("invitations").size shouldBe 2
+    lobby.array("observers").size shouldBe 2
+    expect(403, post("$invitations/$invitationId/revoke", cookie = observer))
+    expect(403, post("$invitations/$invitationId/revoke", cookie = retailer))
+    expect(404, post("$invitations/$UNKNOWN_PARTICIPANT/revoke", cookie = game.facilitator))
+    expect(200, post("$invitations/$invitationId/revoke", cookie = game.facilitator))
+    expect(409, post("$invitations/$invitationId/revoke", cookie = game.facilitator))
+    expect(
+        403,
+        post(
+            "/participations/observe",
+            """{"invitationCode":"${invited.str("invitationCode")}","displayName":"遅れて"}""",
+        ),
+    )
+    expect(200, get(observation, observer))
+}
+
 private const val FINAL_WEEK = 3
 
 /** 確定の根拠にした入力が、確定の前に変わった（409）。古い版の保存は、B1 でどう返っても、仕様の宣言に収まること。 */
@@ -261,6 +322,7 @@ class ApiContractSpec :
                 c.playPhase(game)
                 c.changedDecisionsPhase()
                 c.reviewPhase()
+                c.observerPhase()
                 c.continuationPhase()
                 // 経路・メソッドの違い（仕様に無い経路は、request.* の problem+json）と、運用の確認
                 c.expect(404, get("/no-such-route"))

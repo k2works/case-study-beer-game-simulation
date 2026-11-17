@@ -12,12 +12,14 @@ class DomainFoundationSpec :
                 facilitatorActor.toRef() shouldBe ActorRef(ActorKind.FACILITATOR, gid.value)
                 participantActor(3).toRef() shouldBe ActorRef(ActorKind.PARTICIPANT, pid(3).value)
                 anonymousActor.toRef() shouldBe ActorRef(ActorKind.ANONYMOUS, null)
+                observerActor(2).toRef() shouldBe ActorRef(ActorKind.OBSERVER, oid(2).value)
             }
             test("進行役は、自分のゲームの進行役だけである") {
                 facilitatorActor.isFacilitatorOf(gid) shouldBe true
                 facilitatorActor.isFacilitatorOf(GameId(UUID(1L, 1L))) shouldBe false
                 participantActor(1).isFacilitatorOf(gid) shouldBe false
                 anonymousActor.isFacilitatorOf(gid) shouldBe false
+                observerActor(1).isFacilitatorOf(gid) shouldBe false
             }
         }
 
@@ -28,6 +30,7 @@ class DomainFoundationSpec :
                     Triple(GameError.InvitationInvalid, "game.invitation_invalid", ErrorCategory.Forbidden),
                     Triple(GameError.NotPreparing, "game.not_preparing", ErrorCategory.InvalidState),
                     Triple(GameError.NotEnded, "game.not_ended", ErrorCategory.InvalidState),
+                    Triple(GameError.InvitationNotFound, "game.invitation_not_found", ErrorCategory.NotFound),
                     Triple(GameError.Forbidden("x"), "game.forbidden", ErrorCategory.Forbidden),
                     Triple(GameError.ParticipantNotFound(pid(1)), "game.participant_not_found", ErrorCategory.NotFound),
                     Triple(

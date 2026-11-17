@@ -45,6 +45,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/games/{gameId}/observation': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * プレイ中の観察（現在週・完了状況・チーム合計。B9）
+         * @description 認可は**観察者と進行役**（AC4.1.4）。参加者・資格の無い人・別のゲーム・存在しないゲームは、資格の失敗と同じ 403（`app.unauthorized`）。
+         *     内容は、現在週・入力済みの役割数・確定した週のチーム合計（注文・在庫・受注残）だけ。**役割別の値・将来の需要・参加コード・入力者は含まない**
+         *     （BR-17。DB のロール `beergame_observer` が読める 3 表だけから作る）。
+         *     公開範囲が「なし」（`NONE`）なら合計を出さず、`totals.hiddenReason` に理由（`DISCLOSURE_NONE`）を示す。
+         *     寄与者が 2 未満の週は、値を出さず、`hidden` と理由（`CONTRIBUTORS_BELOW_MINIMUM`）だけを返す（逆算の防止。AC4.1.3）。
+         */
+        get: operations['getObservation'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/games/{gameId}/observer-invitations': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 観察用の招待を発行する（InviteObserver。game ストリーム。B9）
+         * @description 認可は進行役（AC1.3.2。進行役以外は 403）。参加コードとは別の乱数・別のダイジェストの**招待コード**を発行し、
+         *     **招待コードと招待の ID・有効期限を、この応答で一度だけ示す**（保存はダイジェストだけ。再表示しない。イベントには招待の ID と期限だけを入れる）。
+         *     招待の有効期間は 7 日（設計の未決の仮置き）。準備中と開始後の両方で受け付ける。本文は空か `{}`。
+         */
+        post: operations['inviteObserver'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/games/{gameId}/observer-invitations/{invitationId}/revoke': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 観察用の招待を失効させる（RevokeObserverInvitation。game ストリーム。B9）
+         * @description 認可は進行役。以降、その招待での新しい参加はできない（AC1.3.4。`game.invitation_invalid`）。**すでに参加した観察者は、そのまま観察を続けられる**。
+         *     すでに失効していれば `game.credential_already_revoked`（409）。このゲームに無い招待は `game.invitation_not_found`（404）。
+         */
+        post: operations['revokeObserverInvitation'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/participations/observe': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 観察用の招待コードで、観察者として参加する（JoinAsObserver。game ストリーム。B9）
+         * @description 認可は招待コード。有効な招待コードと表示名で、観察者として参加する（AC1.3.3。役割を持たず、状態を変更できない）。
+         *     不明・失効・期限切れ・形式不正の招待コードは、区別しない同じ 403（`game.invitation_invalid`。AC1.3.4。列挙の防止）。
+         *     参加と同じ接続元ごとの失敗の窓で数える（NF-S11。上限を超えると 429）。
+         *     観察者には、ブラウザセッション（`bg_session`）だけを Set-Cookie で発行する。**復帰資格は発行しない**（観察者の復帰は設計の未決）。
+         */
+        post: operations['joinAsObserver'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/games/{gameId}/review': {
         parameters: {
             query?: never;
@@ -54,7 +144,7 @@ export interface paths {
         };
         /**
          * 終了後の振り返り（全役割の全週の結果。B4）
-         * @description 認可は進行役と参加者（終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
+         * @description 認可は進行役・参加者・観察者（B9。終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
          *     資格が無い・別のゲーム・存在しないゲームは、資格の失敗と同じ 403。需要は、小売店の `orders`（顧客からの注文）と同じ値。
          */
         get: operations['getReview'];
@@ -480,6 +570,7 @@ export interface components {
             | 'game.credential_already_revoked'
             | 'game.credential_not_revoked'
             | 'game.not_ended'
+            | 'game.invitation_not_found'
             | 'validation.invalid_input'
             | 'app.retry_exhausted'
             | 'app.idempotency_key_reused'
@@ -754,6 +845,93 @@ export interface components {
             changedSettings: components['schemas']['SettingsField'][];
             commitMode: components['schemas']['CommitMode'];
             participants: components['schemas']['LobbyParticipant'][];
+            /** @description 観察用の招待（B9）。招待コードの値は含まない（発行の応答だけが運ぶ）。 */
+            invitations: components['schemas']['LobbyInvitation'][];
+            /** @description 参加した観察者（B9）。役割を持たない。 */
+            observers: components['schemas']['LobbyObserver'][];
+            versions: components['schemas']['StreamVersions'];
+        };
+        LobbyInvitation: {
+            /** Format: uuid */
+            invitationId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @description 失効させたら true。失効していなくて `expiresAt` を過ぎていれば、期限切れ（画面が現在時刻と比べる）。 */
+            revoked: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        LobbyObserver: {
+            /** Format: uuid */
+            observerId: string;
+            /** @description 表示名（周辺ストアの値）。観察者は役割を持たないので、`role` の項目は無い。 */
+            displayName: string | null;
+            /** Format: date-time */
+            joinedAt: string;
+        };
+        /** @description 招待の発行の応答。招待コードと招待の ID・有効期限を、一度だけ示す（再表示しない）。 */
+        InviteObserverResponse: components['schemas']['CommandResponse'] & {
+            /** Format: uuid */
+            invitationId: string;
+            /** @description 観察用の招待コード。参加コードとは別の値。一度だけ示す。保存はダイジェストだけで、再表示しない。ログ・URL に含めない。 */
+            invitationCode: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        JoinObserverRequest: {
+            invitationCode: string;
+            /** @description 表示名。前後の空白を除いて 1〜80 文字（domain の `DisplayName`）。 */
+            displayName: string;
+        };
+        /** @description 観察者の参加の応答。参加したゲームの ID と、種別（`OBSERVER`）を返す。 */
+        JoinObserverResponse: components['schemas']['CommandResponse'] & {
+            /** Format: uuid */
+            gameId: string;
+            /** @enum {string} */
+            kind: 'OBSERVER';
+        };
+        /** @description 確定した 1 週のチーム合計。寄与者が 2 未満の週は、値を持たず `hidden` と理由だけ。 */
+        ObservationWeek: {
+            week: number;
+            /** @description 4 役割の注文の合計。 */
+            order?: number;
+            /** @description 4 役割の在庫の合計。 */
+            inventory?: number;
+            /** @description 4 役割の受注残の合計。 */
+            backlog?: number;
+            /** @description 値を出さない週なら true。 */
+            hidden?: boolean;
+            /** @enum {string} */
+            reason?: 'CONTRIBUTORS_BELOW_MINIMUM';
+        };
+        ObservationTotals: {
+            /**
+             * @description 公開範囲（ゲームの作成時に決める）。
+             * @enum {string}
+             */
+            policy: 'TEAM_TOTAL' | 'NONE';
+            /**
+             * @description 合計を出さない理由。公開範囲が `NONE` のときだけ付く（`weeks` は空）。
+             * @enum {string}
+             */
+            hiddenReason?: 'DISCLOSURE_NONE';
+            weeks: components['schemas']['ObservationWeek'][];
+        };
+        /**
+         * @description 観察の内容（B9）。現在週・完了状況（入力済みの役割数）・チーム合計だけ。役割別の値・将来の需要・参加コード・入力者を含まない。
+         *     `sessionStatus`・`week`・`submittedRoleCount` は、ゲームの開始後だけ付く。
+         */
+        Observation: {
+            /** Format: uuid */
+            gameId: string;
+            /** @enum {string} */
+            status: 'PREPARING' | 'STARTED' | 'ENDED';
+            finalWeek: number;
+            /** @enum {string} */
+            sessionStatus?: 'ACTIVE' | 'PAUSED' | 'ENDED';
+            week?: number;
+            submittedRoleCount?: number;
+            totals: components['schemas']['ObservationTotals'];
             versions: components['schemas']['StreamVersions'];
         };
         /** @description 終了後の振り返り（B4）。全役割の全週の結果を、週・役割の順に並べる。需要は、小売店の `orders` と同じ値。 */
@@ -932,6 +1110,7 @@ export interface components {
         /** @description 未決：session ストリームの ID が gameId と同じか別かは、設計書のエンドポイント表から確定できない。 */
         SessionId: string;
         ParticipantId: string;
+        InvitationId: string;
         /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
         IdempotencyKey: string;
     };
@@ -1015,6 +1194,138 @@ export interface operations {
             403: components['responses']['Problem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
+        };
+    };
+    getObservation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 観察の内容 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Observation'];
+                };
+            };
+            403: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+        };
+    };
+    inviteObserver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                'application/json': Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description 発行した */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['InviteObserverResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    revokeObserverInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                gameId: components['parameters']['GameId'];
+                invitationId: components['parameters']['InvitationId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 失効させた */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    joinAsObserver: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['JoinObserverRequest'];
+            };
+        };
+        responses: {
+            /** @description 観察者として参加した。ブラウザセッションを Set-Cookie で発行する。 */
+            200: {
+                headers: {
+                    'Set-Cookie': components['headers']['SetCookie'];
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['JoinObserverResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
         };
     };
     getReview: {

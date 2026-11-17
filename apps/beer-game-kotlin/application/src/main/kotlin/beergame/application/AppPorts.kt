@@ -30,6 +30,7 @@ class AppSettings(
     val idempotencyTtl: Duration get() = ttls.idempotency
     val sessionTtl: Duration get() = ttls.session
     val participantCredentialTtl: Duration get() = ttls.participantCredential
+    val observerInvitationTtl: Duration get() = ttls.observerInvitation
 }
 
 /**
@@ -40,7 +41,13 @@ class AppTtls(
     val idempotency: Duration,
     val session: Duration,
     val participantCredential: Duration,
-)
+    /** 観察用の招待の有効期間（B9。設計の未決の仮置き。既定は 7 日）。 */
+    val observerInvitation: Duration = Duration.ofDays(OBSERVER_INVITATION_DAYS),
+) {
+    private companion object {
+        const val OBSERVER_INVITATION_DAYS = 7L
+    }
+}
 
 /**
  * 投影から読む（読み取り専用のトランザクションで、`projection_checkpoints` と同じ時点の行を返す）。
@@ -48,6 +55,15 @@ class AppTtls(
  */
 fun interface ProjectionReader {
     suspend fun read(gameId: GameId): Either<AppFailure, ProjectedGame?>
+}
+
+/**
+ * 観察者の読み取り（B9）。**観察者が読める 3 表（`game_overview`・`session_overview`・`week_team_totals`）だけ**を読む。
+ * 参加コード・役割別の表・設定には到達しない（BR-17。DB のロールでも `beergame_observer` の SELECT はこの 3 表だけ）。
+ * ゲームが無ければ null。開示の規則は掛けない（[Disclosure.forObservation] が掛ける）。
+ */
+fun interface ObservationReader {
+    suspend fun read(gameId: GameId): Either<AppFailure, ProjectedObservation?>
 }
 
 /** 時刻・ID・乱数。副作用なので、ポートの裏に置く（decide は時計も乱数も読まない）。 */
@@ -66,6 +82,8 @@ class Stores(
     val peripheral: PeripheralStore,
     val attempts: AttemptStore,
     val reader: ProjectionReader,
+    /** 観察者用の読み取り。無ければ（null）、[reader] から導く（観察者のロール・接続プールを分けない構成）。 */
+    val observation: ObservationReader? = null,
 )
 
 /**
@@ -89,4 +107,9 @@ class Ports(
     val peripheral: PeripheralStore get() = stores.peripheral
     val attempts: AttemptStore get() = stores.attempts
     val reader: ProjectionReader get() = stores.reader
+
+    /** 観察者用の読み取り。専用のポートが無い構成は、主の読み取りから、観察者が読める項目だけを取り出す。 */
+    val observation: ObservationReader
+        get() =
+            stores.observation ?: ObservationReader { id -> reader.read(id).map { game -> game?.toObservation() } }
 }

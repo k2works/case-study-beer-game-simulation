@@ -12,8 +12,10 @@ import beergame.domain.EndReason
 import beergame.domain.GameEvent
 import beergame.domain.GameId
 import beergame.domain.GameSettings
+import beergame.domain.InvitationId
 import beergame.domain.JoinCode
 import beergame.domain.KitPreset
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import beergame.domain.Quantity
 import beergame.domain.RetentionDays
@@ -37,6 +39,8 @@ private val P1 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-00000000
 private val P2 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000002"))
 private val P3 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000003"))
 private val P4 = ParticipantId(UUID.fromString("00000000-0000-0000-0000-000000000004"))
+private val OBSERVER = ObserverId(UUID.fromString("00000000-0000-0000-0000-0000000000f1"))
+private val INVITATION = InvitationId(UUID.fromString("00000000-0000-0000-0000-0000000000e1"))
 private val EXPIRES = Instant.parse("2026-12-01T09:00:00Z")
 private val SETTINGS = GameSettings.kit(3, listOf(4, 5, 6)).get()
 private val FOUR = Quantity.of(4).get()
@@ -118,6 +122,22 @@ private val GOLDEN: List<Triple<String, DomainEvent, String>> =
             "ParticipantReplaced",
             GameEvent.ParticipantReplaced(P1, Role.RETAILER, P2),
             """{"participantId":"${P1.value}","role":"RETAILER","replacedBy":"${P2.value}"}""",
+        ),
+        Triple(
+            "ObserverInvited",
+            GameEvent.ObserverInvited(INVITATION, EXPIRES),
+            """{"invitationId":"${INVITATION.value}","expiresAt":"2026-12-01T09:00:00Z"}""",
+        ),
+        Triple(
+            "ObserverInvitationRevoked",
+            GameEvent.ObserverInvitationRevoked(INVITATION),
+            """{"invitationId":"${INVITATION.value}"}""",
+        ),
+        Triple(
+            "ObserverJoined",
+            GameEvent.ObserverJoined(OBSERVER, INVITATION, EXPIRES),
+            """{"observerId":"${OBSERVER.value}","invitationId":"${INVITATION.value}",""" +
+                """"credentialExpiresAt":"2026-12-01T09:00:00Z"}""",
         ),
         Triple(
             "SessionStarted",

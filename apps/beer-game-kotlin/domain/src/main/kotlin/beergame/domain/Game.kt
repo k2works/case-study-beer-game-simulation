@@ -96,8 +96,12 @@ data class GameData(
     val gameId: GameId,
     val settings: GameSettings,
     val participants: Map<ParticipantId, ParticipantEntry>,
-    /** 資格の有効性（進行役は作成時、参加者は参加時に発行。失効・再発行・復帰で変わる）。観察者は B9。 */
+    /** 資格の有効性（進行役は作成時、参加者・観察者は参加時に発行。失効・再発行・復帰で変わる）。 */
     val credentials: Map<CredentialSubject, CredentialValidity>,
+    /** 観察用の招待（B9）。招待コードの値は持たない（周辺ストアのダイジェストだけ）。 */
+    val invitations: Map<InvitationId, InvitationEntry> = emptyMap(),
+    /** 観察者と、参加に使った招待（B9）。観察者は役割を持たない。 */
+    val observers: Map<ObserverId, InvitationId> = emptyMap(),
 ) {
     /** 役割ごとの参加者（開始時に、Session へ写しとして渡す）。 */
     fun roleAssignments(): RoleMap<Set<ParticipantId>> =
@@ -168,6 +172,31 @@ sealed interface GameCommand : Command {
         override val at: Instant,
         val participantId: ParticipantId,
         val role: Role,
+    ) : GameCommand
+
+    /** 進行役が、観察用の招待を発行する（AC1.3.1）。招待コードの値は境界が作る（ここには持たない）。 */
+    data class InviteObserver(
+        override val actor: Actor,
+        override val at: Instant,
+        val invitationId: InvitationId,
+        val expiresAt: Instant,
+    ) : GameCommand
+
+    /** 進行役が、観察用の招待を失効させる（AC1.3.4）。すでに参加した観察者は影響を受けない。 */
+    data class RevokeObserverInvitation(
+        override val actor: Actor,
+        override val at: Instant,
+        val invitationId: InvitationId,
+    ) : GameCommand
+
+    /** 観察用の招待で、観察者として参加する。表示名は周辺ストアへ書くための値で、イベントには写さない。 */
+    data class JoinAsObserver(
+        override val actor: Actor,
+        override val at: Instant,
+        val observerId: ObserverId,
+        val invitationId: InvitationId,
+        val displayName: DisplayName,
+        val credentialExpiresAt: Instant,
     ) : GameCommand
 
     /** 進行役が、参加者の資格を失効させる（漏れた資格の被害を止める。AC3.2.5）。準備中と開始後の両方で受け付ける。 */
@@ -251,6 +280,25 @@ sealed interface GameEvent : DomainEvent {
         val credentialExpiresAt: Instant,
     ) : GameEvent
 
+    @EventSpec("EV-G05", "InviteObserver。進行役。準備中と開始後")
+    data class ObserverInvited(
+        val invitationId: InvitationId,
+        val expiresAt: Instant,
+    ) : GameEvent
+
+    @EventSpec("EV-G06", "RevokeObserverInvitation。進行役、失効していない招待（期限切れでも可）")
+    data class ObserverInvitationRevoked(
+        val invitationId: InvitationId,
+    ) : GameEvent
+
+    /** 観察者が参加した。表示名と資格の値は含めない（周辺ストアへ、同じトランザクションで書く）。 */
+    @EventSpec("EV-G07", "JoinAsObserver。有効で期限内の招待（準備中と開始後）")
+    data class ObserverJoined(
+        val observerId: ObserverId,
+        val invitationId: InvitationId,
+        val credentialExpiresAt: Instant,
+    ) : GameEvent
+
     /** 開始後の入れ替えで、旧担当者 [participantId] が [role] から外れ、[replacedBy] が引き継いだ事実（資格の失効は別のイベント）。 */
     @Term("役割の入れ替え", "開始後に、進行役が役割の担当者を別の参加者に替えること。旧担当者の資格は同じ追記で失効し、入力済みの値と週は変わらない", "ドメインモデル 役割の入れ替え、ADR-015")
     @EventSpec("EV-G12", "AssignRole（開始後の入れ替え）。進行役、旧担当者ごとに 1 件。同じ追記で CredentialRevoked と RoleHolderReplaced が付く")
@@ -274,6 +322,12 @@ sealed interface GameError : DomainError {
     data object InvitationInvalid : GameError {
         override val code: String = "game.invitation_invalid"
         override val category: ErrorCategory = ErrorCategory.Forbidden
+    }
+
+    /** 失効させようとした観察用の招待が、このゲームに無い。 */
+    data object InvitationNotFound : GameError {
+        override val code: String = "game.invitation_not_found"
+        override val category: ErrorCategory = ErrorCategory.NotFound
     }
 
     /** 終了していない。振り返りは、終了後だけ開示する（AC4.2.2）。 */
@@ -329,6 +383,36 @@ private fun GameState.preparingData(): Either<GameError, GameData> =
         is GameState.NotCreated, is GameState.Started -> GameError.NotPreparing.left()
     }
 
+/** 準備中の割り当て。同じ役割への再割り当ては変化なし（履歴に足さない。D9）、別の役割へは付け替え（2 イベント）。 */
+private fun decideAssign(
+    state: GameState,
+    command: GameCommand.AssignRole,
+): Either<GameError, List<GameEvent>> =
+    either {
+        val data = state.preparingData().bind()
+        ensure(command.actor.isFacilitatorOf(data.gameId)) { GameError.Forbidden("割り当ては進行役だけができる") }
+        val previous =
+            ensureNotNull(data.participants[command.participantId]) {
+                GameError.ParticipantNotFound(command.participantId)
+            }.role
+        when (previous) {
+            command.role -> {
+                emptyList()
+            }
+
+            null -> {
+                listOf(GameEvent.RoleAssigned(command.participantId, command.role))
+            }
+
+            else -> {
+                listOf(
+                    GameEvent.RoleUnassigned(command.participantId, previous),
+                    GameEvent.RoleAssigned(command.participantId, command.role),
+                )
+            }
+        }
+    }
+
 /** 作成・参加・役割の割り当ての規則は、すべてここに集まる（evolve は事実を採用するだけで、規則を持たない）。 */
 fun decideGame(
     state: GameState,
@@ -356,30 +440,19 @@ fun decideGame(
             }
 
             is GameCommand.AssignRole -> {
-                val data = state.preparingData().bind()
-                ensure(command.actor.isFacilitatorOf(data.gameId)) { GameError.Forbidden("割り当ては進行役だけができる") }
-                val current =
-                    ensureNotNull(data.participants[command.participantId]) {
-                        GameError.ParticipantNotFound(command.participantId)
-                    }
-                val previous = current.role
-                when {
-                    previous == command.role -> {
-                        emptyList()
-                    }
+                decideAssign(state, command).bind()
+            }
 
-                    // 変化なし。履歴に足さない（D9）
-                    previous == null -> {
-                        listOf(GameEvent.RoleAssigned(command.participantId, command.role))
-                    }
+            is GameCommand.InviteObserver -> {
+                decideInvite(state, command).bind()
+            }
 
-                    else -> {
-                        listOf(
-                            GameEvent.RoleUnassigned(command.participantId, previous), // 付け替え = 2 イベント（D9）
-                            GameEvent.RoleAssigned(command.participantId, command.role),
-                        )
-                    }
-                }
+            is GameCommand.RevokeObserverInvitation -> {
+                decideRevokeInvitation(state, command).bind()
+            }
+
+            is GameCommand.JoinAsObserver -> {
+                decideJoinAsObserver(state, command).bind()
             }
 
             is GameCommand.RevokeCredential -> {
@@ -397,7 +470,7 @@ fun decideGame(
     }
 
 /** 準備中と開始後に、データを更新して版を進める（資格は両方で変わる）。decide が作らない列（null）は、状態を変えずに返す。 */
-private fun GameState.updateData(update: (GameData) -> GameData?): GameState =
+internal fun GameState.updateData(update: (GameData) -> GameData?): GameState =
     when (this) {
         is GameState.Preparing -> update(data)?.let { GameState.Preparing(it, version.next()) } ?: this
         is GameState.Started -> update(data)?.let { GameState.Started(it, version.next()) } ?: this
@@ -477,6 +550,18 @@ fun evolveGame(
                 is GameState.Preparing -> GameState.Started(state.data, state.version.next())
                 is GameState.NotCreated, is GameState.Started -> state
             }
+        }
+
+        is GameEvent.ObserverInvited -> {
+            state.updateData { it.invited(event.invitationId, event.expiresAt) }
+        }
+
+        is GameEvent.ObserverInvitationRevoked -> {
+            state.updateData { it.invitationRevoked(event.invitationId) }
+        }
+
+        is GameEvent.ObserverJoined -> {
+            state.updateData { it.observerJoined(event.observerId, event.invitationId, event.credentialExpiresAt) }
         }
 
         is GameEvent.CredentialRevoked -> {

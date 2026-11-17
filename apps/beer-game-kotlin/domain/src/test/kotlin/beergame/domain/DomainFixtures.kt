@@ -86,7 +86,56 @@ fun actorOf(subject: CredentialSubject): Actor =
     when (subject) {
         is CredentialSubject.Facilitator -> Actor.Facilitator(subject.gameId)
         is CredentialSubject.Participant -> Actor.Participant(subject.id)
+        is CredentialSubject.Observer -> Actor.Observer(subject.id)
     }
+
+// ---- Game: 観察者（B9） ----
+
+fun oid(n: Int): ObserverId = ObserverId(UUID(1L, n.toLong()))
+
+fun iid(n: Int): InvitationId = InvitationId(UUID(2L, n.toLong()))
+
+fun observerActor(n: Int): Actor = Actor.Observer(oid(n))
+
+/** 招待の有効期限（発行から 7 日）。 */
+val invitationExpiry: Instant = Instant.parse("2026-11-23T09:00:00Z")
+
+fun inviteObserver(
+    n: Int,
+    actor: Actor = facilitatorActor,
+    expiresAt: Instant = invitationExpiry,
+): GameCommand.InviteObserver = GameCommand.InviteObserver(actor, t0, iid(n), expiresAt)
+
+fun revokeInvitation(
+    n: Int,
+    actor: Actor = facilitatorActor,
+): GameCommand.RevokeObserverInvitation = GameCommand.RevokeObserverInvitation(actor, t0, iid(n))
+
+fun joinAsObserver(
+    observer: Int,
+    invitation: Int,
+    at: Instant = t0,
+): GameCommand.JoinAsObserver =
+    GameCommand.JoinAsObserver(
+        anonymousActor,
+        at,
+        oid(observer),
+        iid(invitation),
+        name("観察者$observer"),
+        credentialExpiry,
+    )
+
+fun observerInvited(
+    n: Int,
+    expiresAt: Instant = invitationExpiry,
+): GameEvent.ObserverInvited = GameEvent.ObserverInvited(iid(n), expiresAt)
+
+fun observerInvitationRevoked(n: Int): GameEvent.ObserverInvitationRevoked = GameEvent.ObserverInvitationRevoked(iid(n))
+
+fun observerJoined(
+    observer: Int,
+    invitation: Int,
+): GameEvent.ObserverJoined = GameEvent.ObserverJoined(oid(observer), iid(invitation), credentialExpiry)
 
 // ---- Game: イベントと状態 ----
 

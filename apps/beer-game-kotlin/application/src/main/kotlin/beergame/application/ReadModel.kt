@@ -1,7 +1,10 @@
 package beergame.application
 
+import beergame.domain.DisclosurePolicy
 import beergame.domain.Editor
 import beergame.domain.GameId
+import beergame.domain.InvitationId
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import beergame.domain.Role
 import java.time.Instant
@@ -63,6 +66,41 @@ data class ProjectedWeekResult(
     val cumulativeCostMinor: Long,
 )
 
+/** 週ごとのチーム合計（`week_team_totals`。B9）。役割別の値を持たない。[contributors] は寄与者数。 */
+data class ProjectedTeamTotal(
+    val week: Int,
+    val ordered: Int,
+    val inventory: Int,
+    val backlog: Int,
+    val contributors: Int,
+)
+
+/** 観察用の招待（`lobby_observer_invitations`。B9）。招待コードの値は持たない。 */
+data class ProjectedInvitation(
+    val invitationId: InvitationId,
+    val expiresAt: Instant,
+    val revokedAt: Instant?,
+    val createdAt: Instant,
+)
+
+/** 参加した観察者（`lobby_observers`。B9）。役割を持たない。表示名は周辺ストアから結合する。 */
+data class ProjectedObserver(
+    val observerId: ObserverId,
+    val displayName: String?,
+    val joinedAt: Instant,
+)
+
+/**
+ * 観察者が読める投影の行（B9）。`game_overview`・`session_overview`・`week_team_totals` の 3 表だけから作る。
+ * 参加コード・設定・役割別の値・将来の需要・入力者を、型に持たせない。
+ */
+data class ProjectedObservation(
+    val status: GameStatus,
+    val finalWeek: Int,
+    val session: ProjectedSession?,
+    val teamTotals: List<ProjectedTeamTotal>,
+)
+
 /** 設定の種別（`KIT`・`CUSTOM`）と、キットの値から変えた項目の名前（B7）。 */
 data class SettingsSummary(
     val kind: String,
@@ -89,6 +127,14 @@ data class ProjectedGame(
     val results: List<ProjectedWeekResult>,
     /** `projection_checkpoints` の版。行と同じ時点（行より新しい版を返さない）。 */
     val versions: Versions,
+    /** 公開範囲（`game_settings.disclosure_policy`。B9）。観察者に見せる合計の範囲。 */
+    val disclosure: DisclosurePolicy = DisclosurePolicy.TEAM_TOTAL,
+    /** 確定した週のチーム合計（B9）。 */
+    val teamTotals: List<ProjectedTeamTotal> = emptyList(),
+    /** 観察用の招待（B9）。進行役にだけ開示する。 */
+    val invitations: List<ProjectedInvitation> = emptyList(),
+    /** 参加した観察者（B9）。進行役にだけ開示する。 */
+    val observers: List<ProjectedObserver> = emptyList(),
 )
 
 // ---- 呼び出した人ごとの投影 ----
@@ -164,6 +210,21 @@ data class LobbyEntry(
     val replaced: Boolean = false,
 )
 
+/** 進行役のロビーの、観察用の招待。[revoked] が false で [expiresAt] を過ぎていれば、期限切れ。 */
+data class InvitationView(
+    val invitationId: InvitationId,
+    val expiresAt: Instant,
+    val revoked: Boolean,
+    val createdAt: Instant,
+)
+
+/** 進行役のロビーの、観察者（役割を持たない）。 */
+data class ObserverView(
+    val observerId: ObserverId,
+    val displayName: String?,
+    val joinedAt: Instant,
+)
+
 data class WeekResultView(
     val week: Int,
     val role: Role,
@@ -188,13 +249,15 @@ sealed interface SnapshotView {
         val coHolders: List<CoHolderView> = emptyList(),
     ) : SnapshotView
 
-    /** 進行役: 全役割の状況と入力、参加コード、ロビー、確定した週の結果。 */
+    /** 進行役: 全役割の状況と入力、参加コード、ロビー、確定した週の結果、観察用の招待と観察者（B9）。 */
     data class Facilitator(
         val joinCode: String,
         val finalWeek: Int,
         val lobby: List<LobbyEntry>,
         val roles: Map<Role, RoleStatus>,
         val results: List<WeekResultView>,
+        val invitations: List<InvitationView> = emptyList(),
+        val observers: List<ObserverView> = emptyList(),
     ) : SnapshotView
 }
 

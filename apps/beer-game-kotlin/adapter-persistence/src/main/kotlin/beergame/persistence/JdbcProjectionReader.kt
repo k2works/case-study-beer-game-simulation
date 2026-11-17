@@ -104,6 +104,10 @@ internal class JdbcProjectionReader(
                     decisions = decisions(c, gameId).bind(),
                     results = results(c, gameId).bind(),
                     versions = versions(c, gameId),
+                    disclosure = ObservationRows.disclosure(c, gameId).bind(),
+                    teamTotals = ObservationRows.teamTotals(c, gameId),
+                    invitations = ObservationRows.invitations(c, gameId).bind(),
+                    observers = ObservationRows.observers(c, gameId).bind(),
                 )
             }
         }
@@ -288,12 +292,12 @@ private fun editorOf(
         else -> null
     }
 
-private fun failure(message: String): AppFailure = AppFailure.Persistence(PersistenceFailure(OP, message))
+internal fun failure(message: String): AppFailure = AppFailure.Persistence(PersistenceFailure(OP, message))
 
 /** 最初の Left で止めて返す。すべて Right なら、値の列。 */
 private fun <T> List<Either<AppFailure, T>>.sequence(): Either<AppFailure, List<T>> = either { map { it.bind() } }
 
-private fun <T> Connection.query(
+internal fun <T> Connection.query(
     sql: String,
     gameId: GameId,
     map: (ResultSet) -> T,

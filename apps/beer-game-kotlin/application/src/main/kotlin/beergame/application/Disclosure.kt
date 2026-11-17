@@ -12,7 +12,7 @@ import beergame.domain.Role
  * 開示の規則（B1 の範囲）。投影から読んだ行に、呼び出した人ごとの規則を掛ける純粋関数。
  * 設計書は `domain` に置くが、読み取りの型（[ProjectedGame]）が `application` にあるので、B1 では同じ層に置いた
  * （読み取りの型にだけ依存し、`Ports` には依存しない。`domain` へ移すのは機械的にできる）。
- * 観察者の規則（公開範囲、寄与者数での抑止）は B9。
+ * 観察者の規則（公開範囲、寄与者数での抑止）は B9 で、[forObservation]（Observation.kt）に足した。
  */
 object Disclosure {
     fun forFacilitator(game: ProjectedGame): Snapshot =
@@ -41,6 +41,16 @@ object Disclosure {
                                 game.statusOf(role) { it is Editor.ByFacilitator }?.let { role to it }
                             }.toMap(),
                     results = game.results.sortedWith(compareBy({ it.week }, { it.role.ordinal })).map { it.view() },
+                    invitations =
+                        game.invitations.map {
+                            InvitationView(
+                                it.invitationId,
+                                it.expiresAt,
+                                it.revokedAt != null,
+                                it.createdAt,
+                            )
+                        },
+                    observers = game.observers.map { ObserverView(it.observerId, it.displayName, it.joinedAt) },
                 ),
         )
 

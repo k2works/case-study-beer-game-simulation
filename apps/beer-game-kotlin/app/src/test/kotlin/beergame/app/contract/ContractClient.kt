@@ -48,6 +48,11 @@ internal class PlayedGame(
     val players: Map<String, Player>,
     /** 進行役の復帰コード（作成の応答の `recoveryCode`）。 */
     val facilitatorCode: String = "placeholder-recovery",
+    /** 発行した観察用の招待（B9）。招待の ID と、招待コード（発行の応答だけが運ぶ）。 */
+    val invitationId: String = "00000000-0000-0000-0000-0000000000c1",
+    val invitationCode: String = "placeholder-invitation",
+    /** 招待で参加した観察者のブラウザセッション（B9）。 */
+    val observer: String = "placeholder",
 ) {
     fun cookieOf(role: String): String = players.getValue(role).cookie
 }
@@ -167,7 +172,24 @@ internal class ContractClient(
                     checkNotNull(joinedAs.getValue(role).cookieValue("bg_recovery")),
                 )
             }
-        return PlayedGame(id, facilitator, joinCode, players, created.body().str("recoveryCode"))
+        val invited = send(HttpMethod.Post, "/games/$id/observer-invitations", "{}", cookie = facilitator)
+        val code = invited.body().str("invitationCode")
+        val observer =
+            send(
+                HttpMethod.Post,
+                "/participations/observe",
+                """{"invitationCode":"$code","displayName":"見学の五郎"}""",
+            )
+        return PlayedGame(
+            id,
+            facilitator,
+            joinCode,
+            players,
+            created.body().str("recoveryCode"),
+            invited.body().str("invitationId"),
+            code,
+            checkNotNull(observer.credential()) { "観察者の資格が発行されていない" },
+        )
     }
 
     suspend fun started(): PlayedGame =

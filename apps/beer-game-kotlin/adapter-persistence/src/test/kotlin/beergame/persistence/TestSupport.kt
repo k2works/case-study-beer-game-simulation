@@ -120,7 +120,7 @@ fun openFixture(
             dialect,
             dataSource,
             PersistenceConfig(TEST_RESPONSE_KEY, lockTimeoutMillis, listenReconnectMillis),
-            listenConnection,
+            listenConnection = listenConnection,
         )
     return Fixture(dialect, dataSource, persistence)
 }

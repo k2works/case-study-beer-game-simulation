@@ -2,10 +2,14 @@ package beergame.persistence
 
 import arrow.core.raise.either
 import beergame.application.AppFailure
+import beergame.application.GameStatus
 import beergame.application.VersionNotice
 import beergame.domain.GameId
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
@@ -19,7 +23,9 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import java.sql.SQLException
 import java.util.UUID
 
 private const val EVENTUALLY_MILLIS = 15_000L
@@ -231,6 +237,55 @@ class PostgresPersistenceSpec :
         if (System.getenv("BEERGAME_MEASURE") == "1") retryMeasurementContract { fx }
         attemptStoreContract { fx }
         attemptFlowContract { fx }
+
+        test(
+            "[B9/NF-S18] 観察者用の接続プール（SET ROLE beergame_observer）は、観察の 3 表だけを読め、参加コード・役割別の表は権限エラー",
+        ) {
+            val script = GameScript().create(joinCode = "OBSERVEPOOL1", finalWeek = 3)
+            val players = script.joinAllRoles()
+            script.startGame().playWeek(players)
+            fx.appendScript(script)
+            val observerPool =
+                HikariDataSource(
+                    HikariConfig().apply {
+                        jdbcUrl = PostgresSupport.container.jdbcUrl
+                        username = PostgresSupport.container.username
+                        password = PostgresSupport.container.password
+                        maximumPoolSize = 2
+                        connectionInitSql = "SET ROLE beergame_observer"
+                    },
+                )
+            observerPool.use { pool ->
+                val read = runBlocking { JdbcObservationReader(pool).read(script.gameId) }.orFail()
+
+                checkNotNull(read).teamTotals.map { it.week to it.ordered } shouldBe listOf(1 to 16)
+                read.status shouldBe GameStatus.STARTED
+                listOf(
+                    "game_join_codes",
+                    "role_current_states",
+                    "week_role_results",
+                    "game_settings",
+                    "lobby_participants",
+                ).forEach { table ->
+                    val failure =
+                        shouldThrow<SQLException> {
+                            pool.connection.use { c ->
+                                c.createStatement().use { it.executeQuery("SELECT * FROM $table").close() }
+                            }
+                        }
+                    failure.sqlState shouldBe "42501"
+                }
+                pool.connection.use { c ->
+                    c.createStatement().use {
+                        it.executeQuery("SELECT current_user").use { rs ->
+                            rs.next()
+                            rs.getString(1)
+                        }
+                    } shouldBe
+                        "beergame_observer"
+                }
+            }
+        }
 
         test("[7.1] 確認: テスト用の PostgreSQL は postgres:18 である") {
             fx.query("SHOW server_version") { it.getString(1) }.single().substringBefore('.') shouldBe "18"

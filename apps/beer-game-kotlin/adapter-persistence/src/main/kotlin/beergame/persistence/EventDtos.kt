@@ -107,7 +107,7 @@ internal data class GameStartedDto(
     val gameId: String,
 )
 
-/** 資格の主体。`kind` は FACILITATOR（`id` はゲーム）または PARTICIPANT（`id` は参加者）。資格の値は持たない。 */
+/** 資格の主体。`kind` は FACILITATOR（`id` はゲーム）、PARTICIPANT（`id` は参加者）、OBSERVER（`id` は観察者）。資格の値は持たない。 */
 @Serializable
 internal data class CredentialSubjectDto(
     val kind: String,
@@ -131,6 +131,29 @@ internal data class CredentialReissuedDto(
 @SerialName("ParticipationRecovered")
 internal data class ParticipationRecoveredDto(
     val subject: CredentialSubjectDto,
+    val credentialExpiresAt: String,
+)
+
+/** 観察用の招待（B9）。招待コードの値は持たない（周辺ストアのダイジェストだけ）。 */
+@Serializable
+@SerialName("ObserverInvited")
+internal data class ObserverInvitedDto(
+    val invitationId: String,
+    val expiresAt: String,
+)
+
+@Serializable
+@SerialName("ObserverInvitationRevoked")
+internal data class ObserverInvitationRevokedDto(
+    val invitationId: String,
+)
+
+/** 観察者の参加（B9）。表示名・資格の値は持たない。 */
+@Serializable
+@SerialName("ObserverJoined")
+internal data class ObserverJoinedDto(
+    val observerId: String,
+    val invitationId: String,
     val credentialExpiresAt: String,
 )
 

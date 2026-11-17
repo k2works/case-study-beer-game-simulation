@@ -9,6 +9,8 @@ import beergame.domain.Editor
 import beergame.domain.GameEvent
 import beergame.domain.GameId
 import beergame.domain.GameSettings
+import beergame.domain.InvitationId
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import beergame.domain.Quantity
 import beergame.domain.Role
@@ -121,6 +123,44 @@ class EventCodecSpec :
                 setOf("CredentialRevoked", "CredentialReissued", "ParticipationRecovered")
             EventCodec.encode(events.first()).payloadJson shouldContain "FACILITATOR"
             EventCodec.encode(events[3]).payloadJson shouldContain "PARTICIPANT"
+        }
+
+        test("[B9] 観察者の資格の主体（OBSERVER）を含む資格のイベントと、観察者のイベントを変換して戻すと、元と等しい") {
+            val observer = ObserverId(UUID.fromString("00000000-0000-0000-0000-0000000000f1"))
+            val invitation = InvitationId(UUID.fromString("00000000-0000-0000-0000-0000000000e1"))
+            val expiresAt = Instant.parse("2026-12-16T09:00:00Z")
+            val events =
+                listOf(
+                    GameEvent.CredentialRevoked(CredentialSubject.Observer(observer)),
+                    GameEvent.ObserverInvited(invitation, expiresAt),
+                    GameEvent.ObserverInvitationRevoked(invitation),
+                    GameEvent.ObserverJoined(observer, invitation, expiresAt),
+                )
+
+            events.forEach { event ->
+                val encoded = EventCodec.encode(event)
+                EventCodec.decode(encoded.eventType, encoded.schemaVersion, encoded.payloadJson) shouldBe
+                    Either.Right(event)
+                encoded.payloadJson shouldNotContain "displayName"
+                encoded.payloadJson shouldNotContain "invitationCode"
+            }
+            EventCodec.encode(events.first()).payloadJson shouldContain "OBSERVER"
+        }
+
+        test("[B9] 観察者のイベントの ID・期限が不正なら、復号できず Left") {
+            val id = "00000000-0000-0000-0000-0000000000e1"
+            listOf(
+                "ObserverInvited" to """{"invitationId":"x","expiresAt":"2026-12-16T09:00:00Z"}""",
+                "ObserverInvited" to """{"invitationId":"$id","expiresAt":"yesterday"}""",
+                "ObserverInvitationRevoked" to """{"invitationId":"x"}""",
+                "ObserverJoined" to
+                    """{"observerId":"x","invitationId":"$id","credentialExpiresAt":"2026-12-16T09:00:00Z"}""",
+                "ObserverJoined" to
+                    """{"observerId":"$id","invitationId":"x","credentialExpiresAt":"2026-12-16T09:00:00Z"}""",
+                "ObserverJoined" to """{"observerId":"$id","invitationId":"$id","credentialExpiresAt":"yesterday"}""",
+            ).forEach { (type, json) ->
+                EventCodec.decode(type, 1, json).shouldBeInstanceOf<Either.Left<String>>()
+            }
         }
 
         test("[B5] 主体の種別・ID・期限が不正な資格のイベントは、復号できず Left") {

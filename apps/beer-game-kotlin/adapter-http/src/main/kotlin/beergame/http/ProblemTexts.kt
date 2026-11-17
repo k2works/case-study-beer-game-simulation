@@ -70,6 +70,7 @@ private val TITLES =
         "game.credential_already_revoked" to "この資格は、すでに失効しています。",
         "game.credential_not_revoked" to "この資格は失効していないため、再発行できません。",
         "game.not_ended" to "ゲームはまだ終了していないため、振り返りは開けません。",
+        "game.invitation_not_found" to "観察用の招待が見つかりません。",
     )
 
 private val DETAILS =

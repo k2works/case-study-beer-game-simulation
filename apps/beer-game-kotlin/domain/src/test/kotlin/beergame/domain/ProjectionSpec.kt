@@ -294,7 +294,60 @@ class ProjectionSpec :
             decision.valueOf("editor_id") shouldBe Value.Id(gid.value)
         }
 
-        test("[7.2] Given WeekCommitted When 投影する Then 確定の事実・役割別の結果・次週の状態が入り、入力はクリアされ、チーム合計は書かない（#12）") {
+        test("[B9/AC4.1.1] Given WeekCommitted When 投影する Then チーム合計は、4 役割の合計と寄与者数だけで、役割別の列を持たない") {
+            val totals =
+                Projections
+                    .project(envelope(weekCommitted, StreamType.SESSION, 12))
+                    .of(ProjectionTable.WEEK_TEAM_TOTALS)
+                    .single()
+
+            totals.keyOf("week") shouldBe Value.Num(1)
+            totals.valueOf("total_ordered") shouldBe Value.Num(16)
+            totals.valueOf("total_inventory") shouldBe
+                Value.Num(Role.entries.sumOf { outcome.results[it].endingInventory.value })
+            totals.valueOf("total_backlog") shouldBe
+                Value.Num(Role.entries.sumOf { outcome.results[it].endingBacklog.value })
+            totals.valueOf("contributors") shouldBe Value.Num(4)
+            (totals as RowChange.Upsert)
+                .values.keys
+                .map { it.name }
+                .none { "role" in it } shouldBe true
+        }
+
+        test("[B9/AC1.3.1] Given 観察用の招待の発行・失効・観察者の参加 When 投影する Then 招待と観察者の表に入る（コードの値は入らない）") {
+            val invited =
+                Projections
+                    .project(envelope(observerInvited(1), StreamType.GAME, 2))
+                    .of(ProjectionTable.LOBBY_OBSERVER_INVITATIONS)
+                    .single()
+            val revoked =
+                Projections
+                    .project(
+                        envelope(
+                            observerInvitationRevoked(1),
+                            StreamType.GAME,
+                            3,
+                            Instant.parse("2026-11-16T10:00:00Z"),
+                        ),
+                    ).single()
+            val joinedRow =
+                Projections
+                    .project(envelope(observerJoined(1, 1), StreamType.GAME, 4))
+                    .single()
+
+            invited.keyOf("invitation_id") shouldBe Value.Id(iid(1).value)
+            invited.valueOf("game_id") shouldBe Value.Id(gid.value)
+            invited.valueOf("expires_at") shouldBe Value.At(invitationExpiry)
+            invited.valueOf("created_at") shouldBe Value.At(t0)
+            revoked.table shouldBe ProjectionTable.LOBBY_OBSERVER_INVITATIONS
+            revoked.valueOf("revoked_at") shouldBe Value.At(Instant.parse("2026-11-16T10:00:00Z"))
+            joinedRow.table shouldBe ProjectionTable.LOBBY_OBSERVERS
+            joinedRow.keyOf("observer_id") shouldBe Value.Id(oid(1).value)
+            joinedRow.valueOf("invitation_id") shouldBe Value.Id(iid(1).value)
+            joinedRow.valueOf("joined_at") shouldBe Value.At(t0)
+        }
+
+        test("[7.2] Given WeekCommitted When 投影する Then 確定の事実・役割別の結果・次週の状態が入り、入力はクリアされる") {
             val rows = Projections.project(envelope(weekCommitted, StreamType.SESSION, 12))
 
             val commit = rows.of(ProjectionTable.WEEK_COMMITS).single()
@@ -315,7 +368,6 @@ class ProjectionSpec :
             val overview = rows.of(ProjectionTable.SESSION_OVERVIEW).single()
             overview.valueOf("week") shouldBe Value.Num(2)
             overview.valueOf("submitted_role_count") shouldBe Value.Num(0)
-            ProjectionTable.entries.map { it.sqlName }.contains("week_team_totals") shouldBe false
         }
 
         test("[7.2] Given 1 件のイベントの変更 When 並べる Then 表の固定の順序（L3）で、同じ表では役割の順") {
@@ -340,6 +392,8 @@ class ProjectionSpec :
                 listOf(
                     envelope(gameCreated(settings), StreamType.GAME, 1),
                     envelope(GameEvent.ParticipantJoined(pid(1), credentialExpiry), StreamType.GAME, 2),
+                    envelope(observerInvited(1), StreamType.GAME, 3),
+                    envelope(observerJoined(1, 1), StreamType.GAME, 4),
                     envelope(saved, StreamType.SESSION, 5),
                     envelope(weekCommitted, StreamType.SESSION, 12),
                 )
@@ -349,11 +403,14 @@ class ProjectionSpec :
                     Projections.gameJoinCodes to ProjectionTable.GAME_JOIN_CODES,
                     Projections.gameSettings to ProjectionTable.GAME_SETTINGS,
                     Projections.lobbyParticipants to ProjectionTable.LOBBY_PARTICIPANTS,
+                    Projections.lobbyObserverInvitations to ProjectionTable.LOBBY_OBSERVER_INVITATIONS,
+                    Projections.lobbyObservers to ProjectionTable.LOBBY_OBSERVERS,
                     Projections.sessionOverview to ProjectionTable.SESSION_OVERVIEW,
                     Projections.roleCurrentStates to ProjectionTable.ROLE_CURRENT_STATES,
                     Projections.currentDecisions to ProjectionTable.CURRENT_DECISIONS,
                     Projections.weekCommits to ProjectionTable.WEEK_COMMITS,
                     Projections.weekRoleResults to ProjectionTable.WEEK_ROLE_RESULTS,
+                    Projections.weekTeamTotals to ProjectionTable.WEEK_TEAM_TOTALS,
                 )
             expected.forEach { (projection, table) ->
                 test("${table.sqlName} の投影は、その表の行だけを 1 行以上作る") {

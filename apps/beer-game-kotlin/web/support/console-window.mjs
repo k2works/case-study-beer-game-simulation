@@ -160,6 +160,79 @@ export class ConsoleWindow {
         return caption.innerText();
     }
 
+    /** 第 [week] 週を、各役割 [quantity] で入力・確定する（前提の準備。確定は、版 1 を根拠にする）。 */
+    async commitSeededWeek(week, quantity) {
+        const facilitator = this.browserContext.request;
+        await this.seedDecisions(week, {
+            retailer: quantity,
+            wholesaler: quantity,
+            distributor: quantity,
+            factory: quantity,
+        });
+        const basis = Object.fromEntries(ROLES.map((role) => [role, 1]));
+        await call(facilitator, 'POST', `/sessions/${this.gameId}/weeks/${week}/commit`, {
+            requestedWeek: week,
+            basis,
+        });
+    }
+
+    /** ロビーで、観察用の招待を発行し、一度だけ示される招待コードを控える（進行役の画面）。 */
+    async issueInvitationOnLobby() {
+        await this.page.goto(`/games/${this.gameId}/lobby`);
+        await this.page
+            .getByRole('button', { name: '観察用の招待を発行' })
+            .click({ timeout: WAIT_MS });
+        const issued = this.page.getByRole('status').filter({ hasText: '招待コード:' });
+        await issued.waitFor({ timeout: WAIT_MS });
+        const match = /v\d+\.[A-Za-z0-9_-]+/.exec(await issued.innerText());
+        assert.ok(match, '招待コードが表示されていない');
+        this.invitationCode = match[0];
+    }
+
+    /** ロビーで、控えた招待を失効させる（確認のダイアログで「失効させる」を選ぶ）。 */
+    async revokeInvitationOnLobby() {
+        await this.page.getByRole('button', { name: '招待 1を失効' }).click({ timeout: WAIT_MS });
+        await this.page
+            .getByRole('dialog')
+            .getByRole('button', { name: '失効させる' })
+            .click({ timeout: WAIT_MS });
+        await this.page.getByText(/招待 1: 失効/).waitFor({ timeout: WAIT_MS });
+    }
+
+    /** 観察者が、別のブラウザで、観察者の参加の画面（S10）から、控えた招待コードで参加する。 */
+    async joinAsObserverOnScreen(displayName) {
+        const context = await this.browser.newContext({ baseURL: this.baseURL, locale: 'ja-JP' });
+        const page = await context.newPage();
+        this.players.set('OBSERVER', { context, page });
+        this.observerPage = page;
+        await page.goto('/observe');
+        await page.getByLabel('観察用の招待コード').fill(this.invitationCode);
+        await page.getByLabel('表示名（任意）').fill(displayName);
+        await page.getByRole('button', { name: '参加する' }).click({ timeout: WAIT_MS });
+    }
+
+    /** 観察の画面に、現在週と、[week] 週のチーム合計の注文が示される。 */
+    async observationShows(currentWeek, week, order) {
+        const page = this.observerPage;
+        await page.getByRole('heading', { name: '観察' }).waitFor({ timeout: WAIT_MS });
+        await page.getByText(new RegExp(`^第 ${currentWeek} 週`)).waitFor({ timeout: WAIT_MS });
+        const table = page.getByRole('table', { name: 'チーム合計の表' });
+        await table.waitFor({ timeout: WAIT_MS });
+        const cells = await table
+            .getByRole('row')
+            .filter({ has: page.getByRole('cell', { name: String(week), exact: true }) })
+            .getByRole('cell')
+            .allTextContents();
+        assert.equal(cells[1], String(order), `週 ${week} の注文の合計: ${JSON.stringify(cells)}`);
+    }
+
+    /** 観察の画面に、役割別の語も、操作のボタンも無い（読み取り専用）。 */
+    async observationReadOnly() {
+        const page = this.observerPage;
+        assert.equal(await page.getByText(/小売店|二次卸|一次卸|工場/).count(), 0);
+        assert.equal(await page.getByRole('button').count(), 0);
+    }
+
     /** 別の Cookie の入れ物で参加し、進行役が [role] に割り当てる。窓口では [key] で引く。 */
     async joinAndAssign(facilitator, joinCode, key, role, displayName) {
         const context = await request.newContext({ baseURL: this.baseURL });

@@ -49,6 +49,17 @@ export const editorName = (editor: DecisionEditor): string => {
     return `${editor.displayName ?? '共同担当'}さん`;
 };
 
+/** 招待の期限などの日時を「月/日 時:分」（24 時間）で示す。[timeZone] を省くと、ブラウザの時刻帯。 */
+export const formatDateTime = (iso: string, timeZone?: string): string =>
+    new Intl.DateTimeFormat('ja-JP', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+        ...(timeZone === undefined ? {} : { timeZone }),
+    }).format(new Date(iso));
+
 /** 入力欄の名称。工場は「生産要請数」、流通役は「発注数」。 */
 export const decisionFieldLabel = (role: Role): string =>
     role === 'FACTORY' ? '生産要請数' : '発注数';

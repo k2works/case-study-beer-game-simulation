@@ -12,7 +12,7 @@ import kotlinx.serialization.KSerializer
 
 // ドメイン -> DTO。`when` は網羅で、イベントの追加でコンパイルが失敗する。
 
-private fun <T> enc(
+internal fun <T> enc(
     serializer: KSerializer<T>,
     dto: T,
 ): EventCodec.Encoded =
@@ -54,6 +54,18 @@ internal fun encodeGameEvent(event: GameEvent): EventCodec.Encoded =
 
         is GameEvent.GameStarted -> {
             enc(GameStartedDto.serializer(), GameStartedDto(event.gameId.value.toString()))
+        }
+
+        is GameEvent.ObserverInvited -> {
+            event.toEncoded()
+        }
+
+        is GameEvent.ObserverInvitationRevoked -> {
+            event.toEncoded()
+        }
+
+        is GameEvent.ObserverJoined -> {
+            event.toEncoded()
         }
 
         is GameEvent.CredentialRevoked -> {
@@ -186,6 +198,7 @@ private fun CredentialSubject.toDto(): CredentialSubjectDto =
     when (this) {
         is CredentialSubject.Facilitator -> CredentialSubjectDto("FACILITATOR", gameId.value.toString())
         is CredentialSubject.Participant -> CredentialSubjectDto("PARTICIPANT", id.value.toString())
+        is CredentialSubject.Observer -> CredentialSubjectDto("OBSERVER", id.value.toString())
     }
 
 private fun Editor.toDto(): EditorDto =

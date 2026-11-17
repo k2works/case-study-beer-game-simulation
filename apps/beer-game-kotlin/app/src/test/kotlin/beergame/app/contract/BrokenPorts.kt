@@ -2,6 +2,7 @@ package beergame.app.contract
 
 import arrow.core.left
 import beergame.application.AppFailure
+import beergame.application.ObservationReader
 import beergame.application.Ports
 import beergame.application.ProjectionReader
 import beergame.application.Stores
@@ -45,6 +46,10 @@ internal fun throwingPorts(
                 ),
             attempts = stores.attempts,
             reader = ProjectionReader { id -> if (broken.get()) explode() else stores.reader.read(id) },
+            observation =
+                stores.observation?.let { observation ->
+                    ObservationReader { id -> if (broken.get()) explode() else observation.read(id) }
+                },
         ),
         ports.lock,
         ports.notifier,
@@ -73,6 +78,7 @@ internal fun conflictingPorts(
             peripheral = stores.peripheral,
             attempts = stores.attempts,
             reader = stores.reader,
+            observation = stores.observation,
         ),
         ports.lock,
         ports.notifier,

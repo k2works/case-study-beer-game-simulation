@@ -55,11 +55,13 @@ class Persistence internal constructor(
          * [dataSource] はマイグレーション済みであること。PostgreSQL では、通知の受信用の専用の接続（プールの外）を
          * [listenConnection] で作る（必須）。H2 では使わない（プロセス内のロックとイベント）。
          * PostgreSQL では、最初の LISTEN ができるまで（最大 10 秒）呼び出したスレッドで待つ。起動時に 1 回だけ呼ぶ。
+         * [observerDataSource] は、観察者の読み取り専用の接続プール（`beergame_observer` のロールに絞ったもの。B9）。無ければ [dataSource]。
          */
         fun open(
             dialect: Dialect,
             dataSource: DataSource,
             config: PersistenceConfig,
+            observerDataSource: DataSource? = null,
             listenConnection: (() -> Connection)? = null,
         ): Persistence {
             val stores =
@@ -70,6 +72,8 @@ class Persistence internal constructor(
                     peripheral = JdbcPeripheralStore().port(),
                     attempts = JdbcAttemptStore().port(),
                     reader = JdbcProjectionReader(dataSource),
+                    // 観察者の読み取りは、3 表だけを読む専用のポート。観察者用の接続プール（DB のロールを絞った）があれば、それを使う
+                    observation = JdbcObservationReader(observerDataSource ?: dataSource),
                 )
             return when (dialect) {
                 Dialect.POSTGRES -> {

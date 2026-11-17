@@ -99,6 +99,25 @@ export type LobbyParticipant = Schemas['LobbyParticipant'];
 
 export type Lobby = Schemas['Lobby'];
 
+/** 観察用の招待（B9）。招待コードの値は含まない（発行の応答だけが一度だけ運ぶ）。 */
+export type LobbyInvitation = Schemas['LobbyInvitation'];
+
+/** 参加した観察者（B9）。役割を持たない。 */
+export type LobbyObserver = Schemas['LobbyObserver'];
+
+/** 招待の発行の応答。招待コードと招待の ID・有効期限を、一度だけ示す。 */
+export type InviteObserverResponse = Schemas['InviteObserverResponse'];
+
+export type JoinObserverRequest = Schemas['JoinObserverRequest'];
+
+/** 観察者の参加の応答。参加したゲームの ID と種別（OBSERVER）。 */
+export type JoinObserverResponse = Schemas['JoinObserverResponse'];
+
+/** 観察の内容（B9）。現在週・完了状況・チーム合計だけ。役割別の値・将来の需要・参加コードは含まない。 */
+export type Observation = Schemas['Observation'];
+
+export type ObservationWeek = Schemas['ObservationWeek'];
+
 export type Review = Schemas['Review'];
 
 export type GameState = Schemas['GameState'];

@@ -194,7 +194,7 @@ data class RoleMap<out A>(val factory: A, val distributor: A, val wholesaler: A,
 | 表示名（DisplayName） | `value class` | 前後の空白を除いて 1〜80 文字。**イベントには入れない** |
 | 参加コード・招待コード | `JoinCode`、`InvitationCode` | 推測困難な乱数から作る（8 桁以上）。**2 つは別の型・別の値**。招待コードの値はイベントに入れない |
 | 資格の有効性（CredentialValidity） | `data class` | **有効期限と、失効したか（`revoked`）**。`status(now)` が有効（VALID）・失効（REVOKED）・期限切れ（EXPIRED）を返す純粋関数。失効は期限より優先し、期限の瞬間から使えない。**発行・失効の時刻は、`evolve` が時刻を読まないので状態に持たない**（イベントの封筒の `occurredAt` と、周辺ストアの `credentials.revoked_at` が持つ。B5 Step 3） |
-| 資格の主体（CredentialSubject） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`。観察者（`Observer`）は B9 で足す。失効・再発行の対象は参加者だけ（ゲート 1 の決定）。 |
+| 資格の主体（CredentialSubject） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`、`Observer(id)`（B9）。観察者は参加（`ObserverJoined`）で資格を持つが、失効・再発行・復帰の対象ではない（観察者の復帰は未決のまま。復帰資格は発行しない）。失効・再発行の対象は参加者だけ（ゲート 1 の決定）。 |
 | 保持方針（RetentionPolicy） | `data class` | 保持日数 1〜3650（既定 90）、保持開始、削除期限。**beer-game2 にあった「方針の版」は持たない**（方針は 1 ゲームにつき 1 つで、作成後に変わらない。版を比べる相手がいないため。保持日数を変える機能を足すときに版を導入する） |
 | 操作者（Actor） | `sealed interface` | `Facilitator(gameId)`、`Participant(id)`、`Observer(id)`、`Anonymous`。認証はアダプターが行い、結果の `Actor` をコマンドに載せる |
 | ストリームの版（StreamVersion） | `value class` | 単調に増える整数。楽観的並行制御の期待値 |
@@ -276,7 +276,8 @@ enum class ErrorCategory { Forbidden, NotFound, InvalidState, Conflict, RuleViol
 | `game.forbidden` | `GameError.Forbidden` | `Forbidden` | 403（HTTP では `app.unauthorized` の同じ本文に写す） |
 | `game.participant_not_found` | `GameError.ParticipantNotFound` | `NotFound` | 404 |
 | `game.start_condition_not_met` | `GameError.StartConditionNotMet` | `RuleViolation` | 422（`missingRoles` を添える） |
-| `game.invitation_invalid` | `GameError.InvitationInvalid` | `Forbidden` | 403。**参加コードの不明・形式不正を区別しない**。`decide` は返さず、境界が参加コードからゲームを引けなかったときに使う。`DomainError` が封印されているため `domain` に置く |
+| `game.invitation_invalid` | `GameError.InvitationInvalid` | `Forbidden` | 403。**参加コードの不明・形式不正を区別しない**。参加では、境界が参加コードからゲームを引けなかったときに使う（`decide` は返さない）。**B9: 観察用の招待では、`decideJoinAsObserver` が、不明・失効・期限切れを区別せず返す**。`DomainError` が封印されているため `domain` に置く |
+| `game.invitation_not_found` | `GameError.InvitationNotFound` | `NotFound` | 404（B9。失効させようとした観察用の招待が、このゲームに無い）。失効済みの招待の再失効は `game.credential_already_revoked`（409）を使う |
 | `game.credential_already_revoked` | `GameError.CredentialAlreadyRevoked` | `InvalidState` | 409（B5。すでに失効した資格をもう一度失効させる。ゲート 1 の決定） |
 | `game.credential_not_revoked` | `GameError.CredentialNotRevoked` | `InvalidState` | 409（B5。失効していない資格の再発行を拒否する。ゲート 1 の決定。期限切れで未失効の資格も、先に失効させてから再発行する） |
 | `session.not_active` | `SessionError.NotActive` | `InvalidState` | 409（**未開始**だけ。B5 で、停止中は下の `session.paused` に分けた） |
@@ -304,7 +305,7 @@ sealed interface GameState {
     val version: StreamVersion
 
     data object NotCreated : GameState                       // ストリームが空
-    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`。招待・観察者は B9。保持方針 `retention` は未実装）
+    data class Preparing(val data: GameData) : GameState     // 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`、B9 で足した招待 `invitations`・観察者 `observers`。保持方針 `retention` は未実装）
     data class Started(val data: GameData) : GameState       // 設定を固定。割り当ては、入れ替え（下の「役割の入れ替え」）だけが変える
 }
 
@@ -826,7 +827,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 
 **出力（`ExportPackage`）は投影にしません。** 問い合わせの時に、全域の純粋関数 `buildExport(settings, weekRoleResults): ExportPackage`（`Either` を返さない）で、`WeekRoleResults` と設定から作ります。`checksum` と `schema_version` も要求時に算出します。設定と全週記録の CSV・JSON で、設定の種別（カスタムの識別）を含みます。閲覧できるのは進行役です。出力は読み取りの導出であり、最終週の確定（`WeekCommitted` と `SessionEnded` の追記）は出力の作成に依存しません（設計判断 D11）。
 
-**開示の判定（`Disclosure`）** は、投影の読み取りに掛ける純粋関数です。**B1 の実装は `application` に置きます**（読み取りの型 `ProjectedGame` が `application` にあり、`Ports` に依存しない純粋関数。`domain` へ移すのは機械的にできる。変更 #29）。観察者の規則（公開範囲、寄与者数での抑止）は B9 です。
+**開示の判定（`Disclosure`）** は、投影の読み取りに掛ける純粋関数です。**B1 の実装は `application` に置きます**（読み取りの型 `ProjectedGame` が `application` にあり、`Ports` に依存しない純粋関数。`domain` へ移すのは機械的にできる。変更 #29）。観察者の規則（公開範囲、寄与者数での抑止）は、B9 で `Disclosure.forObservation`（`Observation.kt`）に実装した。観察者が読める行は、専用のポート `ObservationReader`（3 表だけを読む）が返し、公開範囲（`game_settings`。観察者のロールは読めない）と版は、主の読み取りから、行より先に読む。観察を開けるのは観察者と進行役だけ（参加者・無資格は、資格の失敗と同じ 403）。
 
 | ルール | 内容 | 根拠 |
 | :--- | :--- | :--- |
@@ -990,6 +991,7 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 | 35 | `CredentialValidity` は発行時刻・有効期限・失効時刻 | **有効期限と `revoked`（失効したか）だけ**。時刻は封筒の `occurredAt` と `credentials.revoked_at` が持つ（2026-11-15、B5 Step 3） | `evolve` は封筒を読まず、イベントのペイロードに時刻が無い。同じ事実を二重に持たない |
 | 36 | 失効していない資格の再発行の扱いは未決 | 拒否する（`GameError.CredentialNotRevoked`、409）。失効・再発行の対象は参加者だけで、進行役自身は `Forbidden`。未作成も `Forbidden`（進行役になれる人がいない）。復帰は、操作者が主体自身であることも検査し、失敗はすべて同じ `Forbidden("復帰できない")`（2026-11-15、B5 Step 3。ゲート 1 の決定の反映） | 漏洩した資格の被害を止める。有効な資格を黙って置き換えない。資格の存在・期限・失効を、復帰の失敗から推測させない（NF-S12） |
 | 37 | 開始後の入れ替えのコマンド・規則が無い（「開始後の入れ替え」は未決） | 既存の `AssignRole` を開始後も受け付け、**2 ストリームの関数 `assignRoleAfterStart`** が `ParticipantReplaced`・`CredentialRevoked`・`RoleAssigned`（game）と `RoleHolderReplaced`（session）を同一トランザクションで返す。旧担当者の資格を自動失効し、履歴と入力者のラベルは残す（2026-11-15、B5 Step 3.5.1。**提案。ゲート 3.5 で人が確認する**） | 写し（D4）を更新しないと新担当者が保存できない。コマンドと経路を増やさず、準備中の付け替え（D9）と同じ入口にする（ゲート 1 の決定） |
+| 43（B9。2026-11-17。表の並びは追記の順） | 観察用の招待コードは `InvitationCode` の値オブジェクトで、招待を `GameData` が引く | 招待コードの値は、ドメインに持たない（**型を作らない**）。`credentials`（`kind = OBSERVER_INVITATION`）のダイジェストの行で、コードから招待の ID を引く（境界の責務）。コードの形は、資格の鍵の版の接頭辞つきの乱数（参加コードと同じ生成器。値・ダイジェストは別）。有効期間は 7 日（仮置き）。観察者は復帰資格を持たない。観察を開けるのは、観察者と進行役（2026-11-17、B9。**判断項目は未承認**） | 値をイベントに入れない（D7）。参加コードの列挙と同じ扱いで、不明・失効・期限切れを区別しない 403 にする |
 | 38 | `assignRoleAfterStart` のスケッチ（セッションの状態は `Active`・`Paused` の確認だけ。`evolve` は入れ替えの事実を採用） | **実装**（2026-11-15、B5 Step 3.5.2〜3.5.4。実装の確認はゲート 3.5 で人が行う）: 関数は `ReplaceDecision.kt`（`ReplaceDecision` と同じファイル）。(1) セッションの確認は `openData()` を使い、**未開始は `NotActive`**、終了後は `AlreadyEnded`（スケッチは終了後と同じ扱い）。(2) 新担当者の資格の確認は `credentials[subject]?.revoked == false`（資格の行がない参加者は `CredentialAlreadyRevoked`。参加時に必ず発行されるので到達しない列）。(3) **`evolveGame` の `RoleAssigned` は、開始後も役割を付ける**（準備中と同じ `updateData`。従来は準備中だけで、開始済みでは状態を変えなかった）。`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（準備中・未作成・未知の参加者は状態を変えない）。(4) `RoleHolderReplaced` は進行中・一時停止中だけ写しを更新する（未開始・終了後は状態を変えない） | 開始後の `RoleAssigned` を採用しないと、入れ替えの結果が再生で復元できない。`decide` が作らない列は、これまでどおり状態を変えずに返す（`replay` が検知する） |
 | 39（B5 Step 4.7。2026-11-15） | 投影は `SessionStarted`・`DecisionSaved`・`WeekCommitted` などを購読する（B1） | `SessionPaused`・`SessionResumed`（`session_overview.status` を PAUSED・ACTIVE）、`ProxyDecisionSubmitted`（`current_decisions` に進行役の入力者で書き、`submitted_role_count` を更新）、`ParticipantReplaced`（`lobby_participants` の `role` を NULL、`replaced_at` を書く行の変更。DB の列はマイグレーション（Step 5.5）まで無い）を購読する。**資格のイベント（`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`）と `RoleHolderReplaced` は、どの投影も購読しない**（L5。資格の状態の正本は `credentials`、割り当ての写しは session ストリームの再生） | 投影の契約テストで、資格のイベントが行を作らないことを確認 |
 | 40（B5 Step 8.4。2026-11-15） | 用語・イベントの一覧は、設計書の手書きの表だけ（ユビキタス言語、ドメインイベントの表） | **コードから生成する一覧を足した**: 型に注釈 `@Term`・`@EventSpec`（`Documentation.kt`。標準ライブラリだけ）を付け、`LivingDocumentationSpec` が [イベント一覧](./generated/events.md)・[用語集](./generated/glossary.md) を生成する。**手書きの EV 表は残し**、生成物との不一致（ID・名前）を試験が検出する（実装済みの 17 イベントの ID と名前が、EV 表と一致）。未実装のイベント（EV-G05〜G07、EV-S07）は、生成物の「設計書にあり、まだ実装が無いイベント」に載る。EV 表を生成物への参照に置き換えるかは、人の判断（[ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案） | 開発戦略の「手作業で更新する一覧は作らない」。生成物と手書きの境界: 生成物 = ID・名前・ストリーム・ペイロードの項目・購読する投影・用語、手書き = 意図・判断・却下した代替案 |

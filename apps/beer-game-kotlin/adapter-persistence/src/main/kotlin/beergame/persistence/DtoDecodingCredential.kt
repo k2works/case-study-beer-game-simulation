@@ -6,6 +6,7 @@ import beergame.domain.CredentialSubject
 import beergame.domain.DomainEvent
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 
 // DTO -> ドメイン（game ストリームの資格のイベント）。資格の値は持たず、主体と期限だけを復号する。
@@ -15,6 +16,7 @@ private fun CredentialSubjectDto.toSubject(): Either<String, CredentialSubject> 
         when (kind) {
             "FACILITATOR" -> CredentialSubject.Facilitator(GameId(uuid(id).bind()))
             "PARTICIPANT" -> CredentialSubject.Participant(ParticipantId(uuid(id).bind()))
+            "OBSERVER" -> CredentialSubject.Observer(ObserverId(uuid(id).bind()))
             else -> raise("資格の主体の種別が不正: $kind")
         }
     }

@@ -21,6 +21,40 @@ internal object JdbcPeripheralRows {
             is PeripheralWrite.IssueSessionRow -> insertSession(tx, write)
             is PeripheralWrite.ExtendRecoveryRow -> extendRecovery(tx, write)
             is PeripheralWrite.RevokeSubject -> revokeSubject(tx, write)
+            is PeripheralWrite.SaveObserverName -> insertObserverName(tx, write)
+            is PeripheralWrite.RevokeInvitationRow -> revokeInvitation(tx, write)
+        }
+    }
+
+    private fun insertObserverName(
+        tx: JdbcTx,
+        write: PeripheralWrite.SaveObserverName,
+    ) {
+        tx.connection.prepareStatement(INSERT_DISPLAY_NAME_SQL).use { ps ->
+            ps
+                .params()
+                .uuid(write.gameId.value)
+                .string(ACTOR_OBSERVER)
+                .uuid(write.observerId.value)
+                .string(write.name.value)
+                .instant(write.at)
+            ps.executeUpdate()
+        }
+    }
+
+    /** 観察用の招待の行を失効させる。すでに参加した観察者のブラウザセッションは、そのまま残る（AC1.3.4）。 */
+    private fun revokeInvitation(
+        tx: JdbcTx,
+        write: PeripheralWrite.RevokeInvitationRow,
+    ) {
+        tx.connection.prepareStatement(REVOKE_CREDENTIALS_SQL).use { ps ->
+            ps
+                .params()
+                .instant(write.at)
+                .uuid(write.gameId.value)
+                .string(CredentialKind.OBSERVER_INVITATION.name)
+                .uuid(write.invitationId.value)
+            ps.executeUpdate()
         }
     }
 
@@ -114,16 +148,19 @@ internal object JdbcPeripheralRows {
         when (this) {
             is CredentialSubject.Facilitator -> CredentialKind.FACILITATOR to gameId.value
             is CredentialSubject.Participant -> CredentialKind.PARTICIPANT_RECOVERY to id.value
+            is CredentialSubject.Observer -> CredentialKind.OBSERVER to id.value
         }
 
     private fun actorKindOf(kind: CredentialKind): String =
         when (kind) {
             CredentialKind.FACILITATOR -> ACTOR_FACILITATOR
             CredentialKind.PARTICIPANT_RECOVERY -> ACTOR_PARTICIPANT
+            CredentialKind.OBSERVER, CredentialKind.OBSERVER_INVITATION -> ACTOR_OBSERVER
         }
 
     const val ACTOR_FACILITATOR = "FACILITATOR"
     const val ACTOR_PARTICIPANT = "PARTICIPANT"
+    const val ACTOR_OBSERVER = "OBSERVER"
     private const val INSERT_DISPLAY_NAME_SQL =
         "INSERT INTO display_profiles (game_id, actor_kind, actor_id, display_name, created_at) " +
             "VALUES (?, ?, ?, ?, ?)"

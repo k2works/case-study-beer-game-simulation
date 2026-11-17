@@ -10,7 +10,9 @@ import beergame.domain.GameCommand
 import beergame.domain.GameId
 import beergame.domain.GameSettings
 import beergame.domain.GameState
+import beergame.domain.InvitationId
 import beergame.domain.JoinCode
+import beergame.domain.ObserverId
 import beergame.domain.ParticipantId
 import beergame.domain.Quantity
 import beergame.domain.RetentionDays
@@ -202,6 +204,33 @@ class GameScript(
                 Quantity.of(quantity).getOrElse { error("$it") },
             ),
         )
+    }
+
+    /** 進行役が観察用の招待を発行する（B9）。招待の ID を返す。 */
+    fun invite(): InvitationId {
+        val id = InvitationId(UUID.randomUUID())
+        val at = now()
+        applyGame(facilitator, at, GameCommand.InviteObserver(facilitator, at, id, at.plusSeconds(86_400)))
+        return id
+    }
+
+    fun revokeInvitation(invitation: InvitationId): GameScript {
+        val at = now()
+        applyGame(facilitator, at, GameCommand.RevokeObserverInvitation(facilitator, at, invitation))
+        return this
+    }
+
+    /** 招待で観察者が参加する（B9）。観察者の ID を返す。 */
+    fun observerJoins(invitation: InvitationId): ObserverId {
+        val id = ObserverId(UUID.randomUUID())
+        val at = now()
+        val name = DisplayName.of("見学者").getOrElse { error("$it") }
+        applyGame(
+            Actor.Anonymous,
+            at,
+            GameCommand.JoinAsObserver(Actor.Anonymous, at, id, invitation, name, at.plusSeconds(86_400)),
+        )
+        return id
     }
 
     fun revoke(participant: ParticipantId): GameScript {
