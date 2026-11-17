@@ -658,3 +658,18 @@ describe('S06 進行役のコンソール（確定方式）', () => {
         await waitFor(() => expect(api.setCommitMode).toHaveBeenCalledWith(GAME_ID, 'MANUAL'));
     });
 });
+
+describe('S06 進行役のコンソール（終了後）', () => {
+    it('終了後は、振り返りへの導線を示す', async () => {
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState()),
+            getSessionState: () => Promise.resolve(consoleState({ status: 'ENDED' })),
+        });
+        renderApp(api, PATH);
+
+        expect(await screen.findByRole('link', { name: '振り返りを見る' })).toHaveAttribute(
+            'href',
+            `/games/${GAME_ID}/review`,
+        );
+    });
+});

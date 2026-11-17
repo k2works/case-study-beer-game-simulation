@@ -90,6 +90,27 @@ paths:
         "403": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/review:
+    get:
+      tags: [ゲーム]
+      operationId: getReview
+      summary: 終了後の振り返り（全役割の全週の結果。B4）
+      description: |
+        認可は進行役と参加者（終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
+        資格が無い・別のゲーム・存在しないゲームは、資格の失敗と同じ 403。需要は、小売店の `orders`（顧客からの注文）と同じ値。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+      responses:
+        "200":
+          description: 振り返り
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/participants/{participantId}/role:
     put:
       tags: [ゲーム]
@@ -737,6 +758,7 @@ components:
         - game.start_condition_not_met
         - game.credential_already_revoked
         - game.credential_not_revoked
+        - game.not_ended
         - validation.invalid_input
         - app.retry_exhausted
         - app.idempotency_key_reused
@@ -1130,6 +1152,22 @@ components:
         participants:
           type: array
           items: { $ref: "#/components/schemas/LobbyParticipant" }
+        versions: { $ref: "#/components/schemas/StreamVersions" }
+    Review:
+      type: object
+      description: 終了後の振り返り（B4）。全役割の全週の結果を、週・役割の順に並べる。需要は、小売店の `orders` と同じ値。
+      required: [gameId, finalWeek, settingsKind, changedSettings, commitMode, results, versions]
+      properties:
+        gameId: { type: string, format: uuid }
+        finalWeek: { type: integer }
+        settingsKind: { $ref: "#/components/schemas/SettingsKind" }
+        changedSettings:
+          type: array
+          items: { $ref: "#/components/schemas/SettingsField" }
+        commitMode: { $ref: "#/components/schemas/CommitMode" }
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/RoleWeekResult" }
         versions: { $ref: "#/components/schemas/StreamVersions" }
     GameState:
       type: object

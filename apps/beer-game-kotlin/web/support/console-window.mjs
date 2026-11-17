@@ -107,6 +107,59 @@ export class ConsoleWindow {
         await call(facilitator, 'POST', `/games/${this.gameId}/start`);
     }
 
+    /** 全週を、各役割 4 で入力・確定して、ゲームを終了させる（前提の準備。確定は、版 1 を根拠にする）。 */
+    async finishAllWeeks(finalWeek = 12) {
+        const facilitator = this.browserContext.request;
+        for (let week = 1; week <= finalWeek; week++) {
+            await this.seedDecisions(week, {
+                retailer: 4,
+                wholesaler: 4,
+                distributor: 4,
+                factory: 4,
+            });
+            const basis = Object.fromEntries(ROLES.map((role) => [role, 1]));
+            await call(facilitator, 'POST', `/sessions/${this.gameId}/weeks/${week}/commit`, {
+                requestedWeek: week,
+                basis,
+            });
+        }
+    }
+
+    /** 参加者の画面（プレイ）の「振り返りを見る」から、振り返りを開く。 */
+    async openReviewFromPlay(key) {
+        const { context: apiContext } = this.participants.get(key);
+        const context = await this.browser.newContext({
+            baseURL: this.baseURL,
+            locale: 'ja-JP',
+            storageState: await apiContext.storageState(),
+        });
+        const page = await context.newPage();
+        this.players.set(key, { context, page });
+        await page.goto(`/games/${this.gameId}/play`);
+        await page.getByRole('link', { name: '振り返りを見る' }).click({ timeout: WAIT_MS });
+        await page.getByRole('heading', { name: '振り返り' }).waitFor({ timeout: WAIT_MS });
+        this.reviewPage = page;
+    }
+
+    /** 振り返りの表の列見出し。 */
+    async reviewColumns() {
+        const table = this.reviewPage.getByRole('table', { name: '週次推移の表' });
+        await table.waitFor({ timeout: WAIT_MS });
+        return table.getByRole('columnheader').allTextContents();
+    }
+
+    /** 振り返りの指標を切り替える。 */
+    async switchReviewMetric(label) {
+        await this.reviewPage.getByRole('radio', { name: label }).check({ timeout: WAIT_MS });
+    }
+
+    /** 振り返りの表の見出し（「<指標>の週次推移（グラフと同じ値）」）。 */
+    async reviewCaption() {
+        const caption = this.reviewPage.locator('table caption');
+        await caption.waitFor({ timeout: WAIT_MS });
+        return caption.innerText();
+    }
+
     /** 別の Cookie の入れ物で参加し、進行役が [role] に割り当てる。窓口では [key] で引く。 */
     async joinAndAssign(facilitator, joinCode, key, role, displayName) {
         const context = await request.newContext({ baseURL: this.baseURL });

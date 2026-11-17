@@ -206,3 +206,12 @@ data class Snapshot(
     val view: SnapshotView,
     val settings: SettingsSummary = SettingsSummary.KIT,
 )
+
+/** 振り返り（B4）。終了後の、全役割の全週の結果。需要は、小売店の `orders`（顧客からの注文）と同じ。 */
+data class Review(
+    val gameId: GameId,
+    val finalWeek: Int,
+    val settings: SettingsSummary,
+    val results: List<WeekResultView>,
+    val versions: Versions,
+)

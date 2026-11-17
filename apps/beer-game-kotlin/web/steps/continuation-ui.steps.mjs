@@ -139,3 +139,30 @@ When('進行役が、コンソールで自動確定を有効にする', async fu
 Then('コンソールに、"自動確定: {word}"と表示される', async function (label) {
     await this.console.autoCommitShown(label);
 });
+
+Given('全週が確定され、ゲームが終了している', async function () {
+    await this.console.finishAllWeeks();
+});
+
+When('{word}の参加者が、プレイの画面から振り返りを開く', async function (label) {
+    await this.console.openReviewFromPlay(roleOf(label));
+});
+
+Then('振り返りの表に、週・需要・小売店・二次卸・一次卸・工場の列が示される', async function () {
+    assert.deepEqual(await this.console.reviewColumns(), [
+        '週',
+        '需要',
+        '小売店',
+        '二次卸',
+        '一次卸',
+        '工場',
+    ]);
+});
+
+When('振り返りで、指標を「{word}」に切り替える', async function (label) {
+    await this.console.switchReviewMetric(label);
+});
+
+Then('振り返りの表が、{word}の週次推移になる', async function (label) {
+    assert.match(await this.console.reviewCaption(), new RegExp(`^${label}の週次推移`));
+});

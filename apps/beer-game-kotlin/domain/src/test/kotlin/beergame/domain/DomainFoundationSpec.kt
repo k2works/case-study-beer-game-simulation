@@ -27,6 +27,7 @@ class DomainFoundationSpec :
                     Triple(GameError.AlreadyCreated, "game.already_created", ErrorCategory.InvalidState),
                     Triple(GameError.InvitationInvalid, "game.invitation_invalid", ErrorCategory.Forbidden),
                     Triple(GameError.NotPreparing, "game.not_preparing", ErrorCategory.InvalidState),
+                    Triple(GameError.NotEnded, "game.not_ended", ErrorCategory.InvalidState),
                     Triple(GameError.Forbidden("x"), "game.forbidden", ErrorCategory.Forbidden),
                     Triple(GameError.ParticipantNotFound(pid(1)), "game.participant_not_found", ErrorCategory.NotFound),
                     Triple(

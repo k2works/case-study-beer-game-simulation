@@ -12,6 +12,7 @@ import type {
     Lobby,
     ProblemBody,
     ProxyDecisionRequest,
+    Review,
     RecoverRequest,
     RecoverResponse,
     Role,
@@ -24,6 +25,8 @@ export interface ApiClient {
     createGame(request: CreateGameRequest): Promise<CreateGameResult>;
     getGameState(gameId: string): Promise<GameState>;
     getLobby(gameId: string): Promise<Lobby>;
+    /** 終了後の振り返り（全役割の全週の結果）。終了前は 409（game.not_ended）。 */
+    getReview(gameId: string): Promise<Review>;
     assignRole(gameId: string, participantId: string, role: Role): Promise<CommandResponse>;
     joinGame(request: JoinGameRequest): Promise<JoinResponse>;
     /**
@@ -191,6 +194,7 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         },
         getGameState: (gameId) => query<GameState>(`/games/${gameId}/state`),
         getLobby: (gameId) => query<Lobby>(`/games/${gameId}/lobby`),
+        getReview: (gameId) => query<Review>(`/games/${gameId}/review`),
         async assignRole(gameId, participantId, role) {
             return commandResponse(
                 await command('PUT', `/games/${gameId}/participants/${participantId}/role`, {

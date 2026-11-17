@@ -45,6 +45,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/games/{gameId}/review': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 終了後の振り返り（全役割の全週の結果。B4）
+         * @description 認可は進行役と参加者（終了後は、他の役割の値を含む。学習の振り返りのため）。**ゲームが終了するまでは開示しない**（`game.not_ended`。409。AC4.2.2）。
+         *     資格が無い・別のゲーム・存在しないゲームは、資格の失敗と同じ 403。需要は、小売店の `orders`（顧客からの注文）と同じ値。
+         */
+        get: operations['getReview'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/games/{gameId}/participants/{participantId}/role': {
         parameters: {
             query?: never;
@@ -458,6 +479,7 @@ export interface components {
             | 'game.start_condition_not_met'
             | 'game.credential_already_revoked'
             | 'game.credential_not_revoked'
+            | 'game.not_ended'
             | 'validation.invalid_input'
             | 'app.retry_exhausted'
             | 'app.idempotency_key_reused'
@@ -734,6 +756,17 @@ export interface components {
             participants: components['schemas']['LobbyParticipant'][];
             versions: components['schemas']['StreamVersions'];
         };
+        /** @description 終了後の振り返り（B4）。全役割の全週の結果を、週・役割の順に並べる。需要は、小売店の `orders` と同じ値。 */
+        Review: {
+            /** Format: uuid */
+            gameId: string;
+            finalWeek: number;
+            settingsKind: components['schemas']['SettingsKind'];
+            changedSettings: components['schemas']['SettingsField'][];
+            commitMode: components['schemas']['CommitMode'];
+            results: components['schemas']['RoleWeekResult'][];
+            versions: components['schemas']['StreamVersions'];
+        };
         /** @description 呼び出した人ごとの投影。進行役は `joinCode`・`finalWeek`、参加者は `participantId`・`role` を受け取る。 */
         GameState: {
             /** Format: uuid */
@@ -980,6 +1013,32 @@ export interface operations {
                 };
             };
             403: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+        };
+    };
+    getReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 振り返り */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Review'];
+                };
+            };
+            403: components['responses']['Problem'];
+            409: components['responses']['Problem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
         };

@@ -99,6 +99,8 @@ export type LobbyParticipant = Schemas['LobbyParticipant'];
 
 export type Lobby = Schemas['Lobby'];
 
+export type Review = Schemas['Review'];
+
 export type GameState = Schemas['GameState'];
 
 export type RoleStatus = Schemas['RoleStatus'];

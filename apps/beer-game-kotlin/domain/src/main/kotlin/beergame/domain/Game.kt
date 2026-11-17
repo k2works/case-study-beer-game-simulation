@@ -276,6 +276,12 @@ sealed interface GameError : DomainError {
         override val category: ErrorCategory = ErrorCategory.Forbidden
     }
 
+    /** 終了していない。振り返りは、終了後だけ開示する（AC4.2.2）。 */
+    data object NotEnded : GameError {
+        override val code: String = "game.not_ended"
+        override val category: ErrorCategory = ErrorCategory.InvalidState
+    }
+
     /** 準備中でない（未作成、または開始済み）。 */
     data object NotPreparing : GameError {
         override val code: String = "game.not_preparing"

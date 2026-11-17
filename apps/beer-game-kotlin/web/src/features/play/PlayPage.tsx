@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
@@ -258,7 +258,10 @@ export function PlayPage() {
                     ) : null}
 
                     {status === 'ENDED' || roleStatus === undefined ? (
-                        <p>終了しました。入力できません。</p>
+                        <>
+                            <p>終了しました。入力できません。</p>
+                            <Link to={`/games/${gameId}/review`}>振り返りを見る</Link>
+                        </>
                     ) : (
                         <>
                             <dl className="status-list">

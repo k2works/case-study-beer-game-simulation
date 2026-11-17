@@ -5,6 +5,7 @@ import { ConsolePage } from './features/console/ConsolePage';
 import { LobbyPage } from './features/lobby/LobbyPage';
 import { JoinPage } from './features/participation/JoinPage';
 import { PlayPage } from './features/play/PlayPage';
+import { ReviewPage } from './features/review/ReviewPage';
 import { CreateGamePage } from './features/setup/CreateGamePage';
 import { WelcomePage } from './features/welcome/WelcomePage';
 
@@ -44,6 +45,7 @@ export function AppRoutes() {
                 <Route path="/games/:gameId/lobby" element={<LobbyPage />} />
                 <Route path="/games/:gameId/play" element={<PlayPage />} />
                 <Route path="/games/:gameId/console" element={<ConsolePage />} />
+                <Route path="/games/:gameId/review" element={<ReviewPage />} />
                 <Route path="*" element={<NotFoundPage />} />
             </Route>
         </Routes>

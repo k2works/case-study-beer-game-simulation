@@ -139,6 +139,24 @@ private suspend fun ContractClient.playPhase(game: PlayedGame) {
     expect(422, get("/sessions/${game.id}/state?role=NOBODY", game.cookieOf("RETAILER")))
 }
 
+/** 振り返りの経路（B4）: 終了前は 409、終了後は進行役と参加者に 200、資格の無い人は 403。 */
+private suspend fun ContractClient.reviewPhase() {
+    val game = started()
+    expect(409, get("/games/${game.id}/review", game.facilitator))
+    expect(409, get("/games/${game.id}/review", game.cookieOf("RETAILER")))
+    (1..FINAL_WEEK).forEach { week ->
+        ROLES.forEach { role ->
+            expect(200, put("/sessions/${game.id}/decisions", """{"week":$week,"quantity":4}""", game.cookieOf(role)))
+        }
+        expect(200, post("/sessions/${game.id}/weeks/$week/commit", commitBody(week, 1), game.facilitator))
+    }
+    expect(200, get("/games/${game.id}/review", game.facilitator))
+    expect(200, get("/games/${game.id}/review", game.cookieOf("FACTORY")))
+    expect(403, get("/games/${game.id}/review"))
+}
+
+private const val FINAL_WEEK = 3
+
 /** 確定の根拠にした入力が、確定の前に変わった（409）。古い版の保存は、B1 でどう返っても、仕様の宣言に収まること。 */
 private suspend fun ContractClient.changedDecisionsPhase() {
     val game = started()
@@ -242,6 +260,7 @@ class ApiContractSpec :
                 c.startPhase(game)
                 c.playPhase(game)
                 c.changedDecisionsPhase()
+                c.reviewPhase()
                 c.continuationPhase()
                 // 経路・メソッドの違い（仕様に無い経路は、request.* の problem+json）と、運用の確認
                 c.expect(404, get("/no-such-route"))

@@ -43,3 +43,20 @@ suspend fun Ports.snapshot(
             }
         }
     }
+
+/**
+ * 振り返り（`GET /games/{id}/review`。B4）。進行役と参加者が、終了後に、全役割の全週の結果を取得する。
+ * 終了前は `game.not_ended`（開示しない。AC4.2.2）。資格が無効・別のゲーム・存在しないゲームは [AppFailure.Unauthorized]。
+ */
+suspend fun Ports.review(
+    gameId: GameId,
+    credential: String?,
+): Either<AppFailure, Review> =
+    either {
+        val at = now()
+        val verified = events.transaction { tx -> verifiedSession(tx, credential, at) }.bind()
+        ensure(verified.gameId == gameId) { AppFailure.Unauthorized }
+        ensure(verified.actor !is Actor.Anonymous) { AppFailure.Unauthorized }
+        val game = ensureNotNull(reader.read(gameId).bind()) { AppFailure.Unauthorized }
+        Disclosure.forReview(game).mapLeft(AppFailure::Domain).bind()
+    }

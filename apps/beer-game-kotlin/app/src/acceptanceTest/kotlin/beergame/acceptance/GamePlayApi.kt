@@ -197,6 +197,11 @@ class GamePlayApi(
         key: String = newKey(),
     ) = post("/sessions/$gameId/weeks/$week/commit", body, facilitator, key)
 
+    fun review(
+        gameId: String,
+        cookie: String?,
+    ) = get("/games/$gameId/review", cookie)
+
     fun sessionState(
         gameId: String,
         cookie: String?,

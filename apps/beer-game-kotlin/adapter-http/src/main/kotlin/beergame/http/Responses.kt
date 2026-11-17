@@ -3,6 +3,7 @@ package beergame.http
 import beergame.application.CommandOutcome
 import beergame.application.GameStatus
 import beergame.application.LobbyEntry
+import beergame.application.Review
 import beergame.application.RoleStatus
 import beergame.application.SettingsSummary
 import beergame.application.Snapshot
@@ -149,6 +150,16 @@ internal fun Snapshot.toLobbyJson(facilitator: SnapshotView.Facilitator): JsonOb
         put("joinCode", facilitator.joinCode)
         putSettings(settings)
         put("participants", JsonArray(facilitator.lobby.map(::lobbyEntryJson)))
+        put("versions", versions.toJson())
+    }
+
+/** `GET /games/{id}/review`（B4）。全役割の全週の結果。 */
+internal fun Review.toReviewJson(): JsonObject =
+    buildJsonObject {
+        put("gameId", gameId.value.toString())
+        put("finalWeek", finalWeek)
+        putSettings(settings)
+        put("results", JsonArray(results.map(::weekResultJson)))
         put("versions", versions.toJson())
     }
 

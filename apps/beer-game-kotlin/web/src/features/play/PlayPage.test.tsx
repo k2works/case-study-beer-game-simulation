@@ -268,6 +268,10 @@ describe('S05 プレイ', () => {
         });
         renderApp(api, PATH);
         expect(await screen.findByText('終了しました。入力できません。')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: '振り返りを見る' })).toHaveAttribute(
+            'href',
+            `/games/${GAME_ID}/review`,
+        );
         expect(screen.queryByRole('button', { name: '発注を保存' })).not.toBeInTheDocument();
     });
 

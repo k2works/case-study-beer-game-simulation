@@ -26,6 +26,7 @@ const TEXTS: Record<ErrorCode, string | null> = {
     // 資格の失効・再発行の画面は B6 以降。code の辞書だけ先に定める（提案の文言）
     'game.credential_already_revoked': 'この資格はすでに失効しています。',
     'game.credential_not_revoked': '失効していない資格は再発行できません。',
+    'game.not_ended': 'ゲームが終了するまで、振り返りは開けません。',
     'session.incomplete_decisions': null,
     'game.invitation_invalid': null, // 送った資格の種類から選ぶので、下で組み立てる
     // 設計書に文言が無い。受付の終了という理由（Gherkin AC1.2.2）を示す仮置き

@@ -69,6 +69,7 @@ private val TITLES =
         "session.save_limit_reached" to "この週の保存回数の上限（9 回）に達しました。",
         "game.credential_already_revoked" to "この資格は、すでに失効しています。",
         "game.credential_not_revoked" to "この資格は失効していないため、再発行できません。",
+        "game.not_ended" to "ゲームはまだ終了していないため、振り返りは開けません。",
     )
 
 private val DETAILS =

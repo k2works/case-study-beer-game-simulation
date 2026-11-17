@@ -329,6 +329,11 @@ export function ConsolePage() {
                     </button>
                 </section>
             ) : null}
+            {session.status === 'ENDED' ? (
+                <p>
+                    終了しました。<Link to={`/games/${game.gameId}/review`}>振り返りを見る</Link>
+                </p>
+            ) : null}
             {session.status === 'PAUSED' ? (
                 <>
                     <p role="status">停止中です。再開するまで、週を確定できません。</p>

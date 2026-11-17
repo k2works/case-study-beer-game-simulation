@@ -7,6 +7,7 @@ import arrow.core.right
 import beergame.application.AppFailure
 import beergame.application.Snapshot
 import beergame.application.SnapshotView
+import beergame.application.review
 import beergame.application.snapshot
 import beergame.domain.GameId
 import beergame.domain.Role
@@ -36,6 +37,19 @@ internal fun Route.queryRoutes(deps: HttpDeps) {
     get("/games/{gameId}/state") {
         call.operation("getGameState")
         call.respondSnapshot(deps, "gameId") { snapshot -> snapshot.toGameStateJson().right() }
+    }
+    get("/games/{gameId}/review") {
+        call.operation("getReview")
+        val result =
+            either<Problem, JsonObject> {
+                val id = call.gameIdParam("gameId").bind()
+                deps.ports
+                    .review(GameId(id), call.credential())
+                    .mapLeft { it.toProblem() }
+                    .bind()
+                    .toReviewJson()
+            }
+        result.fold({ call.respondProblem(it) }, { call.respondJson(HttpStatusCode.OK, it) })
     }
     get("/games/{gameId}/lobby") {
         call.operation("getLobby")

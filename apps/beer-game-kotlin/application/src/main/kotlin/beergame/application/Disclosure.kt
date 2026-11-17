@@ -75,6 +75,23 @@ object Disclosure {
         }
     }
 
+    /**
+     * 振り返り（AC4.2.1・AC4.2.2）。終了後だけ、全役割の全週の結果を返す（進行役も参加者も同じ）。
+     * 終了前は、値を持たず `game.not_ended`。
+     */
+    fun forReview(game: ProjectedGame): Either<GameError, Review> =
+        if (game.status != GameStatus.ENDED) {
+            GameError.NotEnded.left()
+        } else {
+            Review(
+                gameId = game.gameId,
+                finalWeek = game.finalWeek,
+                settings = game.settings,
+                results = game.results.sortedWith(compareBy({ it.week }, { it.role.ordinal })).map { it.view() },
+                versions = game.versions,
+            ).right()
+        }
+
     private fun Editor.isParticipant(participantId: ParticipantId): Boolean =
         this is Editor.ByParticipant && id == participantId
 
