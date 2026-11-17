@@ -9542,7 +9542,7 @@
 
 <h1 id="_1">用語集（生成）<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
 <p>この文書は、コードの注釈とソースから生成した。手で編集しない（試験 <code>LivingDocumentationSpec</code> が、コードとの不一致で失敗する）。再生成: <code>./gradlew :domain:generateLivingDocs</code>。</p>
-<p>注釈 <code>@Term</code> を付けた型の 13 項目。これから書くコードと、B5 で足した概念から付け始める（既存コードへの一括適用はしない）。
+<p>注釈 <code>@Term</code> を付けた型の 14 項目。これから書くコードと、B5 で足した概念から付け始める（既存コードへの一括適用はしない）。
 全体のユビキタス言語は<a href="../../domain-model/">ドメインモデル設計</a>の「ユビキタス言語」を参照する。</p>
 <table>
 <thead>
@@ -9603,9 +9603,15 @@
 <td style="text-align: left;">BR-10</td>
 </tr>
 <tr>
+<td style="text-align: left;">観察用の招待</td>
+<td style="text-align: left;"><code>InvitationEntry</code></td>
+<td style="text-align: left;">進行役が発行する、観察者を招くためのコード。参加コードとは別の値で、失効または期限切れの招待では新しく参加できない</td>
+<td style="text-align: left;">AC1.3.1〜1.3.4、BR-17</td>
+</tr>
+<tr>
 <td style="text-align: left;">資格の主体</td>
 <td style="text-align: left;"><code>CredentialSubject</code></td>
-<td style="text-align: left;">資格を持つ人。進行役（ゲーム単位）か参加者。資格の失効・再発行・復帰は、主体ごとに行う（観察者は未実装）</td>
+<td style="text-align: left;">資格を持つ人。進行役（ゲーム単位）、参加者、観察者。資格の失効・再発行・復帰は、主体ごとに行う（観察者は対象外）</td>
 <td style="text-align: left;">ドメインモデル 資格、AC3.2.5</td>
 </tr>
 <tr>

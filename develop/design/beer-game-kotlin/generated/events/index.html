@@ -9542,7 +9542,7 @@
 
 <h1 id="_1">イベント一覧（生成）<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
 <p>この文書は、コードの注釈とソースから生成した。手で編集しない（試験 <code>LivingDocumentationSpec</code> が、コードとの不一致で失敗する）。再生成: <code>./gradlew :domain:generateLivingDocs</code>。</p>
-<p>実装済みのドメインイベント 18 種類。ID は<a href="../../domain-model/">ドメインモデル設計</a>の「ドメインイベント」の表と同じで、
+<p>実装済みのドメインイベント 21 種類。ID は<a href="../../domain-model/">ドメインモデル設計</a>の「ドメインイベント」の表と同じで、
 名前が違うとき、または実装にあって設計書の表に無いときは、試験が失敗する。
 ストリームとペイロードの項目は型から、購読する投影は <code>Projection.kt</code> の走査から、発生する条件は注釈 <code>@EventSpec</code> から作る。</p>
 <table>
@@ -9588,6 +9588,30 @@
 <td style="text-align: left;">AssignRole による付け替え（解除の側）。単独の UnassignRole は未実装</td>
 <td style="text-align: left;"><code>participantId</code>、<code>role</code></td>
 <td style="text-align: left;"><code>lobbyParticipants</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G05</td>
+<td style="text-align: left;"><code>ObserverInvited</code></td>
+<td style="text-align: left;">game</td>
+<td style="text-align: left;">InviteObserver。進行役。準備中と開始後</td>
+<td style="text-align: left;"><code>invitationId</code>、<code>expiresAt</code></td>
+<td style="text-align: left;"><code>lobbyObserverInvitations</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G06</td>
+<td style="text-align: left;"><code>ObserverInvitationRevoked</code></td>
+<td style="text-align: left;">game</td>
+<td style="text-align: left;">RevokeObserverInvitation。進行役、失効していない招待（期限切れでも可）</td>
+<td style="text-align: left;"><code>invitationId</code></td>
+<td style="text-align: left;"><code>lobbyObserverInvitations</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G07</td>
+<td style="text-align: left;"><code>ObserverJoined</code></td>
+<td style="text-align: left;">game</td>
+<td style="text-align: left;">JoinAsObserver。有効で期限内の招待（準備中と開始後）</td>
+<td style="text-align: left;"><code>observerId</code>、<code>invitationId</code>、<code>credentialExpiresAt</code></td>
+<td style="text-align: left;"><code>lobbyObservers</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">EV-G08</td>
@@ -9683,7 +9707,7 @@
 <td style="text-align: left;">session</td>
 <td style="text-align: left;">CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定（B8）は、最後の入力・再開・方式の変更と同じ追記</td>
 <td style="text-align: left;"><code>week</code>、<code>commitKind</code>、<code>decisions</code>、<code>results</code>、<code>nextStates</code>、<code>contributors</code></td>
-<td style="text-align: left;"><code>sessionOverview</code>、<code>roleCurrentStates</code>、<code>currentDecisions</code>、<code>weekCommits</code>、<code>weekRoleResults</code></td>
+<td style="text-align: left;"><code>sessionOverview</code>、<code>roleCurrentStates</code>、<code>currentDecisions</code>、<code>weekCommits</code>、<code>weekRoleResults</code>、<code>weekTeamTotals</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">EV-S09</td>
@@ -9705,9 +9729,6 @@
 </table>
 <h2 id="_2">設計書にあり、まだ実装が無いイベント<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <ul>
-<li>EV-G05 <code>ObserverInvited</code></li>
-<li>EV-G06 <code>ObserverInvitationRevoked</code></li>
-<li>EV-G07 <code>ObserverJoined</code></li>
 <li>EV-S07 <code>AutoCommitChanged</code></li>
 </ul>
 

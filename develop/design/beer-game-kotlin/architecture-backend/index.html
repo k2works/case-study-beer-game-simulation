@@ -10741,19 +10741,19 @@
 <tr>
 <td style="text-align: left;">観察</td>
 <td style="text-align: left;"><code>POST /games/:id/observer-invitations</code></td>
-<td style="text-align: left;"><code>InviteObserver</code>（<code>game</code>）</td>
+<td style="text-align: left;"><code>InviteObserver</code>（<code>game</code>）。<strong>B9 の実装</strong>: 招待コードと招待の ID・期限を、この応答だけが運ぶ</td>
 <td style="text-align: left;">進行役</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;"><code>DELETE /games/:id/observer-invitations/:invid</code></td>
-<td style="text-align: left;"><code>RevokeObserverInvitation</code>（<code>game</code>）</td>
+<td style="text-align: left;"><code>POST /games/:id/observer-invitations/:invid/revoke</code></td>
+<td style="text-align: left;"><code>RevokeObserverInvitation</code>（<code>game</code>）。<strong>B9 の実装は <code>DELETE</code> でなく <code>POST …/revoke</code></strong>（資格の失効と同じ形。冪等キーを持つ）</td>
 <td style="text-align: left;">進行役</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;"><code>POST /observers/join</code></td>
-<td style="text-align: left;"><code>JoinAsObserver</code>（<code>game</code>）</td>
+<td style="text-align: left;"><code>POST /participations/observe</code></td>
+<td style="text-align: left;"><code>JoinAsObserver</code>（<code>game</code>）。<strong>B9 の実装は <code>/observers/join</code> でなく <code>/participations/observe</code></strong>（参加の経路と同じ場所。接続元の窓の対象）。ブラウザセッションだけを発行し、復帰資格は発行しない</td>
 <td style="text-align: left;">観察用の招待コード</td>
 </tr>
 <tr>
@@ -10808,7 +10808,7 @@
 <td style="text-align: left;">学習</td>
 <td style="text-align: left;"><code>GET /games/:id/{observation,review}</code>、<code>GET /games/:id/exports</code></td>
 <td style="text-align: left;">（問い合わせ。出力は要求時に <code>buildExport</code> で生成）</td>
-<td style="text-align: left;">観察は参加者・進行役・観察者、振り返りと出力は終了後</td>
+<td style="text-align: left;">観察は<strong>観察者と進行役</strong>（B9。参加者は開けない。BR-17）、振り返りは進行役・参加者・観察者で終了後（B4・B9）、出力は終了後</td>
 </tr>
 <tr>
 <td style="text-align: left;">資格</td>

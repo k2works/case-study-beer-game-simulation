@@ -10434,7 +10434,7 @@
 <tr>
 <td style="text-align: left;">資格の主体（CredentialSubject）</td>
 <td style="text-align: left;"><code>sealed interface</code></td>
-<td style="text-align: left;"><code>Facilitator(gameId)</code>、<code>Participant(id)</code>。観察者（<code>Observer</code>）は B9 で足す。失効・再発行の対象は参加者だけ（ゲート 1 の決定）。</td>
+<td style="text-align: left;"><code>Facilitator(gameId)</code>、<code>Participant(id)</code>、<code>Observer(id)</code>（B9）。観察者は参加（<code>ObserverJoined</code>）で資格を持つが、失効・再発行・復帰の対象ではない（観察者の復帰は未決のまま。復帰資格は発行しない）。失効・再発行の対象は参加者だけ（ゲート 1 の決定）。</td>
 </tr>
 <tr>
 <td style="text-align: left;">保持方針（RetentionPolicy）</td>
@@ -10586,7 +10586,13 @@
 <td style="text-align: left;"><code>game.invitation_invalid</code></td>
 <td style="text-align: left;"><code>GameError.InvitationInvalid</code></td>
 <td style="text-align: left;"><code>Forbidden</code></td>
-<td style="text-align: left;">403。<strong>参加コードの不明・形式不正を区別しない</strong>。<code>decide</code> は返さず、境界が参加コードからゲームを引けなかったときに使う。<code>DomainError</code> が封印されているため <code>domain</code> に置く</td>
+<td style="text-align: left;">403。<strong>参加コードの不明・形式不正を区別しない</strong>。参加では、境界が参加コードからゲームを引けなかったときに使う（<code>decide</code> は返さない）。<strong>B9: 観察用の招待では、<code>decideJoinAsObserver</code> が、不明・失効・期限切れを区別せず返す</strong>。<code>DomainError</code> が封印されているため <code>domain</code> に置く</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>game.invitation_not_found</code></td>
+<td style="text-align: left;"><code>GameError.InvitationNotFound</code></td>
+<td style="text-align: left;"><code>NotFound</code></td>
+<td style="text-align: left;">404（B9。失効させようとした観察用の招待が、このゲームに無い）。失効済みの招待の再失効は <code>game.credential_already_revoked</code>（409）を使う</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>game.credential_already_revoked</code></td>
@@ -10676,7 +10682,7 @@
 <span class="w">    </span><span class="kd">val</span><span class="w"> </span><span class="nv">version</span><span class="p">:</span><span class="w"> </span><span class="n">StreamVersion</span>
 
 <span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">object</span><span class="w"> </span><span class="nc">NotCreated</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">GameState</span><span class="w">                       </span><span class="c1">// ストリームが空</span>
-<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Preparing</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">data</span><span class="p">:</span><span class="w"> </span><span class="n">GameData</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">GameState</span><span class="w">     </span><span class="c1">// 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`。招待・観察者は B9。保持方針 `retention` は未実装）</span>
+<span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Preparing</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">data</span><span class="p">:</span><span class="w"> </span><span class="n">GameData</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">GameState</span><span class="w">     </span><span class="c1">// 参加・割り当てを受け付ける（実装の `GameData` は設定・参加者・割り当てと、B5 で足した資格 `credentials`、B9 で足した招待 `invitations`・観察者 `observers`。保持方針 `retention` は未実装）</span>
 <span class="w">    </span><span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Started</span><span class="p">(</span><span class="kd">val</span><span class="w"> </span><span class="nv">data</span><span class="p">:</span><span class="w"> </span><span class="n">GameData</span><span class="p">)</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">GameState</span><span class="w">       </span><span class="c1">// 設定を固定。割り当ては、入れ替え（下の「役割の入れ替え」）だけが変える</span>
 <span class="p">}</span>
 
@@ -11491,7 +11497,7 @@
 </tbody>
 </table>
 <p><strong>出力（<code>ExportPackage</code>）は投影にしません。</strong> 問い合わせの時に、全域の純粋関数 <code>buildExport(settings, weekRoleResults): ExportPackage</code>（<code>Either</code> を返さない）で、<code>WeekRoleResults</code> と設定から作ります。<code>checksum</code> と <code>schema_version</code> も要求時に算出します。設定と全週記録の CSV・JSON で、設定の種別（カスタムの識別）を含みます。閲覧できるのは進行役です。出力は読み取りの導出であり、最終週の確定（<code>WeekCommitted</code> と <code>SessionEnded</code> の追記）は出力の作成に依存しません（設計判断 D11）。</p>
-<p><strong>開示の判定（<code>Disclosure</code>）</strong> は、投影の読み取りに掛ける純粋関数です。<strong>B1 の実装は <code>application</code> に置きます</strong>（読み取りの型 <code>ProjectedGame</code> が <code>application</code> にあり、<code>Ports</code> に依存しない純粋関数。<code>domain</code> へ移すのは機械的にできる。変更 #29）。観察者の規則（公開範囲、寄与者数での抑止）は B9 です。</p>
+<p><strong>開示の判定（<code>Disclosure</code>）</strong> は、投影の読み取りに掛ける純粋関数です。<strong>B1 の実装は <code>application</code> に置きます</strong>（読み取りの型 <code>ProjectedGame</code> が <code>application</code> にあり、<code>Ports</code> に依存しない純粋関数。<code>domain</code> へ移すのは機械的にできる。変更 #29）。観察者の規則（公開範囲、寄与者数での抑止）は、B9 で <code>Disclosure.forObservation</code>（<code>Observation.kt</code>）に実装した。観察者が読める行は、専用のポート <code>ObservationReader</code>（3 表だけを読む）が返し、公開範囲（<code>game_settings</code>。観察者のロールは読めない）と版は、主の読み取りから、行より先に読む。観察を開けるのは観察者と進行役だけ（参加者・無資格は、資格の失敗と同じ 403）。</p>
 <table>
 <thead>
 <tr>
@@ -11997,6 +12003,7 @@
 | 35 | <code>CredentialValidity</code> は発行時刻・有効期限・失効時刻 | <strong>有効期限と <code>revoked</code>（失効したか）だけ</strong>。時刻は封筒の <code>occurredAt</code> と <code>credentials.revoked_at</code> が持つ（2026-11-15、B5 Step 3） | <code>evolve</code> は封筒を読まず、イベントのペイロードに時刻が無い。同じ事実を二重に持たない |
 | 36 | 失効していない資格の再発行の扱いは未決 | 拒否する（<code>GameError.CredentialNotRevoked</code>、409）。失効・再発行の対象は参加者だけで、進行役自身は <code>Forbidden</code>。未作成も <code>Forbidden</code>（進行役になれる人がいない）。復帰は、操作者が主体自身であることも検査し、失敗はすべて同じ <code>Forbidden("復帰できない")</code>（2026-11-15、B5 Step 3。ゲート 1 の決定の反映） | 漏洩した資格の被害を止める。有効な資格を黙って置き換えない。資格の存在・期限・失効を、復帰の失敗から推測させない（NF-S12） |
 | 37 | 開始後の入れ替えのコマンド・規則が無い（「開始後の入れ替え」は未決） | 既存の <code>AssignRole</code> を開始後も受け付け、<strong>2 ストリームの関数 <code>assignRoleAfterStart</code></strong> が <code>ParticipantReplaced</code>・<code>CredentialRevoked</code>・<code>RoleAssigned</code>（game）と <code>RoleHolderReplaced</code>（session）を同一トランザクションで返す。旧担当者の資格を自動失効し、履歴と入力者のラベルは残す（2026-11-15、B5 Step 3.5.1。<strong>提案。ゲート 3.5 で人が確認する</strong>） | 写し（D4）を更新しないと新担当者が保存できない。コマンドと経路を増やさず、準備中の付け替え（D9）と同じ入口にする（ゲート 1 の決定） |
+| 43（B9。2026-11-17。表の並びは追記の順） | 観察用の招待コードは <code>InvitationCode</code> の値オブジェクトで、招待を <code>GameData</code> が引く | 招待コードの値は、ドメインに持たない（<strong>型を作らない</strong>）。<code>credentials</code>（<code>kind = OBSERVER_INVITATION</code>）のダイジェストの行で、コードから招待の ID を引く（境界の責務）。コードの形は、資格の鍵の版の接頭辞つきの乱数（参加コードと同じ生成器。値・ダイジェストは別）。有効期間は 7 日（仮置き）。観察者は復帰資格を持たない。観察を開けるのは、観察者と進行役（2026-11-17、B9。<strong>判断項目は未承認</strong>） | 値をイベントに入れない（D7）。参加コードの列挙と同じ扱いで、不明・失効・期限切れを区別しない 403 にする |
 | 38 | <code>assignRoleAfterStart</code> のスケッチ（セッションの状態は <code>Active</code>・<code>Paused</code> の確認だけ。<code>evolve</code> は入れ替えの事実を採用） | <strong>実装</strong>（2026-11-15、B5 Step 3.5.2〜3.5.4。実装の確認はゲート 3.5 で人が行う）: 関数は <code>ReplaceDecision.kt</code>（<code>ReplaceDecision</code> と同じファイル）。(1) セッションの確認は <code>openData()</code> を使い、<strong>未開始は <code>NotActive</code></strong>、終了後は <code>AlreadyEnded</code>（スケッチは終了後と同じ扱い）。(2) 新担当者の資格の確認は <code>credentials[subject]?.revoked == false</code>（資格の行がない参加者は <code>CredentialAlreadyRevoked</code>。参加時に必ず発行されるので到達しない列）。(3) <strong><code>evolveGame</code> の <code>RoleAssigned</code> は、開始後も役割を付ける</strong>（準備中と同じ <code>updateData</code>。従来は準備中だけで、開始済みでは状態を変えなかった）。<code>ParticipantReplaced</code> は開始後だけ旧担当者の役割を外す（準備中・未作成・未知の参加者は状態を変えない）。(4) <code>RoleHolderReplaced</code> は進行中・一時停止中だけ写しを更新する（未開始・終了後は状態を変えない） | 開始後の <code>RoleAssigned</code> を採用しないと、入れ替えの結果が再生で復元できない。<code>decide</code> が作らない列は、これまでどおり状態を変えずに返す（<code>replay</code> が検知する） |
 | 39（B5 Step 4.7。2026-11-15） | 投影は <code>SessionStarted</code>・<code>DecisionSaved</code>・<code>WeekCommitted</code> などを購読する（B1） | <code>SessionPaused</code>・<code>SessionResumed</code>（<code>session_overview.status</code> を PAUSED・ACTIVE）、<code>ProxyDecisionSubmitted</code>（<code>current_decisions</code> に進行役の入力者で書き、<code>submitted_role_count</code> を更新）、<code>ParticipantReplaced</code>（<code>lobby_participants</code> の <code>role</code> を NULL、<code>replaced_at</code> を書く行の変更。DB の列はマイグレーション（Step 5.5）まで無い）を購読する。<strong>資格のイベント（<code>CredentialRevoked</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code>）と <code>RoleHolderReplaced</code> は、どの投影も購読しない</strong>（L5。資格の状態の正本は <code>credentials</code>、割り当ての写しは session ストリームの再生） | 投影の契約テストで、資格のイベントが行を作らないことを確認 |
 | 40（B5 Step 8.4。2026-11-15） | 用語・イベントの一覧は、設計書の手書きの表だけ（ユビキタス言語、ドメインイベントの表） | <strong>コードから生成する一覧を足した</strong>: 型に注釈 <code>@Term</code>・<code>@EventSpec</code>（<code>Documentation.kt</code>。標準ライブラリだけ）を付け、<code>LivingDocumentationSpec</code> が <a href="../generated/events/">イベント一覧</a>・<a href="../generated/glossary/">用語集</a> を生成する。<strong>手書きの EV 表は残し</strong>、生成物との不一致（ID・名前）を試験が検出する（実装済みの 17 イベントの ID と名前が、EV 表と一致）。未実装のイベント（EV-G05〜G07、EV-S07）は、生成物の「設計書にあり、まだ実装が無いイベント」に載る。EV 表を生成物への参照に置き換えるかは、人の判断（<a href="../../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>、提案） | 開発戦略の「手作業で更新する一覧は作らない」。生成物と手書きの境界: 生成物 = ID・名前・ストリーム・ペイロードの項目・購読する投影・用語、手書き = 意図・判断・却下した代替案 |
