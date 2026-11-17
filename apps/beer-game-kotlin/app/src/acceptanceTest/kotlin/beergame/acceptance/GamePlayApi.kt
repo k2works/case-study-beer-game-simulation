@@ -202,6 +202,13 @@ class GamePlayApi(
         cookie: String?,
     ) = get("/games/$gameId/review", cookie)
 
+    /** 結果の出力（B10）。[format] が null なら、形式を指定しない。 */
+    fun export(
+        gameId: String,
+        format: String?,
+        cookie: String?,
+    ) = get("/games/$gameId/exports${format?.let { "?format=$it" } ?: ""}", cookie)
+
     fun sessionState(
         gameId: String,
         cookie: String?,

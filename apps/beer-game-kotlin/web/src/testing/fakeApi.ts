@@ -15,6 +15,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): Spied {
         getGameState: unexpected('getGameState'),
         getLobby: unexpected('getLobby'),
         getReview: unexpected('getReview'),
+        exportResult: unexpected('exportResult'),
         getObservation: unexpected('getObservation'),
         inviteObserver: unexpected('inviteObserver'),
         revokeObserverInvitation: unexpected('revokeObserverInvitation'),

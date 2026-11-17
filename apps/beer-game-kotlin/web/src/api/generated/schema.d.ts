@@ -156,6 +156,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/games/{gameId}/exports': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 終了後の結果の出力（CSV または JSON。B10。US4.3）
+         * @description 認可は**進行役だけ**。参加者・観察者・資格の無い人・別のゲーム・存在しないゲームは、区別せず 403（`app.unauthorized`）。
+         *     **ゲームが終了するまでは出力しない**（`game.not_ended`。409）。`format` は必須で、省略・知らない形式は 422（`errors[].field` が `format`）。
+         *
+         *     出力は、投影にせず、要求時に `week_role_results` と設定から作る（`buildExport`。表 `export_packages` は無い）。
+         *     全体を組み立ててから 1 回で返す（ストリーミングしない）。組み立てられなければ、本文は返さず、problem+json（500 `app.internal`。AC4.3.3）。
+         *     設定の種別（`KIT`・`CUSTOM`）と変更した項目、確定方式、全週・全役割の受注・出荷・発注（意思決定）・週末在庫・週末受注残・週次費用・累計費用を含む。
+         *     **表示名・資格・参加コードは含めない**（NF-S14）。入力の保存の履歴（イベント）は含めない（bolt_10_plan の判断項目 6）。
+         *     CSV は RFC 4180（CRLF）。文字列の列の先頭が `=`・`+`・`-`・`@`・タブ・CR のときは、先頭に `'` を付ける（表計算の数式として解釈させない）。
+         *     JSON と CSV は、同じ記録から作るので、数量と費用は一致する（AC4.3.2）。スキーマ版は、CSV の各行の `schema_version`、JSON の `schemaVersion`、`X-Export-Schema-Version` に記録する。
+         */
+        get: operations['getExport'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/games/{gameId}/participants/{participantId}/role': {
         parameters: {
             query?: never;
@@ -1012,6 +1040,42 @@ export interface components {
             /** @description 累計の費用（最小単位） */
             cumulativeCost: number;
         };
+        /**
+         * @description 結果の出力（JSON。B10）。CSV と同じ記録から作るので、数量と費用が一致する。表示名・資格・参加コードを含まない。
+         *     費用は最小単位の整数。`ordered` は、その週に確定した発注（工場は生産要請）の数量（意思決定）。
+         */
+        ExportDocument: {
+            /** @description 出力の形の版（`beer-game-kotlin.export.v1`） */
+            schemaVersion: string;
+            /** Format: uuid */
+            gameId: string;
+            finalWeek: number;
+            settings: {
+                kind: components['schemas']['SettingsKind'];
+                /** @description キットの値から変えた項目（`kind` が `KIT` なら空）。 */
+                changes: components['schemas']['SettingsField'][];
+                commitMode: components['schemas']['CommitMode'];
+            };
+            /** @description 1 週 × 1 役割ごとの記録（週の昇順、役割は上流から下流）。 */
+            records: {
+                week: number;
+                role: components['schemas']['Role'];
+                /** @description その週に受けた注文 */
+                orders: number;
+                /** @description その週の出荷 */
+                shipped: number;
+                /** @description その週に確定した発注（意思決定） */
+                ordered: number;
+                /** @description 週末の在庫 */
+                endingInventory: number;
+                /** @description 週末の受注残 */
+                endingBacklog: number;
+                /** @description その週の費用（最小単位） */
+                weeklyCostMinor: number;
+                /** @description 累計の費用（最小単位） */
+                cumulativeCostMinor: number;
+            }[];
+        };
         /** @description 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。 */
         SessionState: {
             /**
@@ -1350,6 +1414,42 @@ export interface operations {
             };
             403: components['responses']['Problem'];
             409: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+        };
+    };
+    getExport: {
+        parameters: {
+            query: {
+                format: 'csv' | 'json';
+            };
+            header?: never;
+            path: {
+                gameId: components['parameters']['GameId'];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 出力（ダウンロードとして返す） */
+            200: {
+                headers: {
+                    /** @description `attachment; filename="beer-game-{gameId}.csv|json"` */
+                    'Content-Disposition'?: string;
+                    /** @description 本文（UTF-8 のバイト列）の SHA-256。`sha256-` と小文字の 16 進。形式ごとに別の値 */
+                    'X-Export-Checksum'?: string;
+                    /** @description 出力の形の版（`beer-game-kotlin.export.v1`） */
+                    'X-Export-Schema-Version'?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    'text/csv': string;
+                    'application/json': components['schemas']['ExportDocument'];
+                };
+            };
+            403: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
         };

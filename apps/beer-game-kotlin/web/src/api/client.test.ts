@@ -323,6 +323,45 @@ describe('ApiClient（fetch の薄い包み）', () => {
         expect(result).toMatchObject({ gameId: 'g-1', kind: 'PARTICIPANT', role: 'FACTORY' });
     });
 
+    it('exportResult は、形式つきで GET し、本文を Blob で、ファイル名を Content-Disposition から返す', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(
+            new Response('schema_version,game_id\r\n', {
+                status: 200,
+                headers: {
+                    'content-type': 'text/csv; charset=utf-8',
+                    'content-disposition': 'attachment; filename="beer-game-g-1.csv"',
+                },
+            }),
+        );
+        const file = await clientWith(fetchMock).exportResult('g-1', 'csv');
+
+        const call = fetchMock.mock.calls[0]!;
+        expect(call[0]).toBe('/api/v1/games/g-1/exports?format=csv');
+        expect((call[1] as RequestInit).method).toBe('GET');
+        expect(file.filename).toBe('beer-game-g-1.csv');
+        expect(await file.blob.text()).toBe('schema_version,game_id\r\n');
+    });
+
+    it('exportResult は、Content-Disposition が無ければ、既定のファイル名にする', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(json(200, { schemaVersion: 'v1' }));
+        const file = await clientWith(fetchMock).exportResult('g-1', 'json');
+
+        expect(file.filename).toBe('beer-game-g-1.json');
+    });
+
+    it('exportResult は、失敗（409 など）では、ファイルを返さず ApiError を投げる（部分的な結果を返さない）', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValue(
+                problem(409, { type: '/problems/game.not_ended', code: 'game.not_ended' }),
+            );
+
+        await expect(clientWith(fetchMock).exportResult('g-1', 'csv')).rejects.toMatchObject({
+            status: 409,
+            code: 'game.not_ended',
+        });
+    });
+
     it('利用者が操作し直したときは、新しいキーを使う', async () => {
         // Response の本文は一度しか読めないので、呼ばれるたびに新しい応答を返す
         const fetchMock = vi

@@ -229,6 +229,53 @@ paths:
         "409": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
+  /games/{gameId}/exports:
+    get:
+      tags: [ゲーム]
+      operationId: getExport
+      summary: 終了後の結果の出力（CSV または JSON。B10。US4.3）
+      description: |
+        認可は**進行役だけ**。参加者・観察者・資格の無い人・別のゲーム・存在しないゲームは、区別せず 403（`app.unauthorized`）。
+        **ゲームが終了するまでは出力しない**（`game.not_ended`。409）。`format` は必須で、省略・知らない形式は 422（`errors[].field` が `format`）。
+
+        出力は、投影にせず、要求時に `week_role_results` と設定から作る（`buildExport`。表 `export_packages` は無い）。
+        全体を組み立ててから 1 回で返す（ストリーミングしない）。組み立てられなければ、本文は返さず、problem+json（500 `app.internal`。AC4.3.3）。
+        設定の種別（`KIT`・`CUSTOM`）と変更した項目、確定方式、全週・全役割の受注・出荷・発注（意思決定）・週末在庫・週末受注残・週次費用・累計費用を含む。
+        **表示名・資格・参加コードは含めない**（NF-S14）。入力の保存の履歴（イベント）は含めない（bolt_10_plan の判断項目 6）。
+        CSV は RFC 4180（CRLF）。文字列の列の先頭が `=`・`+`・`-`・`@`・タブ・CR のときは、先頭に `'` を付ける（表計算の数式として解釈させない）。
+        JSON と CSV は、同じ記録から作るので、数量と費用は一致する（AC4.3.2）。スキーマ版は、CSV の各行の `schema_version`、JSON の `schemaVersion`、`X-Export-Schema-Version` に記録する。
+      parameters:
+        - $ref: "#/components/parameters/GameId"
+        - name: format
+          in: query
+          required: true
+          schema: { type: string, enum: [csv, json] }
+      responses:
+        "200":
+          description: 出力（ダウンロードとして返す）
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="beer-game-{gameId}.csv|json"`'
+              schema: { type: string }
+            X-Export-Checksum:
+              description: 本文（UTF-8 のバイト列）の SHA-256。`sha256-` と小文字の 16 進。形式ごとに別の値
+              schema: { type: string }
+            X-Export-Schema-Version:
+              description: 出力の形の版（`beer-game-kotlin.export.v1`）
+              schema: { type: string }
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: 見出しの行と、1 週 × 1 役割ごとの行（週の昇順、役割は上流から下流）。列は `schema_version,game_id,settings_kind,settings_changes,commit_mode,week,role,orders,shipped,ordered,ending_inventory,ending_backlog,weekly_cost_minor,cumulative_cost_minor`。
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportDocument"
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /games/{gameId}/participants/{participantId}/role:
     put:
       tags: [ゲーム]
@@ -1477,6 +1524,43 @@ components:
         shipment: { type: integer, description: その週の出荷 }
         cost: { type: integer, description: その週の費用（最小単位） }
         cumulativeCost: { type: integer, description: 累計の費用（最小単位） }
+    ExportDocument:
+      type: object
+      description: |
+        結果の出力（JSON。B10）。CSV と同じ記録から作るので、数量と費用が一致する。表示名・資格・参加コードを含まない。
+        費用は最小単位の整数。`ordered` は、その週に確定した発注（工場は生産要請）の数量（意思決定）。
+      required: [schemaVersion, gameId, finalWeek, settings, records]
+      properties:
+        schemaVersion: { type: string, description: 出力の形の版（`beer-game-kotlin.export.v1`） }
+        gameId: { type: string, format: uuid }
+        finalWeek: { type: integer }
+        settings:
+          type: object
+          required: [kind, changes, commitMode]
+          properties:
+            kind: { $ref: "#/components/schemas/SettingsKind" }
+            changes:
+              type: array
+              description: キットの値から変えた項目（`kind` が `KIT` なら空）。
+              items: { $ref: "#/components/schemas/SettingsField" }
+            commitMode: { $ref: "#/components/schemas/CommitMode" }
+        records:
+          type: array
+          description: 1 週 × 1 役割ごとの記録（週の昇順、役割は上流から下流）。
+          items:
+            type: object
+            required:
+              [week, role, orders, shipped, ordered, endingInventory, endingBacklog, weeklyCostMinor, cumulativeCostMinor]
+            properties:
+              week: { type: integer }
+              role: { $ref: "#/components/schemas/Role" }
+              orders: { type: integer, description: その週に受けた注文 }
+              shipped: { type: integer, description: その週の出荷 }
+              ordered: { type: integer, description: その週に確定した発注（意思決定） }
+              endingInventory: { type: integer, description: 週末の在庫 }
+              endingBacklog: { type: integer, description: 週末の受注残 }
+              weeklyCostMinor: { type: integer, description: その週の費用（最小単位） }
+              cumulativeCostMinor: { type: integer, description: 累計の費用（最小単位） }
     SessionState:
       type: object
       description: 呼び出した人の役割に応じた投影。参加者は自分の役割の `roleStatus` だけを受け取る。進行役は `roles` と `results` を受け取る。

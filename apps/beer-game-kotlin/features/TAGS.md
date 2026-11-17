@@ -9,6 +9,7 @@
   - `weekly-play/` : Epic 2 1 週の意思決定（US2.1〜US2.3）
   - `continuation/` : Epic 3 継続と復旧（US3.1、US3.2）
   - `review/` : 終了後の振り返り（US4.2。B4）
+  - `export/` : 結果の CSV / JSON の出力（US4.3。B10）
   - `observation/` : 観察者の招待と観察（US1.3、US4.1。B9）
   - `operations/` : Epic 6 運用と観測性（US6.1）
 - 2 つの処理系（Cucumber-JVM の `app/`、Cucumber-JS の `web/`）が、この 1 か所を参照する。

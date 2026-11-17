@@ -7,6 +7,7 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
+import { ExportButtons } from './ExportButtons';
 import { METRICS, seriesOf, weeksOf, type Metric, type SeriesKey } from './reviewData';
 import { TrendChart, seriesLabel } from './TrendChart';
 
@@ -23,6 +24,13 @@ export function ReviewPage() {
     const { gameId = '' } = useParams();
     const api = useApi();
     const { state } = useLoad(() => api.getReview(gameId));
+    // 進行役だけが、結果を出力できる（進行役の項目 joinCode を持つ投影）。取得できなければ、出力のボタンだけを示さない
+    const { state: whoAmI } = useLoad(() =>
+        api.getGameState(gameId).then(
+            (game) => game.joinCode !== undefined,
+            () => false,
+        ),
+    );
     const [metric, setMetric] = useState<Metric>('order');
     const [shown, setShown] = useState<ReadonlySet<SeriesKey>>(new Set(ALL_SERIES));
 
@@ -121,6 +129,7 @@ export function ReviewPage() {
                     ))}
                 </tbody>
             </table>
+            {whoAmI.status === 'ready' && whoAmI.data ? <ExportButtons gameId={gameId} /> : null}
             <p>
                 <Link to="/">はじめるへ戻る</Link>
             </p>

@@ -13,6 +13,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.server.testing.ApplicationTestBuilder
@@ -154,6 +155,29 @@ private suspend fun ContractClient.reviewPhase() {
     expect(200, get("/games/${game.id}/review", game.facilitator))
     expect(200, get("/games/${game.id}/review", game.cookieOf("FACTORY")))
     expect(403, get("/games/${game.id}/review"))
+    exportPhase(game)
+}
+
+/**
+ * 出力の経路（B10）: 終了前は 409、終了後は進行役だけ 200（CSV と JSON）、参加者・観察者・無資格は 403、形式の誤りは 422。
+ * 仕様の宣言（`text/csv` と `application/json`、ヘッダー）への適合は、応答のたびに検査される。
+ */
+private suspend fun ContractClient.exportPhase(ended: PlayedGame) {
+    val exports = "/games/${ended.id}/exports"
+    val csv = expect(200, get("$exports?format=csv", ended.facilitator))
+    csv.headers[HttpHeaders.ContentType].orEmpty() shouldContain "text/csv"
+    csv.headers[HttpHeaders.ContentDisposition].orEmpty() shouldContain "beer-game-${ended.id}.csv"
+    val json = expect(200, get("$exports?format=json", ended.facilitator))
+    json.headers[HttpHeaders.ContentType].orEmpty() shouldContain "application/json"
+    json.body().str("schemaVersion") shouldBe "beer-game-kotlin.export.v1"
+    csv.headers["X-Export-Schema-Version"] shouldBe "beer-game-kotlin.export.v1"
+    expect(403, get("$exports?format=csv", ended.cookieOf("RETAILER")))
+    expect(403, get("$exports?format=csv", ended.observer))
+    expect(403, get("$exports?format=csv"))
+    expect(422, get(exports, ended.facilitator))
+    expect(422, get("$exports?format=xml", ended.facilitator))
+    val running = started()
+    expect(409, get("/games/${running.id}/exports?format=csv", running.facilitator))
 }
 
 /**

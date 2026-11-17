@@ -120,6 +120,15 @@ export type ObservationWeek = Schemas['ObservationWeek'];
 
 export type Review = Schemas['Review'];
 
+/** 出力の形式（B10）。`GET /games/{gameId}/exports?format=` の値。 */
+export type ExportFormat = 'csv' | 'json';
+
+/** 出力したファイル（B10）。名前はサーバーが決める（Content-Disposition）。ダウンロードは画面が Blob から行う。 */
+export interface ExportFile {
+    filename: string;
+    blob: Blob;
+}
+
 export type GameState = Schemas['GameState'];
 
 export type RoleStatus = Schemas['RoleStatus'];

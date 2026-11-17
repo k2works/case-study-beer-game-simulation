@@ -5,6 +5,8 @@ import type {
     CommitWeekRequest,
     CreateGameRequest,
     CreateGameResult,
+    ExportFile,
+    ExportFormat,
     GameState,
     CreateGameResponse,
     InviteObserverResponse,
@@ -31,6 +33,8 @@ export interface ApiClient {
     getLobby(gameId: string): Promise<Lobby>;
     /** 終了後の振り返り（全役割の全週の結果）。終了前は 409（game.not_ended）。 */
     getReview(gameId: string): Promise<Review>;
+    /** 進行役だけ。終了後の結果の出力（CSV か JSON）。全体を受け取れたときだけファイルを返す（部分的な結果を返さない）。 */
+    exportResult(gameId: string, format: ExportFormat): Promise<ExportFile>;
     /** プレイ中の観察（現在週・完了状況・チーム合計）。観察者と進行役だけ（B9）。 */
     getObservation(gameId: string): Promise<Observation>;
     /** 進行役。観察用の招待を発行する。招待コードは、この応答だけが運ぶ（再表示しない）。 */
@@ -114,6 +118,12 @@ function parseBody(text: string): ProblemBody {
         // HTML など、problem+json でない本文（LB の応答など）。本文なしの失敗として扱う（状態コードは残す）
         return {};
     }
+}
+
+/** `Content-Disposition: attachment; filename="..."` のファイル名。無ければ [fallback]。 */
+function filenameOf(response: Response, fallback: string): string {
+    const disposition = response.headers.get('Content-Disposition') ?? '';
+    return /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallback;
 }
 
 export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClient {
@@ -207,6 +217,13 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         getGameState: (gameId) => query<GameState>(`/games/${gameId}/state`),
         getLobby: (gameId) => query<Lobby>(`/games/${gameId}/lobby`),
         getReview: (gameId) => query<Review>(`/games/${gameId}/review`),
+        async exportResult(gameId, format) {
+            const response = await send(`/games/${gameId}/exports?format=${format}`, {
+                method: 'GET',
+            });
+            const blob = await response.blob();
+            return { filename: filenameOf(response, `beer-game-${gameId}.${format}`), blob };
+        },
         getObservation: (gameId) => query<Observation>(`/games/${gameId}/observation`),
         async inviteObserver(gameId) {
             return commandResponse<InviteObserverResponse>(

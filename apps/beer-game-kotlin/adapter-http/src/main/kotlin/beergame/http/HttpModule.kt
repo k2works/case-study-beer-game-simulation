@@ -19,6 +19,7 @@ fun Application.beerGameModule(deps: HttpDeps) {
             commandRoutes(deps)
             observerRoutes(deps)
             queryRoutes(deps)
+            exportRoutes(deps)
         }
     }
 }

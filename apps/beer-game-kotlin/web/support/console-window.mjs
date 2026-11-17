@@ -2,6 +2,7 @@
 // 業務ロジックは持たない。計算の値は @api が確かめるので、ここは画面の結線だけを確かめる。
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { request } from 'playwright';
 
 const ROLES = ['RETAILER', 'WHOLESALER', 'DISTRIBUTOR', 'FACTORY'];
@@ -139,6 +140,31 @@ export class ConsoleWindow {
         await page.getByRole('link', { name: '振り返りを見る' }).click({ timeout: WAIT_MS });
         await page.getByRole('heading', { name: '振り返り' }).waitFor({ timeout: WAIT_MS });
         this.reviewPage = page;
+    }
+
+    /** 進行役のコンソールの「振り返りを見る」から、振り返りを開く（B10。進行役の資格は、ブラウザの文脈の Cookie）。 */
+    async openReviewFromConsole() {
+        await this.open();
+        await this.page.getByRole('link', { name: '振り返りを見る' }).click({ timeout: WAIT_MS });
+        await this.page.getByRole('heading', { name: '振り返り' }).waitFor({ timeout: WAIT_MS });
+        this.reviewPage = this.page;
+    }
+
+    /** 振り返りの画面で、出力のボタン（「CSV を出力」など）を押し、ダウンロードされたファイルを控える。 */
+    async pressExport(label) {
+        const downloading = this.reviewPage.waitForEvent('download', { timeout: WAIT_MS });
+        await this.reviewPage.getByRole('button', { name: label }).click({ timeout: WAIT_MS });
+        this.downloaded = await downloading;
+    }
+
+    /** ダウンロードされたファイルの名前と本文。 */
+    async downloadedFile() {
+        assert.ok(this.downloaded, 'ダウンロードされていない');
+        const path = await this.downloaded.path();
+        return {
+            filename: this.downloaded.suggestedFilename(),
+            text: await readFile(path, 'utf8'),
+        };
     }
 
     /** 振り返りの表の列見出し。 */

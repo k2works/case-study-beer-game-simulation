@@ -56,6 +56,7 @@ internal fun operationRequests(game: PlayedGame): List<OperationRequest> =
         ),
         OperationRequest("getSessionState", HttpMethod.Get, "/sessions/${game.id}/state", null, game.facilitator),
         OperationRequest("getReview", HttpMethod.Get, "/games/${game.id}/review", null, game.facilitator),
+        OperationRequest("getExport", HttpMethod.Get, "/games/${game.id}/exports?format=csv", null, game.facilitator),
         OperationRequest("getGameState", HttpMethod.Get, "/games/${game.id}/state", null, game.facilitator),
     ) + continuationRequests(game) + observerRequests(game)
 

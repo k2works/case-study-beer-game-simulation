@@ -199,6 +199,20 @@ internal class OpenApiDocument private constructor(
                 listOf("$label: Content-Type が ${response.contentType}（宣言: ${contents.propertyNames().sorted()}）")
             }
 
+            // 文字列の本文（text/csv。B10）は、JSON のスキーマで検証できない。宣言の型が string で、本文があることだけを確かめる
+            response.contentType.orEmpty().startsWith("text/") -> {
+                val declared =
+                    contents
+                        .get(response.contentType.orEmpty())
+                        .get("schema")
+                        ?.get("type")
+                        ?.asString()
+                buildList {
+                    if (declared != "string") add("$label: text の本文は type: string で宣言する（宣言: $declared）")
+                    if (response.body.isEmpty()) add("$label: 本文が空")
+                }
+            }
+
             else -> {
                 validate(pointerOf(contents.get(response.contentType.orEmpty()).get("schema")), response.body)
                     .map { "$label: $it" }

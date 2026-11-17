@@ -11,7 +11,7 @@ private const val HTTP_UNPROCESSABLE = 422
 private const val ROLE_PATTERN = "小売店|二次卸|一次卸|工場"
 
 /** 変更した項目の呼び名（画面・受入の言葉）と、API の値。 */
-private val FIELD_LABELS =
+internal val FIELD_LABELS =
     mapOf(
         "初期在庫" to "INITIAL_INVENTORY",
         "初期の流れ" to "INITIAL_FLOW",
