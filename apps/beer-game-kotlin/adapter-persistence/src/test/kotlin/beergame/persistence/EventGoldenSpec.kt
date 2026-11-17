@@ -138,6 +138,11 @@ private val GOLDEN: List<Triple<String, DomainEvent, String>> =
             SessionEvent.RoleHolderReplaced(Role.RETAILER, setOf(P2, P1), P3),
             """{"role":"RETAILER","removed":["${P1.value}","${P2.value}"],"added":"${P3.value}"}""",
         ),
+        Triple(
+            "CommitModeChanged",
+            SessionEvent.CommitModeChanged(CommitMode.AUTO),
+            """{"commitMode":"AUTO"}""",
+        ),
         Triple("SessionPaused", SessionEvent.SessionPaused, "{}"),
         Triple("SessionResumed", SessionEvent.SessionResumed, "{}"),
         Triple(

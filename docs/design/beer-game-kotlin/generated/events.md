@@ -11,7 +11,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 この文書は、コードの注釈とソースから生成した。手で編集しない（試験 `LivingDocumentationSpec` が、コードとの不一致で失敗する）。再生成: `./gradlew :domain:generateLivingDocs`。
 
-実装済みのドメインイベント 17 種類。ID は[ドメインモデル設計](../domain-model.md)の「ドメインイベント」の表と同じで、
+実装済みのドメインイベント 18 種類。ID は[ドメインモデル設計](../domain-model.md)の「ドメインイベント」の表と同じで、
 名前が違うとき、または実装にあって設計書の表に無いときは、試験が失敗する。
 ストリームとペイロードの項目は型から、購読する投影は `Projection.kt` の走査から、発生する条件は注釈 `@EventSpec` から作る。
 
@@ -32,8 +32,9 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 | EV-S04 | `SessionEnded` | session | 最終週の WeekCommitted と同じ decide。手動の EndSession は未実装 | `reason` | `gameOverview`、`sessionOverview` |
 | EV-S05 | `DecisionSaved` | session | SaveDecision。進行中、その役割の参加者、意思決定の版が一致 | `week`、`role`、`quantity`、`decisionVersion`、`editor`、`submittedRoleCount` | `sessionOverview`、`currentDecisions` |
 | EV-S06 | `ProxyDecisionSubmitted` | session | SubmitProxyDecision。進行役、進行中または一時停止中、requestedWeek が現在の週と一致 | `week`、`role`、`quantity`、`decisionVersion`、`editor`、`submittedRoleCount` | `sessionOverview`、`currentDecisions` |
-| EV-S08 | `WeekCommitted` | session | CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定は未実装 | `week`、`commitKind`、`decisions`、`results`、`nextStates`、`contributors` | `sessionOverview`、`roleCurrentStates`、`currentDecisions`、`weekCommits`、`weekRoleResults` |
+| EV-S08 | `WeekCommitted` | session | CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定（B8）は、最後の入力・再開・方式の変更と同じ追記 | `week`、`commitKind`、`decisions`、`results`、`nextStates`、`contributors` | `sessionOverview`、`roleCurrentStates`、`currentDecisions`、`weekCommits`、`weekRoleResults` |
 | EV-S09 | `RoleHolderReplaced` | session | AssignRole（開始後の入れ替え）。game ストリームの ParticipantReplaced と同一トランザクション。進行中または一時停止中 | `role`、`removed`、`added` | なし |
+| EV-S10 | `CommitModeChanged` | session | SetCommitMode。進行役、進行中または一時停止中 | `commitMode` | `gameOverview` |
 
 ## 設計書にあり、まだ実装が無いイベント
 

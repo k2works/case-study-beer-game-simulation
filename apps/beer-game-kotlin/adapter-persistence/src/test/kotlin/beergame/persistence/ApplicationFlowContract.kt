@@ -38,10 +38,12 @@ import beergame.application.joinGame
 import beergame.application.recover
 import beergame.application.revokeCredential
 import beergame.application.saveDecision
+import beergame.application.setCommitMode
 import beergame.application.snapshot
 import beergame.application.startGame
 import beergame.application.submitProxyDecision
 import beergame.domain.Actor
+import beergame.domain.CommitMode
 import beergame.domain.CredentialSubject
 import beergame.domain.DomainError
 import beergame.domain.Editor
@@ -850,6 +852,7 @@ fun FunSpec.coInputConcurrencyContract(fixture: () -> Fixture) {
     sameKeyRaceContract(fixture)
     commitAndSaveRaceContract(fixture)
     proxyAndSaveRaceContract(fixture)
+    autoCommitRaceContract(fixture)
 }
 
 private fun FunSpec.sameRoleRaceContract(fixture: () -> Fixture) {
@@ -1055,3 +1058,50 @@ private fun FunSpec.proxyAndSaveRaceContract(fixture: () -> Fixture) {
         }
     }
 }
+
+private fun FunSpec.autoCommitRaceContract(fixture: () -> Fixture) {
+    test("[B8/AC2.4.4] Given 実 DB で 4 役割がそろった手動のゲーム When 自動確定への変更と手動の確定が同時 Then 第 1 週の確定は一度だけ") {
+        val fx = fixture()
+        repeat(RACE_ROUNDS) { round ->
+            val game = fx.start("auto-$round")
+            fx.saveAllRoles(game)
+
+            val raced =
+                fx.raceCommands(
+                    5,
+                    listOf(
+                        { ports ->
+                            ports.commitWeek(
+                                game.gameId,
+                                CommitWeekInput(1, RoleMap.all(1L)),
+                                meta("auto-commit-$round", game.facilitator),
+                            )
+                        },
+                        { ports ->
+                            ports.setCommitMode(
+                                game.gameId,
+                                CommitMode.AUTO,
+                                meta("auto-mode-$round", game.facilitator),
+                            )
+                        },
+                    ),
+                )
+
+            // 方式の変更は、どちらが先でも成功する。手動の確定は、先なら成功、後なら「すでに進んだ」で拒否される
+            raced.results[1].isRight() shouldBe true
+            if (raced.results[0].isLeft()) {
+                raced.results[0].domainError().shouldBeInstanceOf<SessionError.WeekAdvanced>()
+            }
+            fx.eventCount(game.gameId, "WeekCommitted") shouldBe 1
+            fx.eventCount(game.gameId, "CommitModeChanged") shouldBe 1
+        }
+    }
+}
+
+private fun Fixture.eventCount(
+    game: GameId,
+    type: String,
+): Long =
+    query("SELECT COUNT(*) FROM events WHERE game_id = ? AND event_type = ?", game.value, type) {
+        it.getLong(1)
+    }.single()

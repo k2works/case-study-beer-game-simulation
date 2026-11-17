@@ -44,8 +44,9 @@ internal fun parseCreateGame(body: ByteArray): Either<Problem, CreateGameInput> 
                     { obj.intList("demand").bind() },
                     { obj.optionalInt("retentionDays", DEFAULT_RETENTION_DAYS).bind() },
                     { obj.conditions().bind() },
-                ) { kind, finalWeek, demand, retention, conditions ->
-                    Triple(kind, conditions, CreateGameInput(finalWeek, demand, retention))
+                    { obj.optionalCommitMode().bind() },
+                ) { kind, finalWeek, demand, retention, conditions, commitMode ->
+                    Triple(kind, conditions, CreateGameInput(finalWeek, demand, retention, commitMode = commitMode))
                 }
             }
         }.flatMap { (kind, conditions, input) ->

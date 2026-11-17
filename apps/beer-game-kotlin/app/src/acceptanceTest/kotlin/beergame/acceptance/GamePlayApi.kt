@@ -215,6 +215,12 @@ class GamePlayApi(
         facilitator: String?,
     ) = post("/sessions/$gameId/resume", cookie = facilitator)
 
+    fun setCommitMode(
+        gameId: String,
+        mode: String,
+        facilitator: String?,
+    ) = put("/sessions/$gameId/commit-mode", """{"commitMode":"$mode"}""", facilitator)
+
     fun proxyDecision(
         gameId: String,
         role: Role,

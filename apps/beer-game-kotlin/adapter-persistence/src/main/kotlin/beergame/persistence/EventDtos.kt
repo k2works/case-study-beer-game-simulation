@@ -173,6 +173,12 @@ internal data class RoleHolderReplacedDto(
 )
 
 @Serializable
+@SerialName("CommitModeChanged")
+internal data class CommitModeChangedDto(
+    val commitMode: String,
+)
+
+@Serializable
 @SerialName("SessionPaused")
 internal data object SessionPausedDto
 

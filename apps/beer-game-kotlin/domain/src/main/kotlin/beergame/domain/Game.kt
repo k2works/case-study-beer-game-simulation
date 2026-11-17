@@ -17,9 +17,10 @@ import java.time.Instant
  * B5 の範囲: 資格の失効・再発行・復帰（規則は Credential.kt）。観察者・単独の解除（UnassignRole）は後続の Bolt。
  */
 
-/** 確定方式。B1 は手動だけ。自動（AUTO）は B8 で足す。 */
+/** 確定方式。手動（進行役が確定する）か、自動（4 役割の入力がそろったら、同じ追記で確定する。B8）。 */
 enum class CommitMode {
     MANUAL,
+    AUTO,
 }
 
 /**
@@ -49,8 +50,9 @@ data class GameSettings(
             finalWeek: Int,
             demand: List<Int>,
             inputs: ConditionInputs,
+            commitMode: CommitMode = CommitMode.MANUAL,
         ): Either<NonEmptyList<ValidationError>, GameSettings> {
-            val base = kit(finalWeek, demand)
+            val base = kit(finalWeek, demand, commitMode)
             val conditions = inputs.validate()
             return if (base is Either.Right && conditions is Either.Right) {
                 val c = conditions.value
@@ -74,11 +76,12 @@ data class GameSettings(
         fun kit(
             finalWeek: Int,
             demand: List<Int>,
+            commitMode: CommitMode = CommitMode.MANUAL,
         ): Either<NonEmptyList<ValidationError>, GameSettings> {
             val week = Week.of(finalWeek)
             val series = DemandSeries.of(demand, week.getOrElse { Week.FIRST })
             return when (week) {
-                is Either.Right -> series.map { GameSettings(week.value, it, KitPreset.costPolicy, CommitMode.MANUAL) }
+                is Either.Right -> series.map { GameSettings(week.value, it, KitPreset.costPolicy, commitMode) }
                 is Either.Left -> nonEmptyListOf<ValidationError>(week.value).plus(series.leftOrNull().orEmpty()).left()
             }
         }

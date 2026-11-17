@@ -111,3 +111,6 @@ internal fun RoleHolderReplacedDto.toRoleHolderReplaced(): Either<String, Domain
             ParticipantId(uuid(added).bind()),
         )
     }
+
+internal fun CommitModeChangedDto.toCommitModeChanged(): Either<String, DomainEvent> =
+    enumOf<CommitMode>(commitMode, "確定方式").map { SessionEvent.CommitModeChanged(it) }

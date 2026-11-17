@@ -202,6 +202,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/sessions/{sessionId}/commit-mode': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 確定方式（手動・自動）を変える（SetCommitMode。session ストリーム。B8）
+         * @description 認可は進行役。進行中でも停止中でも、いつでも変えられる（AC2.4.5。自動確定を無効にする）。
+         *     有効（`AUTO`）にしたとき、進行中で、4 役割の入力がすでにそろっていれば、同じ追記で週を確定する。停止中は確定しない（再開のときに判定する）。
+         *     開始前は `session.not_active`、終了後は `session.already_ended`（409）。
+         */
+        put: operations['setCommitMode'];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/sessions/{sessionId}/resume': {
         parameters: {
             query?: never;
@@ -600,6 +622,8 @@ export interface components {
             /** @enum {string} */
             kind: 'KIT' | 'CUSTOM';
             conditions?: components['schemas']['CustomConditions'];
+            /** @description 確定方式（AC1.1.6。B8）。省略は `MANUAL`（自動確定は無効）。設定の種別（`settingsKind`）の判定には含めない。 */
+            commitMode?: components['schemas']['CommitMode'];
             /** @description 最終週（AC1.1.5。1〜50）。 */
             finalWeek: number;
             /** @description 需要系列（最終週以上の長さ、各 0〜1000）。長さの下限は最終週に依存するので、スキーマでは表さない（domain が検証する）。 */
@@ -633,6 +657,14 @@ export interface components {
              * @enum {string}
              */
             disclosurePolicy?: 'TEAM_TOTAL' | 'NONE';
+        };
+        /**
+         * @description 確定方式。`MANUAL`（進行役が確定する）、`AUTO`（4 役割の入力がそろったら、同じ追記で自動的に確定する）。
+         * @enum {string}
+         */
+        CommitMode: 'MANUAL' | 'AUTO';
+        SetCommitModeRequest: {
+            commitMode: components['schemas']['CommitMode'];
         };
         /**
          * @description 設定の種別。キットの値と同じなら `KIT`、違えば `CUSTOM`（最終週と需要系列は、ASM-01 が確定するまで判定に含めない）。
@@ -698,6 +730,7 @@ export interface components {
             settingsKind: components['schemas']['SettingsKind'];
             /** @description キットの値から変えた項目（`settingsKind` が `KIT` なら空）。 */
             changedSettings: components['schemas']['SettingsField'][];
+            commitMode: components['schemas']['CommitMode'];
             participants: components['schemas']['LobbyParticipant'][];
             versions: components['schemas']['StreamVersions'];
         };
@@ -715,6 +748,7 @@ export interface components {
             settingsKind: components['schemas']['SettingsKind'];
             /** @description キットの値から変えた項目（`settingsKind` が `KIT` なら空）。進行役・参加者のどちらにも返す（値そのものは返さない）。 */
             changedSettings: components['schemas']['SettingsField'][];
+            commitMode: components['schemas']['CommitMode'];
             /** @description 進行役だけ。 */
             joinCode?: string;
             /** @description 進行役だけ。 */
@@ -1172,6 +1206,45 @@ export interface operations {
             404: components['responses']['Problem'];
             409: components['responses']['Problem'];
             413: components['responses']['Problem'];
+            429: components['responses']['Problem'];
+            500: components['responses']['Problem'];
+            503: components['responses']['Problem'];
+        };
+    };
+    setCommitMode: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 変更系は必須。同じキーで本文が違う要求は `app.idempotency_key_reused`（409）。 */
+                'Idempotency-Key': components['parameters']['IdempotencyKey'];
+            };
+            path: {
+                /** @description 未決：session ストリームの ID が gameId と同じか別かは、設計書のエンドポイント表から確定できない。 */
+                sessionId: components['parameters']['SessionId'];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['SetCommitModeRequest'];
+            };
+        };
+        responses: {
+            /** @description 変えた */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['CommandResponse'];
+                };
+            };
+            400: components['responses']['Problem'];
+            403: components['responses']['Problem'];
+            404: components['responses']['Problem'];
+            409: components['responses']['Problem'];
+            413: components['responses']['Problem'];
+            422: components['responses']['ValidationProblem'];
             429: components['responses']['Problem'];
             500: components['responses']['Problem'];
             503: components['responses']['Problem'];

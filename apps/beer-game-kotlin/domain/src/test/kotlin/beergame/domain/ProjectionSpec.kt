@@ -92,6 +92,16 @@ class ProjectionSpec :
             gs.valueOf("holding_cost_minor") shouldBe Value.Big(80)
         }
 
+        test("[B8/AC1.1.6] Given CommitModeChanged When 投影する Then game_overview の commit_mode だけを更新する") {
+            val rows =
+                Projections.project(
+                    envelope(SessionEvent.CommitModeChanged(CommitMode.AUTO), StreamType.SESSION, 2),
+                )
+
+            rows.map { it.table } shouldContainExactly listOf(ProjectionTable.GAME_OVERVIEW)
+            rows.single().valueOf("commit_mode") shouldBe Value.Text("AUTO")
+        }
+
         test("[7.2] Given 参加・割り当て・付け替えの解除 When 投影する Then lobby_participants の role が入り、解除で NULL に戻る") {
             val joined =
                 Projections.project(

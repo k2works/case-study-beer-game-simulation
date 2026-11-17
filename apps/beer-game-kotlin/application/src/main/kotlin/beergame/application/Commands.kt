@@ -5,6 +5,7 @@ import arrow.core.raise.either
 import arrow.core.raise.ensureNotNull
 import beergame.domain.Actor
 import beergame.domain.ActorRef
+import beergame.domain.CommitMode
 import beergame.domain.ConditionInputs
 import beergame.domain.DisplayName
 import beergame.domain.GameCommand
@@ -32,6 +33,8 @@ data class CreateGameInput(
     val retentionDays: Int,
     /** カスタム条件。null ならキット準拠（B7）。 */
     val conditions: ConditionInputs? = null,
+    /** 確定方式（AC1.1.6）。既定は手動（自動確定は無効）。 */
+    val commitMode: CommitMode = CommitMode.MANUAL,
 )
 
 data class JoinGameInput(

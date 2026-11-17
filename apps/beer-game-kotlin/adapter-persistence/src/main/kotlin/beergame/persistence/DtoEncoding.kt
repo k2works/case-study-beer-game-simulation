@@ -116,6 +116,10 @@ internal fun encodeSessionEvent(event: SessionEvent): EventCodec.Encoded =
             enc(SessionResumedDto.serializer(), SessionResumedDto)
         }
 
+        is SessionEvent.CommitModeChanged -> {
+            enc(CommitModeChangedDto.serializer(), CommitModeChangedDto(event.commitMode.name))
+        }
+
         is SessionEvent.ProxyDecisionSubmitted -> {
             val dto =
                 ProxyDecisionSubmittedDto(

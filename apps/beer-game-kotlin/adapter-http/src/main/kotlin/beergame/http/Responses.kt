@@ -156,4 +156,5 @@ internal fun Snapshot.toLobbyJson(facilitator: SnapshotView.Facilitator): JsonOb
 private fun JsonObjectBuilder.putSettings(settings: SettingsSummary) {
     put("settingsKind", settings.kind)
     put("changedSettings", JsonArray(settings.changes.map(::JsonPrimitive)))
+    put("commitMode", settings.commitMode)
 }

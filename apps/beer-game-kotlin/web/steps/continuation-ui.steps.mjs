@@ -121,10 +121,21 @@ Then('プレイの画面で、進行役が開始するまでお待ちくださ�
     await this.console.waitingForStartShown();
 });
 
-When('進行役が、画面で、小売店の初期在庫を 20、配送の遅延を 3 週に変えて、ゲームを作成する', async function () {
-    await this.console.createCustomGameOnScreen();
-});
+When(
+    '進行役が、画面で、小売店の初期在庫を 20、配送の遅延を 3 週に変えて、ゲームを作成する',
+    async function () {
+        await this.console.createCustomGameOnScreen();
+    },
+);
 
 Then('ロビーに、{string}と表示される', async function (text) {
     await this.console.lobbyShowsSettings(text);
+});
+
+When('進行役が、コンソールで自動確定を有効にする', async function () {
+    await this.console.enableAutoCommit();
+});
+
+Then('コンソールに、"自動確定: {word}"と表示される', async function (label) {
+    await this.console.autoCommitShown(label);
 });

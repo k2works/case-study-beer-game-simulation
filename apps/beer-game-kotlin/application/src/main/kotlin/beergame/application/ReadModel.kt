@@ -67,6 +67,8 @@ data class ProjectedWeekResult(
 data class SettingsSummary(
     val kind: String,
     val changes: List<String>,
+    /** 確定方式（`MANUAL`・`AUTO`。B8）。 */
+    val commitMode: String = "MANUAL",
 ) {
     companion object {
         val KIT = SettingsSummary("KIT", emptyList())

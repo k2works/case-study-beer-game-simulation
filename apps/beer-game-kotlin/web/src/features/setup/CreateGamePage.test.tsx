@@ -74,6 +74,26 @@ describe('S02 ゲーム作成', () => {
         );
     });
 
+    it('確定方式を「自動」にして作ると、commitMode: AUTO を送る。既定（手動）では送らない', async () => {
+        const user = userEvent.setup();
+        const createGame = vi.fn(() => Promise.resolve(created));
+        const api = fakeApi({
+            createGame,
+            getGameState: () =>
+                Promise.resolve(
+                    gameState({ status: 'PREPARING', sessionId: null, joinCode: 'A1B2C3D4' }),
+                ),
+        });
+        renderApp(api, '/new');
+        expect(screen.getByLabelText('確定方式')).toHaveValue('MANUAL');
+
+        await user.selectOptions(screen.getByLabelText('確定方式'), 'AUTO');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+
+        await screen.findByText('A1B2C3D4');
+        expect(createGame).toHaveBeenCalledWith(expect.objectContaining({ commitMode: 'AUTO' }));
+    });
+
     it('キット準拠のままなら、conditions を送らない', async () => {
         const user = userEvent.setup();
         const createGame = vi.fn(() => Promise.resolve(created));
@@ -89,6 +109,9 @@ describe('S02 ゲーム作成', () => {
 
         await screen.findByText('A1B2C3D4');
         expect(createGame).toHaveBeenCalledWith(expect.objectContaining({ kind: 'KIT' }));
+        expect(createGame).not.toHaveBeenCalledWith(
+            expect.objectContaining({ commitMode: expect.anything() }),
+        );
         expect(createGame.mock.lastCall).not.toBeUndefined();
         expect(createGame).not.toHaveBeenCalledWith(
             expect.objectContaining({ conditions: expect.anything() }),

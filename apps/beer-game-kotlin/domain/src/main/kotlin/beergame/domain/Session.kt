@@ -20,9 +20,10 @@ import java.time.Instant
 /** 1 役割・1 週あたりの保存回数の上限（NF-C8。代理入力を含む）。 */
 const val SAVE_LIMIT_PER_ROLE_WEEK = 9
 
-/** 確定の方式（イベントに残す）。B1 は手動だけ。 */
+/** 確定の方式（イベントに残す）。手動（進行役の確定）か、自動（入力がそろったときの自動確定。B8）。 */
 enum class CommitKind {
     MANUAL,
+    AUTO,
 }
 
 /** 終了の理由。B1 は最終週の確定だけ（進行役による終了は範囲外）。 */
@@ -137,6 +138,13 @@ sealed interface SessionCommand : Command {
         override val at: Instant,
     ) : SessionCommand
 
+    /** 進行役が、確定方式を変える（進行中でも停止中でも。B8）。 */
+    data class SetCommitMode(
+        override val actor: Actor,
+        override val at: Instant,
+        val commitMode: CommitMode,
+    ) : SessionCommand
+
     /** 進行役が、画面の週 [requestedWeek] で、[role] の数量を代わりに入力する。意思決定の版は要求しない（最終決定）。 */
     @Term("代理入力", "不在の参加者に代わって、進行役が役割の発注量を入力すること。値・操作者・役割・時刻を履歴に残し、一時停止中も受け付ける（確定はしない）", "AC3.1.2、FR-15")
     data class SubmitProxyDecision(
@@ -207,7 +215,7 @@ sealed interface SessionEvent : DomainEvent {
     ) : SessionEvent
 
     /** 1 週の事実のすべて。結果と次週の状態を含み、evolve はそれを採用するだけ（D5）。 */
-    @EventSpec("EV-S08", "CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定は未実装")
+    @EventSpec("EV-S08", "CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定（B8）は、最後の入力・再開・方式の変更と同じ追記")
     data class WeekCommitted(
         val week: Week,
         val commitKind: CommitKind,
@@ -215,6 +223,12 @@ sealed interface SessionEvent : DomainEvent {
         val results: RoleMap<RoleWeekResult>,
         val nextStates: RoleMap<RoleState>,
         val contributors: Int,
+    ) : SessionEvent
+
+    /** 確定方式の変更（B8）。以後、4 役割の入力がそろったときの自動確定の有無が変わる。 */
+    @EventSpec("EV-S10", "SetCommitMode。進行役、進行中または一時停止中")
+    data class CommitModeChanged(
+        val commitMode: CommitMode,
     ) : SessionEvent
 
     @EventSpec("EV-S04", "最終週の WeekCommitted と同じ decide。手動の EndSession は未実装")
@@ -313,7 +327,7 @@ sealed interface SessionError : DomainError {
 }
 
 /** 進行中のときだけデータを返す。一時停止中は [SessionError.Paused]。 */
-private fun SessionState.activeData(): Either<SessionError, SessionData> =
+internal fun SessionState.activeData(): Either<SessionError, SessionData> =
     when (this) {
         is SessionState.Active -> data.right()
         is SessionState.Paused -> SessionError.Paused.left()
@@ -412,35 +426,8 @@ private fun Raise<SessionError>.resumeEvents(
     return listOf(SessionEvent.SessionResumed)
 }
 
-private fun Raise<SessionError>.commitWeekEvents(
-    data: SessionData,
-    command: SessionCommand.CommitWeek,
-): List<SessionEvent> {
-    ensure(command.actor.isFacilitatorOf(data.gameId)) { SessionError.Forbidden("確定は進行役だけができる") }
-    // 判定順 1: 週が違えば WeekAdvanced
-    ensure(command.requestedWeek == data.week) { SessionError.WeekAdvanced(command.requestedWeek, data.week) }
-    // 判定順 2: 週は同じで、確定の根拠にした入力の版が現在と違えば DecisionsChanged
-    ensure(command.basis == data.decisionVersions) { SessionError.DecisionsChanged(data.week, data.decisions) }
-    val decisions = data.completeDecisions() ?: raise(SessionError.IncompleteDecisions(data.missingRoles()))
-    val outcome = simulateWeek(data.settings.simulation(), data.week, data.roleStates, decisions)
-    val committed =
-        SessionEvent.WeekCommitted(
-            data.week,
-            CommitKind.MANUAL,
-            decisions,
-            outcome.results,
-            outcome.nextStates,
-            Role.entries.size,
-        )
-    return if (data.week == data.settings.finalWeek) {
-        listOf(committed, SessionEvent.SessionEnded(EndReason.FINAL_WEEK))
-    } else {
-        listOf(committed)
-    }
-}
-
 /**
- * 入力の保存、代理入力、停止・再開、手動の確定の規則は、すべてここに集まる。`simulateWeek`（純粋）は確定のときだけ呼び、
+ * 入力の保存、代理入力、停止・再開、手動と自動の確定、確定方式の変更の規則は、ここと SessionCommit.kt に集まる。`simulateWeek`（純粋）は確定のときだけ呼び、
  * 結果と次週の状態を `WeekCommitted` に事実として固定する。最終週の確定は `SessionEnded` も返す。
  * 保存・確定は進行中だけ、代理入力は進行中と一時停止中、停止は進行中だけ、再開は一時停止中だけ。
  */
@@ -450,10 +437,28 @@ fun decideSession(
 ): Either<SessionError, List<SessionEvent>> =
     either {
         when (command) {
-            is SessionCommand.SaveDecision -> saveDecisionEvents(state.activeData().bind(), command)
-            is SessionCommand.CommitWeek -> commitWeekEvents(state.activeData().bind(), command)
-            is SessionCommand.PauseSession -> pauseEvents(state.activeData().bind(), command)
-            is SessionCommand.ResumeSession -> resumeEvents(state.pausedData().bind(), command)
-            is SessionCommand.SubmitProxyDecision -> proxyDecisionEvents(state.openData().bind(), command)
+            is SessionCommand.SaveDecision -> {
+                state.withAutoCommit(saveDecisionEvents(state.activeData().bind(), command))
+            }
+
+            is SessionCommand.CommitWeek -> {
+                commitWeekEvents(state.activeData().bind(), command)
+            }
+
+            is SessionCommand.PauseSession -> {
+                pauseEvents(state.activeData().bind(), command)
+            }
+
+            is SessionCommand.ResumeSession -> {
+                state.withAutoCommit(resumeEvents(state.pausedData().bind(), command))
+            }
+
+            is SessionCommand.SubmitProxyDecision -> {
+                state.withAutoCommit(proxyDecisionEvents(state.openData().bind(), command))
+            }
+
+            is SessionCommand.SetCommitMode -> {
+                state.withAutoCommit(setCommitModeEvents(state.openData().bind(), command))
+            }
         }
     }

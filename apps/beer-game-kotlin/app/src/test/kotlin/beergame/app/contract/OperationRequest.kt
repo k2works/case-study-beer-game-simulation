@@ -68,6 +68,13 @@ private fun continuationRequests(game: PlayedGame): List<OperationRequest> {
         OperationRequest("pauseSession", HttpMethod.Post, "/sessions/${game.id}/pause", null, game.facilitator),
         OperationRequest("resumeSession", HttpMethod.Post, "/sessions/${game.id}/resume", null, game.facilitator),
         OperationRequest(
+            "setCommitMode",
+            HttpMethod.Put,
+            "/sessions/${game.id}/commit-mode",
+            """{"commitMode":"AUTO"}""",
+            game.facilitator,
+        ),
+        OperationRequest(
             "submitProxyDecision",
             HttpMethod.Put,
             "/sessions/${game.id}/proxy-decisions/FACTORY",

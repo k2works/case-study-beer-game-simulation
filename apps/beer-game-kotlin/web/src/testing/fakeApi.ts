@@ -24,6 +24,7 @@ export function fakeApi(overrides: Partial<ApiClient> = {}): Spied {
         submitProxyDecision: unexpected('submitProxyDecision'),
         pauseSession: unexpected('pauseSession'),
         resumeSession: unexpected('resumeSession'),
+        setCommitMode: unexpected('setCommitMode'),
         recoverParticipation: unexpected('recoverParticipation'),
     };
     const merged: Record<string, unknown> = { ...base };
@@ -47,6 +48,7 @@ export function gameState(overrides: Partial<GameState> = {}): GameState {
         status: 'STARTED',
         settingsKind: 'KIT',
         changedSettings: [],
+        commitMode: 'MANUAL',
         versions: versions(1, 10),
         ...overrides,
     };
@@ -59,6 +61,7 @@ export function lobby(overrides: Partial<Lobby> = {}): Lobby {
         joinCode: 'ABCDEFGH2345',
         settingsKind: 'KIT',
         changedSettings: [],
+        commitMode: 'MANUAL',
         participants: [],
         versions: versions(null, 3),
         ...overrides,

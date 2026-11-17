@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
-import type { FieldError, GameState } from '../../api/types';
+import type { CommitMode, FieldError, GameState } from '../../api/types';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { ValidationSummary, fieldProps } from '../../components/ValidationSummary';
@@ -28,6 +28,7 @@ export function CreateGamePage() {
     const [demand, setDemand] = useState(DEFAULT_DEMAND);
     const [retentionDays, setRetentionDays] = useState(DEFAULT_RETENTION_DAYS);
     const [custom, setCustom] = useState(false);
+    const [commitMode, setCommitMode] = useState<CommitMode>('MANUAL');
     const [draft, setDraft] = useState(EMPTY_DRAFT);
     const [busy, setBusy] = useState(false);
     const [errors, setErrors] = useState<FieldError[]>([]);
@@ -48,6 +49,7 @@ export function CreateGamePage() {
                 demand: demand.split(',').map(toNumberOrRaw),
                 retentionDays: toNumberOrRaw(retentionDays),
                 ...(custom ? { conditions: toConditions(draft) } : {}),
+                ...(commitMode === 'AUTO' ? { commitMode } : {}),
             });
             // 応答は versions だけ。参加コードは、追いついた取得の結果から表示する
             const { snapshot } = await fetchCaughtUp(
@@ -117,6 +119,17 @@ export function CreateGamePage() {
                 {custom ? (
                     <CustomConditionsFields draft={draft} onChange={setDraft} errors={errors} />
                 ) : null}
+                <div className="field">
+                    <label htmlFor="commitMode">確定方式</label>
+                    <select
+                        id="commitMode"
+                        value={commitMode}
+                        onChange={(event) => setCommitMode(event.target.value as CommitMode)}
+                    >
+                        <option value="MANUAL">手動（進行役が確定する）</option>
+                        <option value="AUTO">自動（4 役割がそろったら確定する）</option>
+                    </select>
+                </div>
                 <div className="field">
                     <label htmlFor="finalWeek">最終週</label>
                     <input

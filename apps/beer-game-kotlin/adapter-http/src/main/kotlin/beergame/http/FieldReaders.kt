@@ -6,6 +6,7 @@ import arrow.core.flatMap
 import arrow.core.left
 import arrow.core.nonEmptyListOf
 import arrow.core.right
+import beergame.domain.CommitMode
 import beergame.domain.Role
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -47,6 +48,13 @@ internal fun JsonObject.role(name: String): Either<FieldErrors, Role> =
     string(name).flatMap { text ->
         Role.entries.firstOrNull { it.name == text }?.right()
             ?: single(name, "役割は ${Role.entries.joinToString("、") { it.name }} のいずれかにしてください。").left()
+    }
+
+/** 確定方式。MANUAL か AUTO。 */
+internal fun JsonObject.commitMode(name: String): Either<FieldErrors, CommitMode> =
+    string(name).flatMap { text ->
+        CommitMode.entries.firstOrNull { it.name == text }?.right()
+            ?: single(name, "確定方式は MANUAL か AUTO にしてください。").left()
     }
 
 internal fun JsonObject.int(name: String): Either<FieldErrors, Int> = this[name].asInt(name)

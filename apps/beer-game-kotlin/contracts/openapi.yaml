@@ -318,6 +318,40 @@ paths:
         "429": { $ref: "#/components/responses/Problem" }
         "503": { $ref: "#/components/responses/Problem" }
         "500": { $ref: "#/components/responses/Problem" }
+  /sessions/{sessionId}/commit-mode:
+    put:
+      tags: [進行]
+      operationId: setCommitMode
+      summary: 確定方式（手動・自動）を変える（SetCommitMode。session ストリーム。B8）
+      description: |
+        認可は進行役。進行中でも停止中でも、いつでも変えられる（AC2.4.5。自動確定を無効にする）。
+        有効（`AUTO`）にしたとき、進行中で、4 役割の入力がすでにそろっていれば、同じ追記で週を確定する。停止中は確定しない（再開のときに判定する）。
+        開始前は `session.not_active`、終了後は `session.already_ended`（409）。
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCommitModeRequest"
+      responses:
+        "200":
+          description: 変えた
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/ValidationProblem" }
+        "429": { $ref: "#/components/responses/Problem" }
+        "503": { $ref: "#/components/responses/Problem" }
+        "500": { $ref: "#/components/responses/Problem" }
   /sessions/{sessionId}/resume:
     post:
       tags: [進行]
@@ -953,6 +987,10 @@ components:
           type: string
           enum: [KIT, CUSTOM]
         conditions: { $ref: "#/components/schemas/CustomConditions" }
+        commitMode:
+          allOf:
+            - $ref: "#/components/schemas/CommitMode"
+          description: 確定方式（AC1.1.6。B8）。省略は `MANUAL`（自動確定は無効）。設定の種別（`settingsKind`）の判定には含めない。
         finalWeek:
           type: integer
           minimum: 1
@@ -991,6 +1029,15 @@ components:
           type: string
           enum: [TEAM_TOTAL, NONE]
           description: プレイ中に観察者へ見せる範囲。キットは `TEAM_TOTAL`。
+    CommitMode:
+      type: string
+      enum: [MANUAL, AUTO]
+      description: 確定方式。`MANUAL`（進行役が確定する）、`AUTO`（4 役割の入力がそろったら、同じ追記で自動的に確定する）。
+    SetCommitModeRequest:
+      type: object
+      required: [commitMode]
+      properties:
+        commitMode: { $ref: "#/components/schemas/CommitMode" }
     SettingsKind:
       type: string
       enum: [KIT, CUSTOM]
@@ -1065,7 +1112,7 @@ components:
     Lobby:
       type: object
       description: ロビーの投影（lobby_*）から書き出した、進行役向けの一覧。
-      required: [gameId, status, joinCode, settingsKind, changedSettings, participants, versions]
+      required: [gameId, status, joinCode, settingsKind, changedSettings, commitMode, participants, versions]
       properties:
         gameId: { type: string, format: uuid }
         status:
@@ -1079,6 +1126,7 @@ components:
           type: array
           description: キットの値から変えた項目（`settingsKind` が `KIT` なら空）。
           items: { $ref: "#/components/schemas/SettingsField" }
+        commitMode: { $ref: "#/components/schemas/CommitMode" }
         participants:
           type: array
           items: { $ref: "#/components/schemas/LobbyParticipant" }
@@ -1086,7 +1134,7 @@ components:
     GameState:
       type: object
       description: 呼び出した人ごとの投影。進行役は `joinCode`・`finalWeek`、参加者は `participantId`・`role` を受け取る。
-      required: [gameId, sessionId, status, settingsKind, changedSettings, versions]
+      required: [gameId, sessionId, status, settingsKind, changedSettings, commitMode, versions]
       properties:
         gameId: { type: string, format: uuid }
         sessionId:
@@ -1103,6 +1151,7 @@ components:
           type: array
           description: キットの値から変えた項目（`settingsKind` が `KIT` なら空）。進行役・参加者のどちらにも返す（値そのものは返さない）。
           items: { $ref: "#/components/schemas/SettingsField" }
+        commitMode: { $ref: "#/components/schemas/CommitMode" }
         joinCode:
           type: string
           description: 進行役だけ。

@@ -9,6 +9,7 @@ import beergame.application.recover
 import beergame.application.reissueCredential
 import beergame.application.resumeSession
 import beergame.application.revokeCredential
+import beergame.application.setCommitMode
 import beergame.application.submitProxyDecision
 import beergame.domain.ActorKind
 import beergame.domain.GameId
@@ -45,6 +46,14 @@ private fun Route.sessionControlRoutes(deps: HttpDeps) {
         call.withIds(call.gameIdParam("sessionId")) { id ->
             call.command(deps, HttpStatusCode.OK, { Unit.right() }) { _, meta ->
                 ports.resumeSession(GameId(id), meta).reply()
+            }
+        }
+    }
+    put("/sessions/{sessionId}/commit-mode") {
+        call.operation("setCommitMode")
+        call.withIds(call.gameIdParam("sessionId")) { id ->
+            call.command(deps, HttpStatusCode.OK, ::parseSetCommitMode) { mode, meta ->
+                ports.setCommitMode(GameId(id), mode, meta).reply()
             }
         }
     }

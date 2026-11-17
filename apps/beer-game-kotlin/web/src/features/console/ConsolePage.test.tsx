@@ -621,3 +621,40 @@ describe('S06 進行役のコンソール', () => {
         });
     });
 });
+
+describe('S06 進行役のコンソール（確定方式）', () => {
+    it('確定方式を示し、切り替えると setCommitMode を呼んで、状態を取り直す', async () => {
+        const user = userEvent.setup();
+        let mode: 'MANUAL' | 'AUTO' = 'MANUAL';
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ commitMode: mode })),
+            getSessionState: () => Promise.resolve(consoleState({ versions: versions(6, 10) })),
+            setCommitMode: (_sessionId, next) => {
+                mode = next;
+                return Promise.resolve({ versions: versions(6, 10) });
+            },
+        });
+        renderApp(api, PATH);
+
+        expect(await screen.findByText('自動確定: 無効')).toBeVisible();
+        await user.click(screen.getByRole('button', { name: '自動確定を有効にする' }));
+
+        expect(await screen.findByText('自動確定: 有効')).toBeVisible();
+        expect(api.setCommitMode).toHaveBeenCalledWith(GAME_ID, 'AUTO');
+        expect(screen.getByRole('button', { name: '自動確定を無効にする' })).toBeVisible();
+    });
+
+    it('停止中でも、確定方式を変えられる（無効にする。AC2.4.5）', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ commitMode: 'AUTO' })),
+            getSessionState: () => Promise.resolve(consoleState({ status: 'PAUSED' })),
+            setCommitMode: () => Promise.resolve({ versions: versions(6, 10) }),
+        });
+        renderApp(api, PATH);
+
+        await user.click(await screen.findByRole('button', { name: '自動確定を無効にする' }));
+
+        await waitFor(() => expect(api.setCommitMode).toHaveBeenCalledWith(GAME_ID, 'MANUAL'));
+    });
+});

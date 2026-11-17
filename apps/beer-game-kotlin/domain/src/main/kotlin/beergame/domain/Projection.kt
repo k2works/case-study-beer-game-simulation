@@ -149,6 +149,10 @@ object Projections {
                     )
                 }
 
+                is SessionEvent.CommitModeChanged -> {
+                    listOf(upsert(ProjectionTable.GAME_OVERVIEW, gameKey(e), "commit_mode" to text(p.commitMode.name)))
+                }
+
                 is SessionEvent.SessionEnded -> {
                     listOf(
                         upsert(

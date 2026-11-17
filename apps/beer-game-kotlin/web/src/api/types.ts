@@ -53,6 +53,7 @@ export interface CreateGameRequest {
     demand: ReadonlyArray<number | string>;
     retentionDays?: number | string;
     conditions?: CustomConditionsInput;
+    commitMode?: CommitMode;
 }
 
 /** カスタム条件の入力。仕様（CustomConditions）と同じ項目で、値は整数に読めない入力も文字列のまま送れる。 */
@@ -66,6 +67,8 @@ export interface CustomConditionsInput {
     backlogCostMinor?: number | string;
     disclosurePolicy?: Schemas['CustomConditions']['disclosurePolicy'];
 }
+
+export type CommitMode = Schemas['CommitMode'];
 
 export type SettingsKind = Schemas['SettingsKind'];
 

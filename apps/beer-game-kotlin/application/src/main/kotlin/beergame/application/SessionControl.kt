@@ -2,6 +2,7 @@ package beergame.application
 
 import arrow.core.Either
 import arrow.core.raise.either
+import beergame.domain.CommitMode
 import beergame.domain.GameId
 import beergame.domain.SessionCommand
 
@@ -33,6 +34,19 @@ suspend fun Ports.resumeSession(
     }
 }
 
+/** 確定方式（手動・自動）を変える（AC2.4.5）。進行役だけが、進行中でも停止中でも変えられる。 */
+suspend fun Ports.setCommitMode(
+    gameId: GameId,
+    commitMode: CommitMode,
+    meta: RequestMeta,
+): Either<AppFailure, CommandOutcome> {
+    val body = "$SCOPE_COMMIT_MODE|${commitMode.name}"
+    val request = CommandRequest(Operation(gameId, SCOPE_COMMIT_MODE, body), Auth.REQUIRED, STATUS_OK, meta)
+    return runCommand(request) { tx, ctx ->
+        applySingle(tx, ctx, sessionStream, SessionCommand.SetCommitMode(ctx.actor, ctx.at, commitMode))
+    }
+}
+
 /** 進行役が、参加者の代わりに入力する（進行中・停止中のどちらでも。AC3.1.2）。数量・週の形の誤りは、すべて集める。 */
 suspend fun Ports.submitProxyDecision(
     gameId: GameId,
@@ -51,5 +65,6 @@ suspend fun Ports.submitProxyDecision(
     }
 
 private const val SCOPE_PAUSE = "pause"
+private const val SCOPE_COMMIT_MODE = "commit-mode"
 private const val SCOPE_RESUME = "resume"
 private const val STATUS_OK = 200

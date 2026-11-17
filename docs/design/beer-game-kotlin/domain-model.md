@@ -774,6 +774,7 @@ sealed interface RetentionEvent  { /* DeletionStarted, DeletionFailed, DeletionC
 | EV-S08 | `WeekCommitted` | `CommitWeek`（進行役、進行中、4 役割が揃う、週が一致し、`basis` が現在の意思決定の版と一致）、または `AUTO` の進行中に `SaveDecision` / `SubmitProxyDecision` / `ResumeSession` / `SetCommitMode` が揃った状態を作った場合（一時停止中の代理入力と `SetCommitMode` は確定しない） | `week`、`commitKind`（`MANUAL` / `AUTO`）、`decisions`（`RoleMap<Quantity>`、確定した発注）、`results`（`RoleMap<RoleWeekResult>`）、`nextStates`（`RoleMap<RoleState>`）、`contributors`（寄与者数。現在は 4 役割） |
 
 | EV-S09 | `RoleHolderReplaced`（**提案。ゲート 3.5 で人が確認する**） | `AssignRole`（開始後の入れ替え。`game` の `ParticipantReplaced` などと同一トランザクション）。進行中または一時停止中 | `role`、`removed`（外れた旧担当者の `Set<ParticipantId>`）、`added`（新担当者の `ParticipantId`）。`SessionData.assignments[role]` を更新する |
+| EV-S10 | `CommitModeChanged`（**B8 の提案。人の確認待ち**） | `SetCommitMode`（進行役。進行中または一時停止中） | `commitMode`（`MANUAL`／`AUTO`）。`SessionData.commitMode` を更新する。有効にしたとき、進行中で 4 役割がそろっていれば、同じ追記で `WeekCommitted`（`AUTO`）を足す |
 
 `RoleWeekResult` は、受注（需要）、出荷、発注、週末在庫、週末受注残、週次費用、累積費用を持ちます。`WeekCommitted` は 1 件で、1 週の事実のすべてを含みます。
 

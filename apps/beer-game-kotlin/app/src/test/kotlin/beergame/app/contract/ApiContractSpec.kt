@@ -182,6 +182,9 @@ private suspend fun ContractClient.continuationPhase() {
     expect(422, put("$session/proxy-decisions/MANAGER", PROXY_BODY, game.facilitator))
     expect(200, post("$session/resume", cookie = game.facilitator))
     expect(409, post("$session/resume", cookie = game.facilitator))
+    expect(403, put("$session/commit-mode", """{"commitMode":"AUTO"}""", retailer.cookie))
+    expect(422, put("$session/commit-mode", """{"commitMode":"UNKNOWN"}""", game.facilitator))
+    expect(200, put("$session/commit-mode", """{"commitMode":"AUTO"}""", game.facilitator))
 
     expect(409, post("$credentials/reissue", target, game.facilitator))
     expect(403, post("$credentials/revoke", target, retailer.cookie))
@@ -327,13 +330,15 @@ class ApiContractSpec :
                         "commitWeek",
                         "pauseSession",
                         "resumeSession",
+                        "setCommitMode",
                         "submitProxyDecision",
                         "reissueCredential",
                     )
                 val requests =
                     operationRequests(prepared).filter { it.operationId !in needsState } +
                         operationRequests(started).filter {
-                            it.operationId in setOf("saveDecision", "pauseSession", "submitProxyDecision")
+                            it.operationId in
+                                setOf("saveDecision", "pauseSession", "setCommitMode", "submitProxyDecision")
                         } +
                         operationRequests(decided).filter { it.operationId == "commitWeek" } +
                         operationRequests(paused).filter { it.operationId == "resumeSession" } +

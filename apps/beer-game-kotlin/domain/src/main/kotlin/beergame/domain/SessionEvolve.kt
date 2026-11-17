@@ -50,6 +50,10 @@ private fun SessionState.resumed(): SessionState =
         is SessionState.NotStarted, is SessionState.Active, is SessionState.Ended -> this
     }
 
+/** 確定方式の変更（進行中・一時停止中。データの確定方式だけを変える）。 */
+private fun SessionState.commitModeChanged(event: SessionEvent.CommitModeChanged): SessionState =
+    updateData { it.copy(commitMode = event.commitMode) }
+
 /** 進行中・一時停止中のどちらからも終了になる。 */
 private fun SessionState.ended(): SessionState =
     when (this) {
@@ -100,6 +104,10 @@ fun evolveSession(
 
         is SessionEvent.WeekCommitted -> {
             state.updateData { it.afterCommit(event) }
+        }
+
+        is SessionEvent.CommitModeChanged -> {
+            state.commitModeChanged(event)
         }
 
         is SessionEvent.SessionEnded -> {

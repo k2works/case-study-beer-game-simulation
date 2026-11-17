@@ -188,6 +188,18 @@ export class ConsoleWindow {
         await dialog.getByRole('button', { name: '再開する' }).click({ timeout: WAIT_MS });
     }
 
+    /** 進行役のコンソールで、自動確定を有効にする。 */
+    async enableAutoCommit() {
+        await this.page
+            .getByRole('button', { name: '自動確定を有効にする' })
+            .click({ timeout: WAIT_MS });
+    }
+
+    /** コンソールの「自動確定: 有効／無効」の表示。表示されるまで待つ。 */
+    async autoCommitShown(label) {
+        await this.page.getByText(`自動確定: ${label}`).waitFor({ timeout: WAIT_MS });
+    }
+
     /** コンソールの「第 N 週　<状態>」の表示。表示されるまで待つ。 */
     async consoleStatusShown(week, statusLabel) {
         await this.page

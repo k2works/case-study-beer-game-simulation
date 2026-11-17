@@ -6,6 +6,7 @@ import arrow.core.left
 import arrow.core.raise.either
 import arrow.core.raise.zipOrAccumulate
 import arrow.core.right
+import beergame.domain.CommitMode
 import beergame.domain.CredentialSubject
 import beergame.domain.ParticipantId
 import beergame.domain.Role
@@ -43,6 +44,10 @@ internal fun parseProxyDecision(body: ByteArray): Either<Problem, ProxyBody> =
             ) { week, quantity -> ProxyBody(week, quantity) }
         }
     }
+
+/** 確定方式の変更（`MANUAL`・`AUTO`。B8）。 */
+internal fun parseSetCommitMode(body: ByteArray): Either<Problem, CommitMode> =
+    parseObject(body).flatMap { obj -> collect { obj.commitMode("commitMode").bind() } }
 
 /** 失効・再発行の対象。B5 は参加者だけ（進行役自身の資格は対象外。観察者は B9）。 */
 internal fun parseCredentialSubject(body: ByteArray): Either<Problem, CredentialSubject> =

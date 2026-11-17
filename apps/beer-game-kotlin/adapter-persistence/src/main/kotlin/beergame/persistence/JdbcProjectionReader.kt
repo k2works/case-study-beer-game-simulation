@@ -79,7 +79,11 @@ internal class JdbcProjectionReader(
                         rs.getString("status"),
                         rs.getInt("final_week"),
                         rs.getString("join_code"),
-                        SettingsSummary(rs.getString("settings_kind"), changesOf(rs.getString("settings_changes"))),
+                        SettingsSummary(
+                            rs.getString("settings_kind"),
+                            changesOf(rs.getString("settings_changes")),
+                            rs.getString("commit_mode"),
+                        ),
                     )
                 }
             val first = head.firstOrNull()
@@ -242,7 +246,8 @@ internal class JdbcProjectionReader(
 
     private companion object {
         const val HEAD_SQL =
-            "SELECT o.status, o.final_week, o.settings_kind, o.settings_changes, j.join_code FROM game_overview o " +
+            "SELECT o.status, o.final_week, o.settings_kind, o.settings_changes, o.commit_mode, j.join_code " +
+                "FROM game_overview o " +
                 "JOIN game_join_codes j ON j.game_id = o.game_id WHERE o.game_id = ?"
         const val PARTICIPANTS_SQL =
             "SELECT l.participant_id, l.role, d.display_name, (l.replaced_at IS NOT NULL) AS replaced " +

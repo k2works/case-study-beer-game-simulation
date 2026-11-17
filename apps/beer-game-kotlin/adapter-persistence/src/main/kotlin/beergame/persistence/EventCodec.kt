@@ -134,6 +134,10 @@ object EventCodec {
                 SessionEvent.SessionResumed.right()
             }
 
+            "CommitModeChanged" -> {
+                json.decodeFromString(CommitModeChangedDto.serializer(), payloadJson).toCommitModeChanged()
+            }
+
             "ProxyDecisionSubmitted" -> {
                 json
                     .decodeFromString(ProxyDecisionSubmittedDto.serializer(), payloadJson)

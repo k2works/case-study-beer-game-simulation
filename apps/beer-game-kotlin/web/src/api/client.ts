@@ -1,6 +1,7 @@
 import { ApiError, NetworkError } from './errors';
 import type {
     CommandResponse,
+    CommitMode,
     CommitWeekRequest,
     CreateGameRequest,
     CreateGameResult,
@@ -36,6 +37,8 @@ export interface ApiClient {
     /** 進行役だけ。停止中は、参加者の保存と週の確定を受け付けない。 */
     pauseSession(sessionId: string): Promise<CommandResponse>;
     resumeSession(sessionId: string): Promise<CommandResponse>;
+    /** 進行役だけ。進行中でも停止中でも変えられる（AC2.4.5）。 */
+    setCommitMode(sessionId: string, commitMode: CommitMode): Promise<CommandResponse>;
     /** 進行役の代理入力。意思決定の版（If-Match）は要らない。requestedWeek は、画面が見ている週。 */
     submitProxyDecision(
         sessionId: string,
@@ -218,6 +221,11 @@ export function createHttpApiClient(options: HttpApiClientOptions = {}): ApiClie
         async resumeSession(sessionId) {
             return commandResponse(
                 await command('POST', `/sessions/${sessionId}/resume`, undefined),
+            );
+        },
+        async setCommitMode(sessionId, commitMode) {
+            return commandResponse(
+                await command('PUT', `/sessions/${sessionId}/commit-mode`, { commitMode }),
             );
         },
         async startGame(gameId) {

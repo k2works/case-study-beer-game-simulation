@@ -4,7 +4,7 @@ import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
 import { DECISIONS_CHANGED_TEXT, weekAdvancedText } from '../../api/problems';
-import type { GameState, Role, RoleWeekResult, SessionState } from '../../api/types';
+import type { CommitMode, GameState, Role, RoleWeekResult, SessionState } from '../../api/types';
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
@@ -178,6 +178,29 @@ export function ConsolePage() {
         }
     }
 
+    /**
+     * 確定方式の変更（進行中でも停止中でも。AC2.4.5）。有効にしたとき、そろっていれば同じ追記で週が確定するので、
+     * 状態と確定方式の両方を、追いついた取得の結果から取り直す。
+     */
+    async function changeCommitMode(next: CommitMode) {
+        setBusy(true);
+        setFailure(null);
+        setAdvancedText(null);
+        try {
+            const result = await api.setCommitMode(sessionId, next);
+            const { snapshot } = await fetchCaughtUp(
+                () => api.getSessionState(sessionId),
+                result.versions,
+                catchUp,
+            );
+            setData({ game: await api.getGameState(game.gameId), session: snapshot });
+        } catch (error) {
+            setFailure(error);
+        } finally {
+            setBusy(false);
+        }
+    }
+
     /** 開発用。未入力の役割を、現在の週の需要の既定（4）で代理入力する。1 人で週を進めるため。 */
     async function fillWithProxyDecisions(current: SessionState) {
         setBusy(true);
@@ -243,6 +266,23 @@ export function ConsolePage() {
             {advancedText ? <p role="status">{advancedText}</p> : null}
 
             <p>{`第 ${session.week} 週${WEEK_SEPARATOR}${SESSION_STATUS_LABELS[session.status]}`}</p>
+
+            {session.status === 'ACTIVE' || session.status === 'PAUSED' ? (
+                <p>
+                    <span>{`自動確定: ${game.commitMode === 'AUTO' ? '有効' : '無効'}`}</span>{' '}
+                    <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                            void changeCommitMode(game.commitMode === 'AUTO' ? 'MANUAL' : 'AUTO')
+                        }
+                    >
+                        {game.commitMode === 'AUTO'
+                            ? '自動確定を無効にする'
+                            : '自動確定を有効にする'}
+                    </button>
+                </p>
+            ) : null}
 
             <h2>各役割の入力状況</h2>
             <ul className="roles">
