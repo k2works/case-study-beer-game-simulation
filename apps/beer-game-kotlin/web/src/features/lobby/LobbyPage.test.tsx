@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { LOBBY_POLL_MS } from './LobbyPage';
@@ -10,22 +10,64 @@ import { renderApp } from '../../testing/render';
 const yamamoto: LobbyParticipant = { participantId: 'p-1', displayName: '山本', role: 'RETAILER' };
 const tanaka: LobbyParticipant = { participantId: 'p-2', displayName: '田中', role: null };
 
-function rowOf(name: string) {
-    return screen.getByRole('listitem', { name });
+/** 参加者の表の行（行見出しは表示名）。 */
+function rowOf(name: string): HTMLElement {
+    const table = screen.getByRole('table', { name: '参加者の表' });
+    const row = within(table).getByRole('rowheader', { name }).closest('tr');
+    if (row === null) throw new Error(`行がない: ${name}`);
+    return row;
+}
+
+/** 各役割の担当の表で、役割の「人数」と「担当者」のセル。 */
+function assignmentOf(role: string): { count: string | null; names: string | null } {
+    const table = screen.getByRole('table', { name: '各役割の担当の表' });
+    const row = within(table).getByRole('rowheader', { name: role }).closest('tr');
+    if (row === null) throw new Error(`行がない: ${role}`);
+    const cells = within(row).getAllByRole('cell');
+    return { count: cells[0]?.textContent ?? null, names: cells[1]?.textContent ?? null };
 }
 
 describe('S04 ロビー（進行役）', () => {
-    it('参加コード・状態・各役割の担当・未割り当ての人を示す', async () => {
+    it('参加コード・状態・各役割の担当・未割り当ての人を、表で示す', async () => {
         const api = fakeApi({
             getLobby: () => Promise.resolve(lobby({ participants: [yamamoto, tanaka] })),
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
 
         expect(await screen.findByText('ABCDEFGH2345')).toBeInTheDocument();
-        expect(screen.getByText(/状態: 準備中/)).toBeInTheDocument();
-        expect(screen.getByText('小売店: 山本')).toBeInTheDocument();
-        expect(screen.getByText('二次卸: （未割り当て）')).toBeInTheDocument();
-        expect(within(rowOf('田中')).getByText('未割り当て')).toBeInTheDocument();
+        const summary = screen.getByRole('table', { name: 'ゲームの概要の表' });
+        expect(
+            within(summary)
+                .getAllByRole('row')
+                .map((row) => [
+                    within(row).getByRole('rowheader').textContent,
+                    within(row).getByRole('cell').textContent,
+                ]),
+        ).toEqual([
+            ['参加コード', 'ABCDEFGH2345'],
+            ['状態', '準備中'],
+        ]);
+        const roles = screen.getByRole('table', { name: '各役割の担当の表' });
+        expect(
+            within(roles)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['役割', '人数', '担当者']);
+        expect(
+            within(roles)
+                .getAllByRole('rowheader')
+                .map((h) => h.textContent),
+        ).toEqual(['小売店', '二次卸', '一次卸', '工場']);
+        expect(assignmentOf('小売店')).toEqual({ count: '1', names: '山本' });
+        expect(assignmentOf('二次卸')).toEqual({ count: '0', names: '（未割り当て）' });
+        const members = screen.getByRole('table', { name: '参加者の表' });
+        expect(
+            within(members)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['表示名', '現在の役割', '役割の変更']);
+        expect(within(rowOf('田中')).getAllByRole('cell')[0]).toHaveTextContent('未割り当て');
+        expect(within(rowOf('山本')).getAllByRole('cell')[0]).toHaveTextContent('小売店');
     });
 
     it('B7/S04: 設定の種別を示す。キット準拠はそのまま、カスタムは変更した項目の名前を添える', async () => {
@@ -63,8 +105,9 @@ describe('S04 ロビー（進行役）', () => {
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
 
-        expect(await screen.findByText('小売店: 山本、鈴木')).toBeInTheDocument();
-        expect(screen.getByText('二次卸: （未割り当て）')).toBeInTheDocument();
+        await screen.findByRole('table', { name: '各役割の担当の表' });
+        expect(assignmentOf('小売店')).toEqual({ count: '2', names: '山本、鈴木' });
+        expect(assignmentOf('二次卸')).toEqual({ count: '0', names: '（未割り当て）' });
     });
 
     it('各役割に 1 人以上が要ることと、不足している役割を示し、開始を押せなくする', async () => {
@@ -95,12 +138,13 @@ describe('S04 ロビー（進行役）', () => {
             },
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
-        const row = await screen.findByRole('listitem', { name: '田中' });
+        await screen.findByRole('rowheader', { name: '田中' });
+        const row = rowOf('田中');
         await user.selectOptions(within(row).getByLabelText('役割を選ぶ'), '二次卸');
         await user.click(within(row).getByRole('button', { name: '割り当てる' }));
 
         expect(api.assignRole).toHaveBeenCalledWith(GAME_ID, 'p-2', 'WHOLESALER');
-        expect(await screen.findByText('二次卸: 田中')).toBeInTheDocument();
+        await waitFor(() => expect(assignmentOf('二次卸')).toEqual({ count: '1', names: '田中' }));
     });
 
     it('すでに別の役割にいる人を選ぶと、移動元と移動先を示す確認を挟み、確認してから移す', async () => {
@@ -120,7 +164,8 @@ describe('S04 ロビー（進行役）', () => {
             },
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
-        const row = await screen.findByRole('listitem', { name: '山本' });
+        await screen.findByRole('rowheader', { name: '山本' });
+        const row = rowOf('山本');
         await user.selectOptions(within(row).getByLabelText('役割を選ぶ'), '二次卸');
         await user.click(within(row).getByRole('button', { name: '割り当てる' }));
 
@@ -132,7 +177,7 @@ describe('S04 ロビー（進行役）', () => {
 
         await user.click(within(dialog).getByRole('button', { name: '移す' }));
         expect(api.assignRole).toHaveBeenCalledWith(GAME_ID, 'p-1', 'WHOLESALER');
-        expect(await screen.findByText('二次卸: 山本')).toBeInTheDocument();
+        await waitFor(() => expect(assignmentOf('二次卸')).toEqual({ count: '1', names: '山本' }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
@@ -142,7 +187,8 @@ describe('S04 ロビー（進行役）', () => {
             getLobby: () => Promise.resolve(lobby({ participants: [yamamoto] })),
         });
         renderApp(api, `/games/${GAME_ID}/lobby`);
-        const row = await screen.findByRole('listitem', { name: '山本' });
+        await screen.findByRole('rowheader', { name: '山本' });
+        const row = rowOf('山本');
         await user.selectOptions(within(row).getByLabelText('役割を選ぶ'), '工場');
         await user.click(within(row).getByRole('button', { name: '割り当てる' }));
         await user.click(await screen.findByRole('button', { name: '戻って確認' }));
@@ -158,13 +204,13 @@ describe('S04 ロビー（進行役）', () => {
                 getLobby: () => Promise.resolve(lobby({ participants })),
             });
             renderApp(api, `/games/${GAME_ID}/lobby`);
-            expect(await screen.findByRole('listitem', { name: '山本' })).toBeInTheDocument();
-            expect(screen.queryByRole('listitem', { name: '田中' })).not.toBeInTheDocument();
+            expect(await screen.findByRole('rowheader', { name: '山本' })).toBeInTheDocument();
+            expect(screen.queryByRole('rowheader', { name: '田中' })).not.toBeInTheDocument();
 
             participants = [yamamoto, tanaka];
             await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
 
-            expect(await screen.findByRole('listitem', { name: '田中' })).toBeInTheDocument();
+            expect(await screen.findByRole('rowheader', { name: '田中' })).toBeInTheDocument();
         } finally {
             vi.useRealTimers();
         }
@@ -181,12 +227,12 @@ describe('S04 ロビー（進行役）', () => {
                         : Promise.reject(new Error('通信の失敗')),
             });
             renderApp(api, `/games/${GAME_ID}/lobby`);
-            await screen.findByRole('listitem', { name: '山本' });
+            await screen.findByRole('rowheader', { name: '山本' });
 
             await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
 
             expect(calls).toBeGreaterThan(1);
-            expect(screen.getByRole('listitem', { name: '山本' })).toBeInTheDocument();
+            expect(screen.getByRole('rowheader', { name: '山本' })).toBeInTheDocument();
             expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         } finally {
             vi.useRealTimers();
@@ -206,7 +252,7 @@ describe('S04 ロビー（進行役）', () => {
                           ),
             });
             renderApp(api, `/games/${GAME_ID}/lobby`);
-            await screen.findByRole('listitem', { name: '山本' });
+            await screen.findByRole('rowheader', { name: '山本' });
 
             await act(() => vi.advanceTimersByTimeAsync(LOBBY_POLL_MS));
             expect(await screen.findByRole('alert')).toHaveTextContent('c-9');
@@ -248,10 +294,12 @@ describe('S04 ロビー（進行役）', () => {
             await screen.findByRole('button', { name: /ダミー参加者で不足の役割を埋める/ }),
         );
 
-        expect(await screen.findByText('二次卸: ダミー二次卸')).toBeInTheDocument();
-        expect(screen.getByText('一次卸: ダミー一次卸')).toBeInTheDocument();
-        expect(screen.getByText('工場: ダミー工場')).toBeInTheDocument();
-        expect(screen.getByText('小売店: 山本')).toBeInTheDocument();
+        await waitFor(() =>
+            expect(assignmentOf('二次卸')).toEqual({ count: '1', names: 'ダミー二次卸' }),
+        );
+        expect(assignmentOf('一次卸')).toEqual({ count: '1', names: 'ダミー一次卸' });
+        expect(assignmentOf('工場')).toEqual({ count: '1', names: 'ダミー工場' });
+        expect(assignmentOf('小売店')).toEqual({ count: '1', names: '山本' });
         expect(api.joinWithoutSession).toHaveBeenCalledTimes(3);
         expect(api.joinWithoutSession).toHaveBeenCalledWith({
             joinCode: 'ABCDEFGH2345',

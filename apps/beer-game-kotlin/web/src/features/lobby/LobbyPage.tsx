@@ -11,11 +11,10 @@ import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER } from '../../labels';
 import { InvitationsPanel } from './InvitationsPanel';
+import { AssignmentsTable, ParticipantsTable, SummaryTable, nameOf } from './LobbyTables';
 
 const missingRolesText = (roles: readonly Role[]) =>
     `各役割に 1 人以上が必要です。（不足: ${roles.map((role) => ROLE_LABELS[role]).join('、')}）`;
-
-const nameOf = (participant: LobbyParticipant) => participant.displayName ?? '（表示名なし）';
 
 /** 他の人の参加を反映するため、準備中のロビーを取り直す間隔（ミリ秒）。 */
 export const LOBBY_POLL_MS = 3000;
@@ -172,17 +171,7 @@ export function LobbyPage() {
         <>
             <PageHeading title="ロビー" />
             <SettingsNote kind={lobby.settingsKind} changed={lobby.changedSettings} />
-            <p>
-                参加コード: <strong>{lobby.joinCode}</strong>
-            </p>
-            <p>
-                状態:{' '}
-                {lobby.status === 'PREPARING'
-                    ? '準備中'
-                    : lobby.status === 'STARTED'
-                      ? '進行中'
-                      : '終了'}
-            </p>
+            <SummaryTable lobby={lobby} />
 
             {failure ? (
                 startError ? (
@@ -195,57 +184,18 @@ export function LobbyPage() {
             ) : null}
 
             <h2>各役割の担当</h2>
-            <ul>
-                {ROLE_ORDER.map((role) => {
-                    const names = lobby.participants.filter((p) => p.role === role).map(nameOf);
-                    return (
-                        <li
-                            key={role}
-                        >{`${ROLE_LABELS[role]}: ${names.length > 0 ? names.join('、') : '（未割り当て）'}`}</li>
-                    );
-                })}
-            </ul>
+            <AssignmentsTable participants={lobby.participants} />
 
             <h2>参加者</h2>
-            <ul className="participants">
-                {lobby.participants.map((participant) => {
-                    const nameId = `${idPrefix}-name-${participant.participantId}`;
-                    const choice = selected[participant.participantId] ?? '';
-                    return (
-                        <li key={participant.participantId} aria-labelledby={nameId}>
-                            <span id={nameId}>{nameOf(participant)}</span>{' '}
-                            <span>
-                                {participant.role ? ROLE_LABELS[participant.role] : '未割り当て'}
-                            </span>{' '}
-                            <select
-                                aria-label="役割を選ぶ"
-                                value={choice}
-                                onChange={(event) =>
-                                    setSelected({
-                                        ...selected,
-                                        [participant.participantId]: event.target.value as
-                                            Role | '',
-                                    })
-                                }
-                            >
-                                <option value="">選択してください</option>
-                                {ROLE_ORDER.map((role) => (
-                                    <option key={role} value={role}>
-                                        {ROLE_LABELS[role]}
-                                    </option>
-                                ))}
-                            </select>{' '}
-                            <button
-                                type="button"
-                                disabled={busy || choice === '' || choice === participant.role}
-                                onClick={() => requestAssign(participant)}
-                            >
-                                割り当てる
-                            </button>
-                        </li>
-                    );
-                })}
-            </ul>
+            <ParticipantsTable
+                participants={lobby.participants}
+                selected={selected}
+                busy={busy}
+                onSelect={(participantId, role) =>
+                    setSelected({ ...selected, [participantId]: role })
+                }
+                onAssign={requestAssign}
+            />
 
             <InvitationsPanel gameId={gameId} lobby={lobby} onLobby={setData} />
 
