@@ -15,6 +15,7 @@ import {
     formatClock,
 } from '../../labels';
 import { ConflictNotice, type Conflict } from './ConflictNotice';
+import { StatusTable } from './StatusTable';
 
 const STEPS = ['1. 状況を確認', '2. 入力', '3. 確定待ち'] as const;
 
@@ -264,22 +265,7 @@ export function PlayPage() {
                         </>
                     ) : (
                         <>
-                            <dl className="status-list">
-                                <dt>在庫</dt>
-                                <dd>{roleStatus.inventory}</dd>
-                                <dt>受注残</dt>
-                                <dd>{roleStatus.backlog}</dd>
-                                <dt>入荷</dt>
-                                <dd>{roleStatus.arrivals}</dd>
-                                <dt>受注</dt>
-                                <dd>{roleStatus.orders}</dd>
-                                {roleStatus.customerDemand !== undefined ? (
-                                    <>
-                                        <dt>顧客需要</dt>
-                                        <dd>{roleStatus.customerDemand}</dd>
-                                    </>
-                                ) : null}
-                            </dl>
+                            <StatusTable roleStatus={roleStatus} />
                             <h2>{role === 'FACTORY' ? '生産要請' : '発注'}</h2>
                             {status === 'PAUSED' ? (
                                 <p role="status">停止中です。進行役の再開を待ってください。</p>

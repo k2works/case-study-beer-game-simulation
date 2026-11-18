@@ -35,20 +35,36 @@ describe('S07 観察', () => {
         renderApp(api, PATH);
 
         expect(await screen.findByRole('heading', { name: '観察' })).toBeInTheDocument();
-        expect(screen.getByText(/第 3 週（全 5 週）/)).toBeInTheDocument();
-        expect(screen.getByText(/入力済み 2 \/ 4 役割/)).toBeInTheDocument();
+        const progress = screen.getByRole('table', { name: '進行状況の表' });
+        const progressRows = within(progress)
+            .getAllByRole('row')
+            .map((row) => [
+                within(row).getByRole('rowheader').textContent,
+                within(row).getByRole('cell').textContent,
+            ]);
+        expect(progressRows).toEqual([
+            ['状態', '進行中'],
+            ['現在週', '第 3 週（全 5 週） 進行中'],
+            ['完了状況', '入力済み 2 / 4 役割'],
+        ]);
         const table = screen.getByRole('table', { name: 'チーム合計の表' });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['週', '注文', '在庫', '受注残']);
+        // 新しい週を上にする
         const rows = within(table).getAllByRole('row');
         expect(
             within(rows[1] as HTMLElement)
                 .getAllByRole('cell')
                 .map((c) => c.textContent),
-        ).toEqual(['1', '16', '48', '0']);
+        ).toEqual(['2', '20', '44', '4']);
         expect(
             within(rows[2] as HTMLElement)
                 .getAllByRole('cell')
                 .map((c) => c.textContent),
-        ).toEqual(['2', '20', '44', '4']);
+        ).toEqual(['1', '16', '48', '0']);
         // 役割別の語も、入力・確定・進行の操作もない（読み取り専用）
         expect(screen.queryByText(/小売店|二次卸|一次卸|工場/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -72,7 +88,7 @@ describe('S07 観察', () => {
                 '進行役の設定により、プレイ中のチーム合計は公開されていません。',
             ),
         ).toBeInTheDocument();
-        expect(screen.queryByRole('table')).not.toBeInTheDocument();
+        expect(screen.queryByRole('table', { name: 'チーム合計の表' })).not.toBeInTheDocument();
         expect(screen.getByText(/第 3 週/)).toBeInTheDocument();
     });
 

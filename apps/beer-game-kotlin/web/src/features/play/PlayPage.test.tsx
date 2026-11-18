@@ -41,10 +41,17 @@ describe('S05 プレイ', () => {
         expect(screen.getByText(/1\. 状況を確認/).closest('li')).not.toHaveAttribute(
             'aria-current',
         );
-        expect(screen.getByText('在庫').nextSibling).toHaveTextContent('12');
-        expect(screen.getByText('受注残').nextSibling).toHaveTextContent('4');
-        expect(screen.getByText('入荷').nextSibling).toHaveTextContent('6');
-        expect(screen.getByText('受注').nextSibling).toHaveTextContent('8');
+        const table = screen.getByRole('table', { name: '今週の状況の表' });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['在庫', '受注残', '入荷', '受注']);
+        expect(
+            within(table)
+                .getAllByRole('cell')
+                .map((c) => c.textContent),
+        ).toEqual(['12', '4', '6', '8']);
         expect(screen.getByLabelText('発注数')).toBeInTheDocument();
         expect(screen.queryByText('顧客需要')).not.toBeInTheDocument();
     });
@@ -70,7 +77,15 @@ describe('S05 プレイ', () => {
                 ),
         });
         renderApp(api, PATH);
-        expect((await screen.findByText('顧客需要')).nextSibling).toHaveTextContent('8');
+        const table = await screen.findByRole('table', { name: '今週の状況の表' });
+        const headers = within(table)
+            .getAllByRole('columnheader')
+            .map((h) => h.textContent);
+        const cells = within(table)
+            .getAllByRole('cell')
+            .map((c) => c.textContent);
+        expect(headers).toEqual(['在庫', '受注残', '入荷', '受注', '顧客需要']);
+        expect(cells[headers.indexOf('顧客需要')]).toBe('8');
     });
 
     it('保存すると、意思決定の版を添えて送り、応答ではなく取得し直した状態から「現在の入力」を表示する', async () => {

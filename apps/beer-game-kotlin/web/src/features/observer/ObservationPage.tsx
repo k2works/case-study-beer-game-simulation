@@ -73,23 +73,34 @@ function ObservationView({ observation, gameId }: { observation: Observation; ga
     return (
         <>
             <PageHeading title="観察" />
-            <dl>
-                <dt>状態</dt>
-                <dd>{GAME_STATUS_LABELS[observation.status]}</dd>
-                {observation.week !== undefined ? (
-                    <>
-                        <dt>現在週</dt>
-                        <dd>
-                            第 {observation.week} 週（全 {observation.finalWeek} 週）
-                            {sessionLabel ? ` ${sessionLabel}` : ''}
-                        </dd>
-                        <dt>完了状況</dt>
-                        <dd>
-                            入力済み {observation.submittedRoleCount ?? 0} / {ROLE_COUNT} 役割
-                        </dd>
-                    </>
-                ) : null}
-            </dl>
+            <div className="table-scroll">
+                <table className="results-table summary-table" aria-label="進行状況の表">
+                    <tbody>
+                        <tr>
+                            <th scope="row">状態</th>
+                            <td>{GAME_STATUS_LABELS[observation.status]}</td>
+                        </tr>
+                        {observation.week !== undefined ? (
+                            <>
+                                <tr>
+                                    <th scope="row">現在週</th>
+                                    <td>
+                                        第 {observation.week} 週（全 {observation.finalWeek} 週）
+                                        {sessionLabel ? ` ${sessionLabel}` : ''}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">完了状況</th>
+                                    <td>
+                                        入力済み {observation.submittedRoleCount ?? 0} /{' '}
+                                        {ROLE_COUNT} 役割
+                                    </td>
+                                </tr>
+                            </>
+                        ) : null}
+                    </tbody>
+                </table>
+            </div>
 
             <h2>チーム合計（確定した週）</h2>
             {totals.hiddenReason === 'DISCLOSURE_NONE' ? (
@@ -98,33 +109,39 @@ function ObservationView({ observation, gameId }: { observation: Observation; ga
                 <p>まだ確定した週はありません。</p>
             ) : (
                 <>
-                    <table aria-label="チーム合計の表">
-                        <caption>4 役割の合計（役割別の値は表示されません）</caption>
-                        <thead>
-                            <tr>
-                                <th scope="col">週</th>
-                                <th scope="col">注文</th>
-                                <th scope="col">在庫</th>
-                                <th scope="col">受注残</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {totals.weeks.map((week) => (
-                                <tr key={week.week}>
-                                    <td>{week.week}</td>
-                                    {isHidden(week) ? (
-                                        <td colSpan={3}>非表示（※）</td>
-                                    ) : (
-                                        <>
-                                            <td>{week.order}</td>
-                                            <td>{week.inventory}</td>
-                                            <td>{week.backlog}</td>
-                                        </>
-                                    )}
+                    <div className="table-scroll">
+                        <table className="results-table" aria-label="チーム合計の表">
+                            <caption>4 役割の合計（役割別の値は表示されません）</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">週</th>
+                                    <th scope="col">注文</th>
+                                    <th scope="col">在庫</th>
+                                    <th scope="col">受注残</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {[...totals.weeks]
+                                    .sort((a, b) => b.week - a.week)
+                                    .map((week) => (
+                                        <tr key={week.week}>
+                                            <td>{week.week}</td>
+                                            {isHidden(week) ? (
+                                                <td colSpan={3} className="hidden-cell">
+                                                    非表示（※）
+                                                </td>
+                                            ) : (
+                                                <>
+                                                    <td>{week.order}</td>
+                                                    <td>{week.inventory}</td>
+                                                    <td>{week.backlog}</td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    ))}
+                            </tbody>
+                        </table>
+                    </div>
                     {totals.weeks.some(isHidden) ? (
                         <p className="muted">
                             ※ 合計の対象が 1
