@@ -11,6 +11,7 @@ import { PageHeading } from '../../components/PageHeading';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER, SESSION_STATUS_LABELS, WEEK_SEPARATOR } from '../../labels';
+import { DummyQuantityField } from './DummyQuantityField';
 
 interface ConsoleData {
     game: GameState;
@@ -81,8 +82,8 @@ export function ConsolePage() {
     const [failure, setFailure] = useState<unknown>(null);
     const [advancedText, setAdvancedText] = useState<string | null>(null);
     const [control, setControl] = useState<Control | null>(null);
-    const [dummyQuantity, setDummyQuantity] = useState(DEFAULT_DUMMY_QUANTITY);
-    const [dummyError, setDummyError] = useState<string | null>(null);
+    const [dummyQuantities, setDummyQuantities] = useState<Partial<Record<Role, string>>>({});
+    const [dummyInvalid, setDummyInvalid] = useState<readonly Role[]>([]);
     const titleId = useId();
     const controlTitleId = useId();
     const titleRef = useRef<HTMLHeadingElement>(null);
@@ -218,21 +219,23 @@ export function ConsolePage() {
      * 数量が 0〜1000 の整数でなければ、送らずに範囲を案内する（サーバーの検証と同じ範囲）。
      */
     async function fillWithProxyDecisions(current: SessionState) {
-        const quantity = parseDummyQuantity(dummyQuantity);
-        if (quantity === null) {
-            setDummyError('数量は 0〜1000 の整数で入力してください。');
-            return;
-        }
-        setDummyError(null);
+        const targets = ROLE_ORDER.filter((r) => !decided.includes(r));
+        const parsed = targets.map((role) => ({
+            role,
+            quantity: parseDummyQuantity(dummyQuantities[role] ?? DEFAULT_DUMMY_QUANTITY),
+        }));
+        const invalid = parsed.filter((entry) => entry.quantity === null).map((e) => e.role);
+        setDummyInvalid(invalid);
+        if (invalid.length > 0) return;
         setBusy(true);
         setFailure(null);
         setAdvancedText(null);
         try {
             let latest = current.versions;
-            for (const role of ROLE_ORDER.filter((r) => !decided.includes(r))) {
+            for (const { role, quantity } of parsed) {
                 const result = await api.submitProxyDecision(sessionId, role, {
                     requestedWeek: current.week,
-                    quantity,
+                    quantity: quantity ?? 0,
                 });
                 latest = result.versions;
             }
@@ -338,27 +341,20 @@ export function ConsolePage() {
                 <section aria-labelledby="dev-tools-heading">
                     <h2 id="dev-tools-heading">開発用</h2>
                     <p className="muted">
-                        1 人で試すための代理入力です。未入力の役割すべてに、指定した数量（0〜1000
-                        の整数）を入れます。開発サーバーでだけ表示します。
+                        1 人で試すための代理入力です。未入力の役割ごとに、数量（0〜1000
+                        の整数）を指定できます。開発サーバーでだけ表示します。
                     </p>
-                    <div className="field">
-                        <label htmlFor="dummy-quantity">代理入力の数量</label>
-                        <input
-                            id="dummy-quantity"
-                            inputMode="numeric"
-                            value={dummyQuantity}
-                            aria-invalid={dummyError !== null}
-                            aria-describedby={
-                                dummyError === null ? undefined : 'dummy-quantity-error'
+                    {ROLE_ORDER.filter((role) => !decided.includes(role)).map((role) => (
+                        <DummyQuantityField
+                            key={role}
+                            role={role}
+                            value={dummyQuantities[role] ?? DEFAULT_DUMMY_QUANTITY}
+                            invalid={dummyInvalid.includes(role)}
+                            onChange={(text) =>
+                                setDummyQuantities({ ...dummyQuantities, [role]: text })
                             }
-                            onChange={(event) => setDummyQuantity(event.target.value)}
                         />
-                        {dummyError === null ? null : (
-                            <span id="dummy-quantity-error" className="field-error">
-                                {dummyError}
-                            </span>
-                        )}
-                    </div>
+                    ))}
                     <button
                         type="button"
                         disabled={busy}

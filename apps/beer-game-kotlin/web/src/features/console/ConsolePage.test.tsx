@@ -86,7 +86,7 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         expect(await screen.findByRole('button', { name: '週を確定' })).toBeEnabled();
     });
 
-    it('代理入力する数量を指定できる（既定は 4。指定した値で、未入力の役割すべてを埋める）', async () => {
+    it('未入力の役割ごとに、代理入力の数量を指定できる（既定は 4。入力済みの役割には欄を出さない）', async () => {
         const user = userEvent.setup();
         let roles = decisions({ RETAILER: 4 });
         const api = fakeApi({
@@ -99,23 +99,30 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         });
         renderApp(api, PATH);
 
-        const field = await screen.findByLabelText('代理入力の数量');
-        expect(field).toHaveValue('4');
-        await user.clear(field);
-        await user.type(field, '12');
+        const wholesaler = await screen.findByLabelText('二次卸の代理入力の数量');
+        const distributor = screen.getByLabelText('一次卸の代理入力の数量');
+        const factory = screen.getByLabelText('工場の代理入力の数量');
+        expect(screen.queryByLabelText('小売店の代理入力の数量')).not.toBeInTheDocument();
+        for (const field of [wholesaler, distributor, factory]) expect(field).toHaveValue('4');
+
+        await user.clear(wholesaler);
+        await user.type(wholesaler, '12');
+        await user.clear(factory);
+        await user.type(factory, '0');
         await user.click(screen.getByRole('button', { name: /ダミーの役割を代理入力で埋める/ }));
 
         await waitFor(() => expect(api.submitProxyDecision).toHaveBeenCalledTimes(3));
-        for (const role of ['WHOLESALER', 'DISTRIBUTOR', 'FACTORY'] as const) {
+        const expected = { WHOLESALER: 12, DISTRIBUTOR: 4, FACTORY: 0 } as const;
+        for (const [role, quantity] of Object.entries(expected)) {
             expect(api.submitProxyDecision).toHaveBeenCalledWith(GAME_ID, role, {
                 requestedWeek: 2,
-                quantity: 12,
+                quantity,
             });
         }
     });
 
     it.each(['', '-1', '1001', '4.5', 'abc'])(
-        '数量が 0〜1000 の整数でない（%j）ときは、送らずに、範囲を案内する',
+        '数量が 0〜1000 の整数でない（%j）役割があるときは、どの役割にも送らず、その欄に範囲を案内する',
         async (text) => {
             const user = userEvent.setup();
             const api = fakeApi({
@@ -125,7 +132,7 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
             });
             renderApp(api, PATH);
 
-            const field = await screen.findByLabelText('代理入力の数量');
+            const field = await screen.findByLabelText('一次卸の代理入力の数量');
             await user.clear(field);
             if (text !== '') await user.type(field, text);
             await user.click(
@@ -136,6 +143,10 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
                 await screen.findByText('数量は 0〜1000 の整数で入力してください。'),
             ).toBeVisible();
             expect(field).toHaveAttribute('aria-invalid', 'true');
+            expect(screen.getByLabelText('二次卸の代理入力の数量')).not.toHaveAttribute(
+                'aria-invalid',
+                'true',
+            );
             expect(api.submitProxyDecision).not.toHaveBeenCalled();
         },
     );
