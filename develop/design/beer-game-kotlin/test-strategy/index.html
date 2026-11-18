@@ -3084,6 +3084,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#b15-nfr-84-2026-11-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B15 の結果（NFR 84 件。2026-11-18）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -11999,6 +12010,440 @@
 </tr>
 </tbody>
 </table>
+<h3 id="b15-nfr-84-2026-11-18">B15 の結果（NFR 84 件。2026-11-18）<a class="headerlink" href="#b15-nfr-84-2026-11-18" title="Permanent link">&para;</a></h3>
+<p>上の検証表の全件に、B15 の時点の結果を記録します（詳細と実測の表は <a href="../../../development/beer-game-kotlin/bolt_15_report/">Bolt 15 終了報告</a>）。<strong>数値は、ローカルの PostgreSQL 18（Testcontainers）の上の、インプロセスの Ktor（ネットワーク・ブラウザ・SSE・複数のタスクを含まない）の実測で、実環境（ECS・RDS・ALB）の値ではない。</strong> 結果の区分: <strong>達成</strong>（目標を満たす実測、または対応する自動テストが緑）／<strong>一部達成</strong>（条件つき、または一部が未実施）／<strong>未達</strong>（実測が目標を超える、または機能が無い）／<strong>未測定</strong>（測っていない）／<strong>未実施</strong>（人・AWS・四半期の訓練が要る）／<strong>適用外</strong>。<code>未確認</code> は、この Bolt で個別に確かめていないもの。承認ゲートは<strong>未承認</strong>。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ID</th>
+<th style="text-align: left;">結果</th>
+<th style="text-align: left;">根拠・備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">NF-P1</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">75 の並行を<strong>隙間なく</strong>続けると、保存 p95 1034・1273 ms（全規模 2 回。1 秒を超える）、取得 p95 618・724 ms。<strong>0〜5 秒に分散</strong>すると、保存 p95 87・91 ms、取得 p95 41・43 ms。接続プール（10）が全部使われ、待つスレッドが最大 53。15 分の定常ではなく 40 週分</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P2</td>
+<td style="text-align: left;">未達</td>
+<td style="text-align: left;"><strong>SSE が未実装</strong>（B1 から。画面は手動更新）。測れない。参考（ポーリングの下限）: 確定の応答の後の最初の取得 p95 105・134 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P3</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">最大の長さ（1852 件に至る）の確定 p95 216 ms・p99 343 ms。短いストリームでも、隙間なく同時の負荷下で p95 368・493 ms、p99 827・1107 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P4</td>
+<td style="text-align: left;">未達</td>
+<td style="text-align: left;">SSE も自動のポーリングも無く、「SSE を遮断した E2E」は成り立たない</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P5</td>
+<td style="text-align: left;">未測定</td>
+<td style="text-align: left;">ブラウザの 75 ユーザーの負荷は未実施（<code>@ui</code> は 1 ゲーム）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P6</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">停止・再開 p95 101・115 ms（標本 30）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P7</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">状態の取得（75 並行）p95 618・724 ms は達成。SSE の再接続後 5 秒は、SSE が無く対象外（未達）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P8</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">振り返り p95 353 ms、観察 p95 387・395 ms（90 の読み手 × 20 ループ。30 分の継続ではない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P9</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">50 週 × 4 役割の CSV・JSON を p95 28・29 ms（目標 30 秒）。75 の読み取りの負荷の下でも p95 113・116 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P10</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">p95 67・68 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P11</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">時刻を注入した単体・DB の統合（B11）が緑。本番の実績は未測定（定期タスクは AWS 未適用）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P12</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">境界値の自動テスト（数量は domain・HTTP、64 KB は <code>HttpInfrastructureSpec</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P13</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">NF-P1 の保存と同じ。分散した利用は達成、隙間なしは 1 秒を超える。B6 の計測（323 ms 以下）と合わせる</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P14</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">自動確定の最後の保存 p95 200・224 ms</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P15</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">読み込み p95 26 ms（1052 件）・37 ms（1852 件）、畳み込み p95 1 ms。自前の計測（先頭 5 回を除外、100 回）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P16</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">コンテナの開始から <code>/ready</code> まで 4.5〜11.7 秒（10 回。<code>container-smoke.sh</code>）。ローカルの Docker の値で Fargate ではない。標本 10 で p95 は言わない。起動後 60 秒の p95 2 秒は未測定</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P17</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">負荷の後の GC 後ヒープ 78・79 MB / 512 MB（15%。上限 70%）。<strong>テストの JVM の値</strong>（SSE・コンテナを含まない）。GC の一時停止は未計測</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P18</td>
+<td style="text-align: left;">未達</td>
+<td style="text-align: left;">1 ゲーム 1052 件の再構築 p95 4092 ms（目標 1 秒）。105 ゲーム・合計 34,710 件（平均 330 件）は 167.8 秒（5 分以内）。<strong>1000 件 × 100 ゲームは測っていない</strong>（直線の推定で約 8 分）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P19</td>
+<td style="text-align: left;">未測定</td>
+<td style="text-align: left;">DB 側だけの時間は分離していない。HTTP 全体の保存 p95 149〜224 ms（最大の長さ付近）が上限の目安</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P20</td>
+<td style="text-align: left;">適用外</td>
+<td style="text-align: left;">同期投影のため</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R1</td>
+<td style="text-align: left;">未実施</td>
+<td style="text-align: left;">本番の SLI。AWS 未適用（合成監視は定義のみ。B13）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R2</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">アラートの訓練は模擬の時計で緑（<code>AlarmDrillSteps</code>）。実機の訓練は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R3</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">定義（Multi-AZ・削除保護）は <code>ProductionDefinitionSpec</code> が検査。プロセスの強制停止・再起動の統合テストは未確認</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R4</td>
+<td style="text-align: left;">未実施</td>
+<td style="text-align: left;">復元の訓練（RTO の実測）。手順書とドライランのスクリプトまで（B14）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R5</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>EventStoreContract</code>・<code>IdempotencyContract</code> の取り消し・原子性</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R6</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>IdempotencyContract</code>（24 時間の境界）と冪等キーの再送の HTTP テスト</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R7</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>EventStoreContract</code>（同じ版の追記は <code>ConcurrencyConflict</code>）、<code>SqlFailuresSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R8</td>
+<td style="text-align: left;">未実施</td>
+<td style="text-align: left;">復元の訓練（投影の再構築を含む）。再構築の一致は自動（B12）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R9</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>BrokenPorts</code> による契約テスト（<code>ApiContractSpec</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R10</td>
+<td style="text-align: left;">未達</td>
+<td style="text-align: left;">SSE が未実装</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R11</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">保持削除の再試行の境界（B11。<code>RetentionContract</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R12</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">再起動後に <code>deletion_runs</code> から復元（B11 の統合）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R13</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">2 プロセスの並行（B8 の PostgreSQL の並行テスト）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R14</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">共同入力の並行（<code>ApplicationFlowContract</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R15</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">再構築の一致（<code>ProjectionMaintenanceContract</code>。B12）。日次の検査は定義（B14）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R16</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">往復の同値性・計算と事実の一致（<code>EventGoldenSpec</code> ほか）。投影の整合の日次検査は定義</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-R17</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">再試行の上限（既定 10）。B15 のバースト 600 件（10 ラウンド × 60）で、枯渇を含めて失敗 0 件</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S1</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>SupportSpec</code>（乱数長・一意性）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S2</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">HTTP の Cookie 属性・ログの検査（<code>HttpFlowSpec</code>・<code>ContinuationHttpSpec</code>。X-3 の受入シナリオ）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S3</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>CredentialKeyRingSpec</code>、<code>ServerConfigSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S4</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>CredentialLifecycleSpec</code>（時刻を注入した期限・失効の境界）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S5</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">HTTP の認可のテスト（<code>HttpFlowSpec</code>・<code>ContinuationHttpSpec</code>・契約テスト）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S6</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">他の役割・将来の需要を含まない否定のテスト（受入 <code>situation.feature</code> ほか）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S7</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">参加コードが進行役の資格として扱われないことの認可のテスト（B5 の報告による。この Bolt では個別に再確認していない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S8</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>SecurityPoliciesSpec</code>・<code>HttpInfrastructureSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S9</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>HttpInfrastructureSpec</code>、受入 <code>security-baseline.feature</code>（X-5）、CloudFront は <code>ProductionDefinitionSpec</code>。デプロイ後のスモークは未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S10</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">境界値・64 KB（<code>HttpInfrastructureSpec</code>、domain の単体）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S11</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>AttemptLimitSpec</code>・<code>SecurityPoliciesSpec</code>・受入 <code>join-rate-limit.feature</code>。複数タスクでの実効の上限は実測していない</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S12</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">無効な資格の応答が同じ形（B5。<code>ApiContractSpec</code>・<code>ContinuationHttpSpec</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S13</td>
+<td style="text-align: left;">未達</td>
+<td style="text-align: left;">CI の依存関係・秘密情報の検査が<strong>無かった</strong>。B15 で、実行時の npm 依存の <code>npm audit</code>（high 以上）を足した（初回の CI は未実行）。Gradle の依存関係と秘密情報の検査は未実施（新しい外部ツールのため、人の承認が要る）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S14</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">受入 <code>observability.feature</code>・<code>security-baseline.feature</code>（X-3）、<code>LogRecordSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S15</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">TLS 1.2 以上は <code>ProductionDefinitionSpec</code>（IaC の検査）。ステージングでの TLS の確認は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S16</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">連鎖削除の網羅（B11。<code>information_schema</code> の検査）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S17</td>
+<td style="text-align: left;">未確認</td>
+<td style="text-align: left;">認可の行列は緑。出力の「取得用の参照（15 分）」の境界値は、この Bolt で個別に確かめていない</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S18</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>RolePrivilegesSpec</code>（観察者は 3 表だけ）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S19</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">総当たりのテストは緑。アラートの訓練（四半期）は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S20</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>RolePrivilegesSpec</code>（追記専用）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-S21</td>
+<td style="text-align: left;">未確認</td>
+<td style="text-align: left;">型の検査と <code>events</code> の走査テストは、個別に確かめていない</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O1</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">受入 <code>observability.feature</code>、<code>LogRecordSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O2</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>HttpInfrastructureSpec</code>（相関 ID）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O3</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>MetricsSpec</code>、<code>EmfMetricSinkSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O4</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">模擬の訓練は緑。実機の訓練は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O5</td>
+<td style="text-align: left;">未実施</td>
+<td style="text-align: left;">ダッシュボードの目視（AWS 未適用）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O6</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>EventCodecSpec</code>・<code>EventGoldenSpec</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O7</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>koverVerify</code>（domain 行 100%、全体 行 85%・分岐 75%）が緑</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O8</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">detekt（JDK 21）・PMD・ktlint が違反 0。fixture のテスト</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O9</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">B15 で <code>ui-design.md</code>・本書を同期。PR ごとのレビューは人</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O10</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;"><code>HttpInfrastructureSpec</code>（<code>/ready</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O11</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">N-1 互換（<code>N1CompatibilitySpec</code>）は緑。ロールバック・復元の訓練は AWS 未適用で未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O12</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">JVM のメトリクスの契約（B13）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O13</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">メトリクスとアラームの規則は B13。リリース前のアラートの試験は実機で未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C1</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">15 ゲーム・75 の並行（SSE なし）の計測は NF-P1 のとおり</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C2</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">全 60 役割を 10 秒の窓で保存、10 ラウンド 600 件、失敗 0 件（枯渇を含む）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C3</td>
+<td style="text-align: left;">未測定</td>
+<td style="text-align: left;">25 ゲーム・100 の SSE・複数インスタンスは、SSE 未実装と複数タスク未実施のため</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C4</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">2 プロセスの統合（B8）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C5</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">接続プールの使用が隙間なく同時の負荷で 10/10（100%）、待つスレッドが最大 53。70% を超える状況の実測。アラートの試験は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C6</td>
+<td style="text-align: left;">未実施</td>
+<td style="text-align: left;">四半期の容量モデル（本番の実測が要る）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C7</td>
+<td style="text-align: left;">未確認</td>
+<td style="text-align: left;">設計のレビュー（人）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C8</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">最悪ケース（9 回/週）で 1852 件（2000 件以下）。保存量（数 MB 以下）は未測定</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-C9</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">NF-P15・P3 が基準内で、スナップショットは不要（現時点）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-U1</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">自動（構造の検査、<code>@ui</code> のキーボード操作）は緑。キーボードだけの全操作の手動の確認は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-U2</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">設計トークンのコントラスト比 9 組が基準以上（本文 17.4:1、補助 7.46:1、リンク 6.67:1、エラー 8.12:1、枠線 4.54:1）。axe は未導入、実際の描画の測定・手動は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-U3</td>
+<td style="text-align: left;">達成</td>
+<td style="text-align: left;">幅 640px（200% 相当）で 5 画面が横スクロールなし（3 ブラウザ）。ブラウザの拡大操作そのものは未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-U4</td>
+<td style="text-align: left;">一部達成</td>
+<td style="text-align: left;">Chromium 27/27、WebKit 27/27、Firefox 26/27（1 件でページがクラッシュ、再現）。Chrome・Edge の実機と Safari の実機は未実施</td>
+</tr>
+</tbody>
+</table>
+<p>集計（84 件）: <strong>達成 47、一部達成 20、未達 5</strong>（NF-P2・P4・P18・R10・S13）、<strong>未測定 3</strong>（NF-P5・P19・C3）、<strong>未実施 5</strong>（NF-R1・R4・R8・O5・C6）、<strong>未確認 3</strong>（NF-S17・S21・C7）、適用外 1（NF-P20）。区分は各行の区分の件数で、この表と B15 の終了報告の表は一致させる。</p>
 <h2 id="_23">静的解析と規約の検査<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h2>
 <p>関数型の規約は、レビューだけに頼らず、静的解析で機械的に守らせます。<strong><a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Kotlin%E7%B7%A8/">ガイド 第 9 章</a> を、最初のコードから、例外なく、厳格に適用します</strong>（2026-11-14 の決定。詳細と理由は <a href="../../../development/beer-game-kotlin/development_strategy/">開発戦略</a> の「静的解析とルール設定（厳格に適用）」が正）。</p>
 <h3 id="_24">厳格さの定義<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
