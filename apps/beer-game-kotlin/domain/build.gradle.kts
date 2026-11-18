@@ -17,12 +17,15 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 // 通常の test は、コミット済みの生成物との一致を検査するだけ。この task は、同じ試験を更新モードで実行して、生成物を書き換える。
 tasks.register<Test>("generateLivingDocs") {
     group = "documentation"
-    description = "用語集とイベント一覧を、コードの注釈とソースから生成して docs/design/beer-game-kotlin/generated/ へ書く。"
+    description = "用語集・イベント一覧・ウォーキングスケルトンのガイドツアーを、コードの注釈とソースから生成して docs/design/beer-game-kotlin/generated/ へ書く。"
     val testSourceSet = sourceSets.named("test")
     testClassesDirs = testSourceSet.get().output.classesDirs
     classpath = testSourceSet.get().runtimeClasspath
     useJUnitPlatform()
-    filter { includeTestsMatching("beergame.domain.LivingDocumentationSpec") }
+    filter {
+        includeTestsMatching("beergame.domain.LivingDocumentationSpec")
+        includeTestsMatching("beergame.domain.WalkingSkeletonTourSpec")
+    }
     systemProperty("beergame.docs.update", "true")
     outputs.upToDateWhen { false }
 }
