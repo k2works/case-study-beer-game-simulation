@@ -12,6 +12,7 @@
   - `export/` : 結果の CSV / JSON の出力（US4.3。B10）
   - `observation/` : 観察者の招待と観察（US1.3、US4.1。B9）
   - `operations/` : Epic 6 運用と観測性（US6.1）
+  - `cross-cutting/` : 横断の受入条件 X-1〜X-5（B15）。`accessibility-ui.feature`（X-1。キーボード・200% 拡大・狭い画面の案内・ヘルプ）、`security-baseline.feature`（X-3 ログに秘密を残さない、X-5 セキュリティヘッダー）。X-2（性能）は Gherkin ではなく、実 DB の計測（`app/src/integrationTest/.../Performance*Spec.kt`）で測る。X-4（BDD・カバレッジ）は Kover と本ディレクトリ全体が根拠
 - 2 つの処理系（Cucumber-JVM の `app/`、Cucumber-JS の `web/`）が、この 1 か所を参照する。
 
 ## ストーリー・受入条件の ID
@@ -21,6 +22,7 @@
 | `@US<番号>` | ユーザーストーリー（例: `@US2.3`）。機能（Feature）の行に付ける |
 | `@AC<番号>` | 受入条件（例: `@AC2.3.1`）。シナリオに付ける。**シナリオの期待値は、受入条件の原文と意味が一致していること**。設計書由来の補足や原文との解釈の差は、シナリオの直前にコメントで書く |
 | `@NF-<名前>` | 非機能要件（例: `@NF-S11` 参加・復帰の総当たりの制限）。受入条件の原文が無い確認のシナリオに付ける（B5 Step 5 で追加）。非機能要件の正本は [非機能要件](../../../docs/design/beer-game-kotlin/non-functional.md) |
+| `@X-<番号>` | 横断の受入条件（例: `@X-1`）。機能（Feature）の行に付ける（B15）。正本は [ユーザーストーリー](../../../docs/requirements/beer-game2/user_story.md) の「横断の受入条件」 |
 
 ## 層
 

@@ -162,6 +162,9 @@ jobs:
           cache: npm
           cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
       - run: npm ci
+      # 依存関係の脆弱性（X-5。B15）。利用者のブラウザへ届く実行時の依存（react・react-dom・react-router）だけを、high 以上で落とす。
+      # 開発用の依存（vite など）の脆弱性は、ビルドとテストの道具の問題で、判断を人に委ねる（B15 の報告書）。
+      - run: npm audit --omit=dev --audit-level=high
       # prettier、eslint、tsc、Vitest、vite build
       - run: npm run verify
       # ステップ定義の無いステップ（Undefined）を、バックエンド無しで検出する。

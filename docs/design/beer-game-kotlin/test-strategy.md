@@ -597,6 +597,99 @@ beer-game2 のゲートは、行・関数・文 85%、分岐 75% です。Kotlin
 | NF-U3 | 200% 拡大の E2E | 毎回 |
 | NF-U4 | ブラウザ行列（Chromium、Firefox、WebKit、Chrome、Edge） | 夜間 |
 
+### B15 の結果（NFR 84 件。2026-11-18）
+
+上の検証表の全件に、B15 の時点の結果を記録します（詳細と実測の表は [Bolt 15 終了報告](../../development/beer-game-kotlin/bolt_15_report.md)）。**数値は、ローカルの PostgreSQL 18（Testcontainers）の上の、インプロセスの Ktor（ネットワーク・ブラウザ・SSE・複数のタスクを含まない）の実測で、実環境（ECS・RDS・ALB）の値ではない。** 結果の区分: **達成**（目標を満たす実測、または対応する自動テストが緑）／**一部達成**（条件つき、または一部が未実施）／**未達**（実測が目標を超える、または機能が無い）／**未測定**（測っていない）／**未実施**（人・AWS・四半期の訓練が要る）／**適用外**。`未確認` は、この Bolt で個別に確かめていないもの。承認ゲートは**未承認**。
+
+| ID | 結果 | 根拠・備考 |
+| :--- | :--- | :--- |
+| NF-P1 | 一部達成 | 75 の並行を**隙間なく**続けると、保存 p95 1034・1273 ms（全規模 2 回。1 秒を超える）、取得 p95 618・724 ms。**0〜5 秒に分散**すると、保存 p95 87・91 ms、取得 p95 41・43 ms。接続プール（10）が全部使われ、待つスレッドが最大 53。15 分の定常ではなく 40 週分 |
+| NF-P2 | 未達 | **SSE が未実装**（B1 から。画面は手動更新）。測れない。参考（ポーリングの下限）: 確定の応答の後の最初の取得 p95 105・134 ms |
+| NF-P3 | 達成 | 最大の長さ（1852 件に至る）の確定 p95 216 ms・p99 343 ms。短いストリームでも、隙間なく同時の負荷下で p95 368・493 ms、p99 827・1107 ms |
+| NF-P4 | 未達 | SSE も自動のポーリングも無く、「SSE を遮断した E2E」は成り立たない |
+| NF-P5 | 未測定 | ブラウザの 75 ユーザーの負荷は未実施（`@ui` は 1 ゲーム） |
+| NF-P6 | 達成 | 停止・再開 p95 101・115 ms（標本 30） |
+| NF-P7 | 一部達成 | 状態の取得（75 並行）p95 618・724 ms は達成。SSE の再接続後 5 秒は、SSE が無く対象外（未達） |
+| NF-P8 | 達成 | 振り返り p95 353 ms、観察 p95 387・395 ms（90 の読み手 × 20 ループ。30 分の継続ではない） |
+| NF-P9 | 達成 | 50 週 × 4 役割の CSV・JSON を p95 28・29 ms（目標 30 秒）。75 の読み取りの負荷の下でも p95 113・116 ms |
+| NF-P10 | 達成 | p95 67・68 ms |
+| NF-P11 | 一部達成 | 時刻を注入した単体・DB の統合（B11）が緑。本番の実績は未測定（定期タスクは AWS 未適用） |
+| NF-P12 | 達成 | 境界値の自動テスト（数量は domain・HTTP、64 KB は `HttpInfrastructureSpec`） |
+| NF-P13 | 一部達成 | NF-P1 の保存と同じ。分散した利用は達成、隙間なしは 1 秒を超える。B6 の計測（323 ms 以下）と合わせる |
+| NF-P14 | 達成 | 自動確定の最後の保存 p95 200・224 ms |
+| NF-P15 | 達成 | 読み込み p95 26 ms（1052 件）・37 ms（1852 件）、畳み込み p95 1 ms。自前の計測（先頭 5 回を除外、100 回） |
+| NF-P16 | 一部達成 | コンテナの開始から `/ready` まで 4.5〜11.7 秒（10 回。`container-smoke.sh`）。ローカルの Docker の値で Fargate ではない。標本 10 で p95 は言わない。起動後 60 秒の p95 2 秒は未測定 |
+| NF-P17 | 一部達成 | 負荷の後の GC 後ヒープ 78・79 MB / 512 MB（15%。上限 70%）。**テストの JVM の値**（SSE・コンテナを含まない）。GC の一時停止は未計測 |
+| NF-P18 | 未達 | 1 ゲーム 1052 件の再構築 p95 4092 ms（目標 1 秒）。105 ゲーム・合計 34,710 件（平均 330 件）は 167.8 秒（5 分以内）。**1000 件 × 100 ゲームは測っていない**（直線の推定で約 8 分） |
+| NF-P19 | 未測定 | DB 側だけの時間は分離していない。HTTP 全体の保存 p95 149〜224 ms（最大の長さ付近）が上限の目安 |
+| NF-P20 | 適用外 | 同期投影のため |
+| NF-R1 | 未実施 | 本番の SLI。AWS 未適用（合成監視は定義のみ。B13） |
+| NF-R2 | 一部達成 | アラートの訓練は模擬の時計で緑（`AlarmDrillSteps`）。実機の訓練は未実施 |
+| NF-R3 | 一部達成 | 定義（Multi-AZ・削除保護）は `ProductionDefinitionSpec` が検査。プロセスの強制停止・再起動の統合テストは未確認 |
+| NF-R4 | 未実施 | 復元の訓練（RTO の実測）。手順書とドライランのスクリプトまで（B14） |
+| NF-R5 | 達成 | `EventStoreContract`・`IdempotencyContract` の取り消し・原子性 |
+| NF-R6 | 達成 | `IdempotencyContract`（24 時間の境界）と冪等キーの再送の HTTP テスト |
+| NF-R7 | 達成 | `EventStoreContract`（同じ版の追記は `ConcurrencyConflict`）、`SqlFailuresSpec` |
+| NF-R8 | 未実施 | 復元の訓練（投影の再構築を含む）。再構築の一致は自動（B12） |
+| NF-R9 | 達成 | `BrokenPorts` による契約テスト（`ApiContractSpec`） |
+| NF-R10 | 未達 | SSE が未実装 |
+| NF-R11 | 達成 | 保持削除の再試行の境界（B11。`RetentionContract`） |
+| NF-R12 | 達成 | 再起動後に `deletion_runs` から復元（B11 の統合） |
+| NF-R13 | 達成 | 2 プロセスの並行（B8 の PostgreSQL の並行テスト） |
+| NF-R14 | 達成 | 共同入力の並行（`ApplicationFlowContract`） |
+| NF-R15 | 達成 | 再構築の一致（`ProjectionMaintenanceContract`。B12）。日次の検査は定義（B14） |
+| NF-R16 | 達成 | 往復の同値性・計算と事実の一致（`EventGoldenSpec` ほか）。投影の整合の日次検査は定義 |
+| NF-R17 | 達成 | 再試行の上限（既定 10）。B15 のバースト 600 件（10 ラウンド × 60）で、枯渇を含めて失敗 0 件 |
+| NF-S1 | 達成 | `SupportSpec`（乱数長・一意性） |
+| NF-S2 | 達成 | HTTP の Cookie 属性・ログの検査（`HttpFlowSpec`・`ContinuationHttpSpec`。X-3 の受入シナリオ） |
+| NF-S3 | 達成 | `CredentialKeyRingSpec`、`ServerConfigSpec` |
+| NF-S4 | 達成 | `CredentialLifecycleSpec`（時刻を注入した期限・失効の境界） |
+| NF-S5 | 達成 | HTTP の認可のテスト（`HttpFlowSpec`・`ContinuationHttpSpec`・契約テスト） |
+| NF-S6 | 達成 | 他の役割・将来の需要を含まない否定のテスト（受入 `situation.feature` ほか） |
+| NF-S7 | 達成 | 参加コードが進行役の資格として扱われないことの認可のテスト（B5 の報告による。この Bolt では個別に再確認していない） |
+| NF-S8 | 達成 | `SecurityPoliciesSpec`・`HttpInfrastructureSpec` |
+| NF-S9 | 達成 | `HttpInfrastructureSpec`、受入 `security-baseline.feature`（X-5）、CloudFront は `ProductionDefinitionSpec`。デプロイ後のスモークは未実施 |
+| NF-S10 | 達成 | 境界値・64 KB（`HttpInfrastructureSpec`、domain の単体） |
+| NF-S11 | 達成 | `AttemptLimitSpec`・`SecurityPoliciesSpec`・受入 `join-rate-limit.feature`。複数タスクでの実効の上限は実測していない |
+| NF-S12 | 達成 | 無効な資格の応答が同じ形（B5。`ApiContractSpec`・`ContinuationHttpSpec`） |
+| NF-S13 | 未達 | CI の依存関係・秘密情報の検査が**無かった**。B15 で、実行時の npm 依存の `npm audit`（high 以上）を足した（初回の CI は未実行）。Gradle の依存関係と秘密情報の検査は未実施（新しい外部ツールのため、人の承認が要る） |
+| NF-S14 | 達成 | 受入 `observability.feature`・`security-baseline.feature`（X-3）、`LogRecordSpec` |
+| NF-S15 | 一部達成 | TLS 1.2 以上は `ProductionDefinitionSpec`（IaC の検査）。ステージングでの TLS の確認は未実施 |
+| NF-S16 | 達成 | 連鎖削除の網羅（B11。`information_schema` の検査） |
+| NF-S17 | 未確認 | 認可の行列は緑。出力の「取得用の参照（15 分）」の境界値は、この Bolt で個別に確かめていない |
+| NF-S18 | 達成 | `RolePrivilegesSpec`（観察者は 3 表だけ） |
+| NF-S19 | 一部達成 | 総当たりのテストは緑。アラートの訓練（四半期）は未実施 |
+| NF-S20 | 達成 | `RolePrivilegesSpec`（追記専用） |
+| NF-S21 | 未確認 | 型の検査と `events` の走査テストは、個別に確かめていない |
+| NF-O1 | 達成 | 受入 `observability.feature`、`LogRecordSpec` |
+| NF-O2 | 達成 | `HttpInfrastructureSpec`（相関 ID） |
+| NF-O3 | 達成 | `MetricsSpec`、`EmfMetricSinkSpec` |
+| NF-O4 | 一部達成 | 模擬の訓練は緑。実機の訓練は未実施 |
+| NF-O5 | 未実施 | ダッシュボードの目視（AWS 未適用） |
+| NF-O6 | 達成 | `EventCodecSpec`・`EventGoldenSpec` |
+| NF-O7 | 達成 | `koverVerify`（domain 行 100%、全体 行 85%・分岐 75%）が緑 |
+| NF-O8 | 達成 | detekt（JDK 21）・PMD・ktlint が違反 0。fixture のテスト |
+| NF-O9 | 一部達成 | B15 で `ui-design.md`・本書を同期。PR ごとのレビューは人 |
+| NF-O10 | 達成 | `HttpInfrastructureSpec`（`/ready`） |
+| NF-O11 | 一部達成 | N-1 互換（`N1CompatibilitySpec`）は緑。ロールバック・復元の訓練は AWS 未適用で未実施 |
+| NF-O12 | 達成 | JVM のメトリクスの契約（B13） |
+| NF-O13 | 一部達成 | メトリクスとアラームの規則は B13。リリース前のアラートの試験は実機で未実施 |
+| NF-C1 | 一部達成 | 15 ゲーム・75 の並行（SSE なし）の計測は NF-P1 のとおり |
+| NF-C2 | 達成 | 全 60 役割を 10 秒の窓で保存、10 ラウンド 600 件、失敗 0 件（枯渇を含む） |
+| NF-C3 | 未測定 | 25 ゲーム・100 の SSE・複数インスタンスは、SSE 未実装と複数タスク未実施のため |
+| NF-C4 | 達成 | 2 プロセスの統合（B8） |
+| NF-C5 | 一部達成 | 接続プールの使用が隙間なく同時の負荷で 10/10（100%）、待つスレッドが最大 53。70% を超える状況の実測。アラートの試験は未実施 |
+| NF-C6 | 未実施 | 四半期の容量モデル（本番の実測が要る） |
+| NF-C7 | 未確認 | 設計のレビュー（人） |
+| NF-C8 | 一部達成 | 最悪ケース（9 回/週）で 1852 件（2000 件以下）。保存量（数 MB 以下）は未測定 |
+| NF-C9 | 達成 | NF-P15・P3 が基準内で、スナップショットは不要（現時点） |
+| NF-U1 | 一部達成 | 自動（構造の検査、`@ui` のキーボード操作）は緑。キーボードだけの全操作の手動の確認は未実施 |
+| NF-U2 | 一部達成 | 設計トークンのコントラスト比 9 組が基準以上（本文 17.4:1、補助 7.46:1、リンク 6.67:1、エラー 8.12:1、枠線 4.54:1）。axe は未導入、実際の描画の測定・手動は未実施 |
+| NF-U3 | 達成 | 幅 640px（200% 相当）で 5 画面が横スクロールなし（3 ブラウザ）。ブラウザの拡大操作そのものは未実施 |
+| NF-U4 | 一部達成 | Chromium 27/27、WebKit 27/27、Firefox 26/27（1 件でページがクラッシュ、再現）。Chrome・Edge の実機と Safari の実機は未実施 |
+
+集計（84 件）: **達成 47、一部達成 20、未達 5**（NF-P2・P4・P18・R10・S13）、**未測定 3**（NF-P5・P19・C3）、**未実施 5**（NF-R1・R4・R8・O5・C6）、**未確認 3**（NF-S17・S21・C7）、適用外 1（NF-P20）。区分は各行の区分の件数で、この表と B15 の終了報告の表は一致させる。
+
 ## 静的解析と規約の検査
 
 関数型の規約は、レビューだけに頼らず、静的解析で機械的に守らせます。**[ガイド 第 9 章](../../reference/関数型プログラミングガイド_Kotlin編.md) を、最初のコードから、例外なく、厳格に適用します**（2026-11-14 の決定。詳細と理由は [開発戦略](../../development/beer-game-kotlin/development_strategy.md) の「静的解析とルール設定（厳格に適用）」が正）。

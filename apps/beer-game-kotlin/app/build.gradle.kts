@@ -112,6 +112,8 @@ tasks.register<Test>("integrationTest") {
     testClassesDirs = integrationTest.output.classesDirs
     classpath = integrationTest.runtimeClasspath
     shouldRunAfter(tasks.test)
+    // 計測の規模の切り替え（環境変数 BEERGAME_MEASURE）を、テストの JVM へ渡す（Gradle の入力にして、変えたら再実行する）。
+    inputs.property("beergameMeasure", providers.environmentVariable("BEERGAME_MEASURE").orElse(""))
     testLogging {
         events("failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

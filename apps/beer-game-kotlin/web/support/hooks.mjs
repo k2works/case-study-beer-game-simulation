@@ -10,12 +10,20 @@ import {
     setDefaultTimeout,
     setWorldConstructor,
 } from '@cucumber/cucumber';
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
 import { createServer } from 'vite';
 import { ConsoleWindow } from './console-window.mjs';
 
 process.env.UI_PORT ??= '5273';
 process.env.API_PORT ??= '3100';
+// ブラウザ行列（NF-U4。B15）: 環境変数 BROWSER（chromium・firefox・webkit。既定は chromium）で、実行するブラウザを選ぶ。
+// Edge・Chrome の実機（チャンネル）と、実機の Safari は、この設定では実行しない。
+const ENGINES = { chromium, firefox, webkit };
+const engineName = process.env.BROWSER ?? 'chromium';
+const engine = ENGINES[engineName];
+if (engine === undefined) {
+    throw new Error(`BROWSER は chromium・firefox・webkit のいずれか（指定: ${engineName}）`);
+}
 const uiUrl = `http://localhost:${process.env.UI_PORT}`;
 const apiUrl = `http://localhost:${process.env.API_PORT}`;
 
@@ -45,7 +53,7 @@ BeforeAll(async function () {
         logLevel: 'warn',
     });
     await vite.listen();
-    browser = await chromium.launch();
+    browser = await engine.launch();
 });
 
 AfterAll(async function () {

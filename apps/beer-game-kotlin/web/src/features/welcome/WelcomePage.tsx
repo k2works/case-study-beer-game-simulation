@@ -24,6 +24,11 @@ export function WelcomePage() {
                             観察者として参加
                         </Link>
                     </li>
+                    <li>
+                        <Link to="/help" className="button">
+                            ヘルプ
+                        </Link>
+                    </li>
                 </ul>
             </nav>
         </>
