@@ -90,6 +90,42 @@ describe('S08 振り返り（役割別）', () => {
         ).toEqual(['週', '小売店', '一次卸', '工場']);
     });
 
+    it('全指標の結果を、週の昇順・小売店から工場の順の表でも示す（指標や役割の切り替えに左右されない）', async () => {
+        const user = userEvent.setup();
+        renderApp(fakeApi({ getReview: () => Promise.resolve(review()) }), PATH);
+
+        await user.click(await screen.findByRole('radio', { name: '費用' }));
+        await user.click(screen.getByRole('checkbox', { name: '二次卸' }));
+
+        const table = screen.getByRole('table', { name: '全週の結果の表' });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['週', '役割', '受注', '発注', '在庫', '受注残', '出荷', '費用', '累計費用']);
+        const rows = within(table).getAllByRole('row').slice(1);
+        expect(rows).toHaveLength(12);
+        const keys = rows.map(
+            (row) =>
+                `${within(row).getAllByRole('cell')[0]?.textContent}:${within(row).getByRole('rowheader').textContent}`,
+        );
+        expect(keys.slice(0, 5)).toEqual([
+            '1:小売店',
+            '1:二次卸',
+            '1:一次卸',
+            '1:工場',
+            '2:小売店',
+        ]);
+        expect(keys.at(-1)).toBe('3:工場');
+        const first = rows[0];
+        if (first === undefined) throw new Error('行がない');
+        expect(
+            within(first)
+                .getAllByRole('cell')
+                .map((c) => c.textContent),
+        ).toEqual(['1', '4', '11', '111', '211', '311', '411', '511']);
+    });
+
     it('ゲームが終了していない（game.not_ended）ときは、失敗でなく、終了後に開く旨を示す', async () => {
         renderApp(
             fakeApi({

@@ -8,11 +8,11 @@ import type { CommitMode, GameState, Role, SessionState } from '../../api/types'
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
+import { ResultsTable } from '../../components/ResultsTable';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER, SESSION_STATUS_LABELS, WEEK_SEPARATOR } from '../../labels';
 import { DummyQuantityField } from './DummyQuantityField';
-import { ResultsTable } from './ResultsTable';
 
 interface ConsoleData {
     game: GameState;

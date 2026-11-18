@@ -1,5 +1,5 @@
-import type { Role, RoleWeekResult } from '../../api/types';
-import { ROLE_LABELS, ROLE_ORDER } from '../../labels';
+import type { RoleWeekResult } from '../api/types';
+import { ROLE_LABELS, ROLE_ORDER } from '../labels';
 
 const COLUMNS = [
     '週',
@@ -13,22 +13,31 @@ const COLUMNS = [
     '累計費用',
 ] as const;
 
-/** 新しい週を上に、同じ週は小売店から工場の順。 */
-const sortedResults = (results: readonly RoleWeekResult[]) =>
+/** 同じ週は小売店から工場の順。週は、新しい順（既定）か、古い順。 */
+const sortedResults = (results: readonly RoleWeekResult[], newestFirst: boolean) =>
     [...results].sort(
-        (a, b) => b.week - a.week || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role),
+        (a, b) =>
+            (newestFirst ? b.week - a.week : a.week - b.week) ||
+            ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role),
     );
 
-const roleLabel = (role: Role) => ROLE_LABELS[role];
-
 /**
- * 確定した週の結果の表（S06）。1 行が、1 つの週の 1 つの役割。役割は行見出し。
+ * 週ごと・役割ごとの結果の表（S06 コンソール・S08 振り返り）。1 行が、1 つの週の 1 つの役割。役割は行見出し。
  * 幅が足りない画面では、表の中だけを横にスクロールする（ページは横にスクロールさせない）。
+ * [label] は表の名前（画面ごとに変える）。[newestFirst] は、進行中の確認は新しい週を上、振り返りは古い週を上にするため。
  */
-export function ResultsTable({ results }: { results: readonly RoleWeekResult[] }) {
+export function ResultsTable({
+    results,
+    label = '確定した週の結果の表',
+    newestFirst = true,
+}: {
+    results: readonly RoleWeekResult[];
+    label?: string;
+    newestFirst?: boolean;
+}) {
     return (
         <div className="table-scroll">
-            <table className="results-table" aria-label="確定した週の結果の表">
+            <table className="results-table" aria-label={label}>
                 <thead>
                     <tr>
                         {COLUMNS.map((name) => (
@@ -39,10 +48,10 @@ export function ResultsTable({ results }: { results: readonly RoleWeekResult[] }
                     </tr>
                 </thead>
                 <tbody>
-                    {sortedResults(results).map((result) => (
+                    {sortedResults(results, newestFirst).map((result) => (
                         <tr key={`${result.week}-${result.role}`}>
                             <td>{result.week}</td>
-                            <th scope="row">{roleLabel(result.role)}</th>
+                            <th scope="row">{ROLE_LABELS[result.role]}</th>
                             <td>{result.orders}</td>
                             <td>{result.order}</td>
                             <td>{result.inventory}</td>

@@ -5,6 +5,7 @@ import { ApiError } from '../../api/errors';
 import { describeProblem } from '../../api/problems';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
+import { ResultsTable } from '../../components/ResultsTable';
 import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { RetentionNotice } from '../retention/RetentionNotice';
@@ -108,29 +109,35 @@ export function ReviewPage() {
 
             <TrendChart weeks={weeks} series={series} metricLabel={metricLabel} />
 
-            <table aria-label="週次推移の表">
-                <caption>{metricLabel}の週次推移（グラフと同じ値）</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">週</th>
-                        {series.map((s) => (
-                            <th key={s.key} scope="col">
-                                {seriesLabel(s.key)}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {weeks.map((week, index) => (
-                        <tr key={week}>
-                            <td>{week}</td>
+            <div className="table-scroll">
+                <table className="results-table" aria-label="週次推移の表">
+                    <caption>{metricLabel}の週次推移（グラフと同じ値）</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">週</th>
                             {series.map((s) => (
-                                <td key={s.key}>{s.values[index] ?? '—'}</td>
+                                <th key={s.key} scope="col">
+                                    {seriesLabel(s.key)}
+                                </th>
                             ))}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {weeks.map((week, index) => (
+                            <tr key={week}>
+                                <td>{week}</td>
+                                {series.map((s) => (
+                                    <td key={s.key}>{s.values[index] ?? '—'}</td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <h2>全週の結果</h2>
+            <p className="muted">指標や役割の切り替えに関わらず、全役割・全指標を示します。</p>
+            <ResultsTable results={review.results} label="全週の結果の表" newestFirst={false} />
             {whoAmI.status === 'ready' && whoAmI.data ? <ExportButtons gameId={gameId} /> : null}
             <p>
                 <Link to="/">はじめるへ戻る</Link>
