@@ -6,6 +6,10 @@ package beergame.domain
  * 当週に届く分は [RoleState.arrivals]・[RoleState.orders] が持つので、待ち行列は「次週以降に届く分」だけを持つ。
  * したがって長さは `遅延 - 1`（キットの 2 週遅延なら 1 段）で、遅延 1 週なら空になる。
  */
+@CoreConcept(
+    "シミュレーション計算",
+    "遅延の表現。注文と出荷が遅れて届くことが、変動の増幅（ブルウィップ効果）の原因で、教材が見せたい現象そのもの。長さは遅延 - 1",
+)
 @JvmInline
 value class Pipeline(
     val weeks: List<Units>,
@@ -99,6 +103,10 @@ private fun fulfil(
  * 次週の状態 [WeekOutcome.nextStates] には、次週の入荷と受注（小売店は次週の顧客需要）まで含める。
  * 最終週の次週は無いので、小売店の受注は 0 とする。
  */
+@CoreConcept(
+    "シミュレーション計算",
+    "1 週の計算の入口。JSD 改訂版キットの 12 ステップと遅延を忠実に再現する。副作用が無く、同じ入力から同じ結果を返すので、golden テストと性質テストで守る",
+)
 fun simulateWeek(
     settings: SimulationSettings,
     week: Week,

@@ -25,6 +25,22 @@ annotation class Term(
 )
 
 /**
+ * ドメインの中核の概念（Highlighted Core）。付けると、コアのハイライト（生成物）に載る。
+ * 動的キュレーションの選択基準で、名前や場所を名指しせず、注釈で選ぶ。付けるのは**主要な概念だけ**（上限 10。いまは 5）。
+ * 設計書の「境界付けられたコンテキストの分類」で「中核」とされたコンテキストの概念に限る（補完・一般のものには付けない。試験が検出する）。
+ *
+ * @property context 設計書の表のコンテキスト名（「シミュレーション計算」「進行（プレイ）」）。表の名前と一致させる
+ * @property description なぜ核心か（コードを読むだけでは分からない、意図と背景）。読み手は、新しく参加する開発者
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@MustBeDocumented
+annotation class CoreConcept(
+    val context: String,
+    val description: String,
+)
+
+/**
  * ドメインイベントの 1 項目。イベント（`GameEvent`・`SessionEvent` の部分型）に付けると、イベント一覧（生成物）の 1 行になる。
  * ストリーム、ペイロードの項目、購読する投影は、型とソースから導くので、ここには書かない。
  *

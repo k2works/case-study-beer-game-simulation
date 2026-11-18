@@ -97,7 +97,7 @@ internal object LivingDocumentation {
     private const val DOMAIN_PACKAGE = "beergame.domain"
 
     /** domain のクラス（クラスパスのディレクトリ、または jar）を走査して、注釈を探す対象にする。 */
-    private fun domainClasses(): List<Class<*>> {
+    internal fun domainClasses(): List<Class<*>> {
         val location =
             File(
                 Term::class.java.protectionDomain.codeSource.location
@@ -138,7 +138,7 @@ internal object LivingDocumentation {
         return designText.lines().mapNotNull { row.find(it)?.let { m -> m.groupValues[1] to m.groupValues[2] } }.toMap()
     }
 
-    private fun cell(text: String): String = text.replace("|", "\\|").replace("\n", " ")
+    internal fun cell(text: String): String = text.replace("|", "\\|").replace("\n", " ")
 
     fun eventsMarkdown(
         events: List<EventRow>,

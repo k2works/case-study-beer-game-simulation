@@ -67,6 +67,10 @@ private fun SessionState.ended(): SessionState =
  * `WeekCommitted` の `nextStates` はそのまま採用し、`simulateWeek` を呼ばない（D5）。
  * decide が作らない列は、状態を変えずに返す（版も増えない。検知は [replaySession]）。
  */
+@CoreConcept(
+    "進行（プレイ）",
+    "事実（イベント）を状態へ畳み込む。規則を持たず、確定済みの結果を採用するだけなので、あとから再生しても同じ状態に戻る（イベントソーシングの土台）",
+)
 fun evolveSession(
     state: SessionState,
     event: SessionEvent,

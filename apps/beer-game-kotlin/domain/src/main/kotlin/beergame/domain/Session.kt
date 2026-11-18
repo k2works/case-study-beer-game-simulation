@@ -100,6 +100,10 @@ data class SessionData(
         )
 }
 
+@CoreConcept(
+    "進行（プレイ）",
+    "進行の状態（未開始・進行中・一時停止・終了）。session ストリームのイベントを畳み込んだ結果で、4 役割の入力を揃えて週を一度だけ確定する整合性の土台",
+)
 sealed interface SessionState {
     val version: StreamVersion
 
@@ -431,6 +435,10 @@ private fun Raise<SessionError>.resumeEvents(
  * 結果と次週の状態を `WeekCommitted` に事実として固定する。最終週の確定は `SessionEnded` も返す。
  * 保存・確定は進行中だけ、代理入力は進行中と一時停止中、停止は進行中だけ、再開は一時停止中だけ。
  */
+@CoreConcept(
+    "進行（プレイ）",
+    "進行の規則のすべてが集まる場所。入力の保存・代理入力・停止と再開・手動と自動の確定の可否を決め、事実（イベント）だけを返す。共同入力と自動確定の整合性もここで守る",
+)
 fun decideSession(
     state: SessionState,
     command: SessionCommand,

@@ -25,6 +25,7 @@ tasks.register<Test>("generateLivingDocs") {
     filter {
         includeTestsMatching("beergame.domain.LivingDocumentationSpec")
         includeTestsMatching("beergame.domain.WalkingSkeletonTourSpec")
+        includeTestsMatching("beergame.domain.CoreHighlightSpec")
     }
     systemProperty("beergame.docs.update", "true")
     outputs.upToDateWhen { false }
