@@ -9693,6 +9693,7 @@
 <h1 id="_1">ロールバック手順書<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>状態: 定義のみ。AWS では実行していない・検証していない。</strong> 設計は <a href="../../../design/beer-game-kotlin/operation/">運用要件</a> の「変更管理」（ロールバック、ロールバックの制約）と <a href="../../../design/beer-game-kotlin/architecture-infrastructure/">インフラストラクチャ</a>。デプロイは <a href="../deploy/">デプロイ手順書</a>。</p>
+<p><strong>Bolt 14（本番の定義）</strong>: 本番の api の更新は、ブルー/グリーン（待ち時間 10 分）になった。待ち時間の間は旧版が残り、アラームで自動で戻る。待ち時間の後のロールバックも、戻す版をブルー/グリーンで展開し直す（待ち時間つき）。手順は <a href="../production/">本番の運用手順書</a> の 4。データの復元は <a href="../restore/">復元の手順書</a>。上のロールバックのワークフローの待ち方（<code>rolloutState</code>）は、AWS 上で未確認。</p>
 </blockquote>
 <h2 id="_2">何を戻し、何を戻さないか<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <table>
@@ -9759,7 +9760,7 @@
 </tbody>
 </table>
 <p>書く版を戻す設定の操作で、旧イメージへ戻せる余地を最大にする。リリースの記録に「旧イメージへ戻せる期間（書く版を上げる前まで）」を書く。CI の N-1 互換のジョブ（直前のリリースの読み取り側で、現在の書く版の golden を再生）で、読む側が先行していることを検査する。ただし、このジョブは<strong>雛形で未実装</strong>（直前のリリースのタグが無い間は実行しない）。</p>
-<p>書く版を設定でどこに持つか（環境変数か設定サービスか）は、設計の<strong>未決</strong>である。</p>
+<p>書く版を設定でどこに持つか（環境変数か設定サービスか）は、設計の<strong>未決</strong>である。AI の提案（環境変数 <code>WRITE_SCHEMA_VERSION</code>。未実装・未承認）は <a href="../production/">本番の運用手順書</a> の 8。</p>
 <h2 id="_6">戻せないケース<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>次のときは、旧イメージへ戻さない。</p>
 <ul>
@@ -9770,13 +9771,13 @@
 <p>この場合の復旧は、設計の次のどちらかで、<strong>人が判断する</strong>。</p>
 <ol>
 <li><strong>前進する（第一の選択）</strong>: 新しい版を直して、再度デプロイする。旧版の読み取り側を新しい版に対応させる緊急変更もここに含まれる。</li>
-<li>書く版を戻し、新しい版のイベントが書かれる前の状態まで DB を復元する。<strong>データを失う</strong>。研修の途中では避ける。復元の手順は本書の範囲外（未作成）。</li>
+<li>書く版を戻し、新しい版のイベントが書かれる前の状態まで DB を復元する。<strong>データを失う</strong>。研修の途中では避ける。復元の手順は <a href="../restore/">復元の手順書</a>（B14。訓練は未実施）。</li>
 </ol>
 <h2 id="_7">未確認<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ul>
 <li>ロールバックのワークフロー全体（AWS 上での動作）。履歴の S3 への記録・読み取り、<code>aws ecs wait services-stable</code> の挙動を含め、未実行。</li>
 <li>ステージングでの毎回の確認は、ステージングが存在してから。</li>
-<li>書く版を戻す設定の仕組みと、データの復元の手順は、未決・未作成。</li>
+<li>書く版を戻す設定の仕組みは未決・未実装。データの復元の手順は <a href="../restore/">復元の手順書</a>（訓練は未実施）。</li>
 </ul>
 
 

@@ -9696,6 +9696,18 @@
 <td style="text-align: left;">失敗コードを確認し、原因を直してから再試行する（設計書の障害対応 7）</td>
 </tr>
 <tr>
+<td style="text-align: left;"><code>retention-heartbeat</code></td>
+<td style="text-align: left;">警告</td>
+<td style="text-align: left;"><code>retention</code> の結果のメトリクスが 1 時間無い（B14）</td>
+<td style="text-align: left;"><code>retention</code> の定期タスクが動いていない。<a href="../production/">本番の運用手順書</a> の 6</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>projection-verify-heartbeat</code></td>
+<td style="text-align: left;">警告</td>
+<td style="text-align: left;">日次の検査の結果のメトリクスが 1 日無い（B14）</td>
+<td style="text-align: left;"><code>verify-projections</code> の定期タスクが動いていない。同上</td>
+</tr>
+<tr>
 <td style="text-align: left;"><code>jvm-heap-*</code>、<code>jvm-gc-pause-*</code>、<code>db-pool-utilization-*</code></td>
 <td style="text-align: left;">警告 / 重大</td>
 <td style="text-align: left;">設計書のとおり</td>
@@ -9725,7 +9737,8 @@
 <li>Synthetics のランタイムの版（既定 <code>syn-nodejs-puppeteer-9.1</code>）、カナリアのスクリプトの動作、カナリア名（21 文字まで）。</li>
 <li>SNS のメールの購読は、宛先が確認のメールを承認するまで有効にならない。</li>
 <li>高解像度（1 秒）メトリクスと 10 秒のアラームの費用。</li>
-<li><code>retention</code>・<code>verify-projections</code> の ECS の定期タスクとスケジュール（B14）。これが無いと、<code>projection-*</code>・<code>retention-abandoned</code> のメトリクスは出ない（欠測は通知しない設定）。</li>
+<li><code>retention</code>・<code>verify-projections</code> の ECS の定期タスクとスケジュールは、B14 で Terraform に定義した（<a href="../production/">本番の運用手順書</a>）。定期タスクが止まったことは、B14 の心拍のアラーム（<code>retention-heartbeat</code>・<code>projection-verify-heartbeat</code>。欠測を超過とみなす）で知る。<strong>ただし、AWS では未確認</strong>。</li>
+<li>本番のブルー/グリーンでは、<code>no-healthy-targets</code> は 2 つの対象グループの正常数の最大を見る（B14）。</li>
 </ul>
 
 

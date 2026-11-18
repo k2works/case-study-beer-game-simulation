@@ -10980,7 +10980,14 @@
 <td style="text-align: left;"><a href="../bolt_13_report/">Bolt 13 終了報告</a>。CloudWatch・SNS・Synthetics での動作、環境の <code>terraform validate</code>（Terraform 1.5.7 のため）、研修中の停止の検知（模擬で 60 秒以内）の実機での確認は未実施。SSE・再生・投影の更新時間などの指標は未実装</td>
 </tr>
 <tr>
-<td style="text-align: left;">B14〜B15</td>
+<td style="text-align: left;">B14</td>
+<td style="text-align: left;">U5</td>
+<td style="text-align: left;">定義は完了（定期タスク・心拍のアラーム・ブルー/グリーン（ECS の組み込み方式。AI の提案）・独自ドメインと ACM・TLS・ヘッダー・復元の手順とスクリプト・運用手順書。<code>ProductionDefinitionSpec</code>・受入・単体・結合・Kover・静的検査が緑）。<strong>AWS には適用していない。判断項目とゲートは未承認</strong>（<code>/goal U5</code> に基づく自律実行）。スキーマ・契約・Web の変更なし。これで U5（B11〜B14）が、定義まで出そろった</td>
+<td style="text-align: left;">実績 2026-11-18</td>
+<td style="text-align: left;"><a href="../bolt_14_report/">Bolt 14 終了報告</a>・<a href="../unit_u5_summary/">Unit U5 総括</a>。AWS 上の全動作、ブルー/グリーンの切り替えと戻し、<code>terraform plan</code>、復元の訓練は未実施。机上確認: RPO 0 は PITR で成り立たず、RTO 15 分は PITR で収まる保証がない（人の判断）</td>
+</tr>
+<tr>
+<td style="text-align: left;">B15</td>
 <td style="text-align: left;">—</td>
 <td style="text-align: left;">未着手</td>
 <td style="text-align: left;">-</td>

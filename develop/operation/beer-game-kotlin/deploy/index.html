@@ -4811,6 +4811,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bolt-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bolt 14 での変更（本番の定義）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9910,10 +9921,17 @@
 </tbody>
 </table>
 <p>自動ロールバックそのものが失敗した場合は、手動のロールバック（<a href="../rollback/">ロールバック手順書</a>）を使う。</p>
+<h2 id="bolt-14">Bolt 14 での変更（本番の定義）<a class="headerlink" href="#bolt-14" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>ステージングの自動デプロイ</strong>（AC6.2.1）: main の CI（<code>beer-game-kotlin</code>）が成功すると、<code>workflow_run</code> でステージングのデプロイが起動する。<strong>リポジトリの変数 <code>BEER_GAME_KOTLIN_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ</strong>（未設定の間はジョブを飛ばす）。手動で 1 回成功させてから設定する。</li>
+<li><strong>本番はブルー/グリーン</strong>（ECS の組み込み）。ステージングはローリング。詳細は <a href="../production/">本番の運用手順書</a>。</li>
+<li>追加の変数: <code>RETENTION_TASK_FAMILY</code>・<code>VERIFY_TASK_FAMILY</code>（両環境）、<code>RDS_INSTANCE</code>（本番。デプロイ前のスナップショット用）。いずれも <code>terraform output</code>。<strong>未設定</strong>（人が行う）。</li>
+<li>定期のタスク（<code>retention</code>・<code>verify-projections</code>）のタスク定義も、同じダイジェストの新しい版を登録する。</li>
+</ul>
 <h2 id="_8">未確認<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>
 <li>ワークフロー全体（AWS 上での動作）。<code>actionlint</code> と <code>shellcheck</code> は、ローカルに無く未実行。</li>
-<li>ブルー/グリーン（CodeDeploy）。設計書は本番をブルー/グリーンとするが、Terraform の定義はローリング更新（サーキットブレーカー付き）で、ワークフローもそれに合わせた。どちらにするかは未決。</li>
+<li>ブルー/グリーン。設計書の CodeDeploy ではなく、ECS の組み込み方式で定義した（AI の提案。未承認）。AWS 上の切り替え・待ち時間・自動の戻しは未確認。ステージングはローリングのため、本番で初めて動く。</li>
 <li>ステージングと本番の ECR が別アカウントの場合の昇格（現状は同一アカウントを前提）。</li>
 <li><code>aws-actions/*</code>、<code>setup-java</code>、<code>gradle/actions</code> は、固定する SHA を確認できていないため、版のタグのまま。</li>
 <li>新しい書く版（<code>schema_version</code>）を設定で切り替える仕組み（設計の未決。どこで持つか）。</li>

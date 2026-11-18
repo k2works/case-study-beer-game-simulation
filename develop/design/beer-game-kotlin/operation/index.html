@@ -2772,6 +2772,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#b14-2026-11-18aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B14 の実装の状況（2026-11-18。定義のみ。AWS には未適用。人の確認は未実施）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10511,7 +10522,18 @@
 <li><strong>研修中の停止（1 分）</strong>: 主要な操作の成功を 1 秒の解像度で出し、10 秒 x 5 期間が 0 でアラーム（研修中のみ通知）。模擬の訓練で、停止から 60 秒以内に発報する。合成監視（1 分ごと）は最悪 2 分。</li>
 <li><strong>GC の停止</strong>は、MXBean から p99 が得られないので、区間の平均（1 回あたり）で近似した。閾値は提案のまま。</li>
 <li><strong>合成監視は <code>/api/v1/ready</code> だけ</strong>（業務の操作を呼ぶと本番にゲームが溜まるため）。業務のスモークテスト（B3 の未決）は未実装。</li>
-<li>日次の <code>verify-projections</code>・<code>retention</code> の ECS の定期タスクと通知の経路は B14。</li>
+<li>日次の <code>verify-projections</code>・<code>retention</code> の ECS の定期タスクと通知の経路は B14 で定義した（下の「B14 の実装の状況」）。</li>
+</ul>
+<h4 id="b14-2026-11-18aws">B14 の実装の状況（2026-11-18。定義のみ。AWS には未適用。人の確認は未実施）<a class="headerlink" href="#b14-2026-11-18aws" title="Permanent link">&para;</a></h4>
+<ul>
+<li><strong>定期タスク</strong>: <code>retention</code>（5 分ごと）・<code>verify-projections</code>（日次。UTC 18:00 = 日本時間 03:00）を EventBridge Scheduler で定義した（<code>infra/modules/ecs</code>）。<code>rebuild-projections</code> は人が手動で <code>run-task</code>。失敗は再試行せず（同じ起動を重ねない）、<strong>心拍のアラーム</strong>（<code>retention-heartbeat</code>＝1 時間、<code>projection-verify-heartbeat</code>＝1 日。結果のメトリクスの欠測を超過とみなす。警告）で知る。<code>AlarmCatalog</code> と <code>alarms.tf</code> に同じ値（試験が検査）。</li>
+<li><strong>削除ロール</strong>: <code>retention</code> は <code>DB_DELETER_ROLE=beergame_deleter</code> で <code>SET ROLE</code> する。別のログインユーザーは作らない。所有者が <code>SET ROLE</code> できるかは、AWS 上で未確認。</li>
+<li><strong>ブルー/グリーン</strong>: 本番は ECS の組み込み方式（AI の提案。設計書の CodeDeploy 案の代わり。未承認）。待ち時間 10 分の間にデプロイのアラームが鳴れば自動で戻す。<strong>2 つの対象グループの正常数の最大</strong>を見る（<code>no-healthy-targets</code>）。ステージングはローリング。</li>
+<li><strong>独自ドメインと TLS</strong>: <code>modules/domain</code>（ACM、DNS 検証、別名）。TLS 1.2 以上は <code>TLSv1.2_2021</code>。CloudFront → ALB は HTTP のまま（ALB の HTTPS は未決）。CloudFront に <code>Permissions-Policy</code> を追加。API のセキュリティヘッダーは B1 で実装済み。</li>
+<li><strong>復元</strong>: デプロイ前の手動スナップショット（7 日より古いものを削除。手動のスナップショットは自動で消えず、削除後のバックアップの 7 日と食い違うため）、バックアップの時間帯（UTC 17:00）、<code>scripts/restore-pitr.sh</code>（既定はドライラン）、<a href="../../../operation/beer-game-kotlin/restore/">復元の手順書</a>。</li>
+<li><strong>机上確認（RPO・RTO）</strong>: RPO 0 は、Multi-AZ のフェイルオーバーでは成り立つが、PITR では成り立たない（復元可能な最新時刻が数分遅れる）。RTO 15 分は、PITR の新しいインスタンスの作成で収まる保証がない（実測が要る）。パターン 4 の扱いを、人が決める。</li>
+<li><strong>自動デプロイ</strong>: main の CI の成功後にステージングへ（リポジトリの変数 <code>BEER_GAME_KOTLIN_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ）。本番は手動の承認。</li>
+<li>手順書: <a href="../../../operation/beer-game-kotlin/production/">本番の運用手順書</a>、<a href="../../../operation/beer-game-kotlin/restore/">復元</a>。<strong>書く版の切り替えは環境変数 <code>WRITE_SCHEMA_VERSION</code>（提案。未実装）</strong>。</li>
 </ul>
 <h3 id="_6">ヘルスチェック<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <table>
@@ -10727,7 +10749,7 @@
 <li><strong>進行役に「再開」を依頼する。</strong> 自動で確定の方式なら、再開時に 4 役割が揃っていれば自動確定される（停止中の代理入力では確定しない）。再開を確認して、運営者へ連絡する。</li>
 <li>差が残る場合は、<strong>投影の純粋関数のバグ</strong>として扱う。再構築を繰り返さず、変更管理の緊急変更で修正する。</li>
 </ol>
-<p>再構築は、<code>events</code> を読むだけで、<code>events</code> を変更しません（誤って状態の正本を壊さない）。再構築が書くのは、投影と <code>projection_checkpoints</code> だけです。所要時間の見積もり（1 ゲームのストリームは千件前後）は小さい想定ですが、<strong>実測は訓練で記録する</strong>（未決）。排他ロックにより、停止を依頼できない（進行役と連絡が取れない）場合でも、再構築は安全に直列化されますが、その間にコマンドが 503 になりうるため、研修中は停止の依頼を先に行います。</p>
+<p>再構築は、<code>events</code> を読むだけで、<code>events</code> を変更しません（誤って状態の正本を壊さない）。再構築が書くのは、投影と <code>projection_checkpoints</code> だけです。<strong>再構築では、周辺ストア（表示名・資格・ブラウザセッション・冪等記録・参加の試行）と、削除の受領記録・削除の進行は復元されません</strong>（B12・B14。これらが壊れたときは、A の復元を使う）。所要時間の見積もり（1 ゲームのストリームは千件前後）は小さい想定ですが、<strong>実測は訓練で記録する</strong>（未決）。排他ロックにより、停止を依頼できない（進行役と連絡が取れない）場合でも、再構築は安全に直列化されますが、その間にコマンドが 503 になりうるため、研修中は停止の依頼を先に行います。</p>
 <p><strong>訓練</strong>: 四半期に 1 度、およびリリース前、バックアップ方針の変更時に、復元の訓練（A）と投影の再構築の訓練（B）を行い、RPO と RTO の実測値を記録します。復元の手順がテスト可能な形（手順書とスクリプト）で用意されていなければ、バックアップ設計は完了していません。</p>
 <h3 id="_13">バックアップと削除の関係<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h3>
 <p>保持期間後に削除しても、<strong>自動バックアップには最大 7 日間、削除前のデータが残ります</strong>（<code>events</code> を含む）。この期間を、保持方針に明記し、運営者へ示します（NF-S16。引継）。進行役の画面（ゲーム作成後、ロビー、保持状態。<a href="../ui-design/">UI 設計</a>）に、保持期間・削除予定日と「データベースのバックアップには、削除後も最大 7 日残ります」を表示します。<strong>保持の起点は作成時</strong>です（現在の配線どおり。<strong>暫定</strong>。終了済みのゲームを終了時から数える案（ユーザー代表の提案）は未決で、人の確認が要る）。事前に作成した研修では、終了から削除までの猶予が短くなりうるため、画面で削除予定日を示し、振り返りと出力の期限として運営者に案内します。<code>RetentionPolicy</code> が「方針の版」を持たないのは、方針が単一で、版の比較が要らないためです（<a href="../domain-model/">ドメインモデル</a>）。復元時は、上の A の手順 2 で、削除済みのゲームを再び削除します。</p>
@@ -10921,7 +10943,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>B3 の定義（2026-11-15。AWS では未実行）</strong>: デプロイは、ビルド → ECR → タスク定義の登録 → <strong>migrate（1 回限りの ECS タスク。終了コード 0 でなければ中止）</strong> → api の更新 → 静的ファイル → スモークテスト → 履歴の記録の順で、失敗時は直前のタスク定義と静的ファイルの版へ自動で戻す（マイグレーションは戻さない）。ロールバックは、S3 の履歴（<code>deployments/</code>）から版を選び、<strong><code>confirm_compatible</code>（旧イメージが現在のイベントを読めることの確認）を必須入力</strong>にした。<strong>読む版 → 書く版の 2 段階</strong>（本書の次節）と、戻せないケースは手順書にある。手順書: <a href="../../../operation/beer-game-kotlin/deploy/">デプロイ</a>、<a href="../../../operation/beer-game-kotlin/rollback/">ロールバック</a>、<a href="../../../operation/beer-game-kotlin/container_local/">コンテナのローカル実行</a>。<strong>スモークテストは <code>/api/v1/ready</code>・<code>/api/v1/health</code> のみで、設計の業務のスモーク（作成・参加・SSE・ポーリング・自動確定）は未実装</strong>。書く版を設定で切り替える仕組みも未実装。本番のブルー/グリーンは未定義（ローリング + サーキットブレーカー。人の判断待ち）。</p>
+<p><strong>B3 の定義（2026-11-15。AWS では未実行）</strong>: デプロイは、ビルド → ECR → タスク定義の登録 → <strong>migrate（1 回限りの ECS タスク。終了コード 0 でなければ中止）</strong> → api の更新 → 静的ファイル → スモークテスト → 履歴の記録の順で、失敗時は直前のタスク定義と静的ファイルの版へ自動で戻す（マイグレーションは戻さない）。ロールバックは、S3 の履歴（<code>deployments/</code>）から版を選び、<strong><code>confirm_compatible</code>（旧イメージが現在のイベントを読めることの確認）を必須入力</strong>にした。<strong>読む版 → 書く版の 2 段階</strong>（本書の次節）と、戻せないケースは手順書にある。手順書: <a href="../../../operation/beer-game-kotlin/deploy/">デプロイ</a>、<a href="../../../operation/beer-game-kotlin/rollback/">ロールバック</a>、<a href="../../../operation/beer-game-kotlin/container_local/">コンテナのローカル実行</a>。<strong>スモークテストは <code>/api/v1/ready</code>・<code>/api/v1/health</code> のみで、設計の業務のスモーク（作成・参加・SSE・ポーリング・自動確定）は未実装</strong>。書く版を設定で切り替える仕組みも未実装。本番のブルー/グリーンは、B14 で ECS の組み込み方式として定義した（上の「B14 の実装の状況」。AWS で未確認）。</p>
 <h3 id="es">イベントスキーマの進化（ES 固有）<a class="headerlink" href="#es" title="Permanent link">&para;</a></h3>
 <p>イベントは変更しません（<a href="../data-model/">データモデル</a>）。形を変えるときは、新しい <code>schema_version</code> を追加し、読み込み時に<strong>アップキャスト</strong>（旧版から新版への純粋関数）を適用して、<code>evolve</code> へ渡します。</p>
 <table>
@@ -11209,7 +11231,13 @@
 <td style="text-align: left;">復元の訓練</td>
 <td style="text-align: left;">時点復旧、復元ゲート、<strong>整合性の検査、投影の整合の検査</strong>、記録の様式</td>
 <td style="text-align: center;">高</td>
-<td style="text-align: center;">変更</td>
+<td style="text-align: center;">変更（<strong>B14 で <a href="../../../operation/beer-game-kotlin/restore/">復元</a> を作成。定義のみ・訓練は未実施</strong>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">本番の運用（デプロイ、ブルー/グリーン、定期タスク、アラームの対応）</td>
+<td style="text-align: left;">適用前の確認、独自ドメイン・TLS、ブルー/グリーンのデプロイと戻し、定期タスク、インシデント</td>
+<td style="text-align: center;">高</td>
+<td style="text-align: center;">新（<strong>B14 で <a href="../../../operation/beer-game-kotlin/production/">本番の運用手順書</a> を作成。定義のみ・AWS で未実行</strong>）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>投影の再構築</strong></td>
@@ -11476,6 +11504,7 @@
 <li><strong>出力（<code>buildExport</code>）のキャッシュ</strong>。要求時に作るため、大きい場合は将来キャッシュを検討する（ui-design、データモデルの未決事項と共通）。</li>
 <li><strong>B3 で出た運用の未決（2026-11-15。詳細は <a href="../../../development/beer-game-kotlin/bolt_3_report/">Bolt 3 終了報告</a>）</strong>: SIGTERM の終了コード 143 を、アラームの条件でどう扱うか。業務のスモークテストの実装。書く版の切り替えの仕組み。初回の適用の順序（ECR を先に作る手順）の手順書。ステージングでのロールバックの訓練（AWS 未適用のため未実施）。デプロイ・ロールバックのワークフローの AWS での動作確認。</li>
 <li><strong><code>events</code> の連鎖削除と、アプリの DB ロールの権限</strong>（最初のスライドの Red のテストで確かめる。データモデルの未決事項）。運用では、動かない場合の削除用のロールの運用手順が加わる。</li>
+<li><strong>B14 で出た未決（2026-11-18。詳細は <a href="../../../development/beer-game-kotlin/bolt_14_report/">Bolt 14 終了報告</a>）</strong>: (1) RPO 0 の範囲（PITR では 0 にならない）と、障害パターン 4 の RTO（15 分に収まる保証がない）の扱い。(2) ブルー/グリーンの方式（ECS の組み込み方式の提案か、CodeDeploy か）。(3) CloudFront → ALB の暗号化（HTTPS にするか）。(4) 書く版の切り替え（環境変数 <code>WRITE_SCHEMA_VERSION</code> の提案）。(5) 研修中だけ通知する運用（<code>training_alarms_enabled</code>）の自動化。(6) KMS・DB ログインロールの分離・プライベートサブネット。(7) AWS への適用の判断・費用・アカウント・IAM（R10）。</li>
 <li><strong>スナップショットの導入基準</strong>（再生の所要時間の p95 が 100 ms 超）の妥当性。NFR-03 の予算の配分（再生に何割を許すか）は、性能の実測で決める。</li>
 <li><strong>イベントスキーマの 2 段階（読む → 書く）の運用</strong>で、書く版の設定をどこで持つか（環境変数か、設定サービスか）。変更の承認の流れと合わせて決める。</li>
 <li>非同期投影へ移行した場合の「投影の遅れ」の閾値（現在は同期投影のため、検査の対象は整合の差のみ）。</li>
