@@ -37,8 +37,18 @@ function confirmFrom(session: SessionState, reopened: boolean): Confirm {
     return { week: session.week, values, basis, reopened };
 }
 
-/** 開発用の代理入力の数量。キットの需要の既定（4）。 */
-const DUMMY_QUANTITY = 4;
+/** 開発用の代理入力の数量の既定。キットの需要の既定（4）。 */
+const DEFAULT_DUMMY_QUANTITY = '4';
+
+const MAX_QUANTITY = 1000;
+
+/** 代理入力の数量の入力を、0〜1000 の整数に読む。読めなければ null（サーバーの検証と同じ範囲）。 */
+function parseDummyQuantity(text: string): number | null {
+    const trimmed = text.trim();
+    if (!/^\d+$/.test(trimmed)) return null;
+    const value = Number(trimmed);
+    return value <= MAX_QUANTITY ? value : null;
+}
 
 const resultText = (r: RoleWeekResult) =>
     `${ROLE_LABELS[r.role]} 第 ${r.week} 週の結果: 受注 ${r.orders}、発注 ${r.order}、在庫 ${r.inventory}、受注残 ${r.backlog}、出荷 ${r.shipment}、費用 ${r.cost}（累計 ${r.cumulativeCost}）`;
@@ -71,6 +81,8 @@ export function ConsolePage() {
     const [failure, setFailure] = useState<unknown>(null);
     const [advancedText, setAdvancedText] = useState<string | null>(null);
     const [control, setControl] = useState<Control | null>(null);
+    const [dummyQuantity, setDummyQuantity] = useState(DEFAULT_DUMMY_QUANTITY);
+    const [dummyError, setDummyError] = useState<string | null>(null);
     const titleId = useId();
     const controlTitleId = useId();
     const titleRef = useRef<HTMLHeadingElement>(null);
@@ -201,8 +213,17 @@ export function ConsolePage() {
         }
     }
 
-    /** 開発用。未入力の役割を、現在の週の需要の既定（4）で代理入力する。1 人で週を進めるため。 */
+    /**
+     * 開発用。未入力の役割を、指定した数量（既定 4）で、現在の週に代理入力する。1 人で週を進めるため。
+     * 数量が 0〜1000 の整数でなければ、送らずに範囲を案内する（サーバーの検証と同じ範囲）。
+     */
     async function fillWithProxyDecisions(current: SessionState) {
+        const quantity = parseDummyQuantity(dummyQuantity);
+        if (quantity === null) {
+            setDummyError('数量は 0〜1000 の整数で入力してください。');
+            return;
+        }
+        setDummyError(null);
         setBusy(true);
         setFailure(null);
         setAdvancedText(null);
@@ -211,7 +232,7 @@ export function ConsolePage() {
             for (const role of ROLE_ORDER.filter((r) => !decided.includes(r))) {
                 const result = await api.submitProxyDecision(sessionId, role, {
                     requestedWeek: current.week,
-                    quantity: DUMMY_QUANTITY,
+                    quantity,
                 });
                 latest = result.versions;
             }
@@ -317,9 +338,27 @@ export function ConsolePage() {
                 <section aria-labelledby="dev-tools-heading">
                     <h2 id="dev-tools-heading">開発用</h2>
                     <p className="muted">
-                        1 人で試すための代理入力です（各 {DUMMY_QUANTITY}
-                        ）。開発サーバーでだけ表示します。
+                        1 人で試すための代理入力です。未入力の役割すべてに、指定した数量（0〜1000
+                        の整数）を入れます。開発サーバーでだけ表示します。
                     </p>
+                    <div className="field">
+                        <label htmlFor="dummy-quantity">代理入力の数量</label>
+                        <input
+                            id="dummy-quantity"
+                            inputMode="numeric"
+                            value={dummyQuantity}
+                            aria-invalid={dummyError !== null}
+                            aria-describedby={
+                                dummyError === null ? undefined : 'dummy-quantity-error'
+                            }
+                            onChange={(event) => setDummyQuantity(event.target.value)}
+                        />
+                        {dummyError === null ? null : (
+                            <span id="dummy-quantity-error" className="field-error">
+                                {dummyError}
+                            </span>
+                        )}
+                    </div>
                     <button
                         type="button"
                         disabled={busy}

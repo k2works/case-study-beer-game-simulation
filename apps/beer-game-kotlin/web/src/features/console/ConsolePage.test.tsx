@@ -86,6 +86,60 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         expect(await screen.findByRole('button', { name: '週を確定' })).toBeEnabled();
     });
 
+    it('代理入力する数量を指定できる（既定は 4。指定した値で、未入力の役割すべてを埋める）', async () => {
+        const user = userEvent.setup();
+        let roles = decisions({ RETAILER: 4 });
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () => Promise.resolve(consoleState({ week: 2, roles })),
+            submitProxyDecision: (_sessionId, role, request) => {
+                roles = { ...roles, [role]: roleStatus({ decision: request.quantity }) };
+                return Promise.resolve({ versions: versions(6, 10) });
+            },
+        });
+        renderApp(api, PATH);
+
+        const field = await screen.findByLabelText('代理入力の数量');
+        expect(field).toHaveValue('4');
+        await user.clear(field);
+        await user.type(field, '12');
+        await user.click(screen.getByRole('button', { name: /ダミーの役割を代理入力で埋める/ }));
+
+        await waitFor(() => expect(api.submitProxyDecision).toHaveBeenCalledTimes(3));
+        for (const role of ['WHOLESALER', 'DISTRIBUTOR', 'FACTORY'] as const) {
+            expect(api.submitProxyDecision).toHaveBeenCalledWith(GAME_ID, role, {
+                requestedWeek: 2,
+                quantity: 12,
+            });
+        }
+    });
+
+    it.each(['', '-1', '1001', '4.5', 'abc'])(
+        '数量が 0〜1000 の整数でない（%j）ときは、送らずに、範囲を案内する',
+        async (text) => {
+            const user = userEvent.setup();
+            const api = fakeApi({
+                getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+                getSessionState: () =>
+                    Promise.resolve(consoleState({ roles: decisions({ RETAILER: 4 }) })),
+            });
+            renderApp(api, PATH);
+
+            const field = await screen.findByLabelText('代理入力の数量');
+            await user.clear(field);
+            if (text !== '') await user.type(field, text);
+            await user.click(
+                screen.getByRole('button', { name: /ダミーの役割を代理入力で埋める/ }),
+            );
+
+            expect(
+                await screen.findByText('数量は 0〜1000 の整数で入力してください。'),
+            ).toBeVisible();
+            expect(field).toHaveAttribute('aria-invalid', 'true');
+            expect(api.submitProxyDecision).not.toHaveBeenCalled();
+        },
+    );
+
     it('全役割が入力済みなら、代理入力のボタンを出さない', async () => {
         const api = fakeApi({
             getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
