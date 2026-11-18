@@ -4,6 +4,7 @@ import beergame.application.AppSettings
 import beergame.application.AppTtls
 import beergame.application.AttemptPolicy
 import beergame.application.Generators
+import beergame.application.MetricSink
 import beergame.application.Ports
 import beergame.application.SecureTokens
 import beergame.http.DatabaseProbe
@@ -59,7 +60,11 @@ fun defaultAttemptPolicy(): AttemptPolicy =
 class Tuning(
     val ttls: CredentialTtls = CredentialTtls(),
     val attempts: AttemptPolicy = defaultAttemptPolicy(),
+    /** メトリクスの出力先（B13）。既定は何も出さない。 */
+    val metrics: MetricSink = MetricSink.None,
 ) {
+    fun withMetrics(sink: MetricSink): Tuning = Tuning(ttls, attempts, sink)
+
     companion object {
         fun of(config: ServerConfig): Tuning = Tuning(CredentialTtls.of(config), attemptPolicy(config))
     }
@@ -96,6 +101,7 @@ fun appPorts(
                 credentialKeys = secrets.credentialKeyRing(),
                 attempts = tuning.attempts,
             ),
+        metrics = tuning.metrics,
     )
 
 /** `/ready` の確認: 接続プールから接続を取り、`SELECT 1` を実行できること。接続できなければ例外（呼ぶ側が false として扱う）。 */

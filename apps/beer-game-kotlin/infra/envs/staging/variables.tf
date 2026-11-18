@@ -28,6 +28,18 @@ variable "web_bucket_name" {
   description = "静的ファイルのバケット名（全世界で一意）"
 }
 
+variable "critical_alarm_emails" {
+  type        = list(string)
+  default     = []
+  description = "重大のアラームの通知先（メール）。適用後に、購読の確認のメールを承認する"
+}
+
+variable "warning_alarm_emails" {
+  type        = list(string)
+  default     = []
+  description = "警告のアラームの通知先（メール）"
+}
+
 variable "create_oidc_provider" {
   type        = bool
   default     = true

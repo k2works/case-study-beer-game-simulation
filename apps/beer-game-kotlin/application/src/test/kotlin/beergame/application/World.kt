@@ -490,7 +490,10 @@ class World(
 
     /** 呼ぶたびに現在の設定（[settings]）で組み立てる。ポートの関数は、この世界の状態を見る。 */
     val ports: Ports
-        get() = Ports(generators, stores, lock, notifier, settings)
+        get() = Ports(generators, stores, lock, notifier, settings, MetricSink { recordedMetrics += it })
+
+    /** ポートが出力したメトリクス（B13）。 */
+    val recordedMetrics = mutableListOf<MetricSample>()
 
     private val generators =
         Generators(

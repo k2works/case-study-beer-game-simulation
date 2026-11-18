@@ -113,6 +113,8 @@ class Ports(
     val lock: ProjectionLock,
     val notifier: ChangeNotifier,
     val settings: AppSettings,
+    /** メトリクスの出力先（B13）。既定は何も出さない。 */
+    val metrics: MetricSink = MetricSink.None,
 ) {
     val now: Now get() = generators.now
     val newId: NewId get() = generators.newId

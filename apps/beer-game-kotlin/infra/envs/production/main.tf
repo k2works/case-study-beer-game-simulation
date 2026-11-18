@@ -117,3 +117,18 @@ module "github_oidc" {
   pass_role_arns     = [module.ecs.execution_role_arn, module.ecs.task_role_arn]
   log_group_arns     = module.ecs.log_group_arns
 }
+
+# 観測（B13）: アラーム・ダッシュボード・合成監視・通知。定義だけで、適用していない
+module "observability" {
+  source                  = "../../modules/observability"
+  name                    = local.name
+  environment             = var.environment
+  region                  = var.region
+  alb_arn_suffix          = module.alb.arn_suffix
+  target_group_arn_suffix = module.alb.target_group_arn_suffix
+  cluster_name            = module.ecs.cluster_name
+  service_name            = module.ecs.service_name
+  public_domain           = module.web.public_domain
+  critical_emails         = var.critical_alarm_emails
+  warning_emails          = var.warning_alarm_emails
+}

@@ -1,13 +1,17 @@
 package beergame.acceptance
 
 import beergame.app.Secrets
+import beergame.app.Tuning
 import beergame.app.appPorts
 import beergame.app.databaseProbe
+import beergame.application.MetricSample
+import beergame.application.MetricSink
 import beergame.http.HttpDeps
 import beergame.http.HttpSettings
 import beergame.http.LogRecord
 import beergame.http.LogSink
 import beergame.http.beerGameModule
+import beergame.http.emfLines
 import beergame.persistence.Dialect
 import beergame.persistence.Migrations
 import beergame.persistence.Persistence
@@ -100,6 +104,20 @@ class CapturingLogs : LogSink {
     fun text(): String = records.joinToString("\n") { it.toJsonLine() }
 }
 
+/** 出力されたメトリクスを集める。EMF の行にした全文も返す（出力される形の検査用）。 */
+class CapturingMetrics : MetricSink {
+    private val samples = CopyOnWriteArrayList<MetricSample>()
+
+    override fun record(samples: List<MetricSample>) {
+        this.samples += samples
+    }
+
+    fun all(): List<MetricSample> = samples.toList()
+
+    /** 出力される形（EMF の 1 行 1 JSON）に直した全文。 */
+    fun text(): String = emfLines("acceptance", all()).joinToString("\n")
+}
+
 /** PostgreSQL 18 のコンテナ。JVM で 1 つだけ起動し、シナリオ間で共有する（ゲームは ID と参加コードで独立している）。 */
 private object SharedPostgres {
     val container: PostgreSQLContainer by lazy {
@@ -133,6 +151,7 @@ class RunningApp(
     val db: AcceptanceDb = AcceptanceDb.selected(),
 ) : AutoCloseable {
     val logs = CapturingLogs()
+    val metrics = CapturingMetrics()
     val dataSource: HikariDataSource
     private val persistence: Persistence
     private var server: EmbeddedServer<*, *>
@@ -197,7 +216,7 @@ class RunningApp(
     ): EmbeddedServer<*, *> {
         val deps =
             HttpDeps(
-                ports = appPorts(persistence, secrets, MAX_ATTEMPTS),
+                ports = appPorts(persistence, secrets, MAX_ATTEMPTS, tuning = Tuning(metrics = metrics)),
                 database = databaseProbe(dataSource),
                 settings =
                     HttpSettings(
@@ -252,7 +271,7 @@ class RunningApp(
     val retention: RetentionHarness by lazy { RetentionHarness(dataSource) }
 
     /** 投影の再構築と整合の検査（B12）。投影を壊すことができる。 */
-    val projection: ProjectionHarness by lazy { ProjectionHarness(dataSource, persistence.maintenance) }
+    val projection: ProjectionHarness by lazy { ProjectionHarness(dataSource, persistence.maintenance, metrics) }
 
     /** 削除の受領記録のダイジェストの一覧（ゲームを特定しない証跡。API には読み出しが無いので、試験が保存先を直接読む）。 */
     fun receiptDigests(): List<String> =

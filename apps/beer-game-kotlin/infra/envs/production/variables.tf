@@ -43,6 +43,18 @@ variable "acm_certificate_arn" {
   description = "独自ドメインの ACM 証明書（us-east-1）"
 }
 
+variable "critical_alarm_emails" {
+  type        = list(string)
+  default     = []
+  description = "重大のアラームの通知先（メール）。適用後に、購読の確認のメールを承認する"
+}
+
+variable "warning_alarm_emails" {
+  type        = list(string)
+  default     = []
+  description = "警告のアラームの通知先（メール）"
+}
+
 # 本番は、ステージングで作った GitHub の OIDC プロバイダーを使う（同じアカウントの場合）
 variable "create_oidc_provider" {
   type    = bool

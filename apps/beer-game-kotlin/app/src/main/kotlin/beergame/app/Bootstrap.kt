@@ -1,5 +1,6 @@
 package beergame.app
 
+import beergame.http.EmfMetricSink
 import beergame.http.HttpDeps
 import beergame.http.HttpSettings
 import beergame.http.LEVEL_INFO
@@ -43,8 +44,10 @@ class RunningApi internal constructor(
     private val persistence: Persistence,
     private val dataSource: HikariDataSource,
     private val observerDataSource: HikariDataSource? = null,
+    private val sampler: AutoCloseable? = null,
 ) : AutoCloseable {
     override fun close() {
+        sampler?.close()
         server.stop(SHUTDOWN_GRACE_MILLIS, SHUTDOWN_TIMEOUT_MILLIS)
         persistence.close()
         observerDataSource?.close()
@@ -147,6 +150,7 @@ fun startApi(
             observerDataSource,
             listenConnection(config.database),
         )
+    val metrics = EmfMetricSink(config.app.env.value)
     val deps =
         HttpDeps(
             ports =
@@ -154,7 +158,7 @@ fun startApi(
                     persistence,
                     config.secrets,
                     config.maxAttempts,
-                    tuning = Tuning.of(config),
+                    tuning = Tuning.of(config).withMetrics(metrics),
                 ),
             database = databaseProbe(dataSource),
             settings =
@@ -174,7 +178,8 @@ fun startApi(
                 .port
         }
     logs.emit(startupRecord(config, port))
-    return RunningApi(port, server, persistence, dataSource, observerDataSource)
+    val sampler = JvmSampler(metrics, { readJvm(dataSource) }).start()
+    return RunningApi(port, server, persistence, dataSource, observerDataSource, sampler)
 }
 
 /** 起動した環境とデータベースの種類を記録する。H2 は警告（ローカル開発専用。守られない制約がある）。 */

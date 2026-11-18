@@ -2,10 +2,13 @@ package beergame.app
 
 import arrow.core.Either
 import beergame.application.AppFailure
+import beergame.application.MetricSink
 import beergame.application.Now
 import beergame.application.RetentionSweeper
 import beergame.application.SweepReport
+import beergame.application.sweepMetrics
 import beergame.domain.RetentionSaga
+import beergame.http.EmfMetricSink
 import beergame.http.LEVEL_ERROR
 import beergame.http.LEVEL_INFO
 import beergame.http.LogSink
@@ -60,6 +63,7 @@ internal fun runRetention(
     config: ServerConfig,
     logs: LogSink,
     now: Now = { Instant.now() },
+    metrics: MetricSink = EmfMetricSink(config.app.env.value),
 ): Int =
     openDeleterDataSource(config.database).use { dataSource ->
         val sweeper =
@@ -70,12 +74,15 @@ internal fun runRetention(
                 jitter = { randomJitter() },
                 receiptKey = config.secrets.credentialKey,
             )
-        report(runBlocking { sweeper.sweep() }, logs)
+        val result = runBlocking { sweeper.sweep() }
+        reportSweep(result, logs, metrics, runBlocking { now() })
     }
 
-private fun report(
+internal fun reportSweep(
     result: Either<AppFailure, SweepReport>,
     logs: LogSink,
+    metrics: MetricSink = MetricSink.None,
+    at: Instant = Instant.now(),
 ): Int =
     when (result) {
         is Either.Left -> {
@@ -85,6 +92,7 @@ private fun report(
 
         is Either.Right -> {
             val sweep = result.value
+            metrics.record(sweepMetrics(sweep, at))
             logs.emit(
                 operationalRecord(
                     LEVEL_INFO,

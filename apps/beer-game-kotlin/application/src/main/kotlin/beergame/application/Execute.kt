@@ -88,21 +88,24 @@ private class Authenticated(
  */
 internal tailrec suspend fun <A> withAppendRetry(
     remaining: Int,
+    observe: suspend (AttemptOutcome) -> Unit = {},
     block: suspend () -> Either<AppFailure, A>,
-): Either<AppFailure, A> =
-    when (val result = block()) {
-        is Either.Right -> {
-            result
-        }
-
-        is Either.Left -> {
-            when {
-                result.value !is AppFailure.ConcurrencyConflict -> result
-                remaining > 1 -> withAppendRetry(remaining - 1, block)
-                else -> AppFailure.RetryExhausted.left()
-            }
-        }
+): Either<AppFailure, A> {
+    val result = block()
+    val conflict = result is Either.Left && result.value is AppFailure.ConcurrencyConflict
+    observe(
+        when {
+            !conflict -> AttemptOutcome.PROCEEDED
+            remaining > 1 -> AttemptOutcome.CONFLICT
+            else -> AttemptOutcome.EXHAUSTED
+        },
+    )
+    return when {
+        !conflict -> result
+        remaining > 1 -> withAppendRetry(remaining - 1, observe, block)
+        else -> AppFailure.RetryExhausted.left()
     }
+}
 
 /**
  * 認証から冪等記録の保存までの共通の流れ。[handle] は「読み込み → decide → 追記 → 投影 → ...」の部分で、版を返す。
@@ -116,7 +119,8 @@ internal suspend fun Ports.runCommand(
     val commandId = newId()
     val keyDigest = IdempotencyDigest.key(settings.idempotencySecret, request.meta.idempotencyKey)
     val key = IdempotencyKey(gameId, request.operation.scope, keyDigest)
-    return withAppendRetry(settings.maxAttempts.coerceAtLeast(1)) {
+    val observe: suspend (AttemptOutcome) -> Unit = { metrics.record(attemptMetrics(it, now())) }
+    return withAppendRetry(settings.maxAttempts.coerceAtLeast(1), observe) {
         events.transaction { tx ->
             either {
                 lock.acquireShared(tx, gameId).bind()

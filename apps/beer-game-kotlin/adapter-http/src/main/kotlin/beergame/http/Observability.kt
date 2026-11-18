@@ -1,5 +1,7 @@
 package beergame.http
 
+import beergame.application.RequestOutcome
+import beergame.application.requestMetrics
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.hooks.ResponseSent
@@ -39,7 +41,13 @@ internal val Observability =
             call.response.header(CORRELATION_HEADER, call.correlationId.toString())
             SECURITY_HEADERS.forEach { (name, value) -> call.response.header(name, value) }
         }
-        on(ResponseSent) { call -> deps.logs.emit(accessRecord(call, deps)) }
+        on(ResponseSent) { call ->
+            val record = accessRecord(call, deps)
+            deps.logs.emit(record)
+            deps.ports.metrics.record(
+                requestMetrics(RequestOutcome(record.operation, record.status, record.durationMillis), deps.clock()),
+            )
+        }
     }
 
 /** 要求の相関 ID が UUID ならそのまま使い、そうでなければ作り直す（ログへ任意の文字列を入れさせない）。 */

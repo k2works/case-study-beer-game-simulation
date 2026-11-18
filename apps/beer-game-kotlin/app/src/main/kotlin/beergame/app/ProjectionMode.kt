@@ -2,11 +2,14 @@ package beergame.app
 
 import arrow.core.Either
 import beergame.application.AppFailure
+import beergame.application.MetricSink
 import beergame.application.Now
 import beergame.application.ProjectionMaintainer
 import beergame.application.RebuildReport
 import beergame.application.VerifyReport
+import beergame.application.verifyMetrics
 import beergame.domain.GameId
+import beergame.http.EmfMetricSink
 import beergame.http.LEVEL_ERROR
 import beergame.http.LEVEL_INFO
 import beergame.http.LEVEL_WARN
@@ -71,11 +74,13 @@ internal fun runRebuild(
         }
     }
 
+/** 検査の結果は、ログと終了コードに加えて、メトリクス（不一致・遅れ・検査できず。AC6.1.6）にも出す。 */
 internal fun runVerify(
     config: ServerConfig,
     logs: LogSink,
     now: Now = { Instant.now() },
-): Int = maintainer(config, now) { reportVerify(it.verify(), logs) }
+    metrics: MetricSink = EmfMetricSink(config.app.env.value),
+): Int = maintainer(config, now) { maintainer -> reportVerify(maintainer.verify(), logs, metrics, now()) }
 
 internal fun reportRebuild(
     result: Either<AppFailure, RebuildReport>,
@@ -116,6 +121,8 @@ internal fun reportRebuild(
 internal fun reportVerify(
     result: Either<AppFailure, VerifyReport>,
     logs: LogSink,
+    metrics: MetricSink = MetricSink.None,
+    at: Instant = Instant.now(),
 ): Int =
     when (result) {
         is Either.Left -> {
@@ -125,6 +132,7 @@ internal fun reportVerify(
 
         is Either.Right -> {
             val report = result.value
+            metrics.record(verifyMetrics(report, at))
             report.inconsistent.forEach {
                 logs.log(LEVEL_ERROR, VERIFY, "inconsistent", "ゲーム ${it.gameId.value} の投影が、イベントと一致しません: ${it.findings}")
             }

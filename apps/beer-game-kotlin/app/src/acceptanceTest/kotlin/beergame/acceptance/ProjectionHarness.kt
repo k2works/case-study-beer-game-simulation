@@ -1,9 +1,11 @@
 package beergame.acceptance
 
+import beergame.application.MetricSink
 import beergame.application.ProjectionMaintainer
 import beergame.application.ProjectionMaintenance
 import beergame.application.RebuildReport
 import beergame.application.VerifyReport
+import beergame.application.verifyMetrics
 import beergame.domain.GameId
 import kotlinx.coroutines.runBlocking
 import java.time.Instant
@@ -37,6 +39,7 @@ private val PROJECTION_TABLES =
 class ProjectionHarness(
     private val dataSource: DataSource,
     port: ProjectionMaintenance,
+    private val metrics: MetricSink = MetricSink.None,
 ) {
     private val maintainer = ProjectionMaintainer(port) { Instant.now() }
 
@@ -50,7 +53,10 @@ class ProjectionHarness(
     }
 
     fun verify(gameId: String) {
-        lastVerify = runBlocking { maintainer.verify(listOf(id(gameId))) }.fold({ error("検査を呼べない: $it") }, { it })
+        val report = runBlocking { maintainer.verify(listOf(id(gameId))) }.fold({ error("検査を呼べない: $it") }, { it })
+        lastVerify = report
+        // 本番の `verify-projections` モード（reportVerify）と同じ関数で、検査の結果をメトリクスにする。
+        metrics.record(verifyMetrics(report, Instant.now()))
     }
 
     /** 1 ゲームの投影の全行を、表ごとの文字列の列にする（比較用。DB の返す文字列のまま、並べ替える）。 */

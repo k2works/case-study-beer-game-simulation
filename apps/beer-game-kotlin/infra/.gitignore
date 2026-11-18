@@ -5,6 +5,9 @@
 crash.log
 crash.*.log
 
+# カナリアの zip（apply 時に作る。コミットしない）
+.canary.zip
+
 # 実際の値を入れたファイル（コミットしない）。例は *.example
 backend.hcl
 terraform.tfvars
