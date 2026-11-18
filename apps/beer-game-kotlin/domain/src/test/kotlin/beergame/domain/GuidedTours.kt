@@ -80,108 +80,25 @@ internal object GuidedTours {
             "---",
         ).joinToString("\n")
 
-    private const val APP = "apps/beer-game-kotlin"
-    private val MODULES = listOf("domain", "application", "adapter-persistence", "adapter-http", "app")
-
-    private const val MODIFIERS = "internal|private|public|suspend|inline|data|sealed|value|enum|open|abstract"
-    private val DECLARATION =
-        Regex("""^\s*(?:(?:$MODIFIERS)\s+)*(fun|class|interface|object)\s+(?:<[^>]*>\s*)?([\w.]+)""")
-
     /** すべてのモジュールの `src/main` から、ステップを集める。 */
-    fun steps(root: Path): List<TourStep> =
-        MODULES
-            .map { root.resolve("$APP/$it/src/main") }
-            .filter { Files.exists(it) }
-            .flatMap { dir ->
-                Files.walk(dir).use { stream -> stream.filter { it.toString().endsWith(".kt") }.toList() }
-            }.sorted()
-            .flatMap { parse(Files.readString(it), root.relativize(it).toString().replace('\\', '/')) }
+    fun steps(root: Path): List<TourStep> = AnnotationScanner.scan(root, "GuidedTour").map(::step)
 
     /** 1 つのソースから、[GuidedTour] の注釈を読む。注釈の直後の宣言（他の注釈を挟んでもよい）が、ステップの要素。 */
     fun parse(
         source: String,
         file: String,
-    ): List<TourStep> {
-        val marker = "@GuidedTour("
-        val steps = mutableListOf<TourStep>()
-        var from = source.indexOf(marker)
-        while (from >= 0) {
-            val argsStart = from + marker.length
-            val argsEnd = closingParenthesis(source, argsStart)
-            val args = source.substring(argsStart, argsEnd)
-            val after = source.substring(argsEnd + 1)
-            val declaration = nextDeclaration(after)
-            steps += step(args, declaration, file)
-            from = source.indexOf(marker, argsEnd)
-        }
-        return steps
-    }
+    ): List<TourStep> = AnnotationScanner.parse(source, file, "GuidedTour").map(::step)
 
-    /** [start] から始まる引数の、対応する閉じ括弧の位置。文字列リテラルの中の括弧と、エスケープした引用符は、数えない。 */
-    private fun closingParenthesis(
-        source: String,
-        start: Int,
-    ): Int {
-        var depth = 1
-        var inString = false
-        var index = start
-        while (index < source.length) {
-            val c = source[index]
-            when {
-                inString && c == '\\' -> index++
-                c == '"' -> inString = !inString
-                !inString && c == '(' -> depth++
-                !inString && c == ')' && --depth == 0 -> return index
-            }
-            index++
-        }
-        error("@GuidedTour の閉じ括弧が見つからない")
-    }
-
-    /** 注釈の後ろから、最初の宣言（fun・class・interface・object）を探す。注釈の行と KDoc の行は、読み飛ばす。 */
-    private fun nextDeclaration(after: String): Pair<String, String> {
-        val line =
-            after
-                .lines()
-                .drop(1)
-                .firstOrNull { DECLARATION.containsMatchIn(it) }
-                ?: error("@GuidedTour の直後に宣言が見つからない")
-        val match = DECLARATION.find(line) ?: error("宣言を読めない: $line")
-        val kind = if (match.groupValues[1] == "fun") "関数" else "型"
-        return kind to match.groupValues[2]
-    }
-
-    private fun step(
-        args: String,
-        declaration: Pair<String, String>,
-        file: String,
-    ): TourStep {
-        fun text(name: String): String =
-            Regex("""\b$name\s*=\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+)""")
-                .find(args)
-                ?.groupValues
-                ?.get(1)
-                ?.let { literal ->
-                    Regex(""""((?:[^"\\]|\\.)*)"""").findAll(literal).joinToString("") { it.groupValues[1] }
-                }
-                ?: error("@GuidedTour に $name が無い（$file）")
-        val rank =
-            Regex("""\brank\s*=\s*(\d+)""")
-                .find(args)
-                ?.groupValues
-                ?.get(1)
-                ?.toInt()
-                ?: error("@GuidedTour に rank が無い（$file）")
-        return TourStep(
-            text("name"),
-            rank,
-            text("stage"),
-            text("description"),
-            declaration.first,
-            declaration.second,
-            file,
+    private fun step(found: FoundAnnotation): TourStep =
+        TourStep(
+            tour = AnnotationScanner.text(found, "name"),
+            rank = AnnotationScanner.number(found, "rank"),
+            stage = AnnotationScanner.text(found, "stage"),
+            description = AnnotationScanner.text(found, "description"),
+            kind = found.kind,
+            element = found.element,
+            file = found.file,
         )
-    }
 
     /** 1 本のツアーの Markdown。rank の順に、段階ごとにまとめて示す。操作を持つツアーは、API の経路とイベントを添える。 */
     fun markdown(

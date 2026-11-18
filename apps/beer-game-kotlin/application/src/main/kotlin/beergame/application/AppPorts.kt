@@ -2,6 +2,7 @@ package beergame.application
 
 import arrow.core.Either
 import beergame.domain.GameId
+import beergame.domain.KeyLandmark
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -107,6 +108,11 @@ class Readers(
  * 外部とのやり取りを、関数の束で表す（ガイド §7.2）。テストでは同じ型の関数に差し替える。
  * 使う側が束の入れ子を意識しないよう、各ポートは同じ名前のプロパティでも読める。
  */
+@KeyLandmark(
+    map = "アプリケーションアーキテクチャ",
+    layer = "境界",
+    description = "副作用を関数の束に閉じ込める境界。時計・乱数・永続化・通知を、application は型として知るだけで、実装を知らない",
+)
 class Ports(
     val generators: Generators,
     val stores: Stores,

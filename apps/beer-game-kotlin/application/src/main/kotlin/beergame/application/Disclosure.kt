@@ -5,6 +5,7 @@ import arrow.core.left
 import arrow.core.right
 import beergame.domain.Editor
 import beergame.domain.GameError
+import beergame.domain.KeyLandmark
 import beergame.domain.ParticipantId
 import beergame.domain.Role
 
@@ -14,6 +15,11 @@ import beergame.domain.Role
  * （読み取りの型にだけ依存し、`Ports` には依存しない。`domain` へ移すのは機械的にできる）。
  * 観察者の規則（公開範囲、寄与者数での抑止）は B9 で、[forObservation]（Observation.kt）に足した。
  */
+@KeyLandmark(
+    map = "アプリケーションアーキテクチャ",
+    layer = "核",
+    description = "開示の規則。投影から読んだ行に、呼び出した人ごとの規則を掛ける純粋関数で、他の役割の値は読み取りの型に持たせない",
+)
 object Disclosure {
     fun forFacilitator(game: ProjectedGame): Snapshot =
         Snapshot(

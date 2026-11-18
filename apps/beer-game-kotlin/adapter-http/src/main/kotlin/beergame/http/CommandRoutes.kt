@@ -24,6 +24,7 @@ import beergame.application.sourceKey
 import beergame.application.startGame
 import beergame.domain.GameId
 import beergame.domain.GuidedTour
+import beergame.domain.KeyLandmark
 import beergame.domain.ParticipantId
 import io.ktor.http.CookieEncoding
 import io.ktor.http.HttpHeaders
@@ -46,6 +47,11 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val SAME_SITE_STRICT = mapOf("SameSite" to "Strict")
 
+@KeyLandmark(
+    map = "アプリケーションアーキテクチャ",
+    layer = "副作用",
+    description = "HTTP の入口。要求を値のコマンドに変えるだけの薄い層で、規則は持たず、結果を応答に写す",
+)
 @GuidedTour(
     name = "CQRS（コマンドと問い合わせの分離）",
     rank = 1,

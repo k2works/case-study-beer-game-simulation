@@ -7,6 +7,7 @@ import beergame.application.Generators
 import beergame.application.MetricSink
 import beergame.application.Ports
 import beergame.application.SecureTokens
+import beergame.domain.KeyLandmark
 import beergame.http.DatabaseProbe
 import beergame.persistence.Persistence
 import kotlinx.coroutines.CoroutineDispatcher
@@ -70,6 +71,11 @@ class Tuning(
     }
 }
 
+@KeyLandmark(
+    map = "アプリケーションアーキテクチャ",
+    layer = "組み立て",
+    description = "本物の実装を束ねて、application の境界（Ports）を満たす唯一の場所。他の層は、ここを知らない",
+)
 fun appPorts(
     persistence: Persistence,
     secrets: Secrets,

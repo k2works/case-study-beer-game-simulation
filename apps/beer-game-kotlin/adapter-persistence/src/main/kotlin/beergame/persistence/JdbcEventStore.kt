@@ -21,6 +21,7 @@ import beergame.domain.EventEnvelope
 import beergame.domain.GameEvent
 import beergame.domain.GameId
 import beergame.domain.GuidedTour
+import beergame.domain.KeyLandmark
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
 import java.sql.ResultSet
@@ -29,6 +30,11 @@ import java.sql.ResultSet
  * JDBC による EventStore。楽観的並行制御は、`uq_events_stream_version` の違反（ConcurrencyConflict）で行う（行や版のロックは取らない）。
  * 原子性は呼び出し側のトランザクション（[JdbcTransactionRunner]）が持つ。
  */
+@KeyLandmark(
+    map = "アプリケーションアーキテクチャ",
+    layer = "副作用",
+    description = "永続化の入口。application が定めた EventStore の約束を、データベースで満たす。規則は持たず、追記と読み出しだけを担う",
+)
 @GuidedTour(
     name = "イベントソーシング（事実が状態の正本）",
     rank = 5,

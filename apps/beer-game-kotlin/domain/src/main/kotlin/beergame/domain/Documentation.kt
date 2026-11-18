@@ -64,6 +64,26 @@ annotation class GuidedTour(
 )
 
 /**
+ * サイトシーイング・マップの見どころ（Key Landmark）。付けると、[map] のマップに、順序なしの見どころとして載る。
+ * ガイドツアー（[GuidedTour]）と違い、順序（rank）を持たない。見どころは**最も重要な 5〜7 個（多くても 10 個）**に絞る。
+ * 動的キュレーションの選択基準で、名前や場所を名指ししない。
+ * 生成器は、ソースの文字列を走査して読む。そのため、**引数は名前つきで書き、値は文字列のリテラル**（文字列の連結は可）にする。
+ *
+ * @property map マップの名前（例: アプリケーションアーキテクチャ）。同じ名前の注釈が、1 枚のマップになる
+ * @property layer 見どころの属する層（例: 核・境界・組み立て・副作用）。マップの中で、層ごとにまとめる
+ * @property description 見どころが何か、なぜ見るべきか（短い説明）
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@Repeatable
+@MustBeDocumented
+annotation class KeyLandmark(
+    val map: String,
+    val layer: String,
+    val description: String,
+)
+
+/**
  * ドメインイベントの 1 項目。イベント（`GameEvent`・`SessionEvent` の部分型）に付けると、イベント一覧（生成物）の 1 行になる。
  * ストリーム、ペイロードの項目、購読する投影は、型とソースから導くので、ここには書かない。
  *
