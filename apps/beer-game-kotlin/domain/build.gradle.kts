@@ -24,8 +24,8 @@ tasks.register<Test>("generateLivingDocs") {
     useJUnitPlatform()
     filter {
         includeTestsMatching("beergame.domain.LivingDocumentationSpec")
-        includeTestsMatching("beergame.domain.WalkingSkeletonTourSpec")
         includeTestsMatching("beergame.domain.CoreHighlightSpec")
+        includeTestsMatching("beergame.domain.GuidedTourSpec")
     }
     systemProperty("beergame.docs.update", "true")
     outputs.upToDateWhen { false }

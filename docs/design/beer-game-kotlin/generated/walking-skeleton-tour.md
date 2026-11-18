@@ -6,148 +6,111 @@ tags: [design, generated]
 status: draft
 ---
 
-# ウォーキングスケルトンのガイドツアー（生成）
+# ガイドツアー（生成）: ウォーキングスケルトン
 
 この文書は、コードの注釈とソースから生成した。手で編集しない（試験 `LivingDocumentationSpec` が、コードとの不一致で失敗する）。再生成: `./gradlew :domain:generateLivingDocs`。
 
-最初の縦の切片（1 ゲーム・4 役割・1 週）を、操作の順に、画面からイベントと投影までたどる。
-各層の場所は、コードの走査から導く。見つからなければ、ツアーが古いので、試験が失敗する。
-API の経路は、仕様（`contracts/openapi.yaml`。基準の URL は `/api/v1`）の操作から読む。
+最初の縦の切片（1 ゲーム・4 役割・1 週）を、準備（作成・参加・割り当て・開始）とプレイ（入力・確定・状態の表示）の操作の順に案内する。（7 ステップ）
+ステップは、注釈 `@GuidedTour` を付けた要素を、ソースの走査で集めて、rank の順に並べたもの（名前や場所は名指ししない）。
+各ステップの説明は、注釈の `description` から取り出す。コマンドとイベントの対応は[イベント一覧](./events.md)を参照する。
 
 ## 全体の流れ
 
+図の矢印は、読む順序を示す（実行時の呼び出しの順とは限らない。たとえば、問い合わせ側は投影を読むだけで、書き込みの後続ではない）。
+
 ```plantuml
 @startuml
-actor "進行役" as A1
-actor "参加者" as A2
-participant "画面" as UI
-participant "API" as API
-participant "アプリケーション" as App
-participant "ドメイン" as Domain
-A1 -> UI : 1. ゲームを作成する
-UI -> API : POST /games
-API -> App : createGame
-App -> Domain : decide
-Domain --> App : GameCreated
-A2 -> UI : 2. 参加する
-UI -> API : POST /participations/join
-API -> App : joinGame
-App -> Domain : decide
-Domain --> App : ParticipantJoined
-A1 -> UI : 3. 役割を割り当てる
-UI -> API : PUT /games/{gameId}/participants/{participantId}/role
-API -> App : assignRole
-App -> Domain : decide
-Domain --> App : RoleAssigned、RoleUnassigned
-A1 -> UI : 4. ゲームを開始する
-UI -> API : POST /games/{gameId}/start
-API -> App : startGame
-App -> Domain : decide
-Domain --> App : GameStarted、SessionStarted
-A2 -> UI : 5. 発注（入力）を保存する
-UI -> API : PUT /sessions/{sessionId}/decisions
-API -> App : saveDecision
-App -> Domain : decide
-Domain --> App : DecisionSaved
-A1 -> UI : 6. 週を確定する
-UI -> API : POST /sessions/{sessionId}/weeks/{week}/commit
-API -> App : commitWeek
-App -> Domain : decide
-Domain --> App : WeekCommitted
-A2 -> UI : 7. 状態を表示する
-UI -> API : GET /sessions/{sessionId}/state
-API -> App : snapshot
-App -> Domain : 投影を読む（開示の規則を掛ける）
+left to right direction
+package "準備" {
+  rectangle "1. Ports.createGame" as S1
+  rectangle "2. Ports.joinGame" as S2
+  rectangle "3. Ports.assignRole" as S3
+  rectangle "4. Ports.startGame" as S4
+}
+package "プレイ" {
+  rectangle "5. Ports.saveDecision" as S5
+  rectangle "6. Ports.commitWeek" as S6
+  rectangle "7. Ports.snapshot" as S7
+}
+S1 --> S2
+S2 --> S3
+S3 --> S4
+S4 --> S5
+S5 --> S6
+S6 --> S7
 @enduml
 ```
 
-## 1. ゲームを作成する（進行役）
+### 準備
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/setup/CreateGamePage.tsx`（`api.createGame(…`を呼ぶ） |
-| API | `POST /games`（操作 `createGame`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.createGame` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Game.kt`（`data class CreateGame(…`） |
-| イベント | EV-G01 `GameCreated`（game） |
-| 購読する投影 | `gameOverview`、`gameJoinCodes`、`gameSettings`、`retentionPolicies` |
-| 受入 | `apps/beer-game-kotlin/features/game-setup/game-creation.feature`（@AC1.1.1） |
+#### 1. `Ports.createGame`（関数）
 
-## 2. 参加する（参加者）
+進行役がゲームを作成する。設定を検証し、参加コードと進行役の資格を発行する。ここから、参加と割り当てを受け付ける準備中が始まる
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/participation/JoinPage.tsx`（`api.joinGame(…`を呼ぶ） |
-| API | `POST /participations/join`（操作 `joinGame`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.joinGame` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Game.kt`（`data class JoinGame(…`） |
-| イベント | EV-G02 `ParticipantJoined`（game） |
-| 購読する投影 | `lobbyParticipants` |
-| 受入 | `apps/beer-game-kotlin/features/game-setup/joining-ui.feature`（@AC1.2.1）<br>`apps/beer-game-kotlin/features/game-setup/joining.feature`（@AC1.2.1） |
+API: `POST /games`（操作 `createGame`）
 
-## 3. 役割を割り当てる（進行役）
+発行するイベント: EV-G01 `GameCreated`
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/lobby/LobbyPage.tsx`（`api.assignRole(…`を呼ぶ） |
-| API | `PUT /games/{gameId}/participants/{participantId}/role`（操作 `assignRole`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.assignRole` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Game.kt`（`data class AssignRole(…`） |
-| イベント | EV-G03 `RoleAssigned`（game）<br>EV-G04 `RoleUnassigned`（game） |
-| 購読する投影 | `lobbyParticipants` |
-| 受入 | `apps/beer-game-kotlin/features/game-setup/co-assignment.feature`（@AC1.2.5）<br>`apps/beer-game-kotlin/features/game-setup/joining.feature`（@AC1.2.5） |
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
 
-## 4. ゲームを開始する（進行役）
+#### 2. `Ports.joinGame`（関数）
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/lobby/LobbyPage.tsx`（`api.startGame(…`を呼ぶ） |
-| API | `POST /games/{gameId}/start`（操作 `startGame`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.startGame` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/StartGame.kt`（`data class StartGame(…`） |
-| イベント | EV-G11 `GameStarted`（game）<br>EV-S01 `SessionStarted`（session） |
-| 購読する投影 | `gameOverview`、`sessionOverview`、`roleCurrentStates` |
-| 受入 | `apps/beer-game-kotlin/features/game-setup/joining.feature`（@AC1.2.3） |
+参加者が、参加コードと表示名で参加する。アカウントは作らず、復帰資格を発行する。表示名はイベントに入れず、周辺ストアにだけ書く
 
-## 5. 発注（入力）を保存する（参加者）
+API: `POST /participations/join`（操作 `joinGame`）
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/play/PlayPage.tsx`（`api.saveDecision(…`を呼ぶ） |
-| API | `PUT /sessions/{sessionId}/decisions`（操作 `saveDecision`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.saveDecision` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`（`data class SaveDecision(…`） |
-| イベント | EV-S05 `DecisionSaved`（session） |
-| 購読する投影 | `sessionOverview`、`currentDecisions` |
-| 受入 | `apps/beer-game-kotlin/features/weekly-play/decision.feature`（@AC2.2.1） |
+発行するイベント: EV-G02 `ParticipantJoined`
 
-## 6. 週を確定する（進行役）
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/console/ConsolePage.tsx`（`api.commitWeek(…`を呼ぶ） |
-| API | `POST /sessions/{sessionId}/weeks/{week}/commit`（操作 `commitWeek`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt` の `Ports.commitWeek` |
-| コマンド | `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`（`data class CommitWeek(…`） |
-| イベント | EV-S08 `WeekCommitted`（session） |
-| 購読する投影 | `sessionOverview`、`roleCurrentStates`、`currentDecisions`、`weekCommits`、`weekRoleResults`、`weekTeamTotals` |
-| 受入 | `apps/beer-game-kotlin/features/weekly-play/co-input.feature`（@AC2.3.1）<br>`apps/beer-game-kotlin/features/weekly-play/walking-skeleton-ui.feature`（@AC2.3.1）<br>`apps/beer-game-kotlin/features/weekly-play/week-commit.feature`（@AC2.3.1） |
+#### 3. `Ports.assignRole`（関数）
 
-## 7. 状態を表示する（参加者）
+進行役が、参加者に役割を割り当てる。4 役割のそれぞれに 1 人以上が要る。別の役割にいる人を選ぶと、付け替えになる
 
-| 層 | 場所 |
-| :--- | :--- |
-| 画面 | `apps/beer-game-kotlin/web/src/features/play/PlayPage.tsx`（`api.getSessionState(…`を呼ぶ） |
-| API | `GET /sessions/{sessionId}/state`（操作 `getSessionState`） |
-| ルート | `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/QueryRoutes.kt` |
-| アプリケーション | `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt` の `Ports.snapshot` |
-| コマンド | なし（問い合わせ） |
-| イベント | なし（問い合わせ） |
-| 購読する投影 | なし |
-| 受入 | `apps/beer-game-kotlin/features/weekly-play/situation.feature`（@AC2.1.1） |
+API: `PUT /games/{gameId}/participants/{participantId}/role`（操作 `assignRole`）
+
+発行するイベント: EV-G03 `RoleAssigned`、EV-G04 `RoleUnassigned`
+
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+
+#### 4. `Ports.startGame`（関数）
+
+進行役がゲームを開始する。各役割に参加者がそろっていれば、game と session の両ストリームへ原子的に追記し、第 1 週が始まる
+
+API: `POST /games/{gameId}/start`（操作 `startGame`）
+
+発行するイベント: EV-G11 `GameStarted`、EV-S01 `SessionStarted`
+
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+
+### プレイ
+
+#### 5. `Ports.saveDecision`（関数）
+
+参加者が、自分の役割の当週の数量（発注、工場は生産要請）を保存する。意思決定の版が一致しなければ、競合として知らせる
+
+API: `PUT /sessions/{sessionId}/decisions`（操作 `saveDecision`）
+
+発行するイベント: EV-S05 `DecisionSaved`
+
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+
+#### 6. `Ports.commitWeek`（関数）
+
+進行役が、4 役割の入力が揃った週を確定する。週の計算の結果と次週の状態を、事実として一度だけ固定する
+
+API: `POST /sessions/{sessionId}/weeks/{week}/commit`（操作 `commitWeek`）
+
+発行するイベント: EV-S08 `WeekCommitted`
+
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+
+#### 7. `Ports.snapshot`（関数）
+
+進行役と参加者が、状態を表示する。確定した第 2 週の状況と、各役割の第 1 週の結果を、呼び出した人に許された範囲だけ返す
+
+API: `GET /sessions/{sessionId}/state`（操作 `getSessionState`）
+
+発行するイベント: なし（問い合わせ）
+
+場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt`

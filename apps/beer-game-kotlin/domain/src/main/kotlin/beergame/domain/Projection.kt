@@ -121,6 +121,14 @@ private fun roleKey(
 
 private fun nextWeekOrSame(week: Week): Int = week.next()?.value ?: week.value
 
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 5,
+    stage = "イベントと投影",
+    description =
+        "事実から、読み取りモデルの行の変更を導く純粋関数の集まり。" +
+            "問い合わせの形に合わせて、役割別の値と合計を別の投影に分ける",
+)
 object Projections {
     /** `game_overview`: 参加コードを持たない（M1）。 */
     val gameOverview =

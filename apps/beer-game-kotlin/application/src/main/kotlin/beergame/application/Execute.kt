@@ -8,6 +8,7 @@ import arrow.core.raise.ensureNotNull
 import arrow.core.right
 import beergame.domain.Actor
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import java.time.Instant
 import java.util.UUID
 
@@ -111,6 +112,14 @@ internal tailrec suspend fun <A> withAppendRetry(
  * 認証から冪等記録の保存までの共通の流れ。[handle] は「読み込み → decide → 追記 → 投影 → ...」の部分で、版を返す。
  * 競合は、認可を含めて最初から評価し直す（再読み込みの後に権限や状態が変わっていても、正しく判定する）。
  */
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 2,
+    stage = "コマンド側",
+    description =
+        "コマンドの共通の流れ。認証・冪等記録・競合の再試行を担い、読み込み・decide・追記・投影を順に呼ぶ。" +
+            "競合したときは、認可を含めて最初から評価し直す",
+)
 internal suspend fun Ports.runCommand(
     request: CommandRequest,
     handle: suspend (Tx, Ctx) -> Either<AppFailure, Versions>,

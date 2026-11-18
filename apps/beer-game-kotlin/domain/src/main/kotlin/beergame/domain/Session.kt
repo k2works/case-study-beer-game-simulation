@@ -439,6 +439,14 @@ private fun Raise<SessionError>.resumeEvents(
     "進行（プレイ）",
     "進行の規則のすべてが集まる場所。入力の保存・代理入力・停止と再開・手動と自動の確定の可否を決め、事実（イベント）だけを返す。共同入力と自動確定の整合性もここで守る",
 )
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 3,
+    stage = "コマンド側",
+    description =
+        "進行の規則を判断し、事実（イベント）の列を返す純粋関数。状態を変えず、副作用も無い。" +
+            "返した事実が、次に追記される",
+)
 fun decideSession(
     state: SessionState,
     command: SessionCommand,

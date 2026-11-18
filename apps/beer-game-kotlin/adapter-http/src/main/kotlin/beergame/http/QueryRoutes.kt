@@ -10,6 +10,7 @@ import beergame.application.SnapshotView
 import beergame.application.review
 import beergame.application.snapshot
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.Role
 import beergame.domain.SessionError
 import io.ktor.http.HttpStatusCode
@@ -23,6 +24,12 @@ import kotlinx.serialization.json.JsonObject
  * 資格が無効・別のゲーム・存在しないゲームは、区別せず同じ 403（資格の失敗と同じ本文）。
  */
 
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 7,
+    stage = "問い合わせ側",
+    description = "問い合わせの入口。コマンドとは別の経路で、イベントストアを経由せずに、投影を読む",
+)
 internal fun Route.queryRoutes(deps: HttpDeps) {
     get("/sessions/{sessionId}/state") {
         call.operation("getSessionState")

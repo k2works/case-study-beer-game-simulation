@@ -6,6 +6,7 @@ import arrow.core.raise.ensure
 import arrow.core.raise.ensureNotNull
 import beergame.domain.Actor
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.Role
 
 /**
@@ -13,6 +14,20 @@ import beergame.domain.Role
  * 資格が無効、別のゲーム、存在しないゲームは、区別せず [AppFailure.Unauthorized]（存在を明かさない）。
  * [requestedRole] を指定して、自分の役割と違えば、値を返さず `game.forbidden`（AC2.1.2。経路への写像は Step 9 で決める）。
  */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 7,
+    stage = "プレイ",
+    description = "進行役と参加者が、状態を表示する。確定した第 2 週の状況と、各役割の第 1 週の結果を、呼び出した人に許された範囲だけ返す",
+)
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 8,
+    stage = "問い合わせ側",
+    description =
+        "認証して投影を読み、呼び出した人ごとの開示の規則を掛けて返す。" +
+            "他の役割の値は、返さない",
+)
 suspend fun Ports.snapshot(
     gameId: GameId,
     credential: String?,

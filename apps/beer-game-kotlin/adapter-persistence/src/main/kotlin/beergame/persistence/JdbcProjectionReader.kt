@@ -20,6 +20,7 @@ import beergame.application.SettingsSummary
 import beergame.application.Versions
 import beergame.domain.Editor
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.ParticipantId
 import beergame.domain.Role
 import beergame.domain.StreamType
@@ -43,6 +44,14 @@ import javax.sql.DataSource
  * H2 でも同じ指定をするが、分離の動作の同一性は検証していない（検証は PostgreSQL の統合テストだけ）。
  * 読み取り専用のデータベースロール（観察者用の別の接続プールを含む）は B2・B9。B1 は 1 つの接続プールを使う。
  */
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 9,
+    stage = "問い合わせ側",
+    description =
+        "投影の表を、読み取り専用のトランザクションで読む。" +
+            "行と同じ時点の版を返し、イベントを再生しない",
+)
 internal class JdbcProjectionReader(
     private val dataSource: DataSource,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,

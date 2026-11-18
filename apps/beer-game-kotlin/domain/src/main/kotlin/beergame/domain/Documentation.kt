@@ -41,6 +41,29 @@ annotation class CoreConcept(
 )
 
 /**
+ * ガイドツアーの 1 ステップ。付けると、ツアー名ごとに集められ、[rank] の順に並んで、案内の 1 ステップになる。
+ * 動的キュレーションの選択基準で、名前や場所を名指ししない。ツアーは数ステップ（上限 10）に絞る。
+ * 注釈は、モジュールをまたいで付けられる（domain のほか application・adapter にも）。同じ要素が複数のツアーに出てもよい（繰り返して付ける）。
+ *
+ * 生成器は、ソースの文字列を走査して読む。そのため、**引数は名前つきで書き、値は文字列・整数のリテラル**（文字列の連結は可）にする。
+ *
+ * @property name ツアーの名前。同じ名前の注釈が、1 本のツアーになる
+ * @property rank ツアーの中の順序（小さいほど先。ツアーの中で一意）
+ * @property stage 段階の名前（例: コマンド側）。同じ段階が続くステップを、まとめて示す
+ * @property description このステップで何が起きるか（次に何が起きるかが分かる短い説明）
+ */
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
+@Retention(AnnotationRetention.RUNTIME)
+@Repeatable
+@MustBeDocumented
+annotation class GuidedTour(
+    val name: String,
+    val rank: Int,
+    val stage: String,
+    val description: String,
+)
+
+/**
  * ドメインイベントの 1 項目。イベント（`GameEvent`・`SessionEvent` の部分型）に付けると、イベント一覧（生成物）の 1 行になる。
  * ストリーム、ペイロードの項目、購読する投影は、型とソースから導くので、ここには書かない。
  *

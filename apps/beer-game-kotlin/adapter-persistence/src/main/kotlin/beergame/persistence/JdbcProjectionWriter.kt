@@ -9,6 +9,7 @@ import beergame.application.Tx
 import beergame.domain.DomainEvent
 import beergame.domain.EventEnvelope
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.Projections
 import beergame.domain.RowChange
 import beergame.domain.StreamType
@@ -19,6 +20,14 @@ import beergame.domain.Value
  * `projection_checkpoints` を更新する。更新の順序は、表の固定の順序（data-model.md L3）で、同じ表では発行の順。
  * Upsert は「UPDATE して、0 行なら INSERT」で、PostgreSQL と H2 の両方で同じ意味になる（部分の更新ができる）。
  */
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 6,
+    stage = "イベントと投影",
+    description =
+        "導いた行の変更を、追記と同じトランザクションで書く（同期投影）。" +
+            "書いた版を projection_checkpoints に残し、問い合わせ側が古い表示を捨てられるようにする",
+)
 internal class JdbcProjectionWriter(
     private val dialect: Dialect,
 ) : ProjectionWriter {

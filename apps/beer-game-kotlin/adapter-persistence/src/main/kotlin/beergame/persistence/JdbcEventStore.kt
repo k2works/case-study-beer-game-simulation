@@ -20,6 +20,7 @@ import beergame.domain.DomainEvent
 import beergame.domain.EventEnvelope
 import beergame.domain.GameEvent
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
 import java.sql.ResultSet
@@ -28,6 +29,14 @@ import java.sql.ResultSet
  * JDBC による EventStore。楽観的並行制御は、`uq_events_stream_version` の違反（ConcurrencyConflict）で行う（行や版のロックは取らない）。
  * 原子性は呼び出し側のトランザクション（[JdbcTransactionRunner]）が持つ。
  */
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 4,
+    stage = "イベントと投影",
+    description =
+        "事実を events に追記する。ストリームごとの版の一意制約で、同時の更新のうち片方だけを通す。" +
+            "追記した事実が、投影の元になる",
+)
 internal class JdbcEventStore(
     private val dialect: Dialect,
     private val runner: TransactionRunner,

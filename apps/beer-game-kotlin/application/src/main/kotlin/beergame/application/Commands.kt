@@ -12,6 +12,7 @@ import beergame.domain.GameCommand
 import beergame.domain.GameError
 import beergame.domain.GameId
 import beergame.domain.GameSettings
+import beergame.domain.GuidedTour
 import beergame.domain.JoinCode
 import beergame.domain.ParticipantId
 import beergame.domain.RetentionDays
@@ -84,6 +85,12 @@ private fun generated(
 // ---- ゲームの作成 ----
 
 /** キット準拠のゲームを作成する。進行役の資格を発行し、その生の値は応答だけが運ぶ（AC1.1.1）。 */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 1,
+    stage = "準備",
+    description = "進行役がゲームを作成する。設定を検証し、参加コードと進行役の資格を発行する。ここから、参加と割り当てを受け付ける準備中が始まる",
+)
 suspend fun Ports.createGame(
     input: CreateGameInput,
     meta: RequestMeta,
@@ -131,6 +138,12 @@ suspend fun Ports.createGame(
  * 参加コードで参加する（認可は参加コード）。不明・形式不正の参加コードは区別せず `game.invitation_invalid`（AC1.2.2）。
  * 受付が終わったゲームは、decide が `game.not_preparing` を返す。復帰資格を発行し、表示名は周辺ストアにだけ書く。
  */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 2,
+    stage = "準備",
+    description = "参加者が、参加コードと表示名で参加する。アカウントは作らず、復帰資格を発行する。表示名はイベントに入れず、周辺ストアにだけ書く",
+)
 suspend fun Ports.joinGame(
     input: JoinGameInput,
     meta: RequestMeta,
@@ -179,6 +192,12 @@ private suspend fun Ports.joinWithCode(
 
 // ---- 役割の割り当て・開始 ----
 
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 3,
+    stage = "準備",
+    description = "進行役が、参加者に役割を割り当てる。4 役割のそれぞれに 1 人以上が要る。別の役割にいる人を選ぶと、付け替えになる",
+)
 suspend fun Ports.assignRole(
     gameId: GameId,
     participantId: ParticipantId,
@@ -194,6 +213,12 @@ suspend fun Ports.assignRole(
 }
 
 /** ゲームを開始する。`game` と `session` の両ストリームへ、原子的に追記する。 */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 4,
+    stage = "準備",
+    description = "進行役がゲームを開始する。各役割に参加者がそろっていれば、game と session の両ストリームへ原子的に追記し、第 1 週が始まる",
+)
 suspend fun Ports.startGame(
     gameId: GameId,
     meta: RequestMeta,
@@ -205,6 +230,12 @@ suspend fun Ports.startGame(
 // ---- 入力の保存・確定 ----
 
 /** 当週の数量を保存する（session ストリーム）。数量・週・版の形の誤りは、すべて集める（AC2.2.2）。 */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 5,
+    stage = "プレイ",
+    description = "参加者が、自分の役割の当週の数量（発注、工場は生産要請）を保存する。意思決定の版が一致しなければ、競合として知らせる",
+)
 suspend fun Ports.saveDecision(
     gameId: GameId,
     input: SaveDecisionInput,
@@ -224,6 +255,12 @@ suspend fun Ports.saveDecision(
     }
 
 /** 1 週を確定する（session ストリーム）。判定の順（週 → 根拠の版 → 入力の揃い）は decide が持つ。 */
+@GuidedTour(
+    name = "ウォーキングスケルトン（最初の縦の切片）",
+    rank = 6,
+    stage = "プレイ",
+    description = "進行役が、4 役割の入力が揃った週を確定する。週の計算の結果と次週の状態を、事実として一度だけ固定する",
+)
 suspend fun Ports.commitWeek(
     gameId: GameId,
     input: CommitWeekInput,

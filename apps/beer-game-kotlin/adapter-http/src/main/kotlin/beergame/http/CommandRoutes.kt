@@ -23,6 +23,7 @@ import beergame.application.snapshot
 import beergame.application.sourceKey
 import beergame.application.startGame
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.ParticipantId
 import io.ktor.http.CookieEncoding
 import io.ktor.http.HttpHeaders
@@ -45,6 +46,14 @@ import kotlinx.serialization.json.JsonPrimitive
 
 private val SAME_SITE_STRICT = mapOf("SameSite" to "Strict")
 
+@GuidedTour(
+    name = "CQRS（コマンドと問い合わせの分離）",
+    rank = 1,
+    stage = "コマンド側",
+    description =
+        "コマンドの入口。HTTP の要求を、入力を検証したコマンドに変える。" +
+            "状態は返さず、版だけを返す。次に、認証と冪等を含む共通の流れへ渡す",
+)
 internal fun Route.commandRoutes(deps: HttpDeps) {
     val ports = deps.ports
     post("/games") {
