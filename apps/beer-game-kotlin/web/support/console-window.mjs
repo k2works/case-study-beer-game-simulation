@@ -175,10 +175,20 @@ export class ConsoleWindow {
         this.retentionPage = this.page;
     }
 
-    /** 保持状態の本文（削除予定日・保持期間・バックアップの注記）。 */
-    async retentionText() {
-        await this.retentionPage.getByText(/^削除予定日:/).waitFor({ timeout: WAIT_MS });
-        return this.retentionPage.locator('main').innerText();
+    /** 保持状態の表の「項目 → 内容」（削除予定日・保持期間・保持の起点・削除の進行・バックアップ）。 */
+    async retentionTable() {
+        const table = this.retentionPage.getByRole('table', { name: '保持状態の表' });
+        await table.waitFor({ timeout: WAIT_MS });
+        const rows = table.getByRole('row');
+        const count = await rows.count();
+        const entries = {};
+        for (let index = 0; index < count; index++) {
+            const row = rows.nth(index);
+            entries[(await row.getByRole('rowheader').innerText()).trim()] = (
+                await row.getByRole('cell').innerText()
+            ).trim();
+        }
+        return entries;
     }
 
     /** 振り返りの本文。削除予定日の注記（進行役にだけ。取得してから示す）を待つ。 */

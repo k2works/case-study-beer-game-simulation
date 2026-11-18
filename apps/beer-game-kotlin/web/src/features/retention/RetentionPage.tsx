@@ -4,7 +4,7 @@ import type { Retention } from '../../api/types';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { useLoad } from '../../components/useLoad';
-import { deleteDateText } from './deleteDate';
+import { deleteDateValue, startDateValue } from './deleteDate';
 
 /** 削除の進行の文言。再試行は自動（手動の再試行は無い）。 */
 function progressText(retention: Retention): string {
@@ -43,13 +43,37 @@ export function RetentionPage() {
     return (
         <>
             <PageHeading title="保持状態" />
-            <p>{deleteDateText(retention, new Date())}</p>
-            <p>{`保持期間: ${retention.retentionDays} 日`}</p>
+            <div className="table-scroll">
+                <table className="results-table summary-table" aria-label="保持状態の表">
+                    <tbody>
+                        <tr>
+                            <th scope="row">削除予定日</th>
+                            <td>{deleteDateValue(retention, new Date())}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">保持期間</th>
+                            <td>{`${retention.retentionDays} 日`}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">保持の起点</th>
+                            <td>{startDateValue(retention)}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">削除の進行</th>
+                            <td>
+                                <span role="status">{progressText(retention)}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">バックアップ</th>
+                            <td>{`削除後も最大 ${retention.backupRetentionDays} 日残ります（データベースの自動バックアップ）`}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
             <p className="muted">
-                保持の起点は、ゲームの作成時です。終了後の振り返りと結果の出力は、削除予定日までに済ませてください。
+                終了後の振り返りと結果の出力は、削除予定日までに済ませてください。
             </p>
-            <p role="status">{progressText(retention)}</p>
-            <p>{`データベースのバックアップには、削除後も最大 ${retention.backupRetentionDays} 日残ります。`}</p>
             <p>
                 <Link to={`/games/${gameId}/console`}>コンソールへ戻る</Link>
             </p>

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/errors';
 import type { Retention, Review } from '../../api/types';
@@ -30,22 +30,43 @@ describe('S09 保持状態（US5.1）', () => {
         vi.useRealTimers();
     });
 
-    it('削除予定日と残り日数、保持期間、保持の起点を示す', async () => {
+    /** 保持状態の表の「項目 → 内容」。 */
+    const rowsOf = (table: HTMLElement) =>
+        within(table)
+            .getAllByRole('row')
+            .map((row) => [
+                within(row).getByRole('rowheader').textContent,
+                within(row).getByRole('cell').textContent,
+            ]);
+
+    it('削除予定日と残り日数、保持期間、保持の起点、削除の進行、バックアップの残存を、表で示す', async () => {
         renderApp(fakeApi({ getRetention: () => Promise.resolve(retention()) }), PATH);
 
         expect(await screen.findByRole('heading', { name: '保持状態' })).toBeVisible();
-        expect(screen.getByText('削除予定日: 2027-02-12（あと 3 日）')).toBeVisible();
-        expect(screen.getByText('保持期間: 90 日')).toBeVisible();
-        expect(screen.getByText(/保持の起点は、ゲームの作成時です/)).toBeVisible();
+        const table = screen.getByRole('table', { name: '保持状態の表' });
+        expect(rowsOf(table)).toEqual([
+            ['削除予定日', '2027-02-12（あと 3 日）'],
+            ['保持期間', '90 日'],
+            ['保持の起点', '2026-11-14（ゲームの作成時）'],
+            ['削除の進行', '削除の予定です。'],
+            ['バックアップ', '削除後も最大 7 日残ります（データベースの自動バックアップ）'],
+        ]);
+        expect(screen.getByText(/削除予定日までに済ませてください/)).toBeVisible();
         await expectNoStructuralA11yViolations();
     });
 
     it('バックアップに、削除後も最大 7 日残ることを示す（AC5.1.5）', async () => {
-        renderApp(fakeApi({ getRetention: () => Promise.resolve(retention()) }), PATH);
+        renderApp(
+            fakeApi({
+                getRetention: () => Promise.resolve(retention({ backupRetentionDays: 14 })),
+            }),
+            PATH,
+        );
 
+        const table = await screen.findByRole('table', { name: '保持状態の表' });
         expect(
-            await screen.findByText('データベースのバックアップには、削除後も最大 7 日残ります。'),
-        ).toBeVisible();
+            within(table).getByRole('rowheader', { name: 'バックアップ' }).nextSibling,
+        ).toHaveTextContent('削除後も最大 14 日残ります');
     });
 
     it('状態ごとに、削除の進行を示す', async () => {
@@ -85,9 +106,10 @@ describe('S09 保持状態（US5.1）', () => {
         vi.setSystemTime(new Date('2027-02-13T09:00:00Z'));
         renderApp(fakeApi({ getRetention: () => Promise.resolve(retention()) }), PATH);
 
+        const table = await screen.findByRole('table', { name: '保持状態の表' });
         expect(
-            await screen.findByText('削除予定日: 2027-02-12（期限に達しています）'),
-        ).toBeVisible();
+            within(table).getByRole('rowheader', { name: '削除予定日' }).nextSibling,
+        ).toHaveTextContent('2027-02-12（期限に達しています）');
     });
 
     it('進行役でなければ（403）、取得に失敗したことを role="alert" で示す', async () => {

@@ -9,26 +9,23 @@ When('進行役が、コンソールから保持状態を開く', async function
 });
 
 Then('保持状態に、削除予定日と保持期間 {int} 日が示される', async function (days) {
-    const text = await this.console.retentionText();
+    const table = await this.console.retentionTable();
     // 作成の時刻から保持日数後（UTC の暦日）。ゲームの作成から数秒なので、日付の境界をまたがない限り、今日 + 保持日数
     const expected = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    assert.match(text, new RegExp(`削除予定日: (\\d{4}-\\d{2}-\\d{2})（あと ${days} 日）`));
-    const shown = /削除予定日: (\d{4}-\d{2}-\d{2})/.exec(text)[1];
+    assert.match(table['削除予定日'], new RegExp(`^(\\d{4}-\\d{2}-\\d{2})（あと ${days} 日）$`));
+    const shown = /^(\d{4}-\d{2}-\d{2})/.exec(table['削除予定日'])[1];
     // 実行が UTC の日付の境界をまたぐときだけ、1 日ずれうる
     const gap = Math.abs(new Date(shown).getTime() - new Date(expected).getTime());
     assert.ok(
         gap <= 24 * 60 * 60 * 1000,
         `削除予定日が保持日数と合わない: ${shown}（期待 ${expected}）`,
     );
-    assert.match(text, new RegExp(`保持期間: ${days} 日`));
+    assert.equal(table['保持期間'], `${days} 日`);
 });
 
 Then('保持状態に、バックアップには削除後も最大 {int} 日残ることが示される', async function (days) {
-    const text = await this.console.retentionText();
-    assert.match(
-        text,
-        new RegExp(`データベースのバックアップには、削除後も最大 ${days} 日残ります。`),
-    );
+    const table = await this.console.retentionTable();
+    assert.match(table['バックアップ'], new RegExp(`^削除後も最大 ${days} 日残ります`));
 });
 
 Then('振り返りの見出しの近くに、削除予定日が示される', async function () {
