@@ -38,9 +38,9 @@ variable "domain_name" {
   }
 }
 
-variable "acm_certificate_arn" {
+variable "hosted_zone_id" {
   type        = string
-  description = "独自ドメインの ACM 証明書（us-east-1）"
+  description = "独自ドメインの Route 53 のホストゾーン ID（証明書の DNS 検証と、CloudFront への別名を置く。すでにある前提）"
 }
 
 variable "critical_alarm_emails" {

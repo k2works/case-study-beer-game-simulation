@@ -45,3 +45,9 @@ variable "skip_final_snapshot" {
   type    = bool
   default = true
 }
+
+variable "backup_window" {
+  type        = string
+  default     = "17:00-17:30"
+  description = "自動バックアップの時間帯（UTC）。日本時間 02:00〜02:30。研修のない時間"
+}

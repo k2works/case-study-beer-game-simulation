@@ -22,3 +22,9 @@ variable "web_bucket_arn" { type = string }
 variable "distribution_arn" { type = string }
 variable "pass_role_arns" { type = list(string) }
 variable "log_group_arns" { type = list(string) }
+
+variable "snapshot_instance_arn" {
+  type        = string
+  default     = ""
+  description = "デプロイ前にスナップショットを取る RDS インスタンスの ARN（本番）。空なら、その権限を付けない"
+}

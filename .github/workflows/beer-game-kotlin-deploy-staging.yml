@@ -1,8 +1,9 @@
-# beer-game-kotlin のステージングへのデプロイ（手動起動のみ）。
+# beer-game-kotlin のステージングへのデプロイ。手動起動、または main の CI（beer-game-kotlin）の成功後の自動起動（B14。AC6.2.1）。
 #
 # 状態: **AWS で実行していない・検証していない定義。** 書いただけで、一度も動かしていない（YAML の構文検証のみ）。
-# AWS の準備（Terraform の適用、OIDC、変数の設定）ができてから、docs/operation/beer-game-kotlin/deploy.md の手順に沿って
-# 人が手動で起動し、動作を確認する。確認したうえで、`push` トリガー（main へのマージ）を有効にするかを、人が判断する。
+# 自動起動は、**リポジトリの変数 BEER_GAME_KOTLIN_AUTO_DEPLOY が 'true' のときだけ**動く（未設定の間は、起動してもジョブが飛ばされる）。
+# 人が AWS の準備（Terraform の適用、OIDC、環境の変数）を終え、手動で 1 回成功させてから、この変数を設定する（未設定のまま）。
+# 手順: docs/operation/beer-game-kotlin/deploy.md。本番は自動にしない（deploy-production は手動の承認のあと）。
 # 設計: docs/design/beer-game-kotlin/architecture-infrastructure.md「CI/CD」、operation.md「デプロイ」。
 #
 # 順序: ビルド → ECR への push → 新しいタスク定義の登録 → migrate（1 回限りの ECS タスク。完了待ち。失敗したら中止）
@@ -13,15 +14,19 @@
 # 必要な変数（Settings > Environments > staging の Variables。値は terraform output から。ワークフローに値を書かない）:
 #   AWS_ROLE_ARN（deploy_role_arn）  AWS_REGION  ECR_REPOSITORY（ECR のリポジトリ名。ecr_repository_url の最後の部分）
 #   ECS_CLUSTER（ecs_cluster）  ECS_SERVICE（ecs_service）  API_TASK_FAMILY（api_task_family）  MIGRATE_TASK_FAMILY（migrate_task_family）
+#   RETENTION_TASK_FAMILY（retention_task_family）  VERIFY_TASK_FAMILY（verify_projections_task_family）
 #   WEB_BUCKET（web_bucket）  DISTRIBUTION_ID（distribution_id）  TASK_SG（task_security_group_id）
 #   TASK_SUBNETS（task_subnet_ids をカンマ区切りで）  STAGING_URL（url。スモークテストの宛先）
 name: beer-game-kotlin-deploy-staging
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [main]
-  #   paths: ['apps/beer-game-kotlin/**']
+  # main への merge の CI（beer-game-kotlin。テスト・静的検査・コンテナのスモーク）が成功したら、ステージングへ自動でデプロイする。
+  # CI が apps/beer-game-kotlin/** の変更だけで起動するので、無関係の変更ではデプロイされない
+  workflow_run:
+    workflows: [beer-game-kotlin]
+    types: [completed]
+    branches: [main]
 
 concurrency:
   group: beer-game-kotlin-deploy-staging
@@ -33,6 +38,10 @@ permissions:
 
 jobs:
   deploy:
+    # 手動か、main の CI が成功し、かつ自動デプロイが有効（リポジトリの変数）のときだけ
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && vars.BEER_GAME_KOTLIN_AUTO_DEPLOY == 'true')
     runs-on: ubuntu-24.04
     # イメージのビルド（初回は約 6 分）、migrate、ローリング更新、スモークテストを見込む。実測は未確認（AWS で未実行）
     timeout-minutes: 45
@@ -47,15 +56,20 @@ jobs:
       ECS_SERVICE: ${{ vars.ECS_SERVICE }}
       API_TASK_FAMILY: ${{ vars.API_TASK_FAMILY }}
       MIGRATE_TASK_FAMILY: ${{ vars.MIGRATE_TASK_FAMILY }}
+      RETENTION_TASK_FAMILY: ${{ vars.RETENTION_TASK_FAMILY }}
+      VERIFY_TASK_FAMILY: ${{ vars.VERIFY_TASK_FAMILY }}
       WEB_BUCKET: ${{ vars.WEB_BUCKET }}
       DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
       TASK_SUBNETS: ${{ vars.TASK_SUBNETS }}
       TASK_SG: ${{ vars.TASK_SG }}
       BASE_URL: ${{ vars.STAGING_URL }}
-      RELEASE_ID: ${{ github.sha }}
+      # 自動起動（workflow_run）では、CI が成功したコミット。手動では、起動したブランチの先頭
+      RELEASE_ID: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       # SHA は beer-game-kotlin.yml と同じ（固定済み）。configure-aws-credentials・amazon-ecr-login は、固定する SHA を確認できていないため版のタグ（未固定）
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '26'
@@ -123,6 +137,9 @@ jobs:
           }
           echo "api=$(register "$API_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
           echo "migrate=$(register "$MIGRATE_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+          # 定期のタスク（retention・verify-projections）も同じイメージへ。スケジュールは、版を付けない ARN で最新の有効な版を使う
+          echo "retention=$(register "$RETENTION_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+          echo "verify=$(register "$VERIFY_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
 
       # マイグレーション: 1 回限りの ECS タスク（モード migrate）。完了を待ち、終了コードが 0 でなければ中止する（api は更新しない）
       - name: マイグレーション（migrate タスク）

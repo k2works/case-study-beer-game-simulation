@@ -57,7 +57,13 @@ resource "aws_db_instance" "this" {
   parameter_group_name   = aws_db_parameter_group.this.name
   publicly_accessible    = false
 
+  # バックアップ（B14）: 自動バックアップ 7 日（時点復旧。削除したゲームのデータも、最大 7 日バックアップに残る。data-model.md）。
+  # 時間帯は、研修のない時間（UTC 17:00 = 日本時間 02:00。日次の整合の検査 UTC 18:00 の前）。
+  # インスタンスを消しても自動バックアップを残すのは、削除保護のあるとき（本番）だけ
   backup_retention_period    = 7
+  backup_window              = var.backup_window
+  copy_tags_to_snapshot      = true
+  delete_automated_backups   = !var.deletion_protection
   deletion_protection        = var.deletion_protection
   skip_final_snapshot        = var.skip_final_snapshot
   final_snapshot_identifier  = var.skip_final_snapshot ? null : "${var.name}-final"

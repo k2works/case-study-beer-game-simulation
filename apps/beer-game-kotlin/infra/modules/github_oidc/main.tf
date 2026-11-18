@@ -92,6 +92,26 @@ data "aws_iam_policy_document" "deploy" {
     actions   = ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"]
     resources = [var.distribution_arn]
   }
+  # 本番のデプロイ前の手動スナップショット（B14。マイグレーション前の復元点）。この環境のインスタンスと、その名前のスナップショットだけ
+  dynamic "statement" {
+    for_each = var.snapshot_instance_arn == "" ? [] : [1]
+    content {
+      sid     = "PreDeploySnapshot"
+      actions = ["rds:CreateDBSnapshot", "rds:DeleteDBSnapshot"]
+      resources = [
+        var.snapshot_instance_arn,
+        "${replace(var.snapshot_instance_arn, ":db:", ":snapshot:")}-pre-*",
+      ]
+    }
+  }
+  dynamic "statement" {
+    for_each = var.snapshot_instance_arn == "" ? [] : [1]
+    content {
+      sid       = "DescribeSnapshots"
+      actions   = ["rds:DescribeDBSnapshots"]
+      resources = ["*"]
+    }
+  }
   # マイグレーションのタスクのログの確認だけ（この環境のロググループ）
   statement {
     sid       = "ReadLogs"

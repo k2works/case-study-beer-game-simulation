@@ -74,9 +74,20 @@ module "web" {
   alb_dns_name        = module.alb.dns_name
   origin_verify_value = module.secrets.origin_verify_value
   force_destroy       = false
-  # 本番は独自ドメインと、TLS 1.2 以上（ACM の証明書）
+  # 本番は独自ドメインと、TLS 1.2 以上（ACM の証明書。modules/domain が作る）
   domain_name         = var.domain_name
-  acm_certificate_arn = var.acm_certificate_arn
+  acm_certificate_arn = module.domain.certificate_arn
+}
+
+# 独自ドメイン（B14）: ACM の証明書（us-east-1。DNS 検証）と、Route 53 の別名。ホストゾーンはすでにある前提
+module "domain" {
+  source = "../../modules/domain"
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+  domain_name            = var.domain_name
+  hosted_zone_id         = var.hosted_zone_id
+  cloudfront_domain_name = module.web.domain_name
 }
 
 module "ecs" {
@@ -97,11 +108,21 @@ module "ecs" {
   response_key_secret_arn    = module.secrets.response_key_arn
 
   # 本番: 常時 2 タスク、CPU 60% で 2〜4 に自動増減（設計書）。
-  # 設計書は本番をブルー/グリーン（CodeDeploy）とするが、B3 の定義はローリング + サーキットブレーカー（未決事項）
   desired_count    = 2
   min_count        = 2
   max_count        = 4
   assign_public_ip = true
+
+  # ブルー/グリーン（B14）: ECS の組み込み方式（設計書の CodeDeploy 案の代わりの AI の提案。未承認）。
+  # 切り替え後 10 分は旧版を残し、その間に重大のアラーム（5xx、正常なタスク 0）が鳴れば、自動で旧版へ戻す
+  deployment_strategy          = "BLUE_GREEN"
+  alternate_target_group_arn   = module.alb.alternate_target_group_arn
+  production_listener_rule_arn = module.alb.production_listener_rule_arn
+  bake_time_in_minutes         = 10
+  deployment_alarm_names = [
+    "${local.name}-http-5xx-rate-critical",
+    "${local.name}-no-healthy-targets",
+  ]
 }
 
 module "github_oidc" {
@@ -116,6 +137,8 @@ module "github_oidc" {
   distribution_arn   = module.web.distribution_arn
   pass_role_arns     = [module.ecs.execution_role_arn, module.ecs.task_role_arn]
   log_group_arns     = module.ecs.log_group_arns
+  # デプロイ前に、マイグレーションの前の復元点として、手動のスナップショットを取る（deploy-production）
+  snapshot_instance_arn = module.rds.arn
 }
 
 # 観測（B13）: アラーム・ダッシュボード・合成監視・通知。定義だけで、適用していない
@@ -126,9 +149,11 @@ module "observability" {
   region                  = var.region
   alb_arn_suffix          = module.alb.arn_suffix
   target_group_arn_suffix = module.alb.target_group_arn_suffix
-  cluster_name            = module.ecs.cluster_name
-  service_name            = module.ecs.service_name
-  public_domain           = module.web.public_domain
-  critical_emails         = var.critical_alarm_emails
-  warning_emails          = var.warning_alarm_emails
+  # ブルー/グリーンで、2 つの対象グループの正常数の最大を見る（片側だけだと、切り替えのたびに誤報になる）
+  alternate_target_group_arn_suffix = module.alb.alternate_target_group_arn_suffix
+  cluster_name                      = module.ecs.cluster_name
+  service_name                      = module.ecs.service_name
+  public_domain                     = module.web.public_domain
+  critical_emails                   = var.critical_alarm_emails
+  warning_emails                    = var.warning_alarm_emails
 }

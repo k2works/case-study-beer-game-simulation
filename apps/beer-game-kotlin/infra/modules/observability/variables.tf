@@ -15,6 +15,12 @@ variable "namespace" {
 
 variable "alb_arn_suffix" { type = string }
 variable "target_group_arn_suffix" { type = string }
+
+variable "alternate_target_group_arn_suffix" {
+  type        = string
+  default     = ""
+  description = "ブルー/グリーンのもう一方の対象グループ（B14）。空なら、1 つだけを見る（ローリングのステージング）"
+}
 variable "cluster_name" { type = string }
 variable "service_name" { type = string }
 

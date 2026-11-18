@@ -1,7 +1,9 @@
 # 配信: CloudFront の単一オリジン構成。
 #   既定  → S3（静的ファイル。OAC、非公開）
 #   /api/* → ALB（キャッシュなし。Cookie と、Origin・If-Match・Idempotency-Key などのヘッダーをそのまま転送）
-# 独自ドメインと ACM の本設定は B14。ここでは、変数で渡されたときだけ使う（本番は必須）。
+# 独自ドメインと ACM の証明書は、modules/domain が作る（B14）。ここでは、変数で渡されたときだけ使う（本番は必須）。
+# 利用者と CloudFront の間は、独自ドメインのとき TLS 1.2 以上（TLSv1.2_2021）。CloudFront と ALB の間は HTTP（合言葉のヘッダーで限定。
+# ALB を HTTPS にするには、オリジン用のドメインと証明書が要る。設計の未決として、運用手順書に残した）。
 resource "aws_s3_bucket" "web" {
   bucket        = var.bucket_name
   force_destroy = var.force_destroy
@@ -63,6 +65,15 @@ resource "aws_cloudfront_response_headers_policy" "security" {
     referrer_policy {
       referrer_policy = "same-origin"
       override        = true
+    }
+  }
+
+  # 使わないブラウザの機能を閉じる（B14）
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = "camera=(), microphone=(), geolocation=(), payment=()"
+      override = true
     }
   }
 }

@@ -18,6 +18,20 @@ terraform {
   backend "s3" {}
 }
 
+# CloudFront の証明書（ACM）は us-east-1 で発行する（modules/domain）
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project     = "beer-game-kotlin"
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
 provider "aws" {
   region = var.region
 

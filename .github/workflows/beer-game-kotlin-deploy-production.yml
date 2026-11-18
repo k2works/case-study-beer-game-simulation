@@ -7,15 +7,18 @@
 # 自動で起動しない（`workflow_dispatch` のみ。`push`・`schedule` は置かない）。
 # 設計: docs/design/beer-game-kotlin/architecture-infrastructure.md「CI/CD」。
 #
-# 設計との食い違い（未決）: 設計書は本番を「ブルー/グリーン（CodeDeploy）」とするが、Step 2 の Terraform は
-#   ECS のローリング更新（サーキットブレーカー付き）で定義している。本ワークフローはそれに合わせたローリング更新。
-#   ブルー/グリーンへの切り替えは、AWS 適用のゲートで判断する。
+# 更新方式（B14）: ブルー/グリーン。設計書は CodeDeploy とするが、AI の提案（未承認）として ECS の組み込みのブルー/グリーンで定義した
+#   （Terraform: modules/ecs の deployment_strategy = BLUE_GREEN）。新しい版を別の対象グループで起動し、健全を確かめてから切り替え、
+#   待ち時間（bake。既定 10 分）の間は旧版を残す。その間に重大のアラーム（5xx・正常なタスク 0）が鳴れば、自動で旧版へ戻る。
+#   update-service でタスク定義を指定する手順は、ローリングと同じ。完了の待ち方だけ違う（rolloutState を見る。AWS 上で未確認）。
+# デプロイ前（B14）: マイグレーションの前に、手動のスナップショット（<RDS>-pre-<SHA の先頭 8 桁>）を取る。復元点（運用手順書「復元」）。
 # 前提（未確認）: ステージングと本番の ECR が同じアカウント・同じリージョンにあり、本番のデプロイロールが
 #   ステージングの ECR を読める（昇格のため）。アカウントを分ける場合は、昇格の手順の見直しが要る。
 # イベントの形を変えるリリース: 2 段階（読む版 → 書く版）。書く版を上げた後は旧イメージへ戻せないことがある。rollback.md を参照。
 #
 # 必要な変数（Settings > Environments > production の Variables。terraform output から。値は書かない）:
 #   AWS_ROLE_ARN  AWS_REGION  ECR_REPOSITORY  STAGING_ECR_REPOSITORY（昇格元）  ECS_CLUSTER  ECS_SERVICE
+#   RDS_INSTANCE（rds_instance）  RETENTION_TASK_FAMILY  VERIFY_TASK_FAMILY
 #   API_TASK_FAMILY  MIGRATE_TASK_FAMILY  WEB_BUCKET  DISTRIBUTION_ID  TASK_SG  TASK_SUBNETS（カンマ区切り）  PRODUCTION_URL
 name: beer-game-kotlin-deploy-production
 
@@ -54,6 +57,9 @@ jobs:
       ECS_SERVICE: ${{ vars.ECS_SERVICE }}
       API_TASK_FAMILY: ${{ vars.API_TASK_FAMILY }}
       MIGRATE_TASK_FAMILY: ${{ vars.MIGRATE_TASK_FAMILY }}
+      RETENTION_TASK_FAMILY: ${{ vars.RETENTION_TASK_FAMILY }}
+      VERIFY_TASK_FAMILY: ${{ vars.VERIFY_TASK_FAMILY }}
+      RDS_INSTANCE: ${{ vars.RDS_INSTANCE }}
       WEB_BUCKET: ${{ vars.WEB_BUCKET }}
       DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
       TASK_SUBNETS: ${{ vars.TASK_SUBNETS }}
@@ -137,6 +143,25 @@ jobs:
           }
           echo "api=$(register "$API_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
           echo "migrate=$(register "$MIGRATE_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+          # 定期のタスク（retention・verify-projections）も同じイメージへ。スケジュールは、版を付けない ARN で最新の有効な版を使う
+          echo "retention=$(register "$RETENTION_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+          echo "verify=$(register "$VERIFY_TASK_FAMILY")" >> "$GITHUB_OUTPUT"
+
+      # マイグレーションの前の復元点。スナップショットが使えるようになるまで待つ（失敗したら、マイグレーションへ進まない）
+      - name: デプロイ前のスナップショット（復元点）
+        run: |
+          SNAPSHOT="${RDS_INSTANCE}-pre-${RELEASE_ID:0:8}"
+          aws rds create-db-snapshot --db-instance-identifier "$RDS_INSTANCE" --db-snapshot-identifier "$SNAPSHOT" >/dev/null
+          aws rds wait db-snapshot-available --db-snapshot-identifier "$SNAPSHOT"
+          echo "復元点: $SNAPSHOT（復元は、運用手順書の「復元」）"
+          # 手動のスナップショットは、自動バックアップと違って自動では消えない。削除したゲームのデータが、バックアップに最大 7 日
+          # （NF-S16）を超えて残らないよう、7 日より古いデプロイ前のスナップショットを消す
+          CUTOFF="$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          aws rds describe-db-snapshots --db-instance-identifier "$RDS_INSTANCE" --snapshot-type manual \
+            --query "DBSnapshots[?starts_with(DBSnapshotIdentifier, '${RDS_INSTANCE}-pre-') && SnapshotCreateTime < '$CUTOFF'].DBSnapshotIdentifier" \
+            --output text | tr '\t' '\n' | while read -r old; do
+              [ -z "$old" ] || { echo "7 日を過ぎた復元点を削除: $old"; aws rds delete-db-snapshot --db-snapshot-identifier "$old" >/dev/null; }
+            done
 
       - name: マイグレーション（migrate タスク）
         env:
@@ -162,13 +187,19 @@ jobs:
         run: |
           echo "updated=true" >> "$GITHUB_OUTPUT"
           aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$API_TD" >/dev/null
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
-          ROLLOUT="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
-            --query "services[0].deployments[?status=='PRIMARY'].rolloutState | [0]" --output text)"
-          if [ "$ROLLOUT" != "COMPLETED" ]; then
-            echo "::error::ローリング更新が完了しませんでした（rolloutState: $ROLLOUT）"
-            exit 1
-          fi
+          # ブルー/グリーン: 切り替えの後の待ち時間（bake）が終わるまで、更新は完了しない。waiter の上限（10 分）を超えうるので、
+          # rolloutState を 15 秒ごとに最大 30 分見る。アラームで自動で戻ったとき（ROLLED_BACK）や FAILED は、失敗にする
+          for i in $(seq 1 120); do
+            ROLLOUT="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+              --query "services[0].deployments[?status=='PRIMARY'].rolloutState | [0]" --output text)"
+            echo "待機 $i/120: rolloutState=$ROLLOUT"
+            case "$ROLLOUT" in
+              COMPLETED) break ;;
+              FAILED | ROLLED_BACK) echo "::error::ブルー/グリーンの更新が完了しませんでした（rolloutState: $ROLLOUT）"; exit 1 ;;
+            esac
+            [ "$i" -lt 120 ] || { echo "::error::更新が 30 分で完了しません（最後: $ROLLOUT）"; exit 1; }
+            sleep 15
+          done
 
       - name: 静的ファイルの公開
         id: web
@@ -217,7 +248,13 @@ jobs:
         run: |
           echo "::warning::失敗したため、直前の版へ戻します（マイグレーションは戻しません）"
           aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$PREV_TD" >/dev/null
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          for i in $(seq 1 120); do
+            STATE="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+              --query "services[0].deployments[?status=='PRIMARY'].rolloutState | [0]" --output text)"
+            echo "待機 $i/120: rolloutState=$STATE"
+            [ "$STATE" = "COMPLETED" ] && break
+            sleep 15
+          done
           if [ "${{ steps.web.outputs.published }}" = "true" ] && [ -n "$PREV_RELEASE" ]; then
             aws s3 sync "s3://$WEB_BUCKET/releases/$PREV_RELEASE/" "s3://$WEB_BUCKET/current/" --delete --only-show-errors
             aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' >/dev/null

@@ -11,6 +11,7 @@ object AlarmCatalog {
     private const val MINUTE = 60
     private const val FIVE_MINUTES = 300
     private const val TEN_MINUTES = 600
+    private const val HOUR = 3_600
     private const val DAY = 86_400
     private const val STALL_PERIOD = 10
     private const val STALL_PERIODS = 5
@@ -137,6 +138,22 @@ object AlarmCatalog {
                 above(threshold = 0.0),
                 window(FIVE_MINUTES, 1),
                 Severity.CRITICAL,
+            ),
+            // 心拍（B14）: 定期タスクが動くたびに出るメトリクスが、期間の中に 1 つも無い（欠測）なら発報する。
+            // 値は 0 以上なので、「0 未満」は決して成り立たない。発報の理由は欠測だけ（欠測を超過とみなす）。
+            rule(
+                "projection-verify-heartbeat",
+                app(MetricNames.PROJECTION_MISMATCH_GAMES, Statistic.MAXIMUM),
+                Condition(Comparison.LESS_THAN, threshold = 0.0),
+                window(DAY, 1, MissingData.BREACHING),
+                Severity.WARNING,
+            ),
+            rule(
+                "retention-heartbeat",
+                app(MetricNames.RETENTION_ABANDONED_GAMES, Statistic.MAXIMUM),
+                Condition(Comparison.LESS_THAN, threshold = 0.0),
+                window(HOUR, 1, MissingData.BREACHING),
+                Severity.WARNING,
             ),
         )
 

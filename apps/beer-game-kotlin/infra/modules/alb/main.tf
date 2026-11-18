@@ -58,6 +58,28 @@ resource "aws_lb_target_group" "api" {
   }
 }
 
+# ブルー/グリーン用のもう一方の対象グループ（B14）。名前は 32 文字の上限に収める（本番の name は 27 文字）。
+# 本番のブルー/グリーンのとき、ECS が api とこのグループを交互に使う（切り替えのたびに、リスナールールの転送先が変わる）。
+# ステージング（ローリング）では、空のまま置く。
+resource "aws_lb_target_group" "api_alternate" {
+  name        = "${var.name}-api2"
+  port        = var.container_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  deregistration_delay = var.deregistration_delay
+
+  health_check {
+    path                = var.health_check_path
+    matcher             = "200"
+    interval            = 15
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
@@ -87,5 +109,10 @@ resource "aws_lb_listener_rule" "from_cloudfront_only" {
   action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  # ブルー/グリーンの切り替えで、ECS が転送先を書き換える。Terraform は差分として扱わない
+  lifecycle {
+    ignore_changes = [action]
   }
 }

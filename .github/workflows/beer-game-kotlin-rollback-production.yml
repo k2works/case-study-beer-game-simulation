@@ -12,7 +12,9 @@
 #   研修の途中でのデータの復元（書く版を戻して DB を復元）は、データを失うため、この手順では行わない。
 #   戻してよいかの確認を、入力の confirm_compatible で人に求める。
 #
-# 必要な変数（Environment: production）: AWS_ROLE_ARN  AWS_REGION  ECS_CLUSTER  ECS_SERVICE  WEB_BUCKET  DISTRIBUTION_ID  PRODUCTION_URL
+# 本番はブルー/グリーン（B14）。戻す更新も、新しい版を別の対象グループで起動し、健全を確かめてから切り替える。
+#   切り替えの後の待ち時間（既定 10 分）は旧版が残るので、その間なら、直前の更新を ECS の機能で止めて戻すこともできる（rollback.md）。
+# 必要な変数（Environment: production）: AWS_ROLE_ARN  AWS_REGION  ECS_CLUSTER  ECS_SERVICE  RETENTION_TASK_FAMILY  VERIFY_TASK_FAMILY  WEB_BUCKET  DISTRIBUTION_ID  PRODUCTION_URL
 name: beer-game-kotlin-rollback-production
 
 on:
@@ -44,6 +46,8 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
       ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      RETENTION_TASK_FAMILY: ${{ vars.RETENTION_TASK_FAMILY }}
+      VERIFY_TASK_FAMILY: ${{ vars.VERIFY_TASK_FAMILY }}
       WEB_BUCKET: ${{ vars.WEB_BUCKET }}
       DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
       BASE_URL: ${{ vars.PRODUCTION_URL }}
@@ -89,7 +93,30 @@ jobs:
           echo "戻す先: $RELEASE（$(jq -r .image <<<"$TARGET_JSON")）"
 
           aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --task-definition "$API_TD" >/dev/null
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          # ブルー/グリーン: 切り替えの後の待ち時間（bake）が終わるまで、更新は完了しない。waiter の上限（10 分）を超えうるので、
+          # rolloutState を 15 秒ごとに最大 30 分見る（FAILED・ROLLED_BACK なら失敗。BG の describe-services の出力は AWS 上で未確認）
+          for i in $(seq 1 120); do
+            state="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+              --query "services[0].deployments[?status=='PRIMARY'].rolloutState | [0]" --output text)"
+            echo "待機 $i/120: rolloutState=$state"
+            case "$state" in
+              COMPLETED) break ;;
+              FAILED | ROLLED_BACK) echo "::error::戻す更新が失敗しました（$state）"; exit 1 ;;
+            esac
+            [ "$i" -lt 120 ] || { echo "::error::戻す更新が 30 分で完了しません"; exit 1; }
+            sleep 15
+          done
+
+          # 定期のタスク（retention・verify-projections）も、戻す先のイメージにそろえる
+          IMAGE="$(jq -r .image <<<"$TARGET_JSON")"
+          for family in "$RETENTION_TASK_FAMILY" "$VERIFY_TASK_FAMILY"; do
+            tmp="$(mktemp)"
+            aws ecs describe-task-definition --task-definition "$family" --query taskDefinition --output json \
+              | jq --arg image "$IMAGE" '
+                  del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+                  | .containerDefinitions[0].image = $image' > "$tmp"
+            aws ecs register-task-definition --cli-input-json "file://$tmp" --query taskDefinition.taskDefinitionArn --output text
+          done
 
           aws s3 sync "s3://$WEB_BUCKET/releases/$RELEASE/" "s3://$WEB_BUCKET/current/" --delete --only-show-errors
           aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths '/*' >/dev/null

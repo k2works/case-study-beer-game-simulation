@@ -50,6 +50,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-17T23:00:00Z }
 | `retry-exhausted-warning` / `-critical` | 警告 / 重大 | 1 件超 / 5 件以上（5 分） | 利用者に失敗が見えている。競合の集中するゲームを特定する |
 | `projection-mismatch`、`projection-lag` | 重大 | 日次の検査で、不一致・版の遅れが 1 ゲームでも | 該当ゲームを確認し、研修の無い時間に `rebuild-projections <ゲーム ID>` を実行する（周辺ストア・削除の進行は復元されない） |
 | `retention-abandoned` | 重大 | 削除の再試行の上限に達したゲームがある | 失敗コードを確認し、原因を直してから再試行する（設計書の障害対応 7） |
+| `retention-heartbeat` | 警告 | `retention` の結果のメトリクスが 1 時間無い（B14） | `retention` の定期タスクが動いていない。[本番の運用手順書](./production.md) の 6 |
+| `projection-verify-heartbeat` | 警告 | 日次の検査の結果のメトリクスが 1 日無い（B14） | `verify-projections` の定期タスクが動いていない。同上 |
 | `jvm-heap-*`、`jvm-gc-pause-*`、`db-pool-utilization-*` | 警告 / 重大 | 設計書のとおり | 負荷・タスクのサイズ・接続プールを確認する |
 | `task-cpu-critical` | 重大 | ECS タスクの CPU が 80%（10 分） | タスク数・サイズを確認する |
 
@@ -76,4 +78,5 @@ cd apps/beer-game-kotlin
 - Synthetics のランタイムの版（既定 `syn-nodejs-puppeteer-9.1`）、カナリアのスクリプトの動作、カナリア名（21 文字まで）。
 - SNS のメールの購読は、宛先が確認のメールを承認するまで有効にならない。
 - 高解像度（1 秒）メトリクスと 10 秒のアラームの費用。
-- `retention`・`verify-projections` の ECS の定期タスクとスケジュール（B14）。これが無いと、`projection-*`・`retention-abandoned` のメトリクスは出ない（欠測は通知しない設定）。
+- `retention`・`verify-projections` の ECS の定期タスクとスケジュールは、B14 で Terraform に定義した（[本番の運用手順書](./production.md)）。定期タスクが止まったことは、B14 の心拍のアラーム（`retention-heartbeat`・`projection-verify-heartbeat`。欠測を超過とみなす）で知る。**ただし、AWS では未確認**。
+- 本番のブルー/グリーンでは、`no-healthy-targets` は 2 つの対象グループの正常数の最大を見る（B14）。

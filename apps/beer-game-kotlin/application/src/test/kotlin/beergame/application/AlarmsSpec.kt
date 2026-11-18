@@ -256,7 +256,37 @@ class AlarmsSpec :
 
                 names.toSet().size shouldBe names.size
                 AlarmCatalog.rules.count { it.severity == Severity.CRITICAL } shouldBe 12
-                AlarmCatalog.rules.count { it.severity == Severity.WARNING } shouldBe 7
+                AlarmCatalog.rules.count { it.severity == Severity.WARNING } shouldBe 9
+            }
+        }
+
+        context("心拍: 定期タスクが止まったことを、メトリクスの欠測で知る（B14）") {
+            val day = 86_400L
+
+            test("Given 日次の検査が昨日の期間に 1 回動いた When 評価する Then 発報しない") {
+                val ran = listOf(sample(MetricNames.PROJECTION_MISMATCH_GAMES, 0.0, day + 3_600))
+
+                stateOf("projection-verify-heartbeat", ran, 2 * day) shouldBe AlarmState.OK
+            }
+
+            test("Given 日次の検査が 1 日以上動いていない When 評価する Then 欠測を超過とみなして発報する") {
+                val stale = listOf(sample(MetricNames.PROJECTION_MISMATCH_GAMES, 0.0, 3_600))
+
+                stateOf("projection-verify-heartbeat", stale, 2 * day) shouldBe AlarmState.ALARM
+            }
+
+            test("Given 保持の掃引が 5 分ごとに動いている When 評価する Then 発報しない。1 時間止まると発報する") {
+                val running = (0L until 7_200L step 300).map { sample(MetricNames.RETENTION_ABANDONED_GAMES, 0.0, it) }
+
+                stateOf("retention-heartbeat", running, 7_200) shouldBe AlarmState.OK
+                stateOf("retention-heartbeat", running, 7_200 + 3_600) shouldBe AlarmState.ALARM
+            }
+
+            test("Given 検査の結果が 0 件でない When 評価する Then 心拍は発報しない（異常の通知は別の規則）") {
+                val drift = listOf(sample(MetricNames.PROJECTION_MISMATCH_GAMES, 3.0, day + 3_600))
+
+                stateOf("projection-verify-heartbeat", drift, 2 * day) shouldBe AlarmState.OK
+                stateOf("projection-mismatch", drift, 2 * day) shouldBe AlarmState.ALARM
             }
         }
     })

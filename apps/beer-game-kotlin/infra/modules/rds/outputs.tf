@@ -7,6 +7,8 @@ output "jdbc_url" {
 }
 
 output "username" { value = aws_db_instance.this.username }
+output "identifier" { value = aws_db_instance.this.identifier }
+output "arn" { value = aws_db_instance.this.arn }
 
 output "password" {
   description = "マスターパスワード。Secrets Manager に置く（DB_PASSWORD）"

@@ -167,6 +167,29 @@ locals {
       description        = "削除の再試行の上限に達して、削除をやめたゲームがある（運営者への連絡が要る）"
     })
 
+    # 心拍（B14）: 定期タスクが止まると、上のメトリクスが出ない。値は 0 以上なので「0 未満」は成り立たず、欠測だけが発報の理由
+    "projection-verify-heartbeat" = merge(local.app, {
+      metric_name        = "ProjectionMismatchGames"
+      comparison         = "LessThanThreshold"
+      threshold          = 0
+      period             = 86400
+      evaluation_periods = 1
+      missing            = "breaching"
+      severity           = "warning"
+      description        = "日次の投影の整合の検査（verify-projections）が 1 日動いていない（結果のメトリクスが無い）"
+    })
+
+    "retention-heartbeat" = merge(local.app, {
+      metric_name        = "RetentionAbandonedGames"
+      comparison         = "LessThanThreshold"
+      threshold          = 0
+      period             = 3600
+      evaluation_periods = 1
+      missing            = "breaching"
+      severity           = "warning"
+      description        = "保持削除の掃引（retention。5 分ごと）が 1 時間動いていない（結果のメトリクスが無い）"
+    })
+
     "jvm-heap-warning" = merge(local.app, {
       metric_name        = "JvmHeapUsedPercent"
       comparison         = "GreaterThanThreshold"
@@ -252,20 +275,43 @@ resource "aws_cloudwatch_metric_alarm" "app" {
 }
 
 # インフラ側のアラーム（アプリのメトリクスを待たずに、停止を知る）
+#
+# ブルー/グリーン（B14）では、ECS が 2 つの対象グループを交互に使う。使っていない側の正常数は常に 0 なので、
+# 片側だけを見ると、切り替えのたびに誤報（または見逃し）になる。2 つの対象グループの正常数の最大が 1 未満のとき発報する。
+locals {
+  target_groups = compact([var.target_group_arn_suffix, var.alternate_target_group_arn_suffix])
+}
+
 resource "aws_cloudwatch_metric_alarm" "no_healthy_targets" {
   alarm_name          = "${var.name}-no-healthy-targets"
-  alarm_description   = "負荷分散の対象に、正常なタスクが無い（1 分）"
-  namespace           = "AWS/ApplicationELB"
-  metric_name         = "HealthyHostCount"
-  dimensions          = { LoadBalancer = var.alb_arn_suffix, TargetGroup = var.target_group_arn_suffix }
-  statistic           = "Minimum"
+  alarm_description   = "負荷分散の対象に、正常なタスクが無い（1 分。ブルー/グリーンの 2 つの対象グループの最大）"
   comparison_operator = "LessThanThreshold"
   threshold           = 1
-  period              = 60
   evaluation_periods  = 1
   treat_missing_data  = "breaching"
   alarm_actions       = [aws_sns_topic.critical.arn]
   ok_actions          = [aws_sns_topic.critical.arn]
+
+  metric_query {
+    id          = "healthy"
+    expression  = "MAX([${join(",", [for i, tg in local.target_groups : "tg${i}"])}])"
+    label       = "正常なタスクの数（最大）"
+    return_data = true
+  }
+
+  dynamic "metric_query" {
+    for_each = local.target_groups
+    content {
+      id = "tg${metric_query.key}"
+      metric {
+        namespace   = "AWS/ApplicationELB"
+        metric_name = "HealthyHostCount"
+        dimensions  = { LoadBalancer = var.alb_arn_suffix, TargetGroup = metric_query.value }
+        period      = 60
+        stat        = "Minimum"
+      }
+    }
+  }
 }
 
 resource "aws_cloudwatch_metric_alarm" "task_cpu" {
