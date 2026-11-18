@@ -67,6 +67,12 @@ private fun SessionState.ended(): SessionState =
  * `WeekCommitted` の `nextStates` はそのまま採用し、`simulateWeek` を呼ばない（D5）。
  * decide が作らない列は、状態を変えずに返す（版も増えない。検知は [replaySession]）。
  */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 8,
+    stage = "状態を取り戻す",
+    description = "事実を 1 つずつ状態へ畳み込む。規則は持たず、確定済みの結果を採用するだけなので、再生しても同じ状態に戻る",
+)
 @CoreConcept(
     "進行（プレイ）",
     "事実（イベント）を状態へ畳み込む。規則を持たず、確定済みの結果を採用するだけなので、あとから再生しても同じ状態に戻る（イベントソーシングの土台）",

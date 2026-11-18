@@ -74,9 +74,25 @@ sealed interface Command {
 }
 
 /** 起きた事実。過去形で命名し、変更しない。 */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 2,
+    stage = "事実を決める",
+    description =
+        "起きた事実の型。過去形で命名し、いったん残したら変更しない。" +
+            "個人情報と秘密は入れず、識別子と有効期限だけを持つ",
+)
 sealed interface DomainEvent
 
 /** 全イベントに付く封筒。永続化と追跡に必要な項目を、ペイロードとは別に持つ。 */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 3,
+    stage = "事実を決める",
+    description =
+        "事実に付ける封筒。ストリームの版・書いた版・操作者・相関 ID・時刻を、ペイロードとは別に持つ。" +
+            "版が、追記の順序と同時更新の検出の基準になる",
+)
 data class EventEnvelope<out E : DomainEvent>(
     val eventId: UUID,
     val gameId: GameId,
@@ -130,5 +146,11 @@ private fun Any.nameOf(): String = this::class.simpleName ?: "anonymous"
 fun replayGame(events: List<GameEvent>): Replayed<GameState> =
     replay(StreamType.GAME, GameState.NotCreated, events, ::evolveGame) { it.version }
 
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 7,
+    stage = "状態を取り戻す",
+    description = "事実の列を先頭から畳み込んで、現在の状態を取り戻す。decide が作らない列を見つけたら、不正な遷移として記録する",
+)
 fun replaySession(events: List<SessionEvent>): Replayed<SessionState> =
     replay(StreamType.SESSION, SessionState.NotStarted, events, ::evolveSession) { it.version }

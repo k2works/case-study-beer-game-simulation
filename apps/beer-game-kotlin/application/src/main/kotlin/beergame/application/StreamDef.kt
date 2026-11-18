@@ -13,6 +13,7 @@ import beergame.domain.GameCommand
 import beergame.domain.GameEvent
 import beergame.domain.GameId
 import beergame.domain.GameState
+import beergame.domain.GuidedTour
 import beergame.domain.SessionCommand
 import beergame.domain.SessionEvent
 import beergame.domain.SessionState
@@ -59,6 +60,14 @@ private fun <S, E : DomainEvent, C : Command> StreamDef<S, E, C>.replay(read: St
  * 1 本のストリームへのコマンド。`decide` が空の列を返したときは、追記も投影もせず、現在の版を返す
  * （冪等記録だけが書かれる）。[sideWrites] は、追記したときだけ呼び、同じトランザクションで書く周辺ストアの行を導く。
  */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 4,
+    stage = "事実を残す",
+    description =
+        "1 本のストリームの事実を読み込み、再生して状態を作り、decide し、返った事実を追記する。" +
+            "decide が空なら、何も追記しない",
+)
 internal suspend fun <S, E : DomainEvent, C : Command> Ports.applySingle(
     tx: Tx,
     ctx: Ctx,

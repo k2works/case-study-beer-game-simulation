@@ -30,6 +30,14 @@ import java.sql.ResultSet
  * 原子性は呼び出し側のトランザクション（[JdbcTransactionRunner]）が持つ。
  */
 @GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 5,
+    stage = "事実を残す",
+    description =
+        "事実を events に追記する専用の入口。更新も削除もしない。" +
+            "期待した版と違えば、版の一意制約が同時の更新を検出し、片方だけを通す",
+)
+@GuidedTour(
     name = "CQRS（コマンドと問い合わせの分離）",
     rank = 4,
     stage = "イベントと投影",

@@ -38,7 +38,7 @@ fun repeated() = Unit
 /**
  * ガイドツアー（Living Documentation の Dynamic Curation。ガイド `docs/reference/ダイナミックキュレーション導入ガイド.md`）。
  * 注釈 [GuidedTour] を付けた要素を、ツアー名で分類し、rank の順に並べて、ステップの説明とともに案内する。
- * ツアーは 2 本（CQRS、ウォーキングスケルトン）で、どちらも同じ仕組みで選ぶ。名前や場所は名指ししない（注釈で選ぶ）。
+ * ツアーは 3 本（CQRS、イベントソーシング、ウォーキングスケルトン）で、どれも同じ仕組みで選ぶ。名前や場所は名指ししない（注釈で選ぶ）。
  * ステップの数・順序・段階・場所が崩れたら失敗にする。更新は `./gradlew :domain:generateLivingDocs`（`-Dbeergame.docs.update=true`）。
  */
 class GuidedTourSpec :
@@ -67,7 +67,7 @@ class GuidedTourSpec :
             repeated.map { it.element }.toSet() shouldBe setOf("repeated")
         }
 
-        test("[ツアー] 注釈のあるツアーは、文書の定義（2 本）と過不足なく対応する（定義の無いツアー名・注釈の無い定義が無い）") {
+        test("[ツアー] 注釈のあるツアーは、文書の定義（3 本）と過不足なく対応する（定義の無いツアー名・注釈の無い定義が無い）") {
             steps.map { it.tour }.toSet() shouldBe GuidedTours.docs.map { it.tour }.toSet()
             GuidedTours.docs
                 .map { it.file }
@@ -111,6 +111,40 @@ class GuidedTourSpec :
             names.last() shouldBe "JdbcProjectionReader"
             cqrs.map { step -> step.file.substringAfter("beer-game-kotlin/").substringBefore('/') } shouldContain
                 "application"
+        }
+
+        test("[イベントソーシング] 事実を決める・事実を残す・状態を取り戻すの 3 段階で、事実が状態の唯一の正本になる流れをたどる") {
+            val sourcing = tour(GuidedTours.docs.first { it.file == "event-sourcing-tour.md" })
+            val names = sourcing.map { it.element }
+
+            sourcing.map { it.stage }.distinct() shouldBe listOf("事実を決める", "事実を残す", "状態を取り戻す")
+            names shouldBe
+                listOf(
+                    "decideSession",
+                    "DomainEvent",
+                    "EventEnvelope",
+                    "Ports.applySingle",
+                    "JdbcEventStore",
+                    "EventCodec",
+                    "replaySession",
+                    "evolveSession",
+                    "JdbcProjectionMaintenance",
+                )
+        }
+
+        test("[ツアー] 同じ要素が複数のツアーに出られる（decideSession と JdbcEventStore は、CQRS とイベントソーシングの両方）") {
+            val shared =
+                steps
+                    .groupBy { it.element }
+                    .filterValues {
+                        it
+                            .map { step ->
+                                step.tour
+                            }.distinct()
+                            .size > 1
+                    }.keys
+
+            shared shouldContainAll listOf("decideSession", "JdbcEventStore")
         }
 
         test("[CQRS] 図は案内の順序であり、実行時の呼び出しの順ではないことを、文書に添える（問い合わせ側は、投影を読むだけ）") {

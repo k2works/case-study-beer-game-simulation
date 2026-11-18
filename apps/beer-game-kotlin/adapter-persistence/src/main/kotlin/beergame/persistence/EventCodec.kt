@@ -6,6 +6,7 @@ import arrow.core.left
 import arrow.core.right
 import beergame.domain.DomainEvent
 import beergame.domain.GameEvent
+import beergame.domain.GuidedTour
 import beergame.domain.SessionEvent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -17,6 +18,14 @@ import kotlinx.serialization.json.JsonObject
  * 書く版（[CURRENT_SCHEMA_VERSION]）と、読める最新の版（[LATEST_READABLE_SCHEMA_VERSION]）は別の定数にする
  * （読む版 → 書く版の 2 段階のリリース。書く版は、読める最新の版以下）。
  */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 6,
+    stage = "事実を残す",
+    description =
+        "事実を JSON に符号化して残し、読むときに復号する。旧い版の事実は、アップキャストで新しい版へ変換して読むので、" +
+            "残した事実は書き換えずに、型の進化に耐える",
+)
 object EventCodec {
     /** 書く版。新しいイベントに付ける `schema_version`。 */
     const val CURRENT_SCHEMA_VERSION = 1

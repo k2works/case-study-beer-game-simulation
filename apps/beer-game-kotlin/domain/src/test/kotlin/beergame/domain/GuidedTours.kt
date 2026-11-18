@@ -48,6 +48,15 @@ internal object GuidedTours {
                 intro = "処理の流れを、コマンド側 → イベントと投影 → 問い合わせ側の順に案内する。",
             ),
             TourDoc(
+                tour = "イベントソーシング（事実が状態の正本）",
+                file = "event-sourcing-tour.md",
+                title = "ガイドツアー（生成）: イベントソーシング",
+                description =
+                    "状態を保存せず、事実（イベント）だけを残し、再生して状態を取り戻す流れを、" +
+                        "注釈 @GuidedTour から動的に選び出して案内する。手で編集しない。",
+                intro = "状態を保存せず、起きた事実だけを残す流れを、事実を決める → 事実を残す → 状態を取り戻すの順に案内する。",
+            ),
+            TourDoc(
                 tour = "ウォーキングスケルトン（最初の縦の切片）",
                 file = "walking-skeleton-tour.md",
                 title = "ガイドツアー（生成）: ウォーキングスケルトン",

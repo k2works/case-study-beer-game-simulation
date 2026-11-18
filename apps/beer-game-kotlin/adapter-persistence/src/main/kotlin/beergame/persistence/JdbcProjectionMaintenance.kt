@@ -18,6 +18,7 @@ import beergame.application.Tx
 import beergame.domain.DomainEvent
 import beergame.domain.EventEnvelope
 import beergame.domain.GameId
+import beergame.domain.GuidedTour
 import beergame.domain.ProjectionTable
 import beergame.domain.StreamType
 import beergame.domain.StreamVersion
@@ -31,6 +32,14 @@ import javax.sql.DataSource
  * 同期投影と同じ書き込み（[ProjectionWriter]）で作り直す。コマンドが見るのは、再構築の前後のどちらかだけ（途中の投影は見えない）。
  * 検査は、同じ手順を行って比べたあと、**取り消す**（投影を変えない）。
  */
+@GuidedTour(
+    name = "イベントソーシング（事実が状態の正本）",
+    rank = 9,
+    stage = "状態を取り戻す",
+    description =
+        "事実を追記順に読み直して、投影を作り直す。投影が壊れても、事実から復元できる。" +
+            "ゲームごとに 1 トランザクションで行い、検査は同じ手順を行って比べたあと取り消す",
+)
 internal class JdbcProjectionMaintenance(
     private val runner: TransactionRunner,
     private val lock: ProjectionLock,
