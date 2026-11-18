@@ -100,7 +100,7 @@ internal object WalkingSkeletonTour {
             ),
             TourStop(
                 "状態を表示する",
-                "進行役・参加者",
+                "参加者",
                 "getSessionState",
                 BackendClues("snapshot", null, null),
                 ScreenClues("PlayPage.tsx", "api.getSessionState("),
@@ -199,16 +199,26 @@ internal object WalkingSkeletonTour {
 
     /** ツアーの Markdown。層ごとの場所を表にし、操作の流れをシーケンス図にする。 */
     fun markdown(stops: List<ResolvedStop>): String {
+        // 参加者は、表示名を引用符で宣言し、矢印は ASCII の別名で書く（「・」などの記号を含む名前を、矢印の端に直接書くと壊れる）
+        val actors = stops.map { it.stop.actor }.distinct()
+        val aliasOf = actors.withIndex().associate { (index, name) -> name to "A${index + 1}" }
+        val declarations =
+            actors.map { "actor \"$it\" as ${aliasOf.getValue(it)}" } +
+                listOf(
+                    "participant \"画面\" as UI",
+                    "participant \"API\" as API",
+                    "participant \"アプリケーション\" as App",
+                    "participant \"ドメイン\" as Domain",
+                )
         val sequence =
-            stops.mapIndexed { index, resolved ->
-                val lines =
+            declarations +
+                stops.flatMapIndexed { index, resolved ->
                     listOf(
-                        "${resolved.stop.actor} -> 画面 : ${index + 1}. ${resolved.stop.title}",
-                        "画面 -> API : ${resolved.http}",
-                        "API -> アプリケーション : ${resolved.stop.backend.applicationFunction}",
+                        "${aliasOf.getValue(resolved.stop.actor)} -> UI : ${index + 1}. ${resolved.stop.title}",
+                        "UI -> API : ${resolved.http}",
+                        "API -> App : ${resolved.stop.backend.applicationFunction}",
                     ) + domainLines(resolved)
-                lines.joinToString("\n")
-            }
+                }
         val sections = stops.mapIndexed { index, resolved -> section(index + 1, resolved) }
         return (
             listOf(
@@ -224,7 +234,6 @@ internal object WalkingSkeletonTour {
                 "",
                 "```plantuml",
                 "@startuml",
-                "autonumber",
             ) + sequence + listOf("@enduml", "```", "") + sections
         ).joinToString("\n")
     }
@@ -232,11 +241,11 @@ internal object WalkingSkeletonTour {
     private fun domainLines(resolved: ResolvedStop): List<String> {
         val events = resolved.events.map { it.name }
         return if (events.isEmpty()) {
-            listOf("アプリケーション -> ドメイン : 投影を読む（開示の規則を掛ける）")
+            listOf("App -> Domain : 投影を読む（開示の規則を掛ける）")
         } else {
             listOf(
-                "アプリケーション -> ドメイン : decide",
-                "ドメイン --> アプリケーション : ${events.joinToString("、")}",
+                "App -> Domain : decide",
+                "Domain --> App : ${events.joinToString("、")}",
             )
         }
     }

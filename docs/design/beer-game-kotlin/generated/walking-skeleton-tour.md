@@ -18,41 +18,46 @@ API の経路は、仕様（`contracts/openapi.yaml`。基準の URL は `/api/v
 
 ```plantuml
 @startuml
-autonumber
-進行役 -> 画面 : 1. ゲームを作成する
-画面 -> API : POST /games
-API -> アプリケーション : createGame
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : GameCreated
-参加者 -> 画面 : 2. 参加する
-画面 -> API : POST /participations/join
-API -> アプリケーション : joinGame
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : ParticipantJoined
-進行役 -> 画面 : 3. 役割を割り当てる
-画面 -> API : PUT /games/{gameId}/participants/{participantId}/role
-API -> アプリケーション : assignRole
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : RoleAssigned、RoleUnassigned
-進行役 -> 画面 : 4. ゲームを開始する
-画面 -> API : POST /games/{gameId}/start
-API -> アプリケーション : startGame
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : GameStarted、SessionStarted
-参加者 -> 画面 : 5. 発注（入力）を保存する
-画面 -> API : PUT /sessions/{sessionId}/decisions
-API -> アプリケーション : saveDecision
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : DecisionSaved
-進行役 -> 画面 : 6. 週を確定する
-画面 -> API : POST /sessions/{sessionId}/weeks/{week}/commit
-API -> アプリケーション : commitWeek
-アプリケーション -> ドメイン : decide
-ドメイン --> アプリケーション : WeekCommitted
-進行役・参加者 -> 画面 : 7. 状態を表示する
-画面 -> API : GET /sessions/{sessionId}/state
-API -> アプリケーション : snapshot
-アプリケーション -> ドメイン : 投影を読む（開示の規則を掛ける）
+actor "進行役" as A1
+actor "参加者" as A2
+participant "画面" as UI
+participant "API" as API
+participant "アプリケーション" as App
+participant "ドメイン" as Domain
+A1 -> UI : 1. ゲームを作成する
+UI -> API : POST /games
+API -> App : createGame
+App -> Domain : decide
+Domain --> App : GameCreated
+A2 -> UI : 2. 参加する
+UI -> API : POST /participations/join
+API -> App : joinGame
+App -> Domain : decide
+Domain --> App : ParticipantJoined
+A1 -> UI : 3. 役割を割り当てる
+UI -> API : PUT /games/{gameId}/participants/{participantId}/role
+API -> App : assignRole
+App -> Domain : decide
+Domain --> App : RoleAssigned、RoleUnassigned
+A1 -> UI : 4. ゲームを開始する
+UI -> API : POST /games/{gameId}/start
+API -> App : startGame
+App -> Domain : decide
+Domain --> App : GameStarted、SessionStarted
+A2 -> UI : 5. 発注（入力）を保存する
+UI -> API : PUT /sessions/{sessionId}/decisions
+API -> App : saveDecision
+App -> Domain : decide
+Domain --> App : DecisionSaved
+A1 -> UI : 6. 週を確定する
+UI -> API : POST /sessions/{sessionId}/weeks/{week}/commit
+API -> App : commitWeek
+App -> Domain : decide
+Domain --> App : WeekCommitted
+A2 -> UI : 7. 状態を表示する
+UI -> API : GET /sessions/{sessionId}/state
+API -> App : snapshot
+App -> Domain : 投影を読む（開示の規則を掛ける）
 @enduml
 ```
 
@@ -134,7 +139,7 @@ API -> アプリケーション : snapshot
 | 購読する投影 | `sessionOverview`、`roleCurrentStates`、`currentDecisions`、`weekCommits`、`weekRoleResults`、`weekTeamTotals` |
 | 受入 | `apps/beer-game-kotlin/features/weekly-play/co-input.feature`（@AC2.3.1）<br>`apps/beer-game-kotlin/features/weekly-play/walking-skeleton-ui.feature`（@AC2.3.1）<br>`apps/beer-game-kotlin/features/weekly-play/week-commit.feature`（@AC2.3.1） |
 
-## 7. 状態を表示する（進行役・参加者）
+## 7. 状態を表示する（参加者）
 
 | 層 | 場所 |
 | :--- | :--- |

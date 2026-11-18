@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldMatch
 import java.nio.file.Files
 
 private const val TOUR_FRONT_MATTER =
@@ -57,6 +58,35 @@ class WalkingSkeletonTourSpec :
                 listOf("EV-G03", "EV-G04")
             resolved.first { it.stop.operationId == "startGame" }.events.map { it.name } shouldContain "GameStarted"
             resolved.first { it.stop.operationId == "commitWeek" }.events.map { it.name } shouldContain "WeekCommitted"
+        }
+
+        test("[ツアー] 全体の流れの PlantUML は、参加者を宣言し、矢印の両端を ASCII の別名だけで書く（「・」などで壊れない）") {
+            val diagram =
+                WalkingSkeletonTour
+                    .markdown(resolved)
+                    .substringAfter("```plantuml\n")
+                    .substringBefore("\n```")
+                    .lines()
+            val declarations = diagram.filter { it.startsWith("actor ") || it.startsWith("participant ") }
+            val messages = diagram.filter { it.contains(" -> ") || it.contains(" --> ") }
+            val declared = declarations.map { Regex(""" as (\w+)$""").find(it)?.groupValues?.get(1) }
+
+            declarations.forEach { it shouldMatch Regex("""^(actor|participant) "[^"]+" as \w+$""") }
+            declared.toSet().size shouldBe declared.size
+            messages.isNotEmpty() shouldBe true
+            messages.forEach { line ->
+                line shouldMatch Regex("""^(\w+) --?> (\w+) : .+$""")
+                val ends =
+                    Regex("""^(\w+) --?> (\w+) :""")
+                        .find(line)
+                        ?.groupValues
+                        .orEmpty()
+                        .drop(1)
+                ends.size shouldBe 2
+                ends.forEach { declared shouldContain it }
+            }
+            diagram.first() shouldBe "@startuml"
+            diagram.last() shouldBe "@enduml"
         }
 
         test("[ツアー] 生成したツアーが、コミット済みの docs/design/beer-game-kotlin/generated/walking-skeleton-tour.md と一致する") {
