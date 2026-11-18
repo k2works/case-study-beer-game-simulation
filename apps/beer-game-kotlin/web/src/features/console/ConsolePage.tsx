@@ -4,7 +4,7 @@ import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
 import { DECISIONS_CHANGED_TEXT, weekAdvancedText } from '../../api/problems';
-import type { CommitMode, GameState, Role, RoleWeekResult, SessionState } from '../../api/types';
+import type { CommitMode, GameState, Role, SessionState } from '../../api/types';
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
@@ -12,6 +12,7 @@ import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { ROLE_LABELS, ROLE_ORDER, SESSION_STATUS_LABELS, WEEK_SEPARATOR } from '../../labels';
 import { DummyQuantityField } from './DummyQuantityField';
+import { ResultsTable } from './ResultsTable';
 
 interface ConsoleData {
     game: GameState;
@@ -50,14 +51,6 @@ function parseDummyQuantity(text: string): number | null {
     const value = Number(trimmed);
     return value <= MAX_QUANTITY ? value : null;
 }
-
-const resultText = (r: RoleWeekResult) =>
-    `${ROLE_LABELS[r.role]} 第 ${r.week} 週の結果: 受注 ${r.orders}、発注 ${r.order}、在庫 ${r.inventory}、受注残 ${r.backlog}、出荷 ${r.shipment}、費用 ${r.cost}（累計 ${r.cumulativeCost}）`;
-
-const sortedResults = (results: RoleWeekResult[]) =>
-    [...results].sort(
-        (a, b) => b.week - a.week || ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role),
-    );
 
 /** 停止・再開の確認ダイアログが開いているときの操作。 */
 type Control = 'pause' | 'resume';
@@ -278,7 +271,7 @@ export function ConsolePage() {
         setFailure(error);
     }
 
-    const results = sortedResults(session.results ?? []);
+    const results = session.results ?? [];
 
     return (
         <>
@@ -384,11 +377,7 @@ export function ConsolePage() {
             {results.length > 0 ? (
                 <section aria-label="確定した週の結果">
                     <h2>確定した週の結果</h2>
-                    <ul>
-                        {results.map((result) => (
-                            <li key={`${result.week}-${result.role}`}>{resultText(result)}</li>
-                        ))}
-                    </ul>
+                    <ResultsTable results={results} />
                 </section>
             ) : null}
 

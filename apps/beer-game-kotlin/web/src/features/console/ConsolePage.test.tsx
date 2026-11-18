@@ -272,18 +272,70 @@ describe('S06 進行役のコンソール', () => {
             requestedWeek: 1,
             basis: { RETAILER: 3, WHOLESALER: 3, DISTRIBUTOR: 3, FACTORY: 3 },
         });
-        const results = screen.getByRole('region', { name: '確定した週の結果' });
-        for (const [, label] of ROLE_LABELS) {
-            expect(
-                within(results).getByText(new RegExp(`^${label} 第 1 週の結果:`)),
-            ).toBeInTheDocument();
-        }
+        const table = within(screen.getByRole('region', { name: '確定した週の結果' })).getByRole(
+            'table',
+            { name: '確定した週の結果の表' },
+        );
         expect(
-            within(results).getByText(
-                /^小売店 第 1 週の結果: 受注 4、発注 4、在庫 12、受注残 0、出荷 4、費用 600（累計 600）$/,
-            ),
-        ).toBeInTheDocument();
+            within(table)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['週', '役割', '受注', '発注', '在庫', '受注残', '出荷', '費用', '累計費用']);
+        const rows = within(table).getAllByRole('row').slice(1);
+        expect(rows).toHaveLength(ROLE_LABELS.length);
+        // 同じ週は、小売店から工場の順。役割は行見出し
+        expect(rows.map((row) => within(row).getByRole('rowheader').textContent)).toEqual(
+            ROLE_LABELS.map(([, label]) => label),
+        );
+        const retailer = rows[0];
+        if (retailer === undefined) throw new Error('小売店の行がない');
+        expect(
+            within(retailer)
+                .getAllByRole('cell')
+                .map((c) => c.textContent),
+        ).toEqual(['1', '4', '4', '12', '0', '4', '600', '600']);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('確定した週の結果は、新しい週を上にして、週ごとに小売店から工場の順に並べる', async () => {
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState()),
+            getSessionState: () =>
+                Promise.resolve(
+                    consoleState({
+                        week: 3,
+                        results: [
+                            ...ROLE_LABELS.map(([role]) => resultOf(role, 1)),
+                            ...ROLE_LABELS.map(([role]) => resultOf(role, 2)),
+                        ],
+                    }),
+                ),
+        });
+        renderApp(api, PATH);
+
+        const table = await screen.findByRole('table', { name: '確定した週の結果の表' });
+        const keys = within(table)
+            .getAllByRole('row')
+            .slice(1)
+            .map((row) => {
+                const week = within(row).getAllByRole('cell')[0]?.textContent;
+                return `${week}:${within(row).getByRole('rowheader').textContent}`;
+            });
+        expect(keys).toEqual([
+            ...ROLE_LABELS.map(([, label]) => `2:${label}`),
+            ...ROLE_LABELS.map(([, label]) => `1:${label}`),
+        ]);
+    });
+
+    it('結果がまだ無いときは、表を出さない', async () => {
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState()),
+            getSessionState: () => Promise.resolve(consoleState({ results: [] })),
+        });
+        renderApp(api, PATH);
+
+        await screen.findByRole('button', { name: '週を確定' });
+        expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
 
     it('確定の前に入力が変わったときは、更新した値で確認ダイアログを開き直し、通知の見出しへフォーカスを移して、もう一度確定できる', async () => {

@@ -33,11 +33,11 @@ Then(
     'コンソールに、{int} 役割のそれぞれの第 {int} 週の結果が表示される',
     async function (roles, week) {
         assert.equal(roles, ROLE_LABELS.length);
-        const lines = await this.console.resultLines();
+        const rows = await this.console.resultRows();
         for (const label of ROLE_LABELS) {
             assert.ok(
-                lines.some((line) => new RegExp(`^${label} 第 ${week} 週の結果`).test(line)),
-                `${label} の第 ${week} 週の結果が無い: ${JSON.stringify(lines)}`,
+                rows.some((row) => row.role === label && row.week === String(week)),
+                `${label} の第 ${week} 週の結果が無い: ${JSON.stringify(rows)}`,
             );
         }
     },

@@ -337,11 +337,21 @@ export class ConsoleWindow {
         return locator.textContent();
     }
 
-    /** 確定した週の結果の一覧（1 行ずつ）。 */
-    async resultLines() {
+    /** 確定した週の結果の表の行（週と役割の組）。 */
+    async resultRows() {
         const region = this.page.getByRole('region', { name: '確定した週の結果' });
         await region.waitFor({ timeout: WAIT_MS });
-        return region.getByRole('listitem').allTextContents();
+        const rows = region.getByRole('table').locator('tbody tr');
+        const count = await rows.count();
+        const result = [];
+        for (let index = 0; index < count; index++) {
+            const row = rows.nth(index);
+            result.push({
+                week: (await row.locator('td').first().innerText()).trim(),
+                role: (await row.locator('th').innerText()).trim(),
+            });
+        }
+        return result;
     }
 
     /** 進行役のコンソールの「停止する」を押し、確認ダイアログの「一時停止する」まで押す。 */
