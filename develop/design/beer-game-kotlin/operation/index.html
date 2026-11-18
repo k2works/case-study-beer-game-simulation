@@ -2761,6 +2761,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#b13-2026-11-17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B13 の実装の状況（2026-11-17。人の確認は未実施）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -10491,6 +10502,16 @@
 <li><code>week_commits</code> の件数と、<code>events</code> の <code>WeekCommitted</code> の件数の不一致。</li>
 <li><code>decide</code> の <code>Either</code> が <code>RuleViolation</code> 以外の内部エラーを返した、または 500 になった。</li>
 <li>一意制約の違反（<code>(game_id, stream_type, stream_version)</code> を除く。これは競合として扱い、上の「追記の競合率」で見る）。</li>
+</ul>
+<h4 id="b13-2026-11-17">B13 の実装の状況（2026-11-17。人の確認は未実施）<a class="headerlink" href="#b13-2026-11-17" title="Permanent link">&para;</a></h4>
+<p>メトリクスは EMF の JSON 行（名前空間 <code>BeerGame/Kotlin</code>）で標準出力へ出す（BD9）。アラームの閾値は、<code>AlarmCatalog</code>（コード）と <code>infra/modules/observability/alarms.tf</code> に同じ値で定義した（食い違いは試験が検出する）。<strong>AWS には適用していない。</strong> 手順は <a href="../../../operation/beer-game-kotlin/observability/">観測の運用手順書</a>。</p>
+<ul>
+<li><strong>出力した指標</strong>: 応答時間・要求数・5xx、主要な操作の成功、追記の競合（試行ごと）・再試行の上限超過、投影の不一致・遅れ・検査できず（<code>verify-projections</code>）、削除の放棄（<code>retention</code>）、JVM のヒープ・GC・接続プール。</li>
+<li><strong>出力していない指標（未実装）</strong>: SSE の接続数・通知の遅延（API に SSE が無い）、再生したイベント数と時間・投影の更新時間、イベントの読み込み失敗、削除の期限超過の経過時間、「反映待ちの再取得」の割合、<code>DecisionConflict</code> の件数（ログで代用）。</li>
+<li><strong>研修中の停止（1 分）</strong>: 主要な操作の成功を 1 秒の解像度で出し、10 秒 x 5 期間が 0 でアラーム（研修中のみ通知）。模擬の訓練で、停止から 60 秒以内に発報する。合成監視（1 分ごと）は最悪 2 分。</li>
+<li><strong>GC の停止</strong>は、MXBean から p99 が得られないので、区間の平均（1 回あたり）で近似した。閾値は提案のまま。</li>
+<li><strong>合成監視は <code>/api/v1/ready</code> だけ</strong>（業務の操作を呼ぶと本番にゲームが溜まるため）。業務のスモークテスト（B3 の未決）は未実装。</li>
+<li>日次の <code>verify-projections</code>・<code>retention</code> の ECS の定期タスクと通知の経路は B14。</li>
 </ul>
 <h3 id="_6">ヘルスチェック<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <table>
