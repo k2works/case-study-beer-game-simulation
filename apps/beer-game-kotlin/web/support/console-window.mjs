@@ -242,7 +242,12 @@ export class ConsoleWindow {
             .getByRole('dialog')
             .getByRole('button', { name: '失効させる' })
             .click({ timeout: WAIT_MS });
-        await this.page.getByText(/招待 1: 失効/).waitFor({ timeout: WAIT_MS });
+        // 招待の表の「招待 1」の行の状態が、「失効」になる
+        const row = this.page
+            .getByRole('table', { name: '観察用の招待の表' })
+            .getByRole('row')
+            .filter({ has: this.page.getByRole('rowheader', { name: '招待 1', exact: true }) });
+        await row.getByRole('cell', { name: '失効', exact: true }).waitFor({ timeout: WAIT_MS });
     }
 
     /** 観察者が、別のブラウザで、観察者の参加の画面（S10）から、控えた招待コードで参加する。 */

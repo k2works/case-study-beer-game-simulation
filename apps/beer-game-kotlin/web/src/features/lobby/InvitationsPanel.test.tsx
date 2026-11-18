@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../api/errors';
@@ -51,8 +51,19 @@ describe('S04 ロビー: 観察用の招待', () => {
 
         expect(await screen.findByText('v1.CODE12345678')).toBeInTheDocument();
         expect(screen.getByText(/いま一度だけ表示します/)).toBeInTheDocument();
-        const list = await screen.findByRole('list', { name: '観察用の招待の一覧' });
-        expect(within(list).getByText(/招待 1: 有効/)).toBeInTheDocument();
+        const table = await screen.findByRole('table', { name: '観察用の招待の表' });
+        expect(
+            within(table)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['招待', '状態', '作成', '期限', '操作']);
+        const row = within(table).getByRole('rowheader', { name: '招待 1' }).closest('tr');
+        if (row === null) throw new Error('招待 1 の行がない');
+        expect(within(row).getAllByRole('cell')[0]).toHaveTextContent('有効');
+        expect(within(row).getByRole('button', { name: '招待 1を失効' })).toBeEnabled();
+        // 観察者がまだいないときは、表を出さず、その旨を示す
+        expect(screen.queryByRole('table', { name: '観察者の表' })).not.toBeInTheDocument();
+        expect(screen.getByText('観察者はまだいません。')).toBeInTheDocument();
         expectNoStructuralA11yViolations();
     });
 
@@ -82,8 +93,13 @@ describe('S04 ロビー: 観察用の招待', () => {
             revokeObserverInvitation: () => Promise.resolve({ versions: revokedVersions }),
         });
         renderApp(api, PATH);
-        const observers = await screen.findByRole('list', { name: '観察者の一覧' });
-        expect(within(observers).getByText('見学者')).toBeInTheDocument();
+        const observers = await screen.findByRole('table', { name: '観察者の表' });
+        expect(
+            within(observers)
+                .getAllByRole('columnheader')
+                .map((h) => h.textContent),
+        ).toEqual(['表示名', '参加日時']);
+        expect(within(observers).getByRole('rowheader', { name: '見学者' })).toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('button', { name: '招待 1を失効' }));
         const dialog = await screen.findByRole('dialog');
@@ -92,7 +108,11 @@ describe('S04 ロビー: 観察用の招待', () => {
         ).toBeInTheDocument();
         await userEvent.click(within(dialog).getByRole('button', { name: '失効させる' }));
 
-        expect(await screen.findByText(/招待 1: 失効/)).toBeInTheDocument();
+        const table = await screen.findByRole('table', { name: '観察用の招待の表' });
+        await waitFor(() => {
+            const row = within(table).getByRole('rowheader', { name: '招待 1' }).closest('tr');
+            expect(row && within(row).getAllByRole('cell')[0]).toHaveTextContent('失効');
+        });
         expect(api.revokeObserverInvitation).toHaveBeenCalledWith(GAME_ID, 'inv-1');
         expect(screen.queryByRole('button', { name: '招待 1を失効' })).not.toBeInTheDocument();
     });

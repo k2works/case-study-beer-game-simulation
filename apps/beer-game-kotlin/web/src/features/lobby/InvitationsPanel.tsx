@@ -5,6 +5,7 @@ import type { InviteObserverResponse, Lobby, LobbyInvitation } from '../../api/t
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { formatDateTime } from '../../labels';
+import { InvitationsTable, ObserversTable } from './InvitationsTables';
 
 type InvitationStatus = 'VALID' | 'REVOKED' | 'EXPIRED';
 
@@ -118,41 +119,26 @@ export function InvitationsPanel({
             </button>
 
             {lobby.invitations.length > 0 ? (
-                <ul aria-label="観察用の招待の一覧">
-                    {lobby.invitations.map((invitation, index) => {
+                <InvitationsTable
+                    rows={lobby.invitations.map((invitation, index) => {
                         const status = invitationStatus(invitation, now);
-                        const label = `招待 ${index + 1}`;
-                        return (
-                            <li key={invitation.invitationId} aria-label={label}>
-                                {label}: {STATUS_LABELS[status]}（期限{' '}
-                                {formatDateTime(invitation.expiresAt)}）{' '}
-                                {status === 'VALID' ? (
-                                    <button
-                                        type="button"
-                                        disabled={busy}
-                                        aria-label={`${label}を失効`}
-                                        onClick={() => setPending(invitation)}
-                                    >
-                                        失効
-                                    </button>
-                                ) : null}
-                            </li>
-                        );
+                        return {
+                            invitation,
+                            label: `招待 ${index + 1}`,
+                            statusLabel: STATUS_LABELS[status],
+                            revocable: status === 'VALID',
+                        };
                     })}
-                </ul>
+                    busy={busy}
+                    onRevoke={setPending}
+                />
             ) : null}
 
             <h3>観察者</h3>
             {lobby.observers.length === 0 ? (
                 <p>観察者はまだいません。</p>
             ) : (
-                <ul aria-label="観察者の一覧">
-                    {lobby.observers.map((observer) => (
-                        <li key={observer.observerId}>
-                            {observer.displayName ?? '（表示名なし）'}
-                        </li>
-                    ))}
-                </ul>
+                <ObserversTable observers={lobby.observers} />
             )}
 
             {pending ? (
