@@ -4,7 +4,7 @@ title: "関数型プログラミングガイド（Rust 編）"
 description: "Rust の標準ライブラリ、tokio、futures で関数型プログラミングを実践するためのガイド。純粋関数、所有権と不変性、Option と Result によるエラーの型表現、async による副作用管理、並行処理、イベントソーシングによるアーキテクチャ設計、clippy によるルール設定までを一本の流れで整理する。"
 tags: [reference, rust, functional-programming]
 status: draft
-generated: { by: claude-sonnet-5-5, at: 2026-11-13T00:00:00Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-13T00:00:00Z }
 ---
 
 # 関数型プログラミングガイド（Rust 編）

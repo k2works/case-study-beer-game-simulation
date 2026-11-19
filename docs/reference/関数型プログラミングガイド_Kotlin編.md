@@ -4,7 +4,7 @@ title: "関数型プログラミングガイド（Kotlin 編）"
 description: "Kotlin の標準ライブラリ、Arrow、kotlinx.coroutines で関数型プログラミングを実践するためのガイド。純粋関数からエラーの型表現、副作用の管理、並行処理、イベントソーシングによるアーキテクチャ設計までを一本の流れで整理する。"
 tags: [reference, kotlin, functional-programming, arrow]
 status: draft
-generated: { by: claude-sonnet-5-5, at: 2026-11-13T00:00:00Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-13T00:00:00Z }
 ---
 
 # 関数型プログラミングガイド（Kotlin 編）
@@ -22,7 +22,22 @@ generated: { by: claude-sonnet-5-5, at: 2026-11-13T00:00:00Z }
 
 - **対象**: Kotlin の経験があり、Scala を経由せずに JVM 上で実践的な FP を身につけたい開発者。
 - **使うもの**: 第 1〜2 章は Kotlin 標準ライブラリのみ。第 3 章以降は [Arrow](https://arrow-kt.io/) と kotlinx.coroutines も使う。
-- **コード例**: 出典記事の動作確認済みの実装から転記している。本文に載せたコードは、このガイドのために書き下ろしたものではない。詳細な解説と演習問題は出典の記事を参照する。
+- **コード例**: 出典記事の動作確認済みの実装から転記している。本文に載せたコードは、このガイドのために書き下ろしたものではない。ただし第 9 章の PMD のルールと確認用コードだけは例外で、このガイドのために書き、PMD 7.29.0 で実行して確認した。詳細な解説と演習問題は出典の記事を参照する。
+- **表記**: コード例は、出典の Kotlin の表記のまま載せている。式本体の関数（`fun f(x: Int): Int = x + 1`）、末尾ラムダ、暗黙のパラメータ `it`、`when` を式として使う書き方である。Rust 編と Scala 編のように表記を変換してはいない。
+
+### Rust・Scala との違い
+
+同じ構成で書いた [Rust 編](./関数型プログラミングガイド_Rust編.md) と [Scala 編](./関数型プログラミングガイド_Scala編.md) と比べると、Kotlin は、標準ライブラリだけでは足りない部分を、Arrow と kotlinx.coroutines で補う。
+
+| | Kotlin | Rust | Scala |
+| --- | --- | --- | --- |
+| 不変性 | `val` は再代入を防ぐだけ。`List` は読み取り専用のビュー | 束縛はデフォルトで不変 | `val` と、標準の `List` は不変 |
+| 失敗の型 | nullable、Arrow の `Either` と `Raise` | `Option`、`Result`、`?` | `Option`、`Either`、`for` |
+| 代数的データ型 | `sealed interface` | `enum` | `enum`、`case class` |
+| 逐次の合成 | `either { }` と `bind()`、`suspend` | `?`、`async` | `for` 内包表記（言語にある） |
+| 副作用の型付け | `suspend` | `async fn` | `IO`（Cats Effect。値として組み立てる） |
+| 代数構造 | 自作と Arrow | 自作と言語 | Cats の型クラス |
+| 静的解析 | detekt、ktlint、PMD | clippy | scalac のオプション、WartRemover、Scalafix |
 
 ## 全体像
 
