@@ -52,6 +52,7 @@ AI-DLC で守ること：
 | `orchestrating-analysis` | 分析フェーズの全体ワークフロー |
 | `orchestrating-development` | 開発フェーズの TDD ワークフロー・Codex 分業 |
 | `orchestrating-operation` | 運用フェーズの環境構築・デプロイワークフロー |
+| `orchestrating-project` | 計画・進捗管理フェーズのワークフロー（リリース計画→GitHub 同期→進捗追跡） |
 
 ### 分析
 
@@ -78,6 +79,7 @@ AI-DLC で守ること：
 | :--- | :--- |
 | `developing-backend` | バックエンド TDD（インサイドアウト） |
 | `developing-frontend` | フロントエンド TDD（アウトサイドイン） |
+| `developing-release` | リリースワークフロー（品質ゲート・バージョンバンプ・CHANGELOG・タグ） |
 
 ### レビュー
 
@@ -111,6 +113,7 @@ AI-DLC で守ること：
 | `operating-cicd` | CI/CD パイプライン構築 |
 | `operating-deploy` | デプロイ・ロールバック |
 | `operating-qt` | コード品質管理（SonarQube） |
+| `validating-operating-setup` | 環境セットアップ手順書の実施状況の監査 |
 | `operating-backup` | バックアップ・リストア |
 | `killing-processes` | 開発プロセス強制終了 |
 
@@ -133,6 +136,7 @@ AI-DLC で守ること：
 | `migrating-ai-dlc` | XP ベースの既存プロジェクトを AI-DLC の運用（Unit 分解・Bolt 計画・リスク台帳・ガードレール）へ移行・適合性検証 |
 | `apply-okf` | 文書の作成・更新・レビュー・廃止時に OKF 規約（フロントマター・verified・index/log）を適用 |
 | `apply-docs-structure` | ドキュメント構成ガイド（単一企業・統合戦略・複数プロジェクト）に基づく配置判断・新プロジェクトのディレクトリ一式作成・構成検証 |
+| `apply-living-documentation` | Living Documentation の原則に基づく文書化判断（書く・リンク・生成・書かない）、根拠の補足、ガイドツアー・サイトシーイングによるキュレーション、用語集・図の自動生成 |
 
 ### 学習
 
