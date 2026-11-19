@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-19
+* **Update**: [architecture-frontend](/design/beer-game-rust/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-infrastructure](/design/beer-game-rust/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [operation](/design/beer-game-rust/operation.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
