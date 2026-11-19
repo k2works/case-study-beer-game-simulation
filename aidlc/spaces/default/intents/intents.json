@@ -1,0 +1,18 @@
+[
+  {
+    "uuid": "01a17b51-e01e-71b9-8473-b2a30dfbcf3f",
+    "slug": "beer-game-development",
+    "dirName": "261027-beer-game-development",
+    "scope": "classic",
+    "status": "in-flight",
+    "request": "7beaf144"
+  },
+  {
+    "uuid": "01a1c985-3ea0-7fb4-ba1f-ca219d178a98",
+    "slug": "beer-game3-setup",
+    "dirName": "261111-beer-game3-setup",
+    "scope": "feature",
+    "status": "in-flight",
+    "request": "5e43385f"
+  }
+]

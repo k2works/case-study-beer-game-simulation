@@ -1,0 +1,21 @@
+{
+  "stage": "code-generation",
+  "unit": "u4-retention-operations",
+  "upstream_ids": ["AC5.1.1", "AC5.1.2", "AC5.1.3", "BR15.1", "BR15.2", "BR15.3", "BR15.4", "BR15.5", "BR15.6", "BR15.7", "NFR2.2", "NFR4.1", "NFR7.2"],
+  "coverage": [
+    {"id":"AC5.1.1","status":"OK","target":"apps/beer-game/src/application/game-service.ts; apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"AC5.1.2","status":"Deferred","target":"apps/beer-game/src/retention/owner-deletion.ts; full production deletion awaits existing API PostgreSQL migration"},
+    {"id":"AC5.1.3","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts; apps/beer-game/tests/u4/retention-pg.integration.test.ts"},
+    {"id":"BR15.1","status":"OK","target":"apps/beer-game/src/retention/retention-service.ts"},
+    {"id":"BR15.2","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"BR15.3","status":"Deferred","target":"apps/beer-game/src/retention/owner-deletion.ts; existing API in-memory state remains"},
+    {"id":"BR15.4","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"BR15.5","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"BR15.6","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"BR15.7","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"id":"NFR2.2","status":"OK","target":"apps/beer-game/src/retention/postgres-retention.ts automatic_retries 0..5 and attempt ledger"},
+    {"id":"NFR4.1","status":"Deferred","target":"apps/beer-game/src/retention/postgres-retention.ts expiry sweep; external restore gate required"},
+    {"id":"NFR7.2","status":"GAP","target":"operator alert delivery and five-minute SLI are not implemented"}
+  ],
+  "reverse": []
+}

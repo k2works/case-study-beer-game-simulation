@@ -1,0 +1,8 @@
+coverage/
+test-results/
+playwright-report/
+node_modules/
+dist/
+aidlc/.aidlc-sessions/
+infra/.terraform/
+.browser-binaries/

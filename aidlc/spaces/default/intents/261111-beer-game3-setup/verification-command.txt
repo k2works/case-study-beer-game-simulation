@@ -1,0 +1,1 @@
+. ~/.nvm/nvm.sh && nvm use 26 >/dev/null && DATABASE_URL=postgres://postgres:postgres@localhost:55432/beer_game3_test npm --prefix apps/beer-game3 run verify

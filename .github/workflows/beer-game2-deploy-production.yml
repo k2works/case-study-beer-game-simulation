@@ -1,0 +1,99 @@
+# 本番へのデプロイ（手動起動。AC6.2.2）。ステージングで検証したイメージを、ビルドせずに**同じダイジェスト**で昇格する。
+# 承認: GitHub の `production` 環境の保護（必須のレビュアー）で、人が承認してから実行される。
+# まだ AWS で実行・検証していない（docs/development/beer-game2/bolt_12_plan.md）。
+name: beer-game2-deploy-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: 'ステージングで検証したイメージのダイジェスト（sha256:...）'
+        required: true
+        type: string
+      release:
+        description: 'そのイメージのコミット SHA（静的ファイルを同じコミットからビルドする）'
+        required: true
+        type: string
+
+concurrency:
+  group: beer-game2-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC（長期のアクセスキーは使わない）
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/beer-game2
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      API_TASK_FAMILY: ${{ vars.API_TASK_FAMILY }}
+      MIGRATE_TASK_FAMILY: ${{ vars.MIGRATE_TASK_FAMILY }}
+      WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
+      TASK_SUBNETS: ${{ vars.TASK_SUBNETS }}
+      TASK_SG: ${{ vars.TASK_SG }}
+      RELEASE_ID: ${{ inputs.release }}
+      DIGEST: ${{ inputs.digest }}
+    steps:
+      - name: 入力の検査
+        run: |
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "ダイジェストの形式が違います: $DIGEST" >&2; exit 1; }
+          [[ "$RELEASE_ID" =~ ^[0-9a-f]{40}$ ]] || { echo "コミット SHA の形式が違います: $RELEASE_ID" >&2; exit 1; }
+        working-directory: .
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: apps/beer-game2/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/beer-game2/package-lock.json
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ステージングの ECR から本番の ECR へ、マニフェストを変えずに写す（ダイジェストは変わらない）
+      - name: 同じダイジェストのイメージを本番の ECR へ昇格
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          SOURCE_REPOSITORY: ${{ vars.STAGING_ECR_REPOSITORY }}
+          REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+        run: |
+          docker buildx imagetools create \
+            --tag "$REGISTRY/$REPOSITORY:$RELEASE_ID" "$REGISTRY/$SOURCE_REPOSITORY@$DIGEST"
+          PROMOTED="$(aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" \
+            --query 'imageDetails[0].imageDigest' --output text)"
+          if [ "$PROMOTED" != "$DIGEST" ]; then
+            echo "昇格したイメージのダイジェストが違います（$PROMOTED）。中止します。" >&2
+            exit 1
+          fi
+          echo "image=$REGISTRY/$REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+      - run: npm run build:ui
+
+      - name: デプロイ（マイグレーション → ローリング更新 → 静的ファイル）
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: bash scripts/deploy/deploy.sh
+
+      - name: スモークテスト
+        env:
+          API_URL: ${{ vars.PRODUCTION_URL }}
+          ORIGIN: ${{ vars.PRODUCTION_URL }}
+        run: npx tsx scripts/smoke.ts

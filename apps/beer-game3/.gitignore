@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.env
+*.tsbuildinfo
+verify-summary.json
+verify-summary.md
+test-results
+playwright-report

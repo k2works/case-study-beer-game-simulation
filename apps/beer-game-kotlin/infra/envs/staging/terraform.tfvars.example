@@ -1,0 +1,7 @@
+# すべてダミーの値の例（実在のアカウント・バケット・リポジトリではない）。
+# コピーして terraform.tfvars にし、値を入れる（terraform.tfvars はコミットしない）。
+github_repository = "<owner>/<repo>"
+image             = "<ECR の URL>@sha256:<64 桁のダイジェスト>"
+web_bucket_name   = "<静的ファイルのバケット名（全世界で一意）>"
+# アカウントに GitHub の OIDC プロバイダーが既にあれば false
+create_oidc_provider = true

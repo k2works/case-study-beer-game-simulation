@@ -1,0 +1,20 @@
+{
+  "stage": "code-generation",
+  "unit": "u2-weekly-rules",
+  "version": 1,
+  "writes": [
+    { "path": "apps/beer-game3/.prettierignore" },
+    { "path": "apps/beer-game3/package.json" },
+    { "path": "apps/beer-game3/migrations/1762990000000_u2-cost-bigint.sql" },
+    { "path": "apps/beer-game3/src/server/domain/kit-preset.ts" },
+    { "path": "apps/beer-game3/src/server/domain/types.ts" },
+    { "path": "apps/beer-game3/src/server/session/game-session.ts" },
+    { "path": "apps/beer-game3/src/server/session/numeric.ts" },
+    { "path": "apps/beer-game3/src/server/session/pg-store.ts" },
+    { "path": "apps/beer-game3/src/server/session/schemas.ts" },
+    { "path": "apps/beer-game3/src/server/session/week-state.ts" },
+    { "path": "apps/beer-game3/tests/u1/features/week-confirmation.spec.ts" },
+    { "path": "apps/beer-game3/tests/u1/support/world.ts" },
+    { "path": "apps/beer-game3/tests/u2/" }
+  ]
+}

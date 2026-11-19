@@ -1,5 +1,11 @@
 # ビールゲームのケーススタディ
 
+[![beer-game-kotlin](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-kotlin.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-kotlin.yml)
+[![beer-game3](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game3.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game3.yml)
+[![beer-game2](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game2.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game2.yml)
+[![Deploy MkDocs (develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/mkdocs-develop.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/mkdocs-develop.yml)
+[![デモ環境（Heroku）](https://img.shields.io/badge/demo-Heroku-430098?logo=heroku&logoColor=white)](https://beer-game-kotlin-demo-bc58641c42c0.herokuapp.com)
+
 ## 概要
 
 ### 目的

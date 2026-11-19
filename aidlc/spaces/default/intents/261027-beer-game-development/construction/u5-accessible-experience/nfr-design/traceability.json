@@ -1,0 +1,27 @@
+{
+  "stage": "nfr-design",
+  "unit": "u5-accessible-experience",
+  "upstream_ids": ["NFR1.10", "NFR1.11", "NFR1.12", "NFR1.13", "NFR1.14", "NFR3.12", "NFR3.13", "NFR3.14", "NFR3.15", "NFR3.16", "NFR4.10", "NFR4.11", "NFR7.10", "NFR5.1", "NFR5.2", "NFR5.3", "NFR6.2", "NFR6.3", "NFR8.1", "NFR9.1"],
+  "coverage": [
+    {"id": "NFR1.10", "status": "OK", "target": "performance-design.md > Input latency budget"},
+    {"id": "NFR1.11", "status": "OK", "target": "performance-design.md > Browser update path"},
+    {"id": "NFR1.12", "status": "OK", "target": "performance-design.md > Browser update path"},
+    {"id": "NFR1.13", "status": "OK", "target": "performance-design.md > Browser update path"},
+    {"id": "NFR1.14", "status": "OK", "target": "performance-design.md > Browser update path"},
+    {"id": "NFR3.12", "status": "OK", "target": "security-design.md > Credential and request boundary"},
+    {"id": "NFR3.13", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR3.14", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR3.15", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR3.16", "status": "OK", "target": "security-design.md > CSRF and browser security"},
+    {"id": "NFR4.10", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR4.11", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR7.10", "status": "OK", "target": "security-design.md > Authorization and privacy"},
+    {"id": "NFR5.1", "status": "OK", "target": "logical-components.md > Component inventory"},
+    {"id": "NFR5.2", "status": "OK", "target": "logical-components.md > Component inventory"},
+    {"id": "NFR5.3", "status": "OK", "target": "logical-components.md > Component inventory"},
+    {"id": "NFR6.2", "status": "OK", "target": "logical-components.md > Component inventory"},
+    {"id": "NFR6.3", "status": "OK", "target": "logical-components.md > Component inventory"},
+    {"id": "NFR8.1", "status": "OK", "target": "logical-components.md > Verification and delivery boundary"},
+    {"id": "NFR9.1", "status": "OK", "target": "logical-components.md > Verification and delivery boundary"}
+  ]
+}

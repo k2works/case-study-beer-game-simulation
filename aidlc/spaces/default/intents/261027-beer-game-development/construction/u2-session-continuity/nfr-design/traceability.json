@@ -1,0 +1,29 @@
+{
+  "stage": "nfr-design",
+  "unit": "u2-session-continuity",
+  "upstream_ids": ["NFR10.1","NFR10.2","NFR10.3","NFR11.1","NFR11.2","NFR11.3","NFR11.4","NFR11.5","NFR11.6","NFR11.7","NFR12.1","NFR12.2","NFR12.3","NFR13.1","NFR13.2","NFR13.3","NFR13.4","NFR13.5","NFR14.1","NFR14.2","NFR14.3","NFR14.4"],
+  "coverage": [
+    {"id":"NFR10.1","status":"OK","target":"performance-design.md latency budgets and k6 verification"},
+    {"id":"NFR10.2","status":"OK","target":"indexed snapshot query, bounded pool, 75-user load test"},
+    {"id":"NFR10.3","status":"OK","target":"SSE reconnect budget and snapshot reconciliation"},
+    {"id":"NFR11.1","status":"OK","target":"256-bit opaque token and raw-value exclusion"},
+    {"id":"NFR11.2","status":"OK","target":"versioned HMAC-SHA-256 digest and atomic rotation"},
+    {"id":"NFR11.3","status":"OK","target":"per-command server-side actor and membership authorization"},
+    {"id":"NFR11.4","status":"OK","target":"opaque HttpOnly Secure SameSite cookie, Origin and CSRF checks"},
+    {"id":"NFR11.5","status":"OK","target":"uniform RECOVERY_NOT_AVAILABLE response"},
+    {"id":"NFR11.6","status":"OK","target":"IP and transformed digest-prefix rate limits with audit"},
+    {"id":"NFR11.7","status":"OK","target":"pseudonymous audit allowlist and redaction tests"},
+    {"id":"NFR12.1","status":"OK","target":"stateless multi-instance capacity and autoscaling thresholds"},
+    {"id":"NFR12.2","status":"OK","target":"PostgreSQL authority without sticky sessions"},
+    {"id":"NFR12.3","status":"OK","target":"transactional outbox, SKIP LOCKED claims, event idempotency and version order"},
+    {"id":"NFR13.1","status":"OK","target":"single durable transaction and no memory-only success"},
+    {"id":"NFR13.2","status":"OK","target":"lazy PostgreSQL restore and 15-minute restart objective"},
+    {"id":"NFR13.3","status":"OK","target":"state, audit, idempotency and outbox transaction boundary"},
+    {"id":"NFR13.4","status":"OK","target":"optimistic versioning, durable idempotency and event deduplication"},
+    {"id":"NFR13.5","status":"OK","target":"paused mutation rejection without draft mutation"},
+    {"id":"NFR14.1","status":"OK","target":"structured command, recovery, conflict and lifecycle signals"},
+    {"id":"NFR14.2","status":"OK","target":"bounded structured-log schema and secret allowlist"},
+    {"id":"NFR14.3","status":"OK","target":"one-minute recovery, outbox and restart alert rules"},
+    {"id":"NFR14.4","status":"OK","target":"audit sequence invariant metric and critical alert"}
+  ]
+}

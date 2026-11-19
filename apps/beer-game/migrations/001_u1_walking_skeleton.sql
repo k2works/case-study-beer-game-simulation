@@ -1,0 +1,10 @@
+BEGIN;
+CREATE TABLE games (game_id uuid PRIMARY KEY, join_code text UNIQUE NOT NULL, facilitator_digest text NOT NULL, final_week integer NOT NULL CHECK (final_week > 0), demand jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE sessions (session_id uuid PRIMARY KEY, game_id uuid UNIQUE NOT NULL REFERENCES games(game_id), status text NOT NULL CHECK (status IN ('LOBBY','ACTIVE','ENDED')), week integer NOT NULL CHECK (week > 0), version bigint NOT NULL CHECK (version > 0), state jsonb NOT NULL);
+CREATE TABLE participants (participant_id uuid PRIMARY KEY, game_id uuid NOT NULL REFERENCES games(game_id), display_name text NOT NULL, credential_digest text NOT NULL, role text CHECK (role IN ('FACTORY','DISTRIBUTOR','WHOLESALER','RETAILER')), UNIQUE (game_id, role));
+CREATE TABLE decisions (session_id uuid NOT NULL REFERENCES sessions(session_id), week integer NOT NULL, role text NOT NULL, participant_id uuid NOT NULL REFERENCES participants(participant_id), quantity integer NOT NULL CHECK (quantity >= 0), version bigint NOT NULL, committed boolean NOT NULL DEFAULT false, PRIMARY KEY (session_id, week, role));
+CREATE TABLE week_results (session_id uuid NOT NULL REFERENCES sessions(session_id), week integer NOT NULL, result jsonb NOT NULL, aggregate_version bigint NOT NULL, committed_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (session_id, week));
+CREATE TABLE idempotency_records (actor_id text NOT NULL, operation text NOT NULL, resource_id text NOT NULL, key_digest text NOT NULL, request_digest text NOT NULL, status_code integer NOT NULL, response jsonb NOT NULL, expires_at timestamptz NOT NULL, PRIMARY KEY (actor_id, operation, resource_id, key_digest));
+CREATE TABLE outbox_events (event_id uuid PRIMARY KEY, aggregate_id uuid NOT NULL, aggregate_version bigint NOT NULL, event_type text NOT NULL, payload jsonb NOT NULL, correlation_id uuid NOT NULL, occurred_at timestamptz NOT NULL, published_at timestamptz, attempts integer NOT NULL DEFAULT 0, UNIQUE (aggregate_id, aggregate_version, event_type));
+CREATE INDEX outbox_unpublished_idx ON outbox_events (occurred_at) WHERE published_at IS NULL;
+COMMIT;

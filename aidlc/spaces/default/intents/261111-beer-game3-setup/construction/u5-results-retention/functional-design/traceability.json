@@ -1,0 +1,33 @@
+{
+  "stage": "functional-design",
+  "unit": "u5-results-retention",
+  "upstream_ids": [
+    "AC4.1.1", "AC4.1.2", "AC4.1.3", "AC4.1.4",
+    "AC4.2.1", "AC4.2.2", "AC4.2.3",
+    "AC5.1.1", "AC5.1.2", "AC5.1.3"
+  ],
+  "coverage": [
+    { "id": "AC4.1.1", "status": "OK", "target": "BR21.2; BR21.3; BR21.4; BR22.3; BR22.4; BR22.5; BR22.6" },
+    { "id": "AC4.1.2", "status": "OK", "target": "BR22.1" },
+    { "id": "AC4.1.3", "status": "OK", "target": "BR22.2" },
+    { "id": "AC4.1.4", "status": "OK", "target": "BR21.1; BR21.5" },
+    { "id": "AC4.2.1", "status": "OK", "target": "BR23.1; BR23.2; BR23.6; BR23.8" },
+    { "id": "AC4.2.2", "status": "OK", "target": "BR23.4; BR23.5" },
+    { "id": "AC4.2.3", "status": "OK", "target": "BR23.3" },
+    { "id": "AC5.1.1", "status": "OK", "target": "BR24.2; BR24.3; BR24.4; BR24.5; BR24.7" },
+    { "id": "AC5.1.2", "status": "OK", "target": "BR24.1; BR24.2" },
+    { "id": "AC5.1.3", "status": "OK", "target": "BR25.1; BR25.2; BR25.3; BR25.4; BR25.5" }
+  ],
+  "reverse": [
+    { "id": "BR23.7", "status": "N/A", "target": "FR14.1 の出力をファイルとして保存できる形にする技術上の規則" },
+    { "id": "BR23.9", "status": "N/A", "target": "FR14.2 の出力を表計算ソフトで開く利用者への注意と、NFR11 に関わる列名の説明" },
+    { "id": "BR23.10", "status": "N/A", "target": "NFR6 の入力の安全性。表示名が表計算ソフトで式として実行される恐れへの対策（NFR Requirements の Q5 の A）" },
+    { "id": "BR24.6", "status": "N/A", "target": "NFR7 の個人情報を持ち続けない方針による、削除の記録の扱い（Q8）" },
+    { "id": "BR26.1", "status": "N/A", "target": "NFR7 の自動終了と削除を実行する定期処理の起動（Unit の定義、Q9）" },
+    { "id": "BR26.2", "status": "N/A", "target": "複数のインスタンスでも二重に実行しないための技術上の規則（Q9）" },
+    { "id": "BR26.3", "status": "N/A", "target": "1 回の処理の順序と上限を定める技術上の規則（Q9）" },
+    { "id": "BR26.4", "status": "N/A", "target": "定期処理の失敗が要求に影響しないための技術上の規則（Q9）" },
+    { "id": "BR26.5", "status": "N/A", "target": "起動時の処理が受け付けを遅らせないための技術上の規則" },
+    { "id": "BR26.6", "status": "N/A", "target": "停止時にデータの保存を途中で切らないための技術上の規則" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u3-learning-view",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7", "NFR8", "NFR9"],
+  "coverage": [
+    {"id":"NFR1","status":"OK","target":"NFR1.1-NFR1.6"},
+    {"id":"NFR2","status":"OK","target":"NFR2.1-NFR2.5"},
+    {"id":"NFR3","status":"OK","target":"NFR3.1-NFR3.5"},
+    {"id":"NFR4","status":"OK","target":"NFR4.1-NFR4.2"},
+    {"id":"NFR5","status":"OK","target":"NFR5.1"},
+    {"id":"NFR6","status":"OK","target":"NFR6.1"},
+    {"id":"NFR7","status":"OK","target":"NFR7.1-NFR7.4"},
+    {"id":"NFR8","status":"OK","target":"NFR8.1"},
+    {"id":"NFR9","status":"OK","target":"NFR9.1"}
+  ],
+  "reverse": []
+}

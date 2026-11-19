@@ -1,0 +1,30 @@
+{
+  "stage": "domain-design",
+  "upstream_ids": [
+    "US1.1",
+    "US1.2",
+    "US2.1",
+    "US2.2",
+    "US2.3",
+    "US3.1",
+    "US3.2",
+    "US4.1",
+    "US4.2",
+    "US4.3",
+    "US5.1"
+  ],
+  "coverage": [
+    { "id": "US1.1", "status": "OK", "target": "GameConfiguration" },
+    { "id": "US1.2", "status": "OK", "target": "Participation" },
+    { "id": "US2.1", "status": "OK", "target": "GameSession" },
+    { "id": "US2.2", "status": "OK", "target": "RoleDecision" },
+    { "id": "US2.3", "status": "OK", "target": "GameSession" },
+    { "id": "US3.1", "status": "OK", "target": "GameSession" },
+    { "id": "US3.2", "status": "OK", "target": "RecoveryCredential" },
+    { "id": "US4.1", "status": "OK", "target": "ObservationProjection" },
+    { "id": "US4.2", "status": "OK", "target": "ReviewProjection" },
+    { "id": "US4.3", "status": "OK", "target": "ExportPackage" },
+    { "id": "US5.1", "status": "OK", "target": "GameConfiguration" }
+  ],
+  "reverse": []
+}

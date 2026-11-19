@@ -1,0 +1,32 @@
+{
+  "stage": "nfr-design",
+  "unit": "u3-facilitation",
+  "upstream_ids": ["NFR1.1","NFR2.1","NFR2.2","NFR2.3","NFR3.1","NFR3.2","NFR3.3","NFR3.4","NFR4.1","NFR4.2","NFR4.3","NFR4.4","NFR5.1","NFR5.2","NFR6.1","NFR6.2","NFR6.3","NFR6.4","NFR6.5","NFR6.6","NFR6.7","NFR7.1","NFR9.1","NFR9.2","NFR9.3"],
+  "coverage": [
+    { "id": "NFR1.1", "status": "OK", "target": "計算に触れない操作と同じ保存の関数（reliability-design.md）" },
+    { "id": "NFR2.1", "status": "OK", "target": "状態の更新と履歴の追記を 1 トランザクションで（reliability-design.md）" },
+    { "id": "NFR2.2", "status": "OK", "target": "最終週の確定の中で終了する（reliability-design.md）" },
+    { "id": "NFR2.3", "status": "OK", "target": "占有の中での遷移の表の検査（reliability-design.md）" },
+    { "id": "NFR3.1", "status": "OK", "target": "短い占有と 1 トランザクションの操作（performance-design.md）" },
+    { "id": "NFR3.2", "status": "OK", "target": "占有しない読み取りと履歴の索引（performance-design.md）" },
+    { "id": "NFR3.3", "status": "OK", "target": "1 秒の取り直しを一時停止中も保つ（performance-design.md）" },
+    { "id": "NFR3.4", "status": "OK", "target": "投影に revision と入力者のラベルを含める（performance-design.md）" },
+    { "id": "NFR4.1", "status": "OK", "target": "占有の中での decisionRevision の採番（scalability-design.md）" },
+    { "id": "NFR4.2", "status": "OK", "target": "履歴の規模の目安と保証、ページングの後方互換の追加（scalability-design.md）" },
+    { "id": "NFR4.3", "status": "OK", "target": "読み取り専用のトランザクション（scalability-design.md）" },
+    { "id": "NFR4.4", "status": "OK", "target": "同じ占有で終了と確定を順に処理（scalability-design.md）" },
+    { "id": "NFR5.1", "status": "OK", "target": "状態を games の行に保存（reliability-design.md）" },
+    { "id": "NFR5.2", "status": "OK", "target": "入れ替えの同じコミットでの失効（reliability-design.md）" },
+    { "id": "NFR6.1", "status": "OK", "target": "進行役の操作の表と reason の固定（security-design.md）" },
+    { "id": "NFR6.2", "status": "OK", "target": "平文は応答の本文だけ、no-store（security-design.md）" },
+    { "id": "NFR6.3", "status": "OK", "target": "入れ替えと同じコミットでの失効（security-design.md）" },
+    { "id": "NFR6.4", "status": "OK", "target": "投影の専用の型（security-design.md）" },
+    { "id": "NFR6.5", "status": "OK", "target": "zod の検証と出力時のエスケープ（security-design.md）" },
+    { "id": "NFR6.6", "status": "OK", "target": "共通のエラー処理での許可リストのログ（security-design.md）" },
+    { "id": "NFR6.7", "status": "OK", "target": "本文と認可ヘッダを出力しない許可リスト（security-design.md）" },
+    { "id": "NFR7.1", "status": "OK", "target": "厳密な型の detail とゲーム削除への連鎖（security-design.md）" },
+    { "id": "NFR9.1", "status": "OK", "target": "appendLog を必須にする保存の関数（observability-design.md）" },
+    { "id": "NFR9.2", "status": "OK", "target": "INSERT と SELECT だけ、静的な検査と連番の検査（observability-design.md）" },
+    { "id": "NFR9.3", "status": "OK", "target": "進行役の入口だけが読む、厳密な型（observability-design.md）" }
+  ]
+}

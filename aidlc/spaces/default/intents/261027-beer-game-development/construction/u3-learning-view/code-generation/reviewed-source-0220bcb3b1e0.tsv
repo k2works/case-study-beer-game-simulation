@@ -1,0 +1,9 @@
+manifest	c79c61de52e3cbbfaed3011496d5a00e1010c57a1192428a58b9f3ee295a40ea	-
+	apps/beer-game/infra/main.tf	100644	02a150394551c5c3dc8240c7fb74ab99eec468206b0ed62fda4dd81f6b4b3268
+	apps/beer-game/migrations/003_u3_learning_view.sql	100644	0d215775f1d9d3ec45ea1689f9d2cff831fba20968e1bacda4ac87fd4c8d4809
+	apps/beer-game/package.json	100644	87ecb0a98a5ce10c4b2003935ec86f3e32a092f12bc8e99dfedb922d75850509
+	apps/beer-game/src/api/app.ts	100644	511a2a7546bd199e7a816f4c2d73fed183e1b77221409f5e25962a8bcdd2fc59
+	apps/beer-game/src/learning/learning-view.ts	100644	e08c279b3119108b0100b62668f253e03e2233c656c347a102f7ced0f755cee8
+	apps/beer-game/tests/u3/learning-view.integration.test.ts	100644	0ab6470aaccd607eceda3045f276827e2a93cc2e953ae190445a5278492ef931
+	apps/beer-game/tests/u3/learning-view.test.ts	100644	315619f355d2245068573a654f83e7335ff70e407d5094cd18569c5bbcdcfbae
+	apps/beer-game/vitest.config.ts	100644	0c01c4fbbf8918a5ba987f1ee843e667b647c29bf82c6631972ce24ac4e027fa

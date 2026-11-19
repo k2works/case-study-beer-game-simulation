@@ -1,0 +1,200 @@
+package beergame.application
+
+import arrow.core.Either
+import arrow.core.raise.either
+import arrow.core.raise.ensureNotNull
+import beergame.domain.Actor
+import beergame.domain.ActorKind
+import beergame.domain.ActorRef
+import beergame.domain.CredentialSubject
+import beergame.domain.GameCommand
+import beergame.domain.GameId
+import beergame.domain.Role
+import java.util.UUID
+
+/*
+ * 資格の失効・再発行・復帰（B5）。HTTP の層が呼ぶ公開の操作（Step 6）。経路・入力の形の検証・`Set-Cookie`・復帰コードの応答は HTTP の層。
+ * ここは、認可 → 冪等記録の照合の順序（ADR-004）と、資格の行の変更が追記と同じトランザクションにあること（Step 4）を持つ。
+ * - 失効: 進行役のブラウザセッションが認可。`CredentialRevoked` に付く行の変更（復帰資格の失効とブラウザセッションの削除）は、
+ *   追記の共通の流れ（[revocationWrites]）が書く。
+ * - 再発行: 進行役のブラウザセッションが認可。新しい復帰資格の値は、応答（[CommandOutcome.recovery]）だけが運ぶ。
+ * - 復帰: **提示した復帰資格の有効性が認可**（[Auth.RECOVERY]。冪等記録の照合より前に検証する）。新しいブラウザセッションを発行し、
+ *   復帰資格の期限を新しくする。
+ */
+
+private fun CredentialSubject.rowId(): UUID =
+    when (this) {
+        is CredentialSubject.Facilitator -> gameId.value
+        is CredentialSubject.Participant -> id.value
+        is CredentialSubject.Observer -> id.value
+    }
+
+private fun CredentialSubject.operationKey(): String =
+    when (this) {
+        is CredentialSubject.Facilitator -> "facilitator"
+        is CredentialSubject.Participant -> id.value.toString()
+        is CredentialSubject.Observer -> id.value.toString()
+    }
+
+private fun CredentialSubject.actorRef(): ActorRef =
+    when (this) {
+        is CredentialSubject.Facilitator -> Actor.Facilitator(gameId).toRef()
+        is CredentialSubject.Participant -> Actor.Participant(id).toRef()
+        is CredentialSubject.Observer -> Actor.Observer(id).toRef()
+    }
+
+private fun Actor.subject(): CredentialSubject? =
+    when (this) {
+        is Actor.Facilitator -> CredentialSubject.Facilitator(gameId)
+        is Actor.Participant -> CredentialSubject.Participant(id)
+        is Actor.Observer -> CredentialSubject.Observer(id)
+        is Actor.Anonymous -> null
+    }
+
+private fun CredentialSubject.kind(): CredentialKind =
+    when (this) {
+        is CredentialSubject.Facilitator -> CredentialKind.FACILITATOR
+        is CredentialSubject.Participant -> CredentialKind.PARTICIPANT_RECOVERY
+        is CredentialSubject.Observer -> CredentialKind.OBSERVER
+    }
+
+/** 進行役が、参加者の資格を失効させる。復帰資格を失効させ、そのブラウザセッションを止める（同じトランザクション）。 */
+suspend fun Ports.revokeCredential(
+    gameId: GameId,
+    subject: CredentialSubject,
+    meta: RequestMeta,
+): Either<AppFailure, CommandOutcome> {
+    val key = subject.operationKey()
+    val request =
+        CommandRequest(Operation(gameId, "revoke:$key", "revoke|$key"), Auth.REQUIRED, STATUS_OK, meta)
+    return runCommand(request) { tx, ctx ->
+        applySingle(tx, ctx, gameStream, GameCommand.RevokeCredential(ctx.actor, ctx.at, subject))
+    }
+}
+
+/** 進行役が、失効した参加者の資格を再発行する。新しい復帰資格の値は、この応答だけが運ぶ（再表示しない）。 */
+suspend fun Ports.reissueCredential(
+    gameId: GameId,
+    subject: CredentialSubject,
+    meta: RequestMeta,
+): Either<AppFailure, CommandOutcome> {
+    val key = subject.operationKey()
+    val recovery = issue(subject.kind(), subject.actorRef())
+    val request =
+        CommandRequest(
+            Operation(gameId, "reissue:$key", "reissue|$key"),
+            Auth.REQUIRED,
+            STATUS_OK,
+            meta,
+            // 応答に示す有効期限は、イベントの期限（ctx.at + 期限の長さ）と同じ時刻から作る（冪等な再送でも同じ値）
+            recovery = { _, at -> recovery.credential.copy(expiresAt = at.plus(settings.participantCredentialTtl)) },
+        )
+    return runCommand(request) { tx, ctx ->
+        val expiresAt = ctx.at.plus(settings.participantCredentialTtl)
+        val command = GameCommand.ReissueCredential(ctx.actor, ctx.at, subject, expiresAt)
+        applySingle(tx, ctx, gameStream, command) {
+            listOf(
+                PeripheralWrite.IssueRecoveryRow(
+                    gameId,
+                    recovery.digest,
+                    recovery.credential.kind,
+                    subject.rowId(),
+                    recovery.keyVersion,
+                    ctx.at,
+                    expiresAt,
+                ),
+            )
+        }
+    }
+}
+
+/** 復帰の結果。[role] は、復帰した参加者の担当の役割（役割が未割り当ての参加者と、進行役は null）。 */
+data class Recovered(
+    val outcome: CommandOutcome,
+    val role: Role?,
+)
+
+/**
+ * 復帰（公開）。[recoverParticipation] に、応答に載せる担当の役割を添える（投影から引く。復帰した操作者の ID で引き、資格は使わない）。
+ * 再送で保存済みの応答を返す場合も、いまの担当を返す。
+ */
+suspend fun Ports.recover(
+    gameId: GameId,
+    meta: RequestMeta,
+): Either<AppFailure, Recovered> =
+    either {
+        val outcome = recoverParticipation(gameId, meta).bind()
+        val actor = outcome.issued?.actor
+        val role =
+            if (actor?.kind == ActorKind.PARTICIPANT) {
+                reader
+                    .read(gameId)
+                    .bind()
+                    ?.participants
+                    ?.firstOrNull { it.participantId.value == actor.id }
+                    ?.role
+            } else {
+                null
+            }
+        Recovered(outcome, role)
+    }
+
+/**
+ * 提示した復帰資格（[RequestMeta.credential]）で復帰する。復帰資格が無効（不明・失効・期限切れ・別のゲーム・鍵が外された版）なら、
+ * 理由を区別せず [AppFailure.Unauthorized]（冪等記録を検索する前）。有効なら、新しいブラウザセッションを発行し、復帰資格の期限を新しくする
+ * （参加者は復帰した時刻から [AppSettings.participantCredentialTtl]。進行役は保持期間の期限のまま）。
+ */
+internal suspend fun Ports.recoverParticipation(
+    gameId: GameId,
+    meta: RequestMeta,
+): Either<AppFailure, CommandOutcome> {
+    val session = settings.credentialKeys.mint(newCredential())
+    val request =
+        CommandRequest(
+            Operation(gameId, SCOPE_RECOVER, SCOPE_RECOVER),
+            Auth.RECOVERY,
+            STATUS_OK,
+            meta,
+            issued = { actor -> actor.subject()?.let { IssuedCredential(session.raw, it.kind(), it.actorRef()) } },
+        )
+    // 復帰資格の検査から先を、接続元ごとの窓で制限する（認可の失敗だけを数える。B5 Step 5）
+    return limitedAttempts(AttemptScope.RECOVER, meta.source) { runRecovery(gameId, request, session) }
+}
+
+private suspend fun Ports.runRecovery(
+    gameId: GameId,
+    request: CommandRequest,
+    session: MintedCredential,
+): Either<AppFailure, CommandOutcome> =
+    runCommand(request) { tx, ctx ->
+        either {
+            val subject = ensureNotNull(ctx.actor.subject()) { AppFailure.Unauthorized }
+            val presented = ensureNotNull(ctx.presented) { AppFailure.Unauthorized }
+            val expiresAt =
+                when (subject) {
+                    is CredentialSubject.Participant -> ctx.at.plus(settings.participantCredentialTtl)
+
+                    is CredentialSubject.Facilitator -> presented.expiresAt
+
+                    // 観察者は復帰資格を持たない（観察者の復帰は設計の未決）。ここへは届かない
+                    is CredentialSubject.Observer -> raise(AppFailure.Unauthorized)
+                }
+            val command = GameCommand.RecoverParticipation(ctx.actor, ctx.at, subject, expiresAt)
+            applySingle(tx, ctx, gameStream, command) {
+                listOf(
+                    PeripheralWrite.ExtendRecoveryRow(presented.digest, expiresAt),
+                    PeripheralWrite.IssueSessionRow(
+                        gameId,
+                        session.digest,
+                        subject.kind(),
+                        subject.rowId(),
+                        session.keyVersion,
+                        ctx.at.plus(settings.sessionTtl),
+                    ),
+                )
+            }.bind()
+        }
+    }
+
+private const val STATUS_OK = 200
+private const val SCOPE_RECOVER = "recover"

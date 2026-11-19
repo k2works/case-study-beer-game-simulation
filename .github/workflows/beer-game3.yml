@@ -1,0 +1,285 @@
+name: beer-game3
+
+# beer-game3 の CI（検証のパイプライン）。デプロイは含めない（後の Operation で別に作る）。
+# 必須のチェックにするのは、集約のジョブ gate の 1 つだけ。ジョブ名とワークフローの名前は、変えると
+# 統合の保護の設定の見直しを伴うため、固定する（試験が確かめる）。
+# 設計: aidlc/spaces/default/intents/261111-beer-game3-setup/construction/u6-nfr-verification/infrastructure-design/cicd-pipeline.md
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [develop, main]
+  schedule:
+    # 夜間（日本時間の 02:30）。ワークフローの定義は main のものが使われ、検査する内容は develop を明示して取得する
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 検査する branch
+        required: false
+        default: develop
+        type: string
+
+permissions:
+  contents: read
+
+# 夜間と手動の実行は、実行ごとに一意の集合に置き、取り消さない（待機中の実行が置き換えられて黙って落ちるのを防ぐ）
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('beer-game3-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('beer-game3-push-{0}', github.ref) || github.event_name == 'schedule' && format('beer-game3-nightly-{0}', github.run_id) || format('beer-game3-dispatch-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
+defaults:
+  run:
+    working-directory: apps/beer-game3
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.event_name == 'workflow_dispatch' && inputs.ref || '' }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      - id: detect
+        run: node verification/ci/changes.ts
+        env:
+          GATE_EVENT: ${{ github.event_name }}
+          GATE_BASE_REF: ${{ github.base_ref }}
+          GATE_BEFORE: ${{ github.event.before }}
+
+  verify:
+    name: verify
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beer_game3_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beer_game3_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game3/package-lock.json
+      - run: npm ci
+      # 型検査、linter、formatter の検査、カバレッジつきの Vitest（行 80% を下回ったら失敗）
+      - run: npm run verify
+      # 本番の依存に、検証のための依存が含まれないこと（導入済みの木を、本番の依存だけに絞って調べる）
+      - run: npm run verify:prod-deps
+
+  e2e:
+    name: e2e (${{ matrix.browser }})
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit, edge]
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beer_game3_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beer_game3_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game3/package-lock.json
+      - run: npm ci
+      # 画面の配信（dist/web）が要る
+      - run: npm run build
+      # Edge は msedge のチャンネルで導入する
+      - run: npx playwright install --with-deps ${{ matrix.browser == 'edge' && 'msedge' || matrix.browser }}
+      # 4 ブラウザで、キーボードだけの通し試験と主要な操作の試験
+      - run: npm run e2e -- --project=${{ matrix.browser }} keyboard-flow main-operations
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: e2e-traces-${{ matrix.browser }}
+          path: apps/beer-game3/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  a11y:
+    name: a11y
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beer_game3_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beer_game3_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game3/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # axe-core（WCAG 2.2 AA、コントラスト 4.5:1 を含む）、状態の表示、日本語表示。画面 × 状態の一覧
+      - run: npm run e2e -- --project=chromium a11y status-indication japanese
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: a11y-traces
+          path: apps/beer-game3/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  load-smoke:
+    name: load-smoke
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true' && (github.event_name == 'pull_request' || github.event_name == 'push')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beer_game3_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beer_game3_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game3/package-lock.json
+      - run: npm ci
+      # 短い負荷試験（1 分、15 チーム）。合否は標本が多い指標（取り直し、サーバーの異常、整合性）だけ。「無効」も失敗
+      - run: npm run verify:load:smoke
+        env:
+          VERIFY_BRANCH: ${{ github.head_ref || github.ref_name }}
+      - name: ジョブの要約に表を出す
+        if: always()
+        run: cat verify-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: verify-summary-smoke
+          path: apps/beer-game3/verify-summary.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+  load-main:
+    name: load-main
+    needs: [changes]
+    if: needs.changes.outputs.relevant == 'true' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: beer_game3_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/beer_game3_test
+      VERIFY_APP_MODE: dist
+      VERIFY_BRANCH: ${{ github.event_name == 'schedule' && 'develop' || github.event_name == 'workflow_dispatch' && inputs.ref || github.head_ref }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.event_name == 'workflow_dispatch' && inputs.ref || '' }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game3/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      # 本試験（通常負荷 10 分 → 最大想定 3 分、実ブラウザ 1 チーム）。再実行で通ったことを合格にしない
+      - run: npm run verify:load:main
+      - name: ジョブの要約に表を出す
+        if: always()
+        run: cat verify-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: verify-summary-main
+          path: apps/beer-game3/verify-summary.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  gate:
+    name: gate
+    needs: [changes, verify, e2e, a11y, load-smoke, load-main]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+      # 判定は verification/ci/gate.ts（起動の種類 × relevant × 対象の branch × 各ジョブの結果）
+      - run: node verification/ci/gate.ts
+        env:
+          GATE_EVENT: ${{ github.event_name }}
+          GATE_RELEVANT: ${{ needs.changes.outputs.relevant }}
+          GATE_BASE_REF: ${{ github.base_ref }}
+          GATE_CHANGES: ${{ needs.changes.result }}
+          GATE_VERIFY: ${{ needs.verify.result }}
+          GATE_E2E: ${{ needs.e2e.result }}
+          GATE_A11Y: ${{ needs.a11y.result }}
+          GATE_LOAD_SMOKE: ${{ needs.load-smoke.result }}
+          GATE_LOAD_MAIN: ${{ needs.load-main.result }}

@@ -1,0 +1,23 @@
+{
+  "stage": "code-generation",
+  "unit": "u4-retention-operations",
+  "version": 1,
+  "writes": [
+    {"path":"apps/beer-game/src/retention/retention-service.ts"},
+    {"path":"apps/beer-game/src/retention/postgres-retention.ts"},
+    {"path":"apps/beer-game/src/retention/sqs-worker.ts"},
+    {"path":"apps/beer-game/src/retention/owner-deletion.ts"},
+    {"path":"apps/beer-game/src/retention/worker-main.ts"},
+    {"path":"apps/beer-game/src/api/app.ts"},
+    {"path":"apps/beer-game/src/application/game-service.ts"},
+    {"path":"apps/beer-game/tests/u4/retention.test.ts"},
+    {"path":"apps/beer-game/tests/u4/retention-api.integration.test.ts"},
+    {"path":"apps/beer-game/tests/u4/retention-pg.integration.test.ts"},
+    {"path":"apps/beer-game/migrations/002_u2_session_continuity.sql"},
+    {"path":"apps/beer-game/migrations/004_u4_retention.sql"},
+    {"path":"apps/beer-game/infra/main.tf"},
+    {"path":"apps/beer-game/package.json"},
+    {"path":"apps/beer-game/package-lock.json"},
+    {"path":"apps/beer-game/vitest.config.ts"}
+  ]
+}

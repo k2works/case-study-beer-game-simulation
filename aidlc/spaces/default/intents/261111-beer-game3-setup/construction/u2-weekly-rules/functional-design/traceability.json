@@ -1,0 +1,20 @@
+{
+  "stage": "functional-design",
+  "unit": "u2-weekly-rules",
+  "upstream_ids": ["AC1.6.1", "AC1.6.2", "AC1.6.3", "AC1.6.4", "AC1.6.5", "AC2.4.1", "AC2.4.2", "AC2.4.3", "AC5.2.1"],
+  "coverage": [
+    { "id": "AC1.6.1", "status": "OK", "target": "BR6.1" },
+    { "id": "AC1.6.2", "status": "OK", "target": "BR6.2" },
+    { "id": "AC1.6.3", "status": "OK", "target": "BR6.3" },
+    { "id": "AC1.6.4", "status": "OK", "target": "BR6.4; BR6.3" },
+    { "id": "AC1.6.5", "status": "OK", "target": "BR6.5" },
+    { "id": "AC2.4.1", "status": "OK", "target": "BR7.2; BR7.4" },
+    { "id": "AC2.4.2", "status": "OK", "target": "BR7.1" },
+    { "id": "AC2.4.3", "status": "OK", "target": "BR7.3" },
+    { "id": "AC5.2.1", "status": "OK", "target": "BR8.3" }
+  ],
+  "reverse": [
+    { "id": "BR8.1", "status": "N/A", "target": "U1 のレビュー指摘（設定値の上限）。確定が必ず成功する範囲への制限。FR1.4 の検証の補強" },
+    { "id": "BR8.2", "status": "N/A", "target": "FR10.2 の費用の保存。BR8.1 の上限のもとで 50 週の累積が収まることの保証" }
+  ]
+}

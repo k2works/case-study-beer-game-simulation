@@ -1,0 +1,17 @@
+{
+  "stage":"functional-design",
+  "unit":"u3-learning-view",
+  "upstream_ids":["AC4.1.1","AC4.1.2","AC4.1.3","AC4.2.1","AC4.2.2","AC4.2.3","AC4.3.1","AC4.3.2","AC4.3.3"],
+  "coverage":[
+    {"id":"AC4.1.1","status":"OK","target":"BR11.1"},
+    {"id":"AC4.1.2","status":"OK","target":"BR11.1"},
+    {"id":"AC4.1.3","status":"OK","target":"BR11.2"},
+    {"id":"AC4.2.1","status":"OK","target":"BR12.1, BR12.2"},
+    {"id":"AC4.2.2","status":"OK","target":"BR12.1"},
+    {"id":"AC4.2.3","status":"OK","target":"BR12.2"},
+    {"id":"AC4.3.1","status":"OK","target":"BR13.1, BR13.2"},
+    {"id":"AC4.3.2","status":"OK","target":"BR13.1"},
+    {"id":"AC4.3.3","status":"OK","target":"BR13.1"}
+  ],
+  "reverse":[{"id":"BR14.1","status":"N/A","target":"C3 delivery contract and NFR2 consumer correctness"}]
+}

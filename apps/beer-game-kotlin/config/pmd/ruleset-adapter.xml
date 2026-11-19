@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!--
+  アダプター層（adapter-persistence・adapter-http）のルールセット。全ルールを有効にし、境界の都合で外すものだけを下に書く。
+  外したルールは、ルールセット単位（層ごと）の緩和で、件所ごとの抑制（@Suppress）ではない。
+  緩和は設計判断なので、ゲート 1 で人が確認する（理由と、現に違反した箇所は bolt_2_plan.md Step 1 の結果に記録）。
+
+  外すルールと理由（現に報告された箇所）:
+  - NoThrow: StatusPages で CancellationException を再送出する（ErrorHandling.kt）、LISTEN の接続の失敗を SQLException で再試行の
+    ループへ伝える（ChangeNotifiers.kt）。コルーチンの取消と外部ライブラリの例外の伝播は、値にできない。
+  - NoVarProperty・NoVarClassParameter: JDBC の位置番号の進行（JdbcSupport.kt）、設定の受け渡し（Observability.kt）、
+    試行の窓の件数（SecurityPolicies.kt）。外部ライブラリの設定や、短命で内側に閉じた可変の値。
+  - NoMutableCollectionFactory: ResultSet からイベント列を集める（JdbcEventStore.kt）、コミット後のフック（JdbcTx.kt）、
+    試行の窓の表（SecurityPolicies.kt）。ループの中で積む可変の集合。
+  - NoRawConcurrency: 試行の窓の表を守る @Synchronized（SecurityPolicies.kt）。
+  - SideEffectInNonSuspendFunction: 相関 ID の生成（Observability.kt の UUID.randomUUID）。境界で値を作る。
+  - LooseCoupling（標準）: LinkedHashMap を型に使う（SecurityPolicies.kt。挿入順の削除のため）。
+  - FunctionNameTooShort（標準）: 閾値を 2 にする（外さない）。Kotlin の慣用の of。
+-->
+<ruleset name="Adapter Kotlin Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>アダプター用。境界の都合で外すルールだけを明示する。</description>
+
+    <rule ref="category/kotlin/bestpractices.xml">
+        <exclude name="FunctionNameTooShort"/>
+        <exclude name="LooseCoupling"/>
+    </rule>
+    <rule ref="category/kotlin/bestpractices.xml/FunctionNameTooShort">
+        <properties>
+            <property name="xpath"><value><![CDATA[
+//FunctionDeclaration/SimpleIdentifier/T-Identifier[string-length(@Text) < 2]
+            ]]></value></property>
+        </properties>
+    </rule>
+    <rule ref="category/kotlin/errorprone.xml"/>
+    <rule ref="config/pmd/fp-kotlin-rules.xml">
+        <exclude name="NoThrow"/>
+        <exclude name="NoVarProperty"/>
+        <exclude name="NoVarClassParameter"/>
+        <exclude name="NoMutableCollectionFactory"/>
+        <exclude name="NoRawConcurrency"/>
+        <exclude name="SideEffectInNonSuspendFunction"/>
+    </rule>
+</ruleset>

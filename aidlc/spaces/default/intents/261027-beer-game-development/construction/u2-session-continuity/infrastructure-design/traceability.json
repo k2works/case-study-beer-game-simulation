@@ -1,0 +1,26 @@
+{
+  "stage":"infrastructure-design",
+  "unit":"u2-session-continuity",
+  "upstream_ids":["NFR10.1","NFR10.2","NFR10.3","NFR11.1","NFR11.2","NFR11.4","NFR11.6","NFR11.7","NFR12.1","NFR12.2","NFR12.3","NFR13.1","NFR13.2","NFR13.3","NFR13.4","NFR14.1","NFR14.2","NFR14.3","NFR14.4"],
+  "coverage":[
+    {"id":"NFR10.1","status":"OK","target":"ECS/ALB sizing and CloudWatch latency alarms"},
+    {"id":"NFR10.2","status":"OK","target":"RDS indexes, ECS capacity and k6 gate"},
+    {"id":"NFR10.3","status":"OK","target":"ALB SSE timeout and synthetic reconciliation"},
+    {"id":"NFR11.1","status":"OK","target":"Secrets Manager and encrypted RDS"},
+    {"id":"NFR11.2","status":"OK","target":"versioned HMAC secrets and rotation metadata"},
+    {"id":"NFR11.4","status":"OK","target":"TLS ALB and runtime secret references"},
+    {"id":"NFR11.6","status":"OK","target":"AWS WAF plus application rate metrics"},
+    {"id":"NFR11.7","status":"OK","target":"CloudWatch allowlist logging and redaction gate"},
+    {"id":"NFR12.1","status":"OK","target":"multi-AZ ECS service with 2-6 tasks"},
+    {"id":"NFR12.2","status":"OK","target":"stateless tasks and Multi-AZ RDS authority"},
+    {"id":"NFR12.3","status":"OK","target":"PostgreSQL transactional outbox and contract tests"},
+    {"id":"NFR13.1","status":"OK","target":"Multi-AZ RDS transaction and PITR"},
+    {"id":"NFR13.2","status":"OK","target":"ECS recovery synthetic and RDS restore drill"},
+    {"id":"NFR13.3","status":"OK","target":"single RDS transaction boundary"},
+    {"id":"NFR13.4","status":"OK","target":"integration fault tests and durable idempotency"},
+    {"id":"NFR14.1","status":"OK","target":"CloudWatch EMF metrics and structured logs"},
+    {"id":"NFR14.2","status":"OK","target":"bounded JSON schema and correlation propagation"},
+    {"id":"NFR14.3","status":"OK","target":"CloudWatch one-minute alarms and routing"},
+    {"id":"NFR14.4","status":"OK","target":"scheduled invariant scan and critical alarm"}
+  ]
+}

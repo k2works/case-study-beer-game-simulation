@@ -1,0 +1,368 @@
+name: beer-game-kotlin
+
+# beer-game-kotlin の CI（検証と、デモ環境への配備 deploy-demo。AWS へはデプロイしない）。
+# 設計: docs/design/beer-game-kotlin/test-strategy.md「CI のテスト実行」、docs/development/beer-game-kotlin/bolt_2_plan.md の Step 2・4
+#
+# 工程と、設計の対応:
+#   contract: API の契約（redocly lint による仕様の検証 → openapi-typescript の生成物の差分 0）。web・test の前に実行する
+#   test    : ktlint、test（契約テストを含む）、integrationTest（PostgreSQL 18）、受け入れ @api（PostgreSQL・H2）、カバレッジのゲート
+#   detekt  : JDK 21 の専用ジョブ（detekt 1.23.8 は JDK 25 で動かないため）
+#   pmd     : fixture のテスト → 層ごとの検査
+#   web     : フロントエンド（format・lint・typecheck・コンポーネント・build）と、Cucumber-JS の Undefined 検査
+#   ui      : 受け入れ @ui（Cucumber-JS + Playwright。H2 のバックエンドを起動する）
+#   container: コンテナのスモークテスト（docker build と scripts/container-smoke.sh。Bolt 3 Step 3。検証のみ・AWS 無関係）
+#   deploy-demo: デモ環境（Heroku、H2 のインメモリ）への配備。develop の push と手動の実行のとき、上の検証がすべて緑なら動く
+#             （Environment demo の secret HEROKU_API_KEY。手順は docs/operation/beer-game-kotlin/demo.md）
+#   n1      : N-1 互換（B12。直前のリリースのタグの読み取り側で、現在の golden を読む。タグが無い間は、中身を実行しない。
+#             旧版が書いた過去の golden を現在の読み取り側で読む検査は、test ジョブの N1CompatibilitySpec が毎回行う）
+#
+# actions の版: checkout・setup-node・upload-artifact は、beer-game3.yml と同じ SHA 固定（コメントの版）。
+# setup-java・gradle/actions は、固定する SHA を確認できていないため、版のタグのまま（未固定）。
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-kotlin/**'
+      - '.github/workflows/beer-game-kotlin.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-kotlin/**'
+      - '.github/workflows/beer-game-kotlin.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beer-game-kotlin-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: apps/beer-game-kotlin
+
+jobs:
+  contract:
+    name: API の契約（仕様の検証・型の生成物の差分）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+      - run: npm ci
+      # 1. 仕様の検証: contracts/openapi.yaml が OpenAPI として妥当（Redocly CLI。警告もエラーにする設定）
+      - name: 仕様の検証（redocly lint）
+        run: npm run api:lint
+      # 2. 型の生成: 仕様から TypeScript の型を生成し直し、コミット済みの生成物と一致する（差分 0）ことを確かめる
+      - name: 型の生成物の差分（openapi-typescript）
+        run: npm run api:check
+
+  test:
+    name: test（ktlint・test・統合・受け入れ @api・カバレッジ）
+    runs-on: ubuntu-24.04
+    # 順序（ADR-008）: 仕様の検証 → 型の生成 → 型の検査（web の typecheck）→ 契約テストを含むテスト
+    needs: [contract, web]
+    # ローカルの実測: 全工程を再コンパイルつきで 3 分 25 秒。依存の取得とコンテナの取得を見込んで 30 分。
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # PMD は pmd ジョブで実行するので、ここでは除く（check が pmd に依存するため、重複を避ける）。
+      # detekt は JDK 25 で動かないため、ここでは自動で無効になる（detekt ジョブで実行する）。
+      - name: ktlint・test・モジュール依存の検査
+        run: ./gradlew check -x pmd --no-daemon
+      # Testcontainers が PostgreSQL 18 のコンテナを起動する（runner の Docker を使う。Docker が無ければ失敗）。
+      - name: integrationTest（実 PostgreSQL 18）
+        run: ./gradlew integrationTest --no-daemon
+      # Undefined・Pending のステップがあれば、Cucumber-JVM が失敗にする（実測: Undefined で FAILED）。
+      - name: 受け入れ @api（PostgreSQL 18。正）
+        run: ./gradlew acceptanceTest --no-daemon
+      - name: 受け入れ @api（H2。ローカル開発の経路の確認）
+        run: ./gradlew acceptanceTestH2 --no-daemon
+      # DB の統合が 1 件も実行されなかった（0 件、または全件スキップ）場合は失敗にする（スキップの暗黙の増加を防ぐ）。
+      - name: DB の統合が実行されたことの検査
+        run: |
+          total() { grep -h -o '<testsuite [^>]*>' "$1"/*.xml 2>/dev/null | grep -o " $2=\"[0-9]*\"" | grep -o '[0-9]*' | awk '{s+=$1} END {print s+0}'; }
+          status=0
+          for d in adapter-persistence/build/test-results/integrationTest app/build/test-results/integrationTest app/build/test-results/acceptanceTest app/build/test-results/acceptanceTestH2; do
+            t=$(total "$d" tests); s=$(total "$d" skipped)
+            echo "$d: tests=$t skipped=$s"
+            if [ "$t" -eq 0 ] || [ "$t" -eq "$s" ]; then echo "::error::$d で実行された試験が 0 件です"; status=1; fi
+          done
+          exit $status
+      # test・integrationTest・acceptanceTest・acceptanceTestH2 を合算して検査する（全体の行 85%・分岐 75%、domain の行は暫定の下限）。
+      - name: カバレッジのゲート（Kover。閾値割れで失敗）
+        run: ./gradlew koverVerify koverXmlReport --no-daemon
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: kover-report
+          path: apps/beer-game-kotlin/build/reports/kover/report.xml
+          retention-days: 14
+          if-no-files-found: ignore
+
+  detekt:
+    name: detekt（JDK 21）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # detekt 1.23.8 は JDK 25 で動かない（同梱の Kotlin コンパイラが 25.0.x を解釈できない）。専用ジョブで維持する（人の決定）。
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: detekt（ForbiddenMethodCall を含む。違反は 0 件）
+        run: ./gradlew detekt detektMain detektTest --no-daemon
+
+  pmd:
+    name: PMD（fixture のテストと、層ごとの検査）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      # 先に fixture のテストで、ルール自体が期待どおりに働くことを確かめる（期待と 1 件でも違えば失敗）。
+      - name: PMD の fixture のテスト（14 ルール・17 件）
+        run: ./gradlew pmdFixtureTest --no-daemon
+      # 関数型ルール（14 個）と標準の Kotlin ルールを、層ごとのルールセットで実行する。違反は 0 件。
+      - name: PMD（ドメイン・アプリケーション・アダプター・main・テスト。違反は 0 件）
+        run: ./gradlew pmdDomainApplication pmdAdapter pmdMain pmdTest --no-daemon
+
+  web:
+    name: web（format・lint・typecheck・コンポーネント・build）
+    runs-on: ubuntu-24.04
+    # 3. 型の検査（typecheck は verify に含まれる）は、仕様の検証と型の生成物の差分の後に行う
+    needs: contract
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+      - run: npm ci
+      # 依存関係の脆弱性（X-5。B15）。利用者のブラウザへ届く実行時の依存（react・react-dom・react-router）だけを、high 以上で落とす。
+      # 開発用の依存（vite など）の脆弱性は、ビルドとテストの道具の問題で、判断を人に委ねる（B15 の報告書）。
+      - run: npm audit --omit=dev --audit-level=high
+      # prettier、eslint、tsc、Vitest、vite build
+      - run: npm run verify
+      # ステップ定義の無いステップ（Undefined）を、バックエンド無しで検出する。
+      - run: npm run acceptance:dry-run
+
+  ui:
+    name: 受け入れ @ui（Cucumber-JS + Playwright）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/beer-game-kotlin/web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # バックエンドを、H2 の専用ポート 3100 で起動する（画面の Origin を許可する。web/support/hooks.mjs の案内と同じ）。
+      - name: バックエンドの起動（H2）
+        working-directory: apps/beer-game-kotlin
+        env:
+          APP_ENV: local
+          DB_KIND: h2
+          PORT: '3100'
+          ALLOWED_ORIGINS: http://localhost:5273
+        run: nohup ./gradlew :app:run --no-daemon > app.log 2>&1 &
+      - name: バックエンドの準備の待機
+        run: |
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:3100/api/v1/ready > /dev/null; then echo "起動を確認（${i} 回目）"; exit 0; fi
+            sleep 2
+          done
+          echo "::error::バックエンドが起動しませんでした"; cat ../app.log; exit 1
+      # Undefined・Pending のステップがあれば、Cucumber-JS が失敗にする（strict が既定）。
+      - run: npm run acceptance
+      - name: バックエンドの停止
+        if: always()
+        run: pkill -f 'beergame.app.MainKt' || true
+
+  container:
+    name: コンテナのスモークテスト（docker build・api・migrate）
+    runs-on: ubuntu-24.04
+    # ローカルの実測: 初回のビルド約 6 分、スモークテスト数分（起動時間の計測 3 回を含む）。runner の初回の取得を見込んで 30 分。
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # scripts/container-smoke.sh が、docker build と、postgres:18-alpine のコンテナの起動までを行う（AWS には接続しない）。
+      # 確かめること: api の /api/v1/ready が 200、migrate が終了コード 0、秘密が無ければ 78 で起動失敗、H2 の拒否、非 root、起動時間
+      - name: docker build とスモークテスト
+        run: ./scripts/container-smoke.sh
+
+  n1:
+    name: N-1 互換（直前のリリースの読み取り側で、現在の golden を読む）
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # 直前のリリースのタグを探す。タグの名前の規約は未決のため、仮に beer-game-kotlin-v* とする。
+      # タグが無い間（最初のリリース前）は、以降の工程を実行しない。
+      - name: 直前のリリースのタグ
+        id: previous
+        run: |
+          tag=$(git tag --list 'beer-game-kotlin-v*' --sort=-v:refname | head -n 1)
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if [ -z "$tag" ]; then echo "直前のリリースが無いため、N-1 互換の検査は実行しません。"; fi
+      - uses: actions/setup-java@v4
+        if: steps.previous.outputs.tag != ''
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.previous.outputs.tag != ''
+      # 直前のリリースのタグを git worktree で取り出し、その読み取り側（EventCodec とアップキャスト）で、現在の版が書く golden
+      # （全イベントの種類の JSON）をすべて読めることを確かめる。読めなければ失敗（読む側を先にリリースする規則に従う）。
+      # 手順の本体は scripts/n1-compat.sh（B12）。タグが存在しないため、この工程の GitHub Actions 上の実行は未確認。
+      - name: 直前のリリースの読み取り側で、現在の golden を読む
+        if: steps.previous.outputs.tag != ''
+        run: ./scripts/n1-compat.sh "${{ steps.previous.outputs.tag }}"
+
+  # デモ環境（Heroku、Eco dyno、H2 のインメモリ）への配備。手順と設計: docs/operation/beer-game-kotlin/demo.md
+  # develop の push と手動の実行のときだけ、検証がすべて緑になった後に動く（Pull Request では動かさない）。
+  # 認証は Environment `demo` の secret HEROKU_API_KEY。Environment は配備のブランチを develop に限る。
+  deploy-demo:
+    name: デモ環境への配備（Heroku）
+    runs-on: ubuntu-24.04
+    needs: [contract, test, detekt, pmd, web, ui, container]
+    if: ${{ !cancelled() && !failure() && github.ref == 'refs/heads/develop' && github.event_name != 'pull_request' }}
+    timeout-minutes: 30
+    environment: demo
+    # 配備どうしは 1 つずつ動かし、release の途中で取り消さない
+    concurrency:
+      group: beer-game-kotlin-demo-deploy
+      cancel-in-progress: false
+    env:
+      HEROKU_APP: beer-game-kotlin-demo
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # 古い実行の再実行で、古いコミットを配備しない。アプリを最後に変えたコミットが、このコミットから develop の先頭までで同じか確かめる。
+      - name: 最新の配備の対象か
+        id: latest
+        working-directory: .
+        run: |
+          git fetch -q origin develop
+          mine=$(git log -1 --format=%H "${GITHUB_SHA}" -- apps/beer-game-kotlin)
+          latest=$(git log -1 --format=%H origin/develop -- apps/beer-game-kotlin)
+          if [ "$mine" != "$latest" ]; then
+            echo "::warning::より新しい配備の対象があります（${latest:0:7}）。この実行は配備を飛ばします。"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Heroku のキーがあるか
+        if: steps.latest.outputs.skip != 'true'
+        run: test -n "$HEROKU_API_KEY" || { echo "::error::secret HEROKU_API_KEY が空です（Environment demo）。"; exit 1; }
+      - uses: docker/setup-buildx-action@v3
+        if: steps.latest.outputs.skip != 'true'
+      - name: Container Registry へログイン
+        if: steps.latest.outputs.skip != 'true'
+        run: echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+      # Heroku の Container Registry は Docker v2 の manifest だけを受ける（oci-mediatypes=false、provenance・sbom なし）。
+      - name: イメージの作成と push（demo ステージ）
+        if: steps.latest.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/beer-game-kotlin
+          target: demo
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          outputs: type=image,name=registry.heroku.com/${{ env.HEROKU_APP }}/web,push=true,oci-mediatypes=false
+      - name: 直前の release を控える
+        if: steps.latest.outputs.skip != 'true'
+        id: previous
+        working-directory: .
+        run: |
+          prev=$(curl -fsS -H "Accept: application/vnd.heroku+json; version=3" -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -H "Range: version ..; order=desc,max=1" "https://api.heroku.com/apps/${HEROKU_APP}/releases" | jq -r '.[0].version')
+          echo "version=${prev}" >> "$GITHUB_OUTPUT"
+      - name: release
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          image_id=$(docker image inspect "registry.heroku.com/${HEROKU_APP}/web" --format '{{.Id}}' 2>/dev/null || true)
+          if [ -z "$image_id" ]; then
+            docker pull -q "registry.heroku.com/${HEROKU_APP}/web" >/dev/null
+            image_id=$(docker image inspect "registry.heroku.com/${HEROKU_APP}/web" --format '{{.Id}}')
+          fi
+          curl -fsS -X PATCH "https://api.heroku.com/apps/${HEROKU_APP}/formation" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -d "{\"updates\":[{\"type\":\"web\",\"docker_image\":\"${image_id}\"}]}" >/dev/null
+      # release と Config Vars の変更はそれぞれ再起動を起こす。起動が重ならないよう、起動を確かめてから DEMO_REVISION を入れる。
+      - name: 起動と DB を使う操作の確認（失敗したら直前の release に戻す）
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          # Heroku の URL は、アプリ名に識別子が付く（例: beer-game-kotlin-demo-xxxx.herokuapp.com）。Platform API から取る。
+          url=$(curl -fsS -H "Accept: application/vnd.heroku+json; version=3" -H "Authorization: Bearer $HEROKU_API_KEY" \
+            "https://api.heroku.com/apps/${HEROKU_APP}" | jq -r '.web_url' | sed 's:/$::')
+          test -n "$url" || { echo "::error::アプリの URL を取れません。"; exit 1; }
+          ok=false
+          for i in $(seq 1 40); do
+            if [ "$(curl -s -m 10 -o /dev/null -w '%{http_code}' "${url}/api/v1/ready")" = "200" ] \
+              && [ "$(curl -s -m 10 -o /dev/null -w '%{http_code}' "${url}/")" = "200" ]; then ok=true; break; fi
+            sleep 6
+          done
+          # DB を使う操作（ゲームの作成）が 500 にならないこと。表示だけのページは DB を使わず、DB が閉じていても 200 になるため。
+          if [ "$ok" = "true" ]; then
+            code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -X POST "${url}/api/v1/games" -H 'Content-Type: application/json' \
+              -H "Idempotency-Key: ci-${GITHUB_SHA}" -H "Origin: ${url}" -d '{"kind":"KIT","finalWeek":3,"demand":[4,4,8]}')
+            [ "$code" = "201" ] || ok=false
+          fi
+          if [ "$ok" != "true" ]; then
+            echo "::error::起動を確かめられません。直前の release（v${{ steps.previous.outputs.version }}）に戻します。"
+            curl -fsS -X POST "https://api.heroku.com/apps/${HEROKU_APP}/releases" \
+              -H "Accept: application/vnd.heroku+json; version=3" -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $HEROKU_API_KEY" -d "{\"release\":\"${{ steps.previous.outputs.version }}\"}" >/dev/null || true
+            exit 1
+          fi
+      - name: DEMO_REVISION を入れる
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          curl -fsS -X PATCH "https://api.heroku.com/apps/${HEROKU_APP}/config-vars" \
+            -H "Accept: application/vnd.heroku+json; version=3" -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" -d "{\"DEMO_REVISION\":\"${GITHUB_SHA}\"}" >/dev/null

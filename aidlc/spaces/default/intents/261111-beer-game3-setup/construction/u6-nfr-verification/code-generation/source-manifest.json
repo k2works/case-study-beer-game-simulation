@@ -1,0 +1,18 @@
+{
+  "stage": "code-generation",
+  "unit": "u6-nfr-verification",
+  "version": 1,
+  "writes": [
+    { "path": "apps/beer-game3/verification/" },
+    { "path": "apps/beer-game3/tests/u6/" },
+    { "path": "apps/beer-game3/package.json" },
+    { "path": "apps/beer-game3/package-lock.json" },
+    { "path": "apps/beer-game3/tsconfig.json" },
+    { "path": "apps/beer-game3/eslint.config.js" },
+    { "path": "apps/beer-game3/.gitignore" },
+    { "path": "apps/beer-game3/.prettierignore" },
+    { "path": "apps/beer-game3/README.md" },
+    { "path": ".github/workflows/beer-game3.yml" },
+    { "path": "docs/operation/beer-game3/" }
+  ]
+}

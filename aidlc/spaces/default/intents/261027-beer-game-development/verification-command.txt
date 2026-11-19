@@ -1,0 +1,1 @@
+npm --prefix apps/beer-game run verify:u1

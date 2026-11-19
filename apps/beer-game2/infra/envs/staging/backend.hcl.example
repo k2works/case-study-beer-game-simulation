@@ -1,0 +1,7 @@
+# コピーして backend.hcl にし、値を入れる（backend.hcl はコミットしない）。
+# バケットとテーブルは、手順書の「状態の保管先」で、人が作る。
+bucket         = "beer-game2-tfstate-<アカウント ID>"
+key            = "staging/terraform.tfstate"
+region         = "ap-northeast-1"
+dynamodb_table = "beer-game2-tfstate-lock"
+encrypt        = true

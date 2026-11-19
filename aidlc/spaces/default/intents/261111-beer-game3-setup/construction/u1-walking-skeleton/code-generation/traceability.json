@@ -1,0 +1,601 @@
+{
+  "stage": "code-generation",
+  "unit": "u1-walking-skeleton",
+  "upstream_ids": [
+    "AC1.1.1",
+    "AC1.1.2",
+    "AC1.1.3",
+    "AC1.1.4",
+    "AC1.1.5",
+    "AC1.2.1",
+    "AC1.2.2",
+    "AC1.2.3",
+    "AC1.2.4",
+    "AC1.3.1",
+    "AC1.3.2",
+    "AC1.3.3",
+    "AC1.4.1",
+    "AC1.4.2",
+    "AC1.4.3",
+    "AC1.4.4",
+    "AC1.5.1",
+    "AC1.5.2",
+    "AC1.5.3",
+    "AC1.5.4",
+    "AC1.5.5",
+    "AC1.5.6",
+    "AC1.5.7",
+    "AC1.5.8",
+    "AC1.5.9",
+    "NFR1.1",
+    "NFR1.2",
+    "NFR2.1",
+    "NFR2.2",
+    "NFR2.3",
+    "NFR3.1",
+    "NFR3.2",
+    "NFR3.3",
+    "NFR3.4",
+    "NFR3.5",
+    "NFR3.6",
+    "NFR3.7",
+    "NFR4.1",
+    "NFR4.2",
+    "NFR4.3",
+    "NFR4.4",
+    "NFR5.1",
+    "NFR6.1",
+    "NFR6.2",
+    "NFR6.3",
+    "NFR6.4",
+    "NFR6.5",
+    "NFR6.6",
+    "NFR6.7",
+    "NFR6.9",
+    "NFR6.10",
+    "NFR6.11",
+    "NFR7.1",
+    "NFR5.2",
+    "NFR5.3",
+    "NFR6.8",
+    "NFR7.2",
+    "NFR7.3",
+    "NFR8",
+    "NFR9",
+    "NFR10",
+    "NFR11",
+    "BR1.1",
+    "BR1.2",
+    "BR1.3",
+    "BR1.4",
+    "BR1.5",
+    "BR1.6",
+    "BR1.7",
+    "BR1.8",
+    "BR2.1",
+    "BR2.2",
+    "BR2.3",
+    "BR2.4",
+    "BR2.5",
+    "BR2.6",
+    "BR3.1",
+    "BR3.2",
+    "BR3.3",
+    "BR4.1",
+    "BR4.2",
+    "BR4.3",
+    "BR4.4",
+    "BR4.5",
+    "BR4.6",
+    "BR4.7",
+    "BR4.8",
+    "BR5.1",
+    "BR5.2",
+    "BR5.3",
+    "BR5.4",
+    "BR5.5",
+    "BR5.6",
+    "BR5.7",
+    "BR5.8",
+    "BR5.9",
+    "BR5.10",
+    "BR5.11"
+  ],
+  "coverage": [
+    {
+      "id": "AC1.1.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/game-creation.spec.ts"
+    },
+    {
+      "id": "AC1.1.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/game-creation.spec.ts"
+    },
+    {
+      "id": "AC1.1.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/game-creation.spec.ts"
+    },
+    {
+      "id": "AC1.1.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/game-creation.spec.ts"
+    },
+    {
+      "id": "AC1.1.5",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/game-creation.spec.ts"
+    },
+    {
+      "id": "AC1.2.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.2.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.2.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.2.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.3.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.3.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.3.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/joining-and-start.spec.ts"
+    },
+    {
+      "id": "AC1.4.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "AC1.4.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "AC1.4.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "AC1.4.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "AC1.5.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-confirmation.spec.ts"
+    },
+    {
+      "id": "AC1.5.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-confirmation.spec.ts"
+    },
+    {
+      "id": "AC1.5.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "AC1.5.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "AC1.5.5",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "AC1.5.6",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "AC1.5.7",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "AC1.5.8",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-confirmation.spec.ts"
+    },
+    {
+      "id": "AC1.5.9",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "NFR1.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/week-calculation.spec.ts"
+    },
+    {
+      "id": "NFR1.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "NFR2.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR2.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/pg-store.ts"
+    },
+    {
+      "id": "NFR2.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR3.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/thin-slice.spec.ts",
+      "note": "U1 は 1 チーム分の入力の応答を測った。通常負荷での測定は U6"
+    },
+    {
+      "id": "NFR3.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/web/screens/FacilitatorBoard.tsx",
+      "note": "確定の応答で進行役の画面をすぐ更新し、ほかの画面は 1 秒おきに取り直す作り。2 秒以内の測定は U6 の負荷試験"
+    },
+    {
+      "id": "NFR3.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR3.4",
+      "status": "OK",
+      "target": "apps/beer-game3/src/web/screens/GameScreen.tsx",
+      "note": "取り直しは 1 秒周期の読み取りだけ。通常負荷・最大想定での応答時間の測定は U6"
+    },
+    {
+      "id": "NFR3.5",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/http-security-and-logs.spec.ts"
+    },
+    {
+      "id": "NFR3.6",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/http-security-and-logs.spec.ts"
+    },
+    {
+      "id": "NFR3.7",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR4.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/thin-slice.spec.ts",
+      "note": "U1 は 15 ゲームの並行処理を試験した。75〜270 台の画面の負荷は U6"
+    },
+    {
+      "id": "NFR4.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR4.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR4.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR5.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/integration/pg-store.spec.ts"
+    },
+    {
+      "id": "NFR6.1",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/keys-and-codes.spec.ts"
+    },
+    {
+      "id": "NFR6.2",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "NFR6.3",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/keys-and-codes.spec.ts"
+    },
+    {
+      "id": "NFR6.4",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/http-security-and-logs.spec.ts"
+    },
+    {
+      "id": "NFR6.5",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "NFR6.6",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/http-security-and-logs.spec.ts",
+      "note": "HTTPS の転送と HSTS の動作確認は staging で実施する"
+    },
+    {
+      "id": "NFR6.7",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/features/decisions-and-views.spec.ts"
+    },
+    {
+      "id": "NFR6.9",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/web/game-screens.spec.tsx"
+    },
+    {
+      "id": "NFR6.10",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/http-security-and-logs.spec.ts"
+    },
+    {
+      "id": "NFR6.11",
+      "status": "OK",
+      "target": "apps/beer-game3/tests/u1/unit/keys-and-codes.spec.ts"
+    },
+    {
+      "id": "NFR7.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "NFR5.2",
+      "status": "Deferred",
+      "target": "U4 が実装する（復帰用 token の有効期間 24 時間）。U1 の token は失効しない"
+    },
+    {
+      "id": "NFR5.3",
+      "status": "Deferred",
+      "target": "U4 が実装する（切断からの復帰）。U1 はデータを PostgreSQL にだけ置く"
+    },
+    {
+      "id": "NFR6.8",
+      "status": "Deferred",
+      "target": "U4 が実装する（無効なコードの試行回数の制限）。U1 は失敗の応答を同じ形にし、接続元を鍵付きの要約でログに残す"
+    },
+    {
+      "id": "NFR7.2",
+      "status": "Deferred",
+      "target": "U5 が実装する（保持期間と削除）。U1 はゲームの削除でコード・token・冪等性の記録も消える構造にした"
+    },
+    {
+      "id": "NFR7.3",
+      "status": "Deferred",
+      "target": "U5 が実装する（放置されたゲームの自動終了）"
+    },
+    {
+      "id": "NFR8",
+      "status": "Deferred",
+      "target": "u6-nfr-verification が行う（キーボード操作・コントラストの検査）。U1 の画面は標準の部品と data-testid で作った"
+    },
+    {
+      "id": "NFR9",
+      "status": "Deferred",
+      "target": "u3-facilitation が作る（操作の履歴）。U1 の構造化ログは監査の証跡ではない"
+    },
+    {
+      "id": "NFR10",
+      "status": "Deferred",
+      "target": "u6-nfr-verification が行う（主要ブラウザの検査）"
+    },
+    {
+      "id": "NFR11",
+      "status": "Deferred",
+      "target": "u6-nfr-verification が行う（日本語のみの表示の検査）。U1 の画面と応答は日本語で作った"
+    },
+    {
+      "id": "BR1.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR1.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR1.3",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR1.4",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/access/access-control.ts"
+    },
+    {
+      "id": "BR1.5",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/access/access-control.ts"
+    },
+    {
+      "id": "BR1.6",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR1.7",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR1.8",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR2.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR2.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR2.3",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR2.4",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR2.5",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR2.6",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/access/access-control.ts"
+    },
+    {
+      "id": "BR3.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR3.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR3.3",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR4.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/projection.ts"
+    },
+    {
+      "id": "BR4.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR4.3",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/schemas.ts"
+    },
+    {
+      "id": "BR4.4",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR4.5",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR4.6",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/pg-store.ts"
+    },
+    {
+      "id": "BR4.7",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR4.8",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR5.1",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR5.2",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR5.3",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR5.4",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR5.5",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR5.6",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR5.7",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR5.8",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/domain/engine.ts"
+    },
+    {
+      "id": "BR5.9",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/pg-store.ts"
+    },
+    {
+      "id": "BR5.10",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    },
+    {
+      "id": "BR5.11",
+      "status": "OK",
+      "target": "apps/beer-game3/src/server/session/game-session.ts"
+    }
+  ]
+}

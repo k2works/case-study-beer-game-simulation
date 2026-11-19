@@ -1,0 +1,51 @@
+# 本番を、直前（または指定）の版へ戻す（手動起動。GitHub の `production` 環境の承認を経る）。まだ AWS で検証していない。
+name: beer-game2-rollback-production
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_release:
+        description: '戻す先のコミット SHA（省略すると、現在と違う直近の成功した版）'
+        required: false
+        type: string
+
+concurrency:
+  group: beer-game2-deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/beer-game2
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      WEB_BUCKET: ${{ vars.WEB_BUCKET }}
+      DISTRIBUTION_ID: ${{ vars.DISTRIBUTION_ID }}
+      TARGET_RELEASE: ${{ inputs.target_release }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: apps/beer-game2/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/beer-game2/package-lock.json
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - run: bash scripts/deploy/rollback.sh
+      - run: npm ci
+      - name: スモークテスト（戻した後の確認）
+        env:
+          API_URL: ${{ vars.PRODUCTION_URL }}
+          ORIGIN: ${{ vars.PRODUCTION_URL }}
+        run: npx tsx scripts/smoke.ts

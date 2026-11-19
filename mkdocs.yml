@@ -1,8 +1,8 @@
-site_name: Site Name
-site_description: Site Description
-site_author: Project Team
-repo_url: https://github.com/k2works/claude-code-booster
-repo_name: claude-code-booster
+site_name: ビールゲームのケーススタディ
+site_description: ビールゲームのシミュレーションを題材にしたケーススタディ
+site_author: k2works
+repo_url: https://github.com/k2works/case-study-beer-game-simulation
+repo_name: case-study-beer-game-simulation
 
 theme:
   name: material
@@ -57,7 +57,7 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/k2works
-      name: GitHub Repository/claude-code-booster
+      name: GitHub Repository/case-study-beer-game-simulation
 
 plugins:
   - search
@@ -74,30 +74,225 @@ nav:
       - beer-game:
           - 概要: requirements/beer-game/index.md
           - 要件定義: requirements/beer-game/requirements_definition.md
+          - ビジネスユースケース: requirements/beer-game/business_usecase.md
+          - システムユースケース: requirements/beer-game/system_usecase.md
+          - ユーザーストーリー: requirements/beer-game/user_story.md
+      - beer-game2:
+          - 概要: requirements/beer-game2/index.md
+          - 要件定義: requirements/beer-game2/requirements_definition.md
+          - ビジネスユースケース: requirements/beer-game2/business_usecase.md
+          - システムユースケース: requirements/beer-game2/system_usecase.md
+          - ユーザーストーリー: requirements/beer-game2/user_story.md
+          - Unit 定義: requirements/beer-game2/unit_definition.md
   - 設計:
       - 概要: design/index.md
       - beer-game:
           - 概要: design/beer-game/index.md
+          - ドメインモデル: design/beer-game/domain-model.md
+          - データモデル: design/beer-game/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game/architecture-infrastructure.md
+          - 技術スタック: design/beer-game/tech-stack.md
+          - UI 設計: design/beer-game/ui-design.md
+          - テスト戦略: design/beer-game/test-strategy.md
+          - 非機能要件: design/beer-game/non-functional.md
+          - 運用要件: design/beer-game/operation.md
+      - beer-game2:
+          - 概要: design/beer-game2/index.md
+          - ドメインモデル: design/beer-game2/domain-model.md
+          - データモデル: design/beer-game2/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game2/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game2/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game2/architecture-infrastructure.md
+          - 技術スタック: design/beer-game2/tech-stack.md
+          - UI 設計: design/beer-game2/ui-design.md
+          - サイトシーイング・マップ: design/beer-game2/sightseeing-map.md
+          - ガイドツアー（ウォーキングスケルトン）: design/beer-game2/guided-tour-walking-skeleton.md
+          - テスト戦略: design/beer-game2/test-strategy.md
+          - 非機能要件: design/beer-game2/non-functional.md
+          - 運用要件: design/beer-game2/operation.md
+      - beer-game-kotlin:
+          - 概要: design/beer-game-kotlin/index.md
+          - ドメインモデル: design/beer-game-kotlin/domain-model.md
+          - データモデル: design/beer-game-kotlin/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game-kotlin/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game-kotlin/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game-kotlin/architecture-infrastructure.md
+          - 技術スタック: design/beer-game-kotlin/tech-stack.md
+          - UI 設計: design/beer-game-kotlin/ui-design.md
+          - テスト戦略: design/beer-game-kotlin/test-strategy.md
+          - 非機能要件: design/beer-game-kotlin/non-functional.md
+          - 運用要件: design/beer-game-kotlin/operation.md
+          - 生成物:
+              - 用語集（生成）: design/beer-game-kotlin/generated/glossary.md
+              - イベント一覧（生成）: design/beer-game-kotlin/generated/events.md
+              - コアのハイライト（生成）: design/beer-game-kotlin/generated/core-highlight.md
+              - ウォーキングスケルトンのガイドツアー（生成）: design/beer-game-kotlin/generated/walking-skeleton-tour.md
+              - 'ガイドツアー: CQRS（生成）': design/beer-game-kotlin/generated/cqrs-tour.md
+              - 'ガイドツアー: イベントソーシング（生成）': design/beer-game-kotlin/generated/event-sourcing-tour.md
+              - 'サイトシーイング・マップ: DDD（生成）': design/beer-game-kotlin/generated/ddd-sightseeing-map.md
+              - 'サイトシーイング・マップ: アーキテクチャ（生成）': design/beer-game-kotlin/generated/architecture-sightseeing-map.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
           - 概要: development/beer-game/index.md
+      - beer-game2:
+          - 概要: development/beer-game2/index.md
+          - リリース計画: development/beer-game2/release_plan.md
+          - Bolt 1 計画: development/beer-game2/bolt_1_plan.md
+          - Bolt 1 終了報告: development/beer-game2/bolt_1_report.md
+          - Bolt 2 計画: development/beer-game2/bolt_2_plan.md
+          - Bolt 3 計画: development/beer-game2/bolt_3_plan.md
+          - Bolt 3 終了報告: development/beer-game2/bolt_3_report.md
+          - Bolt 4 計画: development/beer-game2/bolt_4_plan.md
+          - Bolt 4 終了報告: development/beer-game2/bolt_4_report.md
+          - Bolt 5 計画: development/beer-game2/bolt_5_plan.md
+          - Bolt 5 終了報告: development/beer-game2/bolt_5_report.md
+          - Bolt 6 計画: development/beer-game2/bolt_6_plan.md
+          - Bolt 6 終了報告: development/beer-game2/bolt_6_report.md
+          - Bolt 7 計画: development/beer-game2/bolt_7_plan.md
+          - Bolt 7 終了報告: development/beer-game2/bolt_7_report.md
+          - Bolt 8 計画: development/beer-game2/bolt_8_plan.md
+          - Bolt 8 終了報告: development/beer-game2/bolt_8_report.md
+          - Bolt 9 計画: development/beer-game2/bolt_9_plan.md
+          - Bolt 9 終了報告: development/beer-game2/bolt_9_report.md
+          - Bolt 10 計画: development/beer-game2/bolt_10_plan.md
+          - Bolt 10 終了報告: development/beer-game2/bolt_10_report.md
+          - Bolt 11 計画: development/beer-game2/bolt_11_plan.md
+          - Bolt 11 終了報告: development/beer-game2/bolt_11_report.md
+          - Bolt 12 計画: development/beer-game2/bolt_12_plan.md
+          - Bolt 12 終了報告: development/beer-game2/bolt_12_report.md
+          - リリース完了報告書 0.2: development/beer-game2/release_report-0_2_0.md
+      - beer-game-kotlin:
+          - 概要: development/beer-game-kotlin/index.md
+          - リリース計画: development/beer-game-kotlin/release_plan.md
+          - 開発戦略: development/beer-game-kotlin/development_strategy.md
+          - Bolt 1 計画: development/beer-game-kotlin/bolt_1_plan.md
+          - Bolt 1 終了報告: development/beer-game-kotlin/bolt_1_report.md
+          - Bolt 2 計画: development/beer-game-kotlin/bolt_2_plan.md
+          - Bolt 2 終了報告: development/beer-game-kotlin/bolt_2_report.md
+          - Bolt 3 計画: development/beer-game-kotlin/bolt_3_plan.md
+          - Bolt 3 終了報告: development/beer-game-kotlin/bolt_3_report.md
+          - Bolt 4 計画: development/beer-game-kotlin/bolt_4_plan.md
+          - Bolt 4 終了報告: development/beer-game-kotlin/bolt_4_report.md
+          - Bolt 5 計画: development/beer-game-kotlin/bolt_5_plan.md
+          - Bolt 5 終了報告: development/beer-game-kotlin/bolt_5_report.md
+          - Bolt 6 計画: development/beer-game-kotlin/bolt_6_plan.md
+          - Bolt 6 終了報告: development/beer-game-kotlin/bolt_6_report.md
+          - Bolt 7 計画: development/beer-game-kotlin/bolt_7_plan.md
+          - Bolt 7 終了報告: development/beer-game-kotlin/bolt_7_report.md
+          - Bolt 8 計画: development/beer-game-kotlin/bolt_8_plan.md
+          - Bolt 8 終了報告: development/beer-game-kotlin/bolt_8_report.md
+          - Bolt 9 計画: development/beer-game-kotlin/bolt_9_plan.md
+          - Bolt 9 終了報告: development/beer-game-kotlin/bolt_9_report.md
+          - Bolt 10 計画: development/beer-game-kotlin/bolt_10_plan.md
+          - Bolt 10 終了報告: development/beer-game-kotlin/bolt_10_report.md
+          - Bolt 11 計画: development/beer-game-kotlin/bolt_11_plan.md
+          - Bolt 11 終了報告: development/beer-game-kotlin/bolt_11_report.md
+          - Bolt 12 計画: development/beer-game-kotlin/bolt_12_plan.md
+          - Bolt 12 終了報告: development/beer-game-kotlin/bolt_12_report.md
+          - Bolt 13 計画: development/beer-game-kotlin/bolt_13_plan.md
+          - Bolt 13 終了報告: development/beer-game-kotlin/bolt_13_report.md
+          - Bolt 14 計画: development/beer-game-kotlin/bolt_14_plan.md
+          - Bolt 14 終了報告: development/beer-game-kotlin/bolt_14_report.md
+          - Bolt 15 計画: development/beer-game-kotlin/bolt_15_plan.md
+          - Bolt 15 終了報告: development/beer-game-kotlin/bolt_15_report.md
+          - Unit U1 総括: development/beer-game-kotlin/unit_u1_summary.md
+          - Unit U1 ゲート確認手順: development/beer-game-kotlin/unit_u1_review_guide.md
+          - Unit U5 総括: development/beer-game-kotlin/unit_u5_summary.md
+          - Unit U6 総括: development/beer-game-kotlin/unit_u6_summary.md
+          - リリースの準備状況: development/beer-game-kotlin/release_readiness.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
           - 概要: operation/beer-game/index.md
+      - beer-game2:
+          - 概要: operation/beer-game2/index.md
+          - アプリケーション開発環境セットアップ: operation/beer-game2/application_dev_setup.md
+          - AWS ステージング環境セットアップ: operation/beer-game2/aws_staging_setup.md
+          - AWS プロダクション環境セットアップ・運用: operation/beer-game2/aws_production_setup.md
+      - beer-game-kotlin:
+          - 概要: operation/beer-game-kotlin/index.md
+          - デプロイ: operation/beer-game-kotlin/deploy.md
+          - ロールバック: operation/beer-game-kotlin/rollback.md
+          - コンテナのローカル実行: operation/beer-game-kotlin/container_local.md
+          - 観測: operation/beer-game-kotlin/observability.md
+          - 本番: operation/beer-game-kotlin/production.md
+          - 復元: operation/beer-game-kotlin/restore.md
+          - デモ環境（Heroku）: operation/beer-game-kotlin/demo.md
+      - beer-game3:
+          - リリース前の確認票: operation/beer-game3/release-checklist.md
+          - 必須のチェックの設定: operation/beer-game3/required-check.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:
           - 概要: review/beer-game/index.md
+      - beer-game2:
+          - 概要: review/beer-game2/index.md
+      - beer-game-kotlin:
+          - 概要: review/beer-game-kotlin/index.md
+          - 設計書レビュー（2026-11-14）: review/beer-game-kotlin/design_review_20261114.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
           - 概要: adr/beer-game/index.md
+          - ADR-001 週次計算の分離: adr/beer-game/001-pure-weekly-simulation.md
+          - ADR-002 状態を持たない API: adr/beer-game/002-stateless-api-row-lock.md
+          - ADR-003 アウトボックスと投影: adr/beer-game/003-outbox-projection-over-event-sourcing.md
+          - ADR-004 SSE による版の通知: adr/beer-game/004-sse-version-notification.md
+          - ADR-005 資格のダイジェスト保存: adr/beer-game/005-credential-digest-only.md
+          - ADR-006 SPA の構成: adr/beer-game/006-spa-without-router-or-store.md
+          - ADR-007 CloudFront の単一オリジン: adr/beer-game/007-cloudfront-single-origin.md
+          - ADR-008 保持削除の Saga: adr/beer-game/008-retention-saga.md
+      - beer-game2:
+          - 概要: adr/beer-game2/index.md
+          - ADR-001 beer-game2 として作り直す: adr/beer-game2/001-rebuild-as-beer-game2.md
+          - ADR-002 v1 の ADR の引き継ぎ: adr/beer-game2/002-adopt-v1-adrs.md
+          - ADR-003 ポートとアダプター: adr/beer-game2/003-ports-and-adapters-with-lint.md
+          - ADR-004 Game と Session の集約: adr/beer-game2/004-separate-game-and-session-aggregates.md
+          - ADR-005 役割別の週結果: adr/beer-game2/005-role-results-and-sql-read-models.md
+          - ADR-006 SSE は版の通知のみ: adr/beer-game2/006-sse-version-only.md
+          - ADR-007 カスケード削除: adr/beer-game2/007-cascade-deletion-without-queues.md
+          - ADR-008 自動確定と監査: adr/beer-game2/008-auto-commit-and-event-audit.md
+          - ADR-009 資格の鍵の版: adr/beer-game2/009-credential-key-versions.md
+          - ADR-010 URL ルーター: adr/beer-game2/010-url-router-and-features.md
+          - ADR-011 ドメイン・TLS・ヘッダー: adr/beer-game2/011-cloudfront-domain-tls-headers.md
+          - ADR-012 デリバリーと Terraform: adr/beer-game2/012-delivery-pipeline-and-terraform.md
+          - ADR-013 技術スタックの版: adr/beer-game2/013-tech-stack-versions.md
+      - beer-game-kotlin:
+          - 概要: adr/beer-game-kotlin/index.md
+          - ADR-001: adr/beer-game-kotlin/001-kotlin-version-of-beer-game2.md
+          - ADR-002: adr/beer-game-kotlin/002-event-sourcing-and-cqrs.md
+          - ADR-003: adr/beer-game-kotlin/003-synchronous-projections.md
+          - ADR-004: adr/beer-game-kotlin/004-idempotency-after-authorization.md
+          - ADR-005: adr/beer-game-kotlin/005-optimistic-concurrency-and-advisory-lock.md
+          - ADR-006: adr/beer-game-kotlin/006-event-schema-evolution.md
+          - ADR-007: adr/beer-game-kotlin/007-functional-core-with-arrow.md
+          - ADR-008: adr/beer-game-kotlin/008-api-contract-and-error-codes.md
+          - ADR-009: adr/beer-game-kotlin/009-observer-access-control.md
+          - ADR-010: adr/beer-game-kotlin/010-retention-deletion-with-append-only.md
+          - ADR-011: adr/beer-game-kotlin/011-strict-static-analysis.md
+          - ADR-012: adr/beer-game-kotlin/012-gherkin-and-cucumber.md
+          - ADR-013: adr/beer-game-kotlin/013-tech-stack-versions.md
+          - ADR-014: adr/beer-game-kotlin/014-h2-for-local-development.md
+          - ADR-015 復帰資格の受け渡しと失効: adr/beer-game-kotlin/015-credential-handover-and-session-revocation.md
+          - ADR-016 資格の鍵の版: adr/beer-game-kotlin/016-credential-key-versions.md
+          - ADR-017 失敗の窓を DB に持つ: adr/beer-game-kotlin/017-attempt-window-in-database.md
+          - ADR-018 型の注釈からの生成: adr/beer-game-kotlin/018-living-documentation-annotations.md
+          - ADR-019 再試行の上限と直列化: adr/beer-game-kotlin/019-retry-limit-and-serialization.md
+          - ADR-020 タブごとの資格の Cookie: adr/beer-game-kotlin/020-tab-scoped-credential-cookies.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:
           - 概要: journal/beer-game/index.md
+      - beer-game2:
+          - 概要: journal/beer-game2/index.md
+          - 2026-11-10: journal/beer-game2/20261110.md
+      - beer-game-kotlin:
+          - 概要: journal/beer-game-kotlin/index.md
+          - 2026-11-14: journal/beer-game-kotlin/20261114.md
+          - 2026-11-15: journal/beer-game-kotlin/20261115.md
   - 記事:
       - 概要: article/index.md
   - リファレンス:
@@ -136,7 +331,12 @@ nav:
       - リリース・イテレーション計画ガイド（AI-DLC 版）: reference/リリース・イテレーション計画ガイド_AI-DLC版.md
       - 環境変数管理ガイド: reference/環境変数管理ガイド.md
       - 言語別開発ガイド: reference/言語別開発ガイド.md
+      - メンタルモデル構築ガイド（汎用版）: reference/メンタルモデル構築ガイド_汎用版.md
+      - 関数型プログラミングガイド（Kotlin 編）: reference/関数型プログラミングガイド_Kotlin編.md
+      - 関数型プログラミングガイド（Rust 編）: reference/関数型プログラミングガイド_Rust編.md
+      - 関数型プログラミングガイド（Scala 編）: reference/関数型プログラミングガイド_Scala編.md
       - Java アプリケーション環境構築ガイド: reference/Javaアプリケーション環境構築ガイド.md
+      - Java アプリケーションデモ環境構築ガイド: reference/Javaアプリケーションデモ環境構築ガイド.md
       - TypeScript アプリケーション環境構築ガイド: reference/TypeScriptアプリケーション環境構築ガイド.md
       - 運用スクリプト作成ガイド: reference/運用スクリプト作成ガイド.md
       - Codex CLI MCP アプリケーション開発フロー: reference/CodexCLIMCPアプリケーション開発フロー.md

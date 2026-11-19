@@ -1,0 +1,63 @@
+# バージョンカタログ。版はここだけに書く。確認日 2026-11-14（docs/design/beer-game-kotlin/tech-stack.md）。
+# Gradle プラグインの版は Gradle Plugin Portal、ライブラリの版は Maven Central で、実在を確認した。
+[versions]
+kotlin = "2.4.21"
+ktor = "3.6.1"
+arrow = "2.3.0"
+coroutines = "1.11.0"
+serialization = "1.13.0"
+postgresql = "42.7.14"
+hikari = "7.1.0"
+flyway = "13.12.2"
+logback = "1.6.6"
+# logback 1.6.6 が前提にする SLF4J の版（logback-parent の slf4j.version）。
+slf4j = "2.0.19"
+kotest = "6.2.7"
+testcontainers = "2.0.5"
+kover = "0.9.11"
+detekt = "1.23.8"
+# PMD は CI のツール（実行時の依存関係ではない）。関数型ルールの XPath の検査に使う。導入は 2026-11-14 に承認済み。
+pmd = "7.29.0"
+# API の契約テスト（応答の適合の検査）。OpenAPI 3.1 の方言を持つ JSON Schema の検証器。テストだけで使う。導入は 2026-11-14 に承認済み。
+json-schema-validator = "3.0.9"
+ktlint-tool = "1.8.0"
+ktlint-plugin = "14.2.0"
+cucumber = "8.0.4"
+# Cucumber-JVM 8.0.4 の cucumber-junit-platform-engine が要求する JUnit の版（POM の junit-jupiter.version）。acceptanceTest だけで使う。
+junit-cucumber = "6.1.3"
+h2 = "2.5.252"
+
+[libraries]
+arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+ktor-server-core = { module = "io.ktor:ktor-server-core-jvm", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty-jvm", version.ref = "ktor" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages-jvm", version.ref = "ktor" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host-jvm", version.ref = "ktor" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+kotest-runner = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql", version.ref = "testcontainers" }
+cucumber-java = { module = "io.cucumber:cucumber-java", version.ref = "cucumber" }
+cucumber-junit-platform-engine = { module = "io.cucumber:cucumber-junit-platform-engine", version.ref = "cucumber" }
+junit-bom-cucumber = { module = "org.junit:junit-bom", version.ref = "junit-cucumber" }
+junit-platform-suite = { module = "org.junit.platform:junit-platform-suite" }
+junit-platform-launcher-cucumber = { module = "org.junit.platform:junit-platform-launcher" }
+pmd-cli = { module = "net.sourceforge.pmd:pmd-cli", version.ref = "pmd" }
+pmd-kotlin = { module = "net.sourceforge.pmd:pmd-kotlin", version.ref = "pmd" }
+json-schema-validator = { module = "com.networknt:json-schema-validator", version.ref = "json-schema-validator" }
+detekt-cli = { module = "io.gitlab.arturbosch.detekt:detekt-cli", version.ref = "detekt" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-plugin" }

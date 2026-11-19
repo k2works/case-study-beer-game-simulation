@@ -1,0 +1,11 @@
+{
+  "stage": "functional-design",
+  "unit": "u4-retention-operations",
+  "upstream_ids": ["AC5.1.1", "AC5.1.2", "AC5.1.3"],
+  "coverage": [
+    {"id": "AC5.1.1", "status": "OK", "target": "BR15.1"},
+    {"id": "AC5.1.2", "status": "OK", "target": "BR15.2, BR15.3, BR15.7"},
+    {"id": "AC5.1.3", "status": "OK", "target": "BR15.4, BR15.5, BR15.6"}
+  ],
+  "reverse": []
+}

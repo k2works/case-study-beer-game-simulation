@@ -1,0 +1,18 @@
+{
+  "stage": "nfr-requirements",
+  "unit": "u3-facilitation",
+  "upstream_ids": ["NFR1", "NFR2", "NFR3", "NFR4", "NFR5", "NFR6", "NFR7", "NFR8", "NFR9", "NFR10", "NFR11"],
+  "coverage": [
+    { "id": "NFR1", "status": "OK", "target": "NFR1.1" },
+    { "id": "NFR2", "status": "OK", "target": "NFR2.1, NFR2.2, NFR2.3" },
+    { "id": "NFR3", "status": "OK", "target": "NFR3.1, NFR3.2, NFR3.3, NFR3.4" },
+    { "id": "NFR4", "status": "OK", "target": "NFR4.1, NFR4.2, NFR4.3, NFR4.4" },
+    { "id": "NFR5", "status": "OK", "target": "NFR5.1, NFR5.2" },
+    { "id": "NFR6", "status": "OK", "target": "NFR6.1, NFR6.2, NFR6.3, NFR6.4, NFR6.5, NFR6.6, NFR6.7" },
+    { "id": "NFR7", "status": "OK", "target": "NFR7.1" },
+    { "id": "NFR8", "status": "N/A", "target": "画面の検査（キーボード操作、コントラスト）は u6-nfr-verification が行う。U3 の画面（進行管理）も、同じ検査を通す" },
+    { "id": "NFR9", "status": "OK", "target": "NFR9.1, NFR9.2, NFR9.3" },
+    { "id": "NFR10", "status": "N/A", "target": "主要ブラウザでの検査は u6-nfr-verification が行う。U3 は新しい技術を導入しない" },
+    { "id": "NFR11", "status": "N/A", "target": "日本語のみの表示の検査は u6-nfr-verification が行う。U3 の画面とエラーの理由・直し方は日本語で作る" }
+  ]
+}

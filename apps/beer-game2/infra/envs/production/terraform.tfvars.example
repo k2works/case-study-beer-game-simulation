@@ -1,0 +1,6 @@
+# コピーして terraform.tfvars にし、値を入れる（terraform.tfvars はコミットしない）。
+image               = "<ECR の URL>@sha256:<ステージングで検証したダイジェスト>"
+web_bucket_name     = "beer-game2-production-web-<アカウント ID>"
+domain_name         = "<独自ドメイン>"
+acm_certificate_arn = "arn:aws:acm:us-east-1:<アカウント ID>:certificate/<ID>"
+alert_email         = "<通知先>"

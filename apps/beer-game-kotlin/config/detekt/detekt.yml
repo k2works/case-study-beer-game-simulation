@@ -1,0 +1,10 @@
+# detekt 1.23.8 の標準ルール（buildUponDefaultConfig）に、最小の調整だけを足す。
+# 違反は 0 件（maxIssues: 0）。ベースラインは作らない。@Suppress は使わない。
+# 厳格な適用の完成（PMD の関数型ルール、fixture）は B2。
+build:
+  maxIssues: 0
+
+style:
+  MaxLineLength:
+    active: true
+    maxLineLength: 120

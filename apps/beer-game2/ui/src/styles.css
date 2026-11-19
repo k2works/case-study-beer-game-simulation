@@ -1,0 +1,149 @@
+:root {
+  --fg: #1d2733;
+  --bg: #fafaf7;
+  --accent: #1f5fbf;
+  --error: #b3261e;
+  color-scheme: light;
+}
+body {
+  margin: 0;
+  font-family: system-ui, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+main {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+label {
+  display: block;
+  margin: 0.75rem 0;
+}
+input,
+select,
+button {
+  font: inherit;
+  margin-left: 0.5rem;
+  padding: 0.4rem 0.6rem;
+}
+button {
+  margin-left: 0;
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.error {
+  color: var(--error);
+  border-left: 4px solid var(--error);
+  padding-left: 0.75rem;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1rem;
+}
+th,
+td {
+  border: 1px solid #c8ccd2;
+  padding: 0.3rem 0.5rem;
+  text-align: right;
+}
+[role='dialog'] {
+  border: 2px solid var(--accent);
+  background: #fff;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+.menu {
+  background: #fff;
+  border-bottom: 1px solid #c8ccd2;
+}
+.menu ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+  max-width: 56rem;
+}
+.menu a {
+  color: var(--accent);
+  text-decoration: none;
+  padding: 0.25rem 0;
+}
+.menu a[aria-current='page'] {
+  font-weight: bold;
+  border-bottom: 3px solid var(--accent);
+}
+.menu-sep {
+  color: #8a9099;
+}
+:root {
+  /* グラフの色（白地で 3:1 以上）。色だけに頼らず、線の種類と直接のラベルでも区別する */
+  --s1: #1f5fbf;
+  --s2: #b3261e;
+  --s3: #1b6e3a;
+  --s4: #7a3fb8;
+  --s5: #5b5f66;
+}
+fieldset {
+  border: 1px solid #c8ccd2;
+  margin: 0.75rem 0;
+}
+label.inline {
+  display: inline-block;
+  margin: 0.25rem 1rem 0.25rem 0;
+}
+label.inline input {
+  margin-right: 0.35rem;
+  margin-left: 0;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  max-width: 44rem;
+  color: var(--fg);
+  font-size: 12px;
+}
+.chart .grid {
+  stroke: #d5d8dd;
+  stroke-width: 1;
+}
+.chart .series-label {
+  font-weight: bold;
+}
+
+/* 進行役のコンソール: 4 役割を 2 × 2 で同時に見る。狭い画面では 1 列 */
+.console-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.role-panel {
+  border: 1px solid #d5d8dd;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+.role-panel h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+.role-panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.75rem;
+  margin: 0.25rem 0;
+}
+.role-panel dd {
+  margin: 0;
+}
+@media (max-width: 40rem) {
+  .console-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "stage": "functional-design",
+  "unit": "u3-facilitation",
+  "upstream_ids": [
+    "AC2.2.1", "AC2.2.2",
+    "AC2.3.1",
+    "AC2.5.1", "AC2.5.2", "AC2.5.3", "AC2.5.4",
+    "AC2.6.1", "AC2.6.2", "AC2.6.3",
+    "AC2.7.1",
+    "AC2.8.1", "AC2.8.2",
+    "AC5.6.1"
+  ],
+  "coverage": [
+    { "id": "AC2.2.1", "status": "OK", "target": "BR12.1; BR12.2" },
+    { "id": "AC2.2.2", "status": "OK", "target": "BR12.3" },
+    { "id": "AC2.3.1", "status": "OK", "target": "BR12.4" },
+    { "id": "AC2.5.1", "status": "OK", "target": "BR9.3; BR9.1" },
+    { "id": "AC2.5.2", "status": "OK", "target": "BR9.2" },
+    { "id": "AC2.5.3", "status": "OK", "target": "BR9.5" },
+    { "id": "AC2.5.4", "status": "OK", "target": "BR9.7" },
+    { "id": "AC2.6.1", "status": "OK", "target": "BR10.2; BR10.3; BR10.4" },
+    { "id": "AC2.6.2", "status": "OK", "target": "BR10.1" },
+    { "id": "AC2.6.3", "status": "OK", "target": "BR10.5" },
+    { "id": "AC2.7.1", "status": "OK", "target": "BR11.1; BR11.3" },
+    { "id": "AC2.8.1", "status": "OK", "target": "BR14.1" },
+    { "id": "AC2.8.2", "status": "OK", "target": "BR14.3" },
+    { "id": "AC5.6.1", "status": "OK", "target": "BR13.1; BR13.3; BR13.4" }
+  ],
+  "reverse": [
+    { "id": "BR9.4", "status": "N/A", "target": "FR11.1 の終了。進行中と一時停止中から進行役が終了する遷移の条件（準備中は対象外）" },
+    { "id": "BR9.6", "status": "N/A", "target": "FR11.1 の終了の冪等。最終週の確定との競合と再送を安全にする技術的な規則（Q7）" },
+    { "id": "BR9.8", "status": "N/A", "target": "FR1.6 の進行役の権限。U3 の操作にも同じ判定を通す認可の規則" },
+    { "id": "BR10.6", "status": "N/A", "target": "FR3.2 の入れ替えの再送の安全。参加者の二重作成と token の巻き添え失効を防ぐ技術的な規則" },
+    { "id": "BR11.2", "status": "N/A", "target": "FR7.2 の確定前の変更と FR3.3 の後勝ち。入力した主体を記録する規則（Q5）" },
+    { "id": "BR11.4", "status": "N/A", "target": "FR7.3 の二重送信の防止。代理入力にも同じ識別子の規則を通す技術的な規則" },
+    { "id": "BR13.2", "status": "N/A", "target": "履歴を追記のみにして順序を sequence で決める技術的な規則" },
+    { "id": "BR13.5", "status": "N/A", "target": "履歴を進行役だけに返す認可の規則（US5.6 の履歴は進行役が追う）" },
+    { "id": "BR13.6", "status": "N/A", "target": "資格情報の平文を履歴に残さない秘匿情報の規則" },
+    { "id": "BR14.2", "status": "N/A", "target": "FR4.5 の進行管理で入力値を示さない情報の制約（Q8）" }
+  ]
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ログの出力先は標準出力（コンテナのログドライバが収集する）。
+  アプリのログ（logger "beergame.log"）は、LogRecord の 1 行の JSON をそのまま出す（資格・表示名・非公開の値を含まない型）。
+  Logback は、枠組み（Ktor、Netty、Hikari、Flyway）のログ用で、別の形式にする。
+-->
+<configuration>
+  <appender name="APP" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.out</target>
+    <encoder>
+      <pattern>%msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FRAMEWORK" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.out</target>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level framework %logger{20} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <logger name="beergame.log" level="INFO" additivity="false">
+    <appender-ref ref="APP"/>
+  </logger>
+
+  <root level="INFO">
+    <appender-ref ref="FRAMEWORK"/>
+  </root>
+</configuration>
