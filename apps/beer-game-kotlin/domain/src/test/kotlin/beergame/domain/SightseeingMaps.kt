@@ -93,7 +93,8 @@ internal object SightseeingMaps {
         landmarks: List<Landmark>,
     ): String {
         val order = doc.categories.map { it.first }
-        val ofMap = landmarks.filter { it.map == doc.map }.sortedWith(compareBy({ order.indexOf(it.layer) }, { it.element }))
+        val ofMap =
+            landmarks.filter { it.map == doc.map }.sortedWith(compareBy({ order.indexOf(it.layer) }, { it.element }))
         val dependencies =
             if (doc.withDependencies) {
                 listOf(
@@ -176,7 +177,7 @@ internal object SightseeingMaps {
             if (group.isEmpty()) {
                 emptyList()
             } else {
-                listOf("### $category", "", meaning, "") + group.flatMap { landmarkLines(it) }
+                listOf("### $category", "", meaning, "") + group.map(::landmarkLines).flatten()
             }
         }
 

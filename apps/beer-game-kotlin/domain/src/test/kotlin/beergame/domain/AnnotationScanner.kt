@@ -21,7 +21,8 @@ internal object AnnotationScanner {
     private const val APP = "apps/beer-game-kotlin"
     private val MODULES = listOf("domain", "application", "adapter-persistence", "adapter-http", "app")
 
-    private const val MODIFIERS = "internal|private|public|suspend|inline|data|sealed|value|enum|open|abstract|annotation"
+    private const val MODIFIERS =
+        "internal|private|public|suspend|inline|data|sealed|value|enum|open|abstract|annotation"
     private val DECLARATION =
         Regex("""^\s*(?:(?:$MODIFIERS)\s+)*(fun|class|interface|object)\s+(?:<[^>]*>\s*)?([\w.]+)""")
 

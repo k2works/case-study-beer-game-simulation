@@ -6,9 +6,9 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain as shouldContainText
 import io.kotest.matchers.string.shouldMatch
 import java.nio.file.Files
+import io.kotest.matchers.string.shouldContain as shouldContainText
 
 /** 注釈を走査する単体検査に使う、小さな入力。順序を持たない（rank が無い）ことが、ガイドツアーとの違い。 */
 private const val SAMPLE =
@@ -71,7 +71,10 @@ class SightseeingMapSpec :
 
         test("[マップ] 注釈のあるマップは、文書の定義（2 枚）と過不足なく対応する（定義の無いマップ名・注釈の無い定義が無い）") {
             landmarks.map { it.map }.toSet() shouldBe SightseeingMaps.docs.map { it.map }.toSet()
-            SightseeingMaps.docs.map { it.file }.toSet().size shouldBe SightseeingMaps.docs.size
+            SightseeingMaps.docs
+                .map { it.file }
+                .toSet()
+                .size shouldBe SightseeingMaps.docs.size
         }
 
         test("[マップ] どのマップも、見どころは 5〜7 個に絞る（上限 10。多すぎると、意味が薄れる）。名前は一意で、区分は定義の中にある") {
