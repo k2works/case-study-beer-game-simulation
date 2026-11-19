@@ -104,6 +104,11 @@ data class SessionData(
     "進行（プレイ）",
     "進行の状態（未開始・進行中・一時停止・終了）。session ストリームのイベントを畳み込んだ結果で、4 役割の入力を揃えて週を一度だけ確定する整合性の土台",
 )
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦術的設計",
+    description = "集約（進行）。イベントの畳み込みで復元し、4 役割の入力を揃えて週を一度だけ確定する整合性の境界",
+)
 sealed interface SessionState {
     val version: StreamVersion
 
@@ -178,6 +183,11 @@ sealed interface SessionCommand : Command {
     ) : SessionCommand
 }
 
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦術的設計",
+    description = "ドメインイベント。進行で起きた事実を、過去形で表す。状態はここから取り戻し、投影の元にもなる",
+)
 sealed interface SessionEvent : DomainEvent {
     /** 設定と役割の割り当ての写しを運ぶ。以後 session は game を読まない（D4）。[gameId] は session の識別子でもある。 */
     @EventSpec("EV-S01", "StartGame（game ストリームの GameStarted と同一トランザクション）")

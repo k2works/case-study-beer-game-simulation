@@ -6,6 +6,11 @@ import arrow.core.right
 
 /** 発注数・生産要請数。0〜1000 の整数（BR-10）。 */
 @Term("発注量", "各週に、役割が上流へ注文する数量。0〜1000 の整数", "BR-10")
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦術的設計",
+    description = "値オブジェクト。0〜1000 の整数という不変条件を、生成の時点で守る。範囲外の値は、型として存在できない",
+)
 @JvmInline
 value class Quantity private constructor(
     val value: Int,

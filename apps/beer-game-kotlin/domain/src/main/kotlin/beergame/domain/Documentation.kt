@@ -15,6 +15,11 @@ package beergame.domain
  * @property definition 業務の言葉での定義
  * @property source 定義の出典（受入条件、設計書の節など）
  */
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦略的設計",
+    description = "ユビキタス言語。業務の言葉と定義・出典を、型に付けて残す。用語集はここから生成され、コードと会話の言葉がずれない",
+)
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
 @MustBeDocumented
@@ -32,6 +37,11 @@ annotation class Term(
  * @property context 設計書の表のコンテキスト名（「シミュレーション計算」「進行（プレイ）」）。表の名前と一致させる
  * @property description なぜ核心か（コードを読むだけでは分からない、意図と背景）。読み手は、新しく参加する開発者
  */
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦略的設計",
+    description = "中核の識別。設計書の境界付けられたコンテキストの分類で「中核」とされたものだけに付け、力を注ぐ場所を絞る",
+)
 @Target(AnnotationTarget.CLASS, AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
 @MustBeDocumented

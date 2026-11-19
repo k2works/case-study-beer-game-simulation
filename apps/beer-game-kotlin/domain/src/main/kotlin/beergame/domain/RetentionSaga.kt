@@ -106,6 +106,11 @@ sealed interface RetentionRejection {
 private const val BASE_BACKOFF_MINUTES = 5L
 private const val LEASE_MINUTES = 30L
 
+@KeyLandmark(
+    map = "ドメイン駆動設計（DDD）",
+    layer = "戦術的設計",
+    description = "プロセスマネージャー。保持期間の削除という、複数の段階にまたがる手続きの進み方（再試行・間隔）を、状態を持たず決める",
+)
 object RetentionSaga {
     /** 最大の試行回数。5 回続けて失敗したら、再試行をやめて通知する。 */
     const val MAX_ATTEMPTS = 5
