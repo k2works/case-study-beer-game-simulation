@@ -12253,7 +12253,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">6</td>
-<td style="text-align: left;">資格の Cookie は <code>HttpOnly</code>・<code>Secure</code>・<code>SameSite=Strict</code>。<strong>タブごとに名前を変える</strong>（<code>X-Tab-Id</code> ヘッダー、<code>bg_session_&lt;id&gt;</code>・<code>bg_recovery_&lt;id&gt;</code>。ADR-020。提案）</td>
+<td style="text-align: left;">資格の Cookie は <code>HttpOnly</code>・<code>Secure</code>・<code>SameSite=Strict</code>。<strong>タブごとに名前を変える</strong>（<code>X-Tab-Id</code> ヘッダー、<code>bg_session_&lt;id&gt;</code>・<code>bg_recovery_&lt;id&gt;</code>。ADR-020。Rust 版でも扱う。2026-11-19 決定）</td>
 <td style="text-align: left;">Cookie の発行・読み取りを自前で書くため、属性や名前の解決の漏れが起きうる</td>
 <td style="text-align: left;">HTTP の統合テスト（ヘッダーのテスト）。ADR-020 は Kotlin 版でも提案中（承認前）</td>
 </tr>
@@ -12297,7 +12297,7 @@
 <h2 id="_5">アクセシビリティ<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p><strong>WCAG 2.2 AA を目標とし、Kotlin 版（と beer-game2）の内容をそのまま引き継ぎます</strong>（キーボードだけで完了、色だけで状態を表さない、200% 拡大で横スクロールなし、操作対象の大きさ、フォーカスの管理）。検証は、コンポーネントテストと E2E の axe、手動の確認（スクリーンリーダー）です（NFR-08。担当者と時期は <a href="../../beer-game-kotlin/ui-design/">Kotlin 版の未決事項</a> のとおり）。</p>
 <h2 id="_6">設計判断<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
-<h3 id="ru1-ui-kotlin">RU1: UI 設計は複製せず、Kotlin 版を正本として参照する<a class="headerlink" href="#ru1-ui-kotlin" title="Permanent link">&para;</a></h3>
+<h3 id="ru1-ui-kotlin-2026-11-19">RU1: UI 設計は複製せず、Kotlin 版を正本として参照する（承認済み。2026-11-19）<a class="headerlink" href="#ru1-ui-kotlin-2026-11-19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -12308,7 +12308,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">Rust 版の UI 設計は差分の文書にとどめ、画面・遷移・画面イメージ・辞書は Kotlin 版を正本として参照する</td>
 <td style="text-align: left;">食い違いが生まれない。API の契約が同じ間は変更が一度で済む。参照先を読む手間が増える</td>
 </tr>
@@ -12325,7 +12325,7 @@
 </tbody>
 </table>
 <p>トレードオフ: A は、Rust 版を単独で読む人が Kotlin 版に移る必要がある。<strong>将来 UI が実装ごとに分かれる場合は、複製（B）に切り替える</strong>（その時点の差分を ADR に記録する）。</p>
-<h3 id="ru2">RU2: 契約から外れる実装の逸脱は、画面でなくバックエンドで直す<a class="headerlink" href="#ru2" title="Permanent link">&para;</a></h3>
+<h3 id="ru2-2026-11-19">RU2: 契約から外れる実装の逸脱は、画面でなくバックエンドで直す（承認済み。2026-11-19）<a class="headerlink" href="#ru2-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>画面は API の契約にだけ依存し、実装の違いを知りません。上の影響の表の逸脱は、<strong>バックエンドを契約に合わせて直す</strong>（画面を実装ごとに分岐させない）。画面の変更が避けられないときは、設計の矛盾として扱います。</p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
@@ -12355,11 +12355,11 @@
 <p><strong>画面・遷移・インタラクション・アクセシビリティは変えません。</strong></p>
 <h2 id="_7">未決事項<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>RU1 の承認</strong>: UI 設計を参照にとどめる方針でよいか（案 B なら複製する）。</li>
+<li>~~<strong>RU1 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した（RU1・RU2）。</li>
 <li><strong>axum・tower の既定の応答</strong>（#1・#2）: 拒否（rejection）とタイムアウト・負荷の制限の既定の形、problem+json への写像の方法（B1 で確認）。</li>
 <li><strong>axum の SSE の心拍・切断</strong>（#5）。</li>
 <li><strong>辞書の網羅の検査</strong>: 既存のフロントエンドに、辞書がすべての <code>code</code> を網羅することの検査があるか。なければ契約テストに加える。</li>
-<li><strong>ADR-020（タブごとの Cookie 名）</strong>: Kotlin 版でも提案中。承認後に Rust 版へ反映する。</li>
+<li>~~<strong>ADR-020（タブごとの Cookie 名）</strong>~~ <strong>解消（2026-11-19）</strong>: Rust 版でも扱うと決定した（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）。</li>
 <li><strong>数値の型の範囲</strong>（#10）: 契約に整数の範囲を書くか。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 手動のアクセシビリティの確認の担当者と時期、保持の表示（暫定。M5）、自動確定の本人へのフィードバックの文言、参加者のロビーの扱い（B1 の実装は進行役だけ）、ヘルプの教材の本文の人による確認。いずれも <a href="../../beer-game-kotlin/ui-design/">Kotlin 版の未決事項</a> に追従する。</li>
 <li><strong>フロントエンドの共有方法</strong>（フロントエンドアーキテクチャの Rust 版は未着手）: <code>web/</code> を Kotlin 版と共有するか複製するか。共有するなら、UI 設計を参照にとどめる RU1 と整合する。</li>

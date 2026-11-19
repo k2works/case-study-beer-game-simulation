@@ -12497,10 +12497,10 @@
 </tr>
 </tbody>
 </table>
-<h3 id="rd1-enum-match">RD1: 状態の違いは <code>enum</code> の列挙子で表し、網羅は <code>match</code> に任せる<a class="headerlink" href="#rd1-enum-match" title="Permanent link">&para;</a></h3>
+<h3 id="rd1-enum-match-2026-11-19">RD1: 状態の違いは <code>enum</code> の列挙子で表し、網羅は <code>match</code> に任せる（承認済み。2026-11-19）<a class="headerlink" href="#rd1-enum-match-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の <code>sealed interface</code> + <code>when</code>（else なし）に対応します。Rust の <code>match</code> は網羅性をコンパイラが検査するため、状態・イベント・エラーの列挙子を足したときに、見直す箇所がコンパイルエラーで分かります。ただし、<code>evolve</code> の最後の腕に <code>_</code> を使うと、<strong>イベントの追加の見落としは検出できません</strong>（上記）。このため、「<code>decide</code> が作る列は <code>Ignored</code> にならない」性質テストを必須にします。</p>
-<h3 id="rd2">RD2: ストリームの版は状態に持たせず、永続化の層が持つ<a class="headerlink" href="#rd2" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版は <code>State.version</code> を持ち、<code>evolve</code> が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、<code>evolve</code> の結果を <code>Evolution::{Applied, Ignored}</code> で<strong>明示</strong>し、版は <code>(state, version)</code> として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、<code>Ignored</code> を直接検知（ログとメトリクス）できます。<strong>これは Kotlin 版からの設計の変更</strong>であり、<strong>ユーザーが 2026-11-19 に案 A を承認しました</strong>（RD1・RD3〜RD5 は承認前の提案です）。</p>
+<h3 id="rd2-2026-11-19">RD2: ストリームの版は状態に持たせず、永続化の層が持つ（承認済み。2026-11-19）<a class="headerlink" href="#rd2-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>Kotlin 版は <code>State.version</code> を持ち、<code>evolve</code> が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、<code>evolve</code> の結果を <code>Evolution::{Applied, Ignored}</code> で<strong>明示</strong>し、版は <code>(state, version)</code> として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、<code>Ignored</code> を直接検知（ログとメトリクス）できます。<strong>これは Kotlin 版からの設計の変更</strong>であり、<strong>ユーザーが 2026-11-19 に案 A を承認しました</strong>（RD1・RD3〜RD5 も、同日にユーザーが承認しました）。</p>
 <table>
 <thead>
 <tr>
@@ -12522,11 +12522,11 @@
 </tr>
 </tbody>
 </table>
-<h3 id="rd3-result-vec">RD3: 失敗は <code>Result</code>、複数の誤りは <code>Vec</code> に集める<a class="headerlink" href="#rd3-result-vec" title="Permanent link">&para;</a></h3>
+<h3 id="rd3-result-vec-2026-11-19">RD3: 失敗は <code>Result</code>、複数の誤りは <code>Vec</code> に集める（承認済み。2026-11-19）<a class="headerlink" href="#rd3-result-vec-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>Arrow の <code>Either</code> / <code>Raise</code> / <code>zipOrAccumulate</code> を使わず、標準の <code>Result</code>、<code>?</code>、小さな <code>collect</code> 関数で表します（<a href="../tech-stack/">技術スタック</a> の変更の表）。<code>Raise</code> のような「失敗のコンテキスト」は持たず、<code>?</code> による早期の失敗で足ります。誤りの集約は上のコードで確認しました。<code>NonEmptyList</code> に当たるものは、<code>Vec</code> が空でないことを型で保証しない代わりに、<code>validate_*</code> が「誤りがあれば必ず 1 件以上」を返す関数の契約とテストで守ります。</p>
-<h3 id="rd4-code-match-api">RD4: エラーの <code>code</code> は <code>match</code> の網羅で付け、一覧は API の契約として固定する<a class="headerlink" href="#rd4-code-match-api" title="Permanent link">&para;</a></h3>
+<h3 id="rd4-code-match-api-2026-11-19">RD4: エラーの <code>code</code> は <code>match</code> の網羅で付け、一覧は API の契約として固定する（承認済み。2026-11-19）<a class="headerlink" href="#rd4-code-match-api-2026-11-19" title="Permanent link">&para;</a></h3>
 <p><code>code()</code> と <code>category()</code> を列挙子ごとの <code>match</code> で書くため、列挙子の追加時に付け忘れません。一覧そのものは、フロントエンドの辞書の鍵であり、変えません。<strong>エラー型の <code>Display</code> を <code>thiserror</code> で書くか、手で書くか</strong>は未決事項です。</p>
-<h3 id="rd5-crate-lint">RD5: ドメインの crate の純粋性は、依存の制限と lint で守る<a class="headerlink" href="#rd5-crate-lint" title="Permanent link">&para;</a></h3>
+<h3 id="rd5-crate-lint-2026-11-19">RD5: ドメインの crate の純粋性は、依存の制限と lint で守る（承認済み。2026-11-19）<a class="headerlink" href="#rd5-crate-lint-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版は detekt の <code>ForbiddenMethodCall</code> で時計・乱数の呼び出しを禁止します。Rust 版は、ドメインの crate が <code>tokio</code>・<code>sqlx</code>・<code>rand</code> などに<strong>依存しない</strong>ことを第一の守りとします（依存がなければ呼べません）。<code>std::time::SystemTime::now</code> のような標準の呼び出しの禁止は、clippy の <code>disallowed_methods</code> で足りるかを未確認とし、B1 で確かめます。</p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
@@ -12592,7 +12592,7 @@
 <p>上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。</p>
 <h2 id="_13">未決事項<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li>~~<strong>RD2 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 案 A を採用した。残りの RD1・RD3〜RD5 は承認前。</li>
+<li>~~<strong>RD2 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 案 A を採用した。RD1・RD3〜RD5 も同日に承認された（RD5 の lint の確認は B1）。</li>
 <li><strong>エラー型の実装</strong>: <code>thiserror</code> を使うか、手で <code>Display</code> を書くか。ドメインの crate の依存を最小にする観点と比較する。</li>
 <li><strong>数量・金額の整数の幅</strong>: <code>Quantity</code> は <code>u32</code>、<code>Units</code>（上限のない非負の流れの数量）と <code>Money</code> の幅は <code>u64</code> / <code>i64</code> を第一候補とし、<code>simulate_week</code> の演算の範囲を確かめて確定する。</li>
 <li><strong>イベントの JSON の書式</strong>: serde の内部タグ付き列挙型で、アップキャスト（<code>schema_version</code>）を表せるか。B1 で確かめる。</li>

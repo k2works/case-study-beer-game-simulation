@@ -12154,7 +12154,7 @@
 <tr>
 <td style="text-align: left;">ローカル開発の DB</td>
 <td style="text-align: left;">H2 を許す</td>
-<td style="text-align: left;">未決（<a href="../tech-stack/">技術スタック</a>）。PostgreSQL を推奨</td>
+<td style="text-align: left;">PostgreSQL 18（Docker。2026-11-19 決定）</td>
 <td style="text-align: left;">NF-S20、NF-S18 の検証範囲</td>
 </tr>
 </tbody>
@@ -12904,7 +12904,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="rn1-jvm">RN1: JVM に固有の要件は、実行環境に読み替え、実測のない数値は変えない<a class="headerlink" href="#rn1-jvm" title="Permanent link">&para;</a></h3>
+<h3 id="rn1-jvm-2026-11-19">RN1: JVM に固有の要件は、実行環境に読み替え、実測のない数値は変えない（承認済み。2026-11-19）<a class="headerlink" href="#rn1-jvm-2026-11-19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -12915,7 +12915,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">JVM に固有の項目（ウォームアップ、ヒープ・GC）を、Rust の実行環境（接続プールの温まり、RSS、タスク数）に読み替える。<strong>数値の目標は、Kotlin 版の提案値を上限として引き継ぎ、Rust の実測で見直す</strong>（実測前に厳しくも緩くもしない）</td>
 <td style="text-align: left;">根拠のない数値を、確定した要件にしない（Kotlin 版の N-2 と同じ方針）。Rust が速いはずという期待だけで目標を縮めない</td>
 </tr>
@@ -12931,18 +12931,18 @@
 </tr>
 </tbody>
 </table>
-<h3 id="rn2-nf-r18">RN2: キャンセル安全性（NF-R18）を要件として新設する<a class="headerlink" href="#rn2-nf-r18" title="Permanent link">&para;</a></h3>
+<h3 id="rn2-nf-r182026-11-19">RN2: キャンセル安全性（NF-R18）を要件として新設する（承認済み。2026-11-19）<a class="headerlink" href="#rn2-nf-r182026-11-19" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版は、キャンセルの扱い（<code>NonCancellable</code>、<code>CancellationException</code> の再送出）を実装の方針として持ちますが、非機能要件の ID は持ちません。<strong>Rust ではキャンセルが future の drop であり、ハンドラが途中で止まりうるため、要件として検証可能にします</strong>（NF-R18）。RB2 の前提が確認できなければ、設計を見直します。</p>
-<h3 id="rn3-80">RN3: カバレッジのゲートは行 80%、分岐は目安<a class="headerlink" href="#rn3-80" title="Permanent link">&para;</a></h3>
+<h3 id="rn3-802026-11-19">RN3: カバレッジのゲートは行 80%、分岐は目安（承認済み。2026-11-19）<a class="headerlink" href="#rn3-802026-11-19" title="Permanent link">&para;</a></h3>
 <p><a href="../test-strategy/">テスト戦略</a> の RT3 と同じです（NF-O7）。</p>
 <h2 id="_22">未決事項<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>数値目標（SLO、保持、容量、資格の有効期間）を、運営者と合意する</strong>（Kotlin 版と同じ）。</li>
 <li><strong>Rust 版の実測</strong>: NF-P15・NF-P16・NF-P17・NF-P18・NF-P19 の目標値は、すべて提案で、Rust の実測で見直す。計測の道具（<code>criterion</code> などの採否）は未選定。</li>
-<li><strong>RN1 の承認</strong>: JVM の項目の読み替えと、「実測前に数値を変えない」方針でよいか。</li>
+<li>~~<strong>RN1 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した（RN1〜RN3）。</li>
 <li><strong>NF-R18 の前提の確認</strong>（B1）: sqlx のトランザクションの drop での ROLLBACK、<code>tokio::spawn</code> による隔離、シャットダウン時の完了待ち。</li>
 <li><strong>NF-S22 の <code>unsafe</code> の可視化</strong>の手段（<code>cargo-deny</code> で足りるか、別の道具が要るか）。承認が要る。</li>
-<li><strong>ローカル開発の DB</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。H2 を持たないため、NF-S18・NF-S20 の検証範囲は、PostgreSQL をローカルでも使えば全環境で同じになる。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。NF-S18・NF-S20 の検証範囲は全環境で同じになる。</li>
 <li><strong>保存回数の上限</strong>（NF-C8。最大の長さ 2000 件の根拠）、<strong>資格の有効期間の既定値</strong>、<strong>負荷試験の実施環境</strong>、<strong>追記の競合の自動再試行の上限と間隔</strong>（NF-R17。初期値 10 を引き継ぎ、Rust で再計測）、<strong>研修中の再構築の方式</strong>（NF-R15。暫定）、<strong>保持の起点</strong>（NF-S16。暫定）、<strong>出力のキャッシュ</strong>（NF-P9）。いずれも <a href="../../beer-game-kotlin/non-functional/">Kotlin 版の未決事項</a> に追従する。</li>
 <li><strong>コンテナのメモリの割り当て</strong>（NF-P17。インフラの設計と合わせて決める）と、<strong>NF-P16 の Fargate での実測</strong>。</li>
 </ol>

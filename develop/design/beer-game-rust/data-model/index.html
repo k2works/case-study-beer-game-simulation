@@ -12132,7 +12132,7 @@
 <tr>
 <td style="text-align: left;">6</td>
 <td style="text-align: left;">ロールと GRANT は PostgreSQL の統合テストでだけ検証し、H2 では省略</td>
-<td style="text-align: left;"><strong>すべての環境（ローカルを含む）で PostgreSQL を使う前提</strong>。ローカルの DB は未決だが、PostgreSQL を採る限り、ロールと GRANT の検証は全環境で同じ</td>
+<td style="text-align: left;"><strong>すべての環境（ローカルを含む）で PostgreSQL を使う前提</strong>。ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定）で、ロールと GRANT の検証は全環境で同じ</td>
 <td style="text-align: left;"><a href="../tech-stack/#未決事項">技術スタックの未決事項</a> の 1</td>
 </tr>
 </tbody>
@@ -12365,10 +12365,10 @@
 <h2 id="_14">インデックス（主なもの）<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版と同じです（<code>events</code> の <code>(game_id, stream_type, stream_version)</code> 一意と <code>(seq)</code> 一意と <code>(game_id, actor_kind, actor_id)</code>、<code>game_join_codes.join_code</code> 一意、<code>credentials</code> の <code>(game_id, kind, subject_id)</code> と <code>(expires_at)</code>、<code>browser_sessions</code> の <code>(game_id, expires_at)</code>、<code>participation_attempts</code> の <code>(window_start)</code>、<code>lobby_participants</code> の <code>(game_id)</code>、<code>idempotency_records</code> の <code>(expires_at)</code> と部分一意、<code>retention_policies</code> の <code>(delete_after, game_id)</code>、<code>deletion_runs</code> の <code>next_attempt_at</code> の部分索引）。<code>events</code> の 3 つの索引と、<code>idempotency_records</code> の部分一意索引は、上の DDL で検証済みです。</p>
 <h2 id="_15">ローカル開発のデータベース<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
-<p>Kotlin 版は、H2 の PostgreSQL モードでローカル起動を許し、省略する制約の一覧（<code>uq_idempotency_create</code>、追記専用、ロールの分離、プールの分離、複数プロセスの直列化、削除ロールの限定、REPEATABLE READ）を持ちます。<strong>Rust 版には H2 がなく、ローカルの DB は未決です</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。データモデルの観点では、次のとおりです。</p>
+<p>Kotlin 版は、H2 の PostgreSQL モードでローカル起動を許し、省略する制約の一覧（<code>uq_idempotency_create</code>、追記専用、ロールの分離、プールの分離、複数プロセスの直列化、削除ロールの限定、REPEATABLE READ）を持ちます。<strong>Rust 版には H2 がなく、ローカルの DB は PostgreSQL 18（Docker）に決定しました（2026-11-19）</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。データモデルの観点では、次のとおりです。</p>
 <ul>
 <li><strong>PostgreSQL（Docker など）をローカルでも使うなら</strong>、上の制約・ロール・部分一意索引・アドバイザリロック・LISTEN/NOTIFY がすべて使え、<strong>Kotlin 版の「H2 版で省略する制約」の一覧は不要</strong>になる。</li>
-<li>別の軽量 DB を採るなら、Kotlin 版の「方言の差分」と「乖離のリスクと対策」と同じ作業（差分の実測、契約テストを両実装で実行、<code>APP_ENV</code> による本番での拒否）が要る。<strong>データモデルの単純さのため、PostgreSQL を採ることを推奨</strong>します。ただし決定は未決事項です。</li>
+<li>別の軽量 DB を採るなら、Kotlin 版の「方言の差分」と「乖離のリスクと対策」と同じ作業（差分の実測、契約テストを両実装で実行、<code>APP_ENV</code> による本番での拒否）が要る。<strong>ローカルの DB は PostgreSQL 18（Docker）に決定した</strong>（2026-11-19）ため、この作業は要りません。</li>
 </ul>
 <h2 id="_16">設計判断のまとめ<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版の設計判断 1〜9 は<strong>引き継ぎます</strong>（ストリームの単位、並行制御、スナップショットなし、同期投影、観察の合計、周辺ストア、保持削除、冪等性、出力）。判断 10（ローカル開発の DB）は<strong>見直し</strong>です（H2 がないため。上の節）。</p>
@@ -12424,7 +12424,7 @@
 <p>上記以外（表と列、制約名、投影、周辺ストア、保持削除、ロール）は変えません。</p>
 <h2 id="_17">未決事項<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>ローカル開発の DB</strong>: PostgreSQL（Docker）か、別の軽量 DB か（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。PostgreSQL を推奨。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。</li>
 <li><strong>sqlx の確認</strong>（B1）: マイグレーションの命名と動作、型の対応（<code>Uuid</code>、<code>OffsetDateTime</code>、<code>Json</code>）、エラーからの制約名の取得、アドバイザリロック、<code>LISTEN/NOTIFY</code>。</li>
 <li><strong>0003〜0006 の DDL</strong>: Kotlin 版の実ファイルを元に書き、PostgreSQL で適用して検証する。</li>
 <li><strong><code>session_overview.week</code> が最終週 + 1 になる問題</strong>（Kotlin 版で判明、未解決）: <code>WeekCommitted</code> か投影が最終週を知る手段の決定が要る。Rust 版では、設計段階で決める（案: <code>WeekCommitted</code> のペイロードに最終週を載せない代わりに、投影が <code>SessionStarted</code> の設定の最終週を覚える。イベントの構造への影響があるため、ドメインモデルと合わせて決める）。</li>

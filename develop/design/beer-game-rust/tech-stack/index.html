@@ -12472,8 +12472,8 @@
 </tr>
 <tr>
 <td style="text-align: left;">ローカル開発用 DB</td>
-<td style="text-align: left;"><strong>未決</strong>（<a href="#未決事項">未決事項</a> の 1）</td>
-<td style="text-align: left;">-</td>
+<td style="text-align: left;"><strong>PostgreSQL 18（Docker）</strong>（2026-11-19 決定）</td>
+<td style="text-align: left;">18</td>
 <td style="text-align: left;">H2（PostgreSQL モード）</td>
 <td style="text-align: left;">開発機での起動・動作確認</td>
 <td style="text-align: left;">-</td>
@@ -12611,7 +12611,7 @@
 </tbody>
 </table>
 <h2 id="_10">新しく導入する依存関係（導入時に承認を得る）<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
-<p>プロジェクトの規約により、新しい依存関係は導入時に承認を得ます。<strong>本書の段階ではどれも導入していません。</strong> 承認は、B1（ウォーキングスケルトン）の計画で、実際に使うものを確定してから求めます。</p>
+<p>プロジェクトの規約により、新しい依存関係は導入時に承認を得ます。<strong>本書の段階ではどれも導入していません。</strong> 承認は、B1（ウォーキングスケルトン）の計画で、実際に使うものを確定してから求めます（2026-11-19 の決定。未確認の機能を確かめたうえで絞る）。</p>
 <table>
 <thead>
 <tr>
@@ -12726,7 +12726,7 @@
 <tr>
 <td style="text-align: left;">ローカル開発の DB</td>
 <td style="text-align: left;">H2（PostgreSQL モード）</td>
-<td style="text-align: left;">未決</td>
+<td style="text-align: left;">PostgreSQL 18（Docker。2026-11-19 決定）</td>
 <td style="text-align: left;">H2 は JVM の DB のため使えない</td>
 </tr>
 <tr>
@@ -12745,7 +12745,7 @@
 </ul>
 <h2 id="_13">未決事項<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>ローカル開発の DB</strong>: Docker の PostgreSQL、組み込みの PostgreSQL、SQLite などを比較して決める。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表で「見直す」とした。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。ローカル・CI・統合テスト・ステージング・本番が同じ DB になる。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表のとおり Rust 版では引き継がない。</li>
 <li><strong>コンテナの実行イメージ</strong>: distroless、debian-slim、scratch などを比較する。TLS の証明書や DNS の扱いも含めて確認する。</li>
 <li><strong>sqlx の機能</strong>: PostgreSQL のアドバイザリロック、<code>LISTEN/NOTIFY</code>、マイグレーション、コンパイル時の検査（オフラインの可否）。B1 で確認する。</li>
 <li><strong>cucumber-rs の日本語対応</strong>: R5 のとおり。</li>

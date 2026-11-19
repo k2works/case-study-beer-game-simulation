@@ -12217,7 +12217,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">開発</td>
-<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Rust のバックエンドへプロキシする（接続先は <code>API_PORT</code>。固定のポートを書かない）。バックエンドは <code>cargo run</code> で起動し、データベースは PostgreSQL（<strong>ローカルの DB は未決</strong>。<a href="../tech-stack/">技術スタック</a>）</td>
+<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Rust のバックエンドへプロキシする（接続先は <code>API_PORT</code>。固定のポートを書かない）。バックエンドは <code>cargo run</code> で起動し、データベースは PostgreSQL（ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定））</td>
 </tr>
 <tr>
 <td style="text-align: left;">Origin の検査</td>
@@ -12282,7 +12282,7 @@
 <li><strong>RF2: 既存の <code>@ui</code> のシナリオと E2E を、Rust のバックエンドに向けて通す</strong>ことを、Rust 版の受入の一部にする。</li>
 </ul>
 <h2 id="_9">設計判断<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
-<h3 id="rf1-web">RF1: フロントエンドは複製せず、既存の <code>web/</code> と契約・フィーチャーファイルを共有する<a class="headerlink" href="#rf1-web" title="Permanent link">&para;</a></h3>
+<h3 id="rf1-web-2026-11-19">RF1: フロントエンドは複製せず、既存の <code>web/</code> と契約・フィーチャーファイルを共有する（承認済み。2026-11-19）<a class="headerlink" href="#rf1-web-2026-11-19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -12293,7 +12293,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;"><strong>既存の <code>apps/beer-game-kotlin/web/</code> を、そのまま使う</strong>（移動も複製もしない）。Rust 版の CI・E2E は、<code>web/</code> を、Rust のバックエンドに向けて実行する。<code>contracts/openapi.yaml</code> と <code>features/</code> も、現在の場所を共有する</td>
 <td style="text-align: left;">追加の構造変更が要らない。画面と E2E が 1 か所で、食い違わない。Rust 版が Kotlin 版のディレクトリに依存する（Kotlin 版の変更が Rust 版に影響する）</td>
 </tr>
@@ -12310,10 +12310,10 @@
 </tbody>
 </table>
 <p>トレードオフ: A は、<strong>当面の変更を最小</strong>にして、Rust のバックエンドを既存の画面と契約で検証できます。将来、2 つの版が分かれて進化する場合は、B（複製）または C（共通化）へ移行します（その時点で ADR に記録する）。<strong>C が長期的には自然ですが、構造の変更のため、承認を得てから</strong>にします。</p>
-<h3 id="rf2-rust-uie2e">RF2: Rust のバックエンドの契約上の同等性を、既存の <code>@ui</code>・E2E で確かめる<a class="headerlink" href="#rf2-rust-uie2e" title="Permanent link">&para;</a></h3>
+<h3 id="rf2-rust-uie2e-2026-11-19">RF2: Rust のバックエンドの契約上の同等性を、既存の <code>@ui</code>・E2E で確かめる（承認済み。2026-11-19）<a class="headerlink" href="#rf2-rust-uie2e-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>既存の画面コードと E2E は、API の契約にだけ依存しています（上の調査）。<strong>同じ画面・同じ <code>@ui</code> のシナリオを、Rust のバックエンドに向けて通すことは、Rust 版が契約どおりであることの、最も強い検証の 1 つ</strong>です。API の契約テスト（仕様との一致）は、仕様の記述の抜けを検出できない領域（スキーマで表せない条件、SSE）があるため、<strong>画面を通した確認で補います</strong>。</p>
-<h3 id="rf3-e2e">RF3: E2E のバックエンドの起動を差し替えられるようにする<a class="headerlink" href="#rf3-e2e" title="Permanent link">&para;</a></h3>
-<p><code>support/hooks.mjs</code> の案内の文言が Gradle に固有です。<strong>起動コマンドの案内を、環境変数（例: <code>BACKEND_START_HINT</code>）または設定で差し替えられるようにする</strong>（提案）。実際の起動を自動化するかは別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。<strong>この変更は、既存のファイルの編集で、Kotlin 版の <code>web/</code> に影響するため、承認を得てから行います。</strong></p>
+<h3 id="rf3-e2e-2026-11-19">RF3: E2E のバックエンドの起動を差し替えられるようにする（承認済み。2026-11-19）<a class="headerlink" href="#rf3-e2e-2026-11-19" title="Permanent link">&para;</a></h3>
+<p><code>support/hooks.mjs</code> の案内の文言が Gradle に固有です。<strong>起動コマンドの案内を、環境変数（例: <code>BACKEND_START_HINT</code>）または設定で差し替えられるようにする</strong>（承認済み。2026-11-19）。実際の起動を自動化するかは別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。<strong>この変更は、既存のファイルの編集で、Kotlin 版の <code>web/</code> に影響するため、承認を得てから行います。</strong></p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12340,7 +12340,7 @@
 <tr>
 <td style="text-align: left;">3</td>
 <td style="text-align: left;">E2E の起動の案内は Gradle</td>
-<td style="text-align: left;">差し替え可能にする（RF3。承認が要る）</td>
+<td style="text-align: left;">差し替え可能にする（RF3。承認済み。編集の実施前に改めて確認）</td>
 <td style="text-align: left;">案内の文言が言語に固有</td>
 </tr>
 <tr>
@@ -12360,10 +12360,10 @@
 <p><strong>フロントエンドの構成・ルーティング・状態管理・API の契約・版・共同入力・エラーの識別子・アクセシビリティは変えません。</strong></p>
 <h2 id="_10">未決事項<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>RF1 の承認</strong>: <code>web/</code>・<code>contracts/</code>・<code>features/</code> を、Kotlin 版のディレクトリのまま共有する案 A でよいか。複製（B）、共通化（C。構造の変更で確認必須）か。</li>
-<li><strong>RF3 の承認</strong>: E2E の起動の案内を差し替え可能にする変更（既存の <code>web/support/hooks.mjs</code> の編集）の可否。</li>
+<li>~~<strong>RF1 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した（案 A: Kotlin 版のディレクトリのまま共有。複製・共通化はしない）。</li>
+<li>~~<strong>RF3 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した。ただし既存の <code>web/support/hooks.mjs</code> の編集は、<strong>実際に行う前に改めて確認する</strong>。</li>
 <li><strong>環境変数の名前の揃え方</strong>: Rust のバックエンドの設定名（<code>ALLOWED_ORIGINS</code>・<code>PORT</code>・<code>APP_ENV</code> など）を、Kotlin 版と揃えるか。揃えると、E2E の案内・手順書の差分が減る。<code>DB_KIND</code> は Rust 版にはない（H2 がない）。</li>
-<li><strong>ADR-020（タブごとの Cookie 名）</strong>: 既存のフロントエンドは <code>X-Tab-Id</code> を送っている。Rust 版のバックエンドが扱うかの承認（ADR-020 は Kotlin 版でも提案中）。</li>
+<li>~~<strong>ADR-020（タブごとの Cookie 名）</strong>~~ <strong>解消（2026-11-19）</strong>: Rust 版のバックエンドでも扱うと決定した。</li>
 <li><strong>SSE の優先度</strong>: 現在のフロントエンドは使っていない。バックエンドの SSE を、いつ実装するか。<strong>ポーリングだけで NF-P2・NF-P4 を満たせるか</strong>の実測。</li>
 <li><strong>フロントエンドの Rust 版 CI の構成</strong>: <code>web/</code> のジョブ（<code>npm run verify</code>、<code>api:check</code>、<code>@ui</code>）を、Rust 版のワークフローで、どのバックエンドに向けて実行するか（Kotlin 版のワークフローの <code>web</code>・<code>ui</code> ジョブとの重複）。</li>
 <li><strong>Rust のバックエンドを既存の <code>web/</code> に向けた実際の動作</strong>（RF2）: B1 以降で検証する。</li>

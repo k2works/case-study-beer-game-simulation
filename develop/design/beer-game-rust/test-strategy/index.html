@@ -12218,7 +12218,7 @@
 </table>
 <p><strong>DB の統合テストは、CI では必ず実行します。</strong> Docker が使えない場合は、スキップでなく失敗にします（環境変数 <code>CI</code> が設定されている場合）。手元では、スキップした件数を明示します。<strong>DB の統合が 1 件も実行されなかった場合は、失敗</strong>とします。</p>
 <h3 id="db">ローカル開発の DB とテストの分担<a class="headerlink" href="#db" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版は、ローカルの H2 と PostgreSQL の乖離への対策（契約テストを両実装で実行など）を持ちます。<strong>Rust 版には H2 がなく、ローカルの DB は未決</strong>です（<a href="../tech-stack/#未決事項">技術スタックの未決事項</a> の 1）。PostgreSQL をローカルでも使う場合、<strong>統合テストとローカルの動作確認が同じ DB</strong>になり、乖離の対策は不要です。別の軽量 DB を採る場合は、Kotlin 版の対策（(a) その DB でしか通らない記述の禁止、(b) ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の契約テストを両実装で実行、(c) 受け入れは PostgreSQL）を引き継ぎます。</p>
+<p>Kotlin 版は、ローカルの H2 と PostgreSQL の乖離への対策（契約テストを両実装で実行など）を持ちます。<strong>Rust 版には H2 がなく、ローカルの DB は PostgreSQL 18（Docker）に決定しました（2026-11-19）</strong>（<a href="../tech-stack/#未決事項">技術スタックの未決事項</a> の 1）。PostgreSQL をローカルでも使う場合、<strong>統合テストとローカルの動作確認が同じ DB</strong>になり、乖離の対策は不要です。別の軽量 DB を採る場合は、Kotlin 版の対策（(a) その DB でしか通らない記述の禁止、(b) ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の契約テストを両実装で実行、(c) 受け入れは PostgreSQL）を引き継ぎます。</p>
 <h3 id="_6">レベル間の重複を避ける方針<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版と同じです。規則の分岐は、ドメインのユニットで網羅する。HTTP の統合では、境界の契約だけを確認する。永続化の整合性・並行性・再生・再構築・復元は、DB の統合でだけ検証する。画面の分岐は、コンポーネントで確認する。<strong>受入条件は Gherkin、実装の細部と網羅は <code>#[test]</code> が担い、同じ振る舞いを二重に書かない。同じシナリオを <code>@api</code> と <code>@ui</code> の両方で実行しない。</strong></p>
 <h2 id="bdd-tdd">開発の進め方（BDD と TDD）<a class="headerlink" href="#bdd-tdd" title="Permanent link">&para;</a></h2>
@@ -12272,7 +12272,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">関数名の先頭に ID を識別子の形で付ける。例: <code>us2_4_ac2_4_1__自動確定が有効で最後の役割が保存すると週が一度だけ確定される</code></td>
 <td style="text-align: left;">標準の <code>#[test]</code> のまま使える。テストの一覧と結果の出力に ID が出る。トレーサビリティの抽出は、テスト名の接頭辞の走査（<code>us&lt;番号&gt;_ac&lt;番号&gt;</code>）で行える</td>
 </tr>
@@ -12480,7 +12480,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;"><strong>全体の行 80% をゲート</strong>にする（承認済みの R6）。分岐は<strong>目安</strong>にとどめる。層ごとの目標は目安</td>
 <td style="text-align: left;">team の規約と一致する。cargo-llvm-cov の分岐の計測は<strong>未確認</strong>（安定版で使えない可能性があるため、ゲートにしない）</td>
 </tr>
@@ -12712,16 +12712,16 @@
 <tr>
 <td style="text-align: left;">T-5</td>
 <td style="text-align: left;">ローカルは H2、検証は PostgreSQL。ポート契約を両実装で実行</td>
-<td style="text-align: left;"><strong>見直し</strong>（H2 がない。ローカルの DB が未決）</td>
+<td style="text-align: left;"><strong>見直し</strong>（H2 がない。ローカルも PostgreSQL 18 に決定）</td>
 </tr>
 </tbody>
 </table>
-<h3 id="rt1-id">RT1: テスト名とストーリー ID は、関数名の先頭に識別子の形で付ける<a class="headerlink" href="#rt1-id" title="Permanent link">&para;</a></h3>
-<p>上の案 A のとおりです（提案）。案 B（属性マクロ）は、依存の承認が要るため、A で足りなければ検討します。</p>
-<h3 id="rt2-db">RT2: キャンセル安全性を、DB の統合テストで検証する<a class="headerlink" href="#rt2-db" title="Permanent link">&para;</a></h3>
+<h3 id="rt1-id-2026-11-19">RT1: テスト名とストーリー ID は、関数名の先頭に識別子の形で付ける（承認済み。2026-11-19）<a class="headerlink" href="#rt1-id-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>上の案 A を採用しました（2026-11-19 承認）。案 B（属性マクロ）は、依存の承認が要るため、A で足りなければ検討します。</p>
+<h3 id="rt2-db-2026-11-19">RT2: キャンセル安全性を、DB の統合テストで検証する（承認済み。2026-11-19）<a class="headerlink" href="#rt2-db-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>上の表のとおりです。RB2（<code>Tx</code> の drop と spawn）の前提を検証します。<strong>前提が成り立たなければ、設計を見直す</strong>ことを、B1 の受入条件に含めます。</p>
-<h3 id="rt3-80">RT3: カバレッジのゲートは行 80% とし、分岐は目安にする<a class="headerlink" href="#rt3-80" title="Permanent link">&para;</a></h3>
-<p>上の案 A のとおりです（提案。行 80% は承認済みの R6）。</p>
+<h3 id="rt3-80-2026-11-19">RT3: カバレッジのゲートは行 80% とし、分岐は目安にする（承認済み。2026-11-19）<a class="headerlink" href="#rt3-80-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>上の案 A を採用しました（2026-11-19 承認。行 80% は承認済みの R6）。</p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12802,7 +12802,7 @@
 <tr>
 <td style="text-align: left;">12</td>
 <td style="text-align: left;">H2 とポート契約の両実装</td>
-<td style="text-align: left;">なし（ローカルの DB は未決）</td>
+<td style="text-align: left;">なし（ローカルも PostgreSQL 18）</td>
 <td style="text-align: left;">H2 がない</td>
 </tr>
 </tbody>
@@ -12822,7 +12822,7 @@
 <li><strong>契約・フィーチャーファイルの共有方法</strong>（Kotlin 版と同じファイルを参照するか、複製するか）。</li>
 <li><strong>sqlx のトランザクションの drop での ROLLBACK</strong>（RT2 の前提）。</li>
 <li><strong>Rust のビルドキャッシュの方式</strong>と、CI の実行時間の目標の妥当性。</li>
-<li><strong>ローカル開発の DB</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）と、それによるテストの分担の変更。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。テストの分担の変更はない。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 生きたドキュメントの公開ツールと公開先、受け入れのシナリオ数の目標、ストーリー ID の整合の検査の厳しさ、実 DB での負荷試験の環境、手動のアクセシビリティの確認の担当者と時期、変異テストの要否、カバレッジの層ごとの目標の見直し。いずれも <a href="../../beer-game-kotlin/test-strategy/">Kotlin 版の未決事項</a> に追従する。</li>
 </ol>
 <h2 id="_20">出典<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>

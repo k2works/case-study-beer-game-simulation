@@ -12243,6 +12243,7 @@
 <ul>
 <li>著者: claude-code</li>
 <li>確認済み: 引き継ぎ表は、beer-game-kotlin の ADR 002〜020 の本文で検証した（2026-11-19）。</li>
+<li>追記（2026-11-19、ユーザーの決定。表の判定は変えない）: 表の <strong>014（ローカル開発だけ H2）の「見直す」は、ローカルの DB を PostgreSQL 18（Docker）とすることで解決した</strong>。<strong>020（資格の Cookie の名前をタブごとにする）は、Rust 版のバックエンドでも扱う</strong>（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）。</li>
 <li>未確認: Rust 各ライブラリの版と機能（axum・sqlx・tokio、Cucumber の Rust 実装）は未確認で、技術スタックの設計で確認する。</li>
 <li>関連 ADR: beer-game-kotlin の <a href="../../beer-game-kotlin/001-kotlin-version-of-beer-game2/">ADR-001</a>、<a href="../../beer-game-kotlin/002-event-sourcing-and-cqrs/">ADR-002</a>、<a href="../../beer-game-kotlin/007-functional-core-with-arrow/">ADR-007</a>。beer-game2 の <a href="../../beer-game2/001-rebuild-as-beer-game2/">ADR-001</a></li>
 <li>参照: <a href="../../../design/beer-game-kotlin/">beer-game-kotlin の設計書</a>、<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Rust%E7%B7%A8/">関数型プログラミングガイド（Rust 編）</a>、<a href="../../../requirements/beer-game2/user_story/">ユーザーストーリー</a>、<a href="../../../requirements/beer-game2/unit_definition/">Unit 定義</a></li>

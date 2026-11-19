@@ -12088,7 +12088,7 @@
 <li><strong>ビルドと CI</strong>: Gradle から Cargo へ（ツールチェーンの固定、<code>--locked</code>、キャッシュ）。</li>
 <li><strong>メモリ・終了・起動時間</strong>: ヒープ・GC・ウォームアップの前提がなくなる。SIGTERM で完了を待って正常終了する（NF-R18）。</li>
 <li><strong>データベースの接続</strong>: sqlx の接続プール。ロールを用途別に分けるのは同じ。</li>
-<li>ローカル開発の DB は<strong>未決</strong>（H2 を持たない）。</li>
+<li>ローカル開発の DB は <strong>PostgreSQL 18（Docker）に決定</strong>（2026-11-19。H2 を持たない）。</li>
 </ul>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
@@ -12303,7 +12303,7 @@
 <tr>
 <td style="text-align: left;">ローカル</td>
 <td style="text-align: left;">開発・確認</td>
-<td style="text-align: left;">バックエンドは <code>cargo run</code>、フロントエンドは Vite（<code>/api</code> をプロキシ）。<strong>DB は未決</strong>（<a href="../tech-stack/#未決事項">技術スタックの未決事項</a> の 1。<strong>PostgreSQL（Docker など）を推奨</strong>）</td>
+<td style="text-align: left;">バックエンドは <code>cargo run</code>、フロントエンドは Vite（<code>/api</code> をプロキシ）。<strong>DB は PostgreSQL 18（Docker）</strong>（2026-11-19 決定）</td>
 <td style="text-align: left;">—</td>
 </tr>
 <tr>
@@ -12326,7 +12326,7 @@
 </tr>
 </tbody>
 </table>
-<p>各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（Kotlin 版と同じ）。<strong>H2 がないため、Kotlin 版の「本番・ステージングで H2 を拒否する起動時の検査」は、ローカルの DB に別の軽量 DB を採る場合にだけ必要</strong>です（PostgreSQL を採れば不要）。</p>
+<p>各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（Kotlin 版と同じ）。<strong>H2 がないため、Kotlin 版の「本番・ステージングで H2 を拒否する起動時の検査」は、ローカルの DB が PostgreSQL に決定した（2026-11-19）ため、不要</strong>です。</p>
 <h2 id="_9">コンテナ<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <h3 id="ri1">イメージ（設計判断 RI1）<a class="headerlink" href="#ri1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>FROM（ビルド）  rust:&lt;1.97.1 系&gt;            … cargo build --release --locked（ツールチェーンは rust-toolchain.toml で固定）
@@ -12353,7 +12353,7 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">glibc を含む最小のイメージ（<code>distroless</code> の <code>cc</code> など）に、動的リンクのバイナリを載せる</td>
 <td style="text-align: left;">小さい。シェルがなく攻撃面が小さい。標準の Rust のビルドのまま</td>
 <td style="text-align: left;">シェルがないので、<strong>ヘルスチェックはバイナリのサブコマンドで行う</strong>（下記）。運用時にコンテナ内で調査しにくい</td>
@@ -12583,7 +12583,7 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">Rust 版専用に、<code>apps/beer-game-rust/infra/</code> を用意し、Kotlin 版のモジュールを<strong>複製して</strong>出発する。状態・環境・リソースを Rust 版専用にする</td>
 <td style="text-align: left;">他の版と独立に変更・破棄できる。複製による差分の管理が要る</td>
 </tr>
@@ -12675,7 +12675,7 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 <tr>
 <td style="text-align: left;">6</td>
 <td style="text-align: left;">H2 を配布から除外。本番・ステージングで H2 を起動時に拒否。環境の種別 <code>APP_ENV</code> の検査</td>
-<td style="text-align: left;">不要（H2 がない）。ローカルの DB が別の軽量 DB の場合だけ必要</td>
+<td style="text-align: left;">不要（H2 がない。ローカルも PostgreSQL に決定）</td>
 <td style="text-align: left;">H2 がない</td>
 </tr>
 <tr>
@@ -12718,16 +12718,16 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 </table>
 <p>上記以外（CloudFront、S3、ALB、RDS、ECR、EventBridge、Secrets Manager、観測の基本、OIDC、ステージング自動・本番承認、ブルー/グリーン、データベースのロール、<code>LISTEN</code> の専用接続、接続数の見積もり）は変えません。</p>
 <h2 id="_13">設計判断<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
-<h3 id="ri1_1">RI1: 実行イメージは、軽量な最小イメージに単一バイナリを載せる<a class="headerlink" href="#ri1_1" title="Permanent link">&para;</a></h3>
-<p>上の候補（A〜D）のとおりです。<strong>提案は A</strong>（glibc を含む最小のイメージ。シェルなし）です。理由は、攻撃面が小さく、標準の Rust のビルドのまま使えるためです。<strong>ただし、実在・動作・必要なライブラリ（OpenSSL を使う場合）は未確認</strong>で、sqlx の TLS の実装（rustls か OpenSSL か）によって選択が変わります。B1 で、実際にビルド・起動して確認し、決めます。</p>
-<h3 id="ri2">RI2: タスクのサイズは、実測の前に小さくしない<a class="headerlink" href="#ri2" title="Permanent link">&para;</a></h3>
+<h3 id="ri1-2026-11-19">RI1: 実行イメージは、軽量な最小イメージに単一バイナリを載せる（承認済み。2026-11-19）<a class="headerlink" href="#ri1-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>上の候補（A〜D）のとおりです。<strong>案 A を採用しました</strong>（2026-11-19 承認。glibc を含む最小のイメージ。シェルなし）。理由は、攻撃面が小さく、標準の Rust のビルドのまま使えるためです。<strong>ただし、実在・動作・必要なライブラリ（OpenSSL を使う場合）は未確認</strong>で、sqlx の TLS の実装（rustls か OpenSSL か）によって選択が変わります。B1 で、実際にビルド・起動して確認し、決めます。</p>
+<h3 id="ri2-2026-11-19">RI2: タスクのサイズは、実測の前に小さくしない（承認済み。2026-11-19）<a class="headerlink" href="#ri2-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>初期案は Kotlin 版と同じ 1 vCPU / 2 GiB です。Rust のバイナリはメモリの使用量が小さい見込みですが、<strong>実測がない</strong>ため、RN1 と同じ方針（実測前に厳しくも緩くもしない）にします。負荷試験（NF-C1: 15 ゲーム・75 の SSE 接続）で、RSS（NF-P17: 上限の 70% 以下）・タスク数・接続プールの待ちを測り、余裕を残して縮めます。<strong>縮めた値は、運用要件の RSS の閾値とあわせて見直します。</strong></p>
-<h3 id="ri3">RI3: ヘルスチェックはバイナリのサブコマンドで行う<a class="headerlink" href="#ri3" title="Permanent link">&para;</a></h3>
-<p>実行イメージにシェルも <code>curl</code> もない（案 A・C）ため、<code>healthcheck</code> サブコマンドを持たせます。代替は、シェルのあるイメージ（案 B）で <code>bash</code> の <code>/dev/tcp</code> を使う方法（Kotlin 版と同じ）です。サブコマンドは、イメージの選択に依存せず、テストもできる（<a href="../test-strategy/">テスト戦略</a>）ため、提案とします。</p>
-<h3 id="ri4-sigterm-0">RI4: SIGTERM では完了を待って終了コード 0 で終わる<a class="headerlink" href="#ri4-sigterm-0" title="Permanent link">&para;</a></h3>
+<h3 id="ri3-2026-11-19">RI3: ヘルスチェックはバイナリのサブコマンドで行う（承認済み。2026-11-19）<a class="headerlink" href="#ri3-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>実行イメージにシェルも <code>curl</code> もない（案 A・C）ため、<code>healthcheck</code> サブコマンドを持たせます。代替は、シェルのあるイメージ（案 B）で <code>bash</code> の <code>/dev/tcp</code> を使う方法（Kotlin 版と同じ）です。サブコマンドは、イメージの選択に依存せず、テストもできる（<a href="../test-strategy/">テスト戦略</a>）ため、採用します（2026-11-19 承認）。</p>
+<h3 id="ri4-sigterm-0-2026-11-19">RI4: SIGTERM では完了を待って終了コード 0 で終わる（承認済み。2026-11-19）<a class="headerlink" href="#ri4-sigterm-0-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>NF-R18 の要件です。待ちの上限は <code>stopTimeout</code> より短く設定します。<strong>終了コード 0 にすることで、Kotlin 版の「143 を正常とみなすか」の未決を設計で解消</strong>します。実現（tokio のシグナル処理、axum の graceful shutdown、spawn したタスクの完了待ち）は B1 で確認します。</p>
-<h3 id="ri5-terraform-rust">RI5: Terraform は Rust 版専用に複製して出発する<a class="headerlink" href="#ri5-terraform-rust" title="Permanent link">&para;</a></h3>
-<p>上の案 A（提案）です。<strong>AWS への適用は別のゲート</strong>で、本書は適用を含みません。</p>
+<h3 id="ri5-terraform-rust-2026-11-19">RI5: Terraform は Rust 版専用に複製して出発する（承認済み。2026-11-19）<a class="headerlink" href="#ri5-terraform-rust-2026-11-19" title="Permanent link">&para;</a></h3>
+<p>上の案 A を採用しました（2026-11-19 承認）。<strong>AWS への適用は別のゲート</strong>で、本書は適用を含みません。</p>
 <h2 id="_14">前提と見直しの条件<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <ul>
 <li>常時 2 タスクで足りる前提: 同時に進行するゲームが少数。負荷試験で確認する。</li>
@@ -12737,13 +12737,13 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 <h2 id="_15">未決事項<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>実行イメージの選択と実在の確認</strong>（RI1）: ベースイメージのタグ、動的／静的リンク、必要なライブラリ。sqlx の TLS の実装（rustls か OpenSSL か）と RDS の CA バンドル。B1 で、実際にビルドして確認する。</li>
-<li><strong>ヘルスチェックのサブコマンド</strong>（RI3）の承認。</li>
+<li>~~<strong>ヘルスチェックのサブコマンド</strong>（RI3）の承認~~ <strong>解消（2026-11-19）</strong>: 承認した（RI1〜RI5）。実在・動作の確認は B1。</li>
 <li><strong>AWS 環境と Terraform の置き方</strong>（RI5）: 専用か共有か。team の規約との整合。<strong>AWS への適用の判断・費用・アカウント・IAM</strong>。</li>
 <li><strong>SIGTERM の完了待ちの実現と終了コード 0</strong>（RI4）、<code>stopTimeout</code>・ALB の登録解除の遅延との整合。</li>
 <li><strong>release プロファイルの設定</strong>（<code>lto</code>、<code>codegen-units</code>、<code>panic</code>）。<code>panic = "abort"</code> の採否（panic の扱いと関わる）。</li>
 <li><strong>Rust のビルドキャッシュの方式</strong>と、CI の <code>timeout-minutes</code>（実測してから）。<code>cargo-chef</code>・<code>rust-cache</code>・<code>sccache</code> の導入は承認が要る。</li>
 <li><strong>タスクのサイズ、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウン</strong>（負荷試験・Fargate での実測で決める。RI2）。</li>
-<li><strong>ローカル開発の DB</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。</li>
 <li><strong>コンテナのビルド・実行の検証環境</strong>: ローカルには Linux 向けのターゲットも Rust のイメージもない。CI で検証するか、<code>rust</code> のイメージを取得して検証するか（イメージの取得は外部へのアクセスを伴う）。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: ECS の置き場所（公開サブネットと NAT・VPC エンドポイントの費用）、KMS の顧客管理鍵、DB ログインロールの分離とマイグレーション用ユーザーの作り方、状態のロック方式、Terraform の IAM とワークフローの突合、初回の適用の順序、業務のスモークテスト、RDS の CA バンドルと <code>sslmode</code>、CloudFront の CSP と SSE のオリジン待ち時間、履歴バケットのポリシー、秘密が Terraform の状態に入ること、ステージングと本番の ECR が同一アカウントであること、アクションの SHA 固定と各検査ツール（<code>actionlint</code>・<code>shellcheck</code>・<code>tflint</code>・<code>checkov</code>）、独自ドメインと DNS、合成監視の費用と頻度、アカウントの分離、ブルー/グリーンの方式。いずれも <a href="../../beer-game-kotlin/architecture-infrastructure/">Kotlin 版の未決事項</a> に追従する。</li>
 </ol>

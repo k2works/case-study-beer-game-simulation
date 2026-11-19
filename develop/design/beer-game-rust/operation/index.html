@@ -12642,7 +12642,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">アプリケーション開発環境セットアップ</td>
-<td style="text-align: left;">ローカルの構築（Rust のツールチェーン、Docker、sqlx のマイグレーション、PostgreSQL）。<strong>ローカルの DB は未決</strong></td>
+<td style="text-align: left;">ローカルの構築（Rust のツールチェーン、Docker、sqlx のマイグレーション、PostgreSQL）。ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定）</td>
 <td style="text-align: center;">高</td>
 <td style="text-align: center;">変更</td>
 </tr>
@@ -12830,7 +12830,7 @@
 <li><strong>RPO 0 の範囲と RTO</strong>（PITR では 0 にならない、RTO 15 分に収まる保証がない）の扱い（Kotlin 版の B14 から継続。人が決める）。</li>
 <li><strong>ブルー/グリーンの方式</strong>（ECS の組み込み方式か CodeDeploy か）、CloudFront → ALB の暗号化、書く版の切り替え（<code>WRITE_SCHEMA_VERSION</code>）、研修中だけ通知する運用の自動化、KMS・DB ログインロールの分離（Kotlin 版の未決を引き継ぐ）。</li>
 <li><strong>投影の再構築の排他ロックの待ちの上限</strong>と、再構築中のコマンドの応答（短い待ちか 503 か）、<strong>保持の起点</strong>（暫定。作成時）、<strong>追記の競合の再試行の上限と間隔</strong>、<strong>出力のキャッシュ</strong>、<strong>スナップショットの導入基準の妥当性</strong>、<strong>非同期投影へ移行した場合の閾値</strong>（Kotlin 版と同じ未決事項）。</li>
-<li><strong>ローカル開発の DB</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）と、開発環境セットアップの手順書。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。残りは開発環境セットアップの手順書の作成。</li>
 <li><strong>復元の訓練と投影の再構築の訓練の担当者と時期</strong>、合成監視の頻度と費用。</li>
 </ol>
 <h2 id="_27">出典<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h2>

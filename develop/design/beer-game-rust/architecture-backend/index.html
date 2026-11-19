@@ -12238,7 +12238,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;"><code>execute</code> を spawn し、<code>Tx</code> の drop で ROLLBACK</td>
 <td style="text-align: left;">切断で処理が途中で止まらない。drop の挙動に頼る部分は B1 で確認</td>
 </tr>
@@ -12439,7 +12439,7 @@
 <ul>
 <li><strong>ポート <code>ProjectionLock</code> と <code>ChangeNotifier</code> は維持します。</strong> 動機（PostgreSQL 固有の機能を隠す）と、契約テストを実装ごとに実行する考え方は言語に依存しません。</li>
 <li>ローカルの DB を PostgreSQL にする場合は、実装が 1 つになり、ポートは<strong>テスト用のインメモリ実装との差し替え</strong>のためだけに残ります。別の DB を選ぶ場合は、Kotlin 版の「乖離のリスクと対策」と「本番での拒否の検査」を引き継ぎます。</li>
-<li><strong>本番・ステージングで、想定外の DB 実装が選ばれないようにする起動時の検査</strong>（許可リスト方式。<code>APP_ENV</code> × DB の種別）は、ローカル用の別の DB を採る場合だけ必要です。</li>
+<li><strong>本番・ステージングで、想定外の DB 実装が選ばれないようにする起動時の検査</strong>（許可リスト方式。<code>APP_ENV</code> × DB の種別）は、ローカルの DB が PostgreSQL に決定した（2026-11-19）ため、要りません。</li>
 </ul>
 <h2 id="_17">モジュール構成と依存の検査<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>apps/beer-game-rust/
@@ -12565,11 +12565,11 @@
 <tr>
 <td style="text-align: left;">BD12</td>
 <td style="text-align: left;">ローカル開発の DB と、PostgreSQL 固有機能のポート</td>
-<td style="text-align: left;"><strong>見直す</strong>: ポートは維持。ローカルの DB は未決</td>
+<td style="text-align: left;"><strong>見直す</strong>: ポートは維持。ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定）</td>
 </tr>
 </tbody>
 </table>
-<h3 id="rb1_1">RB1: ポートはトレイトで表し、ジェネリクスで組み立てる<a class="headerlink" href="#rb1_1" title="Permanent link">&para;</a></h3>
+<h3 id="rb1-2026-11-19">RB1: ポートはトレイトで表し、ジェネリクスで組み立てる（承認済み。2026-11-19）<a class="headerlink" href="#rb1-2026-11-19" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
@@ -12580,7 +12580,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;">トレイト + 静的ディスパッチ（ジェネリクス）。非同期は <code>impl Future + Send</code> を返す</td>
 <td style="text-align: left;">コンパイル時に解決され、オーバーヘッドがない。テストはインメモリ実装に差し替える。型検査で、<code>async fn</code> を返すトレイトのジェネリックな <code>execute</code> が書けることを確認した。ワイヤリングの型が長くなる</td>
 </tr>
@@ -12596,9 +12596,9 @@
 </tr>
 </tbody>
 </table>
-<h3 id="rb2-tx-drop-rollback-execute-spawn">RB2: <code>Tx</code> は drop で ROLLBACK し、<code>execute</code> は spawn したタスクで実行する<a class="headerlink" href="#rb2-tx-drop-rollback-execute-spawn" title="Permanent link">&para;</a></h3>
+<h3 id="rb2-tx-drop-rollback-execute-spawn-2026-11-19">RB2: <code>Tx</code> は drop で ROLLBACK し、<code>execute</code> は spawn したタスクで実行する（承認済み。2026-11-19）<a class="headerlink" href="#rb2-tx-drop-rollback-execute-spawn-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>上の「キャンセル安全性」の案 A のとおりです。sqlx のトランザクションが drop で ROLLBACK される挙動、<code>tokio::spawn</code> による切断からの隔離、シャットダウン時の完了待ちは、B1 で確かめます。</p>
-<h3 id="rb3-tower-execute">RB3: 認証は tower の層でなく <code>execute</code> の中で行う<a class="headerlink" href="#rb3-tower-execute" title="Permanent link">&para;</a></h3>
+<h3 id="rb3-tower-execute-2026-11-19">RB3: 認証は tower の層でなく <code>execute</code> の中で行う（承認済み。2026-11-19）<a class="headerlink" href="#rb3-tower-execute-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の決定（認証を再試行のたびに、同じトランザクションの中で評価し直す）を引き継ぎます。axum の extractor には、生の資格（Cookie の値）を取り出す役割だけを持たせます。</p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
@@ -12662,7 +12662,7 @@
 <tr>
 <td style="text-align: left;">9</td>
 <td style="text-align: left;">H2 版と PostgreSQL 版の 2 実装、本番での H2 の拒否</td>
-<td style="text-align: left;">ローカルの DB は未決。ポートは維持</td>
+<td style="text-align: left;">ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定）。ポートは維持</td>
 <td style="text-align: left;">H2 は JVM の DB</td>
 </tr>
 <tr>
@@ -12683,11 +12683,11 @@
 <ol>
 <li><strong>sqlx の機能の確認</strong>（B1）: アドバイザリロック、<code>LISTEN/NOTIFY</code>、制約名の取得、<code>Transaction</code> の drop の挙動、マイグレーション。</li>
 <li><strong>axum の SSE と tower の層</strong>: 使う API・層の名前。</li>
-<li><strong>RB2 の承認</strong>: <code>execute</code> を spawn する方式と、<code>Tx</code> の drop による ROLLBACK を採るか。</li>
+<li>~~<strong>RB2 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した。前提（sqlx の <code>Tx</code> の drop での ROLLBACK）は B1 の受入条件で、成り立たなければ設計を見直す。</li>
 <li><strong>シャットダウンの待ち方</strong>: spawn したコマンドのタスクの完了を待つ仕組みと、待ちの上限。</li>
 <li><strong>panic の扱い</strong>: panic フックで記録し、プロセスを継続するか落とすか。</li>
 <li><strong>暗号化と乱数のクレート</strong>: 応答の暗号化（AES-256-GCM）、資格の乱数。承認が要る。</li>
-<li><strong>ローカル開発の DB</strong>（<a href="../tech-stack/">技術スタック</a> の未決事項 1）。</li>
+<li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。</li>
 <li><strong>API の契約の共有方法</strong>（同じ <code>openapi.yaml</code> を参照するか、複製するか）。</li>
 <li><strong>依存の検査の方式</strong>: <code>cargo metadata</code> の検査スクリプトか、<code>cargo-deny</code> の <code>bans</code> か。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 投影の再構築中のコマンドの応答（短い待ちか、すぐ 503 か）、<code>FOR UPDATE</code> の要否、再試行の間の待ち（ジッター）、観察者への開示、SSE の心拍の間隔、<code>app</code> のモードの環境変数の名前。いずれも <a href="../../beer-game-kotlin/architecture-backend/">Kotlin 版の未決事項</a> に追従する。</li>

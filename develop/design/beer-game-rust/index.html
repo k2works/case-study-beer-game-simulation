@@ -3244,6 +3244,45 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
+        設計判断の承認記録
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="設計判断の承認記録">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        承認の条件・留意点
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        未決の事項
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         補足
       
     </span>
@@ -12334,7 +12373,94 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_6">補足<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="_6">設計判断の承認記録<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>ユーザー（k2works）が 2026-11-19 に承認した判断の一覧です。各判断の本文は、右の文書にあります。承認は、ユーザーが指示した範囲だけを記録します。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">判断</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">文書</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ADR-001</td>
+<td style="text-align: left;">beer-game-kotlin を Rust 版として作り、設計と ADR を流用する（引き継ぎ表は ADR 本文で検証済み）</td>
+<td style="text-align: left;"><a href="../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">R1〜R7</td>
+<td style="text-align: left;">イベントストア自前、axum、sqlx の直接 SQL、clippy + cargo-deny、cucumber-rs、行 80% のカバレッジ、版の固定</td>
+<td style="text-align: left;"><a href="tech-stack/">技術スタック</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RD1〜RD5</td>
+<td style="text-align: left;">状態は <code>enum</code>、<code>Evolution</code> で適用の有無を返す（RD2）、<code>Result</code> と誤りの集約、<code>code</code> は <code>match</code> の網羅、ドメインの純粋性</td>
+<td style="text-align: left;"><a href="domain-model/">ドメインモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RB1〜RB3</td>
+<td style="text-align: left;">トレイトによるポート、<code>execute</code> を spawn して <code>Tx</code> の drop で ROLLBACK、認証は <code>execute</code> の中</td>
+<td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RT1〜RT3</td>
+<td style="text-align: left;">テスト名に ID を付ける、キャンセル安全性の検証、行 80% のゲート</td>
+<td style="text-align: left;"><a href="test-strategy/">テスト戦略</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RN1〜RN3</td>
+<td style="text-align: left;">JVM 項目の読み替えと実測前に数値を変えない方針、NF-R18 の新設、行 80%</td>
+<td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RI1〜RI5</td>
+<td style="text-align: left;">最小の実行イメージ、サイズは実測前に縮めない、<code>healthcheck</code> サブコマンド、SIGTERM は完了待ちで終了コード 0、Terraform は Rust 版専用に複製</td>
+<td style="text-align: left;"><a href="architecture-infrastructure/">インフラストラクチャ</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RU1・RU2</td>
+<td style="text-align: left;">UI 設計は参照にとどめる、契約の逸脱はバックエンドで直す</td>
+<td style="text-align: left;"><a href="ui-design/">UI 設計</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">RF1〜RF3</td>
+<td style="text-align: left;"><code>web/</code>・<code>contracts/</code>・<code>features/</code> は Kotlin 版のまま共有、既存の <code>@ui</code>・E2E で契約の同等性を検証、E2E の起動案内の差し替え</td>
+<td style="text-align: left;"><a href="architecture-frontend/">フロントエンドアーキテクチャ</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">ローカル開発の DB</td>
+<td style="text-align: left;"><strong>PostgreSQL 18（Docker）</strong>。ローカル・CI・統合テスト・ステージング・本番が同じ DB</td>
+<td style="text-align: left;"><a href="tech-stack/">技術スタック</a>、<a href="data-model/">データモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">ADR-020 の扱い</td>
+<td style="text-align: left;">資格の Cookie の名前をタブごとにする方式を、Rust 版のバックエンドでも扱う（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）</td>
+<td style="text-align: left;"><a href="ui-design/">UI 設計</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">新規依存関係</td>
+<td style="text-align: left;">導入の承認は、B1 の計画で実際に使うものを確定してから求める（未確認の機能を確かめたうえで絞る）</td>
+<td style="text-align: left;"><a href="tech-stack/">技術スタック</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="_7">承認の条件・留意点<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>RB2・RD5 などの未確認の前提</strong>（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。<strong>成り立たなければ、設計を見直します。</strong></li>
+<li><strong>RF3 の実施</strong>（既存の <code>web/support/hooks.mjs</code> の編集）は、承認済みですが、<strong>実際に編集する前に改めて確認します</strong>（Kotlin 版に影響するため）。</li>
+<li><strong>AWS への適用・費用・アカウント・IAM</strong>（RI5 の範囲外）は、別のゲートで人が判断します。</li>
+<li>各文書の <code>status</code> は <code>draft</code> のままで、OKF の <code>verified</code>（人による検証）は付いていません。承認された<strong>設計判断</strong>と、文書の<strong>検証</strong>は別です。</li>
+</ul>
+<h3 id="_8">未決の事項<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>RPO・RTO の扱い</strong>（PITR では RPO 0 にならず、RTO 15 分に収まる保証がない）。</li>
+<li><strong>AWS 環境の運用の詳細</strong>（アカウントの分離、ブルー/グリーンの方式、ECS の置き場所、KMS）。</li>
+<li><strong>実行イメージの実在確認、SSE の実装時期、数値目標（SLO など）の運営者との合意</strong>。</li>
+<li><strong>設計文書のマルチパースペクティブレビューと <code>verified</code></strong>（ユーザーの指示: 先にレビューを実施する）。</li>
+</ul>
+<h2 id="_9">補足<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>実ドキュメントを追加したら、この一覧を更新します。</li>
 </ul>
