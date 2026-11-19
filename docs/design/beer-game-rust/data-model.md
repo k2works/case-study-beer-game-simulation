@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Rust 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、sqlx のマイグレーション、型の対応、H2 を持たない前提での差分、PostgreSQL 18.6 で検証した DDL と制約を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T08:06:15Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Rust 版）
@@ -29,7 +29,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T08:06:15Z }
 | 3 | `lobby_participants.replaced_at` は V007 で後から追加 | **ロビーの表の作成時から持つ** | 設計が確定済み（開始後の入れ替え） |
 | 4 | `uq_idempotency_create` は H2 版で省略 | **常に PostgreSQL の部分一意索引** | H2 を持たない |
 | 5 | 型は `timestamp with time zone`（H2 でも通る書き方） | `timestamptz`、`jsonb` をそのまま使う | PostgreSQL のみ |
-| 6 | ロールと GRANT は PostgreSQL の統合テストでだけ検証し、H2 では省略 | **すべての環境（ローカルを含む）で PostgreSQL を使う前提**。ローカルの DB は未決だが、PostgreSQL を採る限り、ロールと GRANT の検証は全環境で同じ | [技術スタックの未決事項](./tech-stack.md#未決事項) の 1 |
+| 6 | ロールと GRANT は PostgreSQL の統合テストでだけ検証し、H2 では省略 | **すべての環境（ローカルを含む）で PostgreSQL を使う前提**。ローカルの DB は PostgreSQL 18（Docker。2026-11-19 決定）で、ロールと GRANT の検証は全環境で同じ | [技術スタックの未決事項](./tech-stack.md#未決事項) の 1 |
 
 ## 概念データモデル
 
@@ -434,10 +434,10 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 ## ローカル開発のデータベース
 
-Kotlin 版は、H2 の PostgreSQL モードでローカル起動を許し、省略する制約の一覧（`uq_idempotency_create`、追記専用、ロールの分離、プールの分離、複数プロセスの直列化、削除ロールの限定、REPEATABLE READ）を持ちます。**Rust 版には H2 がなく、ローカルの DB は未決です**（[技術スタック](./tech-stack.md) の未決事項 1）。データモデルの観点では、次のとおりです。
+Kotlin 版は、H2 の PostgreSQL モードでローカル起動を許し、省略する制約の一覧（`uq_idempotency_create`、追記専用、ロールの分離、プールの分離、複数プロセスの直列化、削除ロールの限定、REPEATABLE READ）を持ちます。**Rust 版には H2 がなく、ローカルの DB は PostgreSQL 18（Docker）に決定しました（2026-11-19）**（[技術スタック](./tech-stack.md) の未決事項 1）。データモデルの観点では、次のとおりです。
 
 - **PostgreSQL（Docker など）をローカルでも使うなら**、上の制約・ロール・部分一意索引・アドバイザリロック・LISTEN/NOTIFY がすべて使え、**Kotlin 版の「H2 版で省略する制約」の一覧は不要**になる。
-- 別の軽量 DB を採るなら、Kotlin 版の「方言の差分」と「乖離のリスクと対策」と同じ作業（差分の実測、契約テストを両実装で実行、`APP_ENV` による本番での拒否）が要る。**データモデルの単純さのため、PostgreSQL を採ることを推奨**します。ただし決定は未決事項です。
+- 別の軽量 DB を採るなら、Kotlin 版の「方言の差分」と「乖離のリスクと対策」と同じ作業（差分の実測、契約テストを両実装で実行、`APP_ENV` による本番での拒否）が要る。**ローカルの DB は PostgreSQL 18（Docker）に決定した**（2026-11-19）ため、この作業は要りません。
 
 ## 設計判断のまとめ
 
@@ -458,7 +458,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 ## 未決事項
 
-1. **ローカル開発の DB**: PostgreSQL（Docker）か、別の軽量 DB か（[技術スタック](./tech-stack.md) の未決事項 1）。PostgreSQL を推奨。
+1. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。
 2. **sqlx の確認**（B1）: マイグレーションの命名と動作、型の対応（`Uuid`、`OffsetDateTime`、`Json`）、エラーからの制約名の取得、アドバイザリロック、`LISTEN/NOTIFY`。
 3. **0003〜0006 の DDL**: Kotlin 版の実ファイルを元に書き、PostgreSQL で適用して検証する。
 4. **`session_overview.week` が最終週 + 1 になる問題**（Kotlin 版で判明、未解決）: `WeekCommitted` か投影が最終週を知る手段の決定が要る。Rust 版では、設計段階で決める（案: `WeekCommitted` のペイロードに最終週を載せない代わりに、投影が `SessionStarted` の設定の最終週を覚える。イベントの構造への影響があるため、ドメインモデルと合わせて決める）。

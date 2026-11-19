@@ -39,6 +39,39 @@ beer-game-rust プロジェクトの設計ドキュメントです。
 | :--- | :--- | :--- |
 | [技術スタック選定](./tech-stack.md) | 技術スタック一覧とバージョン管理方針を整理 | 草稿 |
 
+## 設計判断の承認記録
+
+ユーザー（k2works）が 2026-11-19 に承認した判断の一覧です。各判断の本文は、右の文書にあります。承認は、ユーザーが指示した範囲だけを記録します。
+
+| 判断 | 内容 | 文書 |
+| :--- | :--- | :--- |
+| ADR-001 | beer-game-kotlin を Rust 版として作り、設計と ADR を流用する（引き継ぎ表は ADR 本文で検証済み） | [ADR-001](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) |
+| R1〜R7 | イベントストア自前、axum、sqlx の直接 SQL、clippy + cargo-deny、cucumber-rs、行 80% のカバレッジ、版の固定 | [技術スタック](./tech-stack.md) |
+| RD1〜RD5 | 状態は `enum`、`Evolution` で適用の有無を返す（RD2）、`Result` と誤りの集約、`code` は `match` の網羅、ドメインの純粋性 | [ドメインモデル](./domain-model.md) |
+| RB1〜RB3 | トレイトによるポート、`execute` を spawn して `Tx` の drop で ROLLBACK、認証は `execute` の中 | [バックエンドアーキテクチャ](./architecture-backend.md) |
+| RT1〜RT3 | テスト名に ID を付ける、キャンセル安全性の検証、行 80% のゲート | [テスト戦略](./test-strategy.md) |
+| RN1〜RN3 | JVM 項目の読み替えと実測前に数値を変えない方針、NF-R18 の新設、行 80% | [非機能要件](./non-functional.md) |
+| RI1〜RI5 | 最小の実行イメージ、サイズは実測前に縮めない、`healthcheck` サブコマンド、SIGTERM は完了待ちで終了コード 0、Terraform は Rust 版専用に複製 | [インフラストラクチャ](./architecture-infrastructure.md) |
+| RU1・RU2 | UI 設計は参照にとどめる、契約の逸脱はバックエンドで直す | [UI 設計](./ui-design.md) |
+| RF1〜RF3 | `web/`・`contracts/`・`features/` は Kotlin 版のまま共有、既存の `@ui`・E2E で契約の同等性を検証、E2E の起動案内の差し替え | [フロントエンドアーキテクチャ](./architecture-frontend.md) |
+| ローカル開発の DB | **PostgreSQL 18（Docker）**。ローカル・CI・統合テスト・ステージング・本番が同じ DB | [技術スタック](./tech-stack.md)、[データモデル](./data-model.md) |
+| ADR-020 の扱い | 資格の Cookie の名前をタブごとにする方式を、Rust 版のバックエンドでも扱う（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断） | [UI 設計](./ui-design.md) |
+| 新規依存関係 | 導入の承認は、B1 の計画で実際に使うものを確定してから求める（未確認の機能を確かめたうえで絞る） | [技術スタック](./tech-stack.md) |
+
+### 承認の条件・留意点
+
+- **RB2・RD5 などの未確認の前提**（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。**成り立たなければ、設計を見直します。**
+- **RF3 の実施**（既存の `web/support/hooks.mjs` の編集）は、承認済みですが、**実際に編集する前に改めて確認します**（Kotlin 版に影響するため）。
+- **AWS への適用・費用・アカウント・IAM**（RI5 の範囲外）は、別のゲートで人が判断します。
+- 各文書の `status` は `draft` のままで、OKF の `verified`（人による検証）は付いていません。承認された**設計判断**と、文書の**検証**は別です。
+
+### 未決の事項
+
+- **RPO・RTO の扱い**（PITR では RPO 0 にならず、RTO 15 分に収まる保証がない）。
+- **AWS 環境の運用の詳細**（アカウントの分離、ブルー/グリーンの方式、ECS の置き場所、KMS）。
+- **実行イメージの実在確認、SSE の実装時期、数値目標（SLO など）の運営者との合意**。
+- **設計文書のマルチパースペクティブレビューと `verified`**（ユーザーの指示: 先にレビューを実施する）。
+
 ## 補足
 
 - 実ドキュメントを追加したら、この一覧を更新します。

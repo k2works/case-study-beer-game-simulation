@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Rust 版のドメインモデル。beer-game-kotlin の構造（2 ストリーム、decide / evolve、simulateWeek、投影、全イベント）を引き継ぎ、enum・newtype・Result で表す。Kotlin 版の設計判断 D1〜D11 との対応と、Rust 固有の判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T07:47:11Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Rust 版）
@@ -400,28 +400,28 @@ pub trait Projection {
 | D10 | `CommitWeek` の前提は週と意思決定の版 | **引き継ぐ** |
 | D11 | 出力は投影にせず純粋関数で作る | **引き継ぐ** |
 
-### RD1: 状態の違いは `enum` の列挙子で表し、網羅は `match` に任せる
+### RD1: 状態の違いは `enum` の列挙子で表し、網羅は `match` に任せる（承認済み。2026-11-19）
 
 Kotlin 版の `sealed interface` + `when`（else なし）に対応します。Rust の `match` は網羅性をコンパイラが検査するため、状態・イベント・エラーの列挙子を足したときに、見直す箇所がコンパイルエラーで分かります。ただし、`evolve` の最後の腕に `_` を使うと、**イベントの追加の見落としは検出できません**（上記）。このため、「`decide` が作る列は `Ignored` にならない」性質テストを必須にします。
 
-### RD2: ストリームの版は状態に持たせず、永続化の層が持つ
+### RD2: ストリームの版は状態に持たせず、永続化の層が持つ（承認済み。2026-11-19）
 
-Kotlin 版は `State.version` を持ち、`evolve` が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、`evolve` の結果を `Evolution::{Applied, Ignored}` で**明示**し、版は `(state, version)` として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、`Ignored` を直接検知（ログとメトリクス）できます。**これは Kotlin 版からの設計の変更**であり、**ユーザーが 2026-11-19 に案 A を承認しました**（RD1・RD3〜RD5 は承認前の提案です）。
+Kotlin 版は `State.version` を持ち、`evolve` が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、`evolve` の結果を `Evolution::{Applied, Ignored}` で**明示**し、版は `(state, version)` として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、`Ignored` を直接検知（ログとメトリクス）できます。**これは Kotlin 版からの設計の変更**であり、**ユーザーが 2026-11-19 に案 A を承認しました**（RD1・RD3〜RD5 も、同日にユーザーが承認しました）。
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
 | **A（採用）** | `Evolution` で適用の有無を返し、版は外で持つ | 検知が直接的。状態の型が小さい。再生の関数が `Evolution` を畳み込む |
 | B | Kotlin 版と同じく、状態に版を持たせ、再生が前後を比べる | 構造が Kotlin 版と一致する。検知が間接的 |
 
-### RD3: 失敗は `Result`、複数の誤りは `Vec` に集める
+### RD3: 失敗は `Result`、複数の誤りは `Vec` に集める（承認済み。2026-11-19）
 
 Arrow の `Either` / `Raise` / `zipOrAccumulate` を使わず、標準の `Result`、`?`、小さな `collect` 関数で表します（[技術スタック](./tech-stack.md) の変更の表）。`Raise` のような「失敗のコンテキスト」は持たず、`?` による早期の失敗で足ります。誤りの集約は上のコードで確認しました。`NonEmptyList` に当たるものは、`Vec` が空でないことを型で保証しない代わりに、`validate_*` が「誤りがあれば必ず 1 件以上」を返す関数の契約とテストで守ります。
 
-### RD4: エラーの `code` は `match` の網羅で付け、一覧は API の契約として固定する
+### RD4: エラーの `code` は `match` の網羅で付け、一覧は API の契約として固定する（承認済み。2026-11-19）
 
 `code()` と `category()` を列挙子ごとの `match` で書くため、列挙子の追加時に付け忘れません。一覧そのものは、フロントエンドの辞書の鍵であり、変えません。**エラー型の `Display` を `thiserror` で書くか、手で書くか**は未決事項です。
 
-### RD5: ドメインの crate の純粋性は、依存の制限と lint で守る
+### RD5: ドメインの crate の純粋性は、依存の制限と lint で守る（承認済み。2026-11-19）
 
 Kotlin 版は detekt の `ForbiddenMethodCall` で時計・乱数の呼び出しを禁止します。Rust 版は、ドメインの crate が `tokio`・`sqlx`・`rand` などに**依存しない**ことを第一の守りとします（依存がなければ呼べません）。`std::time::SystemTime::now` のような標準の呼び出しの禁止は、clippy の `disallowed_methods` で足りるかを未確認とし、B1 で確かめます。
 
@@ -442,7 +442,7 @@ Kotlin 版は detekt の `ForbiddenMethodCall` で時計・乱数の呼び出し
 
 ## 未決事項
 
-1. ~~**RD2 の承認**~~ **解消（2026-11-19）**: 案 A を採用した。残りの RD1・RD3〜RD5 は承認前。
+1. ~~**RD2 の承認**~~ **解消（2026-11-19）**: 案 A を採用した。RD1・RD3〜RD5 も同日に承認された（RD5 の lint の確認は B1）。
 2. **エラー型の実装**: `thiserror` を使うか、手で `Display` を書くか。ドメインの crate の依存を最小にする観点と比較する。
 3. **数量・金額の整数の幅**: `Quantity` は `u32`、`Units`（上限のない非負の流れの数量）と `Money` の幅は `u64` / `i64` を第一候補とし、`simulate_week` の演算の範囲を確かめて確定する。
 4. **イベントの JSON の書式**: serde の内部タグ付き列挙型で、アップキャスト（`schema_version`）を表せるか。B1 で確かめる。

@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Rust 版の技術スタック。cargo search と rustc で確認した版、確認できなかった項目、beer-game-kotlin からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T07:47:11Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Rust 版）
@@ -105,7 +105,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | スキーマ管理 | sqlx の migrate | 未確認 | Flyway | 履歴テーブルで管理。拡張 → 互換 → 縮小 | - |
 | ORM | なし | - | なし | 直接の SQL（sqlx） | - |
 | イベントのペイロード | `jsonb` + serde | - | `jsonb` + kotlinx.serialization | `schema_version` とアップキャスト（データモデルは別文書） | - |
-| ローカル開発用 DB | **未決**（[未決事項](#未決事項) の 1） | - | H2（PostgreSQL モード） | 開発機での起動・動作確認 | - |
+| ローカル開発用 DB | **PostgreSQL 18（Docker）**（2026-11-19 決定） | 18 | H2（PostgreSQL モード） | 開発機での起動・動作確認 | - |
 
 イベントストアの専用製品（EventStoreDB など）は、**導入しません**（設計判断 R1）。
 
@@ -141,7 +141,7 @@ API の型は、手書きの `openapi.yaml` から生成する方針を引き継
 
 ## 新しく導入する依存関係（導入時に承認を得る）
 
-プロジェクトの規約により、新しい依存関係は導入時に承認を得ます。**本書の段階ではどれも導入していません。** 承認は、B1（ウォーキングスケルトン）の計画で、実際に使うものを確定してから求めます。
+プロジェクトの規約により、新しい依存関係は導入時に承認を得ます。**本書の段階ではどれも導入していません。** 承認は、B1（ウォーキングスケルトン）の計画で、実際に使うものを確定してから求めます（2026-11-19 の決定。未確認の機能を確かめたうえで絞る）。
 
 | 区分 | 依存関係 | 状況 |
 | :--- | :--- | :--- |
@@ -195,7 +195,7 @@ team.md の規約（行 80%）に従います。beer-game-kotlin の目標との
 | ビルドと層の強制 | Gradle のモジュール | Cargo のワークスペースの crate | - |
 | 静的解析 | detekt、PMD、ktlint | clippy、rustfmt、cargo-deny | - |
 | カバレッジ | Kover | cargo-llvm-cov | - |
-| ローカル開発の DB | H2（PostgreSQL モード） | 未決 | H2 は JVM の DB のため使えない |
+| ローカル開発の DB | H2（PostgreSQL モード） | PostgreSQL 18（Docker。2026-11-19 決定） | H2 は JVM の DB のため使えない |
 | 実行環境 | JDK 25（Temurin）の JRE | 単一の実行ファイル | JVM が不要 |
 
 ## アップグレード計画
@@ -206,7 +206,7 @@ team.md の規約（行 80%）に従います。beer-game-kotlin の目標との
 
 ## 未決事項
 
-1. **ローカル開発の DB**: Docker の PostgreSQL、組み込みの PostgreSQL、SQLite などを比較して決める。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表で「見直す」とした。
+1. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。ローカル・CI・統合テスト・ステージング・本番が同じ DB になる。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表のとおり Rust 版では引き継がない。
 2. **コンテナの実行イメージ**: distroless、debian-slim、scratch などを比較する。TLS の証明書や DNS の扱いも含めて確認する。
 3. **sqlx の機能**: PostgreSQL のアドバイザリロック、`LISTEN/NOTIFY`、マイグレーション、コンパイル時の検査（オフラインの可否）。B1 で確認する。
 4. **cucumber-rs の日本語対応**: R5 のとおり。

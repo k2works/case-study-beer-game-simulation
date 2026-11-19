@@ -4,7 +4,7 @@ title: "ADR-001: beer-game-kotlin を Rust 版として作り、設計と ADR �
 description: "beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Rust（axum + sqlx + tokio）と既存の React で作り直す。beer-game-kotlin の ADR の引き継ぎ表を含む。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T07:51:38Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
 ---
 
 # ADR-001: beer-game-kotlin を Rust 版として作り、設計と ADR を流用する
@@ -96,6 +96,7 @@ Rust 版は、同じ学習の価値を、型システムによる不正な状態
 
 - 著者: claude-code
 - 確認済み: 引き継ぎ表は、beer-game-kotlin の ADR 002〜020 の本文で検証した（2026-11-19）。
+- 追記（2026-11-19、ユーザーの決定。表の判定は変えない）: 表の **014（ローカル開発だけ H2）の「見直す」は、ローカルの DB を PostgreSQL 18（Docker）とすることで解決した**。**020（資格の Cookie の名前をタブごとにする）は、Rust 版のバックエンドでも扱う**（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）。
 - 未確認: Rust 各ライブラリの版と機能（axum・sqlx・tokio、Cucumber の Rust 実装）は未確認で、技術スタックの設計で確認する。
 - 関連 ADR: beer-game-kotlin の [ADR-001](../beer-game-kotlin/001-kotlin-version-of-beer-game2.md)、[ADR-002](../beer-game-kotlin/002-event-sourcing-and-cqrs.md)、[ADR-007](../beer-game-kotlin/007-functional-core-with-arrow.md)。beer-game2 の [ADR-001](../beer-game2/001-rebuild-as-beer-game2.md)
 - 参照: [beer-game-kotlin の設計書](../../design/beer-game-kotlin/index.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)
