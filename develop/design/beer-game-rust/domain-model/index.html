@@ -12500,7 +12500,7 @@
 <h3 id="rd1-enum-match">RD1: 状態の違いは <code>enum</code> の列挙子で表し、網羅は <code>match</code> に任せる<a class="headerlink" href="#rd1-enum-match" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の <code>sealed interface</code> + <code>when</code>（else なし）に対応します。Rust の <code>match</code> は網羅性をコンパイラが検査するため、状態・イベント・エラーの列挙子を足したときに、見直す箇所がコンパイルエラーで分かります。ただし、<code>evolve</code> の最後の腕に <code>_</code> を使うと、<strong>イベントの追加の見落としは検出できません</strong>（上記）。このため、「<code>decide</code> が作る列は <code>Ignored</code> にならない」性質テストを必須にします。</p>
 <h3 id="rd2">RD2: ストリームの版は状態に持たせず、永続化の層が持つ<a class="headerlink" href="#rd2" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版は <code>State.version</code> を持ち、<code>evolve</code> が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、<code>evolve</code> の結果を <code>Evolution::{Applied, Ignored}</code> で<strong>明示</strong>し、版は <code>(state, version)</code> として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、<code>Ignored</code> を直接検知（ログとメトリクス）できます。<strong>これは Kotlin 版からの設計の変更</strong>であり、承認を求めます。</p>
+<p>Kotlin 版は <code>State.version</code> を持ち、<code>evolve</code> が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、<code>evolve</code> の結果を <code>Evolution::{Applied, Ignored}</code> で<strong>明示</strong>し、版は <code>(state, version)</code> として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、<code>Ignored</code> を直接検知（ログとメトリクス）できます。<strong>これは Kotlin 版からの設計の変更</strong>であり、<strong>ユーザーが 2026-11-19 に案 A を承認しました</strong>（RD1・RD3〜RD5 は承認前の提案です）。</p>
 <table>
 <thead>
 <tr>
@@ -12511,7 +12511,7 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>A（提案）</strong></td>
+<td style="text-align: left;"><strong>A（採用）</strong></td>
 <td style="text-align: left;"><code>Evolution</code> で適用の有無を返し、版は外で持つ</td>
 <td style="text-align: left;">検知が直接的。状態の型が小さい。再生の関数が <code>Evolution</code> を畳み込む</td>
 </tr>
@@ -12561,7 +12561,7 @@
 <td style="text-align: left;">4</td>
 <td style="text-align: left;"><code>State.version</code> と版の増加による不正な遷移の検知</td>
 <td style="text-align: left;"><code>Evolution::{Applied, Ignored}</code>、版は永続化の層（RD2）</td>
-<td style="text-align: left;">検知を直接にする（承認待ち）</td>
+<td style="text-align: left;">検知を直接にする（承認済み。2026-11-19）</td>
 </tr>
 <tr>
 <td style="text-align: left;">5</td>
@@ -12592,7 +12592,7 @@
 <p>上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。</p>
 <h2 id="_13">未決事項<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li><strong>RD2 の承認</strong>: <code>Evolution</code> と、版を永続化の層に置く案を採るか。採らない場合は案 B。</li>
+<li>~~<strong>RD2 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 案 A を採用した。残りの RD1・RD3〜RD5 は承認前。</li>
 <li><strong>エラー型の実装</strong>: <code>thiserror</code> を使うか、手で <code>Display</code> を書くか。ドメインの crate の依存を最小にする観点と比較する。</li>
 <li><strong>数量・金額の整数の幅</strong>: <code>Quantity</code> は <code>u32</code>、<code>Units</code>（上限のない非負の流れの数量）と <code>Money</code> の幅は <code>u64</code> / <code>i64</code> を第一候補とし、<code>simulate_week</code> の演算の範囲を確かめて確定する。</li>
 <li><strong>イベントの JSON の書式</strong>: serde の内部タグ付き列挙型で、アップキャスト（<code>schema_version</code>）を表せるか。B1 で確かめる。</li>

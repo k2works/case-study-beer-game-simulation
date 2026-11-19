@@ -12082,8 +12082,8 @@
 <p>beer-game-kotlin と同じ機能と振る舞いを、Rust（axum + sqlx + tokio）のバックエンドと既存の React のフロントエンドで作り直す（beer-game-rust）。要件・ユースケース・ストーリー・Unit 定義は beer-game2 のものを、設計は beer-game-kotlin のものを正本として参照して流用し、ADR は本書の引き継ぎ表に従って引き継ぐ・変更する・置き換える。</p>
 <p>日付: 2026-11-19</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>提案中（2026-11-19）。承認はまだ記録しない。</p>
-<p>ユーザーが決めた事項は、Rust 版の作成、バックエンドの技術スタック（axum + sqlx + tokio、フロントエンドは既存の React を踏襲）、今回の範囲（土台、ADR-001、技術スタック、ドメインモデル）である。本書の引き継ぎ表の各判断は AI の提案であり、人の承認を待つ。</p>
+<p>承認済み（2026-11-19、ユーザーの決定）</p>
+<p>ユーザーが決めた事項は、Rust 版の作成、バックエンドの技術スタック（axum + sqlx + tokio、フロントエンドは既存の React を踏襲）、今回の範囲（土台、ADR-001、技術スタック、ドメインモデル）である。引き継ぎ表は、AI が beer-game-kotlin の ADR の本文を読んで検証した案を、ユーザーが 2026-11-19 に承認した。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>beer-game2 は要件（BR・FR・NFR）、ユースケース、ストーリー、Unit 定義（U1〜U6）を持つ。beer-game-kotlin は、それを正本として、ES + CQRS と関数型コア（Arrow）で設計した（<a href="../../../design/beer-game-kotlin/">設計書の入口</a>、ADR 001〜020）。</p>
 <p>Rust 版は、同じ学習の価値を、型システムによる不正な状態の排除（enum、newtype、所有権）と、実行時の安全性・小さな実行ファイルで提供することを狙う。参考として <a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Rust%E7%B7%A8/">関数型プログラミングガイド（Rust 編）</a> がある。</p>
@@ -12101,7 +12101,7 @@
 <li><strong>beer-game-kotlin の ADR は、次の表のとおり扱う。</strong> beer-game-kotlin の ADR のファイルは履歴として変更しない。</li>
 </ul>
 <h3 id="beer-game-kotlin-adr">beer-game-kotlin の ADR の引き継ぎ表<a class="headerlink" href="#beer-game-kotlin-adr" title="Permanent link">&para;</a></h3>
-<p>扱いは、各 ADR の見出し（決定内容）から判断した暫定の案である。本文は読んでいないため、各 ADR を Rust 版で起こす時点で本文を確認し、この表を更新する。</p>
+<p>扱いは、beer-game-kotlin の ADR 002〜020 の<strong>本文を読んで検証した</strong>案である（2026-11-19。調査はサブエージェントが行い、判定の根拠は各 ADR の決定の節）。見出しだけで付けた初稿から、007・011・013・014 の判定または理由を修正し、005・008・018・020 に補足を足した。なお、引き継ぎ元の ADR の多くは Kotlin 版でも「提案中」で、承認済みではない（002〜020 のうち承認済みは 012・015〜019。020 は提案）。</p>
 <table>
 <thead>
 <tr>
@@ -12133,8 +12133,8 @@
 </tr>
 <tr>
 <td style="text-align: left;">005 楽観的並行制御と、投影再構築の直列化にアドバイザリロック</td>
-<td style="text-align: left;"><strong>引き継ぐ</strong></td>
-<td style="text-align: left;">sqlx のトランザクションで実現する</td>
+<td style="text-align: left;"><strong>引き継ぐ</strong>（実現を変更）</td>
+<td style="text-align: left;">sqlx のトランザクションで実現する。コルーチンの取消（<code>NonCancellable</code>、<code>CancellationException</code>）の節は使えず、tokio の非同期キャンセル時のトランザクションの閉じ方に書き換える</td>
 </tr>
 <tr>
 <td style="text-align: left;">006 イベントのスキーマ進化（アップキャスト、2 段階リリース）</td>
@@ -12143,13 +12143,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">007 Arrow による関数型コア、Gradle で層を強制</td>
-<td style="text-align: left;"><strong>置き換える</strong></td>
-<td style="text-align: left;"><code>Result</code> と純粋関数に、Gradle のモジュールを Cargo のワークスペースの crate に</td>
+<td style="text-align: left;"><strong>変更</strong>（趣旨は引き継ぎ、実現を置き換える）</td>
+<td style="text-align: left;">純粋な <code>decide</code> / <code>evolve</code>、副作用は境界へ、<code>evolve</code> の全域化、依存の向きの機械的な強制は言語に依存せず引き継ぐ。置き換えるのは Arrow（<code>Either</code>・<code>Raise</code>・<code>zipOrAccumulate</code>）と Gradle・detekt・PMD の部分で、<code>Result</code>・enum・newtype と Cargo ワークスペースの crate 境界にする</td>
 </tr>
 <tr>
 <td style="text-align: left;">008 OpenAPI 手書きと problem+json のエラーコード</td>
 <td style="text-align: left;"><strong>引き継ぐ</strong></td>
-<td style="text-align: left;">契約を共有する</td>
+<td style="text-align: left;">契約（<code>openapi.yaml</code>、<code>code</code> の一覧）と、フロントエンドの型生成・<code>@redocly/cli</code> は共有する。バックエンドの契約テスト（Ktor <code>testApplication</code>、json-schema-validator）は Rust（axum）で再実装する</td>
 </tr>
 <tr>
 <td style="text-align: left;">009 観察者を DB ロールで分ける</td>
@@ -12164,7 +12164,7 @@
 <tr>
 <td style="text-align: left;">011 厳格な静的解析（detekt、PMD）</td>
 <td style="text-align: left;"><strong>置き換える</strong></td>
-<td style="text-align: left;">clippy、rustfmt、<code>cargo deny</code> などに置き換える</td>
+<td style="text-align: left;">厳格さの原則（違反 0 件、ベースラインなし、抑制なし、緩和は ADR に記録して人が承認、純粋性の静的検査）は引き継ぐ。ツールを clippy（<code>disallowed_methods</code> など）、rustfmt、<code>-D warnings</code> に置き換える。<code>cargo deny</code> は ADR-011 に根拠が無く、Kotlin 版の ADR-013 の「依存関係の脆弱性検査（選定未決）」に対応する別の選定である</td>
 </tr>
 <tr>
 <td style="text-align: left;">012 日本語 Gherkin と Cucumber</td>
@@ -12173,13 +12173,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">013 技術スタックの版</td>
-<td style="text-align: left;"><strong>置き換える</strong></td>
-<td style="text-align: left;">Rust・axum・sqlx・tokio の版を、確認したうえで別の ADR で固定する</td>
+<td style="text-align: left;"><strong>置き換える</strong>（バックエンド部分）。PostgreSQL 18、Node 26 LTS、フロントエンド・インフラ・CI の版と運用原則は引き継ぐ</td>
+<td style="text-align: left;">Rust・axum・sqlx・tokio の版を、確認したうえで別の ADR で固定する。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ</td>
 </tr>
 <tr>
 <td style="text-align: left;">014 ローカル開発だけ H2</td>
 <td style="text-align: left;"><strong>見直す</strong></td>
-<td style="text-align: left;">JVM 固有の判断。ローカルの DB の選択を、設計時の未決事項として比較する</td>
+<td style="text-align: left;">動機（ローカル起動を軽くする。ユーザーの決定）と、固有機能をポート（<code>ProjectionLock</code>・<code>ChangeNotifier</code>）で抽象化する考え方は言語に依存しない。H2 は JVM の組み込み DB で Rust では使えないため、代替の DB（PostgreSQL のみとするか、別の軽量 DB か）は本文に記載がなく、設計時の未決事項として比較する</td>
 </tr>
 <tr>
 <td style="text-align: left;">015 復帰資格の受け渡しと失効</td>
@@ -12199,7 +12199,7 @@
 <tr>
 <td style="text-align: left;">018 型の注釈から用語集・イベント一覧を生成</td>
 <td style="text-align: left;"><strong>置き換える</strong></td>
-<td style="text-align: left;">注釈（Kotlin）の代わりの方式（属性マクロ、doc コメントなど）を設計時に定める</td>
+<td style="text-align: left;">方針（型から生成し、不一致を CI で落とす）と CI の 4 検査（注釈漏れ、ID 重複、設計書との差、生成物との差）は引き継ぐ。実現（注釈、リフレクション、テキスト走査）は、属性マクロ、doc コメントなどから設計時に定める（本文に代替の記載なし）。出力先は <code>docs/design/beer-game-rust/generated/</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">019 再試行の上限と間隔</td>
@@ -12209,7 +12209,7 @@
 <tr>
 <td style="text-align: left;">020 資格の Cookie の名前をタブごとにする</td>
 <td style="text-align: left;"><strong>引き継ぐ</strong></td>
-<td style="text-align: left;">フロントエンドと HTTP の仕様で、言語に依存しない</td>
+<td style="text-align: left;">フロントエンドと HTTP の仕様で、言語に依存しない。axum のミドルウェアで Cookie 名を解決する。Kotlin 版でも「提案」で、レビュー待ち</td>
 </tr>
 </tbody>
 </table>
@@ -12230,7 +12230,7 @@
 <ul>
 <li>三つの系列（beer-game2、beer-game-kotlin、Rust 版）の文書を、読み手が参照する必要がある。</li>
 <li>beer-game-kotlin の設計が変わると、Rust 版にも影響する。変更は正本側で行い、Rust 版へ追従する。</li>
-<li>引き継ぎ表の暫定の判断が、本文の確認で変わる可能性がある。</li>
+<li>引き継ぎ元の ADR の多くは Kotlin 版でも未承認のため、Kotlin 版で内容が変わると、この表の「引き継ぐ」が揺らぐ。003・019 の計測値（千件の再生時間、再試行の上限 10）と 017 の仮置き値（10 回・10 分）は、Rust 版で取り直す。</li>
 </ul>
 <h2 id="_8">コンプライアンス<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>
@@ -12242,7 +12242,8 @@
 <h2 id="_9">備考<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>著者: claude-code</li>
-<li>未確認: 引き継ぎ表は、beer-game-kotlin の ADR の見出しだけで判断した暫定である。Rust 各ライブラリの版と機能（axum・sqlx・tokio、Cucumber の Rust 実装）は未確認で、技術スタックの設計で確認する。</li>
+<li>確認済み: 引き継ぎ表は、beer-game-kotlin の ADR 002〜020 の本文で検証した（2026-11-19）。</li>
+<li>未確認: Rust 各ライブラリの版と機能（axum・sqlx・tokio、Cucumber の Rust 実装）は未確認で、技術スタックの設計で確認する。</li>
 <li>関連 ADR: beer-game-kotlin の <a href="../../beer-game-kotlin/001-kotlin-version-of-beer-game2/">ADR-001</a>、<a href="../../beer-game-kotlin/002-event-sourcing-and-cqrs/">ADR-002</a>、<a href="../../beer-game-kotlin/007-functional-core-with-arrow/">ADR-007</a>。beer-game2 の <a href="../../beer-game2/001-rebuild-as-beer-game2/">ADR-001</a></li>
 <li>参照: <a href="../../../design/beer-game-kotlin/">beer-game-kotlin の設計書</a>、<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Rust%E7%B7%A8/">関数型プログラミングガイド（Rust 編）</a>、<a href="../../../requirements/beer-game2/user_story/">ユーザーストーリー</a>、<a href="../../../requirements/beer-game2/unit_definition/">Unit 定義</a></li>
 </ul>

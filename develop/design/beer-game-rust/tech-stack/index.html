@@ -12649,7 +12649,7 @@
 </tbody>
 </table>
 <h2 id="_11">設計判断<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
-<p>各判断は <strong>AI の提案</strong>です。承認を得るまで確定とは扱いません。</p>
+<p><strong>R1〜R7 は、ユーザーが 2026-11-19 にまとめて承認しました。</strong> ただし、判断の中の未確認項目（R3 のコンパイル時検査の可否、R4 の純粋性の lint、R5 の日本語 Gherkin の対応）は、承認後も未決事項として残り、B1 で確かめます。確かめた結果が判断と食い違う場合は、判断を改訂します。新規の依存関係の導入承認は、これとは別です（承認表のとおり、B1 の計画で求める）。</p>
 <h3 id="r1-postgresql-events">R1: イベントストアは、PostgreSQL の <code>events</code> 表で自前に実装する<a class="headerlink" href="#r1-postgresql-events" title="Permanent link">&para;</a></h3>
 <p>beer-game-kotlin の T1 と同じです。専用製品を入れず、sqlx で <code>events</code> 表への追記と読み出しを書きます。ADR-001 の 002・005 の引き継ぎに従います。</p>
 <h3 id="r2-web-axum">R2: Web フレームワークは axum（ユーザーの決定）<a class="headerlink" href="#r2-web-axum" title="Permanent link">&para;</a></h3>
