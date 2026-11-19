@@ -19,6 +19,9 @@ import { StatusTable } from './StatusTable';
 
 const STEPS = ['1. 状況を確認', '2. 入力', '3. 確定待ち'] as const;
 
+/** プレイ中に、状態を取り直す間隔（ミリ秒）。終了後は取り直さない。 */
+export const PLAY_POLL_MS = 3000;
+
 interface Carried {
     week: number;
     value: string;
@@ -42,7 +45,7 @@ const currentDecisionText = (status: NonNullable<SessionState['roleStatus']>): s
 
 /**
  * S05 プレイ（参加者）。B1 の範囲: 自分の役割の状況、数量の入力と保存、確定待ち、週が進んだ場合の表示。
- * 更新は、手動更新と、保存・確定の応答の後の取得だけ（SSE による自動更新は B1 の範囲外）。
+ * 更新は、一定の間隔の自動更新（[PLAY_POLL_MS]）と、手動更新と、保存・確定の応答の後の取得（SSE は B1 の範囲外）。
  */
 export function PlayPage() {
     const { gameId = '' } = useParams();
@@ -101,6 +104,38 @@ export function PlayPage() {
     useEffect(() => {
         void refresh();
     }, [refresh]);
+
+    // 自動更新: 一定の間隔で、黙って状態を取り直す（ゲーム全体の状態と、自分の役割の状況）。
+    // 保存中は取り直さない（保存の応答の取り直しと競合させない）。失敗は表示を消さず、次の回へ回す。終了後は取り直さない。
+    const loaded = game !== null;
+    const ended = session?.status === 'ENDED' || (session === null && game?.status === 'ENDED');
+    const busyRef = useRef(false);
+    busyRef.current = busy;
+    useEffect(() => {
+        if (ended || !loaded) return undefined;
+        let cancelled = false;
+        const timer = setInterval(() => {
+            if (busyRef.current) return;
+            void (async () => {
+                try {
+                    const latestGame = await api.getGameState(gameId);
+                    const latestSession =
+                        latestGame.sessionId === null
+                            ? null
+                            : await api.getSessionState(latestGame.sessionId);
+                    if (cancelled || busyRef.current) return;
+                    setGame(latestGame);
+                    if (latestSession !== null) applySession(latestSession);
+                } catch {
+                    // 次の回で取り直す。表示中の内容は消さない
+                }
+            })();
+        }, PLAY_POLL_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [api, gameId, applySession, ended, loaded]);
 
     useEffect(() => {
         if (advancedWeek !== null) noticeRef.current?.focus();

@@ -1,12 +1,13 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../api/errors';
 import type { DecisionEntry, Role, SessionState } from '../../api/types';
 import { formatClock } from '../../labels';
 import { expectNoStructuralA11yViolations } from '../../testing/a11y';
 import { GAME_ID, fakeApi, gameState, roleStatus, versions } from '../../testing/fakeApi';
 import { renderApp } from '../../testing/render';
+import { PLAY_POLL_MS } from './PlayPage';
 
 type Overrides = Partial<SessionState> & { status?: SessionState['status'] };
 
@@ -463,6 +464,94 @@ async function conflictedScreen(editor: DecisionEntry['editor']) {
     await user.click(screen.getByRole('button', { name: '発注を保存' }));
     return { api, user };
 }
+
+describe('S05 プレイ（自動更新）', () => {
+    function polledApi(sessions: Array<SessionState | Error>) {
+        const getSessionState = vi.fn<() => Promise<SessionState>>();
+        sessions.forEach((next, index) => {
+            const call =
+                index === sessions.length - 1 ? 'mockResolvedValue' : 'mockResolvedValueOnce';
+            if (next instanceof Error) getSessionState.mockRejectedValueOnce(next);
+            else getSessionState[call](next);
+        });
+        return fakeApi({
+            getGameState: () => Promise.resolve(gameState({ role: 'WHOLESALER' })),
+            getSessionState,
+        });
+    }
+
+    it('一定の間隔で状態を取り直し、週が進んだら新しい週を示す。手動更新を押さなくてよい', async () => {
+        vi.useFakeTimers();
+        try {
+            const api = polledApi([
+                playerState('WHOLESALER', { week: 3 }),
+                playerState('WHOLESALER', { week: 4 }),
+            ]);
+            renderApp(api, PATH);
+            await act(() => vi.advanceTimersByTimeAsync(0));
+            expect(screen.getByText(/^第 3 週\s+二次卸$/)).toBeInTheDocument();
+
+            await act(() => vi.advanceTimersByTimeAsync(PLAY_POLL_MS));
+            expect(screen.getByText(/^第 4 週\s+二次卸$/)).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('取り直しの失敗は、表示中の内容を消さず、エラーも出さない。次の回で戻れば反映する', async () => {
+        vi.useFakeTimers();
+        try {
+            const api = polledApi([
+                playerState('WHOLESALER', { week: 3 }),
+                new Error('一時的な通信の失敗'),
+                playerState('WHOLESALER', { week: 5 }),
+            ]);
+            renderApp(api, PATH);
+            await act(() => vi.advanceTimersByTimeAsync(0));
+
+            await act(() => vi.advanceTimersByTimeAsync(PLAY_POLL_MS));
+            expect(screen.getByText(/^第 3 週\s+二次卸$/)).toBeInTheDocument();
+            expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+            await act(() => vi.advanceTimersByTimeAsync(PLAY_POLL_MS));
+            expect(screen.getByText(/^第 5 週\s+二次卸$/)).toBeInTheDocument();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('入力中の数量は、同じ週の取り直しで消さない', async () => {
+        vi.useFakeTimers();
+        try {
+            const api = polledApi([playerState('WHOLESALER', { week: 3 })]);
+            renderApp(api, PATH);
+            await act(() => vi.advanceTimersByTimeAsync(0));
+
+            const field = screen.getByLabelText('発注数');
+            fireEvent.change(field, { target: { value: '12' } });
+            await act(() => vi.advanceTimersByTimeAsync(PLAY_POLL_MS * 2));
+
+            expect(screen.getByLabelText('発注数')).toHaveValue('12');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('終了したら、取り直しをやめる', async () => {
+        vi.useFakeTimers();
+        try {
+            const api = polledApi([playerState('WHOLESALER', { status: 'ENDED' })]);
+            renderApp(api, PATH);
+            await act(() => vi.advanceTimersByTimeAsync(0));
+            expect(api.getSessionState).toHaveBeenCalledTimes(1);
+
+            await act(() => vi.advanceTimersByTimeAsync(PLAY_POLL_MS * 3));
+            expect(api.getSessionState).toHaveBeenCalledTimes(1);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
 
 describe('S05 プレイ（共同入力）', () => {
     it('formatClock は、保存の時刻を「時:分」で示す（指定した時刻帯で）', () => {
