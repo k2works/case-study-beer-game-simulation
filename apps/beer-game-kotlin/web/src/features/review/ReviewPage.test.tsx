@@ -64,6 +64,28 @@ describe('S08 振り返り（役割別）', () => {
         expect(api.getReview).toHaveBeenCalledWith(GAME_ID);
     });
 
+    it('折れ線に、累計（表示中の 4 役割の合計の累計）の棒グラフを重ねる。値は、累計の表と同じ。役割を外すと、累計も変わる', async () => {
+        const user = userEvent.setup();
+        renderApp(fakeApi({ getReview: () => Promise.resolve(review()) }), PATH);
+
+        const chart = await screen.findByRole('img', { name: /注文の週次推移/ });
+        expect(chart.querySelectorAll('rect.cumulative-bar')).toHaveLength(3);
+        expect(chart).toHaveAccessibleName(/累計の棒グラフ/);
+        const table = screen.getByRole('table', { name: '累計の表' });
+        const cumulative = () =>
+            within(table)
+                .getAllByRole('row')
+                .slice(1)
+                .map((row) => within(row).getAllByRole('cell')[1]?.textContent);
+        // 週 1 は 11+21+31+41、週 2 はそれに 12+22+32+42、週 3 はさらに 13+23+33+43
+        expect(cumulative()).toEqual(['104', '212', '324']);
+
+        await user.click(screen.getByRole('checkbox', { name: '二次卸' }));
+        await user.click(screen.getByRole('checkbox', { name: '需要' }));
+        expect(cumulative()).toEqual(['83', '169', '258']);
+        expect(chart.querySelectorAll('rect.cumulative-bar')).toHaveLength(3);
+    });
+
     it('指標を切り替えると、表の値が、その指標の値になる（グラフと同じ値）', async () => {
         const user = userEvent.setup();
         renderApp(fakeApi({ getReview: () => Promise.resolve(review()) }), PATH);

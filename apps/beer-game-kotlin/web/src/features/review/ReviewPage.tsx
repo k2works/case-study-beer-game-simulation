@@ -10,7 +10,14 @@ import { SettingsNote } from '../../components/SettingsNote';
 import { useLoad } from '../../components/useLoad';
 import { RetentionNotice } from '../retention/RetentionNotice';
 import { ExportButtons } from './ExportButtons';
-import { METRICS, seriesOf, weeksOf, type Metric, type SeriesKey } from './reviewData';
+import {
+    METRICS,
+    cumulativeOf,
+    seriesOf,
+    weeksOf,
+    type Metric,
+    type SeriesKey,
+} from './reviewData';
 import { TrendChart, seriesLabel } from './TrendChart';
 
 const ALL_SERIES: readonly SeriesKey[] = [
@@ -65,6 +72,7 @@ export function ReviewPage() {
     }
 
     const series = seriesOf(review, metric).filter((s) => shown.has(s.key));
+    const cumulative = cumulativeOf(series);
 
     function toggle(key: SeriesKey) {
         const next = new Set(shown);
@@ -107,7 +115,12 @@ export function ReviewPage() {
                 ))}
             </fieldset>
 
-            <TrendChart weeks={weeks} series={series} metricLabel={metricLabel} />
+            <TrendChart
+                weeks={weeks}
+                series={series}
+                metricLabel={metricLabel}
+                cumulative={cumulative}
+            />
 
             <div className="table-scroll">
                 <table className="results-table" aria-label="週次推移の表">
@@ -129,6 +142,28 @@ export function ReviewPage() {
                                 {series.map((s) => (
                                     <td key={s.key}>{s.values[index] ?? '—'}</td>
                                 ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <div className="table-scroll">
+                <table className="results-table" aria-label="累計の表">
+                    <caption>
+                        {metricLabel}の累計（表示中の役割の合計。棒グラフと同じ値。需要は含めない）
+                    </caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">週</th>
+                            <th scope="col">累計</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {weeks.map((week, index) => (
+                            <tr key={week}>
+                                <td>{week}</td>
+                                <td>{cumulative[index] ?? '—'}</td>
                             </tr>
                         ))}
                     </tbody>

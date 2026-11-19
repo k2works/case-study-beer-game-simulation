@@ -42,3 +42,17 @@ export function seriesOf(review: Review, metric: Metric): Series[] {
         })),
     ];
 }
+
+/**
+ * 累計。表示中の役割（需要は含めない）の値を週ごとに合計し、第 1 週からの累計にする。結果が無い週の値は 0 として足す。
+ * 棒グラフと累計の表は、同じ値から作る。
+ */
+export function cumulativeOf(series: readonly Series[]): number[] {
+    const roles = series.filter((s) => s.key !== 'DEMAND');
+    const weekCount = Math.max(0, ...roles.map((s) => s.values.length));
+    let total = 0;
+    return Array.from({ length: weekCount }, (_, index) => {
+        total += roles.reduce((sum, s) => sum + (s.values[index] ?? 0), 0);
+        return total;
+    });
+}

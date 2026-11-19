@@ -28,11 +28,19 @@ export function TrendChart({
     weeks,
     series,
     metricLabel,
+    cumulative = [],
 }: {
     weeks: readonly number[];
     series: readonly Series[];
     metricLabel: string;
+    /** 週ごとの累計。あれば、折れ線の後ろに棒グラフで重ねる（縦軸は折れ線と別で、最大値を右上に示す）。 */
+    cumulative?: readonly number[];
 }) {
+    const cumulativeMax = Math.max(1, ...cumulative);
+    const barWidth = Math.max(
+        2,
+        ((WIDTH - PAD.left - PAD.right) / Math.max(weeks.length, 1)) * 0.5,
+    );
     const values = series.flatMap((s) => s.values).filter((v): v is number => v !== null);
     const max = Math.max(1, ...values);
     const min = Math.min(0, ...values);
@@ -45,10 +53,31 @@ export function TrendChart({
     return (
         <svg
             role="img"
-            aria-label={`${metricLabel}の週次推移（${series.map((s) => seriesLabel(s.key)).join('、')}）。値は下の表と同じです。`}
+            aria-label={`${metricLabel}の週次推移（${series.map((s) => seriesLabel(s.key)).join('、')}）${cumulative.length > 0 ? 'と累計の棒グラフ' : ''}。値は下の表と同じです。`}
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
             className="trend-chart"
         >
+            {cumulative.map((value, index) => {
+                const top =
+                    HEIGHT - PAD.bottom - (value / cumulativeMax) * (HEIGHT - PAD.top - PAD.bottom);
+                return (
+                    <rect
+                        key={weeks[index] ?? index}
+                        className="cumulative-bar"
+                        x={x(index) - barWidth / 2}
+                        y={top}
+                        width={barWidth}
+                        height={HEIGHT - PAD.bottom - top}
+                        fill="#9aa5b1"
+                        fillOpacity="0.45"
+                    />
+                );
+            })}
+            {cumulative.length > 0 ? (
+                <text x={WIDTH - PAD.right + 6} y={PAD.top + 4} fontSize="10" fill="#555">
+                    {`累計の最大 ${cumulativeMax}`}
+                </text>
+            ) : null}
             <line x1={PAD.left} y1={y(min)} x2={WIDTH - PAD.right} y2={y(min)} stroke="#888" />
             <line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={y(min)} stroke="#888" />
             <text x={PAD.left - 6} y={y(max) + 4} textAnchor="end" fontSize="11">
