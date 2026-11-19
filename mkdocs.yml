@@ -129,10 +129,10 @@ nav:
               - イベント一覧（生成）: design/beer-game-kotlin/generated/events.md
               - コアのハイライト（生成）: design/beer-game-kotlin/generated/core-highlight.md
               - ウォーキングスケルトンのガイドツアー（生成）: design/beer-game-kotlin/generated/walking-skeleton-tour.md
-              - ガイドツアー: CQRS（生成）: design/beer-game-kotlin/generated/cqrs-tour.md
-              - ガイドツアー: イベントソーシング（生成）: design/beer-game-kotlin/generated/event-sourcing-tour.md
-              - サイトシーイング・マップ: DDD（生成）: design/beer-game-kotlin/generated/ddd-sightseeing-map.md
-              - サイトシーイング・マップ: アーキテクチャ（生成）: design/beer-game-kotlin/generated/architecture-sightseeing-map.md
+              - 'ガイドツアー: CQRS（生成）': design/beer-game-kotlin/generated/cqrs-tour.md
+              - 'ガイドツアー: イベントソーシング（生成）': design/beer-game-kotlin/generated/event-sourcing-tour.md
+              - 'サイトシーイング・マップ: DDD（生成）': design/beer-game-kotlin/generated/ddd-sightseeing-map.md
+              - 'サイトシーイング・マップ: アーキテクチャ（生成）': design/beer-game-kotlin/generated/architecture-sightseeing-map.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
@@ -220,6 +220,7 @@ nav:
           - 観測: operation/beer-game-kotlin/observability.md
           - 本番: operation/beer-game-kotlin/production.md
           - 復元: operation/beer-game-kotlin/restore.md
+          - デモ環境（Heroku）: operation/beer-game-kotlin/demo.md
       - beer-game3:
           - リリース前の確認票: operation/beer-game3/release-checklist.md
           - 必須のチェックの設定: operation/beer-game3/required-check.md
