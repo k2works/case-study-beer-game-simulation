@@ -1,6 +1,6 @@
 name: beer-game-kotlin
 
-# beer-game-kotlin の CI（検証のみ。デプロイはしない）。
+# beer-game-kotlin の CI（検証と、デモ環境への配備 deploy-demo。AWS へはデプロイしない）。
 # 設計: docs/design/beer-game-kotlin/test-strategy.md「CI のテスト実行」、docs/development/beer-game-kotlin/bolt_2_plan.md の Step 2・4
 #
 # 工程と、設計の対応:
@@ -11,6 +11,8 @@ name: beer-game-kotlin
 #   web     : フロントエンド（format・lint・typecheck・コンポーネント・build）と、Cucumber-JS の Undefined 検査
 #   ui      : 受け入れ @ui（Cucumber-JS + Playwright。H2 のバックエンドを起動する）
 #   container: コンテナのスモークテスト（docker build と scripts/container-smoke.sh。Bolt 3 Step 3。検証のみ・AWS 無関係）
+#   deploy-demo: デモ環境（Heroku、H2 のインメモリ）への配備。develop の push と手動の実行のとき、上の検証がすべて緑なら動く
+#             （Environment demo の secret HEROKU_API_KEY。手順は docs/operation/beer-game-kotlin/demo.md）
 #   n1      : N-1 互換（B12。直前のリリースのタグの読み取り側で、現在の golden を読む。タグが無い間は、中身を実行しない。
 #             旧版が書いた過去の golden を現在の読み取り側で読む検査は、test ジョブの N1CompatibilitySpec が毎回行う）
 #
@@ -254,3 +256,113 @@ jobs:
       - name: 直前のリリースの読み取り側で、現在の golden を読む
         if: steps.previous.outputs.tag != ''
         run: ./scripts/n1-compat.sh "${{ steps.previous.outputs.tag }}"
+
+  # デモ環境（Heroku、Eco dyno、H2 のインメモリ）への配備。手順と設計: docs/operation/beer-game-kotlin/demo.md
+  # develop の push と手動の実行のときだけ、検証がすべて緑になった後に動く（Pull Request では動かさない）。
+  # 認証は Environment `demo` の secret HEROKU_API_KEY。Environment は配備のブランチを develop に限る。
+  deploy-demo:
+    name: デモ環境への配備（Heroku）
+    runs-on: ubuntu-24.04
+    needs: [contract, test, detekt, pmd, web, ui, container]
+    if: ${{ !cancelled() && !failure() && github.ref == 'refs/heads/develop' && github.event_name != 'pull_request' }}
+    timeout-minutes: 30
+    environment: demo
+    # 配備どうしは 1 つずつ動かし、release の途中で取り消さない
+    concurrency:
+      group: beer-game-kotlin-demo-deploy
+      cancel-in-progress: false
+    env:
+      HEROKU_APP: beer-game-kotlin-demo
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # 古い実行の再実行で、古いコミットを配備しない。アプリを最後に変えたコミットが、このコミットから develop の先頭までで同じか確かめる。
+      - name: 最新の配備の対象か
+        id: latest
+        working-directory: .
+        run: |
+          git fetch -q origin develop
+          mine=$(git log -1 --format=%H "${GITHUB_SHA}" -- apps/beer-game-kotlin)
+          latest=$(git log -1 --format=%H origin/develop -- apps/beer-game-kotlin)
+          if [ "$mine" != "$latest" ]; then
+            echo "::warning::より新しい配備の対象があります（${latest:0:7}）。この実行は配備を飛ばします。"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Heroku のキーがあるか
+        if: steps.latest.outputs.skip != 'true'
+        run: test -n "$HEROKU_API_KEY" || { echo "::error::secret HEROKU_API_KEY が空です（Environment demo）。"; exit 1; }
+      - uses: docker/setup-buildx-action@v3
+        if: steps.latest.outputs.skip != 'true'
+      - name: Container Registry へログイン
+        if: steps.latest.outputs.skip != 'true'
+        run: echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+      # Heroku の Container Registry は Docker v2 の manifest だけを受ける（oci-mediatypes=false、provenance・sbom なし）。
+      - name: イメージの作成と push（demo ステージ）
+        if: steps.latest.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/beer-game-kotlin
+          target: demo
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          outputs: type=image,name=registry.heroku.com/${{ env.HEROKU_APP }}/web,push=true,oci-mediatypes=false
+      - name: 直前の release を控える
+        if: steps.latest.outputs.skip != 'true'
+        id: previous
+        working-directory: .
+        run: |
+          prev=$(curl -fsS -H "Accept: application/vnd.heroku+json; version=3" -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -H "Range: version ..; order=desc,max=1" "https://api.heroku.com/apps/${HEROKU_APP}/releases" | jq -r '.[0].version')
+          echo "version=${prev}" >> "$GITHUB_OUTPUT"
+      - name: release
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          image_id=$(docker image inspect "registry.heroku.com/${HEROKU_APP}/web" --format '{{.Id}}' 2>/dev/null || true)
+          if [ -z "$image_id" ]; then
+            docker pull -q "registry.heroku.com/${HEROKU_APP}/web" >/dev/null
+            image_id=$(docker image inspect "registry.heroku.com/${HEROKU_APP}/web" --format '{{.Id}}')
+          fi
+          curl -fsS -X PATCH "https://api.heroku.com/apps/${HEROKU_APP}/formation" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -d "{\"updates\":[{\"type\":\"web\",\"docker_image\":\"${image_id}\"}]}" >/dev/null
+      # release と Config Vars の変更はそれぞれ再起動を起こす。起動が重ならないよう、起動を確かめてから DEMO_REVISION を入れる。
+      - name: 起動と DB を使う操作の確認（失敗したら直前の release に戻す）
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          # Heroku の URL は、アプリ名に識別子が付く（例: beer-game-kotlin-demo-xxxx.herokuapp.com）。Platform API から取る。
+          url=$(curl -fsS -H "Accept: application/vnd.heroku+json; version=3" -H "Authorization: Bearer $HEROKU_API_KEY" \
+            "https://api.heroku.com/apps/${HEROKU_APP}" | jq -r '.web_url' | sed 's:/$::')
+          test -n "$url" || { echo "::error::アプリの URL を取れません。"; exit 1; }
+          ok=false
+          for i in $(seq 1 40); do
+            if [ "$(curl -s -m 10 -o /dev/null -w '%{http_code}' "${url}/api/v1/ready")" = "200" ] \
+              && [ "$(curl -s -m 10 -o /dev/null -w '%{http_code}' "${url}/")" = "200" ]; then ok=true; break; fi
+            sleep 6
+          done
+          # DB を使う操作（ゲームの作成）が 500 にならないこと。表示だけのページは DB を使わず、DB が閉じていても 200 になるため。
+          if [ "$ok" = "true" ]; then
+            code=$(curl -s -m 20 -o /dev/null -w '%{http_code}' -X POST "${url}/api/v1/games" -H 'Content-Type: application/json' \
+              -H "Idempotency-Key: ci-${GITHUB_SHA}" -H "Origin: ${url}" -d '{"kind":"KIT","finalWeek":3,"demand":[4,4,8]}')
+            [ "$code" = "201" ] || ok=false
+          fi
+          if [ "$ok" != "true" ]; then
+            echo "::error::起動を確かめられません。直前の release（v${{ steps.previous.outputs.version }}）に戻します。"
+            curl -fsS -X POST "https://api.heroku.com/apps/${HEROKU_APP}/releases" \
+              -H "Accept: application/vnd.heroku+json; version=3" -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $HEROKU_API_KEY" -d "{\"release\":\"${{ steps.previous.outputs.version }}\"}" >/dev/null || true
+            exit 1
+          fi
+      - name: DEMO_REVISION を入れる
+        if: steps.latest.outputs.skip != 'true'
+        working-directory: .
+        run: |
+          curl -fsS -X PATCH "https://api.heroku.com/apps/${HEROKU_APP}/config-vars" \
+            -H "Accept: application/vnd.heroku+json; version=3" -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" -d "{\"DEMO_REVISION\":\"${GITHUB_SHA}\"}" >/dev/null

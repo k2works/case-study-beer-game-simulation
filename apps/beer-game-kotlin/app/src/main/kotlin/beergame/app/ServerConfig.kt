@@ -107,6 +107,8 @@ data class ServerConfig(
     val attemptMaxFailures: Int = DEFAULT_ATTEMPT_MAX_FAILURES,
     /** 参加・復帰の窓の長さ（秒）。同上。 */
     val attemptWindowSeconds: Int = DEFAULT_ATTEMPT_WINDOW_SECONDS,
+    /** 画面（web のビルド成果物）を配信するディレクトリ（`WEB_ROOT`）。デモ環境だけが設定する。無ければ配信しない。 */
+    val webRoot: String? = null,
 ) {
     companion object {
         const val DEFAULT_PORT = 8080
@@ -189,6 +191,7 @@ data class ServerConfig(
                     participantCredentialTtlDays = participantTtl.orFail(),
                     attemptMaxFailures = attemptMax.orFail(),
                     attemptWindowSeconds = attemptWindow.orFail(),
+                    webRoot = variables["WEB_ROOT"]?.trim()?.takeIf { it.isNotEmpty() },
                 ).right()
             }
         }

@@ -10,21 +10,44 @@ FROM eclipse-temurin:25-jdk-noble AS build
 WORKDIR /src
 COPY . .
 # H2 のドライバは配布に含めない（app/build.gradle.kts の startScripts と distributions で除外）。
-RUN ./gradlew --no-daemon :app:installDist \
+# デモ環境だけが使う H2 は、別に build/demo-lib へ写す（demo ステージが取り込む。本番の runtime には入れない）。
+RUN ./gradlew --no-daemon :app:installDist :app:copyDemoLibs \
     && mkdir -p /out/deps /out/app \
     && cd app/build/install/app/lib \
     && for jar in app.jar application.jar domain.jar adapter-http.jar adapter-persistence.jar; do mv "$jar" /out/app/; done \
     && mv ./*.jar /out/deps/ \
     && cp -r ../bin /out/bin
 
-# ---- 実行: JRE 25 と、ビルド済みの成果物だけ ----
-FROM eclipse-temurin:25-jre-noble
+# ---- 画面: React/Vite のビルド成果物（デモ環境の demo ステージだけが使う）----
+FROM node:24-bookworm-slim AS webbuild
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+# ---- 共通: JRE 25 と、ビルド済みの成果物だけ（runtime と demo の土台）----
+FROM eclipse-temurin:25-jre-noble AS base
 RUN groupadd --system --gid 10001 app && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 WORKDIR /app
 # 依存の JAR（変更が少ない）とアプリの JAR（変更が多い）を別の層にする。
 COPY --from=build /out/bin ./bin
 COPY --from=build /out/deps ./lib
 COPY --from=build /out/app ./lib
+
+# ---- デモ: 共通の土台に、H2 と画面を足す（Heroku のデモ環境。docs/operation/beer-game-kotlin/demo.md）----
+# H2 のインメモリ（APP_ENV=local のときだけ許される。ADR-014）で動き、再起動で初期状態に戻る。画面は API と同じ URL から配信する。
+# 配布の起動スクリプトは H2 を外したクラスパスなので、java で直接起動する。ヒープは JAVA_TOOL_OPTIONS（Config Vars）で 512 MB に収める。
+# 実行ユーザーは Heroku が決めるので、USER は指定しない。ビルドは `--target demo`（既定は、下の本番用の runtime）。
+FROM base AS demo
+COPY --from=build /src/app/build/demo-lib ./demo-lib
+COPY --from=webbuild /web/dist ./web
+ENV APP_ENV=local DB_KIND=h2 HOST=0.0.0.0 WEB_ROOT=/app/web
+ENTRYPOINT ["java", "-cp", "/app/lib/*:/app/demo-lib/*", "beergame.app.MainKt"]
+CMD ["api"]
+
+# ---- 本番用（既定のターゲット。最後のステージ）----
+FROM base AS runtime
 # ヒープはコンテナのメモリの割合で指定し（初期案 70%。測定で決める）、メモリ不足ではプロセスを終了させる。
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
 USER app

@@ -245,6 +245,14 @@ class ServerConfigSpec :
                 listOf(ConfigError.InvalidSetting("ATTEMPT_WINDOW_SECONDS"))
         }
 
+        test("[デモ] Given WEB_ROOT がある When 読み込む Then 画面の配信先になる。無ければ配信しない（null）。空白だけも無し") {
+            val local = mapOf("APP_ENV" to "local", "DB_KIND" to "h2")
+
+            configOf(local + ("WEB_ROOT" to "/app/web")).webRoot shouldBe "/app/web"
+            configOf(local).webRoot shouldBe null
+            configOf(local + ("WEB_ROOT" to "  ")).webRoot shouldBe null
+        }
+
         test("Given 本番相当で ALLOWED_ORIGINS が無い When 読み込む Then 失敗する（許可するオリジンを明示する）") {
             errorsOf(production() - "ALLOWED_ORIGINS") shouldBe listOf(ConfigError.MissingSetting("ALLOWED_ORIGINS"))
             configOf(mapOf("APP_ENV" to "local", "DB_KIND" to "h2")).allowedOrigins shouldBe

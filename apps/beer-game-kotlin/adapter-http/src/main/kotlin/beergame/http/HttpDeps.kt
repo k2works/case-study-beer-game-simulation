@@ -13,6 +13,8 @@ class HttpSettings(
     val cookieSecure: Boolean,
     val maxBodyBytes: Int = DEFAULT_MAX_BODY_BYTES,
     val rateLimitPerMinute: Int = DEFAULT_RATE_LIMIT_PER_MINUTE,
+    /** 画面（web のビルド成果物）を配信するディレクトリ。デモ環境だけが設定する。null なら配信しない（既定）。 */
+    val webRoot: String? = null,
 ) {
     companion object {
         /** 本文の上限（64 KB。NF-S10）。 */

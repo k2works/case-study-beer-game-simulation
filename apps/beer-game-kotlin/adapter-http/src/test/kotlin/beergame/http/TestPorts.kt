@@ -134,9 +134,11 @@ class CapturingLogSink : LogSink {
 fun testSettings(
     rateLimitPerMinute: Int = 10_000,
     allowedOrigins: Set<String> = setOf("http://localhost:5173"),
+    webRoot: String? = null,
 ): HttpSettings =
     HttpSettings(
         allowedOrigins = allowedOrigins,
         cookieSecure = false,
         rateLimitPerMinute = rateLimitPerMinute,
+        webRoot = webRoot,
     )

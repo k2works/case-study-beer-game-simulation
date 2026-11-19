@@ -21,6 +21,17 @@ distributions {
     }
 }
 
+// デモ環境（Dockerfile の demo ステージ）だけが使う。配布から外した H2 のドライバを build/demo-lib に写す。
+// 本番の成果物（runtime ステージ）には入れない（ADR-014）。
+tasks.register<Copy>("copyDemoLibs") {
+    from(
+        configurations.runtimeClasspath.map { classpath ->
+            classpath.filter { excludedFromDistribution.matches(it.name) }
+        },
+    )
+    into(layout.buildDirectory.dir("demo-lib"))
+}
+
 // 組み立てと起動。全モジュールに依存する。
 dependencies {
     implementation(project(":domain"))

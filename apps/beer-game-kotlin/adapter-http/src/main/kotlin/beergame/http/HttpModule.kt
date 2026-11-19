@@ -22,5 +22,6 @@ fun Application.beerGameModule(deps: HttpDeps) {
             exportRoutes(deps)
             retentionRoutes(deps)
         }
+        deps.settings.webRoot?.let { webRoutes(it) }
     }
 }

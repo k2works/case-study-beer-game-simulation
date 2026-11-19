@@ -165,6 +165,7 @@ fun startApi(
                 HttpSettings(
                     allowedOrigins = config.allowedOrigins,
                     cookieSecure = config.app.env != AppEnv.Local,
+                    webRoot = config.webRoot,
                 ),
             logs = logs,
         )
