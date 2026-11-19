@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-19
+* **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [non-functional](/design/beer-game-rust/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [test-strategy](/design/beer-game-rust/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [data-model](/design/beer-game-rust/data-model.md) を更新（claude-code/claude-sonnet-5-5）
