@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-19
+* **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [domain-model](/design/beer-game-rust/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-rust/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [domain-model](/design/beer-game-rust/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [tech-stack](/design/beer-game-rust/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）

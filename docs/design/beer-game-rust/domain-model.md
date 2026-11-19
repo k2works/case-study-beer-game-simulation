@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Rust 版のドメインモデル。beer-game-kotlin の構造（2 ストリーム、decide / evolve、simulateWeek、投影、全イベント）を引き継ぎ、enum・newtype・Result で表す。Kotlin 版の設計判断 D1〜D11 との対応と、Rust 固有の判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T07:31:09Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T07:47:11Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Rust 版）
@@ -406,11 +406,11 @@ Kotlin 版の `sealed interface` + `when`（else なし）に対応します。R
 
 ### RD2: ストリームの版は状態に持たせず、永続化の層が持つ
 
-Kotlin 版は `State.version` を持ち、`evolve` が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、`evolve` の結果を `Evolution::{Applied, Ignored}` で**明示**し、版は `(state, version)` として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、`Ignored` を直接検知（ログとメトリクス）できます。**これは Kotlin 版からの設計の変更**であり、承認を求めます。
+Kotlin 版は `State.version` を持ち、`evolve` が版を進めて、再生側が「版が増えなかった」ことで不正な遷移を検出します。Rust 版では、`evolve` の結果を `Evolution::{Applied, Ignored}` で**明示**し、版は `(state, version)` として永続化の層が数えます。「版が増えたかで推測する」間接性をなくし、`Ignored` を直接検知（ログとメトリクス）できます。**これは Kotlin 版からの設計の変更**であり、**ユーザーが 2026-11-19 に案 A を承認しました**（RD1・RD3〜RD5 は承認前の提案です）。
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（提案）** | `Evolution` で適用の有無を返し、版は外で持つ | 検知が直接的。状態の型が小さい。再生の関数が `Evolution` を畳み込む |
+| **A（採用）** | `Evolution` で適用の有無を返し、版は外で持つ | 検知が直接的。状態の型が小さい。再生の関数が `Evolution` を畳み込む |
 | B | Kotlin 版と同じく、状態に版を持たせ、再生が前後を比べる | 構造が Kotlin 版と一致する。検知が間接的 |
 
 ### RD3: 失敗は `Result`、複数の誤りは `Vec` に集める
@@ -432,7 +432,7 @@ Kotlin 版は detekt の `ForbiddenMethodCall` で時計・乱数の呼び出し
 | 1 | `sealed interface`・`data class`・`value class` | `enum`・`struct`・newtype | 言語の違い |
 | 2 | `Either<DomainError, List<Event>>`、`Raise` | `Result<Vec<Event>, Error>`、`?` | 標準で足りる（RD3） |
 | 3 | `zipOrAccumulate`（Arrow） | `collect` 関数で `Vec` に集める | 標準に無い。小さな関数で足りる |
-| 4 | `State.version` と版の増加による不正な遷移の検知 | `Evolution::{Applied, Ignored}`、版は永続化の層（RD2） | 検知を直接にする（承認待ち） |
+| 4 | `State.version` と版の増加による不正な遷移の検知 | `Evolution::{Applied, Ignored}`、版は永続化の層（RD2） | 検知を直接にする（承認済み。2026-11-19） |
 | 5 | `evolve(state, event): State` | `evolve(state, &event): Evolution<State>`（状態を値で受け取る） | 所有権による更新 |
 | 6 | 純粋性は detekt の `ForbiddenMethodCall` | 依存の制限（crate）+ clippy（RD5） | ツールの違い |
 | 7 | `Int`、`Money` は最小単位の整数 | 幅を型で決める（`u32`・`i64`）、検査付き演算 | オーバーフローを起こさない |
@@ -442,7 +442,7 @@ Kotlin 版は detekt の `ForbiddenMethodCall` で時計・乱数の呼び出し
 
 ## 未決事項
 
-1. **RD2 の承認**: `Evolution` と、版を永続化の層に置く案を採るか。採らない場合は案 B。
+1. ~~**RD2 の承認**~~ **解消（2026-11-19）**: 案 A を採用した。残りの RD1・RD3〜RD5 は承認前。
 2. **エラー型の実装**: `thiserror` を使うか、手で `Display` を書くか。ドメインの crate の依存を最小にする観点と比較する。
 3. **数量・金額の整数の幅**: `Quantity` は `u32`、`Units`（上限のない非負の流れの数量）と `Money` の幅は `u64` / `i64` を第一候補とし、`simulate_week` の演算の範囲を確かめて確定する。
 4. **イベントの JSON の書式**: serde の内部タグ付き列挙型で、アップキャスト（`schema_version`）を表せるか。B1 で確かめる。
