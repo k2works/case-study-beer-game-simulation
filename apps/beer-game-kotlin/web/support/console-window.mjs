@@ -211,7 +211,10 @@ export class ConsoleWindow {
 
     /** 振り返りの表の見出し（「<指標>の週次推移（グラフと同じ値）」）。 */
     async reviewCaption() {
-        const caption = this.reviewPage.locator('table caption');
+        // 累計の表の見出しもあるので、週次推移の表（aria-label「週次推移の表」）に絞る
+        const caption = this.reviewPage
+            .getByRole('table', { name: '週次推移の表' })
+            .locator('caption');
         await caption.waitFor({ timeout: WAIT_MS });
         return caption.innerText();
     }
