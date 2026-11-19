@@ -84,6 +84,8 @@ nav:
           - システムユースケース: requirements/beer-game2/system_usecase.md
           - ユーザーストーリー: requirements/beer-game2/user_story.md
           - Unit 定義: requirements/beer-game2/unit_definition.md
+      - beer-game-rust:
+          - 概要: requirements/beer-game-rust/index.md
   - 設計:
       - 概要: design/index.md
       - beer-game:
@@ -133,6 +135,8 @@ nav:
               - 'ガイドツアー: イベントソーシング（生成）': design/beer-game-kotlin/generated/event-sourcing-tour.md
               - 'サイトシーイング・マップ: DDD（生成）': design/beer-game-kotlin/generated/ddd-sightseeing-map.md
               - 'サイトシーイング・マップ: アーキテクチャ（生成）': design/beer-game-kotlin/generated/architecture-sightseeing-map.md
+      - beer-game-rust:
+          - 概要: design/beer-game-rust/index.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
@@ -203,6 +207,8 @@ nav:
           - Unit U5 総括: development/beer-game-kotlin/unit_u5_summary.md
           - Unit U6 総括: development/beer-game-kotlin/unit_u6_summary.md
           - リリースの準備状況: development/beer-game-kotlin/release_readiness.md
+      - beer-game-rust:
+          - 概要: development/beer-game-rust/index.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
@@ -224,6 +230,8 @@ nav:
       - beer-game3:
           - リリース前の確認票: operation/beer-game3/release-checklist.md
           - 必須のチェックの設定: operation/beer-game3/required-check.md
+      - beer-game-rust:
+          - 概要: operation/beer-game-rust/index.md
   - レビュー:
       - 概要: review/index.md
       - beer-game:
@@ -233,6 +241,8 @@ nav:
       - beer-game-kotlin:
           - 概要: review/beer-game-kotlin/index.md
           - 設計書レビュー（2026-11-14）: review/beer-game-kotlin/design_review_20261114.md
+      - beer-game-rust:
+          - 概要: review/beer-game-rust/index.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
@@ -282,6 +292,8 @@ nav:
           - ADR-018 型の注釈からの生成: adr/beer-game-kotlin/018-living-documentation-annotations.md
           - ADR-019 再試行の上限と直列化: adr/beer-game-kotlin/019-retry-limit-and-serialization.md
           - ADR-020 タブごとの資格の Cookie: adr/beer-game-kotlin/020-tab-scoped-credential-cookies.md
+      - beer-game-rust:
+          - 概要: adr/beer-game-rust/index.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:
@@ -293,6 +305,8 @@ nav:
           - 概要: journal/beer-game-kotlin/index.md
           - 2026-11-14: journal/beer-game-kotlin/20261114.md
           - 2026-11-15: journal/beer-game-kotlin/20261115.md
+      - beer-game-rust:
+          - 概要: journal/beer-game-rust/index.md
   - 記事:
       - 概要: article/index.md
   - リファレンス:
