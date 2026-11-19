@@ -7,11 +7,14 @@ export function DummyQuantityField({
     value,
     invalid,
     onChange,
+    onFillBacklog,
 }: {
     role: Role;
     value: string;
     invalid: boolean;
     onChange: (text: string) => void;
+    /** 直近の週末の受注残を、この欄に入れる。 */
+    onFillBacklog: () => void;
 }) {
     const id = `dummy-quantity-${role}`;
     const errorId = `${id}-error`;
@@ -26,6 +29,9 @@ export function DummyQuantityField({
                 aria-describedby={invalid ? errorId : undefined}
                 onChange={(event) => onChange(event.target.value)}
             />
+            <button type="button" onClick={onFillBacklog}>
+                {`${ROLE_LABELS[role]}の受注残を入力`}
+            </button>
             {invalid ? (
                 <span id={errorId} className="field-error">
                     数量は 0〜1000 の整数で入力してください。

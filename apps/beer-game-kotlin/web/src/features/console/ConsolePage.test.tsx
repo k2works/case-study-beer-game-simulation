@@ -121,6 +121,45 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         }
     });
 
+    it('「受注残を入力」で、その役割の直近の週末の受注残を数量の欄に入れる（結果が無ければ 0）。送るのは、埋めるボタンを押したとき', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () =>
+                Promise.resolve(
+                    consoleState({
+                        week: 3,
+                        roles: decisions({ RETAILER: 4 }),
+                        results: [
+                            resultOf('WHOLESALER', 1, { backlog: 2 }),
+                            resultOf('WHOLESALER', 2, { backlog: 9 }),
+                            resultOf('DISTRIBUTOR', 2, { backlog: 0 }),
+                        ],
+                    }),
+                ),
+        });
+        renderApp(api, PATH);
+
+        const wholesaler = await screen.findByLabelText('二次卸の代理入力の数量');
+        await user.click(screen.getByRole('button', { name: '二次卸の受注残を入力' }));
+        expect(wholesaler).toHaveValue('9');
+
+        await user.click(screen.getByRole('button', { name: '工場の受注残を入力' }));
+        expect(screen.getByLabelText('工場の代理入力の数量')).toHaveValue('0');
+        expect(
+            screen.queryByRole('button', { name: '小売店の受注残を入力' }),
+        ).not.toBeInTheDocument();
+        expect(api.submitProxyDecision).not.toHaveBeenCalled();
+
+        await user.click(screen.getByRole('button', { name: /ダミーの役割を代理入力で埋める/ }));
+        await waitFor(() =>
+            expect(api.submitProxyDecision).toHaveBeenCalledWith(GAME_ID, 'WHOLESALER', {
+                requestedWeek: 3,
+                quantity: 9,
+            }),
+        );
+    });
+
     it.each(['', '-1', '1001', '4.5', 'abc'])(
         '数量が 0〜1000 の整数でない（%j）役割があるときは、どの役割にも送らず、その欄に範囲を案内する',
         async (text) => {

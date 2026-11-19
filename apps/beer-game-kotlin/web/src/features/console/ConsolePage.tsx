@@ -4,7 +4,7 @@ import { useApi, useCatchUp } from '../../api/ApiContext';
 import { fetchCaughtUp } from '../../api/catchUp';
 import { ApiError } from '../../api/errors';
 import { DECISIONS_CHANGED_TEXT, weekAdvancedText } from '../../api/problems';
-import type { CommitMode, GameState, Role, SessionState } from '../../api/types';
+import type { CommitMode, GameState, Role, RoleWeekResult, SessionState } from '../../api/types';
 import { Dialog } from '../../components/Dialog';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
@@ -50,6 +50,13 @@ function parseDummyQuantity(text: string): number | null {
     if (!/^\d+$/.test(trimmed)) return null;
     const value = Number(trimmed);
     return value <= MAX_QUANTITY ? value : null;
+}
+
+/** 役割の直近の週末の受注残。確定した週が無ければ 0。 */
+function latestBacklog(results: readonly RoleWeekResult[], role: Role): number {
+    const ofRole = results.filter((result) => result.role === role);
+    if (ofRole.length === 0) return 0;
+    return ofRole.reduce((latest, result) => (result.week > latest.week ? result : latest)).backlog;
 }
 
 /** 停止・再開の確認ダイアログが開いているときの操作。 */
@@ -345,6 +352,12 @@ export function ConsolePage() {
                             invalid={dummyInvalid.includes(role)}
                             onChange={(text) =>
                                 setDummyQuantities({ ...dummyQuantities, [role]: text })
+                            }
+                            onFillBacklog={() =>
+                                setDummyQuantities({
+                                    ...dummyQuantities,
+                                    [role]: String(latestBacklog(results, role)),
+                                })
                             }
                         />
                     ))}
