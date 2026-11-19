@@ -363,6 +363,21 @@ export function ConsolePage() {
                     ))}
                     <button
                         type="button"
+                        onClick={() =>
+                            setDummyQuantities({
+                                ...dummyQuantities,
+                                ...Object.fromEntries(
+                                    ROLE_ORDER.filter((role) => !decided.includes(role)).map(
+                                        (role) => [role, String(latestBacklog(results, role))],
+                                    ),
+                                ),
+                            })
+                        }
+                    >
+                        受注残を一括入力
+                    </button>
+                    <button
+                        type="button"
                         disabled={busy}
                         onClick={() => void fillWithProxyDecisions(session)}
                     >

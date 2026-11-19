@@ -160,6 +160,34 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         );
     });
 
+    it('「受注残を一括入力」で、未入力の全役割の欄に、それぞれの直近の受注残を入れる（入力済みの役割は対象外）', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () =>
+                Promise.resolve(
+                    consoleState({
+                        week: 3,
+                        roles: decisions({ RETAILER: 4 }),
+                        results: [
+                            resultOf('RETAILER', 2, { backlog: 5 }),
+                            resultOf('WHOLESALER', 2, { backlog: 9 }),
+                            resultOf('DISTRIBUTOR', 1, { backlog: 3 }),
+                            resultOf('DISTRIBUTOR', 2, { backlog: 7 }),
+                        ],
+                    }),
+                ),
+        });
+        renderApp(api, PATH);
+
+        await user.click(await screen.findByRole('button', { name: '受注残を一括入力' }));
+
+        expect(screen.getByLabelText('二次卸の代理入力の数量')).toHaveValue('9');
+        expect(screen.getByLabelText('一次卸の代理入力の数量')).toHaveValue('7');
+        expect(screen.getByLabelText('工場の代理入力の数量')).toHaveValue('0');
+        expect(api.submitProxyDecision).not.toHaveBeenCalled();
+    });
+
     it.each(['', '-1', '1001', '4.5', 'abc'])(
         '数量が 0〜1000 の整数でない（%j）役割があるときは、どの役割にも送らず、その欄に範囲を案内する',
         async (text) => {
