@@ -11860,7 +11860,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>提案。人の承認待ち。</strong> 判断項目は、すべて未決</td>
+<td style="text-align: left;"><strong>実装は完了。判断項目 15 件とゲート 0〜7 は、2026-11-19 にユーザーが承認した（更新履歴）。</strong> デモ項目の人の実操作・コードの全行理解・AWS への適用は、承認に含まれない</td>
 </tr>
 </tbody>
 </table>
@@ -12169,6 +12169,11 @@
 <td style="text-align: left;">2026-11-16</td>
 <td style="text-align: left;">ユーザーの <code>/goal U3</code> に基づき、判断項目 15 件を AI の提案どおりに進めて実装した（<strong>個別の承認ではない。ゲート 0〜7 は未承認のまま</strong>）。結果は <a href="../bolt_7_report/">bolt_7_report</a>。範囲・文言の差分: 範囲外の誤りの項目名は <code>conditions.&lt;名前&gt;</code></td>
 <td style="text-align: left;">claude-code/claude-sonnet-5-5</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-19</td>
+<td style="text-align: left;">ユーザーが、判断項目 15 件とゲート 0〜7 を承認した（指示: 「Boltゲートの承認」。範囲の選択: U3（B7・B8）・U4（B4・B9・B10）・U5（B11〜B14）・U6（B15）。内容の選択: 「判断項目とゲートのみ」）。判断項目は AI の提案どおりの決定として承認された。<strong>この承認に含まれない</strong>: デモ項目の人の実操作、コードの全行理解、AWS への適用（別の承認ゲート）。計画の逸脱（編集に python・sed を使った規律違反。終了報告に記録）は、承認の対象ではなく、是正も別</td>
+<td style="text-align: left;">user（記録: claude-code/claude-sonnet-5-5）</td>
 </tr>
 </tbody>
 </table>
