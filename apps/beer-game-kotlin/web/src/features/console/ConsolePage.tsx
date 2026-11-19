@@ -52,11 +52,14 @@ function parseDummyQuantity(text: string): number | null {
     return value <= MAX_QUANTITY ? value : null;
 }
 
-/** 役割の直近の週末の受注残。確定した週が無ければ 0。 */
+/** 役割の直近の週末の受注残。確定した週が無ければ 0。数量の上限（1000）を超えるときは、上限にする。 */
 function latestBacklog(results: readonly RoleWeekResult[], role: Role): number {
     const ofRole = results.filter((result) => result.role === role);
     if (ofRole.length === 0) return 0;
-    return ofRole.reduce((latest, result) => (result.week > latest.week ? result : latest)).backlog;
+    const backlog = ofRole.reduce((latest, result) =>
+        result.week > latest.week ? result : latest,
+    ).backlog;
+    return Math.min(backlog, MAX_QUANTITY);
 }
 
 /** 停止・再開の確認ダイアログが開いているときの操作。 */

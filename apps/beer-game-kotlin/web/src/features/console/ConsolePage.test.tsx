@@ -188,6 +188,33 @@ describe('S06 進行役のコンソール（開発用: 代理入力）', () => {
         expect(api.submitProxyDecision).not.toHaveBeenCalled();
     });
 
+    it('受注残が数量の上限（1000）を超えるときは、上限の 1000 を入れる（個別も一括も）', async () => {
+        const user = userEvent.setup();
+        const api = fakeApi({
+            getGameState: () => Promise.resolve(gameState({ finalWeek: 12 })),
+            getSessionState: () =>
+                Promise.resolve(
+                    consoleState({
+                        week: 3,
+                        roles: decisions({ RETAILER: 4 }),
+                        results: [
+                            resultOf('WHOLESALER', 2, { backlog: 1500 }),
+                            resultOf('DISTRIBUTOR', 2, { backlog: 1000 }),
+                            resultOf('FACTORY', 2, { backlog: 1001 }),
+                        ],
+                    }),
+                ),
+        });
+        renderApp(api, PATH);
+
+        await user.click(await screen.findByRole('button', { name: '二次卸の受注残を入力' }));
+        expect(screen.getByLabelText('二次卸の代理入力の数量')).toHaveValue('1000');
+
+        await user.click(screen.getByRole('button', { name: '受注残を一括入力' }));
+        expect(screen.getByLabelText('一次卸の代理入力の数量')).toHaveValue('1000');
+        expect(screen.getByLabelText('工場の代理入力の数量')).toHaveValue('1000');
+    });
+
     it.each(['', '-1', '1001', '4.5', 'abc'])(
         '数量が 0〜1000 の整数でない（%j）役割があるときは、どの役割にも送らず、その欄に範囲を案内する',
         async (text) => {
