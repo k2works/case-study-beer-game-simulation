@@ -7,6 +7,7 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { useLoad } from '../../components/useLoad';
 import { SESSION_STATUS_LABELS } from '../../labels';
+import { TeamTotalChart } from './TeamTotalChart';
 
 /** プレイ中の観察を取り直す間隔（ミリ秒）。終了後は取り直さない。 */
 export const OBSERVATION_POLL_MS = 3000;
@@ -109,6 +110,7 @@ function ObservationView({ observation, gameId }: { observation: Observation; ga
                 <p>まだ確定した週はありません。</p>
             ) : (
                 <>
+                    <TeamTotalChart weeks={totals.weeks} />
                     <div className="table-scroll">
                         <table className="results-table" aria-label="チーム合計の表">
                             <caption>4 役割の合計（役割別の値は表示されません）</caption>

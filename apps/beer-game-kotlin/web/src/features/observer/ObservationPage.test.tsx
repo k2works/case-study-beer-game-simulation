@@ -72,6 +72,64 @@ describe('S07 観察', () => {
         expectNoStructuralA11yViolations();
     });
 
+    it('チーム合計の週次推移を、注文・在庫・受注残の折れ線グラフで示す（値は表と同じ。非表示の週は点を打たない）', async () => {
+        const api = fakeApi({
+            getObservation: () =>
+                Promise.resolve(
+                    observation({
+                        totals: {
+                            policy: 'TEAM_TOTAL',
+                            weeks: [
+                                { week: 1, order: 16, inventory: 48, backlog: 0 },
+                                { week: 2, hidden: true, order: 0, inventory: 0, backlog: 0 },
+                                { week: 3, order: 24, inventory: 40, backlog: 8 },
+                            ],
+                        },
+                    }),
+                ),
+        });
+        renderApp(api, PATH);
+
+        const chart = await screen.findByRole('img', {
+            name: /チーム合計の週次推移（注文、在庫、受注残）/,
+        });
+        const lines = Array.from(chart.querySelectorAll('polyline'));
+        expect(lines).toHaveLength(3);
+        for (const line of lines) {
+            expect((line.getAttribute('points') ?? '').split(' ')).toHaveLength(2);
+        }
+        for (const label of ['注文', '在庫', '受注残']) {
+            expect(within(chart as unknown as HTMLElement).getByText(label)).toBeInTheDocument();
+        }
+        expect(screen.queryByText(/小売店|二次卸|一次卸|工場/)).not.toBeInTheDocument();
+        expectNoStructuralA11yViolations();
+    });
+
+    it('公開範囲が「なし」・確定した週が無いときは、グラフを出さない', async () => {
+        const hidden = fakeApi({
+            getObservation: () =>
+                Promise.resolve(
+                    observation({
+                        totals: { policy: 'NONE', weeks: [], hiddenReason: 'DISCLOSURE_NONE' },
+                    }),
+                ),
+        });
+        const { unmount } = renderApp(hidden, PATH);
+        await screen.findByRole('heading', { name: '観察' });
+        expect(screen.queryByRole('img')).not.toBeInTheDocument();
+        unmount();
+
+        renderApp(
+            fakeApi({
+                getObservation: () =>
+                    Promise.resolve(observation({ totals: { policy: 'TEAM_TOTAL', weeks: [] } })),
+            }),
+            PATH,
+        );
+        await screen.findByText('まだ確定した週はありません。');
+        expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    });
+
     it('公開範囲が「なし」なら、合計の表を出さず、理由を示す（現在週と完了状況は示す）', async () => {
         const api = fakeApi({
             getObservation: () =>
