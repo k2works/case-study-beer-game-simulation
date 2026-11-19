@@ -81,6 +81,29 @@ class WebRoutesSpec :
             }
         }
 
+        test("[デモ] Given webRoot の設定 When 画面（HTML・CSS・JS）を返す Then 自分のオリジンのスクリプトとスタイルを許す CSP にする") {
+            val root = webRoot().toString()
+            withWeb(root) {
+                for (path in listOf("/", "/assets/app.js", "/games/x/lobby")) {
+                    val csp = client.fetch(path).headers["Content-Security-Policy"].orEmpty()
+                    csp shouldContain "default-src 'self'"
+                    csp shouldContain "style-src 'self'"
+                    csp shouldContain "connect-src 'self'"
+                    csp shouldContain "frame-ancestors 'none'"
+                }
+            }
+        }
+
+        test("[デモ] Given webRoot の設定 When API の応答 Then 従来どおり default-src 'none'（画面の CSP にしない）") {
+            val root = webRoot().toString()
+            withWeb(root) {
+                for (path in listOf("/api/v1/health", "/api/v1/no-such-route")) {
+                    client.fetch(path).headers["Content-Security-Policy"] shouldBe
+                        "default-src 'none'; frame-ancestors 'none'"
+                }
+            }
+        }
+
         test("[デモ] Given webRoot の設定 When 存在しない API の経路 Then 404（index.html を返さない）") {
             val root = webRoot().toString()
             withWeb(root) {

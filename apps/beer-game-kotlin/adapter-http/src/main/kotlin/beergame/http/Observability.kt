@@ -5,6 +5,7 @@ import beergame.application.requestMetrics
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.hooks.ResponseSent
+import io.ktor.server.request.path
 import io.ktor.server.response.header
 import java.util.UUID
 
@@ -18,15 +19,31 @@ private const val MAX_STACK_FRAMES = 40
 private const val SERVER_ERROR = 500
 private const val CLIENT_ERROR = 400
 
-/** すべての応答に付けるセキュリティヘッダー（CSP、HSTS、nosniff、Referrer-Policy）。API は JSON だけを返す。 */
+/** API の応答の CSP。API は JSON だけを返す。 */
+private const val API_CSP = "default-src 'none'; frame-ancestors 'none'"
+
+/**
+ * 画面（デモ環境で API が配信する web のビルド成果物）の応答の CSP。本番の CloudFront のヘッダーポリシー
+ * （infra/modules/web/main.tf）と同じ。自分のオリジンのスクリプト・スタイル・接続だけを許す。
+ */
+private const val WEB_CSP =
+    "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; " +
+        "frame-ancestors 'none'; base-uri 'self'"
+
+/** すべての応答に付けるセキュリティヘッダー（HSTS、nosniff、Referrer-Policy、Cache-Control）。CSP は、応答の種類で選ぶ。 */
 private val SECURITY_HEADERS =
     listOf(
-        "Content-Security-Policy" to "default-src 'none'; frame-ancestors 'none'",
         "Strict-Transport-Security" to "max-age=31536000; includeSubDomains",
         "X-Content-Type-Options" to "nosniff",
         "Referrer-Policy" to "no-referrer",
         "Cache-Control" to "no-store",
     )
+
+/** 画面を配信する設定（webRoot）があり、API の経路でなければ、画面の応答。 */
+private fun cspFor(
+    deps: HttpDeps,
+    path: String,
+): String = if (deps.settings.webRoot != null && !path.startsWith(API_BASE)) WEB_CSP else API_CSP
 
 internal class ObservabilityConfig {
     var deps: HttpDeps? = null
@@ -39,6 +56,7 @@ internal val Observability =
             call.attributes.put(CorrelationKey, correlationIdOf(call.request.headers[CORRELATION_HEADER]))
             call.attributes.put(StartKey, deps.monotonicNanos())
             call.response.header(CORRELATION_HEADER, call.correlationId.toString())
+            call.response.header("Content-Security-Policy", cspFor(deps, call.request.path()))
             SECURITY_HEADERS.forEach { (name, value) -> call.response.header(name, value) }
         }
         on(ResponseSent) { call ->
