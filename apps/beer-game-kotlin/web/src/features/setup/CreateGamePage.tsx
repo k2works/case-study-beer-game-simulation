@@ -8,6 +8,7 @@ import { ErrorNotice } from '../../components/ErrorNotice';
 import { PageHeading } from '../../components/PageHeading';
 import { ValidationSummary, fieldProps } from '../../components/ValidationSummary';
 import { CustomConditionsFields, EMPTY_DRAFT, toConditions } from './CustomConditionsFields';
+import { DemandPatternFields } from './DemandPatternFields';
 
 /** 画面イメージ（S02）の初期値。キットの既定の需要系列は未確定（ASM-01）なので、これは例として置く値。 */
 const DEFAULT_FINAL_WEEK = '12';
@@ -155,6 +156,10 @@ export function CreateGamePage() {
                         最終週まで、0〜1000（コンマ区切り）
                     </span>
                 </div>
+                <DemandPatternFields
+                    finalWeek={finalWeek}
+                    onGenerate={(values) => setDemand(values.join(', '))}
+                />
                 <div className="field">
                     <label htmlFor="retentionDays">保持期間（日）</label>
                     <input

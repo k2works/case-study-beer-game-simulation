@@ -74,6 +74,71 @@ describe('S02 ゲーム作成', () => {
         );
     });
 
+    it('需要系列を「増加」で、開始値と増分値を指定して、最終週まで作る（作った値を送る）', async () => {
+        const user = userEvent.setup();
+        const createGame = vi.fn(() => Promise.resolve(created));
+        const api = fakeApi({
+            createGame,
+            getGameState: () =>
+                Promise.resolve(
+                    gameState({
+                        status: 'PREPARING',
+                        sessionId: null,
+                        joinCode: 'A1B2C3D4',
+                        versions: versions(null, 1),
+                    }),
+                ),
+        });
+        renderApp(api, '/new');
+
+        const finalWeek = screen.getByLabelText('最終週');
+        await user.clear(finalWeek);
+        await user.type(finalWeek, '5');
+        await user.selectOptions(screen.getByLabelText('系列の作り方'), 'INCREASE');
+        const start = screen.getByLabelText('開始値');
+        await user.clear(start);
+        await user.type(start, '4');
+        await user.type(screen.getByLabelText('増分値'), '2');
+        await user.click(screen.getByRole('button', { name: '最終週まで系列を作る' }));
+
+        expect(screen.getByLabelText('需要系列')).toHaveValue('4, 6, 8, 10, 12');
+        await user.click(screen.getByRole('button', { name: 'ゲームを作成' }));
+        await waitFor(() =>
+            expect(createGame).toHaveBeenCalledWith(
+                expect.objectContaining({ demand: [4, 6, 8, 10, 12], finalWeek: 5 }),
+            ),
+        );
+    });
+
+    it('「一定」では増分値を使わず、「減少」は 0 で止まる。開始値や最終週が読めないときは、作らずに案内する', async () => {
+        const user = userEvent.setup();
+        renderApp(fakeApi(), '/new');
+
+        await user.selectOptions(screen.getByLabelText('系列の作り方'), 'CONSTANT');
+        expect(screen.queryByLabelText('増分値')).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: '最終週まで系列を作る' }));
+        expect(screen.getByLabelText('需要系列')).toHaveValue(
+            Array.from({ length: 12 }, () => '4').join(', '),
+        );
+
+        const finalWeek = screen.getByLabelText('最終週');
+        await user.clear(finalWeek);
+        await user.type(finalWeek, '4');
+        await user.selectOptions(screen.getByLabelText('系列の作り方'), 'DECREASE');
+        await user.type(screen.getByLabelText('増分値'), '3');
+        await user.click(screen.getByRole('button', { name: '最終週まで系列を作る' }));
+        expect(screen.getByLabelText('需要系列')).toHaveValue('4, 1, 0, 0');
+
+        const start = screen.getByLabelText('開始値');
+        await user.clear(start);
+        await user.type(start, 'abc');
+        await user.click(screen.getByRole('button', { name: '最終週まで系列を作る' }));
+        expect(
+            screen.getByText('開始値と増分値は 0〜1000、最終週は 1〜50 の整数で入力してください。'),
+        ).toBeVisible();
+        expect(screen.getByLabelText('需要系列')).toHaveValue('4, 1, 0, 0');
+    });
+
     it('確定方式を「自動」にして作ると、commitMode: AUTO を送る。既定（手動）では送らない', async () => {
         const user = userEvent.setup();
         const createGame = vi.fn(() => Promise.resolve(created));
