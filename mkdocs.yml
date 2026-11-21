@@ -211,6 +211,7 @@ nav:
           - 概要: development/beer-game-rust/index.md
           - リリース計画: development/beer-game-rust/release_plan.md
           - 開発戦略: development/beer-game-rust/development_strategy.md
+          - Bolt 1 計画: development/beer-game-rust/bolt_1_plan.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:

@@ -4,7 +4,7 @@ title: "開発戦略 - ビールゲームシミュレーション（Rust 版）"
 description: "beer-game-rust の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認済み（2026-11-21）。ガード（hook・CI の新設）の導入の承認は含まない。"
 tags: [plan]
 status: stable
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:24:14Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:43:52Z }
 verified:
   - { by: human:kakimomokuri, at: 2026-11-21T02:23:57Z }
 ---
@@ -19,7 +19,8 @@ verified:
 - **参照元（正）。本書は内容を複製せず、判断だけを書きます。**
   - Bolt の配分・完了条件: [リリース計画](./release_plan.md)
   - テストの種類・ツール・カバレッジ・CI・B1 の受入条件: [テスト戦略](../../design/beer-game-rust/test-strategy.md)
-  - コーディング規約・型・エラー・純粋性: [ドメインモデル](../../design/beer-game-rust/domain-model.md)、[バックエンドアーキテクチャ](../../design/beer-game-rust/architecture-backend.md)
+  - **コーディング規約（準拠）: [関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)。** 純粋関数、所有権による不変データ、`Option`/`Result` と型で表すエラー、副作用の境界、並行処理、アーキテクチャ（クレートによる境界）、テスト、静的解析（第 9 章）のすべてに従う。設計との対応は下の「関数型プログラミングガイド（Rust 編）への準拠」。
+  - 型・エラー・純粋性の設計: [ドメインモデル](../../design/beer-game-rust/domain-model.md)、[バックエンドアーキテクチャ](../../design/beer-game-rust/architecture-backend.md)
   - 手法: [コーディングとテストガイド（AI-DLC 版）](../../reference/コーディングとテストガイド_AI-DLC版.md)、[BDD 導入ガイド](../../reference/BDD導入ガイド.md)、[Living Documentation 導入ガイド](../../reference/LivingDocumentation導入ガイド.md)
 - **実装コードはまだありません。** 品質チェックのコマンドは、設計書の記述から導いた**予定**で、B1 で実際のビルド設定に合わせて確定します（憶測を事実として書きません）。
 - Rust 版は Kotlin 版の [開発戦略](../beer-game-kotlin/development_strategy.md) の構造を引き継ぎ、**JVM・H2・detekt・PMD に関する記述は引き継ぎません**。
@@ -100,9 +101,31 @@ Rust 版には H2 がありません。**ローカル開発・統合テスト・
 
 ---
 
+## 関数型プログラミングガイド（Rust 編）への準拠
+
+**本プロジェクトのコーディングは、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md) に準拠します。** ガイドと設計書が食い違う場合は、**設計書（承認済みの設計判断）を正とし、食い違いを ADR か設計書の変更として記録**します（黙ってどちらかに寄せません）。AI は実装のたびにガイドの該当章を参照し、人は承認ゲートで準拠を検証します。
+
+| ガイドの章 | 規約の要点 | 本プロジェクトでの扱い | 守り（下の「戦略の適用をテストと hook でガードする」の対応表） |
+| :--- | :--- | :--- | :--- |
+| 1 基礎 | 純粋関数、所有権と純粋性、参照透過性 | domain は純粋（時計・乱数・I/O を引数で受ける）。共有状態は境界のクレートだけが持つ | DS-3・4 |
+| 2 関数型スタイル | 新しい値を作る、`map`/`filter`/`fold`、添字でなく `get` とイテレータ | `evolve` は状態を値で受け取り新しい状態を返す | DS-2 |
+| 3 型で表すエラー | `Option`/`Result`/`?`、型付きのエラー、`enum` で ADT、`match` のワイルドカードを避ける | domain-model の RD1〜RD4（状態は `enum`、`Result` と誤りの集約、`code` は `match` の網羅） | DS-2・5 |
+| 4 副作用の管理 | 副作用を境界に寄せる、`async` は記述、純粋な計算と非同期を分ける | `decide`/`evolve` は同期の純粋関数。非同期は application・adapter | DS-3・4 |
+| 5 並行処理 | 共有状態は所有権で守る、キャンセル、チャネル、アクター | `execute` の spawn とキャンセル安全性（RB2、RT2）。`std::sync::Mutex` を domain に置かない | DS-12 |
+| 6 代数構造 | 法則を守る | lint で表せない。**法則・性質は proptest で確かめる**（ガイド 8.4） | DS-5 |
+| 7 アーキテクチャ | 薄い縦串、依存は型とトレイト、コマンドと状態遷移表、イベント列、クレートによる境界 | architecture-backend の RB1（トレイトによるポート）、クレート分割 | DS-4 |
+| 8 テスト戦略 | `#[test]`、スタブ、プロパティ、代数の法則、テストの種類 | [テスト戦略](../../design/beer-game-rust/test-strategy.md) | DS-5〜13 |
+| 9 静的解析 | clippy と `[lints]` で規約を表す。`deny` で CI を止める。`allow` は理由を残す。**守る範囲は狭く、守られない範囲はテストで確かめる** | 下の「静的解析と規約」。ガイド 9.6 の設定を出発点にする | DS-1〜3・17 |
+
+- **ガイド 9.4 の注意（守られない範囲）**: `wildcard_enum_match_arm` は、単体の `enum` を直接 `match` したときだけ発火し、**遷移表のように組（タプル）で受けると発火しない**。組の `match` でのワイルドカードは、lint で守れないため、**テスト（腕を 1 つ消すと落ちる性質テスト。DS-5）とレビューで守る**。
+- **ガイド 9.6 の clippy の設定は、clippy 0.1.91 で確認されたもの**です。本プロジェクトの Rust 1.97.1 の clippy で同じ件数が報告されるかを、**B1 の Step 2 の fixture で確かめます**（ガイドの確認用コードを使う）。
+- **ガイドとの差分は、記録します**: ガイドの設定のうち、Rust 版で変えたもの（例: アプリ・アダプターのクレートで `std::env::var` や非同期の `spawn` を許す。クレートごとに `clippy.toml` と `[lints]` を置く: ガイド 9.5）は、ADR か設計書に理由を書きます。
+
+---
+
 ## 静的解析と規約
 
-厳格に適用します（違反 0 件、`allow` の追加は理由つきで人が承認、ベースラインなし）。具体的な lint と、`evolve` の最後の腕の `_` の扱い（`wildcard_enum_match_arm` との衝突の規則）は、[テスト戦略](../../design/beer-game-rust/test-strategy.md) の「静的解析と規約の検査」と B1 の受入条件を正とします。**ルールそのものをテストファーストで確かめる**: 違反するコードを実際に置いて CI が落ちること（ローカルと GitHub Actions の両方）を、B1（lint）と B3（CI）の受入条件にします。AI は `unsafe`・`unwrap`・`expect`・`SystemTime::now` を生成しがちなため、**lint を CI のゲートにする**ことが最も確実な防御です（リスク台帳 R8）。
+厳格に適用します（違反 0 件、`allow` の追加は理由つきで人が承認、ベースラインなし）。具体的な lint は **ガイド 9.6 の設定を出発点**にし、`evolve` の最後の腕の `_` の扱い（`wildcard_enum_match_arm` との衝突の規則）は、[テスト戦略](../../design/beer-game-rust/test-strategy.md) の「静的解析と規約の検査」と B1 の受入条件を正とします。**ルールそのものをテストファーストで確かめる**: 違反するコードを実際に置いて CI が落ちること（ローカルと GitHub Actions の両方）を、B1（lint）と B3（CI）の受入条件にします。AI は `unsafe`・`unwrap`・`expect`・`SystemTime::now` を生成しがちなため、**lint を CI のゲートにする**ことが最も確実な防御です（リスク台帳 R8）。
 
 ---
 
@@ -421,5 +444,6 @@ US6.1・6.2（完成）、横断の受入条件。
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
 | 2026-11-21 | 初版作成（案） | claude-code |
+| 2026-11-21 | コーディング規約として関数型プログラミングガイド（Rust 編）への準拠を明記（章との対応、守りの対応） | claude-code |
 | 2026-11-21 | 戦略の適用をテストと hook でガードする節（規則 DS-1〜22 と守りの対応）を追加 | claude-code |
 | 2026-11-21 | Living Documentation の節に `apply-living-documentation`（triage・augment・curate・automate・check）を適用 | claude-code |
