@@ -1,6 +1,10 @@
 # Docs Update Log
 
 ## 2026-11-21
+* **Update**: [release_plan](/development/beer-game-rust/release_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [development_strategy](/development/beer-game-rust/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Verification**: [development_strategy](/development/beer-game-rust/development_strategy.md) を human:kakimomokuri が検証
+* **Verification**: [release_plan](/development/beer-game-rust/release_plan.md) を human:kakimomokuri が検証
 * **Update**: [development_strategy](/development/beer-game-rust/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [development_strategy](/development/beer-game-rust/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [development_strategy](/development/beer-game-rust/development_strategy.md) を更新（claude-code/claude-sonnet-5-5）

@@ -1,17 +1,19 @@
 ---
 type: Plan
 title: "開発戦略 - ビールゲームシミュレーション（Rust 版）"
-description: "beer-game-rust の開発戦略（案）。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。人の承認待ち。"
+description: "beer-game-rust の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認済み（2026-11-21）。ガード（hook・CI の新設）の導入の承認は含まない。"
 tags: [plan]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:21:05Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:24:14Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T02:23:57Z }
 ---
 
 # 開発戦略 - ビールゲームシミュレーション（Rust 版）
 
 ## 概要
 
-本書は、[リリース計画](./release_plan.md)（案）の Bolt 群（B1〜B16）を **序盤・中盤・終盤** の局面に分け、局面ごとの TDD アプローチと、局面をまたいで変えない進め方を定める**案**です。局面ごとに変えるのは**テストの入口**と**レイヤーを貫く順序**だけで、Red-Green-Refactor は全局面で変えません。**承認前です。**
+本書は、[リリース計画](./release_plan.md)の Bolt 群（B1〜B16）を **序盤・中盤・終盤** の局面に分け、局面ごとの TDD アプローチと、局面をまたいで変えない進め方を定めます。局面ごとに変えるのは**テストの入口**と**レイヤーを貫く順序**だけで、Red-Green-Refactor は全局面で変えません。**2026-11-21 に、ユーザーが承認しました。ただし、守り（git の hook、Claude Code の hook、CI の必須ジョブ）の新設の承認は含みません（未決事項 7・8）。**
 
 - 計画の単位の「イテレーション」は **Bolt** に読み替えます。AI が Bolt ごとにステップ計画を書き、人が承認ゲートで検証します。
 - **参照元（正）。本書は内容を複製せず、判断だけを書きます。**
@@ -418,6 +420,6 @@ US6.1・6.2（完成）、横断の受入条件。
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
-| 2026-11-21 | 初版作成（案。人の承認待ち） | claude-code |
+| 2026-11-21 | 初版作成（案） | claude-code |
 | 2026-11-21 | 戦略の適用をテストと hook でガードする節（規則 DS-1〜22 と守りの対応）を追加 | claude-code |
 | 2026-11-21 | Living Documentation の節に `apply-living-documentation`（triage・augment・curate・automate・check）を適用 | claude-code |

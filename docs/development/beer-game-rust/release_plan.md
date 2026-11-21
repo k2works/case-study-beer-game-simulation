@@ -1,17 +1,19 @@
 ---
 type: Plan
 title: "リリース計画 - ビールゲームシミュレーション（Rust 版）"
-description: "beer-game-rust のリリース計画（案）。Intent、Unit、Bolt 計画（B1〜B16、予備 B17）、リリース 0.1 / 0.2 / 1.0、Rust 版の価値指標、バッファ、リスク台帳。人の承認待ち。"
+description: "beer-game-rust のリリース計画。Intent、Unit、Bolt 計画（B1〜B16、予備 B17）、リリース 0.1 / 0.2 / 1.0、Rust 版の価値指標、バッファ、リスク台帳。承認済み（2026-11-21）。"
 tags: [plan]
-status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:10:05Z }
+status: stable
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:24:14Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T02:23:57Z }
 ---
 
 # リリース計画 - ビールゲームシミュレーション（Rust 版）
 
 ## 概要
 
-本書は、beer-game-rust（beer-game-kotlin の Rust 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義する**案**です。**AI が提案し、人が承認ゲートで検証・承認します。承認前です（本書の承認は、ユーザーの指示があるまで記録しません）。**
+本書は、beer-game-rust（beer-game-kotlin の Rust 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が提案し、人が承認ゲートで検証・承認します。本書は 2026-11-21 に、ユーザーが承認しました（スコープ、Bolt の割り当て、日程の仮定、価値指標の目標、リスク）。**
 
 - 機能・振る舞いは beer-game-kotlin（元は beer-game2）と同じです。要件・ストーリー・Unit・受入条件は新規に作らず参照します（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)）。
 - 設計は [beer-game-rust の設計](../../design/beer-game-rust/index.md)（ES + CQRS、axum + sqlx + tokio。**設計文書 10 本は 2026-11-21 に `verified`**）と [ADR-001](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) です。
@@ -87,10 +89,10 @@ Kotlin 版と同じ範囲（Unit U1〜U6、Release 0.1 / 0.2 / 1.0。ストー�
 - [x] マルチパースペクティブレビューと反映: [設計書レビュー](../../review/beer-game-rust/design_review_20261121.md)
 - [x] ADR-001（Rust 版を作る。承認済み）
 - [x] Terraform の準備（Kotlin 版から複製。適用しない）
-- [ ] **リリース計画（本書）の承認**
+- [x] **リリース計画（本書）の承認**（2026-11-21、ユーザーの承認）
 - [ ] **B1 の新規依存関係の承認**（B1 で使うものを確定し、版を `cargo search` と公式情報で確認してから）
 - [ ] **RT1 の命名規則（AC のみの接頭辞）の承認**（test-strategy の未決 17）
-- [ ] 開発戦略（局面別の TDD アプローチ）の作成と承認（Kotlin 版に準じ、序盤アウトサイドイン・中盤インサイドアウト・終盤アウトサイドイン案）
+- [x] 開発戦略（局面別の TDD アプローチ）の作成と承認（2026-11-21。ガードの導入の承認は別）（Kotlin 版に準じ、序盤アウトサイドイン・中盤インサイドアウト・終盤アウトサイドイン案）
 - [ ] Bolt 1 のステップ計画の作成と承認
 - [ ] RPO・RTO の約束の範囲の決定（B15 の机上確認の前まで）
 - [ ] Bolt の実行 → Release 0.1 → 0.2 → 1.0
@@ -293,7 +295,7 @@ gantt
 
 | Bolt | 計画（稼働日） | 実績 | 状態 |
 | :--- | ---: | ---: | :--- |
-| B1〜B17 | 42 | - | 未着手（承認待ち） |
+| B1〜B17 | 42 | - | 未着手（B1 の依存関係の承認待ち） |
 
 ---
 
@@ -309,4 +311,4 @@ gantt
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
-| 2026-11-21 | 初版作成（案。人の承認待ち） | claude-code |
+| 2026-11-21 | 初版作成（案） | claude-code |
