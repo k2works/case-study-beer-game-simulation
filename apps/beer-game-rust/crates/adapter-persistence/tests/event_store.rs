@@ -256,3 +256,42 @@ async fn rb2__tx_の_drop_は_ロックを解放する_測定して記録する(
         other => Err(format!("drop した Tx のロックが解放されない: {other:?}")),
     }
 }
+
+#[tokio::test]
+async fn マイグレーション_0001_から_0005_が適用され_game_roots_の削除が全表へ連鎖する()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let tables: Vec<String> = sqlx::query_scalar(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' \
+         AND table_name <> '_sqlx_migrations' ORDER BY table_name",
+    )
+    .fetch_all(&env.pool)
+    .await
+    .map_err(e)?;
+    // game_roots、events、projection_checkpoints と、周辺ストア 4、投影 12（設計: data-model）
+    if tables.len() != 3 + 4 + 12 {
+        return Err(format!("表の数が違う: {tables:?}"));
+    }
+    let game = new_game(&env.pool).await?;
+    let s = store(&env.pool, game);
+    let mut tx = s.begin().await.map_err(e)?;
+    s.append(&mut tx, 0, vec![1]).await.map_err(e)?;
+    s.commit(tx).await.map_err(e)?;
+    sqlx::query("DELETE FROM game_roots WHERE game_id = $1")
+        .bind(game)
+        .execute(&env.pool)
+        .await
+        .map_err(e)?;
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM events WHERE game_id = $1")
+        .bind(game)
+        .fetch_one(&env.pool)
+        .await
+        .map_err(e)?;
+    if left == 0 {
+        Ok(())
+    } else {
+        Err(format!("連鎖削除で events が残った: {left}"))
+    }
+}
