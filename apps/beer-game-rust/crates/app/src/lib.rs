@@ -3,7 +3,7 @@
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{AppFailure, AppSettings, Env, PersistenceFailure};
-use beergame_domain::{GameId, Instant};
+use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -84,6 +84,29 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             .await
             .map(|row| row.map(|id| GameId::new(id.as_u128())))
             .map_err(|e| AppFailure::Persistence(PersistenceFailure::Storage(e.to_string())))
+    }
+
+    async fn participant_role(
+        &self,
+        game_id: GameId,
+        participant_id: ParticipantId,
+    ) -> Result<Option<Role>, AppFailure> {
+        let role = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT role FROM lobby_participants WHERE participant_id = $1 AND game_id = $2",
+        )
+        .bind(Uuid::from_u128(participant_id.get()))
+        .bind(Uuid::from_u128(game_id.get()))
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| AppFailure::Persistence(PersistenceFailure::Storage(e.to_string())))?;
+        Ok(role.flatten().and_then(|name| {
+            Role::ALL.into_iter().find(|r| match r {
+                Role::Factory => name == "FACTORY",
+                Role::Distributor => name == "DISTRIBUTOR",
+                Role::Wholesaler => name == "WHOLESALER",
+                Role::Retailer => name == "RETAILER",
+            })
+        }))
     }
 
     async fn is_ready(&self) -> bool {

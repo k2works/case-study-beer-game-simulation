@@ -209,6 +209,35 @@ where
         Ok(u64::try_from(version).unwrap_or(0))
     }
 
+    async fn find_idempotency(
+        &self,
+        tx: &mut PgTx,
+        game_id: GameId,
+        scope: &str,
+        key_digest: &str,
+    ) -> Result<Option<StoredResponse>, AppFailure> {
+        // 期限内の記録だけを照合する（期限切れは、無いものとして扱う）
+        let row = sqlx::query(
+            "SELECT request_digest, status_code, response FROM idempotency_records \
+             WHERE game_id = $1 AND scope = $2 AND key_digest = $3 AND expires_at > now()",
+        )
+        .bind(Uuid::from_u128(game_id.get()))
+        .bind(scope)
+        .bind(key_digest)
+        .fetch_optional(&mut *tx.0)
+        .await
+        .map_err(|e| storage(&e))?;
+        let Some(row) = row else { return Ok(None) };
+        let request_digest: String = row.try_get("request_digest").map_err(|e| storage(&e))?;
+        let status: i32 = row.try_get("status_code").map_err(|e| storage(&e))?;
+        let body: Vec<u8> = row.try_get("response").map_err(|e| storage(&e))?;
+        Ok(Some(StoredResponse {
+            request_digest,
+            status_code: u16::try_from(status).unwrap_or(500),
+            body,
+        }))
+    }
+
     async fn write_peripheral(
         &self,
         tx: &mut PgTx,

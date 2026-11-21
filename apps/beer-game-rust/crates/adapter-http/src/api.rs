@@ -5,15 +5,21 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Bytes;
+use axum::extract::Path;
 use axum::extract::State;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
+use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
-    AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, create_game,
-    join_game,
+    AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
+    Idempotency, ResponseShape, Secret, StartExecuted, assign_role, authenticate, commit_week,
+    create_game, digest, join_game, save_decision, start_game,
 };
-use beergame_domain::{GameEvent, GameId, SessionEvent};
+use beergame_domain::{
+    Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
+    SessionEvent, Week,
+};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -39,6 +45,12 @@ pub trait Backend: Send + Sync + 'static {
         &self,
         code: &str,
     ) -> impl Future<Output = Result<Option<GameId>, AppFailure>> + Send;
+    /// 参加者の役割（投影 `lobby_participants`）。役割が無い（未割り当て・不明）なら `None`。
+    fn participant_role(
+        &self,
+        game_id: GameId,
+        participant_id: ParticipantId,
+    ) -> impl Future<Output = Result<Option<Role>, AppFailure>> + Send;
     /// 依存先（DB）に接続できるか。
     fn is_ready(&self) -> impl Future<Output = bool> + Send;
     /// HTTPS の環境では Cookie に `Secure` を付ける。
@@ -55,6 +67,16 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route("/api/v1/ready", get(ready::<B>))
         .route("/api/v1/games", post(create::<B>))
         .route("/api/v1/participations/join", post(join::<B>))
+        .route(
+            "/api/v1/games/{game_id}/participants/{participant_id}/role",
+            put(assign::<B>),
+        )
+        .route("/api/v1/games/{game_id}/start", post(start::<B>))
+        .route("/api/v1/sessions/{session_id}/decisions", put(decide::<B>))
+        .route(
+            "/api/v1/sessions/{session_id}/weeks/{week}/commit",
+            post(commit::<B>),
+        )
         .with_state(backend)
 }
 
@@ -300,4 +322,389 @@ async fn join<B: Backend>(
         }
         Err(failure) => problem_response(&problem_of(&failure), &correlation),
     }
+}
+
+// ---- 認証・冪等性・変更系のルート ----
+
+fn not_found() -> Problem {
+    Problem {
+        status: 404,
+        code: "app.not_found".to_owned(),
+        title: "見つかりません。".to_owned(),
+        detail: None,
+        retry_after_seconds: None,
+        errors: Vec::new(),
+        extras: serde_json::Map::new(),
+    }
+}
+
+fn parse_game_id(text: &str) -> Result<GameId, Box<Problem>> {
+    Uuid::parse_str(text)
+        .map(|u| GameId::new(u.as_u128()))
+        .map_err(|_| Box::new(not_found()))
+}
+
+/// Cookie ヘッダーから、資格の Cookie の値を取り出す（名前は `X-Tab-Id` で決まる）。
+fn credential_token(headers: &HeaderMap) -> Option<Secret<String>> {
+    let name = cookie_name(headers);
+    headers
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())?
+        .split(';')
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(k, _)| *k == name)
+        .map(|(_, v)| Secret::new(v.to_owned()))
+}
+
+/// 認証。資格が無い・無効・別のゲームのものは、区別せず 403。
+async fn authenticate_for<B: Backend>(
+    backend: &B,
+    headers: &HeaderMap,
+    game_id: GameId,
+) -> Result<Actor, Box<Problem>> {
+    let unauthorized = || Box::new(problem_of(&AppFailure::Unauthorized));
+    let token = credential_token(headers).ok_or_else(unauthorized)?;
+    let store = backend.store(game_id);
+    match authenticate(&store, backend.env(), backend.settings(), &token).await {
+        Ok((credential_game, actor)) if credential_game == game_id => Ok(actor),
+        Ok(_) => Err(unauthorized()),
+        Err(failure) => Err(Box::new(problem_of(&failure))),
+    }
+}
+
+/// `Idempotency-Key` から、冪等性の情報を作る。キーが無ければ 400。
+fn idempotency_for<B: Backend>(
+    backend: &B,
+    headers: &HeaderMap,
+    game_id: GameId,
+    scope: &str,
+    request: &str,
+    shape: ResponseShape,
+) -> Result<Idempotency, Box<Problem>> {
+    let key = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| !v.is_empty() && v.len() <= 200)
+        .ok_or_else(|| Box::new(bad_request_problem("Idempotency-Key ヘッダーが必要です。")))?;
+    let secret_key = &backend.settings().credential_key;
+    let internal = || {
+        Box::new(problem_of(&AppFailure::Persistence(
+            beergame_application::PersistenceFailure::Storage(
+                "資格の鍵が設定されていない".to_owned(),
+            ),
+        )))
+    };
+    let key_digest =
+        digest(secret_key, &Secret::new(format!("idem:{key}"))).ok_or_else(internal)?;
+    let request_digest =
+        digest(secret_key, &Secret::new(format!("{scope}\n{request}"))).ok_or_else(internal)?;
+    let now = backend.env().now();
+    Ok(Idempotency {
+        game_id,
+        scope: scope.to_owned(),
+        key_digest,
+        request_digest,
+        shape,
+        expires_at: Instant::from_epoch_millis(now.epoch_millis().saturating_add(86_400_000)),
+    })
+}
+
+fn executed_response(executed: &Executed, shape: ResponseShape, correlation: &str) -> Response {
+    match executed {
+        Executed::Fresh(version) => raw_json(200, &shape.body(*version), correlation),
+        Executed::Replayed(stored) => raw_json(stored.status_code, &stored.body, correlation),
+    }
+}
+
+fn raw_json(status: u16, body: &[u8], correlation: &str) -> Response {
+    let response = (
+        StatusCode::from_u16(status).unwrap_or(StatusCode::OK),
+        [(header::CONTENT_TYPE, "application/json")],
+        body.to_vec(),
+    )
+        .into_response();
+    // 保存した応答かどうかは、利用者には区別させない（同じ応答）
+    with_correlation(response, correlation)
+}
+
+fn role_of_name(name: &str) -> Option<Role> {
+    Role::ALL.into_iter().find(|r| match r {
+        Role::Factory => name == "FACTORY",
+        Role::Distributor => name == "DISTRIBUTOR",
+        Role::Wholesaler => name == "WHOLESALER",
+        Role::Retailer => name == "RETAILER",
+    })
+}
+
+fn field(name: &str, message: &str) -> FieldError {
+    FieldError {
+        field: name.to_owned(),
+        message: message.to_owned(),
+        week: None,
+    }
+}
+
+async fn assign<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path((game, participant)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let participant_id = Uuid::parse_str(&participant)
+            .map(|u| ParticipantId::new(u.as_u128()))
+            .map_err(|_| Box::new(not_found()))?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let role = parsed
+            .get("role")
+            .and_then(Value::as_str)
+            .and_then(role_of_name)
+            .ok_or_else(|| {
+                Box::new(validation_problem(vec![field(
+                    "role",
+                    "役割は FACTORY・DISTRIBUTOR・WHOLESALER・RETAILER のいずれかにしてください。",
+                )]))
+            })?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "assign_role",
+            &format!("{participant}\n{parsed}"),
+            ResponseShape::Game,
+        )?;
+        let store = backend.store(game_id);
+        assign_role(
+            &store,
+            backend.env(),
+            backend.settings(),
+            actor,
+            participant_id,
+            role,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| executed_response(&executed, ResponseShape::Game, &correlation))
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    }
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+async fn start<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "start_game",
+            "",
+            ResponseShape::Both,
+        )?;
+        let store = backend.store(game_id);
+        start_game(
+            &store,
+            backend.env(),
+            backend.settings(),
+            actor,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| match executed {
+            StartExecuted::Fresh(g, s) => {
+                raw_json(200, &ResponseShape::body_both(g, s), &correlation)
+            }
+            StartExecuted::Replayed(stored) => {
+                raw_json(stored.status_code, &stored.body, &correlation)
+            }
+        })
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    }
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// `If-Match`（意思決定の版。`"3"` のように引用符で囲んでもよい）。無ければ 0。整数でなければ 422。
+fn parse_if_match(headers: &HeaderMap) -> Result<DecisionVersion, Box<Problem>> {
+    let Some(raw) = headers.get(header::IF_MATCH).and_then(|v| v.to_str().ok()) else {
+        return Ok(DecisionVersion::ZERO);
+    };
+    raw.trim()
+        .trim_matches('"')
+        .parse::<u32>()
+        .map(DecisionVersion::new)
+        .map_err(|_| {
+            Box::new(validation_problem(vec![field(
+                "If-Match",
+                "If-Match は意思決定の版（整数）にしてください。",
+            )]))
+        })
+}
+
+async fn decide<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(session): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&session)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let expected = parse_if_match(&headers)?;
+        let mut errors = Vec::new();
+        let week = parsed
+            .get("week")
+            .and_then(Value::as_i64)
+            .map(|n| Week::of(n).map_err(|e| crate::field_error(&e)));
+        let quantity = parsed
+            .get("quantity")
+            .and_then(Value::as_i64)
+            .map(|n| Quantity::of(n).map_err(|e| crate::field_error(&e)));
+        if week.is_none() {
+            errors.push(field("week", "週は 1 以上 50 以下の整数にしてください。"));
+        }
+        if quantity.is_none() {
+            errors.push(field(
+                "quantity",
+                "数量は 0 以上 1000 以下の整数にしてください。",
+            ));
+        }
+        let (Some(week), Some(quantity)) = (week, quantity) else {
+            return Err(Box::new(validation_problem(errors)));
+        };
+        let (week, quantity) = match (week, quantity) {
+            (Ok(w), Ok(q)) => (w, q),
+            (w, q) => {
+                return Err(Box::new(validation_problem(
+                    w.err().into_iter().chain(q.err()).collect(),
+                )));
+            }
+        };
+        // 入力する役割は、資格から決まる。役割が無い操作者は、資格の失敗と同じ 403
+        let role = match actor {
+            Actor::Participant(id) => backend
+                .participant_role(game_id, id)
+                .await
+                .map_err(|f| Box::new(problem_of(&f)))?,
+            Actor::Facilitator(_) | Actor::Anonymous => None,
+        }
+        .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "save_decision",
+            &format!("{expected:?}\n{parsed}"),
+            ResponseShape::Session,
+        )?;
+        let store = backend.store(game_id);
+        save_decision(
+            &store,
+            backend.env(),
+            backend.settings(),
+            actor,
+            role,
+            week,
+            quantity,
+            expected,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    }
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+async fn commit<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path((session, week_path)): Path<(String, i64)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result =
+        async {
+            let game_id = parse_game_id(&session)?;
+            let actor = authenticate_for(&*backend, &headers, game_id).await?;
+            let parsed = parse_json(&body)?;
+            let requested = parsed.get("requestedWeek").and_then(Value::as_i64);
+            let basis = parsed.get("basis");
+            let version = |name: &str| {
+                basis
+                    .and_then(|b| b.get(name))
+                    .and_then(Value::as_u64)
+                    .and_then(|n| u32::try_from(n).ok())
+                    .map(DecisionVersion::new)
+            };
+            let (
+                Some(requested),
+                Some(factory),
+                Some(distributor),
+                Some(wholesaler),
+                Some(retailer),
+            ) = (
+                requested,
+                version("FACTORY"),
+                version("DISTRIBUTOR"),
+                version("WHOLESALER"),
+                version("RETAILER"),
+            )
+            else {
+                return Err(Box::new(validation_problem(vec![field(
+                    "basis",
+                    "requestedWeek と、役割ごとの basis（0 以上の整数）が必要です。",
+                )])));
+            };
+            if requested != week_path {
+                return Err(Box::new(validation_problem(vec![field(
+                    "requestedWeek",
+                    "経路の週と requestedWeek を同じにしてください。",
+                )])));
+            }
+            let week = Week::of(requested)
+                .map_err(|e| Box::new(validation_problem(vec![crate::field_error(&e)])))?;
+            let idem = idempotency_for(
+                &*backend,
+                &headers,
+                game_id,
+                "commit_week",
+                &format!("{week_path}\n{parsed}"),
+                ResponseShape::Session,
+            )?;
+            let store = backend.store(game_id);
+            let basis = RoleMap {
+                factory,
+                distributor,
+                wholesaler,
+                retailer,
+            };
+            commit_week(
+                &store,
+                backend.env(),
+                backend.settings(),
+                actor,
+                week,
+                basis,
+                Some(&idem),
+            )
+            .await
+            .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
+            .map_err(|failure| Box::new(problem_of(&failure)))
+        }
+        .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
