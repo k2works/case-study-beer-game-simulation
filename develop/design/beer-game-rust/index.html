@@ -12298,17 +12298,17 @@
 <tr>
 <td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
 <td style="text-align: left;">バックエンドの責務分割、レイヤ、連携方式を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="architecture-frontend/">フロントエンドアーキテクチャ</a></td>
 <td style="text-align: left;">UI 構成、状態管理、画面遷移を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="architecture-infrastructure/">インフラストラクチャ</a></td>
 <td style="text-align: left;">実行環境、ネットワーク、デプロイ構成を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 </tbody>
 </table>
@@ -12325,12 +12325,12 @@
 <tr>
 <td style="text-align: left;"><a href="data-model/">データモデル設計</a></td>
 <td style="text-align: left;">概念・論理データモデル、テーブル定義、ER 図を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="domain-model/">ドメインモデル設計</a></td>
 <td style="text-align: left;">コンテキスト、集約、エンティティ、値オブジェクトを整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 </tbody>
 </table>
@@ -12347,7 +12347,7 @@
 <tr>
 <td style="text-align: left;"><a href="ui-design/">UI 設計</a></td>
 <td style="text-align: left;">画面設計、画面遷移図、コンポーネント設計を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 </tbody>
 </table>
@@ -12364,17 +12364,17 @@
 <tr>
 <td style="text-align: left;"><a href="test-strategy/">テスト戦略</a></td>
 <td style="text-align: left;">テストピラミッド、ツール、品質ゲートを整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
 <td style="text-align: left;">性能、可用性、セキュリティ、保守性、拡張性を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="operation/">運用要件</a></td>
 <td style="text-align: left;">監視、バックアップ、デプロイ、障害対応を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 </tbody>
 </table>
@@ -12391,7 +12391,7 @@
 <tr>
 <td style="text-align: left;"><a href="tech-stack/">技術スタック選定</a></td>
 <td style="text-align: left;">技術スタック一覧とバージョン管理方針を整理</td>
-<td style="text-align: left;">草稿</td>
+<td style="text-align: left;">検証済み（2026-11-21）</td>
 </tr>
 </tbody>
 </table>
@@ -12512,21 +12512,20 @@
 <h3 id="_7">承認の条件・留意点<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
-<p><strong>ADR のステータスと OKF の <code>status</code></strong>: ADR-001 は、本文のステータスが「承認済み」（ユーザーの決定の記録）で、フロントマターの <code>status: draft</code> は <strong>OKF のレビュー・検証の状態</strong>（人による <code>verified</code> が未付与）を表す。両者は別である。</p>
+<p><strong>ADR のステータスと OKF の <code>status</code></strong>: ADR-001 は、本文のステータスが「承認済み」（ユーザーの決定の記録）で、フロントマターの <code>status: draft</code> は <strong>OKF のレビュー・検証の状態</strong>（ADR-001 には人による <code>verified</code> を付けていない）を表す。両者は別である。</p>
 </li>
 <li>
 <p><strong>RB2・RD5 などの未確認の前提</strong>（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。<strong>成り立たなければ、設計を見直します。</strong></p>
 </li>
 <li><strong>RF3 の実施</strong>（既存の <code>web/support/hooks.mjs</code> の編集）は、承認済みですが、<strong>実際に編集する前に改めて確認します</strong>（Kotlin 版に影響するため）。</li>
 <li><strong>AWS への適用・費用・アカウント・IAM</strong>（RI5 の範囲外）は、別のゲートで人が判断します。</li>
-<li>各文書の <code>status</code> は <code>draft</code> のままで、OKF の <code>verified</code>（人による検証）は付いていません。承認された<strong>設計判断</strong>と、文書の<strong>検証</strong>は別です。</li>
+<li><strong>2026-11-21 に、設計文書 10 本へ OKF の <code>verified</code>（人: kakimomokuri）を記録し、<code>status: stable</code> にしました。</strong> <code>index.md</code> と ADR-001 には付けていません（ユーザーの選択）。承認された<strong>設計判断</strong>と、文書の<strong>検証</strong>は別の記録です。</li>
 </ul>
 <h3 id="_8">未決の事項<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>RPO・RTO の扱い</strong>（PITR では RPO 0 にならず、RTO 15 分に収まる保証がない）。</li>
 <li><strong>AWS 環境の運用の詳細</strong>（アカウントの分離、ブルー/グリーンの方式、ECS の置き場所、KMS）。</li>
 <li><strong>実行イメージの実在確認、SSE の実装時期、数値目標（SLO など）の運営者との合意</strong>。</li>
-<li><strong>設計文書のマルチパースペクティブレビューと <code>verified</code></strong>（ユーザーの指示: 先にレビューを実施する）。</li>
 </ul>
 <h2 id="_9">補足<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
