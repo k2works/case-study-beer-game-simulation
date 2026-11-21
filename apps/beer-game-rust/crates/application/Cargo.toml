@@ -7,6 +7,9 @@ publish.workspace = true
 
 [dependencies]
 beergame-domain = { path = "../domain" }
+base64 = "0.23.1"
+hmac = "0.13.0"
+sha2 = "0.11.1"
 
 [dev-dependencies]
 tokio = { version = "1.54.1", features = ["rt", "macros"] }

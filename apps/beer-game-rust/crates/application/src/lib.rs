@@ -5,8 +5,10 @@ use std::future::Future;
 
 use beergame_domain::{Evolution, GameError, SessionError, StartError, ValidationError};
 
+mod secret;
 mod start;
 
+pub use secret::{Secret, digest, encode_token};
 pub use start::execute_start;
 
 /// `decide` が返した業務上の失敗。
