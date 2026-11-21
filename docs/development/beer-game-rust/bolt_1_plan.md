@@ -4,7 +4,7 @@ title: "Bolt 1 計画 - 検証と土台（Rust 版）"
 description: "beer-game-rust の Bolt 1 のステップ計画。ゴール、仮説、対象の受入条件、着手前に人の判断が要る項目、TDD のステップと承認ゲート、完了条件。人の承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:46:51Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T03:36:11Z }
 ---
 
 # Bolt 1 計画 - 検証と土台（Rust 版）
@@ -19,7 +19,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T02:46:51Z }
 | アプローチ | **B1 はドメインの核から**（[開発戦略](./development_strategy.md) の序盤の例外）。DB を要さない未確認の前提を、最小のコードで確かめる |
 | テスト戦略 | Comprehensive（`simulate_week`、集約の `decide`/`evolve`）、Standard（その他） |
 | 準拠するガイド | **[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)**（[開発戦略](./development_strategy.md) の「準拠」の節）。全ステップで、該当章を参照し、人が準拠を検証する |
-| 状態 | **着手前の判断項目 1〜6 は 2026-11-21 にユーザーが「案どおり」承認した**（7 は B1 で導入しないことの確認）。計画全体の `verified` は未記録。Step ごとのゲートで人が検証する |
+| 状態 | **着手前の判断項目 1〜6 は 2026-11-21 にユーザーが「案どおり」承認した**（7 は B1 で導入しないことの確認）。計画全体の `verified` は未記録。**Step 1〜9 は実施済み。ゲートは人の検証待ち（結果は [Bolt 1 終了報告](./bolt_1_report.md)）** |
 
 ### ゴール
 
