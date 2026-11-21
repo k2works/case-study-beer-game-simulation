@@ -159,3 +159,167 @@ async fn ac1_2_2__存在しないゲームへの参加は拒否され_何も残�
     assert_eq!(rows, 0);
     Ok(())
 }
+
+/// 指定の時刻・ゲーム ID を返す環境。
+struct Fixed {
+    now: i64,
+    game: u128,
+}
+
+impl Env for Fixed {
+    fn now(&self) -> Instant {
+        Instant::from_epoch_millis(self.now)
+    }
+    fn new_id(&self) -> u128 {
+        if self.game == 0 {
+            Uuid::new_v4().as_u128()
+        } else {
+            self.game
+        }
+    }
+    fn token_bytes(&self) -> [u8; 32] {
+        RealEnv.token_bytes()
+    }
+    fn join_code(&self) -> String {
+        RealEnv.join_code()
+    }
+}
+
+#[tokio::test]
+async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通る_資格の期限と失効も効く()
+-> Result<(), String> {
+    use beergame_application::{AppFailure, authenticate, commit_week, save_decision, start_game};
+    use beergame_domain::{DecisionVersion, Quantity, RoleMap, Week};
+
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game_uuid = Uuid::new_v4();
+    let store = PgGameStore::new(env.pool.clone(), game_uuid);
+    let now = 1_700_000_000_000;
+    let at = Fixed {
+        now,
+        game: game_uuid.as_u128(),
+    };
+    let created = create_game(
+        &store,
+        &at,
+        &settings(),
+        &CreateGameInput {
+            final_week: 2,
+            demand: vec![4, 4],
+        },
+    )
+    .await
+    .map_err(e)?;
+    let (_, facilitator) = authenticate(&store, &at, &settings(), &created.facilitator_credential)
+        .await
+        .map_err(e)?;
+    assert_eq!(facilitator, Actor::Facilitator(created.game_id));
+
+    let mut participants = Vec::new();
+    for role in Role::ALL {
+        let joined = join_game(
+            &store,
+            &Fixed { now, game: 0 },
+            &settings(),
+            created.game_id,
+            "参加者",
+        )
+        .await
+        .map_err(e)?;
+        assign_role(
+            &store,
+            &at,
+            &settings(),
+            facilitator,
+            joined.participant_id,
+            role,
+        )
+        .await
+        .map_err(e)?;
+        participants.push((role, joined));
+    }
+    start_game(&store, &at, &settings(), facilitator)
+        .await
+        .map_err(e)?;
+
+    for (role, joined) in &participants {
+        let (_, actor) = authenticate(&store, &at, &settings(), &joined.credential)
+            .await
+            .map_err(e)?;
+        save_decision(
+            &store,
+            &at,
+            &settings(),
+            actor,
+            *role,
+            Week::FIRST,
+            Quantity::of(5).map_err(e)?,
+            DecisionVersion::ZERO,
+        )
+        .await
+        .map_err(e)?;
+    }
+    commit_week(
+        &store,
+        &at,
+        &settings(),
+        facilitator,
+        Week::FIRST,
+        RoleMap::all(&DecisionVersion::new(1)),
+    )
+    .await
+    .map_err(e)?;
+    let week: i32 = sqlx::query_scalar("SELECT week FROM session_overview WHERE game_id = $1")
+        .bind(game_uuid)
+        .fetch_one(&env.pool)
+        .await
+        .map_err(e)?;
+    assert_eq!(week, 2);
+
+    // 認証: 不明な資格・期限切れ・失効は、区別せず Unauthorized
+    let unknown = Secret::new("x".repeat(43));
+    assert_eq!(
+        authenticate(&store, &at, &settings(), &unknown).await.err(),
+        Some(AppFailure::Unauthorized)
+    );
+    let later = Fixed {
+        now: now + 86_400_001,
+        game: game_uuid.as_u128(),
+    };
+    assert_eq!(
+        authenticate(&store, &later, &settings(), &created.facilitator_credential)
+            .await
+            .err(),
+        Some(AppFailure::Unauthorized)
+    );
+    sqlx::query(
+        "UPDATE credentials SET revoked_at = now() WHERE game_id = $1 AND kind = 'FACILITATOR'",
+    )
+    .bind(game_uuid)
+    .execute(&env.pool)
+    .await
+    .map_err(e)?;
+    assert_eq!(
+        authenticate(&store, &at, &settings(), &created.facilitator_credential)
+            .await
+            .err(),
+        Some(AppFailure::Unauthorized)
+    );
+    // 別の参加者は、進行役の操作（確定）ができない
+    let (_, actor) = authenticate(&store, &at, &settings(), &participants[0].1.credential)
+        .await
+        .map_err(e)?;
+    let result = commit_week(
+        &store,
+        &at,
+        &settings(),
+        actor,
+        Week::of(2).map_err(e)?,
+        RoleMap::all(&DecisionVersion::ZERO),
+    )
+    .await;
+    assert!(matches!(result.err(), Some(AppFailure::Domain(_))));
+    Ok(())
+}

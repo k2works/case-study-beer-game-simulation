@@ -1,9 +1,13 @@
 //! ユースケース（コマンド）。入力の形の検証 → 秘密・ID の生成 → `decide`（ドメイン）→ 追記・周辺ストア。**業務ルールは持たない**。
 //! 時計・ID・乱数は `Env` から受け取る（このクレートは読まない）。
 
+use std::future::Future;
+
 use beergame_domain::{
-    Actor, CommitMode, DisplayName, GameCommand, GameError, GameEvent, GameId, GameSettings,
-    GameState, Instant, JoinCode, ParticipantId, RetentionDays, Role, evolve_game,
+    Actor, CommitMode, DecisionVersion, DisplayName, GameCommand, GameError, GameEvent, GameId,
+    GameSettings, GameState, Instant, JoinCode, ParticipantId, Quantity, RetentionDays, Role,
+    RoleMap, SessionCommand, SessionEvent, SessionState, StartGame, Week, evolve_game,
+    evolve_session,
 };
 
 use crate::{
@@ -229,4 +233,154 @@ pub async fn assign_role<St: EventStore<GameEvent>>(
     )
     .await
     .map(|_| ())
+}
+
+/// 保存されている資格（ダイジェストで引く）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CredentialRecord {
+    pub game_id: GameId,
+    pub kind: CredentialKind,
+    pub subject_id: u128,
+    pub expires_at: Instant,
+    pub revoked: bool,
+}
+
+/// 資格の問い合わせのポート。
+pub trait CredentialLookup: Sync {
+    fn find(
+        &self,
+        digest: &str,
+    ) -> impl Future<Output = Result<Option<CredentialRecord>, AppFailure>> + Send;
+}
+
+/// 認証。資格の生の値から、ダイジェストで資格を引き、有効（存在・失効なし・期限内）なら、操作者とゲームを返す。
+/// 無効な資格は、理由を区別せず `Unauthorized`（列挙の防止）。
+///
+/// # Errors
+/// 資格が無効（`Unauthorized`）、永続化の失敗。
+pub async fn authenticate(
+    lookup: &impl CredentialLookup,
+    env: &impl Env,
+    settings: &AppSettings,
+    token: &Secret<String>,
+) -> Result<(GameId, Actor), AppFailure> {
+    let Some(digest) = digest(&settings.credential_key, token) else {
+        return Err(AppFailure::Unauthorized);
+    };
+    match lookup.find(&digest).await? {
+        Some(record) if !record.revoked && record.expires_at > env.now() => {
+            let actor = match record.kind {
+                CredentialKind::Facilitator => Actor::Facilitator(record.game_id),
+                CredentialKind::Participant => {
+                    Actor::Participant(ParticipantId::new(record.subject_id))
+                }
+            };
+            Ok((record.game_id, actor))
+        }
+        Some(_) | None => Err(AppFailure::Unauthorized),
+    }
+}
+
+fn session_domain(e: beergame_domain::SessionError) -> DomainError {
+    DomainError::Session(e)
+}
+
+async fn run_session<St: EventStore<SessionEvent>>(
+    store: &St,
+    settings: &AppSettings,
+    command: &SessionCommand,
+) -> Result<u64, AppFailure> {
+    execute_decision(
+        store,
+        &SessionState::NotStarted,
+        &evolve_session,
+        &|state, cmd| {
+            Ok(Decision {
+                events: beergame_domain::decide_session(state, cmd).map_err(session_domain)?,
+                writes: Vec::new(),
+            })
+        },
+        command,
+        settings.max_attempts,
+    )
+    .await
+}
+
+/// 意思決定の保存（US2.2。その役割の参加者だけ）。
+///
+/// # Errors
+/// 権限・週・版・上限の誤り、永続化の失敗。
+#[allow(clippy::too_many_arguments)] // 理由: コマンドの項目をそのまま受け取る（境界で作った値）
+pub async fn save_decision<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    role: Role,
+    requested_week: Week,
+    quantity: Quantity,
+    expected_decision_version: DecisionVersion,
+) -> Result<u64, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::SaveDecision {
+            actor,
+            at: env.now(),
+            role,
+            requested_week,
+            quantity,
+            expected_decision_version,
+        },
+    )
+    .await
+}
+
+/// 週の確定（US2.3。進行役だけ。手動）。
+///
+/// # Errors
+/// 権限・週・入力の不足・根拠の版の誤り、永続化の失敗。
+pub async fn commit_week<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    requested_week: Week,
+    basis: RoleMap<DecisionVersion>,
+) -> Result<u64, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::CommitWeek {
+            actor,
+            at: env.now(),
+            requested_week,
+            basis,
+        },
+    )
+    .await
+}
+
+/// ゲームの開始（US1.2。進行役だけ）。`game` と `session` の 2 本へ 1 つのトランザクションで追記する。
+///
+/// # Errors
+/// 権限・開始条件・開始済みの誤り、永続化の失敗。
+pub async fn start_game<St>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+) -> Result<(u64, u64), AppFailure>
+where
+    St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
+{
+    crate::execute_start(
+        store,
+        &StartGame {
+            actor,
+            at: env.now(),
+        },
+        settings.max_attempts,
+    )
+    .await
 }

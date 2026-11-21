@@ -3,9 +3,10 @@
 use std::marker::PhantomData;
 
 use beergame_application::{
-    AppFailure, EventStore, PeripheralWrite, PersistenceFailure, StreamRead,
+    AppFailure, CredentialKind, CredentialLookup, CredentialRecord, EventStore, PeripheralWrite,
+    PersistenceFailure, StreamRead,
 };
-use beergame_domain::{GameEvent, SessionEvent};
+use beergame_domain::{GameEvent, GameId, Instant, SessionEvent};
 
 use crate::codec::{GameCodec, SessionCodec};
 use crate::projection::{Bind, Statement, peripheral_statements};
@@ -314,5 +315,41 @@ impl EventStore<SessionEvent> for PgGameStore {
         writes: &[PeripheralWrite],
     ) -> Result<(), AppFailure> {
         EventStore::<SessionEvent>::write_peripheral(&self.session, tx, writes).await
+    }
+}
+
+impl CredentialLookup for PgGameStore {
+    async fn find(&self, digest: &str) -> Result<Option<CredentialRecord>, AppFailure> {
+        let row = sqlx::query(
+            "SELECT game_id, kind, subject_id, (extract(epoch FROM expires_at) * 1000)::bigint AS expires_ms, \
+             revoked_at IS NOT NULL AS revoked FROM credentials WHERE credential_digest = $1",
+        )
+        .bind(digest)
+        .fetch_optional(&self.game.pool)
+        .await
+        .map_err(|e| storage(&e))?;
+        let Some(row) = row else { return Ok(None) };
+        let game: Uuid = row.try_get("game_id").map_err(|e| storage(&e))?;
+        let kind: String = row.try_get("kind").map_err(|e| storage(&e))?;
+        let subject: Uuid = row.try_get("subject_id").map_err(|e| storage(&e))?;
+        let expires: i64 = row.try_get("expires_ms").map_err(|e| storage(&e))?;
+        let revoked: bool = row.try_get("revoked").map_err(|e| storage(&e))?;
+        let kind = match kind.as_str() {
+            "FACILITATOR" => CredentialKind::Facilitator,
+            "PARTICIPANT" => CredentialKind::Participant,
+            // 不明な種類は、無効な資格として扱う（fail closed）
+            other => {
+                return Err(AppFailure::Persistence(PersistenceFailure::Storage(
+                    format!("不明な資格の種類: {other}"),
+                )));
+            }
+        };
+        Ok(Some(CredentialRecord {
+            game_id: GameId::new(game.as_u128()),
+            kind,
+            subject_id: subject.as_u128(),
+            expires_at: Instant::from_epoch_millis(expires),
+            revoked,
+        }))
     }
 }

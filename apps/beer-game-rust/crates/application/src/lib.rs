@@ -12,8 +12,9 @@ mod secret;
 mod start;
 
 pub use commands::{
-    AppSettings, CreateGameInput, CreateOutcome, Env, JoinOutcome, assign_role, create_game,
-    join_game,
+    AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
+    JoinOutcome, assign_role, authenticate, commit_week, create_game, join_game, save_decision,
+    start_game,
 };
 pub use secret::{Secret, digest, encode_token};
 pub use start::execute_start;
