@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game-rust の開発戦略（案）。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。人の承認待ち。">
+        <meta name="description" content="beer-game-rust の開発戦略。Bolt 群を序盤（アウトサイドイン）・中盤（インサイドアウト）・終盤（アウトサイドイン）に分け、各局面の TDD アプローチ、デモ項目の受け入れ基準、BDD と Living Documentation の方針、局面移行時の一貫性維持を定める。承認済み（2026-11-21）。ガード（hook・CI の新設）の導入の承認は含まない。">
       
       
         <meta name="author" content="k2works">
@@ -5753,7 +5753,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -5797,7 +5797,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -5822,7 +5822,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -12782,7 +12782,7 @@
 
 <h1 id="-rust">開発戦略 - ビールゲームシミュレーション（Rust 版）<a class="headerlink" href="#-rust" title="Permanent link">&para;</a></h1>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>本書は、<a href="../release_plan/">リリース計画</a>（案）の Bolt 群（B1〜B16）を <strong>序盤・中盤・終盤</strong> の局面に分け、局面ごとの TDD アプローチと、局面をまたいで変えない進め方を定める<strong>案</strong>です。局面ごとに変えるのは<strong>テストの入口</strong>と<strong>レイヤーを貫く順序</strong>だけで、Red-Green-Refactor は全局面で変えません。<strong>承認前です。</strong></p>
+<p>本書は、<a href="../release_plan/">リリース計画</a>の Bolt 群（B1〜B16）を <strong>序盤・中盤・終盤</strong> の局面に分け、局面ごとの TDD アプローチと、局面をまたいで変えない進め方を定めます。局面ごとに変えるのは<strong>テストの入口</strong>と<strong>レイヤーを貫く順序</strong>だけで、Red-Green-Refactor は全局面で変えません。<strong>2026-11-21 に、ユーザーが承認しました。ただし、守り（git の hook、Claude Code の hook、CI の必須ジョブ）の新設の承認は含みません（未決事項 7・8）。</strong></p>
 <ul>
 <li>計画の単位の「イテレーション」は <strong>Bolt</strong> に読み替えます。AI が Bolt ごとにステップ計画を書き、人が承認ゲートで検証します。</li>
 <li><strong>参照元（正）。本書は内容を複製せず、判断だけを書きます。</strong></li>
@@ -13524,7 +13524,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">2026-11-21</td>
-<td style="text-align: left;">初版作成（案。人の承認待ち）</td>
+<td style="text-align: left;">初版作成（案）</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 <tr>

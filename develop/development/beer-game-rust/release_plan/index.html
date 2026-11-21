@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game-rust のリリース計画（案）。Intent、Unit、Bolt 計画（B1〜B16、予備 B17）、リリース 0.1 / 0.2 / 1.0、Rust 版の価値指標、バッファ、リスク台帳。人の承認待ち。">
+        <meta name="description" content="beer-game-rust のリリース計画。Intent、Unit、Bolt 計画（B1〜B16、予備 B17）、リリース 0.1 / 0.2 / 1.0、Rust 版の価値指標、バッファ、リスク台帳。承認済み（2026-11-21）。">
       
       
         <meta name="author" content="k2works">
@@ -5762,7 +5762,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -5787,7 +5787,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -6125,7 +6125,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -12500,7 +12500,7 @@
 
 <h1 id="-rust">リリース計画 - ビールゲームシミュレーション（Rust 版）<a class="headerlink" href="#-rust" title="Permanent link">&para;</a></h1>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>本書は、beer-game-rust（beer-game-kotlin の Rust 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義する<strong>案</strong>です。<strong>AI が提案し、人が承認ゲートで検証・承認します。承認前です（本書の承認は、ユーザーの指示があるまで記録しません）。</strong></p>
+<p>本書は、beer-game-rust（beer-game-kotlin の Rust 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。<strong>AI が提案し、人が承認ゲートで検証・承認します。本書は 2026-11-21 に、ユーザーが承認しました（スコープ、Bolt の割り当て、日程の仮定、価値指標の目標、リスク）。</strong></p>
 <ul>
 <li>機能・振る舞いは beer-game-kotlin（元は beer-game2）と同じです。要件・ストーリー・Unit・受入条件は新規に作らず参照します（<a href="../../../requirements/beer-game2/user_story/">ユーザーストーリー</a>、<a href="../../../requirements/beer-game2/unit_definition/">Unit 定義</a>）。</li>
 <li>設計は <a href="../../../design/beer-game-rust/">beer-game-rust の設計</a>（ES + CQRS、axum + sqlx + tokio。<strong>設計文書 10 本は 2026-11-21 に <code>verified</code></strong>）と <a href="../../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001</a> です。</li>
@@ -12671,10 +12671,10 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> マルチパースペクティブレビューと反映: <a href="../../../review/beer-game-rust/design_review_20261121/">設計書レビュー</a></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> ADR-001（Rust 版を作る。承認済み）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> Terraform の準備（Kotlin 版から複製。適用しない）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>リリース計画（本書）の承認</strong></li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <strong>リリース計画（本書）の承認</strong>（2026-11-21、ユーザーの承認）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>B1 の新規依存関係の承認</strong>（B1 で使うものを確定し、版を <code>cargo search</code> と公式情報で確認してから）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>RT1 の命名規則（AC のみの接頭辞）の承認</strong>（test-strategy の未決 17）</li>
-<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 開発戦略（局面別の TDD アプローチ）の作成と承認（Kotlin 版に準じ、序盤アウトサイドイン・中盤インサイドアウト・終盤アウトサイドイン案）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> 開発戦略（局面別の TDD アプローチ）の作成と承認（2026-11-21。ガードの導入の承認は別）（Kotlin 版に準じ、序盤アウトサイドイン・中盤インサイドアウト・終盤アウトサイドイン案）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Bolt 1 のステップ計画の作成と承認</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> RPO・RTO の約束の範囲の決定（B15 の机上確認の前まで）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Bolt の実行 → Release 0.1 → 0.2 → 1.0</li>
@@ -13271,7 +13271,7 @@
 <td style="text-align: left;">B1〜B17</td>
 <td style="text-align: right;">42</td>
 <td style="text-align: right;">-</td>
-<td style="text-align: left;">未着手（承認待ち）</td>
+<td style="text-align: left;">未着手（B1 の依存関係の承認待ち）</td>
 </tr>
 </tbody>
 </table>
@@ -13295,7 +13295,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">2026-11-21</td>
-<td style="text-align: left;">初版作成（案。人の承認待ち）</td>
+<td style="text-align: left;">初版作成（案）</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
