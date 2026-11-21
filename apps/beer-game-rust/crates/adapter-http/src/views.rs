@@ -126,3 +126,30 @@ pub(crate) fn game_view(g: &GameSnapshot, actor: &Actor, role: Option<Role>) -> 
     }
     Value::Object(view)
 }
+
+/// ロビー（進行役向け）。参加者の表示名と役割の一覧。観察者・招待は B9。
+pub(crate) fn lobby_view(g: &GameSnapshot) -> Value {
+    let participants: Vec<Value> = g
+        .participants
+        .iter()
+        .map(|p| {
+            json!({
+                "participantId": uuid_text(p.participant_id.get()),
+                "displayName": p.display_name,
+                "role": p.role.map(role_name),
+            })
+        })
+        .collect();
+    json!({
+        "gameId": uuid_text(g.game_id.get()),
+        "status": g.status,
+        "joinCode": g.join_code,
+        "settingsKind": "KIT",
+        "changedSettings": [],
+        "commitMode": g.commit_mode,
+        "participants": participants,
+        "invitations": [],
+        "observers": [],
+        "versions": {"game": g.game_version, "session": g.session_version},
+    })
+}

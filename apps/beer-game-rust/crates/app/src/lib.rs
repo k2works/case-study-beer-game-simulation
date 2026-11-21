@@ -3,8 +3,8 @@
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{
-    AppFailure, AppSettings, Env, GameSnapshot, PersistenceFailure, ResultRow, RoleSnapshot,
-    SessionSnapshot,
+    AppFailure, AppSettings, Env, GameSnapshot, LobbyParticipantRow, PersistenceFailure, ResultRow,
+    RoleSnapshot, SessionSnapshot,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -229,19 +229,24 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
         else {
             return Ok(None);
         };
-        let participants = sqlx::query("SELECT participant_id, role FROM lobby_participants WHERE game_id = $1 ORDER BY joined_at, participant_id")
-            .bind(game)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(storage)?;
+        let participants = sqlx::query(
+            "SELECT p.participant_id, p.role, d.display_name FROM lobby_participants p \
+             LEFT JOIN display_profiles d ON d.game_id = p.game_id AND d.actor_kind = 'PARTICIPANT' AND d.actor_id = p.participant_id \
+             WHERE p.game_id = $1 ORDER BY p.joined_at, p.participant_id",
+        )
+        .bind(game)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage)?;
         let mut list = Vec::new();
         for p in &participants {
             let id: Uuid = p.try_get("participant_id").map_err(storage)?;
             let role: Option<String> = p.try_get("role").map_err(storage)?;
-            list.push((
-                ParticipantId::new(id.as_u128()),
-                role.as_deref().and_then(role_of_text),
-            ));
+            list.push(LobbyParticipantRow {
+                participant_id: ParticipantId::new(id.as_u128()),
+                role: role.as_deref().and_then(role_of_text),
+                display_name: p.try_get("display_name").map_err(storage)?,
+            });
         }
         let (game_version, session_version) = versions(&self.pool, game).await?;
         Ok(Some(GameSnapshot {

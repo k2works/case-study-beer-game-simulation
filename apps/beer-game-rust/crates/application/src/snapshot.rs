@@ -44,6 +44,15 @@ pub struct SessionSnapshot {
     pub session_version: u64,
 }
 
+/// ロビーの参加者（`lobby_participants` と、周辺ストアの表示名）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LobbyParticipantRow {
+    pub participant_id: ParticipantId,
+    pub role: Option<Role>,
+    /// 表示名（周辺ストアに無ければ `None`）。進行役のロビーにだけ使う。
+    pub display_name: Option<String>,
+}
+
 /// ゲーム（準備・進行）の状態。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GameSnapshot {
@@ -53,7 +62,7 @@ pub struct GameSnapshot {
     pub join_code: String,
     pub final_week: i64,
     pub commit_mode: String,
-    pub participants: Vec<(ParticipantId, Option<Role>)>,
+    pub participants: Vec<LobbyParticipantRow>,
     pub game_version: u64,
     /// 開始前は `None`。
     pub session_version: Option<u64>,

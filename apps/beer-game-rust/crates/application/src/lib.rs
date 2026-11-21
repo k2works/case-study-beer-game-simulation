@@ -20,7 +20,7 @@ pub use commands::{
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use secret::{Secret, digest, encode_token};
-pub use snapshot::{GameSnapshot, ResultRow, RoleSnapshot, SessionSnapshot};
+pub use snapshot::{GameSnapshot, LobbyParticipantRow, ResultRow, RoleSnapshot, SessionSnapshot};
 pub use start::{StartExecuted, execute_start};
 
 /// `decide` が返した業務上の失敗。

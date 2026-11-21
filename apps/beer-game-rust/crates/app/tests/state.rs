@@ -275,3 +275,92 @@ async fn ac2_1_2__別のゲームの資格では状態を取得できない() ->
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn ac1_2_1__ロビーは進行役だけが取得でき_表示名と役割の一覧を返す() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = prepared(&app, &env.pool).await?;
+    let uri = format!("/api/v1/games/{}/lobby", game.id);
+    let (status, _, body) = send(&app, "GET", &uri, &[("cookie", &game.facilitator)], "").await?;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.get("joinCode")
+            .and_then(|c| c.as_str())
+            .is_some_and(|c| c.len() >= 8)
+    );
+    let participants = body
+        .get("participants")
+        .and_then(|p| p.as_array())
+        .ok_or("participants が無い")?;
+    assert_eq!(participants.len(), 4);
+    assert!(participants.iter().all(|p| {
+        p.get("displayName")
+            .and_then(|n| n.as_str())
+            .is_some_and(|n| n.starts_with("参加者"))
+    }));
+    let roles: Vec<&str> = participants
+        .iter()
+        .filter_map(|p| p.get("role").and_then(|r| r.as_str()))
+        .collect();
+    assert_eq!(
+        roles,
+        vec!["FACTORY", "DISTRIBUTOR", "WHOLESALER", "RETAILER"]
+    );
+    assert_eq!(body.get("invitations"), Some(&json!([])));
+    // 参加者は、資格の失敗と同じ 403
+    let (status, _, _) = send(&app, "GET", &uri, &[("cookie", &game.players[0].2)], "").await?;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    Ok(())
+}
+
+#[tokio::test]
+async fn adr_020__タブの_Cookie_が無ければ従来の名前の_Cookie_を使う() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = prepared(&app, &env.pool).await?;
+    // X-Tab-Id を付けない呼び出し元が発行した資格（bg_session）を、X-Tab-Id を付けた要求でも読める
+    let (status, _, _) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/state", game.id),
+        &[
+            ("cookie", &game.facilitator),
+            ("x-tab-id", "abcdef0123456789"),
+        ],
+        "",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    // タブの名前の Cookie があれば、それを優先する（別のタブの資格は混ざらない）
+    let own = game
+        .facilitator
+        .replace("bg_session=", "bg_session_abcdef0123456789=");
+    let (status, _, _) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/state", game.id),
+        &[("cookie", &own), ("x-tab-id", "abcdef0123456789")],
+        "",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _, _) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/state", game.id),
+        &[("cookie", &own), ("x-tab-id", "ffffffffffffffff")],
+        "",
+    )
+    .await?;
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "別のタブの名前の Cookie は使わない"
+    );
+    Ok(())
+}

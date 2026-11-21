@@ -27,7 +27,7 @@ use crate::problem::{
     FieldError, Problem, bad_request_problem, invitation_invalid_problem, not_ready_problem,
     problem_of, timeout_problem, validation_problem,
 };
-use crate::views::{Viewer, game_view, session_view};
+use crate::views::{Viewer, game_view, lobby_view, session_view};
 
 /// 外側（永続化・環境）への入口。アプリのバイナリが組み立てて渡す。
 pub trait Backend: Send + Sync + 'static {
@@ -93,6 +93,7 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
             post(commit::<B>),
         )
         .route("/api/v1/games/{game_id}/state", get(game_state::<B>))
+        .route("/api/v1/games/{game_id}/lobby", get(lobby::<B>))
         .route(
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
@@ -365,16 +366,22 @@ fn parse_game_id(text: &str) -> Result<GameId, Box<Problem>> {
         .map_err(|_| Box::new(not_found()))
 }
 
-/// Cookie ヘッダーから、資格の Cookie の値を取り出す（名前は `X-Tab-Id` で決まる）。
+/// Cookie ヘッダーから、資格の Cookie の値を取り出す。タブの名前の Cookie を優先し、無ければ従来の名前（`bg_session`）の
+/// Cookie を使う（タブの識別子を付ける前に発行した資格、識別子を付けない呼び出し元が発行した資格の移行。ADR-020）。
 fn credential_token(headers: &HeaderMap) -> Option<Secret<String>> {
-    let name = cookie_name(headers);
-    headers
+    let cookies: Vec<(&str, &str)> = headers
         .get(header::COOKIE)
         .and_then(|v| v.to_str().ok())?
         .split(';')
         .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(k, _)| *k == name)
-        .map(|(_, v)| Secret::new(v.to_owned()))
+        .collect();
+    let find = |name: &str| {
+        cookies
+            .iter()
+            .find(|(k, _)| *k == name)
+            .map(|(_, v)| Secret::new((*v).to_owned()))
+    };
+    find(&cookie_name(headers)).or_else(|| find(SESSION_COOKIE))
 }
 
 /// 認証。資格が無い・無効・別のゲームのものは、区別せず 403。
@@ -890,4 +897,35 @@ async fn log_request(request: axum::extract::Request, next: axum::middleware::Ne
         tracing::info!(target: "http", correlation_id = %correlation, %method, %path, status, elapsed_ms, "request");
     }
     response
+}
+
+/// ロビー（進行役だけ）。参加者・無資格は、資格の失敗と同じ 403。
+async fn lobby<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if !actor.is_facilitator_of(game_id) {
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
+        let snapshot = backend
+            .game_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        Ok(json_response(
+            StatusCode::OK,
+            &lobby_view(&snapshot),
+            None,
+            None,
+        ))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
 }
