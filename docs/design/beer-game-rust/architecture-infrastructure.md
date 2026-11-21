@@ -299,6 +299,8 @@ Kotlin 版は、`apps/beer-game-kotlin/infra/` に 8 モジュール（`network`
 
 **AWS への適用は、確認必須の別のゲート**（本番環境・費用・アカウント・IAM に関わる）です。**本書の段階では、適用しません。**
 
+**準備の状況（2026-11-21）**: ユーザーの指示（他のプロジェクトと同じく準備だけ）に従い、`apps/beer-game-rust/infra/` に Kotlin 版の 8 モジュール超と 2 環境を複製し、名前（`beer-game-rust`、DB 名 `beer_game_rust`、メトリクスの名前空間 `BeerGame/Rust`）と、JVM 固有のアラーム・ウィジェット（ヒープ・GC）を除いた。`terraform fmt` は通る。**`terraform validate` は未実施**（手元の Terraform は 1.5.7 で、要件の 1.17 以上に満たない。CI か 1.17 以上で確認する）。**`init`（実バックエンド）・`plan`・`apply` は実行していない。** メモリのアラームは B1 の実測後に足す。タスクのサイズ・猶予期間は Kotlin 版の初期案のまま（実測の前に縮めない）。
+
 ## 品質属性への対応
 
 | 品質属性 | 対応する設計 |
