@@ -209,6 +209,7 @@ nav:
           - リリースの準備状況: development/beer-game-kotlin/release_readiness.md
       - beer-game-rust:
           - 概要: development/beer-game-rust/index.md
+          - リリース計画: development/beer-game-rust/release_plan.md
   - 運用:
       - 概要: operation/index.md
       - beer-game:
