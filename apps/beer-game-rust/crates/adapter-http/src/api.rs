@@ -13,8 +13,8 @@ use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
-    Idempotency, ResponseShape, Secret, StartExecuted, assign_role, authenticate, commit_week,
-    create_game, digest, join_game, save_decision, start_game,
+    GameSnapshot, Idempotency, ResponseShape, Secret, SessionSnapshot, StartExecuted, assign_role,
+    authenticate, commit_week, create_game, digest, join_game, save_decision, start_game,
 };
 use beergame_domain::{
     Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
@@ -27,6 +27,7 @@ use crate::problem::{
     FieldError, Problem, bad_request_problem, invitation_invalid_problem, not_ready_problem,
     problem_of, validation_problem,
 };
+use crate::views::{Viewer, game_view, session_view};
 
 /// 外側（永続化・環境）への入口。アプリのバイナリが組み立てて渡す。
 pub trait Backend: Send + Sync + 'static {
@@ -51,6 +52,16 @@ pub trait Backend: Send + Sync + 'static {
         game_id: GameId,
         participant_id: ParticipantId,
     ) -> impl Future<Output = Result<Option<Role>, AppFailure>> + Send;
+    /// 進行（session）の状態。開始前は `None`。
+    fn session_snapshot(
+        &self,
+        game_id: GameId,
+    ) -> impl Future<Output = Result<Option<SessionSnapshot>, AppFailure>> + Send;
+    /// ゲームの状態。存在しなければ `None`。
+    fn game_snapshot(
+        &self,
+        game_id: GameId,
+    ) -> impl Future<Output = Result<Option<GameSnapshot>, AppFailure>> + Send;
     /// 依存先（DB）に接続できるか。
     fn is_ready(&self) -> impl Future<Output = bool> + Send;
     /// HTTPS の環境では Cookie に `Secure` を付ける。
@@ -76,6 +87,11 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route(
             "/api/v1/sessions/{session_id}/weeks/{week}/commit",
             post(commit::<B>),
+        )
+        .route("/api/v1/games/{game_id}/state", get(game_state::<B>))
+        .route(
+            "/api/v1/sessions/{session_id}/state",
+            get(session_state::<B>),
         )
         .with_state(backend)
 }
@@ -436,6 +452,22 @@ fn role_of_name(name: &str) -> Option<Role> {
     })
 }
 
+fn query_role(query: Option<&str>) -> Result<Option<Role>, Box<Problem>> {
+    let Some(query) = query else { return Ok(None) };
+    query
+        .split('&')
+        .filter_map(|pair| pair.split_once('='))
+        .find(|(k, _)| *k == "role")
+        .map_or(Ok(None), |(_, v)| {
+            role_of_name(v).map(Some).ok_or_else(|| {
+                Box::new(validation_problem(vec![field(
+                    "role",
+                    "役割は FACTORY・DISTRIBUTOR・WHOLESALER・RETAILER のいずれかにしてください。",
+                )]))
+            })
+        })
+}
+
 fn field(name: &str, message: &str) -> FieldError {
     FieldError {
         field: name.to_owned(),
@@ -707,4 +739,89 @@ async fn commit<B: Backend>(
         }
         .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+async fn game_state<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let snapshot = backend
+            .game_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        let role = match actor {
+            Actor::Participant(id) => backend
+                .participant_role(game_id, id)
+                .await
+                .map_err(|f| Box::new(problem_of(&f)))?,
+            Actor::Facilitator(_) | Actor::Anonymous => None,
+        };
+        Ok(json_response(
+            StatusCode::OK,
+            &game_view(&snapshot, &actor, role),
+            None,
+            None,
+        ))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+async fn session_state<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(session): Path<String>,
+    axum::extract::RawQuery(query): axum::extract::RawQuery,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&session)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let wanted = query_role(query.as_deref())?;
+        let viewer = match actor {
+            Actor::Facilitator(_) => Viewer::Facilitator,
+            Actor::Participant(id) => {
+                let own = backend
+                    .participant_role(game_id, id)
+                    .await
+                    .map_err(|f| Box::new(problem_of(&f)))?
+                    .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+                // 他の役割の状況の問い合わせは、値を返さず 403（AC2.1.2）
+                if wanted.is_some_and(|w| w != own) {
+                    return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+                }
+                Viewer::Participant(id.get(), own)
+            }
+            Actor::Anonymous => return Err(Box::new(problem_of(&AppFailure::Unauthorized))),
+        };
+        let snapshot = backend
+            .session_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| {
+                Box::new(problem_of(&AppFailure::Domain(
+                    beergame_application::DomainError::Session(
+                        beergame_domain::SessionError::NotActive,
+                    ),
+                )))
+            })?;
+        Ok(json_response(
+            StatusCode::OK,
+            &session_view(&snapshot, &viewer),
+            None,
+            None,
+        ))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
 }

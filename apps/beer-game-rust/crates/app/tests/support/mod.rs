@@ -78,3 +78,7 @@ pub async fn new_game(pool: &PgPool) -> Result<Uuid, String> {
         .map_err(|e| e.to_string())?;
     Ok(game)
 }
+
+// 理由: HTTP 越しのテストの共通部品。テストのバイナリごとに使う関数が違う（使わないバイナリで dead_code になる）。
+#[allow(dead_code)]
+pub mod api;

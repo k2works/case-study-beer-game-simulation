@@ -2,6 +2,7 @@
 
 mod api;
 mod problem;
+mod views;
 
 pub use api::{Backend, router};
 pub use problem::{
