@@ -174,7 +174,7 @@ mod naming_tests {
 
     #[test]
     fn ds10_テストの関数名を拾う() {
-        let src = "#[test]\\nfn a() {}\\n#[tokio::test]\\nasync fn b() {}\\nfn not_test() {}\\n#[tokio::test]\\n#[allow(x)]\\nasync fn c() {}\\n";
+        let src = "#[test]\nfn a() {}\n#[tokio::test]\nasync fn b() {}\nfn not_test() {}\n#[tokio::test]\n#[allow(x)]\nasync fn c() {}\n";
         assert_eq!(
             test_names(src),
             vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]

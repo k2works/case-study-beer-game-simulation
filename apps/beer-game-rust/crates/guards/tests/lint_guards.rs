@@ -1,3 +1,6 @@
+// 理由: RT1 の命名（承認済み）の `__` を使うため（rustc の non_snake_case は連続する `_` を許さない）。
+#![allow(non_snake_case)]
+
 //! 守りの検査（DS-1〜3。開発戦略の「戦略の適用をテストと hook でガードする」）。
 //!
 //! 規則を破る最小のコード（`tests/fixtures/*.rs`）を、ワークスペースと同じ lint・domain と同じ
