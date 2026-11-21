@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use beergame_application::{
     AppFailure, CredentialKind, CredentialLookup, CredentialRecord, EventStore, PeripheralWrite,
-    PersistenceFailure, StreamRead,
+    PersistenceFailure, StoredResponse, StreamRead,
 };
 use beergame_domain::{GameEvent, GameId, Instant, SessionEvent};
 
@@ -59,6 +59,7 @@ async fn run_statement(tx: &mut PgTx, statement: &Statement) -> Result<(), AppFa
             Bind::Text(v) => query.bind(v.clone()),
             Bind::Int(v) => query.bind(*v),
             Bind::Json(v) => query.bind(v.clone()),
+            Bind::Bytes(v) => query.bind(v.clone()),
             Bind::NullText => query.bind(None::<String>),
         };
     }
@@ -272,6 +273,16 @@ impl EventStore<GameEvent> for PgGameStore {
         EventStore::<GameEvent>::rollback(&self.game, tx).await
     }
 
+    async fn find_idempotency(
+        &self,
+        tx: &mut PgTx,
+        game_id: GameId,
+        scope: &str,
+        key_digest: &str,
+    ) -> Result<Option<StoredResponse>, AppFailure> {
+        EventStore::<GameEvent>::find_idempotency(&self.game, tx, game_id, scope, key_digest).await
+    }
+
     async fn write_peripheral(
         &self,
         tx: &mut PgTx,
@@ -307,6 +318,17 @@ impl EventStore<SessionEvent> for PgGameStore {
 
     async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
         EventStore::<SessionEvent>::rollback(&self.session, tx).await
+    }
+
+    async fn find_idempotency(
+        &self,
+        tx: &mut PgTx,
+        game_id: GameId,
+        scope: &str,
+        key_digest: &str,
+    ) -> Result<Option<StoredResponse>, AppFailure> {
+        EventStore::<SessionEvent>::find_idempotency(&self.session, tx, game_id, scope, key_digest)
+            .await
     }
 
     async fn write_peripheral(

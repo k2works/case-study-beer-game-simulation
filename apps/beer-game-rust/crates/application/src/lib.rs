@@ -8,6 +8,7 @@ use beergame_domain::{
 };
 
 mod commands;
+mod idempotency;
 mod secret;
 mod start;
 
@@ -16,8 +17,9 @@ pub use commands::{
     JoinOutcome, assign_role, authenticate, commit_week, create_game, join_game, save_decision,
     start_game,
 };
+pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use secret::{Secret, digest, encode_token};
-pub use start::execute_start;
+pub use start::{StartExecuted, execute_start};
 
 /// `decide` が返した業務上の失敗。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -82,6 +84,16 @@ pub enum PeripheralWrite {
         issued_at: Instant,
         expires_at: Instant,
     },
+    /// 冪等記録（成功した応答。秘密を含まないものに限る）。
+    Idempotency {
+        game_id: GameId,
+        scope: String,
+        key_digest: String,
+        request_digest: String,
+        status_code: u16,
+        response: Vec<u8>,
+        expires_at: Instant,
+    },
     /// 表示名（参加者のみ）。
     DisplayName {
         game_id: GameId,
@@ -122,6 +134,17 @@ pub trait EventStore<E>: Sync {
 
     fn rollback(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;
 
+    /// 冪等記録を引く（同じトランザクション）。既定は記録なし。
+    fn find_idempotency(
+        &self,
+        _tx: &mut Self::Tx,
+        _game_id: GameId,
+        _scope: &str,
+        _key_digest: &str,
+    ) -> impl Future<Output = Result<Option<StoredResponse>, AppFailure>> + Send {
+        async { Ok(None) }
+    }
+
     /// 周辺ストアへ書く（追記と同じトランザクション）。既定は何もしない。
     fn write_peripheral(
         &self,
@@ -160,23 +183,50 @@ async fn step<E, S, C, St>(
     evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
     decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
     command: &C,
-) -> Result<u64, AppFailure>
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure>
 where
     E: Send,
     S: Clone + Send + Sync,
     C: Sync,
     St: EventStore<E>,
 {
+    // 冪等記録の照合は、読み込みの前（認証・認可は、この関数の前に済んでいる）
+    if let Some(idem) = idem
+        && let Some(stored) = store
+            .find_idempotency(tx, idem.game_id, &idem.scope, &idem.key_digest)
+            .await?
+    {
+        return if stored.request_digest == idem.request_digest {
+            Ok(Executed::Replayed(stored))
+        } else {
+            Err(AppFailure::IdempotencyKeyReused)
+        };
+    }
     let read = store.read(tx).await?;
     let state = replay(initial, &read.events, evolve)?;
     let decided = decide(&state, command).map_err(AppFailure::Domain)?;
-    if decided.events.is_empty() {
+    let version = if decided.events.is_empty() {
         // 空の列は追記しない（変化なし）
-        return Ok(read.version);
+        read.version
+    } else {
+        let version = store.append(tx, read.version, decided.events).await?;
+        store.write_peripheral(tx, &decided.writes).await?;
+        version
+    };
+    if let Some(idem) = idem {
+        let record = PeripheralWrite::Idempotency {
+            game_id: idem.game_id,
+            scope: idem.scope.clone(),
+            key_digest: idem.key_digest.clone(),
+            request_digest: idem.request_digest.clone(),
+            status_code: 200,
+            response: idem.shape.body(version),
+            expires_at: idem.expires_at,
+        };
+        store.write_peripheral(tx, &[record]).await?;
     }
-    let version = store.append(tx, read.version, decided.events).await?;
-    store.write_peripheral(tx, &decided.writes).await?;
-    Ok(version)
+    Ok(Executed::Fresh(version))
 }
 
 async fn run_once<E, S, C, St>(
@@ -185,7 +235,8 @@ async fn run_once<E, S, C, St>(
     evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
     decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
     command: &C,
-) -> Result<u64, AppFailure>
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure>
 where
     E: Send,
     S: Clone + Send + Sync,
@@ -193,10 +244,15 @@ where
     St: EventStore<E>,
 {
     let mut tx = store.begin().await?;
-    match step(store, &mut tx, initial, evolve, decide, command).await {
-        Ok(version) => {
+    match step(store, &mut tx, initial, evolve, decide, command, idem).await {
+        Ok(Executed::Fresh(version)) => {
             store.commit(tx).await?;
-            Ok(version)
+            Ok(Executed::Fresh(version))
+        }
+        Ok(replayed @ Executed::Replayed(_)) => {
+            // 何も書いていない（読み取りだけ）
+            drop(store.rollback(tx).await);
+            Ok(replayed)
         }
         Err(failure) => {
             // 失敗の経路は明示の ROLLBACK。ROLLBACK 自体の失敗は、元の失敗を隠さない
@@ -224,10 +280,38 @@ where
     C: Sync,
     St: EventStore<E>,
 {
+    match execute_idempotent(store, initial, evolve, decide, command, max_attempts, None).await? {
+        Executed::Fresh(version) => Ok(version),
+        // 冪等性を指定していないので、再送の応答は返らない
+        Executed::Replayed(_) => Err(AppFailure::Persistence(PersistenceFailure::Storage(
+            "想定外の冪等記録".to_owned(),
+        ))),
+    }
+}
+
+/// 冪等性つきでコマンドを実行する。同じキー・同じ内容の再送は、保存した応答を返す（`Replayed`）。
+///
+/// # Errors
+/// `execute_decision` と同じ。同じキーで内容が違えば `IdempotencyKeyReused`。
+pub async fn execute_idempotent<E, S, C, St>(
+    store: &St,
+    initial: &S,
+    evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
+    decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
+    command: &C,
+    max_attempts: u32,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure>
+where
+    E: Send,
+    S: Clone + Send + Sync,
+    C: Sync,
+    St: EventStore<E>,
+{
     let mut attempt = 0;
     loop {
         attempt += 1;
-        match run_once(store, initial, evolve, decide, command).await {
+        match run_once(store, initial, evolve, decide, command, idem).await {
             Err(AppFailure::ConcurrencyConflict) if attempt < max_attempts => {}
             Err(AppFailure::ConcurrencyConflict) => return Err(AppFailure::RetryExhausted),
             other => return other,

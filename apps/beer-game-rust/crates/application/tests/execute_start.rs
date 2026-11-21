@@ -6,7 +6,9 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use beergame_application::{AppFailure, DomainError, EventStore, StreamRead, execute_start};
+use beergame_application::{
+    AppFailure, DomainError, EventStore, StartExecuted, StreamRead, execute_start,
+};
 use beergame_domain::{
     Actor, CommitMode, GameError, GameEvent, GameId, GameSettings, Instant, JoinCode,
     ParticipantId, RetentionDays, Role, SessionEvent, StartError, StartGame,
@@ -202,8 +204,11 @@ async fn ac1_2_3__開始は_game_と_session_の両方へ_1_回のコミット�
     let store = MemoryStore::new(game_events(&Role::ALL)?);
     let before = store.lens().0;
     assert_eq!(
-        execute_start(&store, &command(), 3).await,
-        Ok((u64::try_from(before + 1).map_err(e)?, 1))
+        execute_start(&store, &command(), 3, None).await,
+        Ok(StartExecuted::Fresh(
+            u64::try_from(before + 1).map_err(e)?,
+            1
+        ))
     );
     assert_eq!(store.lens(), (before + 1, 1));
     assert_eq!(store.committed.load(Ordering::SeqCst), 1);
@@ -215,7 +220,7 @@ async fn ac1_2_3__役割が足りなければ_どちらにも追記せず_rollba
     let store = MemoryStore::new(game_events(&[Role::Factory, Role::Retailer])?);
     let before = store.lens();
     assert_eq!(
-        execute_start(&store, &command(), 3).await,
+        execute_start(&store, &command(), 3, None).await,
         Err(AppFailure::Domain(DomainError::Start(StartError::Game(
             GameError::StartConditionNotMet(vec![Role::Distributor, Role::Wholesaler])
         ))))
@@ -229,7 +234,7 @@ async fn ac1_2_3__役割が足りなければ_どちらにも追記せず_rollba
 async fn ac1_2_3__game_の追記が競合したら_再試行して_最後に_commit_する() -> Result<(), String> {
     let store = MemoryStore::new(game_events(&Role::ALL)?);
     store.game_conflicts.store(2, Ordering::SeqCst);
-    assert!(execute_start(&store, &command(), 3).await.is_ok());
+    assert!(execute_start(&store, &command(), 3, None).await.is_ok());
     assert_eq!(store.begun.load(Ordering::SeqCst), 3);
     assert_eq!(store.rolled_back.load(Ordering::SeqCst), 2);
     assert_eq!(store.committed.load(Ordering::SeqCst), 1);
@@ -243,7 +248,7 @@ async fn ac1_2_3__session_の追記が失敗したら_game_への追記も残さ
     store.session_fails = true;
     let before = store.lens();
     assert_eq!(
-        execute_start(&store, &command(), 2).await,
+        execute_start(&store, &command(), 2, None).await,
         Err(AppFailure::RetryExhausted)
     );
     assert_eq!(store.lens(), before);
@@ -254,9 +259,9 @@ async fn ac1_2_3__session_の追記が失敗したら_game_への追記も残さ
 #[tokio::test]
 async fn ac1_2_3__開始済みのゲームは_再開始できない() -> Result<(), String> {
     let store = MemoryStore::new(game_events(&Role::ALL)?);
-    assert!(execute_start(&store, &command(), 3).await.is_ok());
+    assert!(execute_start(&store, &command(), 3, None).await.is_ok());
     assert_eq!(
-        execute_start(&store, &command(), 3).await,
+        execute_start(&store, &command(), 3, None).await,
         Err(AppFailure::Domain(DomainError::Start(StartError::Session(
             beergame_domain::SessionError::AlreadyStarted
         ))))

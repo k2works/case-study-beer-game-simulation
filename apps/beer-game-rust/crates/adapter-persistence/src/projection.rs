@@ -14,6 +14,7 @@ pub enum Bind {
     Text(String),
     Int(i64),
     Json(Value),
+    Bytes(Vec<u8>),
     NullText,
 }
 
@@ -293,6 +294,27 @@ pub fn peripheral_statements(write: &PeripheralWrite) -> Statement {
                 pid(*subject_id),
                 Bind::Int(i64::from(*key_version)),
                 Bind::Int(issued_at.epoch_millis()),
+                Bind::Int(expires_at.epoch_millis()),
+            ],
+        ),
+        PeripheralWrite::Idempotency {
+            game_id,
+            scope,
+            key_digest,
+            request_digest,
+            status_code,
+            response,
+            expires_at,
+        } => st(
+            "INSERT INTO idempotency_records (game_id, scope, key_digest, request_digest, status_code, response, expires_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, to_timestamp($7::double precision / 1000))",
+            vec![
+                pid(game_id.get()),
+                Bind::Text(scope.clone()),
+                Bind::Text(key_digest.clone()),
+                Bind::Text(request_digest.clone()),
+                Bind::Int(i64::from(*status_code)),
+                Bind::Bytes(response.clone()),
                 Bind::Int(expires_at.epoch_millis()),
             ],
         ),

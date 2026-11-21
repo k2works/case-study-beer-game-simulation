@@ -98,6 +98,7 @@ async fn ac1_1_1__作成と参加と割り当てが_イベント_投影_周辺�
         Actor::Facilitator(created.game_id),
         joined.participant_id,
         Role::Retailer,
+        None,
     )
     .await
     .map_err(e)?;
@@ -242,12 +243,13 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
             facilitator,
             joined.participant_id,
             role,
+            None,
         )
         .await
         .map_err(e)?;
         participants.push((role, joined));
     }
-    start_game(&store, &at, &settings(), facilitator)
+    start_game(&store, &at, &settings(), facilitator, None)
         .await
         .map_err(e)?;
 
@@ -264,6 +266,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
             Week::FIRST,
             Quantity::of(5).map_err(e)?,
             DecisionVersion::ZERO,
+            None,
         )
         .await
         .map_err(e)?;
@@ -275,6 +278,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
         facilitator,
         Week::FIRST,
         RoleMap::all(&DecisionVersion::new(1)),
+        None,
     )
     .await
     .map_err(e)?;
@@ -325,6 +329,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
         actor,
         Week::of(2).map_err(e)?,
         RoleMap::all(&DecisionVersion::ZERO),
+        None,
     )
     .await;
     assert!(matches!(result.err(), Some(AppFailure::Domain(_))));

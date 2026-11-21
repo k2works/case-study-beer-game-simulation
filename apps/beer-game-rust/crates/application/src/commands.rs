@@ -11,8 +11,8 @@ use beergame_domain::{
 };
 
 use crate::{
-    AppFailure, CredentialKind, Decision, DomainError, EventStore, PeripheralWrite, Secret, digest,
-    encode_token, execute_decision,
+    AppFailure, CredentialKind, Decision, DomainError, EventStore, Executed, Idempotency,
+    PeripheralWrite, Secret, digest, encode_token, execute_decision, execute_idempotent,
 };
 
 /// 外の世界（時計・ID・乱数）。テストでは固定の実装に差し替える。
@@ -217,14 +217,15 @@ pub async fn assign_role<St: EventStore<GameEvent>>(
     actor: Actor,
     participant_id: ParticipantId,
     role: Role,
-) -> Result<(), AppFailure> {
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
     let command = GameCommand::AssignRole {
         actor,
         at: env.now(),
         participant_id,
         role,
     };
-    execute_decision(
+    execute_idempotent(
         store,
         &GameState::NotCreated,
         &evolve_game,
@@ -236,9 +237,9 @@ pub async fn assign_role<St: EventStore<GameEvent>>(
         },
         &command,
         settings.max_attempts,
+        idem,
     )
     .await
-    .map(|_| ())
 }
 
 /// 保存されている資格（ダイジェストで引く）。
@@ -295,8 +296,9 @@ async fn run_session<St: EventStore<SessionEvent>>(
     store: &St,
     settings: &AppSettings,
     command: &SessionCommand,
-) -> Result<u64, AppFailure> {
-    execute_decision(
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    execute_idempotent(
         store,
         &SessionState::NotStarted,
         &evolve_session,
@@ -308,6 +310,7 @@ async fn run_session<St: EventStore<SessionEvent>>(
         },
         command,
         settings.max_attempts,
+        idem,
     )
     .await
 }
@@ -326,7 +329,8 @@ pub async fn save_decision<St: EventStore<SessionEvent>>(
     requested_week: Week,
     quantity: Quantity,
     expected_decision_version: DecisionVersion,
-) -> Result<u64, AppFailure> {
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
     run_session(
         store,
         settings,
@@ -338,6 +342,7 @@ pub async fn save_decision<St: EventStore<SessionEvent>>(
             quantity,
             expected_decision_version,
         },
+        idem,
     )
     .await
 }
@@ -353,7 +358,8 @@ pub async fn commit_week<St: EventStore<SessionEvent>>(
     actor: Actor,
     requested_week: Week,
     basis: RoleMap<DecisionVersion>,
-) -> Result<u64, AppFailure> {
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
     run_session(
         store,
         settings,
@@ -363,6 +369,7 @@ pub async fn commit_week<St: EventStore<SessionEvent>>(
             requested_week,
             basis,
         },
+        idem,
     )
     .await
 }
@@ -376,7 +383,8 @@ pub async fn start_game<St>(
     env: &impl Env,
     settings: &AppSettings,
     actor: Actor,
-) -> Result<(u64, u64), AppFailure>
+    idem: Option<&Idempotency>,
+) -> Result<crate::StartExecuted, AppFailure>
 where
     St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
 {
@@ -387,6 +395,7 @@ where
             at: env.now(),
         },
         settings.max_attempts,
+        idem,
     )
     .await
 }

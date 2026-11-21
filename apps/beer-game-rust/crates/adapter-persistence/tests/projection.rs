@@ -153,7 +153,7 @@ async fn ac1_2_1__投影の表は追記と同じトランザクションで更�
     EventStore::<GameEvent>::commit(&store, tx)
         .await
         .map_err(e)?;
-    execute_start(&store, &command, 3).await.map_err(e)?;
+    execute_start(&store, &command, 3, None).await.map_err(e)?;
     let status: String = sqlx::query_scalar("SELECT status FROM game_overview WHERE game_id = $1")
         .bind(game)
         .fetch_one(&env.pool)
@@ -212,6 +212,7 @@ async fn ac2_3_5__進行と結果の投影は_確定まで追記と同じトラ�
             at: expires,
         },
         3,
+        None,
     )
     .await
     .map_err(e)?;

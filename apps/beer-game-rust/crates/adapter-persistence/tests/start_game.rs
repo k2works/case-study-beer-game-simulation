@@ -4,7 +4,7 @@
 //! `execute_start` を実 PostgreSQL で（`game` と `session` の 2 本へ 1 トランザクション。AC1.2.3）。
 
 use beergame_adapter_persistence::PgGameStore;
-use beergame_application::{AppFailure, EventStore, execute_start};
+use beergame_application::{AppFailure, EventStore, StartExecuted, execute_start};
 use beergame_domain::{
     Actor, CommitMode, GameEvent, GameId, GameSettings, Instant, JoinCode, ParticipantId,
     RetentionDays, Role, SessionEvent, StartGame,
@@ -65,7 +65,10 @@ async fn ac1_2_3__開始は_game_と_session_の両方へ追記され_読み直�
         actor: Actor::Facilitator(id),
         at: Instant::from_epoch_millis(1),
     };
-    assert_eq!(execute_start(&store, &command, 3).await, Ok((n + 1, 1)));
+    assert_eq!(
+        execute_start(&store, &command, 3, None).await,
+        Ok(StartExecuted::Fresh(n + 1, 1))
+    );
 
     let mut tx = EventStore::<GameEvent>::begin(&store).await.map_err(e)?;
     let games = EventStore::<GameEvent>::read(&store, &mut tx)
@@ -112,8 +115,8 @@ async fn ac1_2_3__同時の開始は一方だけが成功し_開始のイベン�
     };
     // 2 つの開始を同時に実行し、一方だけが成功する
     let (a, b) = tokio::join!(
-        execute_start(&store, &command, 5),
-        execute_start(&store, &command, 5)
+        execute_start(&store, &command, 5, None),
+        execute_start(&store, &command, 5, None)
     );
     let results = [a, b];
     let ok = results.iter().filter(|r| r.is_ok()).count();
