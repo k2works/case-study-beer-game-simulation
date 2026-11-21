@@ -11,7 +11,7 @@ beergame-adapter-persistence = { path = "../adapter-persistence" }
 beergame-application = { path = "../application" }
 beergame-domain = { path = "../domain" }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "io-util", "time"] }
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "postgres", "uuid"] }
 tracing-subscriber = { version = "0.3.23", features = ["json"] }
 uuid = { version = "1.29.3", features = ["v4"] }

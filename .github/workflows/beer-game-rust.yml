@@ -72,3 +72,34 @@ jobs:
         run: |
           command -v cargo-deny >/dev/null || cargo install cargo-deny --version 0.21.0 --locked
           cargo deny check
+
+  # コンテナ（検証のみ。AWS 無関係）: イメージをビルドし、スモークテスト（/ready・/health・HEALTHCHECK・migrate・終了コード・非 root・SIGTERM）。
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: イメージのビルド
+        run: docker build -t beer-game-rust:smoke apps/beer-game-rust
+      - name: スモークテスト
+        run: apps/beer-game-rust/scripts/container-smoke.sh beer-game-rust:smoke
+
+  # Terraform の定義の検証（適用はしない。AWS 無関係）。beer-game2.yml と同じ action（版のタグ指定。SHA は未固定）。
+  infra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.17.2
+      - name: fmt
+        run: terraform fmt -recursive -check apps/beer-game-rust/infra
+      - name: staging の validate（バックエンドなし）
+        working-directory: apps/beer-game-rust/infra/envs/staging
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: production の validate（バックエンドなし）
+        working-directory: apps/beer-game-rust/infra/envs/production
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
