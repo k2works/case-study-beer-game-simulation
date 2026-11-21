@@ -69,6 +69,12 @@ impl DemandSeries {
         Ok(DemandSeries(weeks))
     }
 
+    /// 系列そのもの（週 1 から順の整数）。永続化の往復（イベントの JSON への変換）に使う。
+    #[must_use]
+    pub fn to_ints(&self) -> Vec<i64> {
+        self.0.iter().map(|u| i64::from(u.get())).collect()
+    }
+
     /// その週の需要。系列の外は 0。
     #[must_use]
     pub fn at(&self, week: Week) -> Units {
