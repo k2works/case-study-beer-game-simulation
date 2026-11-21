@@ -1,6 +1,8 @@
 # 依存関係の検査（設計: tech-stack の R4）。緩和は ADR で記録し、人が承認する。
 [graph]
 all-features = true
+exclude-dev = false
+exclude-unpublished = false
 
 [advisories]
 version = 2
