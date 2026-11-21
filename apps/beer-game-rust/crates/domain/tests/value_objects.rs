@@ -139,3 +139,12 @@ fn 開始の誤りは_Game_と_Session_の_code_と_category_をそのまま返�
     assert_eq!(session.code(), "session.already_started");
     assert_eq!(session.category(), ErrorCategory::InvalidState);
 }
+
+#[test]
+fn ac1_1_1__需要系列は整数の列として取り出せる() -> Result<(), String> {
+    let week = Week::of(3).map_err(|e| format!("{e:?}"))?;
+    let series =
+        beergame_domain::DemandSeries::of(&[4, 8, 12], week).map_err(|e| format!("{e:?}"))?;
+    assert_eq!(series.to_ints(), vec![4, 8, 12]);
+    Ok(())
+}
