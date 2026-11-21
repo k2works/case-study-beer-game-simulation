@@ -1,0 +1,102 @@
+# beer-game-rust の開発タスク（apps/beer-game-kotlin/justfile に倣う）
+# 使い方: just <タスク>   一覧: just
+# 画面（web/）と受け入れ条件（features/）は beer-game-kotlin の共有物を読み取り専用で使う。
+
+set shell := ["bash", "-cu"]
+
+api_port := env("API_PORT", "3000")
+ui_port := env("UI_PORT", "5173")
+db_port := env("DB_PORT", "55432")
+db_name := "beergame-rust-dev"
+db_url := env("DATABASE_URL", "postgres://postgres:pw@127.0.0.1:" + db_port + "/postgres")
+credential_key := env("CREDENTIAL_KEY", "dev-only-credential-key-0123456789abcdef")
+web_dir := "../beer-game-kotlin/web"
+
+default:
+    @just --list
+
+# --- データベース（ローカルの PostgreSQL。Docker が必要） ---
+
+# PostgreSQL 18.6 を起動し、接続できるまで待つ
+db-up:
+    docker inspect {{db_name}} >/dev/null 2>&1 || docker run -d --name {{db_name}} -e POSTGRES_PASSWORD=pw -p {{db_port}}:5432 postgres:18.6 >/dev/null
+    docker start {{db_name}} >/dev/null
+    for i in $(seq 1 60); do docker exec {{db_name}} pg_isready -U postgres >/dev/null 2>&1 && exit 0; sleep 1; done; echo "PostgreSQL が起動しない" >&2; exit 1
+
+# PostgreSQL を止めて削除する
+db-down:
+    docker rm -f {{db_name}} >/dev/null 2>&1 || true
+
+# --- バックエンド ---
+
+# マイグレーションを適用する
+migrate:
+    DATABASE_URL={{db_url}} CREDENTIAL_KEY={{credential_key}} cargo run -q -p beergame-app -- migrate
+
+# API サーバーを起動する（DB は別途 `just db-up`）
+backend:
+    DATABASE_URL={{db_url}} CREDENTIAL_KEY={{credential_key}} PORT={{api_port}} cargo run -p beergame-app
+
+# 全テスト（実 PostgreSQL のテストは Docker が必要）
+backend-test:
+    cargo test --workspace
+
+# 受け入れテスト（共有の features/ を実 PostgreSQL で実行）
+acceptance:
+    cargo test -p beergame-acceptance --test acceptance
+
+# 書式の検査と整形
+fmt:
+    cargo fmt
+
+# 品質チェック一式（CI と同じ。deny・llvm-cov は未導入なら先に cargo install）
+backend-check:
+    cargo fmt --check
+    cargo clippy --workspace --all-targets --locked -- -D warnings
+    cargo test --workspace
+    cargo llvm-cov clean --workspace
+    cargo llvm-cov -p beergame-domain --locked --fail-under-lines 100 --summary-only
+    cargo llvm-cov --workspace --locked --fail-under-lines 80 --summary-only
+    cargo deny check
+
+# 速い検査だけ（整形・lint。DB 不要）
+backend-lint:
+    cargo fmt --check
+    cargo clippy --workspace --all-targets --locked -- -D warnings
+
+# --- 画面（beer-game-kotlin/web を共有） ---
+
+web-install:
+    cd {{web_dir}} && npm ci
+
+# 画面の開発サーバー（API は api_port のバックエンドへ中継）
+web:
+    cd {{web_dir}} && UI_PORT={{ui_port}} API_PORT={{api_port}} npm run dev
+
+# 画面のテスト・型検査・ビルド
+web-verify:
+    cd {{web_dir}} && npm run verify
+
+# Rust のバックエンドに対する画面の受け入れ（@ui）。専用ポート API 3100 / UI 5273。B5 以降の機能は未実装のため 27 中 13 が通る（残りは失敗で終了コード 1）
+ui-acceptance:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just db-up
+    DATABASE_URL={{db_url}} CREDENTIAL_KEY={{credential_key}} PORT=3100 cargo run -q -p beergame-app >/tmp/beergame-rust-ui.log 2>&1 &
+    backend=$!
+    trap 'kill $backend 2>/dev/null || true' EXIT
+    for i in $(seq 1 60); do curl -sf http://127.0.0.1:3100/api/v1/ready >/dev/null && break; sleep 1; done
+    cd {{web_dir}} && API_PORT=3100 UI_PORT=5273 npx cucumber-js
+
+# バックエンドと画面を同時に起動する（Ctrl-C で両方止める）
+dev:
+    bash -c "trap 'kill 0' EXIT; just db-up; just backend & just web & wait"
+
+# --- コンテナ ---
+
+docker-build:
+    docker build -t beer-game-rust:smoke .
+
+# コンテナのスモークテスト（イメージのビルド後）
+container-smoke: docker-build
+    scripts/container-smoke.sh
