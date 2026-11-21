@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 use crate::problem::{
     FieldError, Problem, bad_request_problem, invitation_invalid_problem, not_ready_problem,
-    problem_of, validation_problem,
+    problem_of, timeout_problem, validation_problem,
 };
 use crate::views::{Viewer, game_view, session_view};
 
@@ -64,6 +64,10 @@ pub trait Backend: Send + Sync + 'static {
     ) -> impl Future<Output = Result<Option<GameSnapshot>, AppFailure>> + Send;
     /// 依存先（DB）に接続できるか。
     fn is_ready(&self) -> impl Future<Output = bool> + Send;
+    /// コマンドの応答を待つ上限。超えても、コマンドの処理は最後まで走る（504 を返す）。
+    fn command_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(10)
+    }
     /// HTTPS の環境では Cookie に `Secure` を付ける。
     fn secure_cookies(&self) -> bool;
 }
@@ -483,7 +487,12 @@ async fn assign<B: Backend>(
     body: Bytes,
 ) -> Response {
     let correlation = correlation_id(&*backend, &headers);
-    let result = async {
+    let backend_task = Arc::clone(&backend);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let backend = backend_task;
+        let correlation = correlation_task;
         let game_id = parse_game_id(&game)?;
         let participant_id = Uuid::parse_str(&participant)
             .map(|u| ParticipantId::new(u.as_u128()))
@@ -521,7 +530,7 @@ async fn assign<B: Backend>(
         .await
         .map(|executed| executed_response(&executed, ResponseShape::Game, &correlation))
         .map_err(|failure| Box::new(problem_of(&failure)))
-    }
+    })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
@@ -532,7 +541,12 @@ async fn start<B: Backend>(
     headers: HeaderMap,
 ) -> Response {
     let correlation = correlation_id(&*backend, &headers);
-    let result = async {
+    let backend_task = Arc::clone(&backend);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let backend = backend_task;
+        let correlation = correlation_task;
         let game_id = parse_game_id(&game)?;
         let actor = authenticate_for(&*backend, &headers, game_id).await?;
         let idem = idempotency_for(
@@ -561,7 +575,7 @@ async fn start<B: Backend>(
             }
         })
         .map_err(|failure| Box::new(problem_of(&failure)))
-    }
+    })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
@@ -590,7 +604,12 @@ async fn decide<B: Backend>(
     body: Bytes,
 ) -> Response {
     let correlation = correlation_id(&*backend, &headers);
-    let result = async {
+    let backend_task = Arc::clone(&backend);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let backend = backend_task;
+        let correlation = correlation_task;
         let game_id = parse_game_id(&session)?;
         let actor = authenticate_for(&*backend, &headers, game_id).await?;
         let parsed = parse_json(&body)?;
@@ -656,7 +675,7 @@ async fn decide<B: Backend>(
         .await
         .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
         .map_err(|failure| Box::new(problem_of(&failure)))
-    }
+    })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
@@ -668,8 +687,13 @@ async fn commit<B: Backend>(
     body: Bytes,
 ) -> Response {
     let correlation = correlation_id(&*backend, &headers);
+    let backend_task = Arc::clone(&backend);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
     let result =
-        async {
+        detached(limit, async move {
+            let backend = backend_task;
+            let correlation = correlation_task;
             let game_id = parse_game_id(&session)?;
             let actor = authenticate_for(&*backend, &headers, game_id).await?;
             let parsed = parse_json(&body)?;
@@ -736,7 +760,7 @@ async fn commit<B: Backend>(
             .await
             .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
             .map_err(|failure| Box::new(problem_of(&failure)))
-        }
+        })
         .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
@@ -824,4 +848,22 @@ async fn session_state<B: Backend>(
     result
         .map(|response: Response| with_correlation(response, &correlation))
         .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// コマンドの処理を、**別のタスクで実行する**（RB2）。クライアントが切断してルートの future が drop されても、
+/// 処理は最後まで走る（COMMIT が中途半端にならない）。応答の待ちには上限があり、超えたら 504（`type` なし）を返す。
+/// 処理そのものは止めない（実行済みの可能性があるので、画面は同じ `Idempotency-Key` で再送する）。
+async fn detached<T: Send + 'static>(
+    limit: std::time::Duration,
+    work: impl Future<Output = Result<T, Box<Problem>>> + Send + 'static,
+) -> Result<T, Box<Problem>> {
+    let mut handle = tokio::spawn(work);
+    match tokio::time::timeout(limit, &mut handle).await {
+        Ok(Ok(result)) => result,
+        // タスクの panic。利用者には相関 ID だけを返す（500）。release は panic = "unwind" が前提
+        Ok(Err(_)) => Err(Box::new(problem_of(&AppFailure::Persistence(
+            beergame_application::PersistenceFailure::Storage("タスクが異常終了した".to_owned()),
+        )))),
+        Err(_) => Err(Box::new(timeout_problem())),
+    }
 }

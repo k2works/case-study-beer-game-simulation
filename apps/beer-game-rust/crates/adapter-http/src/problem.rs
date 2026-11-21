@@ -44,10 +44,15 @@ impl Problem {
     #[must_use]
     pub fn body(&self) -> Value {
         let mut body = Map::new();
-        body.insert("type".to_owned(), json!(format!("/problems/{}", self.code)));
+        // `code` が空の problem（504 のタイムアウト）は、`type` を持たない（LB の 504 と同じ形。画面は「結果が不明」として再送する）
+        if !self.code.is_empty() {
+            body.insert("type".to_owned(), json!(format!("/problems/{}", self.code)));
+        }
         body.insert("title".to_owned(), json!(self.title));
         body.insert("status".to_owned(), json!(self.status));
-        body.insert("code".to_owned(), json!(self.code));
+        if !self.code.is_empty() {
+            body.insert("code".to_owned(), json!(self.code));
+        }
         if let Some(detail) = &self.detail {
             body.insert("detail".to_owned(), json!(detail));
         }
@@ -315,4 +320,15 @@ pub fn invitation_invalid_problem() -> Problem {
 #[must_use]
 pub fn not_ready_problem() -> Problem {
     Problem::new(503, "app.not_ready", "まだ準備ができていません。")
+}
+
+/// タイムアウト（504。**`type` を付けない**）。コマンドは**実行中または実行済みの可能性がある**ため、画面は「結果が不明」として、
+/// 同じ `Idempotency-Key` で再送する。
+#[must_use]
+pub fn timeout_problem() -> Problem {
+    let mut problem = Problem::new(504, "", "処理に時間がかかっています。");
+    problem.detail = Some(
+        "結果が不明です。同じ操作をもう一度送ってください（二重には実行されません）。".to_owned(),
+    );
+    problem
 }

@@ -50,9 +50,17 @@ pub struct PgBackend<E: Env + Send + Sync + 'static> {
     env: E,
     settings: AppSettings,
     secure_cookies: bool,
+    command_timeout: std::time::Duration,
 }
 
 impl<E: Env + Send + Sync + 'static> PgBackend<E> {
+    /// コマンドの応答を待つ上限を変える（既定は 10 秒）。
+    #[must_use]
+    pub const fn with_command_timeout(mut self, limit: std::time::Duration) -> Self {
+        self.command_timeout = limit;
+        self
+    }
+
     #[must_use]
     pub fn new(pool: PgPool, env: E, settings: AppSettings, secure_cookies: bool) -> Self {
         PgBackend {
@@ -60,6 +68,7 @@ impl<E: Env + Send + Sync + 'static> PgBackend<E> {
             env,
             settings,
             secure_cookies,
+            command_timeout: std::time::Duration::from_secs(10),
         }
     }
 }
@@ -252,6 +261,10 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             .fetch_one(&self.pool)
             .await
             .is_ok()
+    }
+
+    fn command_timeout(&self) -> std::time::Duration {
+        self.command_timeout
     }
 
     fn secure_cookies(&self) -> bool {
