@@ -280,3 +280,39 @@ pub fn problem_of(failure: &AppFailure) -> Problem {
         }
     }
 }
+
+/// 入力の誤り（422）。項目ごとの誤りを、すべて集めて返す。
+#[must_use]
+pub fn validation_problem(errors: Vec<FieldError>) -> Problem {
+    let mut problem = Problem::new(422, "validation.invalid_input", "入力に誤りがあります。");
+    problem.errors = errors;
+    problem
+}
+
+/// JSON として不正な本文（400）。
+#[must_use]
+pub fn bad_request_problem(detail: &str) -> Problem {
+    let mut problem = Problem::new(
+        400,
+        "validation.invalid_input",
+        "リクエストを解釈できません。",
+    );
+    problem.detail = Some(detail.to_owned());
+    problem
+}
+
+/// 参加コードが無効（不明・形式不正を区別しない。列挙の防止。AC1.2.2）。
+#[must_use]
+pub fn invitation_invalid_problem() -> Problem {
+    Problem::new(
+        403,
+        "game.invitation_invalid",
+        title_of("game.invitation_invalid"),
+    )
+}
+
+/// 準備ができていない（503。`/ready`）。
+#[must_use]
+pub fn not_ready_problem() -> Problem {
+    Problem::new(503, "app.not_ready", "まだ準備ができていません。")
+}

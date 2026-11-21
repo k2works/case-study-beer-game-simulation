@@ -51,6 +51,8 @@ pub struct CreateOutcome {
     pub game_id: GameId,
     pub join_code: String,
     pub facilitator_credential: Secret<String>,
+    /// 追記後の `game` ストリームの版。
+    pub game_version: u64,
 }
 
 /// 参加の結果。
@@ -58,6 +60,8 @@ pub struct CreateOutcome {
 pub struct JoinOutcome {
     pub participant_id: ParticipantId,
     pub credential: Secret<String>,
+    /// 追記後の `game` ストリームの版。
+    pub game_version: u64,
 }
 
 fn domain(e: GameError) -> DomainError {
@@ -74,7 +78,7 @@ fn issue(env: &impl Env, settings: &AppSettings) -> Result<(Secret<String>, Stri
     Ok((token, digest))
 }
 
-/// ゲームの作成（US1.1。匿名）。入力の誤りは、項目ごとにすべて集めて返す（AC1.1.2）。
+/// ゲームの作成（US1.1。匿名）。`game_id` は境界が決める（ストアはゲームごとに作るため）。入力の誤りは、項目ごとにすべて集めて返す（AC1.1.2）。
 ///
 /// # Errors
 /// 入力の誤り（`Invalid`）、永続化の失敗。
@@ -82,13 +86,13 @@ pub async fn create_game<St: EventStore<GameEvent>>(
     store: &St,
     env: &impl Env,
     settings: &AppSettings,
+    game_id: GameId,
     input: &CreateGameInput,
 ) -> Result<CreateOutcome, AppFailure> {
     let game_settings = GameSettings::kit(input.final_week, &input.demand, CommitMode::Manual)
         .map_err(AppFailure::Invalid)?;
     let retention =
         RetentionDays::of(settings.retention_days).map_err(|e| AppFailure::Invalid(vec![e]))?;
-    let game_id = GameId::new(env.new_id());
     let code_text = env.join_code();
     let join_code = JoinCode::of(&code_text).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let (token, token_digest) = issue(env, settings)?;
@@ -106,7 +110,7 @@ pub async fn create_game<St: EventStore<GameEvent>>(
         retention_days: retention,
         facilitator_credential_expires_at: expires,
     };
-    execute_decision(
+    let game_version = execute_decision(
         store,
         &GameState::NotCreated,
         &evolve_game,
@@ -133,6 +137,7 @@ pub async fn create_game<St: EventStore<GameEvent>>(
         game_id,
         join_code: code_text,
         facilitator_credential: token,
+        game_version,
     })
 }
 
@@ -163,7 +168,7 @@ pub async fn join_game<St: EventStore<GameEvent>>(
         display_name: name.clone(),
         credential_expires_at: expires,
     };
-    execute_decision(
+    let game_version = execute_decision(
         store,
         &GameState::NotCreated,
         &evolve_game,
@@ -197,6 +202,7 @@ pub async fn join_game<St: EventStore<GameEvent>>(
     Ok(JoinOutcome {
         participant_id,
         credential: token,
+        game_version,
     })
 }
 

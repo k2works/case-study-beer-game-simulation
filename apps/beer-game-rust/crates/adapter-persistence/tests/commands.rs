@@ -77,9 +77,15 @@ async fn ac1_1_1__作成と参加と割り当てが_イベント_投影_周辺�
     let game_uuid = Uuid::new_v4();
     let store = PgGameStore::new(env.pool.clone(), game_uuid);
     let one = OneId(game_uuid.as_u128());
-    let created = create_game(&store, &one, &settings(), &input)
-        .await
-        .map_err(e)?;
+    let created = create_game(
+        &store,
+        &one,
+        &settings(),
+        GameId::new(game_uuid.as_u128()),
+        &input,
+    )
+    .await
+    .map_err(e)?;
     assert_eq!(created.game_id, GameId::new(game_uuid.as_u128()));
 
     let joined = join_game(&store, &RealEnv, &settings(), created.game_id, "山本")
@@ -205,6 +211,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
         &store,
         &at,
         &settings(),
+        GameId::new(game_uuid.as_u128()),
         &CreateGameInput {
             final_week: 2,
             demand: vec![4, 4],

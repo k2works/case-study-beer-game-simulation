@@ -107,7 +107,14 @@ async fn ac1_1_2__無効な需要系列は作成せず_対象の週ごとの誤�
         final_week: 12,
         demand: vec![4, 4, 4, 4, 1001, 4, 4, 4, 4, 4, 4, 4],
     };
-    let result = create_game(&store, &FixedEnv(AtomicU32::new(0)), &settings(), &input).await;
+    let result = create_game(
+        &store,
+        &FixedEnv(AtomicU32::new(0)),
+        &settings(),
+        GameId::new(1),
+        &input,
+    )
+    .await;
     assert!(matches!(
         result.as_ref().err(),
         Some(AppFailure::Invalid(errors)) if errors == &vec![ValidationError::DemandSeriesInvalid { week_index: 5, reason: "需要は 0〜1000 の整数" }]
@@ -125,9 +132,15 @@ async fn ac1_1_1__作成は進行役の資格を一度だけ返し_保存はダ�
         final_week: 3,
         demand: vec![4, 4, 4],
     };
-    let outcome = create_game(&store, &FixedEnv(AtomicU32::new(0)), &settings(), &input)
-        .await
-        .map_err(|e| format!("{e:?}"))?;
+    let outcome = create_game(
+        &store,
+        &FixedEnv(AtomicU32::new(0)),
+        &settings(),
+        GameId::new(1),
+        &input,
+    )
+    .await
+    .map_err(|e| format!("{e:?}"))?;
     assert_eq!(outcome.join_code, "abcd1234");
     let writes = store.writes.lock().map_err(|e| e.to_string())?.clone();
     let [
@@ -163,6 +176,7 @@ async fn ac1_2_1__参加は表示名を周辺ストアにだけ書き_イベン�
         &store,
         &env,
         &settings(),
+        GameId::new(1),
         &CreateGameInput {
             final_week: 3,
             demand: vec![4, 4, 4],
@@ -234,6 +248,7 @@ async fn nf_s__資格の鍵が空なら作成できない() {
         &store,
         &FixedEnv(AtomicU32::new(0)),
         &s,
+        GameId::new(1),
         &CreateGameInput {
             final_week: 3,
             demand: vec![4, 4, 4],
