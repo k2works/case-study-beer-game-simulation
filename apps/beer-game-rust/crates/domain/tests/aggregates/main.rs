@@ -5,5 +5,6 @@
 
 mod fixtures;
 mod game;
+mod property;
 mod session;
 mod start_game;

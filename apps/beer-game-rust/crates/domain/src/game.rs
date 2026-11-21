@@ -284,7 +284,11 @@ pub fn decide_game(state: &GameState, command: &GameCommand) -> Result<Vec<GameE
             credential_expires_at,
             ..
         } => {
-            state.preparing_data()?;
+            let data = state.preparing_data()?;
+            // 同じ参加者 ID の再参加は変化なし（履歴に足さない）。evolve が採用しないイベントを作らない。
+            if data.participants.contains_key(participant_id) {
+                return Ok(Vec::new());
+            }
             Ok(vec![GameEvent::ParticipantJoined {
                 participant_id: *participant_id,
                 credential_expires_at: *credential_expires_at,

@@ -52,6 +52,14 @@ fn ac1_2_1__準備中は参加できる_イベントには_ID_と資格の期限
 }
 
 #[test]
+fn ac1_2_1__同じ参加者_ID_の再参加は変化なし_履歴に足さない() -> R<()> {
+    // 性質テスト（property.rs）が見つけた: decide が evolve の採用しないイベントを作っていた
+    let joined = game_of(&[game_created()?, participant_joined(1)])?;
+    assert_eq!(decide_game(&joined, &join_game(1)?), Ok(Vec::new()));
+    Ok(())
+}
+
+#[test]
 fn ac1_2_2__開始済みと未作成への参加は_NotPreparing() -> R<()> {
     let mut events = fully_assigned_events()?;
     events.push(GameEvent::GameStarted { game_id: GAME });
