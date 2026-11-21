@@ -34,6 +34,19 @@ jobs:
         working-directory: apps/beer-game-rust
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # キャッシュ（B3 で導入）: ツール（cargo-llvm-cov・cargo-deny は毎回ソースからビルドすると約 10 分かかる）と、依存のビルド成果物。
+      # キーは Cargo.lock と rust-toolchain.toml のハッシュ。復元しても、検査はすべて実行する（結果は変わらない）。
+      - name: キャッシュ（cargo のツール・レジストリ・ビルド成果物）
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            apps/beer-game-rust/target
+          key: beer-game-rust-${{ runner.os }}-${{ hashFiles('apps/beer-game-rust/Cargo.lock', 'apps/beer-game-rust/rust-toolchain.toml') }}
+          restore-keys: |
+            beer-game-rust-${{ runner.os }}-
       - name: ツールチェーン（rust-toolchain.toml の版）
         run: rustup show active-toolchain || rustup toolchain install
       - name: 書式
@@ -44,11 +57,11 @@ jobs:
         run: cargo test --workspace --locked
       - name: カバレッジのゲート（行 80% 未満で失敗。RT3）
         run: |
-          cargo install cargo-llvm-cov --version 0.9.1 --locked
+          command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version 0.9.1 --locked
           cargo llvm-cov --workspace --locked --fail-under-lines 80 --summary-only
       - name: domain の行カバレッジ 100%（domain 自身のテストだけで）
         run: cargo llvm-cov -p beergame-domain --locked --fail-under-lines 100 --summary-only
       - name: 依存関係の検査（cargo-deny。開発時のみの依存も検査する）
         run: |
-          cargo install cargo-deny --version 0.21.0 --locked
+          command -v cargo-deny >/dev/null || cargo install cargo-deny --version 0.21.0 --locked
           cargo deny check
