@@ -97,6 +97,7 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
         )
+        .layer(axum::middleware::from_fn(log_request))
         .with_state(backend)
 }
 
@@ -866,4 +867,27 @@ async fn detached<T: Send + 'static>(
         )))),
         Err(_) => Err(Box::new(timeout_problem())),
     }
+}
+
+/// 構造化ログ（AC6.1.1）。**相関 ID・操作（メソッドと経路）・結果（状態）・所要時間**だけを出す。
+/// Cookie（資格）・本文（表示名・数量）・参加コード・クエリは含めない。
+async fn log_request(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let method = request.method().to_string();
+    let path = request.uri().path().to_owned();
+    let started = std::time::Instant::now();
+    let response = next.run(request).await;
+    let status = response.status().as_u16();
+    let correlation = response
+        .headers()
+        .get("x-correlation-id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    if status >= 500 {
+        tracing::error!(target: "http", correlation_id = %correlation, %method, %path, status, elapsed_ms, "request failed");
+    } else {
+        tracing::info!(target: "http", correlation_id = %correlation, %method, %path, status, elapsed_ms, "request");
+    }
+    response
 }

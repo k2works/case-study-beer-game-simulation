@@ -305,3 +305,8 @@ async fn versions(pool: &PgPool, game: Uuid) -> Result<(u64, Option<u64>), AppFa
     }
     Ok((game_version, session_version))
 }
+
+/// 構造化ログ（JSON）を標準出力へ出す。ログの型には、表示名・資格を持たせない（各ルートは、相関 ID・操作・結果・所要時間だけを出す）。
+pub fn init_logging() {
+    tracing_subscriber::fmt().json().with_target(true).init();
+}

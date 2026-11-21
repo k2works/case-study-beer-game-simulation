@@ -91,10 +91,12 @@ pub async fn prepared(app: &Router, pool: &PgPool) -> Result<Game, String> {
         .trim_start_matches("/api/v1/games/")
         .trim_end_matches("/state")
         .to_owned();
-    let code: String = sqlx::query_scalar("SELECT join_code FROM game_join_codes")
-        .fetch_one(pool)
-        .await
-        .map_err(e)?;
+    let code: String =
+        sqlx::query_scalar("SELECT join_code FROM game_join_codes WHERE game_id = $1::uuid")
+            .bind(&id)
+            .fetch_one(pool)
+            .await
+            .map_err(e)?;
     let mut players = Vec::new();
     for (i, role) in ["FACTORY", "DISTRIBUTOR", "WHOLESALER", "RETAILER"]
         .into_iter()
