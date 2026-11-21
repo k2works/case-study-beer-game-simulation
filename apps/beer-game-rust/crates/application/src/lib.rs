@@ -3,11 +3,18 @@
 
 use std::future::Future;
 
-use beergame_domain::{Evolution, GameError, SessionError, StartError, ValidationError};
+use beergame_domain::{
+    Evolution, GameError, GameId, Instant, ParticipantId, SessionError, StartError, ValidationError,
+};
 
+mod commands;
 mod secret;
 mod start;
 
+pub use commands::{
+    AppSettings, CreateGameInput, CreateOutcome, Env, JoinOutcome, assign_role, create_game,
+    join_game,
+};
 pub use secret::{Secret, digest, encode_token};
 pub use start::execute_start;
 
@@ -54,6 +61,42 @@ pub struct StreamRead<E> {
     pub version: u64,
 }
 
+/// 資格の種類。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CredentialKind {
+    Facilitator,
+    Participant,
+}
+
+/// 周辺ストアへの書き込み（イベントには入れない値。D7）。内容は純粋に導出し、追記と同じトランザクションで書く。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PeripheralWrite {
+    /// 資格のダイジェスト（生の値は含めない）。
+    Credential {
+        digest: String,
+        game_id: GameId,
+        kind: CredentialKind,
+        subject_id: u128,
+        key_version: i32,
+        issued_at: Instant,
+        expires_at: Instant,
+    },
+    /// 表示名（参加者のみ）。
+    DisplayName {
+        game_id: GameId,
+        participant_id: ParticipantId,
+        name: String,
+        at: Instant,
+    },
+}
+
+/// `decide` の結果。追記するイベントと、同じトランザクションで書く周辺ストアの内容。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Decision<E> {
+    pub events: Vec<E>,
+    pub writes: Vec<PeripheralWrite>,
+}
+
 /// イベントストアのポート。`Tx` は `begin` / `commit` / `rollback` で表す。
 /// 失敗の経路では `rollback` を明示し、`Tx` の drop は panic・ランタイムの終了のときの保険にする（RB2）。
 pub trait EventStore<E>: Sync {
@@ -77,6 +120,15 @@ pub trait EventStore<E>: Sync {
     fn commit(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;
 
     fn rollback(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;
+
+    /// 周辺ストアへ書く（追記と同じトランザクション）。既定は何もしない。
+    fn write_peripheral(
+        &self,
+        _tx: &mut Self::Tx,
+        _writes: &[PeripheralWrite],
+    ) -> impl Future<Output = Result<(), AppFailure>> + Send {
+        async { Ok(()) }
+    }
 }
 
 /// 保存済みのイベントを畳み込む。`Ignored`（decide が作らない列）があれば、状態を信用せず失敗にする（RD2）。
@@ -105,7 +157,7 @@ async fn step<E, S, C, St>(
     tx: &mut St::Tx,
     initial: &S,
     evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
-    decide: &(impl Fn(&S, &C) -> Result<Vec<E>, DomainError> + Sync),
+    decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
     command: &C,
 ) -> Result<u64, AppFailure>
 where
@@ -117,19 +169,20 @@ where
     let read = store.read(tx).await?;
     let state = replay(initial, &read.events, evolve)?;
     let decided = decide(&state, command).map_err(AppFailure::Domain)?;
-    if decided.is_empty() {
+    if decided.events.is_empty() {
         // 空の列は追記しない（変化なし）
-        Ok(read.version)
-    } else {
-        store.append(tx, read.version, decided).await
+        return Ok(read.version);
     }
+    let version = store.append(tx, read.version, decided.events).await?;
+    store.write_peripheral(tx, &decided.writes).await?;
+    Ok(version)
 }
 
 async fn run_once<E, S, C, St>(
     store: &St,
     initial: &S,
     evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
-    decide: &(impl Fn(&S, &C) -> Result<Vec<E>, DomainError> + Sync),
+    decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
     command: &C,
 ) -> Result<u64, AppFailure>
 where
@@ -152,15 +205,15 @@ where
     }
 }
 
-/// コマンドを実行する。追記の競合は、上限まで再試行する（試行のたびに rollback し、新しい `Tx` で読み直す）。
+/// コマンドを実行する（周辺ストアへの書き込みを伴う）。追記の競合は、上限まで再試行する（試行のたびに rollback し、新しい `Tx` で読み直す）。
 ///
 /// # Errors
 /// 業務上の失敗、永続化の失敗、再試行の上限（`RetryExhausted`）。
-pub async fn execute<E, S, C, St>(
+pub async fn execute_decision<E, S, C, St>(
     store: &St,
     initial: &S,
     evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
-    decide: &(impl Fn(&S, &C) -> Result<Vec<E>, DomainError> + Sync),
+    decide: &(impl Fn(&S, &C) -> Result<Decision<E>, DomainError> + Sync),
     command: &C,
     max_attempts: u32,
 ) -> Result<u64, AppFailure>
@@ -179,4 +232,38 @@ where
             other => return other,
         }
     }
+}
+
+/// 周辺ストアへの書き込みを伴わないコマンドを実行する。
+///
+/// # Errors
+/// `execute_decision` と同じ。
+pub async fn execute<E, S, C, St>(
+    store: &St,
+    initial: &S,
+    evolve: &(impl Fn(S, &E) -> Evolution<S> + Sync),
+    decide: &(impl Fn(&S, &C) -> Result<Vec<E>, DomainError> + Sync),
+    command: &C,
+    max_attempts: u32,
+) -> Result<u64, AppFailure>
+where
+    E: Send,
+    S: Clone + Send + Sync,
+    C: Sync,
+    St: EventStore<E>,
+{
+    execute_decision(
+        store,
+        initial,
+        evolve,
+        &|state, cmd| {
+            decide(state, cmd).map(|events| Decision {
+                events,
+                writes: Vec::new(),
+            })
+        },
+        command,
+        max_attempts,
+    )
+    .await
 }

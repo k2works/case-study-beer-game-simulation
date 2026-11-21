@@ -2,6 +2,7 @@
 //! 設計: architecture-backend の「投影は追記の後に更新する（同じトランザクション）」。
 //! 簡略化: 設計の `Projection(Event -> List<RowChange>)` の `RowChange` は、SQL の文と束縛値の列で表した（表の型づけは、投影の表が増える B5 以降に見直す）。
 
+use beergame_application::{CredentialKind, PeripheralWrite};
 use beergame_domain::{Editor, GameEvent, Pipeline, Role, RoleMap, RoleState, SessionEvent};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -261,5 +262,54 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
                 vec![Bind::Uuid(game)],
             ),
         ],
+    }
+}
+
+/// 周辺ストアへの書き込み（資格のダイジェスト・表示名）の文。イベントには入れない値（D7）。
+#[must_use]
+pub fn peripheral_statements(write: &PeripheralWrite) -> Statement {
+    match write {
+        PeripheralWrite::Credential {
+            digest,
+            game_id,
+            kind,
+            subject_id,
+            key_version,
+            issued_at,
+            expires_at,
+        } => st(
+            "INSERT INTO credentials (credential_digest, game_id, kind, subject_id, key_version, issued_at, expires_at) \
+             VALUES ($1, $2, $3, $4, $5, to_timestamp($6::double precision / 1000), to_timestamp($7::double precision / 1000))",
+            vec![
+                Bind::Text(digest.clone()),
+                pid(game_id.get()),
+                Bind::Text(
+                    match kind {
+                        CredentialKind::Facilitator => "FACILITATOR",
+                        CredentialKind::Participant => "PARTICIPANT",
+                    }
+                    .to_owned(),
+                ),
+                pid(*subject_id),
+                Bind::Int(i64::from(*key_version)),
+                Bind::Int(issued_at.epoch_millis()),
+                Bind::Int(expires_at.epoch_millis()),
+            ],
+        ),
+        PeripheralWrite::DisplayName {
+            game_id,
+            participant_id,
+            name,
+            at,
+        } => st(
+            "INSERT INTO display_profiles (game_id, actor_kind, actor_id, display_name, created_at) \
+             VALUES ($1, 'PARTICIPANT', $2, $3, to_timestamp($4::double precision / 1000))",
+            vec![
+                pid(game_id.get()),
+                pid(participant_id.get()),
+                Bind::Text(name.clone()),
+                Bind::Int(at.epoch_millis()),
+            ],
+        ),
     }
 }

@@ -2,11 +2,13 @@
 
 use std::marker::PhantomData;
 
-use beergame_application::{AppFailure, EventStore, PersistenceFailure, StreamRead};
+use beergame_application::{
+    AppFailure, EventStore, PeripheralWrite, PersistenceFailure, StreamRead,
+};
 use beergame_domain::{GameEvent, SessionEvent};
 
 use crate::codec::{GameCodec, SessionCodec};
-use crate::projection::{Bind, Statement};
+use crate::projection::{Bind, Statement, peripheral_statements};
 use sqlx::postgres::PgPool;
 use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
@@ -169,6 +171,14 @@ where
         events: Vec<E>,
     ) -> Result<u64, AppFailure> {
         let mut version = i64::try_from(expected).map_err(|_| AppFailure::RetryExhausted)?;
+        if expected == 0 && self.stream == StreamType::Game {
+            // 連鎖削除の根。ゲームの最初の追記（作成）で作る（同じ ID の再作成は decide が拒否する）
+            sqlx::query("INSERT INTO game_roots (game_id, created_at) VALUES ($1, now()) ON CONFLICT DO NOTHING")
+                .bind(self.game_id)
+                .execute(&mut *tx.0)
+                .await
+                .map_err(|e| storage(&e))?;
+        }
         for event in &events {
             let (event_type, schema_version, payload) = self
                 .codec
@@ -195,6 +205,17 @@ where
             }
         }
         Ok(u64::try_from(version).unwrap_or(0))
+    }
+
+    async fn write_peripheral(
+        &self,
+        tx: &mut PgTx,
+        writes: &[PeripheralWrite],
+    ) -> Result<(), AppFailure> {
+        for write in writes {
+            run_statement(tx, &peripheral_statements(write)).await?;
+        }
+        Ok(())
     }
 
     async fn commit(&self, tx: PgTx) -> Result<(), AppFailure> {
@@ -249,6 +270,14 @@ impl EventStore<GameEvent> for PgGameStore {
     async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
         EventStore::<GameEvent>::rollback(&self.game, tx).await
     }
+
+    async fn write_peripheral(
+        &self,
+        tx: &mut PgTx,
+        writes: &[PeripheralWrite],
+    ) -> Result<(), AppFailure> {
+        EventStore::<GameEvent>::write_peripheral(&self.game, tx, writes).await
+    }
 }
 
 impl EventStore<SessionEvent> for PgGameStore {
@@ -277,5 +306,13 @@ impl EventStore<SessionEvent> for PgGameStore {
 
     async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
         EventStore::<SessionEvent>::rollback(&self.session, tx).await
+    }
+
+    async fn write_peripheral(
+        &self,
+        tx: &mut PgTx,
+        writes: &[PeripheralWrite],
+    ) -> Result<(), AppFailure> {
+        EventStore::<SessionEvent>::write_peripheral(&self.session, tx, writes).await
     }
 }

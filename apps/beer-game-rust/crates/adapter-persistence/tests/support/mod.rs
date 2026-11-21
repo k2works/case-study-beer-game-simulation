@@ -67,6 +67,8 @@ pub async fn start() -> Result<Option<Env>, String> {
     Err(format!("PostgreSQL に接続できない: {last}"))
 }
 
+// 理由: 共通部品は、テストのバイナリごとに使う関数が違う（使わないバイナリで dead_code になる）。
+#[allow(dead_code)]
 pub async fn new_game(pool: &PgPool) -> Result<Uuid, String> {
     let game = Uuid::new_v4();
     sqlx::query("INSERT INTO game_roots (game_id, created_at) VALUES ($1, now())")
