@@ -181,3 +181,52 @@ mod naming_tests {
         );
     }
 }
+
+/// フィーチャーの本文から、`@api` のシナリオに付いた AC の ID（例: `AC2.1.3`）を拾う。
+#[must_use]
+pub fn api_ac_ids(feature: &str) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    for line in feature
+        .lines()
+        .map(str::trim)
+        .filter(|l| l.starts_with('@'))
+    {
+        let tags: Vec<&str> = line.split_whitespace().collect();
+        if tags.contains(&"@api") {
+            for tag in tags {
+                if let Some(id) = tag.strip_prefix('@')
+                    && id.starts_with("AC")
+                    && !ids.iter().any(|i| i == id)
+                {
+                    ids.push(id.to_owned());
+                }
+            }
+        }
+    }
+    ids
+}
+
+/// AC の ID に対応するテスト名の接頭辞の部品（`AC2.1.3` → `ac2_1_3`）。
+#[must_use]
+pub fn ac_segment(id: &str) -> String {
+    id.to_lowercase().replace('.', "_")
+}
+
+#[cfg(test)]
+mod ac_tests {
+    use super::*;
+
+    #[test]
+    fn ds11_api_の_ac_だけを拾う() {
+        let text = "  @AC1.1.1 @api @core\n  シナリオ: a\n  @AC2.1.1 @ui\n  シナリオ: b\n  @api @AC2.1.1 @AC2.1.3\n  シナリオ: c\n";
+        assert_eq!(
+            api_ac_ids(text),
+            vec![
+                "AC1.1.1".to_owned(),
+                "AC2.1.1".to_owned(),
+                "AC2.1.3".to_owned()
+            ]
+        );
+        assert_eq!(ac_segment("AC2.1.3"), "ac2_1_3");
+    }
+}

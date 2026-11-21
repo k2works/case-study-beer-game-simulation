@@ -35,7 +35,7 @@ async fn started(app: &axum::Router, game: &Game) -> Result<(), String> {
 }
 
 #[tokio::test]
-async fn ac2_1_1__参加者には自分の役割の状況だけを返し_小売店だけが当週の需要を見る()
+async fn ac2_1_1_ac2_1_3__参加者には自分の役割の状況だけを返し_小売店だけが当週の需要を見る()
 -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());

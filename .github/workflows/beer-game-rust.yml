@@ -55,6 +55,13 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: テスト
         run: cargo test --workspace --locked
+      - name: 受入条件とテストの対応表（DS-11。guards のテストが生成）
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ac-test-map
+          path: apps/beer-game-rust/target/ac-test-map.md
+          if-no-files-found: ignore
       - name: カバレッジのゲート（行 80% 未満で失敗。RT3）
         run: |
           command -v cargo-llvm-cov >/dev/null || cargo install cargo-llvm-cov --version 0.9.1 --locked
