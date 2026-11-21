@@ -4,7 +4,7 @@ title: "Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 
 description: "beer-game-rust の Bolt 2 のステップ計画。イベントストア・execute・axum・投影・共有する features の許可リスト・DB を要する前提の検証・NF-P2 の実測。着手前に人の判断が要る項目を含む。人の承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T03:37:46Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T03:46:17Z }
 ---
 
 # Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 版）
@@ -18,7 +18,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T03:37:46Z }
 | ゲート密度 | **密**（ステップごとに人が検証） |
 | アプローチ | **アウトサイドイン**（[開発戦略](./development_strategy.md) の序盤）。共有する日本語 Gherkin の許可リスト → API の契約 → 内側へ一段ずつ |
 | 準拠するガイド | [関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)（第 4・5・7 章: 副作用の境界、async、キャンセル、ポートとトランザクション境界） |
-| 状態 | **承認待ち。着手前の判断項目（下記）の承認を含む。承認前にコードは書かない** |
+| 状態 | **着手前の判断項目 1〜8 は 2026-11-21 にユーザーが「案どおり」承認した**（9 は超過時の扱い）。計画全体の `verified` は未記録。Step ごとのゲートは人の検証待ち |
 
 ### ゴール
 
@@ -115,6 +115,23 @@ B1 のドメインの範囲に、HTTP・永続化・認証を加えたもの（�
 ### Step 10: 検証と終了（✅）
 
 - 品質チェック一式。`validating-design`。設計書の変更が要る点を列挙（人が判断）。`bolt_2_report.md`。ゲート: Bolt の承認。
+
+---
+
+## Step 1 の結果（ゲート: 許可リストの合意待ち）
+
+実施済み（2026-11-21、AI）。**人の合意は未取得**。
+
+- **許可リストの仕組み**: `crates/acceptance/allowlist.txt`（Rust 側のファイル。共有する `.feature` は変更しない）。許可したファイルだけを、`target/acceptance-features/` に**読み取り専用のシンボリックリンク**で並べて実行する。許可の外の `@api` は「未対応」として件数を表示（現在: `@api` 159 件のうち、実行 4 件、未対応 155 件）。許可したシナリオに Undefined・Pending があれば失敗（`fail_on_skipped`）。
+- **発見**: Rust の `gherkin`（0.16）は、日本語の **`ルール:`**（`operations/metrics-and-alarms.feature`、B14 の範囲）を解析できず、**ディレクトリ全体を渡すと実行が止まる**（"1 parsing error"）。許可したファイルだけを渡すことで回避した。**B14 でこのファイルを許可するときは、対処が要る**（共有物の変更は不可のため、Rust 側の回避を検討し、人に提示）。
+- **B2 の許可リストの提案（20 シナリオ。`@api` のみ）**。いずれも `allowlist.txt` には**まだ入れていない**（ステップ定義ができた Step 7 で、green になったものから入れる）:
+  - `game-setup/game-creation.feature`（2）: 作成、無効な需要系列
+  - `game-setup/joining.feature`（5）: 参加、無効なコード、受付終了、不足の役割を示す開始の拒否、付け替え
+  - `weekly-play/situation.feature`（4）: 役割ごとの開示
+  - `weekly-play/decision.feature`（3）
+  - `weekly-play/week-commit.feature`（6）: 確定、冪等、一回性、決定論、結果の項目、入力不足
+  - **除外**: 共同担当（`co-assignment`・`co-input`）、復帰・失効（`continuation`）、カスタム条件、自動確定、観察、出力、保持。B1 で書いた `co-assignment`（ドメインに対して実行）は、B2 の HTTP 化に合わせて、B6 まで許可リストから外す予定。
+- **契約（`openapi.yaml`）との差の一覧**: Step 6（HTTP）の着手時に、各経路のリクエスト・レスポンスの項目を、Rust 側の型と突き合わせて一覧にする（変更しない。差は Rust で直す。RU2）。
 
 ---
 
