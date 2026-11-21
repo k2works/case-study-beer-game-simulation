@@ -6160,6 +6160,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#step-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2・3 の結果（ゲート: 人の検証待ち）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 2・3 の結果（ゲート: 人の検証待ち）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ddl00020005" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ゲート: DDL（0002〜0005）の検証 — 着手前の承認が要る
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12802,6 +12830,112 @@
 <li><strong>除外</strong>: 共同担当（<code>co-assignment</code>・<code>co-input</code>）、復帰・失効（<code>continuation</code>）、カスタム条件、自動確定、観察、出力、保持。B1 で書いた <code>co-assignment</code>（ドメインに対して実行）は、B2 の HTTP 化に合わせて、B6 まで許可リストから外す予定。</li>
 <li><strong>契約（<code>openapi.yaml</code>）との差の一覧</strong>: Step 6（HTTP）の着手時に、各経路のリクエスト・レスポンスの項目を、Rust 側の型と突き合わせて一覧にする（変更しない。差は Rust で直す。RU2）。</li>
 </ul>
+<hr />
+<h2 id="step-23">Step 2・3 の結果（ゲート: 人の検証待ち）<a class="headerlink" href="#step-23" title="Permanent link">&para;</a></h2>
+<p>実施済み（2026-11-21、AI）。<strong>人のゲートは未承認</strong>。</p>
+<ul>
+<li><strong>Step 2（<code>application</code> クレート）</strong>: ポート（<code>EventStore</code>、<code>AppFailure</code>、<code>StreamRead</code>）と <code>execute</code>（読む → 再生 → decide → 追記）。メモリ実装で 6 件（成功は commit だけ / 競合ごとに rollback して再試行 / 上限で <code>RetryExhausted</code> / 業務の失敗は rollback / 空の列は追記しない / 再生で <code>Ignored</code> なら fail closed）。依存方向の検査（DS-4）を application に広げた（sqlx・axum などに依存しない）。</li>
+<li><strong>Step 3（<code>adapter-persistence</code>、0001 のみ）</strong>: マイグレーション 0001（設計書の検証済みの DDL）と <code>PgEventStore</code>（sqlx 0.9.1）。実 PostgreSQL 18.6（testcontainers）の測定結果（<strong>RB2 の前提</strong>）:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">前提</th>
+<th style="text-align: left;">結果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">制約名（<code>uq_events_stream_version</code>）の取得</td>
+<td style="text-align: left;"><strong>成立</strong>。<code>sqlx::Error::Database</code> の <code>code() == "23505"</code> と <code>constraint()</code> で判別できた</td>
+</tr>
+<tr>
+<td style="text-align: left;">実際の並行（2 タスク、同じ版へ追記）</td>
+<td style="text-align: left;"><strong>成立</strong>。一方だけが成功し、他方は <code>ConcurrencyConflict</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">明示の <code>rollback</code> の後、同じ版への追記</td>
+<td style="text-align: left;"><strong>成立</strong>。約 7 ms で通る（ロック残りなし）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>Tx</code> の drop（rollback なし）の後、同じ版への追記</strong></td>
+<td style="text-align: left;"><strong>成立（保険として有効）</strong>。約 8 ms で通った（sqlx 0.9.1 は drop で ROLLBACK を送る）。ただし測定は 1 回・ローカル。負荷時の遅れは B3 以降で追う</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>postgres:18.6</code> のタグ固定</td>
+<td style="text-align: left;"><strong>成立</strong>（<code>SHOW server_version</code> が 18.6）</td>
+</tr>
+<tr>
+<td style="text-align: left;">Docker が無いとき</td>
+<td style="text-align: left;"><code>CI</code> があれば失敗、無ければスキップ（DS-13 の入口。<strong>実行件数が 0 なら失敗にする検査は B3</strong>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">テンプレート DB による分離</td>
+<td style="text-align: left;"><strong>未確認</strong>（テストごとに別コンテナ。約 22 秒/5 テスト。B3 で方式を決める）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>発見（技術スタックの食い違い）</strong>: <code>testcontainers-modules</code> 0.15.0 は <code>testcontainers</code> ^0.27 を要し、技術スタックの組（<code>testcontainers</code> 0.28.0 と <code>testcontainers-modules</code> 0.15.0）は<strong>同時に解決できない</strong>。<code>testcontainers</code> 0.28.0 の <code>GenericImage</code> だけで足りたため、<strong><code>testcontainers-modules</code> は導入しない</strong>（依存が 1 つ減る）。設計書（tech-stack）の更新が要る。</li>
+<li><strong>発見（ライセンス・勧告）</strong>: 新規依存で、ISC・BSD-3-Clause・Zlib のライセンスと、<code>astral-tokio-tar</code>（testcontainers の依存）の非メンテナンスの勧告（RUSTSEC-2026-0440）が出た。<code>deny.toml</code> に<strong>暫定の許可・無視</strong>を入れた（承認待ち。B1 の 2 件と同じ扱い）。</li>
+</ul>
+<h3 id="ddl00020005">ゲート: DDL（0002〜0005）の検証 — <strong>着手前の承認が要る</strong><a class="headerlink" href="#ddl00020005" title="Permanent link">&para;</a></h3>
+<p>0001 は設計書の検証済みの DDL で作成済み。0002〜0005 は、Kotlin 版の <code>V002</code>〜<code>V005</code> を元にします。<strong>差の一覧</strong>（人が検証してから、DDL を作る）:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">Kotlin 版</th>
+<th style="text-align: left;">Rust 版</th>
+<th style="text-align: left;">理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;"><code>${json_type}</code>（H2 と PostgreSQL の切り替え）</td>
+<td style="text-align: left;"><code>jsonb</code></td>
+<td style="text-align: left;">H2 を使わない</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;"><code>timestamp with time zone</code></td>
+<td style="text-align: left;"><code>timestamptz</code></td>
+<td style="text-align: left;">同じ型の別名。0001 と揃える</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">共通（V002〜V005）と PostgreSQL 固有（V101）の 2 系統</td>
+<td style="text-align: left;"><strong>1 系統</strong>。V101 の部分一意索引 <code>uq_idempotency_create</code> は 0002 に含める</td>
+<td style="text-align: left;">方言がない</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">表: <code>display_profiles</code>・<code>credentials</code>・<code>browser_sessions</code>・<code>idempotency_records</code>（V002）、<code>game_overview</code>・<code>game_join_codes</code>・<code>game_settings</code>・<code>lobby_participants</code>・<code>lobby_observer_invitations</code>・<code>lobby_observers</code>（V003）、<code>session_overview</code>・<code>role_current_states</code>・<code>current_decisions</code>（V004）、<code>week_commits</code>・<code>week_role_results</code>・<code>week_team_totals</code>（V005）</td>
+<td style="text-align: left;"><strong>同じ 15 表・同じ列・同じ制約名</strong></td>
+<td style="text-align: left;">API・投影の契約を保つ</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">V006（保持）・V007（<code>lobby_participants.replaced_at</code>）・V008（<code>participation_attempts</code>）</td>
+<td style="text-align: left;"><strong>B2 では作らない</strong>（B6・B12 の範囲）</td>
+<td style="text-align: left;">B2 の範囲外</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">V102・V103（ロールと GRANT）</td>
+<td style="text-align: left;"><strong>B3 で作る</strong>（追記専用権限の否定テストと同時）</td>
+<td style="text-align: left;">表より後ろの番号に置く（既定の権限は与えない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">番号 <code>V002</code>〜<code>V005</code></td>
+<td style="text-align: left;"><code>0002</code>〜<code>0005</code>（sqlx の <code>&lt;番号&gt;_&lt;名前&gt;.sql</code>）</td>
+<td style="text-align: left;">sqlx の命名</td>
+</tr>
+</tbody>
+</table>
+<p>承認をお願いします（差の一覧どおりに DDL を作ってよいか）。</p>
 <hr />
 <h2 id="definition-of-done">完了条件（Definition of Done）<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
 <ul class="task-list">
