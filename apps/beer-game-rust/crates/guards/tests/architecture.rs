@@ -42,6 +42,6 @@ fn ds4_domain_は禁止されたクレートに依存しない() -> Result<(), S
 }
 
 #[test]
-fn ds4_application_は_DB_と_HTTP_とアダプターに依存しない() -> Result<(), String> {
+fn ds4_application_は_db_と_http_とアダプターに依存しない() -> Result<(), String> {
     assert_clean("beergame-application", APPLICATION_FORBIDDEN)
 }
