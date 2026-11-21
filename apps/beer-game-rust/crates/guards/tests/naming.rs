@@ -52,3 +52,24 @@ fn ds10_すべてのテストの名前が接頭辞の規則を満たす() -> Res
         ))
     }
 }
+
+/// DS-13: DB を使う統合テスト（実 PostgreSQL）が、一定数あること（テストが消える・スキップされるだけで緑になるのを防ぐ）。
+/// Docker が無いときは、`CI` 環境変数があれば各テストが失敗する（`start()` の規則）。ここでは、件数の下限を守る。
+#[test]
+fn ds13_実_postgresql_を使う統合テストが一定数ある() -> Result<(), String> {
+    let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files = Vec::new();
+    rust_files(&crates, &mut files).map_err(|e| e.to_string())?;
+    let mut db_tests = 0;
+    for file in files {
+        let source = fs::read_to_string(&file).map_err(|e| e.to_string())?;
+        db_tests += source.matches("start().await?").count();
+    }
+    if db_tests >= 40 {
+        Ok(())
+    } else {
+        Err(format!(
+            "実 PostgreSQL を使う統合テストが少ない（{db_tests} 件。下限 40）"
+        ))
+    }
+}
