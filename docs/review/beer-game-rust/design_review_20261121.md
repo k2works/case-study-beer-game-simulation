@@ -4,7 +4,7 @@ title: "設計書レビュー - beer-game-rust（2026-11-21）"
 description: "beer-game-rust の設計書 10 本と ADR-001 を、プロダクトマネージャー・アーキテクト・インタラクションデザイナー・テスター・ユーザー代表の 5 視点で並列にレビューした統合結果。重要度「高」9 件、「中」20 件、「低」12 件。対応方針は案で、人が確定する。"
 tags: [review]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T00:25:34Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # 設計書レビュー - beer-game-rust（2026-11-21）
@@ -141,6 +141,41 @@ AI が先回りして確定しない。重要度「高」の各項目につい�
 | H9 | **修正する（運用要件に追記）** | |
 
 中・低は、一覧のとおり修正する案。M3（NF-S22 の承認の範囲）、M6（panic の方針）、M9（投影の案の選択）は、人の判断が要る。
+
+## 対応結果（2026-11-21。ユーザーの決定に基づく）
+
+ユーザーは、次のとおり決定した（`AskUserQuestion` による）。
+
+- **H2（RB2 の見直し）**: 承認した。
+- **H1・H3・H4・H5・H6・H7・H9**: 案どおり修正する。**H8** は B1 の計画（`planning-releases`）で扱う。
+- **矛盾 3（NF-P2）**: **B1 で測って決める**。
+- **中・低 32 件**: 案どおり修正する（M3: NF-S22 を承認済みとして記録、M6: `panic = "unwind"` を制約として固定、M9: 案の選択は B1）。
+- **矛盾 4（RPO・RTO の約束の範囲）**: まだ決めていない（人の判断が残る）。
+
+反映した結果は次のとおり。**「修正済み」は文書への反映を指し、実装・実測の確認ではない。**
+
+| # | 結果 | 反映先 |
+| :--- | :--- | :--- |
+| H1 | 修正済み。設定先をログインユーザーに訂正し、`SHOW` の検証をテスト戦略に追加 | operation.md、architecture-infrastructure.md、data-model.md、test-strategy.md |
+| H2 | 修正済み。`rollback` を明示する `execute` のスケッチを、型検査してテストした（4 件）。RB2・NF-R18・RT2 を見直し | architecture-backend.md、test-strategy.md、non-functional.md、index.md |
+| H3 | 設計に追記。**実現と追跡の依存の承認は B1** | architecture-backend.md、architecture-infrastructure.md |
+| H4 | 修正済み。タイムアウトは `type` なしの 504、実行中の再送は完了を待つ。**実現は B1** | ui-design.md（#11）、architecture-backend.md、test-strategy.md |
+| H5 | 修正済み（記述を実態に合わせた）。**NF-P2 の方式は B1 の実測で決める** | ui-design.md（#12）、non-functional.md、architecture-frontend.md |
+| H6 | 修正済み（NF-P16 を 2 秒に戻した） | non-functional.md、operation.md |
+| H7 | 方針を追記（許可リスト）。**具体の仕組みは B1** | test-strategy.md |
+| H8 | 設計文書には、B1 の受入条件の書き方と指標の案を追記。**リリース計画は `planning-releases` で** | test-strategy.md |
+| H9 | 修正済み（案の文言と、進行役向けの案内の手順書を追加）。**文言は案で、運営者との合意は未** | operation.md |
+| M1〜M20 | 修正済み。M9・M10 は案の整理と設計の追記で、選択・実現は B1。M12 は NF-P16・NF-P17・NF-R18・NF-O5・NF-S22 を修正（NF-R18 の待ちの上限の数値は B1） | 各文書 |
+| L1・L5・L6・L9〜L12 | 修正済み | 各文書 |
+| L2 | 未決事項へ（統合のエラー型は B1 の最初のスライドで決める） | architecture-backend.md |
+| L3 | **部分的**。全体構成の図に注記した。読み取りロールに `events` の SELECT を与えるかは B1 | architecture-infrastructure.md |
+| L4 | 修正済み（NF-S5 の要約を RB3 に合わせた） | non-functional.md |
+| L7 | 命名の規則を追記。**承認は未**（未決事項 17） | test-strategy.md |
+| L8 | UI の影響表 #11 に記載し、Kotlin 版と共通の課題として残す | ui-design.md |
+
+**検証**: `gulp okf:check`・`docs_structure.py check --check` は ERROR 0、リンク・PlantUML の検査は問題なし。**`verified` は付けていない**（ユーザーが確認した範囲にだけ付ける）。
+
+**残っている人の判断**: 矛盾 4（RPO・RTO の約束の範囲）、RT1 の命名の規則（L7）、H9 の依頼文言の運営者との合意。
 
 ## エージェント別フィードバックの件数
 

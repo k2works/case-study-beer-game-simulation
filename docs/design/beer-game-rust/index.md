@@ -48,9 +48,9 @@ beer-game-rust プロジェクトの設計ドキュメントです。
 | ADR-001 | beer-game-kotlin を Rust 版として作り、設計と ADR を流用する（引き継ぎ表は ADR 本文で検証済み） | [ADR-001](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) |
 | R1〜R7 | イベントストア自前、axum、sqlx の直接 SQL、clippy + cargo-deny、cucumber-rs、行 80% のカバレッジ、版の固定 | [技術スタック](./tech-stack.md) |
 | RD1〜RD5 | 状態は `enum`、`Evolution` で適用の有無を返す（RD2）、`Result` と誤りの集約、`code` は `match` の網羅、ドメインの純粋性 | [ドメインモデル](./domain-model.md) |
-| RB1〜RB3 | トレイトによるポート、`execute` を spawn して `Tx` の drop で ROLLBACK、認証は `execute` の中 | [バックエンドアーキテクチャ](./architecture-backend.md) |
+| RB1〜RB3 | トレイトによるポート、`execute` を spawn（**RB2 は 2026-11-21 に見直し: 失敗の経路で ROLLBACK を明示し、`Tx` の drop は保険**）、認証は `execute` の中 | [バックエンドアーキテクチャ](./architecture-backend.md) |
 | RT1〜RT3 | テスト名に ID を付ける、キャンセル安全性の検証、行 80% のゲート | [テスト戦略](./test-strategy.md) |
-| RN1〜RN3 | JVM 項目の読み替えと実測前に数値を変えない方針、NF-R18 の新設、行 80% | [非機能要件](./non-functional.md) |
+| RN1〜RN3 | JVM 項目の読み替えと実測前に数値を変えない方針、**NF-R18（キャンセル安全性）と NF-S22（メモリ安全）の新設**、行 80% | [非機能要件](./non-functional.md) |
 | RI1〜RI5 | 最小の実行イメージ、サイズは実測前に縮めない、`healthcheck` サブコマンド、SIGTERM は完了待ちで終了コード 0、Terraform は Rust 版専用に複製 | [インフラストラクチャ](./architecture-infrastructure.md) |
 | RU1・RU2 | UI 設計は参照にとどめる、契約の逸脱はバックエンドで直す | [UI 設計](./ui-design.md) |
 | RF1〜RF3 | `web/`・`contracts/`・`features/` は Kotlin 版のまま共有、既存の `@ui`・E2E で契約の同等性を検証、E2E の起動案内の差し替え | [フロントエンドアーキテクチャ](./architecture-frontend.md) |
@@ -58,7 +58,30 @@ beer-game-rust プロジェクトの設計ドキュメントです。
 | ADR-020 の扱い | 資格の Cookie の名前をタブごとにする方式を、Rust 版のバックエンドでも扱う（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断） | [UI 設計](./ui-design.md) |
 | 新規依存関係 | 導入の承認は、B1 の計画で実際に使うものを確定してから求める（未確認の機能を確かめたうえで絞る） | [技術スタック](./tech-stack.md) |
 
+### 2026-11-21 のレビュー後の承認（ユーザーの決定）
+
+2026-11-21 のマルチパースペクティブレビュー（[設計書レビュー](../../review/beer-game-rust/design_review_20261121.md)）の結果、次をユーザーが承認しました。
+
+| 判断 | 内容 | 文書 |
+| :--- | :--- | :--- |
+| **RB2 の見直し** | **`execute` は spawn して実行し、失敗の経路では ROLLBACK を明示する。`Tx` の drop は保険にする。** 部分更新は PostgreSQL が防ぐため、NF-R18・RT2 の検証は「ロック・接続の解放時間、プールに返った接続がトランザクション外であること」に変える（2026-11-19 の RB2 を見直し） | [バックエンド](./architecture-backend.md)、[テスト戦略](./test-strategy.md)、[非機能要件](./non-functional.md) |
+| 高の修正（H1・H3〜H7・H9） | `idle_in_transaction_session_timeout` の設定先をログインユーザーに訂正、spawn したタスクの寿命・SSE の終了・プール取得の写像、タイムアウトは `type` なしの 504 と実行中の再送の扱い、影響表を実態（SSE なし、3 秒のポーリング）に合わせる、NF-P16 を 2 秒に戻す、許可リスト方式、進行役向けの案内 | 各文書 |
+| NF-P2 の扱い | **B1 で測って決める**（SSE を作る／間隔を詰める／目標を再定義する）。実測前に数値・方式を変えない | [非機能要件](./non-functional.md)、[UI 設計](./ui-design.md) |
+| 中・低の修正 | M3: **NF-S22（メモリ安全。`unsafe` を使わない）を、2026-11-19 の RN1〜RN3 の承認に含まれたものとして記録**（承認時の選択肢の説明に含まれていた）。M6: **`panic = "unwind"` を制約として固定**。M9: `session_overview.week` の案の選択は B1 | 各文書 |
+
+**H8（Rust 版の価値指標・B1 の受入条件の絞り込み）は、B1 の計画（`planning-releases`）で扱う。** 設計文書には、受入条件の書き方（観察できる形）と指標の案だけを追記した（[テスト戦略](./test-strategy.md) の「B1 の受入条件」）。
+
+### 引き継ぎの基準（レビュー M16）
+
+Kotlin 版の設計書に含まれる**実装の経緯の注記**（B1〜B15 の記述）と、**実装中に確定した業務ルール**を区別します。**基準は 1 つ: 「経緯は捨て、確定した業務ルールは引き継ぐ」**。
+
+- **引き継ぐもの**: 実装中に確定した業務ルール・契約（例: 保存回数の上限 9 回は共同担当で共有され、版は値の変化でなく保存で数える、`ParticipantReplaced` と `lobby_participants.replaced_at`、`RetentionSaga` の `Abandoned`、`session.paused` などのエラー `code`、`WeekAdvanced` と `DecisionsChanged` の判定の順）。
+- **捨てるもの**: どの Bolt で何を実装したか、実装の都合で設計から変わった点の経緯、Kotlin 固有の実装の事情（H2、`detekt`、JDK 25 の制約など）。
+- 各文書の冒頭の「Kotlin 版の実装の経緯（Bn〜Bm の注記）は引き継ぎません」は、**「確定した業務ルールは別途、本文に引き継いである」**という意味に読む。**引き継ぎの抜けを見つけたら、Kotlin 版の差分表（変更表）を確認して追加する**（今回のレビュー時点で、すべての文書の確認はしていない）。
+
 ### 承認の条件・留意点
+
+- **ADR のステータスと OKF の `status`**: ADR-001 は、本文のステータスが「承認済み」（ユーザーの決定の記録）で、フロントマターの `status: draft` は **OKF のレビュー・検証の状態**（人による `verified` が未付与）を表す。両者は別である。
 
 - **RB2・RD5 などの未確認の前提**（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。**成り立たなければ、設計を見直します。**
 - **RF3 の実施**（既存の `web/support/hooks.mjs` の編集）は、承認済みですが、**実際に編集する前に改めて確認します**（Kotlin 版に影響するため）。

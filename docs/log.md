@@ -1,6 +1,29 @@
 # Docs Update Log
 
 ## 2026-11-21
+* **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [test-strategy](/design/beer-game-rust/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-rust/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [operation](/design/beer-game-rust/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game-rust/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [domain-model](/design/beer-game-rust/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [data-model](/design/beer-game-rust/data-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-rust/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-rust/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-rust/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [design_review_20261121](/review/beer-game-rust/design_review_20261121.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [test-strategy](/design/beer-game-rust/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-rust/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [operation](/design/beer-game-rust/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game-rust/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [domain-model](/design/beer-game-rust/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [data-model](/design/beer-game-rust/data-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-rust/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-rust/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-rust/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [design_review_20261121](/review/beer-game-rust/design_review_20261121.md) を更新（claude-code/claude-sonnet-5-5）
 
 ## 2026-11-19

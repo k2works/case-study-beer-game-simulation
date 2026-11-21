@@ -4,7 +4,7 @@ title: "ドメインモデル設計 - ビールゲームシミュレーション
 description: "Rust 版のドメインモデル。beer-game-kotlin の構造（2 ストリーム、decide / evolve、simulateWeek、投影、全イベント）を引き継ぎ、enum・newtype・Result で表す。Kotlin 版の設計判断 D1〜D11 との対応と、Rust 固有の判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Rust 版）
@@ -301,16 +301,22 @@ pub fn decide_session(state: &SessionState, command: &SessionCommand)
             // 判定順: 権限 → 週(WeekAdvanced) → 版(DecisionConflict) → 保存回数の上限
             // …
             let saved = SessionEvent::DecisionSaved { /* … */ };
-            let after = evolve_session(state.clone(), &saved).into_state();
+            let after = apply_decided(state, &saved)?;   // 保存直後の状態。Ignored（decide が作らない列）なら失敗させる（下記）
             let mut events = vec![saved];
             events.extend(auto_commit_events(&after, command)?);   // AUTO で 4 役割が揃えば WeekCommitted（+ SessionEnded）
             Ok(events)
         }
         // CommitWeek: (1) 週が違えば WeekAdvanced (2) basis が違えば DecisionsChanged (3) 揃っていなければ IncompleteDecisions
+        // SubmitProxyDecision: 進行役だけ。**進行中または一時停止中**で受け付け（state.active_or_paused()?）、
+        //   requestedWeek が現在の週と違えば WeekAdvanced。**一時停止中は自動確定しない**（再開時に判定）
         // …
     }
 }
 ```
+
+**停止中の代理入力（レビュー M17）**: `SubmitProxyDecision`（進行役）は、`SaveDecision`（参加者）と違い、**一時停止中も受け付けます**（UC-09: 停止 → 代理入力 → 再開）。**進行中で `AUTO` かつ 4 役割が揃えば自動確定し、一時停止中は確定しません**（`SetCommitMode(AUTO)` も同じ。再開時に判定する）。Kotlin 版は、初版でここが「進行中のみ」に誤り、レビューで直した経緯があるため、Rust 版は最初から明記します。
+
+**`Ignored` の扱い（レビュー M7）**: `evolve_*` は `Evolution::{Applied, Ignored}` を返します（RD2）。`decide` の内部で保存直後の状態を求める `apply_decided` は、`Ignored` が出たら**失敗**にします（`decide` が作る列は `Ignored` にならないはずなので、出た場合は不具合）。**コマンドの経路で、保存済みのイベントの再生中に `Ignored` が出た場合も、状態を信用せず `AppFailure::Persistence`（500・相関 ID）で失敗させます**（[バックエンドアーキテクチャ](./architecture-backend.md)。fail closed）。再生を診断する用途（`verify-projections` など）では、`Ignored` を記録して続けます。
 
 自動確定は、Kotlin 版と同じく **1 回の `decide` が複数のイベントを返す**ことで表します（D6）。`WeekCommitted` は結果と次週の状態を事実として含み、`evolve` はそれを採用するだけで、`simulate_week` を呼び直しません（D5）。
 
@@ -362,7 +368,7 @@ Kotlin 版の D8 のとおり、ES にせず、状態の行を持つプロセス
 
 イベントの一覧（EV-G01〜G12、EV-S01〜S10）、発生条件、ペイロードは、[Kotlin 版のドメインイベント](../beer-game-kotlin/domain-model.md) を正本として**引き継ぎます**（名称も変えません。イベントは永続化され、投影と契約の一部になるため）。
 
-- ペイロードの JSON は、serde の `#[serde(tag = "event_type")]` のような**内部タグ付きの列挙型**で表すことを第一候補とします（Kotlin 版の「`event_type` を判別子にした多相」に対応。**書式は未確認**で、B1 で確かめる）。
+- ペイロードの JSON は、**adapter（`adapter-persistence` の `EventCodec`）の DTO** を、serde の `#[serde(tag = "event_type")]` のような**内部タグ付きの列挙型**で表すことを第一候補とします（**ドメインのイベントの型には serde の属性を付けない**。BD5）（Kotlin 版の「`event_type` を判別子にした多相」に対応。**書式は未確認**で、B1 で確かめる）。
 - 表示名と資格の値は、ペイロードに含めません（D7）。型の上でも、`GameEvent` のフィールドに `DisplayName` と資格のダイジェストの型を**持たせません**。
 
 ## 投影（読み取りモデル）

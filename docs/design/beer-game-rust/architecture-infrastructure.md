@@ -4,7 +4,7 @@ title: "インフラストラクチャアーキテクチャ - ビールゲーム
 description: "Rust 版のインフラアーキテクチャ。beer-game-kotlin の ECS Fargate、CloudFront、RDS、Terraform、GitHub Actions（OIDC）、ステージング自動・本番承認の構成を踏襲し、単一バイナリのコンテナ、実行イメージの選択、起動モードと終了コード、SIGTERM での正常終了、Cargo のビルドと CI、データベースのロールと接続を Rust に合わせて整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Rust 版）
@@ -53,7 +53,7 @@ Kotlin 版から変更する点を太字で示します。
 | **イメージ** | **ECR。Rust の単一バイナリを、軽量な実行イメージに載せる。マルチステージ**（設計判断 RI1） | JVM のイメージから変更 |
 | **実行環境** | **ネイティブの単一プロセス。SIGTERM で完了を待って正常終了（終了コード 0）。ヘルスチェックはバイナリのサブコマンド** | JVM のヒープ・GC・ウォームアップ・終了コード 143 の扱いがなくなる |
 | 秘密情報 | Secrets Manager（鍵の版を複数保持）、KMS。ロールごとに別の DB の接続情報 | 変更なし |
-| IaC | Terraform。**Rust 版の環境の置き方は未決**（設計判断 RI5） | team の規約は beer-game3 専用の環境 |
+| IaC | Terraform。**Rust 版専用に複製して出発する**（設計判断 RI5。承認済み。AWS への適用は別のゲート） | team の規約は beer-game3 専用の環境のため、Rust 版専用を新設する |
 | **ビルド** | **Cargo（`rust-toolchain.toml`、`Cargo.lock`、`--locked`）** | Gradle から変更。フロントエンドは npm のまま |
 | CI/CD | GitHub Actions（OIDC）。ステージングは自動、本番は承認 + ブルー/グリーン。**ワークフローは beer-game3 用とは別に新設**（team の規約） | 検証の手順が Cargo になる |
 | 観測 | 構造化ログ、メトリクス（EMF）、合成監視、アラーム、ダッシュボード | **JVM の指標が RSS・タスク数・panic・取り残しに変わる**（[運用要件](./operation.md)） |
@@ -95,7 +95,7 @@ EB --> Ret
 EB --> Reb : verify-projections（日次）
 Ret --> DB : 削除用のロール
 Mig --> DB : 所有者のロール
-Reb --> DB : 書き込みのロール
+Reb --> DB : 書き込みのロール（rebuild-projections）。verify-projections は読み取りのロール
 ECR ..> API : イメージ
 ECR ..> Ret
 ECR ..> Mig
@@ -125,7 +125,7 @@ CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネッ�
 
 | ロール | 使うタスク | 接続の持ち方（Rust 版） |
 | :--- | :--- | :--- |
-| 書き込み | api（コマンド）、rebuild-projections | sqlx の `PgPool`。トランザクション単位。**アプリのロールに `idle_in_transaction_session_timeout` を設定**（[運用要件](./operation.md) の障害パターン 17。実測済み） |
+| 書き込み | api（コマンド）、rebuild-projections | sqlx の `PgPool`。トランザクション単位。**アプリが接続する「ログインユーザー」に `idle_in_transaction_session_timeout` を設定**（NOLOGIN の `beergame_writer` に設定しても継承されず効かない。[運用要件](./operation.md) の障害パターン 17。実測済み） |
 | 読み取り | api（問い合わせ） | 別の `PgPool` |
 | 観察者の読み取り | api（観察者の問い合わせ） | **別の `PgPool`**（`beergame_observer` で接続。3 表だけ読める） |
 | 通知の受信 | api | **プールの外の専用の接続**（1 タスクにつき 1 本。`LISTEN` 用。sqlx での扱いは未確認） |
@@ -173,7 +173,7 @@ FROM（実行）    <軽量な実行イメージ>         … バイナリ 1 つ
 | C | `scratch` に、静的リンク（musl）のバイナリを載せる | 最小。依存がない | musl のビルドの設定（OpenSSL を避ける）が要る。DNS・証明書の束を自前で持つ。メモリの確保の性能が glibc と異なりうる |
 | D | `alpine` に、musl のバイナリを載せる | 小さく、シェルがある | musl の差異。C と同様 |
 
-**ヘルスチェックの実装（RI3）**: Kotlin 版は、実行イメージに `curl` も `wget` もないため、`bash` の `/dev/tcp` で `/api/v1/ready` に GET を送りました。Rust 版は、案 A・C ではシェルがないので、**バイナリに `healthcheck` サブコマンドを持たせ**、`HEALTHCHECK CMD ["/app/beergame", "healthcheck"]` で `/api/v1/ready` を呼び、200 のときだけ終了コード 0 とします（interval 30s、timeout 3s、start-period は起動時間の実測で決める。retries 3）。
+**ヘルスチェックの実装（RI3。2026-11-21 のレビュー M5 で対象を見直し）**: Kotlin 版は、実行イメージに `curl` も `wget` もないため、`bash` の `/dev/tcp` で `/api/v1/ready` に GET を送りました。Rust 版は、案 A・C ではシェルがないので、**バイナリに `healthcheck` サブコマンドを持たせます**。**ただし、コンテナの生存の検査は `/api/v1/health`（プロセスが応答するか）を対象にし、`/api/v1/ready` は ALB のターゲットの検査（負荷分散の対象から外す）に使います。**`/api/v1/ready` は DB の接続に依存するため、これをコンテナの生存の検査に使うと、DB の障害の間に全タスクが unhealthy になり、ECS が入れ替えを繰り返して障害を広げます。`healthcheck` サブコマンドは、**`AppConfig::load`（秘密が無ければ終了コード 78）を通さない軽い経路**で、`/api/v1/health` を呼び、200 のときだけ終了コード 0 とします（interval 30s、timeout 3s、start-period は起動時間の実測で決める。retries 3）。**ECS は Dockerfile の `HEALTHCHECK` を使わず、タスク定義の `healthCheck` を使う見込み**（未確認。B1 で確認し、必要ならタスク定義に同じコマンドを書く）。
 
 ### 起動モードと終了コード
 
@@ -186,7 +186,7 @@ FROM（実行）    <軽量な実行イメージ>         … バイナリ 1 つ
 | `retention` | 保持削除の掃引を 1 回行って終了 | 放棄したゲームがあれば 1、掃引の失敗は 70 |
 | `rebuild-projections [ゲーム ID ...]` | 投影を `events` から作り直す | 再構築できなかったゲームがあれば 1、ゲームの一覧を読めなければ 70、形が不正なゲーム ID は 64 |
 | `verify-projections` | 投影が、イベントから作り直した結果と一致するかを検査する（日次。投影は変えない） | 不一致があれば 1 |
-| `healthcheck` | `/api/v1/ready` を呼ぶ（**Rust 版で追加**） | 200 なら 0、それ以外は 1 |
+| `healthcheck` | `/api/v1/health` を呼ぶ（**Rust 版で追加**。コンテナの生存の検査用） | 200 なら 0、それ以外は 1 |
 | 不明なモード | 使い方を示す | 64 |
 
 | 終了コード | 意味（sysexits の慣例に沿う） |
@@ -211,9 +211,9 @@ FROM（実行）    <軽量な実行イメージ>         … バイナリ 1 つ
 
 | 局面 | 設計 |
 | :--- | :--- |
-| 起動 | 設定を読み込み、検証する（`AppConfig::load`。失敗なら起動しない。終了コード 78）→ 接続プールを作る → 通知の受信を始める → HTTP の受付を始める。`/ready` は、**データベースの接続、通知の受信の接続の生存、スキーマの版が期待と一致すること**が確認できるまで、503（`app.not_ready`）を返す。起動のたびに投影の再構築はしない |
+| 起動 | 設定を読み込み、検証する（`AppConfig::load`。失敗なら起動しない。終了コード 78）→ 接続プールを作る → 通知の受信を始める → HTTP の受付を始める。`/api/v1/ready` は、**データベースの接続、通知の受信の接続の生存、スキーマの版が期待と一致すること**が確認できるまで、503（`app.not_ready`）を返す。起動のたびに投影の再構築はしない |
 | マイグレーションとの順序 | マイグレーションのタスクが完了してから、アプリのタスクを起動する（デプロイの手順で保証）。アプリは起動時に、期待するスキーマの版が適用済みかを確認し、未適用なら準備できていない |
-| 終了（NF-R18） | ECS は、タスクの停止時に SIGTERM を送り、一定の時間（`stopTimeout`）の後に強制終了する。アプリは SIGTERM で、**新しい要求の受付を止め、進行中のコマンドの完了を待ち（待ちの上限は `stopTimeout` より短く）、SSE の接続を閉じ、接続プールを閉じ、終了コード 0 で終わる**。クライアントは、SSE が切れても再接続し、スナップショットを取得して追いつく。**実現は B1 で確認**（[バックエンドアーキテクチャ](./architecture-backend.md) の RB2、未決事項） |
+| 終了（NF-R18） | ECS は、タスクの停止時に SIGTERM を送り、一定の時間（`stopTimeout`）の後に強制終了する。アプリは SIGTERM で、**新しい要求の受付を止め、進行中のコマンドの完了を待ち（待ちの上限は `stopTimeout` より短く）、SSE の接続を閉じ、接続プールを閉じ、終了コード 0 で終わる**。クライアントは、SSE が切れても再接続し、スナップショットを取得して追いつく。**重要（2026-11-21 のレビュー H3）**: axum の graceful shutdown は接続の完了を待ちますが、**切り離された（`JoinHandle` が drop された）コマンドのタスクの完了は待たない**見込みで、**SSE の接続は自然には閉じない**。そのため、(1) **終了の合図で SSE の stream を止める**（止めないと、graceful の待ちが `stopTimeout` まで続き、SIGKILL で終わって「終了コード 0」を満たせない）、(2) **コマンドのタスクを追跡し、完了を待つ**（追跡の道具は B1 で承認）。**実現は B1 で確認**（[バックエンドアーキテクチャ](./architecture-backend.md) の RB2「spawn したタスクの寿命」） |
 | 負荷分散との整合 | ALB のターゲットの登録解除の遅延（deregistration delay）と、アプリの終了の待ちを整合させる。長い SSE の接続は、猶予の後に切られてよい |
 | 1 回限りの処理 | 正常終了は終了コード 0、失敗は 0 以外。失敗は CloudWatch のアラームで通知する |
 
@@ -228,7 +228,7 @@ FROM（実行）    <軽量な実行イメージ>         … バイナリ 1 つ
 | 依存の検査 | `cargo deny check`（ライセンス・脆弱性・重複）。チェックサムの検証は Cargo が標準で行う |
 | 警告 | `-D warnings`（CI）。clippy と rustfmt を CI で必須にする（team の規約） |
 | テスト | `cargo test`（ユニット・性質）と、**統合テスト**（実際の PostgreSQL 18。追記専用の権限、連鎖削除の網羅、複数プロセスの競合、キャンセル安全性）を分ける（[テスト戦略](./test-strategy.md)） |
-| 成果物 | `app` の release ビルドのバイナリ 1 つ。**release のプロファイルの設定（`lto`、`codegen-units`、`panic` の方針など）は、ビルドの時間・サイズ・性能を測ってから決める**（未決）。**`panic = "abort"` にするかは、panic の扱い（NF-R18、運用要件）と関わるため、慎重に決める**（`abort` だと、spawn したタスクの panic を `JoinError` として捕捉できず、プロセスが落ちる） |
+| 成果物 | `app` の release ビルドのバイナリ 1 つ。**`panic` は `unwind`（既定）を制約として固定する**（2026-11-21 のレビュー M6。`abort` にすると、spawn したタスクの panic を `JoinError` として捕捉できず、NF-R18・RB2 の panic の写像と、キャンセル安全性のテスト RT2 が崩れる。テストのビルドは常に unwind のため、`abort` にすると本番の振る舞いをテストが保護しない）。`lto`・`codegen-units` などの release のプロファイルは、ビルドの時間・サイズ・性能を測ってから決める（未決） |
 | フロントエンド | `web/` は npm（Node 26）でビルドし、Cargo のビルドとは独立。仕様から型を生成する手順を、ビルドの前に置く |
 
 **Rust のビルド時間**: 初回のビルドは長い見込みで、**CI の時間とキャッシュの方式が課題**です（[テスト戦略](./test-strategy.md)）。キャッシュの道具（`Swatinem/rust-cache` のようなアクションや `sccache`）は**未選定で、導入は承認が要る**（アクションは SHA で固定する方針）。
@@ -301,7 +301,7 @@ Kotlin 版は、`apps/beer-game-kotlin/infra/` に 8 モジュール（`network`
 
 | 品質属性 | 対応する設計 |
 | :--- | :--- |
-| 可用性 | API 2 タスク以上、RDS Multi-AZ、`/ready` のヘルスチェック、最小正常率 100% のローリング、ブルー/グリーン、**SIGTERM での完了待ちと正常終了** |
+| 可用性 | API 2 タスク以上、RDS Multi-AZ、`/api/v1/ready` のヘルスチェック、最小正常率 100% のローリング、ブルー/グリーン、**SIGTERM での完了待ちと正常終了** |
 | スケーラビリティ | CPU ベースの自動増減（2〜4）。状態を持たない API。接続数の上限を、タスクの最大数で確認 |
 | セキュリティ | 非 root、シェルのない実行イメージ（案 A）、**データベースのロールの分離**、`unsafe` を使わないドメイン（NF-S22）、依存関係の検査（`cargo-deny`） |
 | 運用性 | Terraform、構造化ログ、メトリクス（Rust ランタイムと ES の指標）、合成監視、アラーム、ロールバック、復元の訓練、投影の再構築のタスク |
@@ -322,7 +322,7 @@ Kotlin 版は、`apps/beer-game-kotlin/infra/` に 8 モジュール（`network`
 | 9 | detekt・PMD・ktlint の検証ジョブ（detekt は JDK 21 の専用ジョブ） | rustfmt・clippy・`cargo deny`。ツールチェーンは 1 つ | ツールの違い |
 | 10 | Flyway（ベンダー別の配置） | sqlx のマイグレーション（1 系統） | ツールの違い |
 | 11 | 依存関係の検査ツールは「JVM に対応するもの」を選定（未決） | `cargo-deny` | R4 で選定済み |
-| 12 | Terraform は Kotlin 版専用の `infra/` | Rust 版の置き方は未決（RI5）。team の規約は beer-game3 専用の AWS 環境 | 規約と実態の差 |
+| 12 | Terraform は Kotlin 版専用の `infra/` | Rust 版専用に複製して出発する（RI5。承認済み）。AWS への適用は別のゲート | team の規約は beer-game3 専用の AWS 環境 |
 
 上記以外（CloudFront、S3、ALB、RDS、ECR、EventBridge、Secrets Manager、観測の基本、OIDC、ステージング自動・本番承認、ブルー/グリーン、データベースのロール、`LISTEN` の専用接続、接続数の見積もり）は変えません。
 
@@ -358,9 +358,9 @@ NF-R18 の要件です。待ちの上限は `stopTimeout` より短く設定し�
 
 1. **実行イメージの選択と実在の確認**（RI1）: ベースイメージのタグ、動的／静的リンク、必要なライブラリ。sqlx の TLS の実装（rustls か OpenSSL か）と RDS の CA バンドル。B1 で、実際にビルドして確認する。
 2. ~~**ヘルスチェックのサブコマンド**（RI3）の承認~~ **解消（2026-11-19）**: 承認した（RI1〜RI5）。実在・動作の確認は B1。
-3. **AWS 環境と Terraform の置き方**（RI5）: 専用か共有か。team の規約との整合。**AWS への適用の判断・費用・アカウント・IAM**。
+3. ~~**AWS 環境と Terraform の置き方**（RI5）~~ **解消（2026-11-19）**: Rust 版専用に複製して出発する。**残り: AWS への適用の判断・費用・アカウント・IAM（別のゲート）**。
 4. **SIGTERM の完了待ちの実現と終了コード 0**（RI4）、`stopTimeout`・ALB の登録解除の遅延との整合。
-5. **release プロファイルの設定**（`lto`、`codegen-units`、`panic`）。`panic = "abort"` の採否（panic の扱いと関わる）。
+5. **release プロファイルの設定**（`lto`、`codegen-units`、`panic`）。`panic` は **`unwind` を制約として固定する**（2026-11-21 のレビュー M6。`abort` にしない）。
 6. **Rust のビルドキャッシュの方式**と、CI の `timeout-minutes`（実測してから）。`cargo-chef`・`rust-cache`・`sccache` の導入は承認が要る。
 7. **タスクのサイズ、接続プールの大きさ、ヘルスチェックの猶予期間、自動増減のクールダウン**（負荷試験・Fargate での実測で決める。RI2）。
 8. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。

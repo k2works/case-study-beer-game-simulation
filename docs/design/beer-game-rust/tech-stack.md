@@ -4,7 +4,7 @@ title: "技術スタック選定 - ビールゲームシミュレーション（
 description: "Rust 版の技術スタック。cargo search と rustc で確認した版、確認できなかった項目、beer-game-kotlin からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Rust 版）
@@ -135,7 +135,7 @@ API の型は、手書きの `openapi.yaml` から生成する方針を引き継
 
 | カテゴリ | 技術 | 版 | beer-game-kotlin | 用途 |
 | :--- | :--- | :--- | :--- | :--- |
-| コンテナ | マルチステージのビルド。実行イメージは**未決**（[未決事項](#未決事項) の 2） | - | Temurin JRE 25 | Rust は JVM を要さず、単一の実行ファイルにできる |
+| コンテナ | マルチステージのビルド。実行イメージは **RI1（承認済み）の案 A（glibc を含む最小のイメージ。シェルなし）**。実在・動作の確認は B1 | - | Temurin JRE 25 | Rust は JVM を要さず、単一の実行ファイルにできる |
 | CI/CD | GitHub Actions、ECR、OIDC、ステージング自動・本番承認、Terraform | beer-game-kotlin のとおり | 同左 | 構成は引き継ぐ。ジョブは Cargo に置き換える（ADR-001 の 011・012）。AWS への適用は別ゲート |
 | 配信 | CloudFront、独自ドメイン、TLS、ヘッダー | beer-game-kotlin のとおり | 同左 | 引き継ぐ |
 
@@ -169,7 +169,7 @@ beer-game-kotlin の「ORM なし」と同じです。sqlx には、SQL をコ�
 
 ### R4: 静的解析は clippy を厳格に適用し、cargo-deny で依存関係を検査する
 
-beer-game-kotlin の T5（detekt を中心に PMD の XPath で補完）に対応します。`cargo clippy -- -D warnings`、`cargo fmt --check`、`cargo deny check` を CI で必須にします。ドメインの純粋性（副作用の呼び出しの禁止）は、clippy の設定だけで足りるかを**未確認**とし、足りなければ crate の依存の制限（ドメインの crate が I/O 系のクレートに依存しない）で守ります。違反は 0 件で、`#[allow(...)]` は理由なしに使いません。
+beer-game-kotlin の T5（detekt を中心に PMD の XPath で補完）に対応します。`cargo clippy -- -D warnings`、`cargo fmt --check`、`cargo deny check` を CI で必須にします。ドメインの純粋性（副作用の呼び出しの禁止）は、**第一に crate の依存の制限（ドメインの crate が I/O 系のクレートに依存しない。依存がなければ呼べない）で守り、clippy（`disallowed_methods` など）で補います**（[ドメインモデル](./domain-model.md) の RD5、[テスト戦略](./test-strategy.md) と同じ主従。clippy の設定だけで足りるかは**未確認**）。違反は 0 件で、`#[allow(...)]` は理由なしに使いません。
 
 ### R5: 受入条件は Gherkin と cucumber-rs で表し、細部は標準のテストで書く
 
@@ -207,11 +207,11 @@ team.md の規約（行 80%）に従います。beer-game-kotlin の目標との
 ## 未決事項
 
 1. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。ローカル・CI・統合テスト・ステージング・本番が同じ DB になる。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表のとおり Rust 版では引き継がない。
-2. **コンテナの実行イメージ**: distroless、debian-slim、scratch などを比較する。TLS の証明書や DNS の扱いも含めて確認する。
+2. **コンテナの実行イメージの実在確認**: RI1 で案 A（glibc を含む最小のイメージ）を承認済み。ベースイメージのタグ、動的リンクに必要なライブラリ、TLS の証明書や DNS の扱い（sqlx の TLS の実装を含む）は B1 で確認する。
 3. **sqlx の機能**: PostgreSQL のアドバイザリロック、`LISTEN/NOTIFY`、マイグレーション、コンパイル時の検査（オフラインの可否）。B1 で確認する。
 4. **cucumber-rs の日本語対応**: R5 のとおり。
 5. **axum の SSE と tower-http のプラグイン**: 使うプラグインの名前と機能を確認する。
-6. **API の契約の共有方法**: beer-game-kotlin の `contracts/openapi.yaml` を共有するか、複製するか。
+6. ~~**API の契約の共有方法**~~ **解消（2026-11-19。RF1）**: Kotlin 版の `contracts/openapi.yaml` を、現在の場所のまま共有する。
 7. **MSRV とサポート**: 各クレートの MSRV が Rust 1.97.1 以下であること、各クレートの公開日と保守状況を `cargo info` で確認する。
 8. **エディション**: 2024 を第一候補とするが、ツールチェーンの対応を実装開始時に確認する。
 

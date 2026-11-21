@@ -4,7 +4,7 @@ title: "バックエンドアーキテクチャ - ビールゲームシミュレ
 description: "Rust 版のバックエンドアーキテクチャ。beer-game-kotlin の構造（ES + CQRS、薄いコマンド処理、同期投影、冪等性、競合の再試行、SSE、保持削除）を引き継ぎ、Cargo ワークスペース、トレイトによるポート、axum、sqlx、キャンセル安全性で表す。Kotlin 版の設計判断 BD1〜BD12 との対応を含む。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Rust 版）
@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
 
 ### 本書の位置づけと確認の範囲
 
-- **本書で確認したこと**: 「コマンド処理の流れ」の `EventStore` トレイト、`execute`、競合の再試行、`Secret` 型は、ローカルの rustc 1.97.1（edition 2024）で、標準ライブラリだけで型検査し、4 件のテストが通ることを確認しました（2026-11-19。非同期は自前の `block_on` で実行）。
+- **本書で確認したこと**: 「コマンド処理の流れ」の `EventStore` トレイト（`begin`・`commit`・`rollback`）、`execute`、競合の再試行、`Secret` 型は、ローカルの rustc 1.97.1（edition 2024）で、標準ライブラリだけで型検査し、テストが通ることを確認しました（2026-11-19。**2026-11-21 のレビュー（H2）で、明示の ROLLBACK を持つ形に改め、再度確認した**。非同期は自前の `block_on` で実行）。**tokio・sqlx・axum と組み合わせた動作は、この確認に含まれません。**
 - **確認していないこと**: axum・sqlx・tokio を使った実装（SSE、`LISTEN/NOTIFY`、アドバイザリロック、sqlx のトランザクションの drop の挙動）、tower の層の組み立て、依存の検査の方式は、**未確認の設計のスケッチ**です。[技術スタック](./tech-stack.md) の未決事項と同じで、B1 で確かめます。
 - **引き継ぐだけのもの**: 冪等性の表、競合の再試行の一意制約の表、問い合わせ側の開示、API のエンドポイントと認可の表、エラーの写像の表、SSE の仕様（版の通知だけ、再生なし）、保持削除の手順、セキュリティの表は、Kotlin 版の該当節を正本とします。**API の契約（`openapi.yaml`、`code`、problem+json）は変えません。**
 - Kotlin 版の実装の経緯（B1〜B12 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。
@@ -127,12 +127,13 @@ pub trait EventStore<E>: Sync {
     fn append(&self, tx: &mut Self::Tx, expected: u64, events: Vec<E>)
         -> impl Future<Output = Result<u64, AppFailure>> + Send;
     fn commit(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;
+    fn rollback(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;   // 明示の ROLLBACK
 }
 ```
 
 上の `AppFailure`（簡略化した型）と `EventStore` は、型検査してテストを通したものです。実際の `EventStore` は、ストリームの種別（`game` / `session`）と複数のストリームの追記（`start_game`）を受け取る形に広げます（スケッチは 1 本のストリーム）。`ProjectionLock`・`ChangeNotifier`・`IdempotencyStore`・`PeripheralStore`・`Clock`・`IdGen`・`CredentialIssuer` も同じ形のトレイトで、**型検査していません**。
 
-**`Tx` は `begin` / `commit` の組で表し、ROLLBACK は `Tx` の drop で行います**（設計判断 RB2）。
+**`Tx` は `begin` / `commit` / `rollback` で表します。失敗の経路では `rollback` を明示し、`Tx` の drop による ROLLBACK は、panic・ランタイムの終了のときの保険にします**（設計判断 RB2。2026-11-21 のレビュー H2 で見直し）。
 
 ## コマンド側
 
@@ -185,22 +186,32 @@ R --> P : 200（versions のみ）/ problem+json
 `execute` は、ストリームの種類に依存しない汎用の関数です。ストリームごとの `initial`・`evolve`・`decide` を引数で受け取り、ルールを持ちません（Kotlin 版と同じ）。**型検査したスケッチ**:
 
 ```rust
-async fn run_once<E, S, C, St>(
-    store: &St, initial: &S,
+/// 読む -> 再生 -> decide -> 追記。失敗は run_once が rollback する
+async fn step<E, S, C, St>(
+    store: &St, tx: &mut St::Tx, initial: &S,
     evolve: &(impl Fn(S, &E) -> S + Sync),
     decide: &(impl Fn(&S, &C) -> Result<Vec<E>, String> + Sync),
     command: &C,
 ) -> Result<u64, AppFailure>
 where E: Send, S: Clone + Send + Sync, C: Sync, St: EventStore<E>,
 {
-    let mut tx = store.begin().await?;
-    let read = store.read(&mut tx).await?;
+    let read = store.read(tx).await?;
     let state = read.events.into_iter().fold(initial.clone(), |s, e| evolve(s, &e));
-    let decided = decide(&state, command).map_err(AppFailure::Domain)?;   // Err なら tx は drop され ROLLBACK
-    let version = if decided.is_empty() { read.version }                  // 空の列は追記しない
-                  else { store.append(&mut tx, read.version, decided).await? };
-    store.commit(tx).await?;
-    Ok(version)
+    let decided = decide(&state, command).map_err(AppFailure::Domain)?;
+    if decided.is_empty() { Ok(read.version) }                    // 空の列は追記しない
+    else { store.append(tx, read.version, decided).await }
+}
+
+async fn run_once</* … */>(/* … */) -> Result<u64, AppFailure> {
+    let mut tx = store.begin().await?;
+    match step(store, &mut tx, initial, evolve, decide, command).await {
+        Ok(version) => { store.commit(tx).await?; Ok(version) }
+        Err(failure) => {
+            // 失敗の経路は明示の ROLLBACK。ROLLBACK 自体の失敗は、元の失敗を隠さない
+            let _ = store.rollback(tx).await;
+            Err(failure)
+        }
+    }
 }
 
 pub async fn execute</* … */>(/* … */, max_attempts: u32) -> Result<u64, AppFailure> {
@@ -216,7 +227,9 @@ pub async fn execute</* … */>(/* … */, max_attempts: u32) -> Result<u64, App
 }
 ```
 
-上のコードについて、次の 3 つの性質のテストが通ることを確認しました。(1) 競合が 2 回続いても、再試行して成功する（追記の呼び出しは 3 回）。(2) 競合が上限まで続くと `RetryExhausted` を返す。(3) 業務の失敗（`decide` が `Err`）は、再試行せず、追記もしない。
+上のコードについて、次の 4 つの性質のテストが通ることを確認しました。(1) 成功は `commit` だけで、`rollback` しない。(2) 競合が 2 回続いても、再試行して成功する（試行 3 回で、`rollback` は競合の 2 回、`commit` は最後の 1 回）。(3) 競合が上限まで続くと、すべて `rollback` して `RetryExhausted` を返す（`commit` は 0 回）。(4) 業務の失敗（`decide` が `Err`）は、`rollback` して、再試行も追記もしない。
+
+**`Ignored` の扱い（レビュー M7）**: 実際の `step` の再生は `Evolution`（[ドメインモデル](./domain-model.md) の RD2）を畳み込み、**コマンドの経路で `Ignored` が出たら、状態を信用せず `AppFailure::Persistence`（500・相関 ID）で失敗させます**（fail closed）。保存済みの事実を無視した状態で `decide` すると、不変条件が崩れるためです。`StreamRead.version` は、読み込んだイベントの**件数ではなく、`MAX(stream_version)`** とします（追記の期待する版）。上のスケッチは、簡単のため `S -> S` の `evolve` を使っています。
 
 要点は Kotlin 版と同じです。
 
@@ -230,16 +243,22 @@ pub async fn execute</* … */>(/* … */, max_attempts: u32) -> Result<u64, App
 
 Kotlin 版は、コルーチンのキャンセルに対して、COMMIT と ROLLBACK を `NonCancellable` で行い、`CancellationException` を再送出します（ADR-005）。**Rust では、キャンセルは「future が drop されること」**です。クライアントが切断すると、axum が処理中の future を drop しうるため、次の方針にします。
 
+**リスクの置き場所（2026-11-21 のレビュー H2・H3 による見直し）**: 「部分更新が残る」ことは、**PostgreSQL のトランザクションの原子性が防ぎます**（COMMIT の前に接続が切れれば、サーバーが中止する）。本当のリスクは次の 3 つです。**(1) ロックと接続が解放されるまでの遅れ**（`pg_advisory_xact_lock_shared`・行ロックを握ったまま接続が残ると、再構築の排他ロックの待ちとプールの枯渇が静かに進む）。**(2) spawn したタスクの寿命**（切り離されたタスクの追跡、シャットダウン）。**(3) COMMIT の結果が呼び出し側に分からなくなること**（タイムアウト・切断）。
+
 | 項目 | 設計 |
 | :--- | :--- |
-| ROLLBACK | `Tx` を drop すれば ROLLBACK になる設計にする（失敗の経路で、明示的な ROLLBACK を書かない）。sqlx のトランザクションが drop で ROLLBACK される仕様は、**公式の文書で確認していない**ため、B1 で確かめる |
-| COMMIT の途中でのキャンセル | `execute` を **`tokio::spawn` した別のタスクで実行**し、ルートはその完了（`JoinHandle`）を待つ。クライアントが切断しても、コマンドの処理は最後まで走る（COMMIT が中途半端にならない）。結果が返らなかった要求は、同じ `Idempotency-Key` の再送で、保存済みの応答を得る |
-| タスクの panic | `JoinHandle` の `JoinError` を `AppFailure::Persistence` に写し、500 と相関 ID にする。**ドメインは panic しない**（RD5）が、境界で守る |
-| シャットダウン | SIGTERM で新しい要求を止め、spawn したコマンドのタスクの完了を待つ（待ちの上限を置く）。**待ち方は未確認** |
+| ROLLBACK | **失敗の経路では `rollback` を明示する**（上の `run_once`。型検査・テスト済み）。`Tx` の drop による ROLLBACK は、**panic・ランタイムの終了のときの保険**とする。sqlx のトランザクションは、drop した時点で ROLLBACK を送らず、接続が次に使われる（またはプールに返る）ときに送る実装だった見込み（**公式の文書で確認していない**）。そのため、drop だけに頼ると、ロックを握ったまま接続が残る時間が生じうる。B1 で挙動を確かめる |
+| COMMIT の途中でのキャンセル | `execute` を **`tokio::spawn` した別のタスクで実行**し、ルートはその完了（`JoinHandle`）を待つ。クライアントが切断しても、コマンドの処理は最後まで走る（COMMIT が中途半端にならない）。通常の失敗の経路は spawn の中で完結するため、**ルートの future が drop されても、明示の ROLLBACK は実行される** |
+| タイムアウトと「結果が不明」 | tower のタイムアウトが応答した後も、spawn したタスクは COMMIT まで進みうる。**タイムアウトの応答は `type` を付けない 504 とし、画面は「結果が不明」として同じ `Idempotency-Key` で再送する**（[UI 設計](./ui-design.md) の影響表 #1〜#3）。**元の処理が実行中に同じキーの再送が届いたときは、先の処理の完了を待って、保存済みの応答（または同じ失敗）を返す**（冪等記録の照合の前に、同じキーの実行中のコマンドの完了を待つ。実現は B1 で確認。待ちの上限を超えたら `app.retry_exhausted`） |
+| プール取得のタイムアウト | プールから接続を取れなかった場合は、**コマンドは未実行が確実**なので、`AppFailure::RetryExhausted`（503・`type` つき・`Retry-After`）に写す。`begin` の失敗は、`Persistence`（500）とは区別する |
+| タスクの panic | `JoinHandle` の `JoinError` を `AppFailure::Persistence` に写し、500 と相関 ID にする。**ドメインは panic しない**（RD5）が、境界で守る。**この写像は、panic が unwind で伝わることを前提にするため、release のプロファイルは `panic = "unwind"` を制約として固定する**（`abort` にしない。レビュー M6） |
+| spawn したタスクの寿命 | **切り離されたタスクを追跡する仕組みを置く**（`JoinHandle` を drop するとタスクは切り離されたまま走り続ける。tokio の一般的な仕様で、導入するクレートの版での確認は B1）。追跡の道具（`tokio_util` の `TaskTracker` など）は新規依存のため、**B1 の計画で承認を得る**。**同時に走るコマンドのタスクの数に上限を置く**（超えたら `RetryExhausted`）。 |
+| シャットダウン | SIGTERM で新しい要求の受付を止め、**SSE の接続に終了を知らせて閉じ**（SSE は自然には閉じず、graceful の待ちが `stopTimeout` まで続き SIGKILL になると「終了コード 0」を満たせない）、追跡しているコマンドのタスクの完了を待つ（待ちの上限は `stopTimeout` より短く）。**axum の graceful shutdown は接続を待つが、切り離されたタスクの完了は待たない**見込みのため、追跡の仕組みで待つ（B1 で確認） |
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用）** | `execute` を spawn し、`Tx` の drop で ROLLBACK | 切断で処理が途中で止まらない。drop の挙動に頼る部分は B1 で確認 |
+| **A'（採用。2026-11-21 の見直し）** | `execute` を spawn し、**失敗の経路で `rollback` を明示**する。`Tx` の drop は保険 | 切断で処理が途中で止まらず、ロックの解放が drop の挙動に左右されない。`EventStore` に `rollback` が加わる |
+| A（旧。2026-11-19 に承認） | `execute` を spawn し、`Tx` の drop で ROLLBACK | 単純。drop の ROLLBACK の遅延（未確認）で、ロックを握ったまま接続が残りうる |
 | B | ハンドラの future の中で直接実行する | 単純。ただし、クライアントの切断で COMMIT の直前に future が drop されうる |
 
 ### 冪等性と競合の再試行
@@ -250,6 +269,7 @@ Kotlin 版は、コルーチンのキャンセルに対して、COMMIT と ROLLB
 | :--- | :--- |
 | 一意制約違反の判別 | PostgreSQL のエラーの SQLSTATE（`23505`）と**制約名**で見分ける。sqlx のエラーから制約名を取る方法は**未確認**（B1 で確認）。40001・40P01 も `ConcurrencyConflict` に写す。55P03 は `RetryExhausted` |
 | 再試行の上限 | 初期値は 10（ADR-019 を引き継ぎ、Rust 版で再計測する）。ジッターなし、書き込みの直列化なし |
+| `lock_timeout` | **B1 の受入条件に、`lock_timeout` の初期値を入れる**（未設定だと、再構築の間、コマンドがアドバイザリロックを無期限に待ち、spawn したタスクと接続が積み上がる。`idle_in_transaction_session_timeout` は `active` の待ちを切らないため、安全網にならない）。超過（SQLSTATE 55P03）は `RetryExhausted` に写す。**値は実測で決める**（レビュー M4） |
 | 待ち | 再試行のあいだに待ちを入れない。入れる場合は `tokio::time::sleep`（計測して決める。未決事項） |
 | 暗号化と HMAC | 候補は `hmac`・`sha2`・`base64`、応答の暗号化（AES-256-GCM）のクレートは**未選定**（資格の設計時に決め、承認を得る） |
 
@@ -257,7 +277,7 @@ Kotlin 版は、コルーチンのキャンセルに対して、COMMIT と ROLLB
 
 Kotlin 版を引き継ぎます。読み取り専用の DB ロールで投影の表を SELECT し、**読み取り専用の REPEATABLE READ のトランザクション**で `projection_checkpoints` を同じトランザクションで読みます（応答の `versions` が行より新しくならない）。観察者は別のロール・別の接続プール（`PgPool`）で、`game_overview`・`session_overview`・`week_team_totals` の 3 表だけを読めます（ADR-009）。出力は要求時に `build_export`（純粋関数）で作ります。
 
-Rust 版の実現として、**用途別に `PgPool` を持ちます**（書き込み、読み取り、観察者、削除、所有者）。プールの配線テスト（`SELECT current_user` の検査）は書き直します（ADR-009）。
+Rust 版の実現として、**用途別に `PgPool` を持ちます**（api は書き込み・読み取り・観察者の 3 つと `LISTEN` の専用接続。削除は retention、所有者は migrate のタスクが持つ。[インフラストラクチャ](./architecture-infrastructure.md)）。プールの配線テスト（`SELECT current_user` の検査）は書き直します（ADR-009）。
 
 ### 投影の更新と再構築
 
@@ -280,6 +300,10 @@ Rust 版の実現として、**用途別に `PgPool` を持ちます**（書き�
 REST + JSON（`/api/v1`）、リアルタイム通知は SSE、エラーは `application/problem+json`、変更系は `Idempotency-Key` を必須とし、`If-Match` は `SaveDecision`（意思決定の版）だけに付けます。**エンドポイントの一覧、コマンドの流れるストリーム、認可、コマンドの応答（`versions` だけ。資格を渡す操作の例外）は、Kotlin 版の表と同じ**で、OpenAPI の契約を共有します。`POST /games/:id/start` は 2 ストリームにまたがる資源として維持します。
 
 ### 入力の検証とエラーの写像
+
+**エラーの `code` と HTTP の写像の契約（レビュー M8）**: Kotlin 版は、`DomainError` の `code` と分類から HTTP の `code` への写像の**正本の一部を実装ファイル（`ProblemMapping.kt`）**に持ちます。Rust 版は、次を**この文書と `openapi.yaml` の両方で固定**します（実装ファイルを正本にしない）。(1) 分類が `Forbidden` のドメインの誤り（`session.forbidden`・`game.forbidden`）は、HTTP では **`app.unauthorized`（403）と同じ本文**に写る（資格の失敗と区別しない。NF-S12）。例外は参加コードの失敗の `game.invitation_invalid`（同じ本文）。(2) 409 の `problem+json` は、拡張メンバー（`requestedWeek`・`currentWeek`・`role`・`latest`・`week`・`current`）を操作ごとに持つ。どの操作がどのメンバーを返すかは、`openapi.yaml` の `ConflictProblem` を正本とする。(3) HTTP の層の失敗（`request.*`・`app.rate_limited`・`app.not_ready`）と、`validation.invalid_input` は、`DomainError` でなく `AppFailure` と axum の拒否の写像が持つ。契約テスト（[テスト戦略](./test-strategy.md)）が、`code()` の全体と `openapi.yaml` の一覧を突き合わせる。
+
+**`AppFailure` の写像の表の補足（レビュー L1）**: 表は、ドメインの分類（`Forbidden`・`NotFound`・`InvalidState`・`Conflict`・`RuleViolation`）と、`AppFailure` の列挙子を**別の軸**で示す。`AppFailure` の写像は、`Invalid` → 422（本文の構文エラーは 400）、`Domain` → 分類の写像、`ConcurrencyConflict` → **利用者には返らない**（`execute` が再試行し、上限で `RetryExhausted`）、`RetryExhausted` → 503・`Retry-After`・`type` つき、`IdempotencyKeyReused` → 409、`Unauthorized` → 403、`Persistence` → 500・相関 ID。**統合のエラー型**（`AppFailure::Domain` が包む型、`start_game` の戻り値、`Projection` の `DomainEvent`）は、`GameError`・`SessionError` を包む `DomainError` の列挙型として、B1 の最初のスライドで決める（レビュー L2。未決事項）。
 
 - ルートは、DTO を、スマートコンストラクタで `Command` に変換します。誤りは**すべて集め**（[ドメインモデル](./domain-model.md) の `collect`）、`422` で項目ごとの誤りを返します。本文の構文エラーは `400`。
 - ドメインのエラーは、分類で HTTP の状態へ写します。**写像は 1 か所（`adapter-http`）の `IntoResponse` の実装**で、`AppFailure` の 7 種を `match`（`_` なし）で網羅します。写像の表（`Forbidden` → 403、`NotFound` → 404、`InvalidState` → 409、`Conflict` → 409、`RuleViolation` → 422、`Unauthorized` → 403、`RetryExhausted` → 503 と `Retry-After`、`Persistence` → 500）、`code` の一覧、HTTP の層の失敗（`request.*`、`app.rate_limited`、`app.not_ready`）は **Kotlin 版と同じ**です。
@@ -328,7 +352,7 @@ impl<A> Debug for Secret<A> {
 | エラー | 予期しないエラーは、相関 ID を含めて必ず記録する。利用者へは相関 ID だけを返す。**panic はフックで記録し、プロセスを継続するか落とすかを未決とする** |
 | メトリクス | 応答時間、エラー率、`ConcurrencyConflict` の件数と再試行の回数、`DecisionConflict`、確定の方式、再生したイベント数と所要時間、投影の更新時間、SSE の接続数、通知の遅延、接続プールの使用状況、削除の経過時間。CloudWatch の EMF の JSON 行を標準出力へ出す。**JVM のヒープと GC に当たる項目はない**（tokio のタスク数などの採否は未決） |
 | 追跡 | 相関 ID を、HTTP、コマンド、イベントの封筒、SSE の通知、ログに伝える。非同期のタスクをまたぐ伝播は、`tracing` の span と、spawn するときの span の引き継ぎで行う |
-| ヘルスチェック | `GET /health`（生存）と `GET /ready`（`SELECT 1`、接続プールの取得、通知の受信が生きていること） |
+| ヘルスチェック | `GET /api/v1/health`（生存）と `GET /api/v1/ready`（`SELECT 1`、接続プールの取得、通知の受信が生きていること） |
 | 不変条件の監視 | Kotlin 版と同じ（投影の版の不一致、週確定の重複、資格とイベントの不一致、投影の整合を日次で検査） |
 
 ## セキュリティ
@@ -339,12 +363,12 @@ Kotlin 版の表を引き継ぎます（資格は 256 ビットの乱数とダ�
 | :--- | :--- |
 | 乱数 | OS の乱数を使う（`rand` の OS 由来の生成器、または `getrandom`）。**どのクレートを使うかは資格の設計時に決める** |
 | 設定の検証 | `AppConfig::load` が、全項目の誤りを集めて `Result` で返し、失敗なら終了する。鍵は `local` 以外で必須 |
-| 依存関係 | CI で `cargo deny`（脆弱性・ライセンス・重複）を実行する。**秘密情報の検査**のツールは [インフラストラクチャ](../beer-game-kotlin/architecture-infrastructure.md) の方針に従う（Rust 版のインフラ設計は別文書） |
+| 依存関係 | CI で `cargo deny`（脆弱性・ライセンス・重複）を実行する。**秘密情報の検査**のツールは [インフラストラクチャ](../beer-game-kotlin/architecture-infrastructure.md) の方針に従う（[インフラストラクチャ](./architecture-infrastructure.md) も参照） |
 | メモリ安全 | ドメインの crate に `unsafe` を置かない（`#![forbid(unsafe_code)]`。未確認の lint の設定と合わせて確認） |
 
 ## ローカル開発（Kotlin 版の H2 の節の扱い）
 
-Kotlin 版は、H2 の PostgreSQL モードでのローカル起動を許し、PostgreSQL 固有の機能を `ProjectionLock` と `ChangeNotifier` のポートの裏に隠し、2 実装を持ちます（ADR-014）。**H2 は JVM の組み込み DB で、Rust 版では使えません**。ローカル開発の DB は [技術スタックの未決事項](./tech-stack.md#未決事項) の 1 のとおり**未決**です。
+Kotlin 版は、H2 の PostgreSQL モードでのローカル起動を許し、PostgreSQL 固有の機能を `ProjectionLock` と `ChangeNotifier` のポートの裏に隠し、2 実装を持ちます（ADR-014）。**H2 は JVM の組み込み DB で、Rust 版では使えません**。ローカル開発の DB は **PostgreSQL 18（Docker）に決定しました**（2026-11-19）。
 
 - **ポート `ProjectionLock` と `ChangeNotifier` は維持します。** 動機（PostgreSQL 固有の機能を隠す）と、契約テストを実装ごとに実行する考え方は言語に依存しません。
 - ローカルの DB を PostgreSQL にする場合は、実装が 1 つになり、ポートは**テスト用のインメモリ実装との差し替え**のためだけに残ります。別の DB を選ぶ場合は、Kotlin 版の「乖離のリスクと対策」と「本番での拒否の検査」を引き継ぎます。
@@ -380,7 +404,7 @@ apps/beer-game-rust/
 
 ## 品質属性への対応
 
-Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トランザクションの追記・投影、可用性は状態を持たない API、性能は 1 ストリーム千件前後の再生、保守性は crate の依存と lint、観測性は合成によるログとメトリクス、テスト容易性は純粋なドメインとトレイトの差し替え）。**性能の見積もりは JVM の値でなく、Rust で再計測します**（ADR-003）。テスト戦略の詳細は、未着手の別文書（テスト戦略）で定めます。
+Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トランザクションの追記・投影、可用性は状態を持たない API、性能は 1 ストリーム千件前後の再生、保守性は crate の依存と lint、観測性は合成によるログとメトリクス、テスト容易性は純粋なドメインとトレイトの差し替え）。**性能の見積もりは JVM の値でなく、Rust で再計測します**（ADR-003）。テスト戦略の詳細は [テスト戦略](./test-strategy.md) で定めます。
 
 ## 設計判断
 
@@ -409,9 +433,11 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | B | `dyn Trait`（動的ディスパッチ）。非同期は `async_trait` などのクレート | 組み立てが簡単。クレートの追加と、実行時のオーバーヘッドがある |
 | C | 関数の束（クロージャの構造体）。Kotlin 版と同じ | Kotlin 版と形が一致する。Rust ではクロージャの型と借用が扱いにくく、トレイトのほうが自然 |
 
-### RB2: `Tx` は drop で ROLLBACK し、`execute` は spawn したタスクで実行する（承認済み。2026-11-19）
+### RB2: `execute` は spawn したタスクで実行し、失敗の経路では ROLLBACK を明示する（承認済み。2026-11-19。**2026-11-21 に見直しを承認**）
 
-上の「キャンセル安全性」の案 A のとおりです。sqlx のトランザクションが drop で ROLLBACK される挙動、`tokio::spawn` による切断からの隔離、シャットダウン時の完了待ちは、B1 で確かめます。
+2026-11-19 に承認した RB2 は「`Tx` の drop で ROLLBACK する」ことを主にしていました。2026-11-21 のレビュー（H2・H3）で、**部分更新は PostgreSQL が防ぐので、本当のリスクはロック・接続の解放の遅れ、spawn したタスクの寿命、COMMIT の結果が分からなくなること**と分かり、ユーザーが**見直しを承認**しました（上の「キャンセル安全性」の案 A'）。`spawn` は維持し、失敗の経路では `rollback` を明示し、`Tx` の drop は保険にします。sqlx の drop での ROLLBACK の挙動、`tokio::spawn` による切断からの隔離、追跡と完了待ちは、B1 で確かめます。
+
+**テスト用の差し込み口（レビュー M10）**: 「追記の後・COMMIT の前で止める」「ルートの future を drop した後に spawn したタスクが完了する」を決定論的に再現するため、**`EventStore` と `Tx` は、テスト用のデコレーター（barrier・フックを持つラッパー）で差し込める形にする**。具体的には、`EventStore` のトレイトを実装した**ラッパー型**が、内側の実装の各メソッドの前後で、待ち合わせ（`tokio::sync::Barrier` など）やカウンタを挟める。本番のコードには、この仕組みを持ち込まない（`#[cfg(test)]` または別の crate のテスト用の型）。
 
 ### RB3: 認証は tower の層でなく `execute` の中で行う（承認済み。2026-11-19）
 
@@ -443,14 +469,17 @@ Kotlin 版の決定（認証を再試行のたびに、同じトランザクシ�
 
 1. **sqlx の機能の確認**（B1）: アドバイザリロック、`LISTEN/NOTIFY`、制約名の取得、`Transaction` の drop の挙動、マイグレーション。
 2. **axum の SSE と tower の層**: 使う API・層の名前。
-3. ~~**RB2 の承認**~~ **解消（2026-11-19）**: 承認した。前提（sqlx の `Tx` の drop での ROLLBACK）は B1 の受入条件で、成り立たなければ設計を見直す。
-4. **シャットダウンの待ち方**: spawn したコマンドのタスクの完了を待つ仕組みと、待ちの上限。
+3. ~~**RB2 の承認**~~ **解消（2026-11-19。2026-11-21 に見直しを承認）**: 明示の ROLLBACK を主にし、drop を保険にする。前提（sqlx の drop の挙動、spawn したタスクの追跡）は B1 の受入条件で、成り立たなければ設計を見直す。
+4. **シャットダウンの待ち方**: 追跡の仕組み（`TaskTracker` など。新規依存のため B1 で承認）、SSE の終了、同時に走るタスクの数の上限、待ちの上限（`stopTimeout` より短く）。**値は実測で決める。**
 5. **panic の扱い**: panic フックで記録し、プロセスを継続するか落とすか。
 6. **暗号化と乱数のクレート**: 応答の暗号化（AES-256-GCM）、資格の乱数。承認が要る。
 7. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。
-8. **API の契約の共有方法**（同じ `openapi.yaml` を参照するか、複製するか）。
+8. ~~**API の契約の共有方法**~~ **解消（2026-11-19。RF1）**: Kotlin 版のディレクトリのまま共有する。
 9. **依存の検査の方式**: `cargo metadata` の検査スクリプトか、`cargo-deny` の `bans` か。
 10. **Kotlin 版の未決事項の引き継ぎ**: 投影の再構築中のコマンドの応答（短い待ちか、すぐ 503 か）、`FOR UPDATE` の要否、再試行の間の待ち（ジッター）、観察者への開示、SSE の心拍の間隔、`app` のモードの環境変数の名前。いずれも [Kotlin 版の未決事項](../beer-game-kotlin/architecture-backend.md) に追従する。
+11. **同じ `Idempotency-Key` の再送が、元の処理の実行中に届いたときの待ち方**（先の処理の完了を待つ仕組みと、待ちの上限。H4）。
+12. **`lock_timeout` の初期値**（M4）、**プール取得のタイムアウト**の値、**同時に走るコマンドのタスクの数の上限**。
+13. **統合のエラー型**（`DomainError`。`GameError`・`SessionError` を包む）と、`Projection` の `DomainEvent`（L2）。B1 の最初のスライドで決める。
 
 ## 出典
 

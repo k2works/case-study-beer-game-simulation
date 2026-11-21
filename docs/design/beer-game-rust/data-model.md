@@ -4,7 +4,7 @@ title: "データモデル設計 - ビールゲームシミュレーション（
 description: "Rust 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、sqlx のマイグレーション、型の対応、H2 を持たない前提での差分、PostgreSQL 18.6 で検証した DDL と制約を整理した正本。"
 tags: [design]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Rust 版）
@@ -356,6 +356,8 @@ CREATE INDEX ix_events_actor ON events (game_id, actor_kind, actor_id);
 
 観察者の接続プールは、別の `PgPool`（`beergame_observer` のメンバーであるユーザーで接続）です（ADR-009）。
 
+**ログインユーザーとセッションの設定（レビュー H1）**: ロール（`beergame_writer` など）は `NOLOGIN` で、アプリが接続するのは**そのメンバーのログインユーザー**です。**`idle_in_transaction_session_timeout` や `lock_timeout` のようなロールごとの設定は、NOLOGIN ロールに設定してもメンバーのログインユーザーに継承されず、効きません**（PostgreSQL 18.6 で再現して確認。`SET ROLE` した後も効かない）。**ログインユーザー自身**に設定するか、接続文字列の `options`・接続後の `SET` で設定し、統合テストで `SHOW` が期待値になることを確かめます（[運用要件](./operation.md) の障害パターン 17）。
+
 ### 検証の結果（PostgreSQL 18.6、2026-11-19）
 
 使い捨てのコンテナに上の DDL とロールを適用し、次を実測しました。
@@ -364,7 +366,7 @@ CREATE INDEX ix_events_actor ON events (game_id, actor_kind, actor_id);
 | :--- | :--- | :--- |
 | 1 | 同じストリームの同じ版への 2 回目の追記 | **SQLSTATE 23505**、`CONSTRAINT NAME: uq_events_stream_version`（制約名がエラーに入る） |
 | 2 | 部分一意索引 `uq_idempotency_create` | 別のゲームの同じ `('create', key_digest)` は**違反**。同じキーでも `scope` が `create` 以外なら**通る** |
-| 3 | `beergame_writer` による `events` の UPDATE・DELETE・TRUNCATE、`game_roots` の DELETE | すべて **permission denied**（SQLSTATE 42501 相当）。INSERT・SELECT は許可 |
+| 3 | `beergame_writer` による `events` の UPDATE・DELETE・TRUNCATE、`game_roots` の DELETE | すべて **permission denied**（エラーメッセージで確認。SQLSTATE の値は、この実測では記録していない。権限不足は一般に 42501 のはずだが、**実際に観測した値ではない**）。INSERT・SELECT は許可 |
 | 4 | `beergame_deleter`（`events` の DELETE 権限なし）が `game_roots` の 1 行を DELETE | 成功し、そのゲームの `events` と `idempotency_records` が**連鎖して消え**、別のゲームの行は残る。`events` を直接 DELETE すると拒否される |
 
 4 は、Kotlin 版 ADR-010 の実測（PostgreSQL 18、1 回）を、Rust 版の DDL で再確認したものです。**1 回の実測で、他の版は未確認**です。
@@ -461,7 +463,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 1. ~~**ローカル開発の DB**~~ **解消（2026-11-19）**: PostgreSQL 18（Docker）に決定した。
 2. **sqlx の確認**（B1）: マイグレーションの命名と動作、型の対応（`Uuid`、`OffsetDateTime`、`Json`）、エラーからの制約名の取得、アドバイザリロック、`LISTEN/NOTIFY`。
 3. **0003〜0006 の DDL**: Kotlin 版の実ファイルを元に書き、PostgreSQL で適用して検証する。
-4. **`session_overview.week` が最終週 + 1 になる問題**（Kotlin 版で判明、未解決）: `WeekCommitted` か投影が最終週を知る手段の決定が要る。Rust 版では、設計段階で決める（案: `WeekCommitted` のペイロードに最終週を載せない代わりに、投影が `SessionStarted` の設定の最終週を覚える。イベントの構造への影響があるため、ドメインモデルと合わせて決める）。
+4. **`session_overview.week` が最終週 + 1 になる問題**（Kotlin 版で判明、未解決）: **「投影が `SessionStarted` の最終週を覚える」案は、投影の型（`&Event -> Vec<RowChange>`。状態を持たず、Upsert の値は絶対値）と合わない**（2026-11-21 のレビュー M9）。**比べる案**: (A) `WeekCommitted` のペイロードに、**次の週（終了なら終了の事実）**を持たせる（イベントの構造への影響があるため、ドメインモデルと合わせて決める）。(B) `session_overview` に `final_week` を持たせ、**SQL の式で更新する**（`week = LEAST(week + 1, final_week)`。`RowChange` に式の更新を加える。`submitted_role_count` の増減の表し方も Kotlin 版の実装で確かめる）。**決定は B1 のドメイン・投影の実装で行う**（承認済みの方針: 案の選択は B1）。
 5. **ロック待ちの上限（`lock_timeout`）と、再構築中のコマンドの応答**（短い待ちか、すぐ 503 か）。
 6. **投影の更新の順序と `FOR UPDATE` の要否**: Kotlin 版でも、今のイベント構成では実際の競合は起きないと整理されている。
 7. **所有者のロールの作り方（RDS）、通知の受信（`LISTEN`）専用のロールと接続、アプリの用途別のロール・接続への切り替え**: Kotlin 版と同じ未決事項。

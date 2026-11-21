@@ -4,7 +4,7 @@ title: "ADR-001: beer-game-kotlin を Rust 版として作り、設計と ADR �
 description: "beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Rust（axum + sqlx + tokio）と既存の React で作り直す。beer-game-kotlin の ADR の引き継ぎ表を含む。"
 tags: [adr]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-19T09:36:31Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
 ---
 
 # ADR-001: beer-game-kotlin を Rust 版として作り、設計と ADR を流用する
@@ -34,13 +34,13 @@ Rust 版は、同じ学習の価値を、型システムによる不正な状態
 
 - **機能と振る舞いは、beer-game2 を正本として引き継ぐ。** 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、`docs/requirements/beer-game2/` を参照する。範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）。
 - **設計の構造は、beer-game-kotlin を正本として引き継ぐ。** ES + CQRS、`game` と `session` の 2 ストリーム、`decide` / `evolve` の純粋関数、投影、保持削除などの構造は変えず、Rust の表現に置き換える。設計書は `docs/design/beer-game-rust/` に、beer-game-kotlin と同じ文書構成で作り、各文書に「beer-game-kotlin からの変更」を設ける。
-- **技術スタックは、バックエンドを Rust（axum + sqlx + tokio）、フロントエンドを既存の React / TypeScript とする。** API の契約は、beer-game-kotlin の `contracts/openapi.yaml`（手書き）を正本として共有する方針を第一候補とし、扱いは技術スタックの設計で定める。版は設計時に実際に確認して固定し、別の ADR で記録する。
+- **技術スタックは、バックエンドを Rust（axum + sqlx + tokio）、フロントエンドを既存の React / TypeScript とする。** API の契約は、beer-game-kotlin の `contracts/openapi.yaml`（手書き）を正本として共有する方針を第一候補とし、扱いは技術スタックの設計で定める。版は設計時に実際に確認して固定し、**技術スタック（[tech-stack.md](../../design/beer-game-rust/tech-stack.md)）の設計判断 R7 と確認した版の表に記録する**（版を固定する時点で ADR が必要になれば、別の ADR を起票する。2026-11-21 のレビューで、存在しない「別の ADR」への参照を直した）。
 - **コーディングは、関数型プログラミングガイド（Rust 編）に準拠する。** 失敗は `Result` と型付きのエラー（列挙型）で表し、ドメインを副作用のない関数で書く。
 - **beer-game-kotlin の ADR は、次の表のとおり扱う。** beer-game-kotlin の ADR のファイルは履歴として変更しない。
 
 ### beer-game-kotlin の ADR の引き継ぎ表
 
-扱いは、beer-game-kotlin の ADR 002〜020 の**本文を読んで検証した**案である（2026-11-19。調査はサブエージェントが行い、判定の根拠は各 ADR の決定の節）。見出しだけで付けた初稿から、007・011・013・014 の判定または理由を修正し、005・008・018・020 に補足を足した。なお、引き継ぎ元の ADR の多くは Kotlin 版でも「提案中」で、承認済みではない（002〜020 のうち承認済みは 012・015〜019。020 は提案）。
+扱いは、beer-game-kotlin の ADR 002〜020 の**本文を読んで検証した**案である（2026-11-19。調査はサブエージェントが行い、判定の根拠は各 ADR の決定の節）。見出しだけで付けた初稿から、007・011・013・014 の判定または理由を修正し、005・008・018・020 に補足を足した。なお、引き継ぎ元の ADR の多くは Kotlin 版でも「提案中」で、承認済みではない（**002〜020 のうち承認済みは 002・012・015〜019**。020 は提案。001 は本書の元の ADR で承認済み。2026-11-21 のレビューで、002 を落としていた誤りを訂正）。
 
 | beer-game-kotlin の ADR | Rust 版での扱い | 内容 |
 | :--- | :--- | :--- |
@@ -56,7 +56,7 @@ Rust 版は、同じ学習の価値を、型システムによる不正な状態
 | 010 events 追記専用、game_roots の連鎖削除 | **引き継ぐ** | 言語に依存しない |
 | 011 厳格な静的解析（detekt、PMD） | **置き換える** | 厳格さの原則（違反 0 件、ベースラインなし、抑制なし、緩和は ADR に記録して人が承認、純粋性の静的検査）は引き継ぐ。ツールを clippy（`disallowed_methods` など）、rustfmt、`-D warnings` に置き換える。`cargo deny` は ADR-011 に根拠が無く、Kotlin 版の ADR-013 の「依存関係の脆弱性検査（選定未決）」に対応する別の選定である |
 | 012 日本語 Gherkin と Cucumber | **変更** | Cucumber の Rust 実装などを設計時に比較する |
-| 013 技術スタックの版 | **置き換える**（バックエンド部分）。PostgreSQL 18、Node 26 LTS、フロントエンド・インフラ・CI の版と運用原則は引き継ぐ | Rust・axum・sqlx・tokio の版を、確認したうえで別の ADR で固定する。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ |
+| 013 技術スタックの版 | **置き換える**（バックエンド部分）。PostgreSQL 18、Node 26 LTS、フロントエンド・インフラ・CI の版と運用原則は引き継ぐ | Rust・axum・sqlx・tokio の版を、確認したうえで固定する（記録先は tech-stack.md の R7 と版の表）。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ |
 | 014 ローカル開発だけ H2 | **見直す** | 動機（ローカル起動を軽くする。ユーザーの決定）と、固有機能をポート（`ProjectionLock`・`ChangeNotifier`）で抽象化する考え方は言語に依存しない。H2 は JVM の組み込み DB で Rust では使えないため、代替の DB（PostgreSQL のみとするか、別の軽量 DB か）は本文に記載がなく、設計時の未決事項として比較する |
 | 015 復帰資格の受け渡しと失効 | **引き継ぐ** | 言語に依存しない |
 | 016 資格の鍵の版 | **引き継ぐ** | 言語に依存しない |
