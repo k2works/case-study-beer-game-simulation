@@ -6149,6 +6149,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#step-1_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 の結果（ゲート: 許可リストの合意待ち）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#definition-of-done" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12601,7 +12612,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>承認待ち。着手前の判断項目（下記）の承認を含む。承認前にコードは書かない</strong></td>
+<td style="text-align: left;"><strong>着手前の判断項目 1〜8 は 2026-11-21 にユーザーが「案どおり」承認した</strong>（9 は超過時の扱い）。計画全体の <code>verified</code> は未記録。Step ごとのゲートは人の検証待ち</td>
 </tr>
 </tbody>
 </table>
@@ -12775,6 +12786,21 @@
 <h3 id="step-10">Step 10: 検証と終了（✅）<a class="headerlink" href="#step-10" title="Permanent link">&para;</a></h3>
 <ul>
 <li>品質チェック一式。<code>validating-design</code>。設計書の変更が要る点を列挙（人が判断）。<code>bolt_2_report.md</code>。ゲート: Bolt の承認。</li>
+</ul>
+<hr />
+<h2 id="step-1_1">Step 1 の結果（ゲート: 許可リストの合意待ち）<a class="headerlink" href="#step-1_1" title="Permanent link">&para;</a></h2>
+<p>実施済み（2026-11-21、AI）。<strong>人の合意は未取得</strong>。</p>
+<ul>
+<li><strong>許可リストの仕組み</strong>: <code>crates/acceptance/allowlist.txt</code>（Rust 側のファイル。共有する <code>.feature</code> は変更しない）。許可したファイルだけを、<code>target/acceptance-features/</code> に<strong>読み取り専用のシンボリックリンク</strong>で並べて実行する。許可の外の <code>@api</code> は「未対応」として件数を表示（現在: <code>@api</code> 159 件のうち、実行 4 件、未対応 155 件）。許可したシナリオに Undefined・Pending があれば失敗（<code>fail_on_skipped</code>）。</li>
+<li><strong>発見</strong>: Rust の <code>gherkin</code>（0.16）は、日本語の <strong><code>ルール:</code></strong>（<code>operations/metrics-and-alarms.feature</code>、B14 の範囲）を解析できず、<strong>ディレクトリ全体を渡すと実行が止まる</strong>（"1 parsing error"）。許可したファイルだけを渡すことで回避した。<strong>B14 でこのファイルを許可するときは、対処が要る</strong>（共有物の変更は不可のため、Rust 側の回避を検討し、人に提示）。</li>
+<li><strong>B2 の許可リストの提案（20 シナリオ。<code>@api</code> のみ）</strong>。いずれも <code>allowlist.txt</code> には<strong>まだ入れていない</strong>（ステップ定義ができた Step 7 で、green になったものから入れる）:</li>
+<li><code>game-setup/game-creation.feature</code>（2）: 作成、無効な需要系列</li>
+<li><code>game-setup/joining.feature</code>（5）: 参加、無効なコード、受付終了、不足の役割を示す開始の拒否、付け替え</li>
+<li><code>weekly-play/situation.feature</code>（4）: 役割ごとの開示</li>
+<li><code>weekly-play/decision.feature</code>（3）</li>
+<li><code>weekly-play/week-commit.feature</code>（6）: 確定、冪等、一回性、決定論、結果の項目、入力不足</li>
+<li><strong>除外</strong>: 共同担当（<code>co-assignment</code>・<code>co-input</code>）、復帰・失効（<code>continuation</code>）、カスタム条件、自動確定、観察、出力、保持。B1 で書いた <code>co-assignment</code>（ドメインに対して実行）は、B2 の HTTP 化に合わせて、B6 まで許可リストから外す予定。</li>
+<li><strong>契約（<code>openapi.yaml</code>）との差の一覧</strong>: Step 6（HTTP）の着手時に、各経路のリクエスト・レスポンスの項目を、Rust 側の型と突き合わせて一覧にする（変更しない。差は Rust で直す。RU2）。</li>
 </ul>
 <hr />
 <h2 id="definition-of-done">完了条件（Definition of Done）<a class="headerlink" href="#definition-of-done" title="Permanent link">&para;</a></h2>
