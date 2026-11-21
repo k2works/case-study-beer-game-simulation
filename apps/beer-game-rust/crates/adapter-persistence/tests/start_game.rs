@@ -90,8 +90,7 @@ async fn ac1_2_3__開始は_game_と_session_の両方へ追記され_読み直�
 }
 
 #[tokio::test]
-async fn ac1_2_3__同時の開始は一方だけが成功し_開始のイベントは_1_回だけ()
--> Result<(), String> {
+async fn ac1_2_3__同時の開始は一方だけが成功し_開始のイベントは_1_回だけ() -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());
     };
