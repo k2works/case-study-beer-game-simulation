@@ -6,6 +6,7 @@ use beergame_application::{AppFailure, EventStore, PersistenceFailure, StreamRea
 use beergame_domain::{GameEvent, SessionEvent};
 
 use crate::codec::{GameCodec, SessionCodec};
+use crate::projection::{Bind, Statement};
 use sqlx::postgres::PgPool;
 use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
@@ -40,6 +41,29 @@ pub trait EventCodec<E>: Sync {
         schema_version: i32,
         payload: serde_json::Value,
     ) -> Result<E, String>;
+
+    /// イベントが書く投影（追記と同じトランザクションで実行する）。既定は投影なし。
+    fn projection(&self, _game_id: Uuid, _event: &E) -> Vec<Statement> {
+        Vec::new()
+    }
+}
+
+async fn run_statement(tx: &mut PgTx, statement: &Statement) -> Result<(), AppFailure> {
+    let mut query = sqlx::query(statement.sql);
+    for bind in &statement.binds {
+        query = match bind {
+            Bind::Uuid(v) => query.bind(*v),
+            Bind::Text(v) => query.bind(v.clone()),
+            Bind::Int(v) => query.bind(*v),
+            Bind::Json(v) => query.bind(v.clone()),
+            Bind::NullText => query.bind(None::<String>),
+        };
+    }
+    query
+        .execute(&mut *tx.0)
+        .await
+        .map(|_| ())
+        .map_err(|e| storage(&e))
 }
 
 /// 実行中のトランザクション。明示の `commit` / `rollback` で終える。drop は保険（RB2）。
@@ -166,6 +190,9 @@ where
             .execute(&mut *tx.0)
             .await
             .map_err(|e| append_failure(&e))?;
+            for statement in self.codec.projection(self.game_id, event) {
+                run_statement(tx, &statement).await?;
+            }
         }
         Ok(u64::try_from(version).unwrap_or(0))
     }

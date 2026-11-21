@@ -244,6 +244,10 @@ fn read_editor(v: &Value) -> R<Editor> {
 pub struct GameCodec;
 
 impl EventCodec<GameEvent> for GameCodec {
+    fn projection(&self, game_id: Uuid, event: &GameEvent) -> Vec<crate::projection::Statement> {
+        crate::projection::game_statements(game_id, event)
+    }
+
     fn encode(&self, event: &GameEvent) -> R<(String, i32, Value)> {
         let (name, payload) = match event {
             GameEvent::GameCreated {
