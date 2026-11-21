@@ -12600,6 +12600,7 @@ FROM（実行）    &lt;軽量な実行イメージ&gt;         … バイナリ
 </tbody>
 </table>
 <p><strong>AWS への適用は、確認必須の別のゲート</strong>（本番環境・費用・アカウント・IAM に関わる）です。<strong>本書の段階では、適用しません。</strong></p>
+<p><strong>準備の状況（2026-11-21）</strong>: ユーザーの指示（他のプロジェクトと同じく準備だけ）に従い、<code>apps/beer-game-rust/infra/</code> に Kotlin 版の 8 モジュール超と 2 環境を複製し、名前（<code>beer-game-rust</code>、DB 名 <code>beer_game_rust</code>、メトリクスの名前空間 <code>BeerGame/Rust</code>）と、JVM 固有のアラーム・ウィジェット（ヒープ・GC）を除いた。<code>terraform fmt</code> は通る。<strong><code>terraform validate</code> は未実施</strong>（手元の Terraform は 1.5.7 で、要件の 1.17 以上に満たない。CI か 1.17 以上で確認する）。<strong><code>init</code>（実バックエンド）・<code>plan</code>・<code>apply</code> は実行していない。</strong> メモリのアラームは B1 の実測後に足す。タスクのサイズ・猶予期間は Kotlin 版の初期案のまま（実測の前に縮めない）。</p>
 <h2 id="_12">品質属性への対応<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
