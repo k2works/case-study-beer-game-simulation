@@ -4,7 +4,7 @@ title: "Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 
 description: "beer-game-rust の Bolt 2 のステップ計画。イベントストア・execute・axum・投影・共有する features の許可リスト・DB を要する前提の検証・NF-P2 の実測。着手前に人の判断が要る項目を含む。人の承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T04:14:03Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T07:34:47Z }
 ---
 
 # Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 版）
@@ -18,7 +18,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T04:14:03Z }
 | ゲート密度 | **密**（ステップごとに人が検証） |
 | アプローチ | **アウトサイドイン**（[開発戦略](./development_strategy.md) の序盤）。共有する日本語 Gherkin の許可リスト → API の契約 → 内側へ一段ずつ |
 | 準拠するガイド | [関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)（第 4・5・7 章: 副作用の境界、async、キャンセル、ポートとトランザクション境界） |
-| 状態 | **着手前の判断項目 1〜8 は 2026-11-21 にユーザーが「案どおり」承認した**（9 は超過時の扱い）。計画全体の `verified` は未記録。Step ごとのゲートは人の検証待ち |
+| 状態 | **着手前の判断項目 1〜8 は 2026-11-21 にユーザーが「案どおり」承認した**（9 は超過時の扱い）。計画全体の `verified` は未記録。**Step 1〜10 は実施済み。ゲートは人の検証待ち（結果は [Bolt 2 終了報告](./bolt_2_report.md)）** |
 
 ### ゴール
 
