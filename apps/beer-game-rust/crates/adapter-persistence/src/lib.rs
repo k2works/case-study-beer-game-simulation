@@ -4,4 +4,4 @@ mod codec;
 mod store;
 
 pub use codec::{GameCodec, SessionCodec};
-pub use store::{EventCodec, PgEventStore, PgTx, StreamType, migrate};
+pub use store::{EventCodec, PgEventStore, PgGameStore, PgTx, StreamType, migrate};

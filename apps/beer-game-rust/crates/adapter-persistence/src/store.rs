@@ -3,6 +3,9 @@
 use std::marker::PhantomData;
 
 use beergame_application::{AppFailure, EventStore, PersistenceFailure, StreamRead};
+use beergame_domain::{GameEvent, SessionEvent};
+
+use crate::codec::{GameCodec, SessionCodec};
 use sqlx::postgres::PgPool;
 use sqlx::{Postgres, Row, Transaction};
 use uuid::Uuid;
@@ -173,5 +176,79 @@ where
 
     async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
         tx.0.rollback().await.map_err(|e| storage(&e))
+    }
+}
+
+/// 1 ゲームの `game` と `session` の 2 本のストリーム。`Tx` を共有するので、`start_game` が 1 つのトランザクションで両方へ追記できる。
+pub struct PgGameStore {
+    game: PgEventStore<GameEvent, GameCodec>,
+    session: PgEventStore<SessionEvent, SessionCodec>,
+}
+
+impl PgGameStore {
+    #[must_use]
+    pub fn new(pool: PgPool, game_id: Uuid) -> Self {
+        PgGameStore {
+            game: PgEventStore::new(pool.clone(), game_id, StreamType::Game, GameCodec),
+            session: PgEventStore::new(pool, game_id, StreamType::Session, SessionCodec),
+        }
+    }
+}
+
+impl EventStore<GameEvent> for PgGameStore {
+    type Tx = PgTx;
+
+    async fn begin(&self) -> Result<PgTx, AppFailure> {
+        EventStore::<GameEvent>::begin(&self.game).await
+    }
+
+    async fn read(&self, tx: &mut PgTx) -> Result<StreamRead<GameEvent>, AppFailure> {
+        self.game.read(tx).await
+    }
+
+    async fn append(
+        &self,
+        tx: &mut PgTx,
+        expected: u64,
+        events: Vec<GameEvent>,
+    ) -> Result<u64, AppFailure> {
+        self.game.append(tx, expected, events).await
+    }
+
+    async fn commit(&self, tx: PgTx) -> Result<(), AppFailure> {
+        EventStore::<GameEvent>::commit(&self.game, tx).await
+    }
+
+    async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
+        EventStore::<GameEvent>::rollback(&self.game, tx).await
+    }
+}
+
+impl EventStore<SessionEvent> for PgGameStore {
+    type Tx = PgTx;
+
+    async fn begin(&self) -> Result<PgTx, AppFailure> {
+        EventStore::<SessionEvent>::begin(&self.session).await
+    }
+
+    async fn read(&self, tx: &mut PgTx) -> Result<StreamRead<SessionEvent>, AppFailure> {
+        self.session.read(tx).await
+    }
+
+    async fn append(
+        &self,
+        tx: &mut PgTx,
+        expected: u64,
+        events: Vec<SessionEvent>,
+    ) -> Result<u64, AppFailure> {
+        self.session.append(tx, expected, events).await
+    }
+
+    async fn commit(&self, tx: PgTx) -> Result<(), AppFailure> {
+        EventStore::<SessionEvent>::commit(&self.session, tx).await
+    }
+
+    async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
+        EventStore::<SessionEvent>::rollback(&self.session, tx).await
     }
 }

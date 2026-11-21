@@ -5,6 +5,10 @@ use std::future::Future;
 
 use beergame_domain::{Evolution, GameError, SessionError, StartError, ValidationError};
 
+mod start;
+
+pub use start::execute_start;
+
 /// `decide` が返した業務上の失敗。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DomainError {
@@ -73,6 +77,26 @@ pub trait EventStore<E>: Sync {
     fn rollback(&self, tx: Self::Tx) -> impl Future<Output = Result<(), AppFailure>> + Send;
 }
 
+/// 保存済みのイベントを畳み込む。`Ignored`（decide が作らない列）があれば、状態を信用せず失敗にする（RD2）。
+pub(crate) fn replay<E, S: Clone>(
+    initial: &S,
+    events: &[E],
+    evolve: &impl Fn(S, &E) -> Evolution<S>,
+) -> Result<S, AppFailure> {
+    let mut state = initial.clone();
+    for (index, event) in events.iter().enumerate() {
+        match evolve(state, event) {
+            Evolution::Applied(next) => state = next,
+            Evolution::Ignored(_) => {
+                return Err(AppFailure::Persistence(PersistenceFailure::Replay {
+                    index,
+                }));
+            }
+        }
+    }
+    Ok(state)
+}
+
 /// 読む → 再生 → decide → 追記。失敗は `run_once` が rollback する。
 async fn step<E, S, C, St>(
     store: &St,
@@ -89,18 +113,7 @@ where
     St: EventStore<E>,
 {
     let read = store.read(tx).await?;
-    let mut state = initial.clone();
-    for (index, event) in read.events.iter().enumerate() {
-        match evolve(state, event) {
-            Evolution::Applied(next) => state = next,
-            // decide が作らない列。状態を信用せず、コマンドの経路では失敗にする（RD2）
-            Evolution::Ignored(_) => {
-                return Err(AppFailure::Persistence(PersistenceFailure::Replay {
-                    index,
-                }));
-            }
-        }
-    }
+    let state = replay(initial, &read.events, evolve)?;
     let decided = decide(&state, command).map_err(AppFailure::Domain)?;
     if decided.is_empty() {
         // 空の列は追記しない（変化なし）
