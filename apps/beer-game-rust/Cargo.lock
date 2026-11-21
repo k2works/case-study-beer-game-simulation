@@ -83,6 +83,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "beergame-application"
+version = "0.1.0"
+dependencies = [
+ "beergame-domain",
+ "tokio",
+]
+
+[[package]]
 name = "beergame-domain"
 version = "0.1.0"
 dependencies = [

@@ -16,6 +16,23 @@ pub const DOMAIN_FORBIDDEN: &[&str] = &[
     "futures",
     "rand",
     "getrandom",
+    "beergame-application",
+    "beergame-adapter-http",
+    "beergame-adapter-persistence",
+    "beergame-app",
+];
+
+/// application が依存してはならないクレート（DB・HTTP は、アダプターが実装する。設計: architecture-backend）。
+pub const APPLICATION_FORBIDDEN: &[&str] = &[
+    "sqlx",
+    "axum",
+    "hyper",
+    "tower",
+    "tower-http",
+    "reqwest",
+    "beergame-adapter-http",
+    "beergame-adapter-persistence",
+    "beergame-app",
 ];
 
 /// `cargo tree --prefix none` の出力から、禁止されたクレートの名前を返す（重複なし、出現順）。
