@@ -87,26 +87,28 @@ pub fn api_scenarios(text: &str) -> Vec<String> {
 }
 
 #[cfg(test)]
+// 理由: RT1 の命名（承認済み）の `__` を使うため（rustc の non_snake_case は連続する `_` を許さない）。
+#[allow(non_snake_case)]
 mod tests {
     use super::*;
 
     const TEXT: &str = "# 説明\n\ngame-setup/co-assignment.feature\nweekly-play/decision.feature :: 数量を保存する\n";
 
     #[test]
-    fn コメントと空行を無視して読む() {
+    fn tech__コメントと空行を無視して読む() {
         assert_eq!(Allowlist::parse(TEXT).len(), 2);
         assert!(Allowlist::parse("# だけ\n").is_empty());
     }
 
     #[test]
-    fn ファイルの指定は_そのファイルのすべてのシナリオを許す() {
+    fn tech__ファイルの指定は_そのファイルのすべてのシナリオを許す() {
         let list = Allowlist::parse(TEXT);
         assert!(list.allows("/x/features/game-setup/co-assignment.feature", "任意"));
         assert!(!list.allows("/x/features/game-setup/joining.feature", "任意"));
     }
 
     #[test]
-    fn api_のシナリオ名だけを拾う() {
+    fn tech__api_のシナリオ名だけを拾う() {
         let text = "機能: x\n  @AC1 @api @core\n  シナリオ: 拾う\n    前提 a\n  @AC2 @ui\n  シナリオ: 拾わない\n  # c\n  @api\n  # 間のコメント\n  シナリオアウトライン: 拾う 2\n";
         assert_eq!(
             api_scenarios(text),
@@ -115,7 +117,7 @@ mod tests {
     }
 
     #[test]
-    fn 許可リストのファイルは重複なく返す() {
+    fn tech__許可リストのファイルは重複なく返す() {
         assert_eq!(Allowlist::parse(TEXT).files().len(), 2);
         assert_eq!(
             Allowlist::parse("a.feature :: x\na.feature :: y\n").files(),
@@ -124,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn シナリオの指定は_そのシナリオだけを許す() {
+    fn tech__シナリオの指定は_そのシナリオだけを許す() {
         let list = Allowlist::parse(TEXT);
         assert!(list.allows("/x/weekly-play/decision.feature", "数量を保存する"));
         assert!(!list.allows("/x/weekly-play/decision.feature", "別のシナリオ"));

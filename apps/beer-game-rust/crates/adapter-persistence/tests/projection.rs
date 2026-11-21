@@ -29,7 +29,7 @@ fn created(id: GameId) -> Result<GameEvent, String> {
 }
 
 #[test]
-fn 投影は純粋_同じイベントから同じ文を導く() -> Result<(), String> {
+fn tech__投影は純粋_同じイベントから同じ文を導く() -> Result<(), String> {
     let id = GameId::new(7);
     let game = Uuid::from_u128(7);
     let event = created(id)?;

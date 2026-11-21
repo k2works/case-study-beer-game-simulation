@@ -131,7 +131,7 @@ fn ac1_1_2__最終週と需要系列の誤りはすべて集めて返す() {
 }
 
 #[test]
-fn 開始の誤りは_Game_と_Session_の_code_と_category_をそのまま返す() {
+fn tech__開始の誤りは_Game_と_Session_の_code_と_category_をそのまま返す() {
     let game = StartError::Game(GameError::StartConditionNotMet(vec![Role::Factory]));
     assert_eq!(game.code(), "game.start_condition_not_met");
     assert_eq!(game.category(), ErrorCategory::RuleViolation);

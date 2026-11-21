@@ -252,7 +252,7 @@ fn replay__decide_が作らない列の位置を返す() -> R<()> {
 }
 
 #[test]
-fn エラーの_code_と_category_は_API_の契約として固定される() {
+fn tech__エラーの_code_と_category_は_API_の契約として固定される() {
     let cases = [
         (
             GameError::AlreadyCreated,

@@ -66,7 +66,7 @@ async fn ds13__postgres_18_6_を固定して起動できる() -> Result<(), Stri
 }
 
 #[tokio::test]
-async fn 追記したイベントを版つきで読める() -> Result<(), String> {
+async fn tech__追記したイベントを版つきで読める() -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());
     };
@@ -190,7 +190,7 @@ async fn rb2__tx_の_drop_は_ロックを解放する_測定して記録する(
 }
 
 #[tokio::test]
-async fn マイグレーション_0001_から_0005_が適用され_game_roots_の削除が全表へ連鎖する()
+async fn tech__マイグレーション_0001_から_0005_が適用され_game_roots_の削除が全表へ連鎖する()
 -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());

@@ -185,7 +185,7 @@ fn ds3_共有状態の_mutex_を使うと失敗する() -> Result<(), String> {
 }
 
 #[test]
-fn 規則を破らないコードは通る() -> Result<(), String> {
+fn tech__規則を破らないコードは通る() -> Result<(), String> {
     assert_accepted("clean/ok")?;
     Ok(())
 }
@@ -194,7 +194,7 @@ fn 規則を破らないコードは通る() -> Result<(), String> {
 /// この限界を記録する（通ることを確かめる）。守りはテスト（`evolve` の腕を消すと落ちる性質テスト。DS-5）で補う。
 /// もし将来 lint が発火するようになれば、このテストが落ちるので、守りの対応表を見直す。
 #[test]
-fn ガイド9_4_組の_match_のワイルドカードは_lint_で守られない() -> Result<(), String> {
+fn tech__ガイド9_4_組の_match_のワイルドカードは_lint_で守られない() -> Result<(), String> {
     assert_accepted("clean/tuple_wildcard_not_detected")?;
     Ok(())
 }
