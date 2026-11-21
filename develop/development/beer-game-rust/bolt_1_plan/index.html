@@ -5952,6 +5952,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        静的解析とルール設定（ガイド第 9 章の適用）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12643,6 +12654,51 @@
 </table>
 <p><strong>範囲に含めないことの確認</strong>: <code>.claude/settings.json</code> の変更、git の hook、ブランチ保護、AWS への適用は、B1 で行いません。</p>
 <hr />
+<h2 id="9">静的解析とルール設定（ガイド第 9 章の適用）<a class="headerlink" href="#9" title="Permanent link">&para;</a></h2>
+<p><a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Rust%E7%B7%A8/">関数型プログラミングガイド（Rust 編）</a> の第 9 章「静的解析とルール設定」を、B1 で次のとおり適用します。<strong>Rust 版にはガイド 9.1 のとおり detekt・ktlint・PMD を入れません</strong>（Rust のソースは対象外。PMD は重複検出のみ）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ガイドの節</th>
+<th style="text-align: left;">B1 での適用</th>
+<th style="text-align: left;">確認する Step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">9.1 ツールの選び方</td>
+<td style="text-align: left;"><strong>rustc（<code>[lints.rust]</code>）、rustfmt、clippy、カバレッジ</strong>の 4 つ。それぞれの役割を CI の段に対応させる</td>
+<td style="text-align: left;">Step 1・8</td>
+</tr>
+<tr>
+<td style="text-align: left;">9.2 検査に何を入れるか</td>
+<td style="text-align: left;"><strong>段ごとに「何を守るか」「<code>test</code> と重複するか」「秒数」を書き出してから入れる</strong>（<code>fmt</code>・<code>clippy</code>・<code>test</code>・<code>cov</code>・<code>deny</code>）。重複する段は入れない。結果を Bolt 終了報告の表に記録</td>
+<td style="text-align: left;">Step 1・8・9</td>
+</tr>
+<tr>
+<td style="text-align: left;">9.3 clippy が止めたものの扱い</td>
+<td style="text-align: left;"><strong><code>allow</code> するときは理由を残す</strong>（コメントまたは ADR）。指摘を「設計の改善」と「clippy の好み」に仕分けて件数を記録。法則のテストが止められる場合のみ <code>allow</code></td>
+<td style="text-align: left;">Step 4〜6</td>
+</tr>
+<tr>
+<td style="text-align: left;">9.4 コンパイラと clippy が守る範囲</td>
+<td style="text-align: left;"><strong>守られない範囲をテストで確かめる</strong>: 組（タプル）の <code>match</code> のワイルドカード、遷移の行き先の誤り、クエリ側からの状態変更。<code>evolve</code> の腕を消す性質テスト（DS-5）と遷移表のテスト</td>
+<td style="text-align: left;">Step 2・5・6</td>
+</tr>
+<tr>
+<td style="text-align: left;">9.5 ツールを入れる前に、守りたいことを決める</td>
+<td style="text-align: left;">複数人・長期の保守に当たるため、<strong>clippy の lint を <code>deny</code> にして CI で止める。<code>[workspace.lints]</code> で全クレートに揃え、層ごとに <code>clippy.toml</code> を分ける</strong>。入れる前に、守る規約と副作用（ビルド時間）を記録</td>
+<td style="text-align: left;">Step 1</td>
+</tr>
+<tr>
+<td style="text-align: left;">9.6 関数型ルールを clippy の設定にする</td>
+<td style="text-align: left;"><strong>章と規約の対応表（ガイド 9.6）を、そのまま <code>Cargo.toml</code> の <code>[lints]</code> と <code>clippy.toml</code> にする</strong>。確認用コード（17 件）を fixture にし、<strong>Rust 1.97.1 の clippy で期待どおりの行が報告される</strong>ことを確かめる（ガイドは clippy 0.1.91）</td>
+<td style="text-align: left;">Step 1・2</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ルールそのものをテストファーストで確かめる</strong>: 設定を入れる前に、fixture（違反するコードとしないコード）を置き、<strong>違反だけが報告され、しないコードは報告されない</strong>ことを確認してから、設定を <code>deny</code> にして CI に入れます。ガイドとの差分（Rust 版で変えた設定）は、理由とともに ADR か設計書に記録します。</p>
+<hr />
 <h2 id="_6">ステップ計画<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>記号: 🔵 土台・検証、🔴 Red、🟢 Green、🟡 Refactor、✅ 検証。各ステップの終わりが<strong>承認ゲート</strong>です（密）。1 ステップ 1 コミット（構造と動作を分ける）。</p>
 <h3 id="step-1">Step 1: リポジトリの土台（🔵）<a class="headerlink" href="#step-1" title="Permanent link">&para;</a></h3>
@@ -12703,6 +12759,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 判断項目 1〜6 が承認され、使った版が出典つきで記録されている</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> ドメインの Given/When/Then（Game・Session・<code>simulate_week</code>）が green。golden と性質テストが green。<strong>domain の行カバレッジ 100%</strong></li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> DS-1〜3 の fixture が、<strong>期待の理由で落ちる</strong>（ローカルと GitHub Actions）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>ガイド第 9 章の適用</strong>（上の表）: 段ごとの「守るもの・重複・秒数」の記録、ガイド 9.6 の設定、確認用コード（17 件）が Rust 1.97.1 の clippy で期待どおり、<code>allow</code> はすべて理由つき、守られない範囲（組の <code>match</code> など）をテストで確認</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> DS-4（依存方向）、DS-5（腕を消すと落ちる）、DS-6（しきい値）、DS-14（<code>cargo deny</code>）が確認済み</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> cucumber-rs の日本語 Gherkin の可否と Undefined の扱いが記録されている</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 品質チェック一式が CI で緑</li>
@@ -12730,6 +12787,10 @@
 <tr>
 <td style="text-align: left;">cucumber-rs が日本語を扱えない</td>
 <td style="text-align: left;">代替（英語キーワード + 日本語本文）を比較して人に提示</td>
+</tr>
+<tr>
+<td style="text-align: left;">ガイドの設定が Rust 1.97.1 の clippy で件数・行が変わる</td>
+<td style="text-align: left;">確認用コードで差を記録し、設定を調整して ADR に残す</td>
 </tr>
 <tr>
 <td style="text-align: left;">手元の <code>cargo-llvm-cov</code>・<code>cargo-deny</code> が古い</td>
