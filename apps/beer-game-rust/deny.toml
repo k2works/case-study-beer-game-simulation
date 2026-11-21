@@ -6,10 +6,20 @@ exclude-unpublished = false
 
 [advisories]
 version = 2
+# 暫定・人の承認待ち（開発戦略 DS-17。ADR で記録して承認を得る）:
+# humantime は cucumber 0.23.0（開発時のみ）の依存で、chrono が非メンテナンスになったため非メンテナンスと報告された
+# （脆弱性ではない。解決策なし）。承認されない場合は、cucumber の代替を検討する。
+ignore = [
+    { id = "RUSTSEC-2026-0542", reason = "cucumber（開発時のみ）の依存。脆弱性ではなく非メンテナンスの報告。人の承認待ち" },
+]
 
 [licenses]
 version = 2
-allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BSD-3-Clause", "ISC"]
+# 開発時のみの依存も検査する（既定は検査しない）
+include-dev = true
+# BlueOak-1.0.0 は cucumber（開発時のみ）の依存 synthez の許可。寛容な OSI 承認のライセンスだが、
+# 許可の追加は DS-17 の対象なので、暫定・人の承認待ち。
+allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BlueOak-1.0.0"]
 
 [licenses.private]
 ignore = true
@@ -17,3 +27,5 @@ ignore = true
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# ワークスペース内の path 依存は版を書かない
+allow-wildcard-paths = true

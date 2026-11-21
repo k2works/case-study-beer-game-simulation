@@ -3,7 +3,7 @@ name: beer-game-rust
 # beer-game-rust の CI（検証のみ。デプロイはしない）。
 # 設計: docs/design/beer-game-rust/test-strategy.md「CI との連携」、docs/development/beer-game-rust/bolt_1_plan.md の Step 1
 #
-# 工程: fmt・clippy・test・deny。カバレッジのゲート（行 80%、domain 100%）は Bolt 1 の Step 8 で足す。
+# 工程: fmt・clippy・test（受け入れ・守りの検査を含む）・カバレッジのゲート（行 80%）・deny。
 # actions の版: checkout は beer-game3.yml と同じ SHA 固定。Rust のツールチェーンは rust-toolchain.toml（1.97.1）が正。
 
 on:
@@ -42,7 +42,13 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: テスト
         run: cargo test --workspace --locked
-      - name: 依存関係の検査（cargo-deny）
+      - name: カバレッジのゲート（行 80% 未満で失敗。RT3）
         run: |
-          cargo install cargo-deny --locked
+          cargo install cargo-llvm-cov --version 0.9.1 --locked
+          cargo llvm-cov --workspace --locked --fail-under-lines 80 --summary-only
+      - name: domain の行カバレッジ 100%（domain 自身のテストだけで）
+        run: cargo llvm-cov -p beergame-domain --locked --fail-under-lines 100 --summary-only
+      - name: 依存関係の検査（cargo-deny。開発時のみの依存も検査する）
+        run: |
+          cargo install cargo-deny --version 0.21.0 --locked
           cargo deny check
