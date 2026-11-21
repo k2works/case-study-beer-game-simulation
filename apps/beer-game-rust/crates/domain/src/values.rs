@@ -150,3 +150,154 @@ impl Money {
         Money(self.0.saturating_mul(i64::from(units.0)))
     }
 }
+
+/// 表示名。前後の空白を除いて 1〜80 文字（Unicode のコードポイント数）。イベントには入れない。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DisplayName(String);
+
+impl DisplayName {
+    pub const MAX_LENGTH: usize = 80;
+
+    /// # Errors
+    /// 前後の空白を除いた文字数が 1〜80 でないとき `DisplayNameInvalid`。
+    pub fn of(raw: &str) -> Result<Self, ValidationError> {
+        let trimmed = raw.trim();
+        let length = trimmed.chars().count();
+        if (1..=Self::MAX_LENGTH).contains(&length) {
+            Ok(DisplayName(trimmed.to_owned()))
+        } else {
+            Err(ValidationError::DisplayNameInvalid { length })
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// 参加コード。推測困難な乱数から作る 8 文字以上の文字列（生成は境界が行い、ドメインは長さだけを検証する）。
+#[derive(Clone, PartialEq, Eq)]
+pub struct JoinCode(String);
+
+impl JoinCode {
+    pub const MIN_LENGTH: usize = 8;
+
+    /// # Errors
+    /// 8 文字に満たないとき `JoinCodeInvalid`。
+    pub fn of(raw: &str) -> Result<Self, ValidationError> {
+        let length = raw.chars().count();
+        if length >= Self::MIN_LENGTH {
+            Ok(JoinCode(raw.to_owned()))
+        } else {
+            Err(ValidationError::JoinCodeInvalid { length })
+        }
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// 秘密に準じる値なので、`Debug` では中身を出さない（ログ・テスト出力への漏れを防ぐ）。
+impl std::fmt::Debug for JoinCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("JoinCode(***)")
+    }
+}
+
+/// 保持日数。1〜3650。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RetentionDays(u16);
+
+impl RetentionDays {
+    pub const MIN: u16 = 1;
+    pub const MAX: u16 = 3650;
+
+    /// # Errors
+    /// 1〜3650 の範囲外のとき `RetentionOutOfRange`。
+    pub fn of(n: i64) -> Result<Self, ValidationError> {
+        u16::try_from(n)
+            .ok()
+            .filter(|v| (Self::MIN..=Self::MAX).contains(v))
+            .map(RetentionDays)
+            .ok_or(ValidationError::RetentionOutOfRange { actual: n })
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u16 {
+        self.0
+    }
+}
+
+/// 意思決定の版。役割ごと・週ごとに 0 から始まり、保存のたびに 1 増える（ストリームの版とは別）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DecisionVersion(u32);
+
+impl DecisionVersion {
+    pub const ZERO: DecisionVersion = DecisionVersion(0);
+
+    #[must_use]
+    pub const fn new(n: u32) -> Self {
+        DecisionVersion(n)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn next(self) -> DecisionVersion {
+        DecisionVersion(self.0.saturating_add(1))
+    }
+}
+
+/// ゲームの識別子。セッションの識別子も同じ値（1 ゲーム 1 セッション）。UUID の 128 ビット値で、変換は境界が行う。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GameId(u128);
+
+impl GameId {
+    #[must_use]
+    pub const fn new(n: u128) -> Self {
+        GameId(n)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u128 {
+        self.0
+    }
+}
+
+/// 参加者の識別子。UUID の 128 ビット値で、変換は境界が行う。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ParticipantId(u128);
+
+impl ParticipantId {
+    #[must_use]
+    pub const fn new(n: u128) -> Self {
+        ParticipantId(n)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u128 {
+        self.0
+    }
+}
+
+/// 時刻（UNIX エポックからのミリ秒）。時計は読まず、コマンドの値として受け取る。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Instant(i64);
+
+impl Instant {
+    #[must_use]
+    pub const fn from_epoch_millis(ms: i64) -> Self {
+        Instant(ms)
+    }
+
+    #[must_use]
+    pub const fn epoch_millis(self) -> i64 {
+        self.0
+    }
+}

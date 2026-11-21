@@ -45,12 +45,12 @@ fn ac1_1_2__需要系列の範囲外は対象の週ごとにすべて集める()
         .err()
         .unwrap_or_default()
         .iter()
-        .filter_map(|e| match e {
-            ValidationError::DemandSeriesInvalid { week_index, .. } => Some(*week_index),
-            ValidationError::QuantityOutOfRange { .. }
-            | ValidationError::WeekOutOfRange { .. }
-            | ValidationError::UnitsNegative { .. }
-            | ValidationError::MoneyNegative { .. } => None,
+        .filter_map(|e| {
+            if let ValidationError::DemandSeriesInvalid { week_index, .. } = e {
+                Some(*week_index)
+            } else {
+                None
+            }
         })
         .collect();
     assert_eq!(weeks, vec![2, 4]);
