@@ -217,6 +217,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "beergame-adapter-http"
+version = "0.1.0"
+dependencies = [
+ "beergame-application",
+ "beergame-domain",
+ "serde_json",
+]
+
+[[package]]
 name = "beergame-adapter-persistence"
 version = "0.1.0"
 dependencies = [

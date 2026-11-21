@@ -1,0 +1,14 @@
+[package]
+name = "beergame-adapter-http"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+beergame-application = { path = "../application" }
+beergame-domain = { path = "../domain" }
+serde_json = "1.0.154"
+
+[lints]
+workspace = true
