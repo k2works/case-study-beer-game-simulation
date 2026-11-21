@@ -4,7 +4,7 @@ title: "Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 
 description: "beer-game-rust の Bolt 2 のステップ計画。イベントストア・execute・axum・投影・共有する features の許可リスト・DB を要する前提の検証・NF-P2 の実測。着手前に人の判断が要る項目を含む。人の承認待ち。"
 tags: [plan]
 status: draft
-generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T03:46:17Z }
+generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T04:14:03Z }
 ---
 
 # Bolt 2 計画 - 縦の最小（ウォーキングスケルトン、Rust 版）
@@ -132,6 +132,44 @@ B1 のドメインの範囲に、HTTP・永続化・認証を加えたもの（�
   - `weekly-play/week-commit.feature`（6）: 確定、冪等、一回性、決定論、結果の項目、入力不足
   - **除外**: 共同担当（`co-assignment`・`co-input`）、復帰・失効（`continuation`）、カスタム条件、自動確定、観察、出力、保持。B1 で書いた `co-assignment`（ドメインに対して実行）は、B2 の HTTP 化に合わせて、B6 まで許可リストから外す予定。
 - **契約（`openapi.yaml`）との差の一覧**: Step 6（HTTP）の着手時に、各経路のリクエスト・レスポンスの項目を、Rust 側の型と突き合わせて一覧にする（変更しない。差は Rust で直す。RU2）。
+
+---
+
+## Step 2・3 の結果（ゲート: 人の検証待ち）
+
+実施済み（2026-11-21、AI）。**人のゲートは未承認**。
+
+- **Step 2（`application` クレート）**: ポート（`EventStore`、`AppFailure`、`StreamRead`）と `execute`（読む → 再生 → decide → 追記）。メモリ実装で 6 件（成功は commit だけ / 競合ごとに rollback して再試行 / 上限で `RetryExhausted` / 業務の失敗は rollback / 空の列は追記しない / 再生で `Ignored` なら fail closed）。依存方向の検査（DS-4）を application に広げた（sqlx・axum などに依存しない）。
+- **Step 3（`adapter-persistence`、0001 のみ）**: マイグレーション 0001（設計書の検証済みの DDL）と `PgEventStore`（sqlx 0.9.1）。実 PostgreSQL 18.6（testcontainers）の測定結果（**RB2 の前提**）:
+
+| 前提 | 結果 |
+| :--- | :--- |
+| 制約名（`uq_events_stream_version`）の取得 | **成立**。`sqlx::Error::Database` の `code() == "23505"` と `constraint()` で判別できた |
+| 実際の並行（2 タスク、同じ版へ追記） | **成立**。一方だけが成功し、他方は `ConcurrencyConflict` |
+| 明示の `rollback` の後、同じ版への追記 | **成立**。約 7 ms で通る（ロック残りなし） |
+| **`Tx` の drop（rollback なし）の後、同じ版への追記** | **成立（保険として有効）**。約 8 ms で通った（sqlx 0.9.1 は drop で ROLLBACK を送る）。ただし測定は 1 回・ローカル。負荷時の遅れは B3 以降で追う |
+| `postgres:18.6` のタグ固定 | **成立**（`SHOW server_version` が 18.6） |
+| Docker が無いとき | `CI` があれば失敗、無ければスキップ（DS-13 の入口。**実行件数が 0 なら失敗にする検査は B3**） |
+| テンプレート DB による分離 | **未確認**（テストごとに別コンテナ。約 22 秒/5 テスト。B3 で方式を決める） |
+
+- **発見（技術スタックの食い違い）**: `testcontainers-modules` 0.15.0 は `testcontainers` ^0.27 を要し、技術スタックの組（`testcontainers` 0.28.0 と `testcontainers-modules` 0.15.0）は**同時に解決できない**。`testcontainers` 0.28.0 の `GenericImage` だけで足りたため、**`testcontainers-modules` は導入しない**（依存が 1 つ減る）。設計書（tech-stack）の更新が要る。
+- **発見（ライセンス・勧告）**: 新規依存で、ISC・BSD-3-Clause・Zlib のライセンスと、`astral-tokio-tar`（testcontainers の依存）の非メンテナンスの勧告（RUSTSEC-2026-0440）が出た。`deny.toml` に**暫定の許可・無視**を入れた（承認待ち。B1 の 2 件と同じ扱い）。
+
+### ゲート: DDL（0002〜0005）の検証 — **着手前の承認が要る**
+
+0001 は設計書の検証済みの DDL で作成済み。0002〜0005 は、Kotlin 版の `V002`〜`V005` を元にします。**差の一覧**（人が検証してから、DDL を作る）:
+
+| # | Kotlin 版 | Rust 版 | 理由 |
+| :--- | :--- | :--- | :--- |
+| 1 | `${json_type}`（H2 と PostgreSQL の切り替え） | `jsonb` | H2 を使わない |
+| 2 | `timestamp with time zone` | `timestamptz` | 同じ型の別名。0001 と揃える |
+| 3 | 共通（V002〜V005）と PostgreSQL 固有（V101）の 2 系統 | **1 系統**。V101 の部分一意索引 `uq_idempotency_create` は 0002 に含める | 方言がない |
+| 4 | 表: `display_profiles`・`credentials`・`browser_sessions`・`idempotency_records`（V002）、`game_overview`・`game_join_codes`・`game_settings`・`lobby_participants`・`lobby_observer_invitations`・`lobby_observers`（V003）、`session_overview`・`role_current_states`・`current_decisions`（V004）、`week_commits`・`week_role_results`・`week_team_totals`（V005） | **同じ 15 表・同じ列・同じ制約名** | API・投影の契約を保つ |
+| 5 | V006（保持）・V007（`lobby_participants.replaced_at`）・V008（`participation_attempts`） | **B2 では作らない**（B6・B12 の範囲） | B2 の範囲外 |
+| 6 | V102・V103（ロールと GRANT） | **B3 で作る**（追記専用権限の否定テストと同時） | 表より後ろの番号に置く（既定の権限は与えない） |
+| 7 | 番号 `V002`〜`V005` | `0002`〜`0005`（sqlx の `<番号>_<名前>.sql`） | sqlx の命名 |
+
+承認をお願いします（差の一覧どおりに DDL を作ってよいか）。
 
 ---
 
