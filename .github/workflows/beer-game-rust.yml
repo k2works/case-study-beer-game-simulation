@@ -1,0 +1,48 @@
+name: beer-game-rust
+
+# beer-game-rust の CI（検証のみ。デプロイはしない）。
+# 設計: docs/design/beer-game-rust/test-strategy.md「CI との連携」、docs/development/beer-game-rust/bolt_1_plan.md の Step 1
+#
+# 工程: fmt・clippy・test・deny。カバレッジのゲート（行 80%、domain 100%）は Bolt 1 の Step 8 で足す。
+# actions の版: checkout は beer-game3.yml と同じ SHA 固定。Rust のツールチェーンは rust-toolchain.toml（1.97.1）が正。
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-rust/**'
+      - '.github/workflows/beer-game-rust.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-rust/**'
+      - '.github/workflows/beer-game-rust.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beer-game-rust-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game-rust
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: ツールチェーン（rust-toolchain.toml の版）
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: 書式
+        run: cargo fmt --check
+      - name: 静的解析（clippy。警告はすべて失敗）
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: テスト
+        run: cargo test --workspace --locked
+      - name: 依存関係の検査（cargo-deny）
+        run: |
+          cargo install cargo-deny --locked
+          cargo deny check

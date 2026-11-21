@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["crates/domain"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+# 規約は lint で守る。出発点は docs/reference/関数型プログラミングガイド_Rust編.md の 9.6。
+# 緩和（allow の追加・しきい値の変更）は理由を残し、ADR で記録して人が承認する。
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+indexing_slicing = "deny"
+wildcard_enum_match_arm = "deny"
+match_wildcard_for_single_variants = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+let_underscore_must_use = "deny"
+disallowed_methods = "deny"
+disallowed_types = "deny"

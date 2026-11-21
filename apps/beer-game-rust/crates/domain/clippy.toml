@@ -1,0 +1,17 @@
+# domain は純粋。時計・環境・スレッド・共有状態を持たない（ガイド 9.6）。
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "時計は引数で受け取る" },
+    { path = "std::time::Instant::now", reason = "時計は引数で受け取る" },
+    { path = "std::thread::sleep", reason = "スレッドを塞ぐ" },
+    { path = "std::thread::spawn", reason = "スレッドを直接扱わない" },
+    { path = "std::panic::catch_unwind", reason = "失敗は Result で返す" },
+    { path = "std::env::var", reason = "環境は引数で受け取る" },
+]
+disallowed-types = [
+    { path = "std::sync::Mutex", reason = "共有状態は境界のクレートだけが持つ" },
+]
