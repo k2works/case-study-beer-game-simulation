@@ -330,6 +330,10 @@ impl EventCodec<GameEvent> for GameCodec {
 pub struct SessionCodec;
 
 impl EventCodec<SessionEvent> for SessionCodec {
+    fn projection(&self, game_id: Uuid, event: &SessionEvent) -> Vec<crate::projection::Statement> {
+        crate::projection::session_statements(game_id, event)
+    }
+
     fn encode(&self, event: &SessionEvent) -> R<(String, i32, Value)> {
         let (name, payload) = match event {
             SessionEvent::SessionStarted {

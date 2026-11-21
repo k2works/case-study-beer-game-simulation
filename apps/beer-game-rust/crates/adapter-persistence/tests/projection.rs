@@ -162,3 +162,142 @@ async fn ac1_2_1__投影の表は追記と同じトランザクションで更�
     assert_eq!(status, "STARTED");
     Ok(())
 }
+
+fn decide(
+    state: &beergame_domain::SessionState,
+    command: &beergame_domain::SessionCommand,
+) -> Result<Vec<beergame_domain::SessionEvent>, beergame_application::DomainError> {
+    beergame_domain::decide_session(state, command)
+        .map_err(beergame_application::DomainError::Session)
+}
+
+#[tokio::test]
+async fn ac2_3_5__進行と結果の投影は_確定まで追記と同じトランザクションで更新される()
+-> Result<(), String> {
+    use beergame_application::execute;
+    use beergame_domain::{
+        DecisionVersion, Quantity, RoleMap, SessionCommand, SessionState, Week, evolve_session,
+    };
+
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game: Uuid = new_game(&env.pool).await?;
+    let id = GameId::new(game.as_u128());
+    let store = PgGameStore::new(env.pool.clone(), game);
+    let expires = Instant::from_epoch_millis(9);
+    let mut events = vec![created(id)?];
+    for (i, role) in Role::ALL.iter().enumerate() {
+        let p = ParticipantId::new(u128::try_from(i + 1).map_err(e)?);
+        events.push(GameEvent::ParticipantJoined {
+            participant_id: p,
+            credential_expires_at: expires,
+        });
+        events.push(GameEvent::RoleAssigned {
+            participant_id: p,
+            role: *role,
+        });
+    }
+    let mut tx = EventStore::<GameEvent>::begin(&store).await.map_err(e)?;
+    EventStore::<GameEvent>::append(&store, &mut tx, 0, events)
+        .await
+        .map_err(e)?;
+    EventStore::<GameEvent>::commit(&store, tx)
+        .await
+        .map_err(e)?;
+    execute_start(
+        &store,
+        &StartGame {
+            actor: Actor::Facilitator(id),
+            at: expires,
+        },
+        3,
+    )
+    .await
+    .map_err(e)?;
+
+    let (week, status, submitted): (i32, String, i32) = sqlx::query_as(
+        "SELECT week, status, submitted_role_count FROM session_overview WHERE game_id = $1",
+    )
+    .bind(game)
+    .fetch_one(&env.pool)
+    .await
+    .map_err(e)?;
+    assert_eq!((week, status.as_str(), submitted), (1, "ACTIVE", 0));
+    let states: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM role_current_states WHERE game_id = $1")
+            .bind(game)
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    assert_eq!(states, 4);
+
+    for (n, role) in Role::ALL.iter().enumerate() {
+        let command = SessionCommand::SaveDecision {
+            actor: Actor::Participant(ParticipantId::new(u128::try_from(n + 1).map_err(e)?)),
+            at: expires,
+            role: *role,
+            requested_week: Week::FIRST,
+            quantity: Quantity::of(6).map_err(e)?,
+            expected_decision_version: DecisionVersion::ZERO,
+        };
+        execute(
+            &store,
+            &SessionState::NotStarted,
+            &evolve_session,
+            &decide,
+            &command,
+            3,
+        )
+        .await
+        .map_err(e)?;
+    }
+    let (submitted, decisions): (i32, i64) = sqlx::query_as(
+        "SELECT (SELECT submitted_role_count FROM session_overview WHERE game_id = $1), (SELECT count(*) FROM current_decisions WHERE game_id = $1)",
+    ).bind(game).fetch_one(&env.pool).await.map_err(e)?;
+    assert_eq!((submitted, decisions), (4, 4));
+
+    let commit = SessionCommand::CommitWeek {
+        actor: Actor::Facilitator(id),
+        at: expires,
+        requested_week: Week::FIRST,
+        basis: RoleMap::all(&DecisionVersion::new(1)),
+    };
+    execute(
+        &store,
+        &SessionState::NotStarted,
+        &evolve_session,
+        &decide,
+        &commit,
+        3,
+    )
+    .await
+    .map_err(e)?;
+
+    let (week, submitted): (i32, i32) = sqlx::query_as(
+        "SELECT week, submitted_role_count FROM session_overview WHERE game_id = $1",
+    )
+    .bind(game)
+    .fetch_one(&env.pool)
+    .await
+    .map_err(e)?;
+    assert_eq!((week, submitted), (2, 0), "確定で週が進み、入力は空に戻る");
+    let current: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM current_decisions WHERE game_id = $1")
+            .bind(game)
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    assert_eq!(current, 0);
+    let results: Vec<(String, i32, i32)> = sqlx::query_as("SELECT role, ordered, ending_inventory FROM week_role_results WHERE game_id = $1 AND week = 1 ORDER BY role")
+        .bind(game).fetch_all(&env.pool).await.map_err(e)?;
+    assert_eq!(results.len(), 4);
+    assert!(results.iter().all(|(_, ordered, _)| *ordered == 6));
+    let (as_of, version): (i32, i64) = sqlx::query_as(
+        "SELECT (SELECT as_of_week FROM role_current_states WHERE game_id = $1 AND role = 'RETAILER'), \
+         (SELECT stream_version FROM week_commits WHERE game_id = $1 AND week = 1)",
+    ).bind(game).fetch_one(&env.pool).await.map_err(e)?;
+    assert_eq!(as_of, 2);
+    assert_eq!(version, 6, "SessionStarted(1) + 4 保存 + WeekCommitted(6)");
+    Ok(())
+}

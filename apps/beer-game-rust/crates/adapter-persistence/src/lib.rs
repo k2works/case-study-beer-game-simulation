@@ -5,5 +5,5 @@ mod projection;
 mod store;
 
 pub use codec::{GameCodec, SessionCodec};
-pub use projection::{Bind, Statement, game_statements};
+pub use projection::{Bind, Statement, game_statements, session_statements};
 pub use store::{EventCodec, PgEventStore, PgGameStore, PgTx, StreamType, migrate};
