@@ -3,8 +3,10 @@ type: Design
 title: "運用要件定義 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版の運用要件。beer-game-kotlin の運用要件（運用フロー、監視、バックアップ・復旧、障害対応、変更管理、イベントスキーマの進化、保持削除）を引き継ぎ、JVM に固有の監視・障害パターン・手順書を Rust の実行環境（RSS、panic、タスク、キャンセル後のトランザクション取り残し）に読み替えた正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # 運用要件定義 - ビールゲームシミュレーション（Rust 版）

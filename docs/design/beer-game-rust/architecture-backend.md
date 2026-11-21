@@ -3,8 +3,10 @@ type: Design
 title: "バックエンドアーキテクチャ - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のバックエンドアーキテクチャ。beer-game-kotlin の構造（ES + CQRS、薄いコマンド処理、同期投影、冪等性、競合の再試行、SSE、保持削除）を引き継ぎ、Cargo ワークスペース、トレイトによるポート、axum、sqlx、キャンセル安全性で表す。Kotlin 版の設計判断 BD1〜BD12 との対応を含む。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Rust 版）

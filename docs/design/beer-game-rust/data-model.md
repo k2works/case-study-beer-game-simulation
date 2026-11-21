@@ -3,8 +3,10 @@ type: Design
 title: "データモデル設計 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、sqlx のマイグレーション、型の対応、H2 を持たない前提での差分、PostgreSQL 18.6 で検証した DDL と制約を整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Rust 版）

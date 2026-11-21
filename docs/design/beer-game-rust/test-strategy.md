@@ -3,8 +3,10 @@ type: Design
 title: "テスト戦略 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のテスト戦略。beer-game-kotlin の BDD・Given/When/Then・性質テスト・実 PostgreSQL の統合テスト・契約テスト・厳格な静的解析・CI の構造を引き継ぎ、標準の #[test]、proptest、cucumber-rs、testcontainers、clippy、cargo-llvm-cov で表す。Rust 固有のキャンセル安全性のテストと、カバレッジ基準（行 80%）を含む。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # テスト戦略 - ビールゲームシミュレーション（Rust 版）

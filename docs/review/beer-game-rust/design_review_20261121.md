@@ -173,7 +173,7 @@ AI が先回りして確定しない。重要度「高」の各項目につい�
 | L7 | 命名の規則を追記。**承認は未**（未決事項 17） | test-strategy.md |
 | L8 | UI の影響表 #11 に記載し、Kotlin 版と共通の課題として残す | ui-design.md |
 
-**検証**: `gulp okf:check`・`docs_structure.py check --check` は ERROR 0、リンク・PlantUML の検査は問題なし。**`verified` は付けていない**（ユーザーが確認した範囲にだけ付ける）。
+**検証**: `gulp okf:check`・`docs_structure.py check --check` は ERROR 0、リンク・PlantUML の検査は問題なし。設計文書 10 本には、ユーザーの承認により 2026-11-21 に `verified`（human:kakimomokuri）を記録した（`index.md` と ADR-001 は対象外）。
 
 **残っている人の判断**: 矛盾 4（RPO・RTO の約束の範囲）、RT1 の命名の規則（L7）、H9 の依頼文言の運営者との合意。
 

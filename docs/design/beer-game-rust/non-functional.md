@@ -3,8 +3,10 @@ type: Design
 title: "非機能要件定義 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版の非機能要件。beer-game-kotlin の 84 件の ID をすべて維持し、JVM に固有の要件（ウォームアップ、ヒープと GC、Gradle・detekt、HikariCP）を Rust の実行環境に読み替え、キャンセル安全性（NF-R18）とメモリ安全（NF-S22）を新設して 86 件とした正本。変更表つき。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # 非機能要件定義 - ビールゲームシミュレーション（Rust 版）

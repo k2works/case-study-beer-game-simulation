@@ -3,8 +3,10 @@ type: Design
 title: "UI 設計 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版の UI 設計。画面・遷移・画面イメージ・インタラクション・アクセシビリティは beer-game2 と beer-game-kotlin の UI 設計をそのまま正本とし、Rust のバックエンド（axum・tokio・sqlx）が UI に与える影響（エラー応答の形、キャンセル安全性と再送、SSE、セッションの Cookie）だけを整理した差分の文書。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # UI 設計 - ビールゲームシミュレーション（Rust 版）

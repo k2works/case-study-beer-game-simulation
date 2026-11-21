@@ -3,8 +3,10 @@ type: Design
 title: "フロントエンドアーキテクチャ - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のフロントエンドアーキテクチャ。API の契約が同じなら既存の React / TypeScript（beer-game-kotlin の web/）をそのまま使えるため、設計は複製せず、Kotlin 版を正本として参照し、web/ のバックエンドへの結合点の調査結果と、Rust のバックエンドに向けるときの差分（開発時のプロキシ、E2E の起動、契約の共有、X-Tab-Id、自動更新）だけを整理した文書。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # フロントエンドアーキテクチャ - ビールゲームシミュレーション（Rust 版）

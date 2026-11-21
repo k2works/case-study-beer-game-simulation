@@ -1,6 +1,16 @@
 # Docs Update Log
 
 ## 2026-11-21
+* **Verification**: [ui-design](/design/beer-game-rust/ui-design.md) を human:kakimomokuri が検証
+* **Verification**: [test-strategy](/design/beer-game-rust/test-strategy.md) を human:kakimomokuri が検証
+* **Verification**: [tech-stack](/design/beer-game-rust/tech-stack.md) を human:kakimomokuri が検証
+* **Verification**: [operation](/design/beer-game-rust/operation.md) を human:kakimomokuri が検証
+* **Verification**: [non-functional](/design/beer-game-rust/non-functional.md) を human:kakimomokuri が検証
+* **Verification**: [domain-model](/design/beer-game-rust/domain-model.md) を human:kakimomokuri が検証
+* **Verification**: [data-model](/design/beer-game-rust/data-model.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-infrastructure](/design/beer-game-rust/architecture-infrastructure.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-frontend](/design/beer-game-rust/architecture-frontend.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-backend](/design/beer-game-rust/architecture-backend.md) を human:kakimomokuri が検証
 * **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [test-strategy](/design/beer-game-rust/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）

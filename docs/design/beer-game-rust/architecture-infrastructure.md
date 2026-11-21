@@ -3,8 +3,10 @@ type: Design
 title: "インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のインフラアーキテクチャ。beer-game-kotlin の ECS Fargate、CloudFront、RDS、Terraform、GitHub Actions（OIDC）、ステージング自動・本番承認の構成を踏襲し、単一バイナリのコンテナ、実行イメージの選択、起動モードと終了コード、SIGTERM での正常終了、Cargo のビルドと CI、データベースのロールと接続を Rust に合わせて整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（Rust 版）

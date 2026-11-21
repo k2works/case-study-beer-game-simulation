@@ -3,8 +3,10 @@ type: Design
 title: "技術スタック選定 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版の技術スタック。cargo search と rustc で確認した版、確認できなかった項目、beer-game-kotlin からの変更、新規の依存関係の承認表、設計判断を整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # 技術スタック選定 - ビールゲームシミュレーション（Rust 版）

@@ -3,8 +3,10 @@ type: Design
 title: "ドメインモデル設計 - ビールゲームシミュレーション（Rust 版）"
 description: "Rust 版のドメインモデル。beer-game-kotlin の構造（2 ストリーム、decide / evolve、simulateWeek、投影、全イベント）を引き継ぎ、enum・newtype・Result で表す。Kotlin 版の設計判断 D1〜D11 との対応と、Rust 固有の判断を整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-21T01:07:57Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-21T01:18:16Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Rust 版）
