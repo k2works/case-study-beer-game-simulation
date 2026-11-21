@@ -1,5 +1,8 @@
 # Docs Update Log
 
+## 2026-11-21
+* **Update**: [design_review_20261121](/review/beer-game-rust/design_review_20261121.md) を更新（claude-code/claude-sonnet-5-5）
+
 ## 2026-11-19
 * **Update**: [001-rust-version-of-beer-game-kotlin](/adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) を更新（claude-code/claude-sonnet-5-5）
 * **Update**: [ui-design](/design/beer-game-rust/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
