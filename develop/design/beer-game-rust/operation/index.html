@@ -12094,8 +12094,8 @@
 <ul>
 <li><strong>本書で確認したこと</strong>: キャンセル・panic 後のトランザクションの取り残しを検知するクエリと、自動切断の設定を、<strong>PostgreSQL 18.6</strong>（ローカルの Docker の <code>postgres:18.6</code>、使い捨てのコンテナ。終了後に削除）で実測しました（2026-11-19。下の「障害パターン 17」）。</li>
 <li><code>pg_stat_activity</code> の <code>state = 'idle in transaction'</code> で、BEGIN したまま放置したセッションを捉えられる。</li>
-<li><code>idle_in_transaction_session_timeout = 2s</code> を設定すると、放置したセッションが <code>FATAL: terminating connection due to idle-in-transaction timeout</code> で切断される。</li>
-<li><strong>確認していないこと</strong>: それ以外の運用（監視の閾値、アラーム、バックアップ・復元の所要時間、デプロイ、ブルー/グリーン、各手順書）は、すべて<strong>未実装・未検証</strong>です。<strong>インフラの Rust 版の設計（コンテナの実行イメージ、メモリの割り当て、起動の猶予期間など）は未着手</strong>で、本書は <a href="../../beer-game-kotlin/architecture-infrastructure/">Kotlin 版のインフラ</a> の構成を前提にします（差分は未決事項）。</li>
+<li><strong>ログインロール</strong>に <code>idle_in_transaction_session_timeout = 2s</code> を設定すると、放置したセッションが <code>FATAL: terminating connection due to idle-in-transaction timeout</code> で切断される。<strong>NOLOGIN のロール（<code>beergame_writer</code> など）に設定しても、メンバーのログインユーザーには継承されず、効かない</strong>（2026-11-21 のレビューで再現して確認。この文書の初版は、設定先を NOLOGIN ロールと誤って書いていた）。</li>
+<li><strong>確認していないこと</strong>: それ以外の運用（監視の閾値、アラーム、バックアップ・復元の所要時間、デプロイ、ブルー/グリーン、各手順書）は、すべて<strong>未実装・未検証</strong>です。Rust 版のインフラ設計は <a href="../architecture-infrastructure/">インフラストラクチャ</a> にあります（RI1〜RI5 は承認済みで、実行イメージの実在確認・メモリの割り当て・起動の猶予期間などの実測は B1 以降）。</li>
 <li>Kotlin 版の実装の経緯（B3・B13・B14 の注記）は引き継ぎません（Rust 版の値ではないため）。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
 </ul>
 <h3 id="_3">凡例<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
@@ -12123,7 +12123,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">実行環境</td>
-<td style="text-align: left;"><strong>Rust の単一バイナリ</strong>をコンテナで ECS のタスクとして動かす想定（<a href="../../beer-game-kotlin/architecture-infrastructure/">インフラ</a> を出発点とする。<strong>Rust 版のインフラ設計は未着手</strong>）。ツールチェーンは <code>rust-toolchain.toml</code> で固定（1.97.1。<a href="../tech-stack/">技術スタック</a>）（変更）</td>
+<td style="text-align: left;"><strong>Rust の単一バイナリ</strong>をコンテナで ECS のタスクとして動かす想定（<a href="../../beer-game-kotlin/architecture-infrastructure/">インフラ</a> を出発点とする。Rust 版の設計は <a href="../architecture-infrastructure/">インフラストラクチャ</a>）。ツールチェーンは <code>rust-toolchain.toml</code> で固定（1.97.1。<a href="../tech-stack/">技術スタック</a>）（変更）</td>
 </tr>
 <tr>
 <td style="text-align: left;">主な SLO</td>
@@ -12152,7 +12152,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">研修の前</td>
-<td style="text-align: left;">実施日時の連絡を受け、直前の合成監視（作成から参加、SSE まで）で正常を確認する。<strong>コールドスタート直後も定常と同じ応答（NF-P16）であることを確認する</strong>（JIT のウォームアップは無いが、接続プールと OS のキャッシュの影響は残る）</td>
+<td style="text-align: left;">実施日時の連絡を受け、直前の合成監視（作成から参加、SSE まで）で正常を確認する。<strong>コールドスタート直後も NF-P16 の目標（p95 2 秒以下）を満たすことを確認する</strong>（JIT のウォームアップは無いが、接続プールと OS のキャッシュの影響は残る）</td>
 <td style="text-align: left;">運用担当</td>
 <td style="text-align: left;">合成監視を自動化</td>
 <td style="text-align: center;">変更</td>
@@ -12353,7 +12353,7 @@
 <td style="text-align: left;">1 件（5 分）</td>
 <td style="text-align: left;">5 件（5 分。提案）、またはプロセスの再起動</td>
 <td style="text-align: left;">アプリ</td>
-<td style="text-align: left;"><strong>NF-O12（新）</strong>。ドメインは panic しない設計（RD5）のため、1 件でも不具合を示す。500 と相関 ID の記録を伴う</td>
+<td style="text-align: left;"><strong>NF-O12（変更）</strong>。ドメインは panic しない設計（RD5）のため、1 件でも不具合を示す。500 と相関 ID の記録を伴う</td>
 </tr>
 <tr>
 <td style="text-align: left;">実行</td>
@@ -12389,7 +12389,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">起動</td>
-<td style="text-align: left;"><strong>タスクの起動時間</strong>: ECS がタスクの起動を始めてから <code>/ready</code> が初めて成功するまで</td>
+<td style="text-align: left;"><strong>タスクの起動時間</strong>: ECS がタスクの起動を始めてから <code>/api/v1/ready</code> が初めて成功するまで</td>
 <td style="text-align: left;">60 秒超（提案）</td>
 <td style="text-align: left;">120 秒超（提案）</td>
 <td style="text-align: left;">ECS</td>
@@ -12397,7 +12397,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>起動時間の測る区間</strong>は、Kotlin 版と同じ 2 つを混ぜずに測ります（アプリの起動時間 = プロセスの開始から <code>/ready</code> の成功まで、p95 30 秒（NF-P16。上限として維持し、実測で縮める）。タスクの起動時間 = ECS がタスクの起動を始めてからヘルスチェックの成功まで）。RTO（15 分）の見積もりは、タスクの起動時間を使います。</p>
+<p><strong>起動時間の測る区間</strong>は、Kotlin 版と同じ 2 つを混ぜずに測ります（アプリの起動時間 = プロセスの開始から <code>/api/v1/ready</code> の成功まで、p95 30 秒（NF-P16。上限として維持し、実測で縮める）。タスクの起動時間 = ECS がタスクの起動を始めてからヘルスチェックの成功まで）。RTO（15 分）の見積もりは、タスクの起動時間を使います。</p>
 <p><strong>「整合性」の行</strong>は、Kotlin 版と同じです（<code>stream_version</code> の欠番、<code>week_commits</code> と <code>WeekCommitted</code> の件数の不一致、内部エラー、想定外の一意制約違反）。</p>
 <h3 id="_8">ヘルスチェック<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <table>
@@ -12411,12 +12411,12 @@
 <tbody>
 <tr>
 <td style="text-align: left;">生存（liveness）</td>
-<td style="text-align: left;">プロセスが応答する（<code>GET /health</code>）</td>
+<td style="text-align: left;">プロセスが応答する（<code>GET /api/v1/health</code>）</td>
 <td style="text-align: center;">引継</td>
 </tr>
 <tr>
 <td style="text-align: left;">準備（readiness）</td>
-<td style="text-align: left;">データベースに接続できる（<code>SELECT 1</code>）、接続プールの取得、通知の受信が生きている（<code>LISTEN</code> の接続）、<strong>マイグレーションが適用済み（スキーマの版が期待と一致）</strong>（<code>GET /ready</code>）</td>
+<td style="text-align: left;">データベースに接続できる（<code>SELECT 1</code>）、接続プールの取得、通知の受信が生きている（<code>LISTEN</code> の接続）、<strong>マイグレーションが適用済み（スキーマの版が期待と一致）</strong>（<code>GET /api/v1/ready</code>）</td>
 <td style="text-align: center;">引継</td>
 </tr>
 </tbody>
@@ -12522,11 +12522,42 @@
 <span class="k">WHERE</span><span class="w"> </span><span class="k">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'idle in transaction'</span><span class="p">;</span>
 </code></pre></div>
 <ol>
-<li><strong>自動の安全網</strong>: アプリの DB ロールに <code>idle_in_transaction_session_timeout</code> を設定し、<strong>取り残しが一定時間で DB によって切断される</strong>ようにする（<code>ALTER ROLE beergame_writer SET idle_in_transaction_session_timeout = '&lt;値&gt;'</code>）。<strong>2 秒に設定すると、BEGIN したまま放置した接続が <code>FATAL: terminating connection due to idle-in-transaction timeout</code> で切断されることを実測で確認した。</strong> 切断されたトランザクションは ROLLBACK され、保持していたロックは解放される。<strong>値は、コマンドのトランザクションの最大の長さより十分長く決める</strong>（提案: 30 秒。実測で見直す。短すぎると正常な処理を切る）。</li>
-<li><strong>原因の調査</strong>: 取り残しが出た時刻の前後の、クライアントの切断・panic・デプロイを確認する。<strong>NF-R18 の前提（<code>Tx</code> の drop で ROLLBACK、spawn による隔離）が破れている可能性</strong>がある。パターン 15 の panic の記録と照合する。</li>
+<li><strong>自動の安全網</strong>: <strong>アプリが接続する「ログインユーザー」（または接続文字列の <code>options</code>、接続後の <code>SET</code>）に</strong> <code>idle_in_transaction_session_timeout</code> を設定し、<strong>取り残しが一定時間で DB によって切断される</strong>ようにする（例: <code>ALTER ROLE &lt;ログインユーザー&gt; SET idle_in_transaction_session_timeout = '&lt;値&gt;'</code>）。<strong>NOLOGIN の <code>beergame_writer</code> に設定しても効かない</strong>（ロールごとの設定は、ログインしたロール自身にだけ適用され、メンバーシップでは継承されない。<strong>PostgreSQL 18.6 で、NOLOGIN ロールに設定するとメンバーで <code>SHOW</code> が <code>0</code>（無効）、<code>SET ROLE</code> した後も <code>0</code>、ログインユーザー自身に設定すると <code>2s</code> になることを再現して確認した</strong>。2026-11-21 のレビュー H1）。<strong>ログインユーザーに 2 秒を設定すると、BEGIN したまま放置した接続が <code>FATAL: terminating connection due to idle-in-transaction timeout</code> で切断されることを実測で確認した</strong>（2026-11-19）。切断されたトランザクションは ROLLBACK され、保持していたロックは解放される。<strong>値は、コマンドのトランザクションの最大の長さより十分長く決める</strong>（提案: 30 秒。実測で見直す。短すぎると正常な処理を切る）。<strong>統合テストで、アプリの接続で <code>SHOW idle_in_transaction_session_timeout</code> が期待値になることを確かめる</strong>（<a href="../test-strategy/">テスト戦略</a>）。</li>
+<li><strong>原因の調査</strong>: 取り残しが出た時刻の前後の、クライアントの切断・panic・デプロイを確認する。<strong>NF-R18 の前提（失敗の経路での明示の ROLLBACK、spawn による隔離、spawn したタスクの追跡）が破れている可能性</strong>がある。パターン 15 の panic の記録と照合する。</li>
 <li><strong>恒久対策</strong>: キャンセル安全性のテスト（<a href="../test-strategy/">テスト戦略</a> の RT2）に、再現のテストを加える。</li>
 </ol>
-<p><strong>安全網の位置づけ</strong>: この設定は、NF-R18 を満たす設計（<code>Tx</code> の drop、spawn）の<strong>代わりではなく、最後の守り</strong>です。取り残しの件数が 0 でないこと自体を、アラームの対象にします（設定があっても、検知は残す）。</p>
+<p><strong>安全網の位置づけ</strong>: この設定は、NF-R18 を満たす設計（失敗の経路での明示の ROLLBACK、spawn）の<strong>代わりではなく、最後の守り</strong>です。取り残しの件数が 0 でないこと自体を、アラームの対象にします（設定があっても、検知は残す）。<strong>この安全網は <code>active</code> の待ち（ロックの待ち）を切らない</strong>ため、<code>lock_timeout</code> を別に設定する（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）。</p>
+<h3 id="1517-h9m18">利用者・進行役への案内（パターン 15・17。レビュー H9・M18）<a class="headerlink" href="#1517-h9m18" title="Permanent link">&para;</a></h3>
+<p>パターン 13・14 と同じく、<strong>運営者を通じて進行役へ依頼する文言</strong>を定めます（Kotlin 版のパターン 13・14 に倣う）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">場面</th>
+<th style="text-align: left;">依頼・案内の文言（案）</th>
+<th style="text-align: left;">補足</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">パターン 17（取り残し）で、プールが枯渇して全体が遅い／止まる</td>
+<td style="text-align: left;">「システムが混み合っています。数分お待ちください。<strong>入力済みの発注は保存されています。</strong> 再開の案内があるまで、同じ操作を繰り返さないでください。」</td>
+<td style="text-align: left;">利用者が再操作すると負荷が増える。画面は「問題が発生しました。時間をおいて、もう一度お試しください。」を出す（<code>app.internal</code>）ため、進行役から口頭でも案内する</td>
+</tr>
+<tr>
+<td style="text-align: left;">パターン 15 で、タスクを置き換える（OOM kill、panic の多発）</td>
+<td style="text-align: left;">「画面が一瞬切れても、自動でつながり直します。切れた場合は、少し待ってから画面を更新してください。入力済みの内容は保存されています。」</td>
+<td style="text-align: left;">OOM kill でタスクを置き換えると、接続が切れる（SSE を使う場合はそれも切れる）</td>
+</tr>
+<tr>
+<td style="text-align: left;">復旧中の再開の依頼</td>
+<td style="text-align: left;">「復旧しました。画面を更新して、続きから操作してください。」</td>
+<td style="text-align: left;">進行役が一時停止していた場合は、再開を依頼する</td>
+</tr>
+</tbody>
+</table>
+<p><strong>自動切断で利用者に何が見えるか（M18）</strong>: <code>idle_in_transaction_session_timeout</code> で切断されるのは、<strong>取り残されたトランザクション</strong>（応答を返す役目を終えたもの）で、<strong>利用者の要求に直接の応答を返すものではない</strong>。要求の処理が、切断された接続で失敗した場合は、<code>Persistence</code> の失敗（500・相関 ID。<code>type</code> つき）として返り、<strong>画面は「結果が不明」でなく失敗として扱う</strong>（<a href="../ui-design/">UI 設計</a>）。COMMIT 前に切断されたトランザクションは ROLLBACK されるため、再操作しても二重にならない。ただし、<strong>COMMIT の応答が失われた場合は、結果が不明</strong>であり、同じ <code>Idempotency-Key</code> での再送が回復の手段になる。</p>
+<h3 id="h9">進行役向けの「研修中にシステムが止まったら」の案内（H9）<a class="headerlink" href="#h9" title="Permanent link">&para;</a></h3>
+<p>手順書の一覧（下）に、<strong>運用担当向けでなく、進行役（運営者）向けの案内</strong>を加えます。RTO 15 分は、90 分前後の研修で大きな割合を占めるため、<strong>進行役が待つ間に場を持たせる手段</strong>が要ります。案の項目: (1) まず落ち着いて、<strong>参加者に「入力済みの発注は保存されている」ことを伝える</strong>。(2) 紙などで、各役割の<strong>今週の発注数を控える</strong>。(3) 復旧後、<strong>停止中も受け付ける「代理入力」で、控えた値を入れ直す</strong>（停止して代理入力し、再開する。業務上自然な流れ）。(4) 復旧が長引くときは、<strong>その研修の残りを振り返りの時間に切り替える</strong>（確定済みの週までの結果を見る）。(5) 連絡窓口（運営者を通じた運用担当）。<strong>具体の文言と配布の方法は、運営者と合意して決める</strong>（連絡窓口は未決。Kotlin 版にも同様の案内がないため、Kotlin 版のヘルプ（S11）にも反映できる）。</p>
 <p>各パターンの<strong>手順書</strong>は、<code>docs/operation/beer-game-rust/</code> に作成します（下の一覧）。</p>
 <h3 id="_17">事後分析<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版と同じです（時系列、原因、検知の遅れ、復旧の手段、再発防止。個人の責任を問わない）。投影の不整合とイベントの読み込み失敗は、原因となったイベントの種類と版を記録し、テストへ反映します。<strong>panic と取り残しは、バックトレースと、キャンセルされたコマンドの種類を記録</strong>し、キャンセル安全性のテストへ反映します。</p>
@@ -12554,7 +12585,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">権限</td>
-<td style="text-align: left;">最小権限。長期のアクセスキーを置かず、CI は OIDC で一時的な権限を使う。<strong>アプリの DB ロールは <code>events</code> への INSERT と SELECT だけ</strong>（追記専用。実測済み）。保持削除は別のロール。<strong><code>idle_in_transaction_session_timeout</code> をアプリのロールに設定</strong>（障害パターン 17）</td>
+<td style="text-align: left;">最小権限。長期のアクセスキーを置かず、CI は OIDC で一時的な権限を使う。<strong>アプリの DB ロールは <code>events</code> への INSERT と SELECT だけ</strong>（追記専用。実測済み）。保持削除は別のロール。<strong><code>idle_in_transaction_session_timeout</code> を、アプリが接続するログインユーザーに設定</strong>（NOLOGIN ロールには効かない。障害パターン 17）</td>
 <td style="text-align: center;">変更</td>
 </tr>
 <tr>
@@ -12719,6 +12750,12 @@
 <td style="text-align: center;">引継</td>
 </tr>
 <tr>
+<td style="text-align: left;"><strong>進行役向けの「研修中にシステムが止まったら」の案内</strong>（新。レビュー H9）</td>
+<td style="text-align: left;">運営者・進行役向け。入力済みの発注は保存されている旨、紙の控え、停止中の代理入力での入れ直し、振り返りへの切り替え、連絡窓口。パターン 15・17 の依頼文言を含む</td>
+<td style="text-align: center;">高</td>
+<td style="text-align: center;">新</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Rust ランタイムの調査</strong></td>
 <td style="text-align: left;">RSS、タスク数、接続プール、panic のバックトレースの確認と、メモリのプロファイルの取得（承認、取り扱い）。<strong>取り残しのトランザクションの確認と切断</strong>（<code>pg_stat_activity</code>）</td>
 <td style="text-align: center;">中</td>
@@ -12758,8 +12795,8 @@
 <tr>
 <td style="text-align: left;">3</td>
 <td style="text-align: left;">（なし）</td>
-<td style="text-align: left;"><strong><code>idle in transaction</code> の取り残し</strong>の監視、障害パターン 17、<code>idle_in_transaction_session_timeout</code> の安全網</td>
-<td style="text-align: left;">キャンセル安全性（NF-R18、RB2）。実測済み</td>
+<td style="text-align: left;"><strong><code>idle in transaction</code> の取り残し</strong>の監視、障害パターン 17、<code>idle_in_transaction_session_timeout</code> の安全網（ログインユーザーに設定）</td>
+<td style="text-align: left;">キャンセル安全性（NF-R18、RB2）。<strong>設定先は 2026-11-21 に訂正（NOLOGIN ロールには効かない）</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">4</td>
@@ -12770,7 +12807,7 @@
 <tr>
 <td style="text-align: left;">5</td>
 <td style="text-align: left;">手順書 15 件（「JVM の調査」を含む）</td>
-<td style="text-align: left;">「Rust ランタイムの調査」に置き換え。取り残しのトランザクションの確認を含める</td>
+<td style="text-align: left;">「Rust ランタイムの調査」に置き換え、<strong>進行役向けの案内</strong>を加えて 16 件。取り残しのトランザクションの確認を含める</td>
 <td style="text-align: left;">同上</td>
 </tr>
 <tr>
@@ -12822,11 +12859,11 @@
 <ol>
 <li><strong>オンコールの体制、通知先、エスカレーション、運営者への連絡窓口</strong>（組織の判断。beer-game2・Kotlin 版から継続）。</li>
 <li><strong>研修の実施日時を、運営者から運用側へ伝える手順</strong>と、運用の予定表。</li>
-<li><strong>Rust 版のインフラ設計</strong>（未着手）: コンテナの実行イメージ、メモリ・CPU の割り当て、ヘルスチェックの猶予期間、ECS の構成。<strong>AWS 環境を Rust 版専用に用意するか、共有するか</strong>（team の規約は beer-game3 専用）。</li>
+<li><strong>Rust 版のインフラの実測と AWS 環境</strong>: 設計は <a href="../architecture-infrastructure/">インフラストラクチャ</a>（RI1〜RI5 は承認済み。Terraform は Rust 版専用に複製して出発）。<strong>実行イメージの実在確認、メモリ・CPU の割り当て、ヘルスチェックの猶予期間は B1 以降の実測</strong>。AWS への適用・費用・アカウント・IAM は別のゲート。</li>
 <li><strong>Rust の実測値</strong>: 起動時間（アプリ・タスク）、RSS、タスク数の推移。<strong>実測前は、Kotlin 版の提案値を上限として維持し、実測で見直す</strong>（RN1）。</li>
 <li><strong>障害パターン 17 の値</strong>: <code>idle_in_transaction_session_timeout</code> の値（提案: 30 秒）、検知の閾値（10 秒・5 件・30 秒）。実測で見直す。</li>
 <li><strong>panic の扱い</strong>: panic フックで記録し、プロセスを継続するか落とすか（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の未決事項と同じ）。アラームの閾値（1 件・5 件）の妥当性。</li>
-<li><strong>SIGTERM のシャットダウン</strong>: 完了待ちの方法、終了コード、ECS の停止猶予との関係。</li>
+<li><strong>SIGTERM のシャットダウンの実現</strong>: RI4 は承認済み（完了待ちで終了コード 0）。実現（追跡の仕組み、SSE の終了、<code>stopTimeout</code> との関係）の確認が B1 に残る。</li>
 <li><strong>RPO 0 の範囲と RTO</strong>（PITR では 0 にならない、RTO 15 分に収まる保証がない）の扱い（Kotlin 版の B14 から継続。人が決める）。</li>
 <li><strong>ブルー/グリーンの方式</strong>（ECS の組み込み方式か CodeDeploy か）、CloudFront → ALB の暗号化、書く版の切り替え（<code>WRITE_SCHEMA_VERSION</code>）、研修中だけ通知する運用の自動化、KMS・DB ログインロールの分離（Kotlin 版の未決を引き継ぐ）。</li>
 <li><strong>投影の再構築の排他ロックの待ちの上限</strong>と、再構築中のコマンドの応答（短い待ちか 503 か）、<strong>保持の起点</strong>（暫定。作成時）、<strong>追記の競合の再試行の上限と間隔</strong>、<strong>出力のキャッシュ</strong>、<strong>スナップショットの導入基準の妥当性</strong>、<strong>非同期投影へ移行した場合の閾値</strong>（Kotlin 版と同じ未決事項）。</li>
@@ -12837,7 +12874,7 @@
 <ul>
 <li><a href="../../beer-game-kotlin/operation/">運用要件定義（beer-game-kotlin）</a>、<a href="../../beer-game2/operation/">beer-game2 運用要件定義</a>、<a href="../../../reference/%E9%81%8B%E7%94%A8%E8%A6%81%E4%BB%B6%E5%AE%9A%E7%BE%A9%E3%82%AC%E3%82%A4%E3%83%89/">運用要件定義ガイド</a></li>
 <li><a href="../../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001（Rust 版）</a>、<a href="../non-functional/">非機能要件</a>、<a href="../tech-stack/">技術スタック</a>、<a href="../data-model/">データモデル</a>、<a href="../domain-model/">ドメインモデル</a>、<a href="../architecture-backend/">バックエンドアーキテクチャ</a>、<a href="../test-strategy/">テスト戦略</a></li>
-<li><a href="../../beer-game-kotlin/architecture-infrastructure/">インフラストラクチャ（beer-game-kotlin）</a>（Rust 版のインフラ設計は未着手のため、出発点として参照）</li>
+<li><a href="../architecture-infrastructure/">インフラストラクチャ（Rust 版）</a>、<a href="../../beer-game-kotlin/architecture-infrastructure/">インフラストラクチャ（beer-game-kotlin）</a>（出発点）</li>
 <li>取り残しの検知と自動切断の実測: ローカルの Docker の <code>postgres:18.6</code>（使い捨てのコンテナ。終了後に削除）、2026-11-19。</li>
 <li>team の規約: <code>aidlc/active-memory/team.md</code>（Deployment、Code Style）</li>
 </ul>

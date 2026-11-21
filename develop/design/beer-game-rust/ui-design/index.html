@@ -12092,22 +12092,23 @@
 <tbody>
 <tr>
 <td style="text-align: left;">画面一覧、画面遷移、遷移の条件、表示名、OOUI</td>
-<td style="text-align: left;"><a href="../../beer-game-kotlin/ui-design/">Kotlin 版の UI 設計</a>（beer-game2 を引き継ぎ、ES + CQRS の影響を反映済み）</td>
+<td style="text-align: left;"><a href="../../beer-game-kotlin/ui-design/">Kotlin 版の UI 設計</a>の「画面一覧」「画面遷移」「表示名」「オブジェクトと画面」の各節（beer-game2 を引き継ぎ、ES + CQRS の影響を反映済み）</td>
 </tr>
 <tr>
 <td style="text-align: left;">画面イメージ（S02〜S10 の salt 図 14 枚）、確認ダイアログ</td>
-<td style="text-align: left;">同上</td>
+<td style="text-align: left;">同「画面イメージ」の節</td>
 </tr>
 <tr>
 <td style="text-align: left;">インタラクション（保存直後の表示、競合の種類と表示、エラーの <code>code</code> と表示の辞書、結果が不明なとき、画面の状態）</td>
-<td style="text-align: left;">同上</td>
+<td style="text-align: left;">同「インタラクション設計」の各節</td>
 </tr>
 <tr>
 <td style="text-align: left;">アクセシビリティ（WCAG 2.2 AA）</td>
-<td style="text-align: left;">同上</td>
+<td style="text-align: left;">同「アクセシビリティ」の節</td>
 </tr>
 </tbody>
 </table>
+<p><strong>基準にした版（レビュー M15）</strong>: 本書は、Kotlin 版 <code>ui-design.md</code> の <strong>2026-11-15 の版</strong>（フロントマターの <code>generated.at</code> が <code>2026-11-15T08:13:26Z</code>）を基準にしています。<strong>Kotlin 版が更新されたときは、本書の影響の表（#1〜#14）を見直す</strong>（見直したら、基準にした版を更新する）。<strong>Kotlin 版の ui-design.md の記述のうち、376 行付近の「停止・再開は手動更新・保存・確定のあとの取得で知る」と 667 行付近の「1 秒ごとに更新しています」は、現行の実装（3 秒のポーリング）と合っていない</strong>（UX のレビューによる指摘。正本側の修正は Kotlin 版の判断）。</p>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>本書で確認したこと</strong>: Kotlin 版の UI 設計の全体を読み、<strong>Rust の実装が UI の契約に影響しうる箇所</strong>を洗い出しました（下の「Rust 版のバックエンドが UI に与える影響」）。画面そのものは、コードを動かして確認していません（Rust 版の実装がまだ無いため）。</li>
@@ -12231,31 +12232,31 @@
 <td style="text-align: left;">2</td>
 <td style="text-align: left;"><strong>バックエンド自身が返す 503 は必ず <code>type</code> を持つ</strong>。<code>type</code> のない 503（負荷分散装置など）は「結果が不明」として<strong>同じキーで再送</strong>する</td>
 <td style="text-align: left;">tower の層（負荷の制限など）が、<code>type</code> のない 503 を返してしまうと、画面が「結果が不明」と誤認して再送し、<strong>新しいキーで再送すべき場面を取り違える</strong></td>
-<td style="text-align: left;">#1 と同じ。<strong>503 は <code>app.retry_exhausted</code>・<code>app.not_ready</code> など <code>type</code> つきだけ</strong>にする。<code>type</code> のない 503 を返さないことを契約テストで確認</td>
+<td style="text-align: left;">#1 と同じ。<strong>503 は <code>app.retry_exhausted</code>・<code>app.not_ready</code> など <code>type</code> つきだけ</strong>にする。<code>type</code> のない 503 を返さないことを契約テストで確認。<strong>tower のタイムアウトは、<code>type</code> を付けない 504 にして「結果が不明」と扱わせる</strong>（#11）</td>
 </tr>
 <tr>
 <td style="text-align: left;">3</td>
 <td style="text-align: left;"><strong>結果が不明（通信の切断）のとき、同じ冪等キーで再送すると、同じ結果を受け取る</strong></td>
 <td style="text-align: left;">クライアントの切断でハンドラが途中で止まると、コマンドが<strong>途中までしか実行されない</strong>恐れ</td>
-<td style="text-align: left;"><strong>NF-R18（キャンセル安全性）と RB2</strong>: <code>execute</code> を spawn して切断から隔離し、<code>Tx</code> の drop で部分更新を残さない。切断後の再送が保存済みの応答を返すことを DB の統合テストで検証（<a href="../test-strategy/">テスト戦略</a> の RT2）。<strong>これが成り立てば、UI の「結果が不明」の設計は変わらない</strong></td>
+<td style="text-align: left;"><strong>NF-R18（キャンセル安全性）と RB2（2026-11-21 に見直し）</strong>: <code>execute</code> を spawn して切断から隔離し、<strong>失敗の経路では ROLLBACK を明示</strong>する（<code>Tx</code> の drop は保険）。切断後の再送が保存済みの応答を返すことを DB の統合テストで検証（<a href="../test-strategy/">テスト戦略</a> の RT2）。<strong>これが成り立てば、UI の「結果が不明」の設計は変わらない</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">4</td>
-<td style="text-align: left;">コマンドの応答は <code>versions</code> だけ。画面は応答後に<strong>スナップショットを取得し、版に追いつくまで待つ</strong>。SSE が切れても自分の保存は表示される</td>
+<td style="text-align: left;">コマンドの応答は <code>versions</code> だけ。画面は応答後に<strong>スナップショットを取得し、版に追いつくまで待つ</strong>。<strong>現行の画面は SSE を使わず、自動更新（ポーリング）と、保存・確定の応答の後の取得で更新する</strong>（#12）</td>
 <td style="text-align: left;">同期投影の更新漏れで、応答の <code>versions</code> より古いスナップショットが返る</td>
 <td style="text-align: left;">問い合わせの REPEATABLE READ と <code>projection_checkpoints</code> の同時読み取り（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）。統合テスト「問い合わせの一貫性」</td>
 </tr>
 <tr>
 <td style="text-align: left;">5</td>
-<td style="text-align: left;">SSE は版の通知だけ。再生なし。<strong>60 秒より短い間隔の心拍</strong>で、負荷分散装置（アイドル 60 秒）に切られない。遅い接続は切断され、再接続後にスナップショットで追いつく</td>
+<td style="text-align: left;"><strong>（SSE を使う場合の前提。現行の画面は使わない）</strong> SSE は版の通知だけ。再生なし。60 秒より短い間隔の心拍で、負荷分散装置（アイドル 60 秒）に切られない。遅い接続は切断され、再接続後にスナップショットで追いつく</td>
 <td style="text-align: left;">axum の SSE の心拍・切断の動作は未確認（<code>Lagged</code> の接続の扱いを含む）</td>
-<td style="text-align: left;">B1 の SSE の負荷試験と、E2E「SSE の切断」。<strong>未確認</strong></td>
+<td style="text-align: left;"><strong>画面が SSE を使い始める時点で、B1 以降の SSE の負荷試験と、E2E「SSE の切断」で確かめる</strong>。現行は未使用のため、Rust 版のバックエンドは SSE を実装しなくても、既存の画面は動く</td>
 </tr>
 <tr>
 <td style="text-align: left;">6</td>
 <td style="text-align: left;">資格の Cookie は <code>HttpOnly</code>・<code>Secure</code>・<code>SameSite=Strict</code>。<strong>タブごとに名前を変える</strong>（<code>X-Tab-Id</code> ヘッダー、<code>bg_session_&lt;id&gt;</code>・<code>bg_recovery_&lt;id&gt;</code>。ADR-020。Rust 版でも扱う。2026-11-19 決定）</td>
 <td style="text-align: left;">Cookie の発行・読み取りを自前で書くため、属性や名前の解決の漏れが起きうる</td>
-<td style="text-align: left;">HTTP の統合テスト（ヘッダーのテスト）。ADR-020 は Kotlin 版でも提案中（承認前）</td>
+<td style="text-align: left;">HTTP の統合テスト（ヘッダーのテスト）。Kotlin 版の ADR-020 自体は提案中だが、既存のフロントエンドはすでに <code>X-Tab-Id</code> を送っているため、Rust 版でも扱う（承認済み）</td>
 </tr>
 <tr>
 <td style="text-align: left;">7</td>
@@ -12281,6 +12282,30 @@
 <td style="text-align: left;"><code>u64</code>・<code>i64</code> の値が JSON で大きな数になると、精度を失う</td>
 <td style="text-align: left;">版は 1 から数える小さな整数（ストリーム 2000 件）で、実際には問題にならない。<strong>型の範囲を契約に書く</strong>かは未決</td>
 </tr>
+<tr>
+<td style="text-align: left;">11</td>
+<td style="text-align: left;"><strong>「結果が不明」の扱い</strong>（レビュー H4）: 画面は、<code>type</code> つきの応答を「<strong>未実行</strong>」として扱い、利用者の再操作を<strong>新しい冪等キー</strong>で送る。<code>type</code> のない 5xx・通信の失敗は「結果が不明」として、<strong>同じキーで 500 ms 間隔、最大 2 回だけ自動で再送</strong>する（<code>client.ts</code>）</td>
+<td style="text-align: left;">tower のタイムアウトが <code>type</code> つきの応答を返すと、<strong>処理は COMMIT まで進んでいる</strong>のに、画面が未実行と判断して新しいキーで再操作する（ゲーム作成などが二重になる。見込み。実装は未確認）。また、spawn した元の処理が<strong>実行中のまま</strong>、同じキーの再送が届く（<code>client.ts</code> は 500 ms 後に再送する）</td>
+<td style="text-align: left;"><strong>(a) タイムアウトの応答は、<code>type</code> を付けない 504（または切断）にして「結果が不明」と扱わせる。</strong> OpenAPI の <code>ErrorCode</code> にタイムアウトの <code>code</code> を足さない。<strong>(b) 元の処理が実行中に同じ <code>Idempotency-Key</code> の再送が届いたときは、先の処理の完了を待ち、保存済みの応答（または同じ失敗）を返す</strong>（<code>409 app.idempotency_key_reused</code> を返さない。409 は、画面が「操作を確認できませんでした。もう一度操作してください。」を出し、新しいキーでの再操作を促してしまう）。<strong>契約テストと RT2 の検証項目に加える</strong>（<a href="../test-strategy/">テスト戦略</a>）。<strong>COMMIT の応答が失われた 500（フェイルオーバー中など）にも <code>type</code> が付き、画面は再送しない</strong>。ゲーム作成は <code>If-Match</code> で守られないため、Kotlin 版と共通の課題として未決事項に残す</td>
+</tr>
+<tr>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;"><strong>現行の画面の更新は、SSE でなくポーリング</strong>（レビュー H5）: <code>features/play/PlayPage.tsx</code> は <code>PLAY_POLL_MS</code>（3000 ms）の間隔で、黙って状態を取り直す。S04（ロビー）・S07（観察）にもポーリングがある（S06 には <code>setInterval</code> が見つからなかった）。<strong>ポーリングの失敗（403・レート制限・タイムアウト）は黙って無視され、画面は古いまま何の通知も出ない</strong></td>
+<td style="text-align: left;">tower の<strong>レート制限をポーリングの GET に適用すると</strong>、制限に達した GET が黙って失敗し、画面が古いままになる。<strong>3 秒間隔では、反映の遅れは最大で約 3 秒に GET の時間を足したもの</strong>で、NF-P2（週確定から全画面への反映 p95 2 秒）を満たさない見込みが高い（計算上の推定。<strong>実測していない</strong>）。負荷の想定も SSE 75 本でなく、ポーリングの GET（見込みで毎秒 50 件程度。75 ユーザー ÷ 3 秒に複数の画面を足した推定）</td>
+<td style="text-align: left;">(a) <strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（参加・復帰・招待の専用の制限は別。NF-S11）。(b) <strong>NF-P2 の扱いは B1 で測って決める</strong>（承認済みの方針。SSE を作る／ポーリング間隔を詰める／NF-P2 を再定義する、のどれにするかを実測の結果で決める。RN1 と同じく、実測前に数値や方式を変えない）。(c) ポーリングの失敗が続くときに画面が古いままであることは、Kotlin 版と共通の未解決の課題（未決事項）</td>
+</tr>
+<tr>
+<td style="text-align: left;">13</td>
+<td style="text-align: left;"><strong>入力の誤りを一度に示す</strong>（レビュー M13）: S02（ゲーム作成）は、422 の <code>errors[]</code> を<strong>項目ごと（<code>errors[].field</code>。例: <code>quantity</code>）に</strong>、入力欄の近くへ示す（<code>PlayPage.tsx</code> など）</td>
+<td style="text-align: left;"><strong>axum の <code>Json</code> と serde は、最初の型の誤りで解析を止める</strong>（見込み。未確認）ため、DTO の段階で誤りが集まる保証がない。<strong>根拠にしていたドメインの <code>collect</code> は、DTO から値を作った後の段階</strong>である。また、画面は <code>errors[].field</code> の名前で照合するため、<strong>フィールド名の一致も契約</strong>に含まれる</td>
+<td style="text-align: left;">DTO を、<strong>型の誤りも含めてすべて集められる形</strong>（生の JSON から値を取り出して <code>collect</code> で検証する）にするか、型の誤りは最初の 1 件で 422 とする。<strong>どちらにするかは B1 で決め、契約テストに「複数の誤りが一度に返る」「フィールド名が仕様と一致する」を入れる</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">14</td>
+<td style="text-align: left;"><strong>自動切断（<code>idle_in_transaction_session_timeout</code>）の利用者への見え方</strong>（レビュー M18）</td>
+<td style="text-align: left;">切断されるのは<strong>取り残されたトランザクション</strong>で、利用者の要求の応答を返すものではない。要求の処理中に接続が切られた場合は、<code>Persistence</code>（500・相関 ID。<code>type</code> つき）として返る</td>
+<td style="text-align: left;">画面は失敗として扱い、利用者は再操作できる（COMMIT 前なら ROLLBACK されるため二重にならない）。COMMIT の応答が失われた場合の回復は、同じ <code>Idempotency-Key</code> での再送（#11）。<a href="../operation/">運用要件</a> の「利用者・進行役への案内」</td>
+</tr>
 </tbody>
 </table>
 <p><strong>画面の変更が必要になる場合の扱い</strong>: 上の逸脱を契約どおりに直せず、画面側の対応が必要になったときは、<strong>設計の矛盾として扱い</strong>、Kotlin 版の UI 設計と合わせて更新する（Rust 版だけ画面を変えない）。</p>
@@ -12290,7 +12315,7 @@
 <li>共通のルール（明示的なボタンで操作を始める、フォーカスと入力だけで状態を変えない）</li>
 <li><strong>保存直後の表示と投影の遅延</strong>（応答は <code>versions</code> だけ。スナップショットを取得して追いついてから表示。同期投影のため遅延は通常ない。反映待ちの共通部品）</li>
 <li><strong>競合の種類と表示</strong>（共同入力の競合 <code>session.decision_conflict</code>、確定済みの週 <code>session.week_advanced</code>、確定の前に入力が変わった <code>session.decisions_changed</code>、追記の競合の再試行切れ <code>app.retry_exhausted</code>）</li>
-<li><strong>エラーの <code>code</code> と表示の辞書</strong>（正本。鍵は <code>code</code>。<strong>Rust 版でも <code>code</code> の一覧を変えない</strong>。Rust の列挙型の <code>code()</code> と OpenAPI の一覧が一致することを契約テストで確認し、辞書が全 <code>code</code> を網羅することも確認する。<strong>辞書の網羅の検査が既存のフロントエンドにあるかは未確認</strong>）</li>
+<li><strong>エラーの <code>code</code> と表示の辞書</strong>（正本。鍵は <code>code</code>。<strong>Rust 版でも <code>code</code> の一覧を変えない</strong>。Rust の列挙型の <code>code()</code> と OpenAPI の一覧が一致することを契約テストで確認し、辞書が全 <code>code</code> を網羅することも確認する。<strong>辞書の網羅の検査は、既存のフロントエンドにある</strong>（確認済み。<code>problems.ts</code> が <code>Record&lt;ErrorCode, string | null&gt;</code> で、<code>ErrorCode</code> は生成した型。保証されるのは鍵がそろっていることだけで、値が <code>null</code> の <code>code</code>（<code>request.*</code> など）は一般の文言になる））</li>
 <li><strong>結果が不明なとき</strong>（<code>type</code> のない 5xx・タイムアウト・切断は「結果が不明」として同じキーで再送。<code>type</code> つきの 503 は利用者の再操作で新しいキー）</li>
 <li>主な操作の流れ、エラーと状態のフィードバック、画面の状態</li>
 </ul>
@@ -12358,11 +12383,13 @@
 <li>~~<strong>RU1 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した（RU1・RU2）。</li>
 <li><strong>axum・tower の既定の応答</strong>（#1・#2）: 拒否（rejection）とタイムアウト・負荷の制限の既定の形、problem+json への写像の方法（B1 で確認）。</li>
 <li><strong>axum の SSE の心拍・切断</strong>（#5）。</li>
-<li><strong>辞書の網羅の検査</strong>: 既存のフロントエンドに、辞書がすべての <code>code</code> を網羅することの検査があるか。なければ契約テストに加える。</li>
+<li>~~<strong>辞書の網羅の検査</strong>~~ <strong>解消（2026-11-21）</strong>: 既存のフロントエンドに、型による検査がある（<code>Record&lt;ErrorCode, …&gt;</code>）。値が <code>null</code> の <code>code</code> は一般の文言になる点だけ残る。</li>
 <li>~~<strong>ADR-020（タブごとの Cookie 名）</strong>~~ <strong>解消（2026-11-19）</strong>: Rust 版でも扱うと決定した（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）。</li>
 <li><strong>数値の型の範囲</strong>（#10）: 契約に整数の範囲を書くか。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 手動のアクセシビリティの確認の担当者と時期、保持の表示（暫定。M5）、自動確定の本人へのフィードバックの文言、参加者のロビーの扱い（B1 の実装は進行役だけ）、ヘルプの教材の本文の人による確認。いずれも <a href="../../beer-game-kotlin/ui-design/">Kotlin 版の未決事項</a> に追従する。</li>
-<li><strong>フロントエンドの共有方法</strong>（フロントエンドアーキテクチャの Rust 版は未着手）: <code>web/</code> を Kotlin 版と共有するか複製するか。共有するなら、UI 設計を参照にとどめる RU1 と整合する。</li>
+<li>~~<strong>フロントエンドの共有方法</strong>~~ <strong>解消（2026-11-19。RF1）</strong>: <code>web/</code> は Kotlin 版のディレクトリのまま共有する（<a href="../architecture-frontend/">フロントエンドアーキテクチャ</a>）。</li>
+<li><strong>タイムアウトと実行中の再送</strong>（#11）、<strong>ポーリングと NF-P2</strong>（#12）、<strong>入力の誤りの集約</strong>（#13）: B1 で確認・決定する。</li>
+<li><strong>ポーリングの失敗が黙って無視される</strong>（#12）: Kotlin 版と共通の課題。画面側の対応は、Kotlin 版の UI 設計と合わせて決める。</li>
 </ol>
 <h2 id="_8">出典<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>

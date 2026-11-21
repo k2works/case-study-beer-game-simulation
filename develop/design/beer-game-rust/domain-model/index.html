@@ -12367,16 +12367,20 @@
 <span class="w">            </span><span class="c1">// 判定順: 権限 → 週(WeekAdvanced) → 版(DecisionConflict) → 保存回数の上限</span>
 <span class="w">            </span><span class="c1">// …</span>
 <span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">saved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SessionEvent</span><span class="p">::</span><span class="n">DecisionSaved</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* … */</span><span class="w"> </span><span class="p">};</span>
-<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">after</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">evolve_session</span><span class="p">(</span><span class="n">state</span><span class="p">.</span><span class="n">clone</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">saved</span><span class="p">).</span><span class="n">into_state</span><span class="p">();</span>
+<span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="n">after</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">apply_decided</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">saved</span><span class="p">)</span><span class="o">?</span><span class="p">;</span><span class="w">   </span><span class="c1">// 保存直後の状態。Ignored（decide が作らない列）なら失敗させる（下記）</span>
 <span class="w">            </span><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="fm">vec!</span><span class="p">[</span><span class="n">saved</span><span class="p">];</span>
 <span class="w">            </span><span class="n">events</span><span class="p">.</span><span class="n">extend</span><span class="p">(</span><span class="n">auto_commit_events</span><span class="p">(</span><span class="o">&amp;</span><span class="n">after</span><span class="p">,</span><span class="w"> </span><span class="n">command</span><span class="p">)</span><span class="o">?</span><span class="p">);</span><span class="w">   </span><span class="c1">// AUTO で 4 役割が揃えば WeekCommitted（+ SessionEnded）</span>
 <span class="w">            </span><span class="nb">Ok</span><span class="p">(</span><span class="n">events</span><span class="p">)</span>
 <span class="w">        </span><span class="p">}</span>
 <span class="w">        </span><span class="c1">// CommitWeek: (1) 週が違えば WeekAdvanced (2) basis が違えば DecisionsChanged (3) 揃っていなければ IncompleteDecisions</span>
+<span class="w">        </span><span class="c1">// SubmitProxyDecision: 進行役だけ。**進行中または一時停止中**で受け付け（state.active_or_paused()?）、</span>
+<span class="w">        </span><span class="c1">//   requestedWeek が現在の週と違えば WeekAdvanced。**一時停止中は自動確定しない**（再開時に判定）</span>
 <span class="w">        </span><span class="c1">// …</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
+<p><strong>停止中の代理入力（レビュー M17）</strong>: <code>SubmitProxyDecision</code>（進行役）は、<code>SaveDecision</code>（参加者）と違い、<strong>一時停止中も受け付けます</strong>（UC-09: 停止 → 代理入力 → 再開）。<strong>進行中で <code>AUTO</code> かつ 4 役割が揃えば自動確定し、一時停止中は確定しません</strong>（<code>SetCommitMode(AUTO)</code> も同じ。再開時に判定する）。Kotlin 版は、初版でここが「進行中のみ」に誤り、レビューで直した経緯があるため、Rust 版は最初から明記します。</p>
+<p><strong><code>Ignored</code> の扱い（レビュー M7）</strong>: <code>evolve_*</code> は <code>Evolution::{Applied, Ignored}</code> を返します（RD2）。<code>decide</code> の内部で保存直後の状態を求める <code>apply_decided</code> は、<code>Ignored</code> が出たら<strong>失敗</strong>にします（<code>decide</code> が作る列は <code>Ignored</code> にならないはずなので、出た場合は不具合）。<strong>コマンドの経路で、保存済みのイベントの再生中に <code>Ignored</code> が出た場合も、状態を信用せず <code>AppFailure::Persistence</code>（500・相関 ID）で失敗させます</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。fail closed）。再生を診断する用途（<code>verify-projections</code> など）では、<code>Ignored</code> を記録して続けます。</p>
 <p>自動確定は、Kotlin 版と同じく <strong>1 回の <code>decide</code> が複数のイベントを返す</strong>ことで表します（D6）。<code>WeekCommitted</code> は結果と次週の状態を事実として含み、<code>evolve</code> はそれを採用するだけで、<code>simulate_week</code> を呼び直しません（D5）。</p>
 <h4 id="_9">状態遷移<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h4>
 <p>状態遷移図は <a href="../../beer-game-kotlin/domain-model/">Kotlin 版</a> の <code>session ストリームの状態</code> と同じです（<code>NotStarted</code> → <code>Active</code> ⇄ <code>Paused</code> → <code>Ended</code>）。</p>
@@ -12414,7 +12418,7 @@
 <h2 id="_10">ドメインイベント<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p>イベントの一覧（EV-G01〜G12、EV-S01〜S10）、発生条件、ペイロードは、<a href="../../beer-game-kotlin/domain-model/">Kotlin 版のドメインイベント</a> を正本として<strong>引き継ぎます</strong>（名称も変えません。イベントは永続化され、投影と契約の一部になるため）。</p>
 <ul>
-<li>ペイロードの JSON は、serde の <code>#[serde(tag = "event_type")]</code> のような<strong>内部タグ付きの列挙型</strong>で表すことを第一候補とします（Kotlin 版の「<code>event_type</code> を判別子にした多相」に対応。<strong>書式は未確認</strong>で、B1 で確かめる）。</li>
+<li>ペイロードの JSON は、<strong>adapter（<code>adapter-persistence</code> の <code>EventCodec</code>）の DTO</strong> を、serde の <code>#[serde(tag = "event_type")]</code> のような<strong>内部タグ付きの列挙型</strong>で表すことを第一候補とします（<strong>ドメインのイベントの型には serde の属性を付けない</strong>。BD5）（Kotlin 版の「<code>event_type</code> を判別子にした多相」に対応。<strong>書式は未確認</strong>で、B1 で確かめる）。</li>
 <li>表示名と資格の値は、ペイロードに含めません（D7）。型の上でも、<code>GameEvent</code> のフィールドに <code>DisplayName</code> と資格のダイジェストの型を<strong>持たせません</strong>。</li>
 </ul>
 <h2 id="_11">投影（読み取りモデル）<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>

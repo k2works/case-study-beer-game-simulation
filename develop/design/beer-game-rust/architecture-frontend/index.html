@@ -12364,7 +12364,7 @@
 <li>~~<strong>RF3 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した。ただし既存の <code>web/support/hooks.mjs</code> の編集は、<strong>実際に行う前に改めて確認する</strong>。</li>
 <li><strong>環境変数の名前の揃え方</strong>: Rust のバックエンドの設定名（<code>ALLOWED_ORIGINS</code>・<code>PORT</code>・<code>APP_ENV</code> など）を、Kotlin 版と揃えるか。揃えると、E2E の案内・手順書の差分が減る。<code>DB_KIND</code> は Rust 版にはない（H2 がない）。</li>
 <li>~~<strong>ADR-020（タブごとの Cookie 名）</strong>~~ <strong>解消（2026-11-19）</strong>: Rust 版のバックエンドでも扱うと決定した。</li>
-<li><strong>SSE の優先度</strong>: 現在のフロントエンドは使っていない。バックエンドの SSE を、いつ実装するか。<strong>ポーリングだけで NF-P2・NF-P4 を満たせるか</strong>の実測。</li>
+<li><strong>SSE の優先度と NF-P2</strong>（レビュー H5。<strong>2026-11-21 に「B1 で測って決める」と承認</strong>）: 現在のフロントエンドは SSE を使わず、3 秒間隔のポーリング。<strong>ポーリングだけで NF-P2（p95 2 秒）・NF-P4 を満たせない見込み</strong>で、SSE を作る／ポーリング間隔を詰める（既存の <code>web/</code> の編集を伴う）／目標を再定義する、のどれにするかは<strong>B1 の実測で決める</strong>。実測前に数値や方式を変えない。<strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（<a href="../ui-design/">UI 設計</a> の影響表 #12）。</li>
 <li><strong>フロントエンドの Rust 版 CI の構成</strong>: <code>web/</code> のジョブ（<code>npm run verify</code>、<code>api:check</code>、<code>@ui</code>）を、Rust 版のワークフローで、どのバックエンドに向けて実行するか（Kotlin 版のワークフローの <code>web</code>・<code>ui</code> ジョブとの重複）。</li>
 <li><strong>Rust のバックエンドを既存の <code>web/</code> に向けた実際の動作</strong>（RF2）: B1 以降で検証する。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 表示名の辞書の形式（多言語化の要否）、設計トークンの管理とコントラスト比の自動検査、ルーターのライブラリ（現状は <code>react-router</code> 8.5.1）、防御的な再取得の要否、<code>useLiveSnapshot</code> の実装時期、アクセシビリティの自動検査（axe）・200% 拡大・スクリーンリーダーの確認、進行役のコンソールの未実装の機能。いずれも <a href="../../beer-game-kotlin/architecture-frontend/">Kotlin 版の未決事項</a> に追従する。</li>

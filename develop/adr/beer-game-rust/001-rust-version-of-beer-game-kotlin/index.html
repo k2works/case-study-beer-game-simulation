@@ -12096,12 +12096,12 @@
 <ul>
 <li><strong>機能と振る舞いは、beer-game2 を正本として引き継ぐ。</strong> 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、<code>docs/requirements/beer-game2/</code> を参照する。範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）。</li>
 <li><strong>設計の構造は、beer-game-kotlin を正本として引き継ぐ。</strong> ES + CQRS、<code>game</code> と <code>session</code> の 2 ストリーム、<code>decide</code> / <code>evolve</code> の純粋関数、投影、保持削除などの構造は変えず、Rust の表現に置き換える。設計書は <code>docs/design/beer-game-rust/</code> に、beer-game-kotlin と同じ文書構成で作り、各文書に「beer-game-kotlin からの変更」を設ける。</li>
-<li><strong>技術スタックは、バックエンドを Rust（axum + sqlx + tokio）、フロントエンドを既存の React / TypeScript とする。</strong> API の契約は、beer-game-kotlin の <code>contracts/openapi.yaml</code>（手書き）を正本として共有する方針を第一候補とし、扱いは技術スタックの設計で定める。版は設計時に実際に確認して固定し、別の ADR で記録する。</li>
+<li><strong>技術スタックは、バックエンドを Rust（axum + sqlx + tokio）、フロントエンドを既存の React / TypeScript とする。</strong> API の契約は、beer-game-kotlin の <code>contracts/openapi.yaml</code>（手書き）を正本として共有する方針を第一候補とし、扱いは技術スタックの設計で定める。版は設計時に実際に確認して固定し、<strong>技術スタック（<a href="../../../design/beer-game-rust/tech-stack/">tech-stack.md</a>）の設計判断 R7 と確認した版の表に記録する</strong>（版を固定する時点で ADR が必要になれば、別の ADR を起票する。2026-11-21 のレビューで、存在しない「別の ADR」への参照を直した）。</li>
 <li><strong>コーディングは、関数型プログラミングガイド（Rust 編）に準拠する。</strong> 失敗は <code>Result</code> と型付きのエラー（列挙型）で表し、ドメインを副作用のない関数で書く。</li>
 <li><strong>beer-game-kotlin の ADR は、次の表のとおり扱う。</strong> beer-game-kotlin の ADR のファイルは履歴として変更しない。</li>
 </ul>
 <h3 id="beer-game-kotlin-adr">beer-game-kotlin の ADR の引き継ぎ表<a class="headerlink" href="#beer-game-kotlin-adr" title="Permanent link">&para;</a></h3>
-<p>扱いは、beer-game-kotlin の ADR 002〜020 の<strong>本文を読んで検証した</strong>案である（2026-11-19。調査はサブエージェントが行い、判定の根拠は各 ADR の決定の節）。見出しだけで付けた初稿から、007・011・013・014 の判定または理由を修正し、005・008・018・020 に補足を足した。なお、引き継ぎ元の ADR の多くは Kotlin 版でも「提案中」で、承認済みではない（002〜020 のうち承認済みは 012・015〜019。020 は提案）。</p>
+<p>扱いは、beer-game-kotlin の ADR 002〜020 の<strong>本文を読んで検証した</strong>案である（2026-11-19。調査はサブエージェントが行い、判定の根拠は各 ADR の決定の節）。見出しだけで付けた初稿から、007・011・013・014 の判定または理由を修正し、005・008・018・020 に補足を足した。なお、引き継ぎ元の ADR の多くは Kotlin 版でも「提案中」で、承認済みではない（<strong>002〜020 のうち承認済みは 002・012・015〜019</strong>。020 は提案。001 は本書の元の ADR で承認済み。2026-11-21 のレビューで、002 を落としていた誤りを訂正）。</p>
 <table>
 <thead>
 <tr>
@@ -12174,7 +12174,7 @@
 <tr>
 <td style="text-align: left;">013 技術スタックの版</td>
 <td style="text-align: left;"><strong>置き換える</strong>（バックエンド部分）。PostgreSQL 18、Node 26 LTS、フロントエンド・インフラ・CI の版と運用原則は引き継ぐ</td>
-<td style="text-align: left;">Rust・axum・sqlx・tokio の版を、確認したうえで別の ADR で固定する。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ</td>
+<td style="text-align: left;">Rust・axum・sqlx・tokio の版を、確認したうえで固定する（記録先は tech-stack.md の R7 と版の表）。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ</td>
 </tr>
 <tr>
 <td style="text-align: left;">014 ローカル開発だけ H2</td>

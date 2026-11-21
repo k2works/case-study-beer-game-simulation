@@ -12538,6 +12538,109 @@
 </tbody>
 </table>
 <p>中・低は、一覧のとおり修正する案。M3（NF-S22 の承認の範囲）、M6（panic の方針）、M9（投影の案の選択）は、人の判断が要る。</p>
+<h2 id="2026-11-21">対応結果（2026-11-21。ユーザーの決定に基づく）<a class="headerlink" href="#2026-11-21" title="Permanent link">&para;</a></h2>
+<p>ユーザーは、次のとおり決定した（<code>AskUserQuestion</code> による）。</p>
+<ul>
+<li><strong>H2（RB2 の見直し）</strong>: 承認した。</li>
+<li><strong>H1・H3・H4・H5・H6・H7・H9</strong>: 案どおり修正する。<strong>H8</strong> は B1 の計画（<code>planning-releases</code>）で扱う。</li>
+<li><strong>矛盾 3（NF-P2）</strong>: <strong>B1 で測って決める</strong>。</li>
+<li><strong>中・低 32 件</strong>: 案どおり修正する（M3: NF-S22 を承認済みとして記録、M6: <code>panic = "unwind"</code> を制約として固定、M9: 案の選択は B1）。</li>
+<li><strong>矛盾 4（RPO・RTO の約束の範囲）</strong>: まだ決めていない（人の判断が残る）。</li>
+</ul>
+<p>反映した結果は次のとおり。<strong>「修正済み」は文書への反映を指し、実装・実測の確認ではない。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">結果</th>
+<th style="text-align: left;">反映先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">H1</td>
+<td style="text-align: left;">修正済み。設定先をログインユーザーに訂正し、<code>SHOW</code> の検証をテスト戦略に追加</td>
+<td style="text-align: left;">operation.md、architecture-infrastructure.md、data-model.md、test-strategy.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H2</td>
+<td style="text-align: left;">修正済み。<code>rollback</code> を明示する <code>execute</code> のスケッチを、型検査してテストした（4 件）。RB2・NF-R18・RT2 を見直し</td>
+<td style="text-align: left;">architecture-backend.md、test-strategy.md、non-functional.md、index.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H3</td>
+<td style="text-align: left;">設計に追記。<strong>実現と追跡の依存の承認は B1</strong></td>
+<td style="text-align: left;">architecture-backend.md、architecture-infrastructure.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H4</td>
+<td style="text-align: left;">修正済み。タイムアウトは <code>type</code> なしの 504、実行中の再送は完了を待つ。<strong>実現は B1</strong></td>
+<td style="text-align: left;">ui-design.md（#11）、architecture-backend.md、test-strategy.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H5</td>
+<td style="text-align: left;">修正済み（記述を実態に合わせた）。<strong>NF-P2 の方式は B1 の実測で決める</strong></td>
+<td style="text-align: left;">ui-design.md（#12）、non-functional.md、architecture-frontend.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H6</td>
+<td style="text-align: left;">修正済み（NF-P16 を 2 秒に戻した）</td>
+<td style="text-align: left;">non-functional.md、operation.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H7</td>
+<td style="text-align: left;">方針を追記（許可リスト）。<strong>具体の仕組みは B1</strong></td>
+<td style="text-align: left;">test-strategy.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H8</td>
+<td style="text-align: left;">設計文書には、B1 の受入条件の書き方と指標の案を追記。<strong>リリース計画は <code>planning-releases</code> で</strong></td>
+<td style="text-align: left;">test-strategy.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">H9</td>
+<td style="text-align: left;">修正済み（案の文言と、進行役向けの案内の手順書を追加）。<strong>文言は案で、運営者との合意は未</strong></td>
+<td style="text-align: left;">operation.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">M1〜M20</td>
+<td style="text-align: left;">修正済み。M9・M10 は案の整理と設計の追記で、選択・実現は B1。M12 は NF-P16・NF-P17・NF-R18・NF-O5・NF-S22 を修正（NF-R18 の待ちの上限の数値は B1）</td>
+<td style="text-align: left;">各文書</td>
+</tr>
+<tr>
+<td style="text-align: left;">L1・L5・L6・L9〜L12</td>
+<td style="text-align: left;">修正済み</td>
+<td style="text-align: left;">各文書</td>
+</tr>
+<tr>
+<td style="text-align: left;">L2</td>
+<td style="text-align: left;">未決事項へ（統合のエラー型は B1 の最初のスライドで決める）</td>
+<td style="text-align: left;">architecture-backend.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">L3</td>
+<td style="text-align: left;"><strong>部分的</strong>。全体構成の図に注記した。読み取りロールに <code>events</code> の SELECT を与えるかは B1</td>
+<td style="text-align: left;">architecture-infrastructure.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">L4</td>
+<td style="text-align: left;">修正済み（NF-S5 の要約を RB3 に合わせた）</td>
+<td style="text-align: left;">non-functional.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">L7</td>
+<td style="text-align: left;">命名の規則を追記。<strong>承認は未</strong>（未決事項 17）</td>
+<td style="text-align: left;">test-strategy.md</td>
+</tr>
+<tr>
+<td style="text-align: left;">L8</td>
+<td style="text-align: left;">UI の影響表 #11 に記載し、Kotlin 版と共通の課題として残す</td>
+<td style="text-align: left;">ui-design.md</td>
+</tr>
+</tbody>
+</table>
+<p><strong>検証</strong>: <code>gulp okf:check</code>・<code>docs_structure.py check --check</code> は ERROR 0、リンク・PlantUML の検査は問題なし。<strong><code>verified</code> は付けていない</strong>（ユーザーが確認した範囲にだけ付ける）。</p>
+<p><strong>残っている人の判断</strong>: 矛盾 4（RPO・RTO の約束の範囲）、RT1 の命名の規則（L7）、H9 の依頼文言の運営者との合意。</p>
 <h2 id="_12">エージェント別フィードバックの件数<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

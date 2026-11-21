@@ -12589,7 +12589,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">コンテナ</td>
-<td style="text-align: left;">マルチステージのビルド。実行イメージは<strong>未決</strong>（<a href="#未決事項">未決事項</a> の 2）</td>
+<td style="text-align: left;">マルチステージのビルド。実行イメージは <strong>RI1（承認済み）の案 A（glibc を含む最小のイメージ。シェルなし）</strong>。実在・動作の確認は B1</td>
 <td style="text-align: left;">-</td>
 <td style="text-align: left;">Temurin JRE 25</td>
 <td style="text-align: left;">Rust は JVM を要さず、単一の実行ファイルにできる</td>
@@ -12657,7 +12657,7 @@
 <h3 id="r3-db-sqlx-sql-orm">R3: DB は sqlx で直接 SQL を書き、ORM を使わない<a class="headerlink" href="#r3-db-sqlx-sql-orm" title="Permanent link">&para;</a></h3>
 <p>beer-game-kotlin の「ORM なし」と同じです。sqlx には、SQL をコンパイル時に検査する機能があるといわれますが、<strong>どの機能を使うか（接続が必要なマクロか、オフラインの検査か）は未確認</strong>です。CI で DB を要さない形にできるかを B1 で確かめます。</p>
 <h3 id="r4-clippy-cargo-deny">R4: 静的解析は clippy を厳格に適用し、cargo-deny で依存関係を検査する<a class="headerlink" href="#r4-clippy-cargo-deny" title="Permanent link">&para;</a></h3>
-<p>beer-game-kotlin の T5（detekt を中心に PMD の XPath で補完）に対応します。<code>cargo clippy -- -D warnings</code>、<code>cargo fmt --check</code>、<code>cargo deny check</code> を CI で必須にします。ドメインの純粋性（副作用の呼び出しの禁止）は、clippy の設定だけで足りるかを<strong>未確認</strong>とし、足りなければ crate の依存の制限（ドメインの crate が I/O 系のクレートに依存しない）で守ります。違反は 0 件で、<code>#[allow(...)]</code> は理由なしに使いません。</p>
+<p>beer-game-kotlin の T5（detekt を中心に PMD の XPath で補完）に対応します。<code>cargo clippy -- -D warnings</code>、<code>cargo fmt --check</code>、<code>cargo deny check</code> を CI で必須にします。ドメインの純粋性（副作用の呼び出しの禁止）は、<strong>第一に crate の依存の制限（ドメインの crate が I/O 系のクレートに依存しない。依存がなければ呼べない）で守り、clippy（<code>disallowed_methods</code> など）で補います</strong>（<a href="../domain-model/">ドメインモデル</a> の RD5、<a href="../test-strategy/">テスト戦略</a> と同じ主従。clippy の設定だけで足りるかは<strong>未確認</strong>）。違反は 0 件で、<code>#[allow(...)]</code> は理由なしに使いません。</p>
 <h3 id="r5-gherkin-cucumber-rs">R5: 受入条件は Gherkin と cucumber-rs で表し、細部は標準のテストで書く<a class="headerlink" href="#r5-gherkin-cucumber-rs" title="Permanent link">&para;</a></h3>
 <p>ADR-001 の 012（変更）に対応します。cucumber-rs が日本語の Gherkin（<code># language: ja</code>）を扱えるかは<strong>未確認</strong>です。不可なら、英語のキーワード + 日本語の本文、または別の方式を比較して決めます。</p>
 <h3 id="r6-cargo-llvm-cov-80">R6: カバレッジは cargo-llvm-cov で計測し、行 80% を基準にする<a class="headerlink" href="#r6-cargo-llvm-cov-80" title="Permanent link">&para;</a></h3>
@@ -12746,11 +12746,11 @@
 <h2 id="_13">未決事項<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
 <li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。ローカル・CI・統合テスト・ステージング・本番が同じ DB になる。beer-game-kotlin の ADR-014（H2）は、ADR-001 の表のとおり Rust 版では引き継がない。</li>
-<li><strong>コンテナの実行イメージ</strong>: distroless、debian-slim、scratch などを比較する。TLS の証明書や DNS の扱いも含めて確認する。</li>
+<li><strong>コンテナの実行イメージの実在確認</strong>: RI1 で案 A（glibc を含む最小のイメージ）を承認済み。ベースイメージのタグ、動的リンクに必要なライブラリ、TLS の証明書や DNS の扱い（sqlx の TLS の実装を含む）は B1 で確認する。</li>
 <li><strong>sqlx の機能</strong>: PostgreSQL のアドバイザリロック、<code>LISTEN/NOTIFY</code>、マイグレーション、コンパイル時の検査（オフラインの可否）。B1 で確認する。</li>
 <li><strong>cucumber-rs の日本語対応</strong>: R5 のとおり。</li>
 <li><strong>axum の SSE と tower-http のプラグイン</strong>: 使うプラグインの名前と機能を確認する。</li>
-<li><strong>API の契約の共有方法</strong>: beer-game-kotlin の <code>contracts/openapi.yaml</code> を共有するか、複製するか。</li>
+<li>~~<strong>API の契約の共有方法</strong>~~ <strong>解消（2026-11-19。RF1）</strong>: Kotlin 版の <code>contracts/openapi.yaml</code> を、現在の場所のまま共有する。</li>
 <li><strong>MSRV とサポート</strong>: 各クレートの MSRV が Rust 1.97.1 以下であること、各クレートの公開日と保守状況を <code>cargo info</code> で確認する。</li>
 <li><strong>エディション</strong>: 2024 を第一候補とするが、ツールチェーンの対応を実装開始時に確認する。</li>
 </ol>

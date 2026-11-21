@@ -3253,6 +3253,28 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#2026-11-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2026-11-21 のレビュー後の承認（ユーザーの決定）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#m16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        引き継ぎの基準（レビュー M16）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -12401,7 +12423,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">RB1〜RB3</td>
-<td style="text-align: left;">トレイトによるポート、<code>execute</code> を spawn して <code>Tx</code> の drop で ROLLBACK、認証は <code>execute</code> の中</td>
+<td style="text-align: left;">トレイトによるポート、<code>execute</code> を spawn（<strong>RB2 は 2026-11-21 に見直し: 失敗の経路で ROLLBACK を明示し、<code>Tx</code> の drop は保険</strong>）、認証は <code>execute</code> の中</td>
 <td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
 </tr>
 <tr>
@@ -12411,7 +12433,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">RN1〜RN3</td>
-<td style="text-align: left;">JVM 項目の読み替えと実測前に数値を変えない方針、NF-R18 の新設、行 80%</td>
+<td style="text-align: left;">JVM 項目の読み替えと実測前に数値を変えない方針、<strong>NF-R18（キャンセル安全性）と NF-S22（メモリ安全）の新設</strong>、行 80%</td>
 <td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
 </tr>
 <tr>
@@ -12446,9 +12468,55 @@
 </tr>
 </tbody>
 </table>
+<h3 id="2026-11-21">2026-11-21 のレビュー後の承認（ユーザーの決定）<a class="headerlink" href="#2026-11-21" title="Permanent link">&para;</a></h3>
+<p>2026-11-21 のマルチパースペクティブレビュー（<a href="../../review/beer-game-rust/design_review_20261121/">設計書レビュー</a>）の結果、次をユーザーが承認しました。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">判断</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">文書</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>RB2 の見直し</strong></td>
+<td style="text-align: left;"><strong><code>execute</code> は spawn して実行し、失敗の経路では ROLLBACK を明示する。<code>Tx</code> の drop は保険にする。</strong> 部分更新は PostgreSQL が防ぐため、NF-R18・RT2 の検証は「ロック・接続の解放時間、プールに返った接続がトランザクション外であること」に変える（2026-11-19 の RB2 を見直し）</td>
+<td style="text-align: left;"><a href="architecture-backend/">バックエンド</a>、<a href="test-strategy/">テスト戦略</a>、<a href="non-functional/">非機能要件</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">高の修正（H1・H3〜H7・H9）</td>
+<td style="text-align: left;"><code>idle_in_transaction_session_timeout</code> の設定先をログインユーザーに訂正、spawn したタスクの寿命・SSE の終了・プール取得の写像、タイムアウトは <code>type</code> なしの 504 と実行中の再送の扱い、影響表を実態（SSE なし、3 秒のポーリング）に合わせる、NF-P16 を 2 秒に戻す、許可リスト方式、進行役向けの案内</td>
+<td style="text-align: left;">各文書</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P2 の扱い</td>
+<td style="text-align: left;"><strong>B1 で測って決める</strong>（SSE を作る／間隔を詰める／目標を再定義する）。実測前に数値・方式を変えない</td>
+<td style="text-align: left;"><a href="non-functional/">非機能要件</a>、<a href="ui-design/">UI 設計</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">中・低の修正</td>
+<td style="text-align: left;">M3: <strong>NF-S22（メモリ安全。<code>unsafe</code> を使わない）を、2026-11-19 の RN1〜RN3 の承認に含まれたものとして記録</strong>（承認時の選択肢の説明に含まれていた）。M6: <strong><code>panic = "unwind"</code> を制約として固定</strong>。M9: <code>session_overview.week</code> の案の選択は B1</td>
+<td style="text-align: left;">各文書</td>
+</tr>
+</tbody>
+</table>
+<p><strong>H8（Rust 版の価値指標・B1 の受入条件の絞り込み）は、B1 の計画（<code>planning-releases</code>）で扱う。</strong> 設計文書には、受入条件の書き方（観察できる形）と指標の案だけを追記した（<a href="test-strategy/">テスト戦略</a> の「B1 の受入条件」）。</p>
+<h3 id="m16">引き継ぎの基準（レビュー M16）<a class="headerlink" href="#m16" title="Permanent link">&para;</a></h3>
+<p>Kotlin 版の設計書に含まれる<strong>実装の経緯の注記</strong>（B1〜B15 の記述）と、<strong>実装中に確定した業務ルール</strong>を区別します。<strong>基準は 1 つ: 「経緯は捨て、確定した業務ルールは引き継ぐ」</strong>。</p>
+<ul>
+<li><strong>引き継ぐもの</strong>: 実装中に確定した業務ルール・契約（例: 保存回数の上限 9 回は共同担当で共有され、版は値の変化でなく保存で数える、<code>ParticipantReplaced</code> と <code>lobby_participants.replaced_at</code>、<code>RetentionSaga</code> の <code>Abandoned</code>、<code>session.paused</code> などのエラー <code>code</code>、<code>WeekAdvanced</code> と <code>DecisionsChanged</code> の判定の順）。</li>
+<li><strong>捨てるもの</strong>: どの Bolt で何を実装したか、実装の都合で設計から変わった点の経緯、Kotlin 固有の実装の事情（H2、<code>detekt</code>、JDK 25 の制約など）。</li>
+<li>各文書の冒頭の「Kotlin 版の実装の経緯（Bn〜Bm の注記）は引き継ぎません」は、<strong>「確定した業務ルールは別途、本文に引き継いである」</strong>という意味に読む。<strong>引き継ぎの抜けを見つけたら、Kotlin 版の差分表（変更表）を確認して追加する</strong>（今回のレビュー時点で、すべての文書の確認はしていない）。</li>
+</ul>
 <h3 id="_7">承認の条件・留意点<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>RB2・RD5 などの未確認の前提</strong>（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。<strong>成り立たなければ、設計を見直します。</strong></li>
+<li>
+<p><strong>ADR のステータスと OKF の <code>status</code></strong>: ADR-001 は、本文のステータスが「承認済み」（ユーザーの決定の記録）で、フロントマターの <code>status: draft</code> は <strong>OKF のレビュー・検証の状態</strong>（人による <code>verified</code> が未付与）を表す。両者は別である。</p>
+</li>
+<li>
+<p><strong>RB2・RD5 などの未確認の前提</strong>（sqlx のトランザクションの drop での ROLLBACK、clippy による純粋性の検査など）は、B1 の受入条件です。<strong>成り立たなければ、設計を見直します。</strong></p>
+</li>
 <li><strong>RF3 の実施</strong>（既存の <code>web/support/hooks.mjs</code> の編集）は、承認済みですが、<strong>実際に編集する前に改めて確認します</strong>（Kotlin 版に影響するため）。</li>
 <li><strong>AWS への適用・費用・アカウント・IAM</strong>（RI5 の範囲外）は、別のゲートで人が判断します。</li>
 <li>各文書の <code>status</code> は <code>draft</code> のままで、OKF の <code>verified</code>（人による検証）は付いていません。承認された<strong>設計判断</strong>と、文書の<strong>検証</strong>は別です。</li>

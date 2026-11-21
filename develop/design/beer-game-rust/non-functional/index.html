@@ -12112,7 +12112,7 @@
 <tr>
 <td style="text-align: left;">起動とウォームアップ</td>
 <td style="text-align: left;">JVM の起動、JIT のウォームアップ。コールドスタート直後の遅さを要件にする</td>
-<td style="text-align: left;">JIT がない。<strong>ウォームアップ依存の遅さは原則なし</strong>。ただし、DB の接続プールの温まりと OS のキャッシュの影響は残るため、<strong>コールドスタート直後も定常と同じ目標</strong>を置いて確認する</td>
+<td style="text-align: left;">JIT がない。<strong>ウォームアップ依存の遅さは原則なし</strong>。ただし、DB の接続プールの温まりと OS のキャッシュの影響は残るため、<strong>コールドスタート直後は NF-P16 の目標（Kotlin 版と同じ 2 秒。RN1）</strong>を置いて確認する</td>
 <td style="text-align: left;">NF-P1、NF-P16</td>
 </tr>
 <tr>
@@ -12173,7 +12173,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-P1</td>
-<td style="text-align: left;">15 チーム（各 4 参加者 + 進行役）の同時利用で、意思決定の送信と役割別の状態取得の p95 を 1 秒以下とする。<strong>DB の接続プールが温まった後の定常値で測り、コールドスタート直後の 60 秒間も同じ目標を満たすこと（NF-P16）を別に確認する</strong>（JIT のウォームアップは存在しない）</td>
+<td style="text-align: left;">15 チーム（各 4 参加者 + 進行役）の同時利用で、意思決定の送信と役割別の状態取得の p95 を 1 秒以下とする。<strong>DB の接続プールが温まった後の定常値で測り、コールドスタート直後の 60 秒間は NF-P16 の目標（p95 2 秒以下）を別に確認する</strong>（JIT のウォームアップは存在しない）</td>
 <td style="text-align: left;">75 並行、15 分の定常負荷。検証エラーと認可エラーは別の系列にする</td>
 <td style="text-align: center;">変更</td>
 </tr>
@@ -12185,13 +12185,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-P16</td>
-<td style="text-align: left;"><strong>起動時間</strong>: コンテナのプロセスの開始から <code>/ready</code> が成功するまで、p95 30 秒以下（マイグレーションの適用を除く。<strong>アプリの起動時間</strong>。ECS のタスクの起動時間とは別の区間で、運用要件の「起動時間の測る区間」に従う）（<strong>Kotlin 版の提案値を引き継ぐ上限</strong>。Rust の実測で見直し、大きく下回る場合は目標を縮める）。<strong>コールドスタートの後 60 秒間の p95 も NF-P1 と同じ 1 秒以下</strong>とする（接続プールと OS のキャッシュの影響を測る）</td>
+<td style="text-align: left;"><strong>起動時間</strong>: コンテナのプロセスの開始から <code>/api/v1/ready</code> が成功するまで、p95 30 秒以下（マイグレーションの適用を除く。<strong>アプリの起動時間</strong>。ECS のタスクの起動時間とは別の区間で、運用要件の「起動時間の測る区間」に従う）（<strong>Kotlin 版の提案値を引き継ぐ上限</strong>。Rust の実測で見直す。<strong>縮める基準: Fargate での実測（10 回以上の p95）が上限の 3 分の 1 を下回り、運営者と合意できたとき</strong>）。<strong>コールドスタートの後 60 秒間の p95 は 2 秒以下</strong>（Kotlin 版の提案値を引き継ぐ上限。2026-11-21 のレビュー H6 で、1 秒に厳しくしていた誤りを戻した。RN1）とする（接続プールと OS のキャッシュの影響を測る）</td>
 <td style="text-align: left;">コールドスタートの計測（夜間）</td>
 <td style="text-align: center;">変更</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P17</td>
-<td style="text-align: left;"><strong>メモリ</strong>: コンテナのメモリ上限から、プロセスが使える量を明示する。NF-C1 の負荷（15 ゲーム、75 の SSE 接続）の定常で、<strong>常駐メモリ（RSS）が、コンテナのメモリ上限の 70% 以下</strong>、<strong>OOM kill 0 件</strong>とする。tokio のタスク数と、確保したメモリの推移（増え続けないこと）を記録する。<strong>目標値は実測で決める</strong>（GC の一時停止は存在しない）</td>
+<td style="text-align: left;"><strong>メモリ</strong>: コンテナのメモリ上限から、プロセスが使える量を明示する。NF-C1 の負荷（15 ゲーム、75 の SSE 接続）の定常で、<strong>常駐メモリ（RSS）が、コンテナのメモリ上限の 70% 以下</strong>、<strong>OOM kill 0 件</strong>とする。tokio のタスク数と、確保したメモリの推移（増え続けないこと）を記録する。<strong>合否の式は「RSS ≤ コンテナのメモリ上限の 70%」かつ「OOM kill 0 件」</strong>（Kotlin 版の提案値を引き継ぐ。RN1）。<strong>実測で決めるのは、タスクのメモリの割り当て（上限）であり、この式の閾値ではない</strong>（GC の一時停止は存在しない）</td>
 <td style="text-align: left;">負荷試験中の RSS・タスク数の記録</td>
 <td style="text-align: center;">変更</td>
 </tr>
@@ -12214,7 +12214,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-P2</td>
-<td style="text-align: left;">週確定から全ブラウザの表示まで p95 2 秒以下（同一の時計で測る。同期投影のため通知の版以上の状態が取れる）</td>
+<td style="text-align: left;">週確定から全ブラウザの表示まで p95 2 秒以下（同一の時計で測る。同期投影のため通知の版以上の状態が取れる）。<strong>現行の画面は SSE を使わず 3 秒間隔のポーリングのため、この目標を満たせない見込み</strong>（推定。実測していない）。<strong>SSE を作る／間隔を詰める／目標を再定義する、のどれにするかは、B1 の実測で決める</strong>（2026-11-21 の決定。実測前に数値・方式を変えない。RN1。<a href="../ui-design/">UI 設計</a> の影響表 #12）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P3</td>
@@ -12276,6 +12276,8 @@
 </table>
 <h3 id="_5">ストリームの最大の長さ<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版と同じです（想定 1000 件、保存回数の上限（提案: 1 役割・1 週あたり 9 回。代理入力を含む）を置くと最大 2000 件）。<strong>この見積もりと上限は、JVM の値ではなく設計上の見積もり</strong>で、Rust の実測で見直します。上限の有無と値は、運営者と合意して決める未決事項です。</p>
+<h3 id="h5">現行の画面の更新方式（ポーリング）による負荷の想定（レビュー H5）<a class="headerlink" href="#h5" title="Permanent link">&para;</a></h3>
+<p>NF-C1・NF-P17・NF-P1 の負荷の想定は、Kotlin 版と同じ「15 ゲーム、75 の SSE 接続」です。<strong>現行の画面（既存の <code>web/</code>）は SSE を使わず、<code>PLAY_POLL_MS</code>（3000 ms）の間隔のポーリングで状態を取り直す</strong>ため、実際の負荷は「<strong>ポーリングの GET が毎秒 25 件以上</strong>（75 ユーザー ÷ 3 秒に、ロビー・観察などの画面を足した見込み。推定で毎秒 50 件程度）」という<strong>形が違う負荷</strong>になる。<strong>負荷試験（NF-P1・NF-P17・NF-C1）は、実際の画面の更新方式（ポーリング）で行う</strong>。SSE を実装した場合は、その負荷（接続の維持）を別に測る。数値は推定で、実測していない。</p>
 <h2 id="_6">信頼性・可用性要件<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <h3 id="_7">変更・新の要件（全文）<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
 <table>
@@ -12302,13 +12304,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-R18</td>
-<td style="text-align: left;"><strong>キャンセル安全性</strong>: クライアントの切断（ハンドラの future の drop）、spawn したタスクの panic、プロセスへの SIGTERM のいずれでも、<strong>トランザクションが部分更新を残さない</strong>（COMMIT されるか、全体が ROLLBACK される）。コマンドの処理は、<strong>切断されても最後まで実行され</strong>（COMMIT の途中で止まらない）、結果が返らなかった要求は、同じ <code>Idempotency-Key</code> の再送で保存済みの応答を得る。SIGTERM では、進行中のコマンドの完了を、待ちの上限つきで待ってから終了する</td>
-<td style="text-align: left;">DB の統合テスト（<code>Tx</code> の drop、spawn による隔離、タスクの panic、シャットダウン。<a href="../test-strategy/">テスト戦略</a> の RT2）</td>
+<td style="text-align: left;"><strong>キャンセル安全性</strong>: クライアントの切断（ハンドラの future の drop）、spawn したタスクの panic、プロセスへの SIGTERM、COMMIT の前の失敗のいずれでも、(1) <strong>トランザクションが部分更新を残さない</strong>（COMMIT されるか、全体が ROLLBACK される。これは PostgreSQL が保証する）、(2) <strong>失敗の経路では ROLLBACK を明示し、ロックと接続が一定時間（初期値は B1 で測って決める）以内に解放され、プールに返った接続はトランザクション外の状態である</strong>、(3) コマンドの処理は、<strong>切断されても最後まで実行され</strong>（COMMIT の途中で止まらない）、結果が返らなかった要求は、同じ <code>Idempotency-Key</code> の再送で保存済みの応答を得る（<strong>元の処理が実行中の再送は、完了を待って同じ応答を返す</strong>）、(4) SIGTERM では、新しい要求を止め、SSE を閉じ、<strong>追跡しているコマンドのタスクの完了を、<code>stopTimeout</code> より短い上限で待ってから</strong>終了コード 0 で終わる</td>
+<td style="text-align: left;">DB の統合テスト（失敗の経路の明示の ROLLBACK とロック・接続の解放時間、<code>Tx</code> の drop（panic・ランタイム終了の保険）、spawn による隔離、タイムアウト後の COMMIT と再送、実行中の再送、タスクの panic、シャットダウン、安全網の設定。<a href="../test-strategy/">テスト戦略</a> の RT2）</td>
 <td style="text-align: center;">新</td>
 </tr>
 </tbody>
 </table>
-<p>NF-R18 は、設計判断 RB2（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）の前提（sqlx のトランザクションが drop で ROLLBACK される）が B1 で確認できることに依存します。<strong>確認できなければ設計を見直す</strong>ことを、本要件の受入条件に含めます。</p>
+<p>NF-R18 は、設計判断 RB2（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。<strong>2026-11-21 に、明示の ROLLBACK を主にする形へ見直し済み</strong>）の前提（sqlx のトランザクションの drop・ROLLBACK の挙動、spawn したタスクの追跡）が B1 で確認できることに依存します。<strong>確認できなければ設計を見直す</strong>ことを、本要件の受入条件に含めます。<strong>待ちの上限と、ロック・接続の解放時間の数値は、B1 で測って決める</strong>（<code>stopTimeout</code> の値は <a href="../architecture-infrastructure/">インフラストラクチャ</a> の実測で決める）。</p>
 <h3 id="_8">継続する要件（要約）<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -12412,7 +12414,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-S22</td>
-<td style="text-align: left;"><strong>メモリ安全</strong>: ドメインと application の crate に <code>unsafe</code> を置かない（<code>#![forbid(unsafe_code)]</code>）。adapter・app で <code>unsafe</code> が必要になる場合は、理由を ADR に記録し、人が承認する。依存クレートの <code>unsafe</code> は <code>cargo-deny</code> などで可視化する（<strong>可視化の手段は未選定</strong>）</td>
+<td style="text-align: left;"><strong>メモリ安全</strong>: ドメインと application の crate に <code>unsafe</code> を置かない（<code>#![forbid(unsafe_code)]</code>）。adapter・app で <code>unsafe</code> が必要になる場合は、理由を ADR に記録し、人が承認する。<strong>依存クレートの <code>unsafe</code> の可視化は、本要件の合否に含めない</strong>（手段は未選定。<code>cargo-deny</code> で足りるか、別の道具が要るかを B1 で確認し、導入するなら承認を得る）</td>
 <td style="text-align: left;">コンパイル（<code>forbid</code>）、CI の検査</td>
 <td style="text-align: center;">新</td>
 </tr>
@@ -12441,7 +12443,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-S5</td>
-<td style="text-align: left;">すべての読み書き・SSE の購読で、サーバー側で認可を検査（認証はアダプター、認可の規則は <code>decide</code>）</td>
+<td style="text-align: left;">すべての読み書き・SSE の購読で、サーバー側で認可を検査（<strong>認証は <code>execute</code> の中、同じトランザクションの中で行う（RB3）</strong>。認可の規則は <code>decide</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-S6</td>
@@ -12477,7 +12479,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-S16</td>
-<td style="text-align: left;">保持期間 1〜3650 日（既定 90）。削除は <code>game_roots</code> の連鎖削除で、<code>game_id</code> 列を持つ全表に行が残らない。受領記録は 1 年。保持の起点は作成時（暫定）</td>
+<td style="text-align: left;">保持期間 1〜3650 日（既定 90）。削除は <code>game_roots</code> の連鎖削除で、<code>game_id</code> 列を持つ全表に行が残らない。受領記録は 1 年。保持の起点は作成時（暫定）。<strong>削除予定日と「バックアップには削除後も最大 7 日残る」を、作成後・ロビー・保持状態の画面に示す</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-S17</td>
@@ -12522,7 +12524,7 @@
 <tr>
 <td style="text-align: left;">NF-O5</td>
 <td style="text-align: left;">ダッシュボードに、リクエストの量・応答時間・エラー、ゲームと SSE の数、確定の成功と競合、追記の競合と再試行、投影の更新時間、<strong>常駐メモリ（RSS）と tokio のタスク数</strong>、SLO の消費を表示する</td>
-<td style="text-align: left;">目視</td>
+<td style="text-align: left;">目視に加え、<strong>ダッシュボードの定義に、RSS・タスク数・接続プールの待ち・panic の件数・<code>idle in transaction</code> の件数の項目が含まれること</strong>を、定義ファイルの検査で確かめる（B13 相当の実装時に決める）</td>
 <td style="text-align: center;">変更</td>
 </tr>
 <tr>
@@ -12582,7 +12584,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-O10</td>
-<td style="text-align: left;"><code>GET /ready</code> が DB への接続を確認し、接続できないタスクを負荷分散の対象から外す</td>
+<td style="text-align: left;"><code>GET /api/v1/ready</code> が DB への接続を確認し、接続できないタスクを負荷分散の対象から外す</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-O13</td>
@@ -12762,7 +12764,7 @@
 <tr>
 <td style="text-align: left;">NF-P1</td>
 <td style="text-align: left;">JVM のウォームアップ後の定常値</td>
-<td style="text-align: left;">接続プールが温まった後の定常値。コールドスタート直後も同じ目標</td>
+<td style="text-align: left;">接続プールが温まった後の定常値。コールドスタート直後は NF-P16 の目標（2 秒）</td>
 <td style="text-align: left;">JIT がない（NF-P16）</td>
 </tr>
 <tr>
@@ -12774,7 +12776,7 @@
 <tr>
 <td style="text-align: left;">NF-P16</td>
 <td style="text-align: left;">起動 p95 30 秒以下 + コールドスタート後 60 秒間 p95 2 秒以下（JIT の影響）</td>
-<td style="text-align: left;">起動 p95 30 秒以下（上限として引き継ぎ、実測で縮める）+ コールドスタート後 60 秒間も NF-P1 と同じ 1 秒以下</td>
+<td style="text-align: left;">起動 p95 30 秒以下（上限として引き継ぎ、実測で縮める）+ コールドスタート後 60 秒間 p95 2 秒以下（Kotlin 版と同じ。2026-11-21 に 1 秒から戻した）</td>
 <td style="text-align: left;">JIT がない</td>
 </tr>
 <tr>

@@ -12085,7 +12085,7 @@
 <ul>
 <li><strong>本書で確認したこと</strong>: 次の 3 つを、実際に実行して確認しました（2026-11-19）。</li>
 <li>Rust の標準の <code>#[test]</code> で、<strong>日本語の関数名</strong>のテストが書け、実行できる（rustc 1.97.1。<a href="../domain-model/">ドメインモデル</a>・<a href="../architecture-backend/">バックエンドアーキテクチャ</a> のスケッチの 8 件が通った）。</li>
-<li>非同期のポート（トレイト）を<strong>メモリ上の実装に差し替える</strong>アプリケーション層のテストが書ける（競合の再試行、上限、業務の失敗は追記しない、の 3 件が通った）。</li>
+<li>非同期のポート（トレイト）を<strong>メモリ上の実装に差し替える</strong>アプリケーション層のテストが書ける（成功は commit だけ、競合のたびに明示の rollback して再試行、上限で再試行の枯渇、業務の失敗は rollback して追記しない、の 4 件が通った。<strong>自前の <code>block_on</code> と標準ライブラリだけの確認で、tokio・実際のクレートとの組み合わせは未確認</strong>。2026-11-21 に明示の rollback を持つ形へ改めて再確認）。</li>
 <li>実 PostgreSQL 18.6 で、追記専用・部分一意索引・連鎖削除・一意制約の制約名を検査できる（<a href="../data-model/">データモデル</a> の検証。Rust 版の統合テストの最初の 4 件に当たる）。</li>
 <li><strong>確認していないこと</strong>: proptest、cucumber-rs（日本語 Gherkin を含む）、testcontainers（PostgreSQL 18 のイメージ指定を含む）、cargo-llvm-cov（分岐の計測を含む）、clippy の個々の lint の設定、cargo-deny の設定の<strong>動作</strong>。いずれも、版は <a href="../tech-stack/">技術スタック</a> で確認しましたが、機能は未確認で、B1 で確かめます。</li>
 <li><strong>引き継ぐだけのもの</strong>: テスト形状とレベルの責務、層の分担、境界値の一覧、非機能のテストの対応、トレーサビリティの方針、CI の工程の考え方は Kotlin 版を正本とします。</li>
@@ -12240,7 +12240,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">フィーチャーファイル</td>
-<td style="text-align: left;"><code>apps/beer-game-rust/features/&lt;機能領域&gt;/</code>。内容は Kotlin 版と共有する方針（複製か参照かは未決）。<strong>API の契約が同じなので、シナリオは変わらない見込み</strong></td>
+<td style="text-align: left;"><strong>Kotlin 版の <code>apps/beer-game-kotlin/features/</code> を共有する</strong>（RF1。承認済み。複製しない）。<strong>API の契約が同じなので、シナリオは変わらない見込み</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>@api</code> の実行</td>
@@ -12256,7 +12256,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">実行</td>
-<td style="text-align: left;">Undefined・Pending があれば失敗。<code>@wip</code> が残っていれば失敗（提案）</td>
+<td style="text-align: left;"><strong>Rust 側で実行するシナリオを、許可リスト（タグまたは ID の一覧。Rust 側のファイルで管理）で決め、許可したシナリオに Undefined・Pending があれば失敗</strong>とする。<strong>共有する <code>.feature</code> に <code>@wip</code> などの Rust 専用のタグを書き込まない</strong>（Kotlin 版に影響するため）。<strong>B1 の最初の許可リストは、ウォーキングスケルトン（1 ゲーム・4 役割・1 週）に必要な Must のストーリー（US1.1・US1.2・US2.1〜US2.3）の代表シナリオに限り</strong>、Bolt ごとに広げる（レビュー H7）。許可リストに載らないシナリオは「未対応」として一覧に出し、<strong>許可リストの外のシナリオが Rust で通る割合を、Rust 版の進捗の指標にする</strong>（H8）。cucumber-rs が、定義のないステップを skipped として扱い、終了コード 0 で終わる場合があるか（<strong>未確認</strong>）を B1 で確かめ、<strong>失敗にする設定</strong>を使う</td>
 </tr>
 </tbody>
 </table>
@@ -12345,7 +12345,8 @@
 <p>その他のテスト（Kotlin 版と同じ）: 空のイベントは追記しない、結果が変わる場合（<code>DecisionConflict</code>、<code>WeekAdvanced</code>、<code>DecisionsChanged</code>、<code>AlreadyStarted</code>）は再評価した結果を返す、冪等（同じキー・同じ内容は保存済みの応答、内容が違えば 409）、<strong>処理の順（認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → decide → 追記・投影。認可が冪等照合より先）</strong>、失効した資格の再送は 403、冪等記録は成功だけ、制約ごとの再試行・再照合、周辺ストアに書かれイベントに含まれない、永続化の失敗で受理済みと表示しない、ログ・計測のラッパーが結果を変えず、ログに表示名・資格が含まれない。</p>
 <p><strong>処理の順の検査</strong>は、差し替えたポートの呼び出し順を記録する実装（記録用のメモリ実装）で行います。</p>
 <h3 id="rust-rt2">キャンセル安全性のテスト（Rust 固有。設計判断 RT2）<a class="headerlink" href="#rust-rt2" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版の「COMMIT / ROLLBACK は <code>NonCancellable</code>、<code>CancellationException</code> を再送出」に当たる検証です。Rust では、キャンセルは <strong>future の drop</strong> で（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の RB2）、次をテストします。</p>
+<p>Kotlin 版の「COMMIT / ROLLBACK は <code>NonCancellable</code>、<code>CancellationException</code> を再送出」に当たる検証です。Rust では、キャンセルは <strong>future の drop</strong> で（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の RB2。<strong>2026-11-21 のレビュー H2 で、明示の ROLLBACK を主にする形へ見直した</strong>）、次をテストします。</p>
+<p><strong>検証する対象の見直し（H2）</strong>: 「部分更新が残らない」ことは、<strong>COMMIT していない変更が他のセッションから見えない</strong>ため、<strong>PostgreSQL が保証します</strong>。したがって、この条件だけでは、接続が <code>idle in transaction</code> のままロックを握っていても、テストが通ってしまいます。<strong>検証の中心は、ロックと接続が速やかに解放されること</strong>です。</p>
 <table>
 <thead>
 <tr>
@@ -12356,31 +12357,52 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><code>Tx</code> の drop で ROLLBACK</td>
-<td style="text-align: left;"><code>execute</code> の途中（追記の後、COMMIT の前）で future を drop しても、<code>events</code>・投影・冪等記録・周辺ストアに<strong>部分更新が残らない</strong></td>
+<td style="text-align: left;">失敗の経路の明示の ROLLBACK</td>
+<td style="text-align: left;"><code>decide</code> の失敗・追記の競合・投影の失敗のあと、<strong>一定時間内に</strong>、(a) <code>pg_stat_activity</code> で該当の <code>application_name</code> の <code>idle in transaction</code> が <strong>0 件</strong>になる、(b) 同じストリームへの<strong>次の追記が待たされない</strong>、(c) アドバイザリロックが解放されている（再構築の排他ロックを取れる）、(d) <strong>プールに返った接続がトランザクション外の状態</strong>である</td>
+<td style="text-align: left;">DB の統合</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Tx</code> の drop（保険）</td>
+<td style="text-align: left;"><strong>panic・ランタイムの終了に当たる状況</strong>（<code>execute</code> のタスクを panic させる、タスクを abort する）で、<strong>部分更新が残らず、かつ上の (a)〜(d) が成り立つ</strong>。sqlx の drop での ROLLBACK がいつ送られるか（すぐか、接続を次に使うときか）を、<strong>測定して記録する</strong>（B1 の確認の中心）</td>
 <td style="text-align: left;">DB の統合</td>
 </tr>
 <tr>
 <td style="text-align: left;">spawn による隔離</td>
-<td style="text-align: left;">ルートの future が drop（クライアントの切断）されても、spawn された <code>execute</code> は完了し、COMMIT される。同じ <code>Idempotency-Key</code> の再送が、保存済みの応答を返す</td>
+<td style="text-align: left;">ルートの future が drop（クライアントの切断）されても、spawn された <code>execute</code> は完了し、COMMIT される。同じ <code>Idempotency-Key</code> の再送が、保存済みの応答を返す。<strong>通常の失敗の経路は spawn の中で完結するため、ルートの future を drop しても、明示の ROLLBACK が実行される</strong></td>
 <td style="text-align: left;">DB の統合、HTTP</td>
 </tr>
 <tr>
-<td style="text-align: left;">タスクの panic</td>
-<td style="text-align: left;">spawn したタスクが panic したとき、<code>JoinError</code> が <code>Persistence</code>（500、相関 ID）に写り、<strong>トランザクションが残らない</strong>（接続が解放される）</td>
+<td style="text-align: left;">タイムアウト後の COMMIT（H4）</td>
+<td style="text-align: left;">tower のタイムアウトが <code>type</code> なしの 504 で応答した後も、spawn したタスクが COMMIT まで進み、<strong>同じキーでの再送が保存済みの応答を返す</strong>（二重にならない）</td>
+<td style="text-align: left;">HTTP、DB の統合</td>
+</tr>
+<tr>
+<td style="text-align: left;">実行中の再送（H4）</td>
+<td style="text-align: left;">元の処理が<strong>実行中</strong>のとき、同じ <code>Idempotency-Key</code> の再送が届いても、<strong>409 を返さず</strong>、先の処理の完了を待って、保存済みの応答（または同じ失敗）を返す</td>
 <td style="text-align: left;">DB の統合</td>
 </tr>
 <tr>
+<td style="text-align: left;">タスクの panic</td>
+<td style="text-align: left;">spawn したタスクが panic したとき、<code>JoinError</code> が <code>Persistence</code>（500、相関 ID）に写り、<strong>トランザクションが残らず接続が解放される</strong>。<strong>release のプロファイルが <code>panic = "unwind"</code> であることも確認する</strong>（<code>abort</code> だと本番の振る舞いをテストが保護しない。コンテナのスモークテストでも確認する。M6）</td>
+<td style="text-align: left;">DB の統合、スモーク</td>
+</tr>
+<tr>
 <td style="text-align: left;">シャットダウン</td>
-<td style="text-align: left;">SIGTERM で、進行中のコマンドの完了を待ってから終了する（待ちの上限つき）</td>
+<td style="text-align: left;">SIGTERM で、新しい要求を止め、<strong>SSE を閉じ、追跡しているコマンドのタスクの完了を待ってから</strong>終了コード 0 で終わる（待ちの上限つき。<code>stopTimeout</code> に達して SIGKILL にならない）。切り離されたタスクが完了を待たれること</td>
 <td style="text-align: left;">統合（プロセス）</td>
+</tr>
+<tr>
+<td style="text-align: left;">安全網の設定</td>
+<td style="text-align: left;"><strong>アプリの接続で <code>SHOW idle_in_transaction_session_timeout</code> が期待値になる</strong>（NOLOGIN ロールに設定しても継承されず効かないため。H1）。<strong>テスト用の DB では、安全網が不具合を隠さないよう、この設定を無効にするか、判定をタイムアウトより前に行う</strong></td>
+<td style="text-align: left;">DB の統合</td>
 </tr>
 </tbody>
 </table>
-<p>これらは、<strong>sqlx のトランザクションが drop で ROLLBACK されること</strong>（<a href="../tech-stack/#未決事項">技術スタックの未決事項</a>、<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の未決事項 1）を前提にします。前提が成り立たなければ、設計（RB2）を見直します。</p>
+<p><strong>差し込み口（M10）</strong>: 「追記の後・COMMIT の前で止める」を決定論的に再現するため、<code>EventStore</code>・<code>Tx</code> を<strong>テスト用のデコレーター</strong>（barrier・フックを持つラッパー。<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の RB2）で差し込めるようにします。</p>
+<p>これらは、<strong>sqlx のトランザクションの drop・ROLLBACK の挙動</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の未決事項 1）と、<strong>spawn したタスクの追跡</strong>を前提にします。前提が成り立たなければ、設計（RB2）を見直します。</p>
 <h2 id="postgresql">イベントストアと投影の統合テスト（実 PostgreSQL）<a class="headerlink" href="#postgresql" title="Permanent link">&para;</a></h2>
-<p>testcontainers の PostgreSQL 18 を使い、<strong>マイグレーションを適用した空の DB から始め</strong>ます。ゲームごとに ID を分け、テスト間で干渉しません。テストは <code>#[tokio::test]</code> で書きます（<strong>マルチスレッドのランタイムの指定は未確認</strong>）。testcontainers で PostgreSQL 18 のイメージを指定する方法は<strong>未確認</strong>です。</p>
-<p>次の検証は、Kotlin 版と同じです（表の項目は同一）: イベントストア（追記と読み込み、追記の競合、複数ストリームの原子性、保存の途中の失敗、追記専用の権限、追記専用の否定テスト、観察者の接続プールの配線、マイグレーション）、冪等性・競合（冪等キーの再送、内容違いの再送、24 時間の保持、資格の再返却、共同入力の競合、手動確定と自動確定の競合（2 つの API プロセス）、停止中の代理入力、代理入力と確定の競合、資格の失効と再送、制約ごとの再照合、再試行の上限）、投影・再構築・復元（同期投影、投影の整合性の検査、投影の再構築の一致、永続化往復の同値性、投影の整合、出力は要求時に作る、復元、強制停止、観察者の権限、問い合わせの一貫性、<code>ProjectionLock</code> の契約、再構築の同時実行制御、<code>ChangeNotifier</code> の契約、通知（ロールバックなら出ない、LISTEN の再購読、<code>/ready</code>）、連鎖削除の網羅、保持削除の再試行、個人情報の不在）。</p>
+<p>testcontainers の PostgreSQL 18 を使い、<strong>マイグレーションを適用した空の DB から始め</strong>ます。<strong>DB の分離（レビュー M11）</strong>: 「実行全体でコンテナを 1 つ共有する」だけでは、<strong>全ゲームの再構築、<code>information_schema</code> を走査する連鎖削除の網羅、<code>projected_version</code> と <code>MAX(stream_version)</code> の全体の検査、マイグレーションのテスト</strong>が、他のテストが同時に書く行と干渉します。<strong>コンテナは 1 つ共有し、テストごと（または干渉するテストのグループごと）に、マイグレーション済みのテンプレート DB から DB を作る</strong>（<code>CREATE DATABASE … TEMPLATE …</code>）方針を第一候補とします（B1 で確認）。通常のテストは、ゲームごとに ID を分け、干渉しません。<strong>「DB の統合が 0 件でも失敗」の実現</strong>: <code>cargo test</code> には、早期の return で飛ばした件数を数える標準の仕組みがないため、DB の統合テストは <strong><code>CI</code> 環境変数が設定されていれば Docker が無いことを panic（失敗）にする</strong>共通の入口を通し、<strong>実行したテストの件数を数えて、0 件なら CI が失敗する</strong>ようにする（<code>#[ignore]</code> と <code>--include-ignored</code> の組み合わせも候補）。<code>#[tokio::test]</code> はテストごとにランタイムが別のため、<strong>static に置いた <code>PgPool</code> をテスト間で共有すると不具合が出るおそれ</strong>があり（未確認）、プールはテストごとに作る。テストは <code>#[tokio::test]</code> で書きます（<strong>マルチスレッドのランタイムの指定は未確認</strong>）。testcontainers で PostgreSQL 18 のイメージを指定する方法は<strong>未確認</strong>です。</p>
+<p>次の検証は、Kotlin 版と同じです（表の項目は同一）: イベントストア（追記と読み込み、追記の競合、複数ストリームの原子性、保存の途中の失敗、追記専用の権限、追記専用の否定テスト、観察者の接続プールの配線、マイグレーション）、冪等性・競合（冪等キーの再送、内容違いの再送、24 時間の保持、資格の再返却、共同入力の競合、手動確定と自動確定の競合（2 つの API プロセス）、停止中の代理入力、代理入力と確定の競合、資格の失効と再送、制約ごとの再照合、再試行の上限）、投影・再構築・復元（同期投影、投影の整合性の検査、投影の再構築の一致、永続化往復の同値性、投影の整合、出力は要求時に作る、復元、強制停止、観察者の権限、問い合わせの一貫性、<code>ProjectionLock</code> の契約、再構築の同時実行制御、<code>ChangeNotifier</code> の契約、通知（ロールバックなら出ない、LISTEN の再購読、<code>/api/v1/ready</code>）、連鎖削除の網羅、保持削除の再試行、個人情報の不在）。</p>
 <p><strong>この DB の統合テストの最初の 4 件は、実測済み</strong>です（<a href="../data-model/">データモデル</a> の検証。PostgreSQL 18.6）。</p>
 <table>
 <thead>
@@ -12415,7 +12437,7 @@
 </table>
 <p>Kotlin 版にあった「<code>FOR UPDATE</code> の効果」「H2 版のポート契約」「H2 のスモーク」は、Rust 版にはありません。</p>
 <h2 id="http-axum">HTTP の統合テスト（axum）<a class="headerlink" href="#http-axum" title="Permanent link">&para;</a></h2>
-<p>アダプターの契約を検証します。観点は Kotlin 版と同じです（認証・認可（無効な資格はすべて同じ応答）、入力の検証（誤りを項目ごとに集める、64 KB の上限）、エラーの写像（分類 → HTTP の状態。<code>AppFailure</code> の <code>match</code> の網羅）、境界の契約（Origin、冪等キー、版、エラー形式、セキュリティヘッダー、相関 ID。<code>If-Match</code> は <code>SaveDecision</code> だけ）、エラーの識別子（problem+json の <code>type</code> と <code>code</code>）、応答の形（<code>versions</code> だけ）、停止中・週の競合、レート制限、SSE、アプリケーション層の失敗（バックエンド自身の 503 は必ず <code>type</code> を持つ）、ログ、<code>/ready</code>）。axum のルーターを tower の <code>ServiceExt</code> で直接呼べるかは<strong>未確認</strong>です（できなければ、実際にポートを開いて呼ぶ）。</p>
+<p>アダプターの契約を検証します。観点は Kotlin 版と同じです（認証・認可（無効な資格はすべて同じ応答）、入力の検証（誤りを項目ごとに集める、64 KB の上限）、エラーの写像（分類 → HTTP の状態。<code>AppFailure</code> の <code>match</code> の網羅）、境界の契約（Origin、冪等キー、版、エラー形式、セキュリティヘッダー、相関 ID。<code>If-Match</code> は <code>SaveDecision</code> だけ）、エラーの識別子（problem+json の <code>type</code> と <code>code</code>）、応答の形（<code>versions</code> だけ）、停止中・週の競合、レート制限、SSE、アプリケーション層の失敗（バックエンド自身の 503 は必ず <code>type</code> を持つ）、ログ、<code>/api/v1/ready</code>）。axum のルーターを tower の <code>ServiceExt</code> で直接呼べるかは<strong>未確認</strong>です（できなければ、実際にポートを開いて呼ぶ）。</p>
 <h2 id="api-openapi">API の契約テスト（OpenAPI）<a class="headerlink" href="#api-openapi" title="Permanent link">&para;</a></h2>
 <p><a href="../../../adr/beer-game-kotlin/008-api-contract-and-error-codes/">ADR-008</a> の方針（<code>openapi.yaml</code> を手書きの正本とし、<strong>仕様が先</strong>。仕様を直す → 契約テストを書いて Red → 実装 → 型を再生成 → 画面を直す）を引き継ぎます。<strong>契約の共有方法（同じファイルか複製か）は未決</strong>です（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の未決事項）。</p>
 <table>
@@ -12496,7 +12518,7 @@
 <h2 id="_12">テストデータ<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版と同じです。ドメインは <strong>Given のビルダー</strong>（Object Mother）で過去のイベントの列を組み立て、時刻・ID・乱数はコマンドの値として固定で与える。週次計算は golden と proptest による性質。アップキャストは、旧い <code>schema_version</code> のイベントの JSON をフィクスチャとして保存する（変更しない）。DB の統合は、testcontainers の PostgreSQL 18 の専用のコンテナで、接続先の名前を検査して誤った DB への接続を防ぎ、マイグレーションを適用した空の DB から始める。資格は、テスト用の鍵（複数の版）とテストごとの乱数で、生の値を保存や出力に含めない。</p>
 <h2 id="_13">非機能のテスト<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
-<p>NFR 84 件ごとの検証の手段と頻度、境界値の一覧は、<strong>Kotlin 版の表を正本</strong>とします（非機能要件の Rust 版は未着手。本書の記述は暫定）。境界値は同じ値（注文数量 -1/0/1000/1001、最終週 0/1/50/51、保持日数 0/1/3650/3651、表示名 0/1/80/81 と空白のみ、保持削除の再試行 4/5/6 回目、冪等記録の 24 時間、資格の有効期限、寄与者の数 1/2、自動再試行の上限（設定から注入）、リクエストの大きさ 64 KB）です。<strong>上限が未定のもの（再試行の上限など）は、実装の定数に埋め込まず、設定から注入できる設計</strong>にします。</p>
+<p>NFR 86 件ごとの検証の手段と頻度、境界値の一覧は、<strong>Kotlin 版の表（84 件）を正本</strong>とし、Rust 版で加わった NF-R18・NF-S22 と、変更した NF-P1・NF-P15〜NF-P18・NF-O5・NF-O7・NF-O12 は、<a href="../non-functional/">非機能要件</a>（86 件）を正本とします。<strong>NF-R18 の検証は RT2、NF-S22 は <code>#![forbid(unsafe_code)]</code> のコンパイルと CI の検査、NF-P17 は RSS・タスク数の負荷試験、NF-O12 の panic の件数・取り残しの件数は、メトリクスの契約テスト（毎回）、NF-O5 は目視に加えてダッシュボードの項目の存在の検査</strong>とします。境界値は同じ値（注文数量 -1/0/1000/1001、最終週 0/1/50/51、保持日数 0/1/3650/3651、表示名 0/1/80/81 と空白のみ、保持削除の再試行 4/5/6 回目、冪等記録の 24 時間、資格の有効期限、寄与者の数 1/2、自動再試行の上限（設定から注入）、リクエストの大きさ 64 KB）です。<strong>上限が未定のもの（再試行の上限など）は、実装の定数に埋め込まず、設定から注入できる設計</strong>にします。</p>
 <p>JVM に固有の項目は、Rust では次のように読み替えます。</p>
 <table>
 <thead>
@@ -12678,6 +12700,60 @@
 <li><strong>Rust の <code>#[test]</code></strong>: テスト名の接頭辞（<code>us&lt;番号&gt;_ac&lt;番号&gt;</code>。RT1）を、テスト結果から抽出する。<strong>テスト結果の形式</strong>（<code>cargo test</code> の標準出力、または JUnit XML への変換）は、B1 で選ぶ（<strong><code>cargo-nextest</code> などの導入は未選定で、承認が要る</strong>）。</li>
 <li><strong>整合の検査</strong>: ストーリー・受入条件の一覧（<a href="../../../requirements/beer-game2/user_story/">ユーザーストーリー</a>）に存在しない ID、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。</li>
 </ul>
+<h2 id="b1-h8m10">B1 の受入条件（未確認の前提を、観察できる形にする。レビュー H8・M10）<a class="headerlink" href="#b1-h8m10" title="Permanent link">&para;</a></h2>
+<p>未確認の前提は、「B1 で確認」だけでなく、<strong>合否の基準と、成り立たなかったときに見直す対象</strong>を書きます。B1 の範囲は、ウォーキングスケルトンに必要なものに絞り、残りは後の Bolt に移します（B1 の範囲の確定は <code>planning-releases</code> で行う）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">前提</th>
+<th style="text-align: left;">合否の基準（観察できる形）</th>
+<th style="text-align: left;">成り立たなければ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">sqlx のトランザクションの drop での ROLLBACK</td>
+<td style="text-align: left;">RT2 の測定: drop から ROLLBACK が送られるまでの時間と、その間のロック・接続の状態を記録する。<strong>失敗の経路の明示の ROLLBACK で、ロックと接続が一定時間内に解放される</strong></td>
+<td style="text-align: left;">RB2 の見直し（明示の ROLLBACK を唯一の手段にする。drop の保険を外す）</td>
+</tr>
+<tr>
+<td style="text-align: left;">sqlx のエラーから制約名を取る</td>
+<td style="text-align: left;"><code>uq_events_stream_version</code> などの違反で、制約名を取り出して <code>ConcurrencyConflict</code> に写せる。<strong>実際の並行（複数タスク）</strong>で、一方だけが成功し、他方が競合になる</td>
+<td style="text-align: left;">エラーの SQLSTATE とメッセージから判別する方式へ変更（脆いため ADR で記録）</td>
+</tr>
+<tr>
+<td style="text-align: left;">cucumber-rs の日本語 Gherkin</td>
+<td style="text-align: left;"><code># language: ja</code> のフィーチャー 1 本を実行できる。<strong>ステップ定義がない状態で、Undefined（または skipped）が失敗として扱われ、終了コードが非 0</strong>になる設定を確認する（既定では skipped が成功扱いになりうる。未確認）。JUnit または JSON の形式で出力できる</td>
+<td style="text-align: left;">キーワードを英語にして本文を日本語にする、または別の方式（R5 の代替の比較）</td>
+</tr>
+<tr>
+<td style="text-align: left;">proptest の状態ベースの操作列</td>
+<td style="text-align: left;">本体にはなく、別のクレート（<code>proptest-state-machine</code>。見込み、未確認）がある場合は<strong>新規依存として承認を得る</strong>。受入条件は「<strong><code>evolve</code> の腕を 1 つ消すと、性質テストが落ちる</strong>」。生成列の分類（M19）は本体に機能がない見込みで、<strong>自前の集計</strong>を前提にする</td>
+<td style="text-align: left;"><code>Strategy</code> の合成で自前に書く</td>
+</tr>
+<tr>
+<td style="text-align: left;">cargo-llvm-cov</td>
+<td style="text-align: left;"><strong>統合テストと cucumber のテストのターゲットの計測が合算される</strong>。<strong>行 80% を割ると終了コードが非 0</strong>になる。分岐の計測が nightly を要する場合は、分岐は目安のままにする（ゲートにしない。RT3）</td>
+<td style="text-align: left;">行のゲートを、単体・統合の合算の別の方法で実現する</td>
+</tr>
+<tr>
+<td style="text-align: left;">testcontainers</td>
+<td style="text-align: left;"><strong><code>postgres:18.6</code> のタグを固定したコンテナ</strong>を起動し、<code>SELECT version()</code> が 18 であることを検査する。<code>CI</code> 環境変数があり Docker が無いとき失敗する</td>
+<td style="text-align: left;">testcontainers を使わず、サービスコンテナの接続先を環境変数で渡す方式</td>
+</tr>
+<tr>
+<td style="text-align: left;">clippy の lint</td>
+<td style="text-align: left;"><strong>規約違反のコードを実際に置いて、CI が落ちる</strong>ことを確かめる: ドメインの crate で <code>unwrap_used</code>・<code>expect_used</code>・<code>panic</code>・<code>indexing_slicing</code> が検出される、<code>disallowed_methods</code> の <code>SystemTime::now</code> が検出される、<code>#![forbid(unsafe_code)]</code> が効く。<strong><code>wildcard_enum_match_arm</code> は、domain-model の意図した <code>_</code>（<code>evolve</code> のイベント側の腕）と衝突しうる</strong>ため、<strong>許容する箇所の規則</strong>（例: <code>evolve_*</code> の最後の 1 腕だけ。理由をコードのコメントではなく設定または ADR に記録）を決める。<strong>「<code>_</code> を使わない」は、状態・エラー・イベントの変換に当てはめ、<code>evolve</code> の最後の腕は例外とする</strong></td>
+<td style="text-align: left;">lint の代わりに、依存の制限とレビュー・性質テストで守る（RD5 の見直し）</td>
+</tr>
+<tr>
+<td style="text-align: left;">契約テストのスキーマ検証</td>
+<td style="text-align: left;">応答・リクエストを <code>openapi.yaml</code> のスキーマで検査でき、<strong>未宣言の項目（<code>unevaluatedProperties: false</code>）を検出できる</strong>。<strong>仕様と実装を意図的にずらすと CI が落ちる</strong></td>
+<td style="text-align: left;">別の道具、または自前の検査</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rust 版の価値を測る指標（H8）</strong>: ADR-001 は価値を「型による不正な状態の排除、実行時の安全性、小さな実行ファイル」としています。測れる指標として、次を提案します（<strong>数値の目標は B1 の計画で決める</strong>）。(1) <strong>共有する <code>features/</code> のうち、Rust のバックエンドで通るシナリオの割合</strong>（許可リストの外を含む。<code>@api</code> と <code>@ui</code>）。(2) <strong>Must のストーリー 11 本の受入条件のパリティ</strong>（Kotlin 版と同じ受入条件で通る数）。(3) <strong>確認済みの前提の数と、未確認の前提の数の推移</strong>（上の表の行）。</p>
 <h2 id="_18">設計判断<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h2>
 <h3 id="kotlin-t-1t-5">Kotlin 版の設計判断 T-1〜T-5 との対応<a class="headerlink" href="#kotlin-t-1t-5" title="Permanent link">&para;</a></h3>
 <table>
@@ -12718,6 +12794,7 @@
 </table>
 <h3 id="rt1-id-2026-11-19">RT1: テスト名とストーリー ID は、関数名の先頭に識別子の形で付ける（承認済み。2026-11-19）<a class="headerlink" href="#rt1-id-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>上の案 A を採用しました（2026-11-19 承認）。案 B（属性マクロ）は、依存の承認が要るため、A で足りなければ検討します。</p>
+<p><strong>命名の規則（レビュー L7。抽出ツールを作る前に決める）</strong>: AC の ID は US の ID を含む（<code>AC2.4.1</code> は <code>US2.4</code> に属する）ため、<strong>接頭辞は AC の ID だけで足りる</strong>（<code>ac2_4_1__…</code>。US は表から引く）。<strong>1 つのテストが複数の AC を保証する場合は、接頭辞を <code>ac2_4_1_ac2_4_2__…</code> のように並べる</strong>。ストーリーの ID だけを保証する（AC に対応しない）テストは <code>us2_4__…</code>。抽出は、先頭の <code>(ac|us)[0-9_]+</code> を走査する。</p>
 <h3 id="rt2-db-2026-11-19">RT2: キャンセル安全性を、DB の統合テストで検証する（承認済み。2026-11-19）<a class="headerlink" href="#rt2-db-2026-11-19" title="Permanent link">&para;</a></h3>
 <p>上の表のとおりです。RB2（<code>Tx</code> の drop と spawn）の前提を検証します。<strong>前提が成り立たなければ、設計を見直す</strong>ことを、B1 の受入条件に含めます。</p>
 <h3 id="rt3-80-2026-11-19">RT3: カバレッジのゲートは行 80% とし、分岐は目安にする（承認済み。2026-11-19）<a class="headerlink" href="#rt3-80-2026-11-19" title="Permanent link">&para;</a></h3>
@@ -12819,10 +12896,14 @@
 <li><strong>テストの層のルールセット</strong>: テストコードで <code>unwrap</code> などを許すか。許すなら ADR に記録して承認を得る。</li>
 <li><strong>テスト結果の形式とトレーサビリティの抽出</strong>（RT1）。<code>cargo-nextest</code> などの導入の要否（承認が要る）。</li>
 <li><strong>契約テストのスキーマ検証の道具</strong>（<code>jsonschema</code> の OpenAPI への対応）、ルートの網羅の検査の方法。</li>
-<li><strong>契約・フィーチャーファイルの共有方法</strong>（Kotlin 版と同じファイルを参照するか、複製するか）。</li>
-<li><strong>sqlx のトランザクションの drop での ROLLBACK</strong>（RT2 の前提）。</li>
+<li>~~<strong>契約・フィーチャーファイルの共有方法</strong>~~ <strong>解消（2026-11-19。RF1）</strong>: Kotlin 版のディレクトリのまま共有する。Rust 側で実行するシナリオは許可リストで決める（H7）。</li>
+<li><strong>sqlx のトランザクションの drop・ROLLBACK の挙動</strong>（RT2・RB2 の前提）。<strong>B1 の受入条件の表</strong>（上）に、合否の基準と見直す対象を書いた。</li>
 <li><strong>Rust のビルドキャッシュの方式</strong>と、CI の実行時間の目標の妥当性。</li>
 <li>~~<strong>ローカル開発の DB</strong>~~ <strong>解消（2026-11-19）</strong>: PostgreSQL 18（Docker）に決定した。テストの分担の変更はない。</li>
+<li><strong>DB の統合テストの分離</strong>（テンプレート DB からテストごとに作る方式）と、<strong>「0 件なら失敗」の実現</strong>（M11）。</li>
+<li><strong>差し込み口（テスト用のデコレーター）の設計</strong>（M10）。B1 の最初のスライドで決める。</li>
+<li><strong>RT1 の命名の規則</strong>（上の追記）の承認。</li>
+<li><strong><code>evolve</code> の最後の腕の <code>_</code> を例外とする lint の設定</strong>（<code>wildcard_enum_match_arm</code> との整合）。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 生きたドキュメントの公開ツールと公開先、受け入れのシナリオ数の目標、ストーリー ID の整合の検査の厳しさ、実 DB での負荷試験の環境、手動のアクセシビリティの確認の担当者と時期、変異テストの要否、カバレッジの層ごとの目標の見直し。いずれも <a href="../../beer-game-kotlin/test-strategy/">Kotlin 版の未決事項</a> に追従する。</li>
 </ol>
 <h2 id="_20">出典<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
