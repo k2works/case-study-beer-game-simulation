@@ -342,3 +342,24 @@ fn ac1_1_3__カスタム条件つきの_GameCreated_は往復でき_条件の無
     assert_eq!(read.conditions, beergame_domain::Conditions::kit());
     Ok(())
 }
+
+#[test]
+fn ac2_4_5__確定方式の変更は_JSON_に変換して戻すと同じになり_不明な確定の種類は失敗する() -> R<()> {
+    use beergame_domain::SessionEvent;
+    roundtrip(
+        &SessionCodec,
+        &SessionEvent::CommitModeChanged {
+            mode: CommitMode::Auto,
+        },
+    )?;
+    assert!(
+        SessionCodec
+            .decode(
+                "WeekCommitted",
+                1,
+                serde_json::json!({"week": 1, "commitKind": "OTHER"})
+            )
+            .is_err()
+    );
+    Ok(())
+}

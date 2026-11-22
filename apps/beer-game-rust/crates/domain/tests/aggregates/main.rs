@@ -3,6 +3,7 @@
 
 //! Game・Session 集約の Given（過去のイベント）/ When（コマンド）/ Then（イベントまたはエラー）のテスト。
 
+mod auto_commit;
 mod fixtures;
 mod game;
 mod property;

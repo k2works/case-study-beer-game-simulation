@@ -673,6 +673,31 @@ pub async fn reissue_credential<St: EventStore<GameEvent>>(
     })
 }
 
+/// 確定方式の変更（US2.4。進行役だけ。進行中でも停止中でも）。自動確定を有効にしたとき、入力がそろっていれば同じ追記で確定する。
+///
+/// # Errors
+/// 権限・未開始・終了後の誤り、永続化の失敗。
+pub async fn set_commit_mode<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    mode: CommitMode,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::SetCommitMode {
+            actor,
+            at: env.now(),
+            mode,
+        },
+        idem,
+    )
+    .await
+}
+
 /// 一時停止（US3.1。進行役だけ）。
 ///
 /// # Errors

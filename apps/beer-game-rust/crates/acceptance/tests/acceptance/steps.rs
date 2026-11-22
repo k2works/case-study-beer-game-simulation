@@ -3139,3 +3139,114 @@ async fn retailer_inventory(world: &mut ApiWorld, week: i64, inventory: i64) -> 
         &format!("在庫・週が違う: {body}"),
     )
 }
+
+// ---- 自動確定（AC1.1.6・US2.4） ----
+
+fn commit_mode_body(mode: &str) -> Value {
+    json!({"kind": "KIT", "finalWeek": 12, "demand": kit_demand(12), "commitMode": mode})
+}
+
+#[given("進行役が、自動確定を有効にして、ゲームを作成している")]
+async fn created_with_auto(world: &mut ApiWorld) -> R {
+    let reply = world.create_with(&commit_mode_body("AUTO")).await?;
+    expect(
+        reply.status == 201,
+        &format!("作成できない: {}", reply.body),
+    )
+}
+
+#[when("進行役が、自動確定を有効にして、ゲームを作成する")]
+async fn create_with_auto(world: &mut ApiWorld) -> R {
+    world
+        .create_with(&commit_mode_body("AUTO"))
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^進行役が、確定方式「(.+)」で、ゲームを作成しようとする$")]
+async fn create_with_commit_mode(world: &mut ApiWorld, mode: String) -> R {
+    world
+        .create_with(&commit_mode_body(&mode))
+        .await
+        .map(|_| ())
+}
+
+#[then(regex = r"^ゲームの確定方式は「(手動確定|自動確定)」である$")]
+async fn commit_mode_is(world: &mut ApiWorld, label: String) -> R {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    let body = world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?
+        .body;
+    let expected = if label == "自動確定" {
+        "AUTO"
+    } else {
+        "MANUAL"
+    };
+    expect(
+        body.get("commitMode") == Some(&json!(expected)),
+        &format!("確定方式が違う: {body}"),
+    )
+}
+
+#[then("誤りの対象は「commitMode」であり、MANUAL か AUTO にするという修正内容が示される")]
+async fn commit_mode_error_shown(world: &mut ApiWorld) -> R {
+    expect(status(world)? == 422, "拒否されていない")?;
+    let ok = error_list(world)?.iter().any(|e| {
+        e.get("field") == Some(&json!("commitMode"))
+            && e.get("message")
+                .and_then(Value::as_str)
+                .is_some_and(|m| m.contains("MANUAL") && m.contains("AUTO"))
+    });
+    expect(ok, "commitMode の修正内容が示されていない")
+}
+
+#[when(regex = r"^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存する$")]
+async fn participant_saves(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    save_in_week(world, &role, week, json!(quantity)).await?;
+    expect(
+        status(world)? == 200,
+        &format!("保存できない: {}", world.reply()?.body),
+    )
+}
+
+async fn change_commit_mode(world: &mut ApiWorld, cookie: &str, mode: &str) -> R {
+    let (id, key) = (world.game()?.id.clone(), world.next_key());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/commit-mode"),
+            Some(cookie),
+            Some(&key),
+            &json!({"commitMode": mode}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^進行役が、自動確定を(有効|無効)にする$")]
+async fn facilitator_changes_commit_mode(world: &mut ApiWorld, which: String) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    change_commit_mode(
+        world,
+        &cookie,
+        if which == "有効" { "AUTO" } else { "MANUAL" },
+    )
+    .await?;
+    expect(
+        status(world)? == 200,
+        &format!("確定方式を変えられない: {}", world.reply()?.body),
+    )
+}
+
+#[when(regex = r"^(.+)の参加者が、自動確定を無効にしようとする$")]
+async fn participant_tries_to_disable(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
+    change_commit_mode(world, &cookie, "MANUAL").await
+}

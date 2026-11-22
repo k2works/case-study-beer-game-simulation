@@ -417,6 +417,7 @@ impl EventCodec<SessionEvent> for SessionCodec {
             | SessionEvent::SessionEnded { .. }
             | SessionEvent::SessionPaused
             | SessionEvent::RoleReplaced { .. }
+            | SessionEvent::CommitModeChanged { .. }
             | SessionEvent::SessionResumed => ("ANONYMOUS", None),
         }
     }
@@ -469,7 +470,7 @@ impl EventCodec<SessionEvent> for SessionCodec {
                 "WeekCommitted",
                 json!({
                     "week": week.get(),
-                    "commitKind": match commit_kind { CommitKind::Manual => "MANUAL" },
+                    "commitKind": match commit_kind { CommitKind::Manual => "MANUAL", CommitKind::Auto => "AUTO" },
                     "decisions": per_role(decisions, |q| json!(q.get())),
                     "results": per_role(results, role_result),
                     "nextStates": per_role(next_states, role_state),
@@ -479,6 +480,10 @@ impl EventCodec<SessionEvent> for SessionCodec {
             SessionEvent::RoleReplaced { role, new_holder } => (
                 "RoleReplaced",
                 json!({"role": role_name(*role), "newHolder": uuid_of(new_holder.get())}),
+            ),
+            SessionEvent::CommitModeChanged { mode } => (
+                "CommitModeChanged",
+                json!({"commitMode": commit_mode_name(*mode)}),
             ),
             SessionEvent::SessionPaused => ("SessionPaused", json!({})),
             SessionEvent::SessionResumed => ("SessionResumed", json!({})),
@@ -528,6 +533,7 @@ impl EventCodec<SessionEvent> for SessionCodec {
                 week: week_of(int(&p, "week")?)?,
                 commit_kind: match text(&p, "commitKind")? {
                     "MANUAL" => CommitKind::Manual,
+                    "AUTO" => CommitKind::Auto,
                     other => return Err(format!("不明な確定の種類: {other}")),
                 },
                 decisions: read_per_role(field(&p, "decisions")?, quantity)?,
@@ -538,6 +544,9 @@ impl EventCodec<SessionEvent> for SessionCodec {
             "RoleReplaced" => Ok(SessionEvent::RoleReplaced {
                 role: role_field(&p, "role")?,
                 new_holder: ParticipantId::new(id(&p, "newHolder")?),
+            }),
+            "CommitModeChanged" => Ok(SessionEvent::CommitModeChanged {
+                mode: read_commit_mode(text(&p, "commitMode")?)?,
             }),
             "SessionPaused" => Ok(SessionEvent::SessionPaused),
             "SessionResumed" => Ok(SessionEvent::SessionResumed),

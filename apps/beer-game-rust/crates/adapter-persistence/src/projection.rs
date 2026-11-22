@@ -4,8 +4,8 @@
 
 use beergame_application::{CredentialKind, PeripheralWrite};
 use beergame_domain::{
-    Conditions, DecisionVersion, DisclosurePolicy, Editor, GameEvent, Pipeline, Quantity, Role,
-    RoleMap, RoleState, SessionEvent, SettingsField, SettingsKind, Week,
+    CommitKind, Conditions, DecisionVersion, DisclosurePolicy, Editor, GameEvent, Pipeline,
+    Quantity, Role, RoleMap, RoleState, SessionEvent, SettingsField, SettingsKind, Week,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -277,7 +277,7 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
         ),
         SessionEvent::WeekCommitted {
             week,
-            commit_kind: _,
+            commit_kind,
             results,
             next_states,
             contributors,
@@ -285,11 +285,18 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
         } => {
             let mut statements = vec![st(
                 "INSERT INTO week_commits (game_id, week, commit_kind, contributors, stream_version, committed_at) \
-                 VALUES ($1, $2, 'MANUAL', $3, (SELECT max(stream_version) FROM events WHERE game_id = $1 AND stream_type = 'SESSION'), now())",
+                 VALUES ($1, $2, $4, $3, (SELECT max(stream_version) FROM events WHERE game_id = $1 AND stream_type = 'SESSION'), now())",
                 vec![
                     Bind::Uuid(game),
                     Bind::Int(i64::from(week.get())),
                     Bind::Int(i64::try_from(*contributors).unwrap_or(0)),
+                    Bind::Text(
+                        match commit_kind {
+                            CommitKind::Manual => "MANUAL",
+                            CommitKind::Auto => "AUTO",
+                        }
+                        .to_owned(),
+                    ),
                 ],
             )];
             for role in Role::ALL {
@@ -346,6 +353,19 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
             ("FACILITATOR", operator.get()),
             *submitted_role_count,
         ),
+        SessionEvent::CommitModeChanged { mode } => vec![st(
+            "UPDATE game_overview SET commit_mode = $2 WHERE game_id = $1",
+            vec![
+                Bind::Uuid(game),
+                Bind::Text(
+                    match mode {
+                        beergame_domain::CommitMode::Manual => "MANUAL",
+                        beergame_domain::CommitMode::Auto => "AUTO",
+                    }
+                    .to_owned(),
+                ),
+            ],
+        )],
         // 担当者の入れ替えは、投影（lobby_participants）が game ストリームのイベントで更新する
         SessionEvent::RoleReplaced { .. } => Vec::new(),
         SessionEvent::SessionPaused => vec![st(

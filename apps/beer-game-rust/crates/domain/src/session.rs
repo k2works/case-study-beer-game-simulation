@@ -16,6 +16,8 @@ pub const SAVE_LIMIT_PER_ROLE_WEEK: u32 = 9;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CommitKind {
     Manual,
+    /// 4 役割の入力がそろった追記と同じ追記で確定した（自動確定。US2.4）。
+    Auto,
 }
 
 /// 終了の理由。
@@ -133,6 +135,12 @@ pub enum SessionCommand {
         /// 確定の根拠にした、役割ごとの意思決定の版。
         basis: RoleMap<DecisionVersion>,
     },
+    /// 確定方式の変更（進行役だけ。進行中でも停止中でも）。自動確定を有効にしたとき、入力がそろっていれば同じ追記で確定する。
+    SetCommitMode {
+        actor: Actor,
+        at: Instant,
+        mode: CommitMode,
+    },
     /// 一時停止（進行役だけ）。
     PauseSession { actor: Actor, at: Instant },
     /// 再開（進行役だけ）。
@@ -177,6 +185,10 @@ pub enum SessionEvent {
     },
     SessionPaused,
     SessionResumed,
+    /// 確定方式の変更。
+    CommitModeChanged {
+        mode: CommitMode,
+    },
     /// 開始後の役割の入れ替え。役割の担当者が、新しい担当者だけになる。
     RoleReplaced {
         role: Role,
@@ -324,14 +336,40 @@ fn save_decision_events(
         .chain(std::iter::once(&role))
         .collect::<BTreeSet<_>>()
         .len();
-    Ok(vec![SessionEvent::DecisionSaved {
+    let saved = SessionEvent::DecisionSaved {
         week: data.week,
         role,
         quantity,
         decision_version: current.next(),
         editor,
         submitted_role_count: submitted,
-    }])
+    };
+    let after = data.clone().with_decision(
+        role,
+        DecisionEntry {
+            quantity,
+            version: current.next(),
+            editor,
+        },
+    );
+    Ok(with_auto_commit(&after, saved))
+}
+
+/// 保存の結果（`after`）、自動確定が有効で、停止中でなく、4 役割の入力がそろうなら、同じ追記で週を確定する（US2.4）。
+fn with_auto_commit(after: &SessionData, saved: SessionEvent) -> Vec<SessionEvent> {
+    let mut events = vec![saved];
+    events.extend(auto_commit_events(after));
+    events
+}
+
+/// 自動確定の判定。自動確定が有効で、停止中でなく、4 役割の入力がそろっていれば、確定のイベント。
+fn auto_commit_events(data: &SessionData) -> Vec<SessionEvent> {
+    if data.commit_mode != CommitMode::Auto || data.paused {
+        return Vec::new();
+    }
+    data.complete_decisions()
+        .map(|decisions| week_commit_events(data, decisions, CommitKind::Auto))
+        .unwrap_or_default()
 }
 
 fn require_facilitator(
@@ -359,7 +397,32 @@ fn resume_events(data: &SessionData, actor: &Actor) -> Result<Vec<SessionEvent>,
     if !data.paused {
         return Err(SessionError::NotPaused);
     }
-    Ok(vec![SessionEvent::SessionResumed])
+    // 再開のとき、停止中にそろっていた入力で、自動確定を判定する（AC2.4.3）
+    let resumed = SessionData {
+        paused: false,
+        ..data.clone()
+    };
+    let mut events = vec![SessionEvent::SessionResumed];
+    events.extend(auto_commit_events(&resumed));
+    Ok(events)
+}
+
+fn commit_mode_events(
+    data: &SessionData,
+    actor: &Actor,
+    mode: CommitMode,
+) -> Result<Vec<SessionEvent>, SessionError> {
+    require_facilitator(data, actor, "確定方式の変更は進行役だけができる")?;
+    if data.commit_mode == mode {
+        return Ok(Vec::new());
+    }
+    let changed = SessionData {
+        commit_mode: mode,
+        ..data.clone()
+    };
+    let mut events = vec![SessionEvent::CommitModeChanged { mode }];
+    events.extend(auto_commit_events(&changed));
+    Ok(events)
 }
 
 fn proxy_events(
@@ -385,14 +448,23 @@ fn proxy_events(
         .chain(std::iter::once(&role))
         .collect::<BTreeSet<_>>()
         .len();
-    Ok(vec![SessionEvent::ProxyDecisionSubmitted {
+    let proxied = SessionEvent::ProxyDecisionSubmitted {
         week: data.week,
         role,
         quantity,
         decision_version: data.decision_versions.get(role).next(),
         operator: data.game_id,
         submitted_role_count: submitted,
-    }])
+    };
+    let after = data.clone().with_decision(
+        role,
+        DecisionEntry {
+            quantity,
+            version: data.decision_versions.get(role).next(),
+            editor: Editor::ByFacilitator(data.game_id),
+        },
+    );
+    Ok(with_auto_commit(&after, proxied))
 }
 
 /// 4 役割の入力から、週の確定のイベントを作る。最終週なら `SessionEnded` も返す。
@@ -491,6 +563,9 @@ pub fn decide_session(
             basis,
             ..
         } => commit_week_events(state.active_data()?, actor, *requested_week, basis),
+        SessionCommand::SetCommitMode { actor, mode, .. } => {
+            commit_mode_events(state.active_data()?, actor, *mode)
+        }
         SessionCommand::PauseSession { actor, .. } => pause_events(state.active_data()?, actor),
         SessionCommand::ResumeSession { actor, .. } => resume_events(state.active_data()?, actor),
         SessionCommand::SubmitProxyDecision {
@@ -589,6 +664,10 @@ pub fn evolve_session(state: SessionState, event: &SessionEvent) -> Evolution<Se
                 assignments,
                 ..data
             }
+        }),
+        SessionEvent::CommitModeChanged { mode } => update_active(state, |data| SessionData {
+            commit_mode: *mode,
+            ..data
         }),
         SessionEvent::SessionPaused => update_active(state, |data| SessionData {
             paused: true,

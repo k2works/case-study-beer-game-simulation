@@ -16,8 +16,8 @@ use beergame_application::{
     GameSnapshot, Idempotency, ResponseShape, SealedIdempotency, Secret, SessionSnapshot,
     SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role, authenticate,
     commit_week, create_game, digest, join_game, open_sealed, pause_session, recover,
-    reissue_credential, resume_session, revoke_credential, save_decision, start_game,
-    submit_proxy_decision,
+    reissue_credential, resume_session, revoke_credential, save_decision, set_commit_mode,
+    start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
@@ -131,6 +131,10 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         )
         .route("/api/v1/sessions/{session_id}/pause", post(pause::<B>))
         .route("/api/v1/sessions/{session_id}/resume", post(resume::<B>))
+        .route(
+            "/api/v1/sessions/{session_id}/commit-mode",
+            put(commit_mode::<B>),
+        )
         .route(
             "/api/v1/sessions/{session_id}/proxy-decisions/{role}",
             put(proxy_decision::<B>),
@@ -1815,6 +1819,60 @@ async fn reissue<B: Backend>(
 /// 期限を RFC 3339（UTC、ミリ秒）の文字列にする。
 fn expires_at_text(at: Instant) -> String {
     crate::views::rfc3339_millis(at.epoch_millis())
+}
+
+/// 確定方式の変更（進行役だけ）。本文は `{"commitMode": "MANUAL" | "AUTO"}`。
+async fn commit_mode<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(session): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&session)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let mode = match parsed.get("commitMode").and_then(Value::as_str) {
+            Some("MANUAL") => CommitMode::Manual,
+            Some("AUTO") => CommitMode::Auto,
+            _ => {
+                return Err(Box::new(validation_problem(vec![field(
+                    "commitMode",
+                    "確定方式は MANUAL か AUTO にしてください。",
+                )])));
+            }
+        };
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "commit_mode",
+            &parsed.to_string(),
+            ResponseShape::Session,
+        )?;
+        match set_commit_mode(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+            mode,
+            Some(&idem),
+        )
+        .await
+        {
+            Ok(executed) => Ok(executed_response(
+                &executed,
+                ResponseShape::Session,
+                &correlation_task,
+            )),
+            Err(failure) => Err(Box::new(problem_of(&failure))),
+        }
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
 
 #[cfg(test)]

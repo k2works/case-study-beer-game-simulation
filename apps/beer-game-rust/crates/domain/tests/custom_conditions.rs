@@ -283,3 +283,12 @@ fn ac1_1_5__最終週は_1_以上_50_以下に限る() -> R<()> {
     }
     Ok(())
 }
+
+#[test]
+fn ac1_1_6__確定方式は手動が既定で_自動にしても設定の種別はキットのままである() -> R<()> {
+    assert_eq!(CommitMode::default(), CommitMode::Manual);
+    let auto = GameSettings::kit(3, &[4, 4, 4], CommitMode::Auto).map_err(err)?;
+    assert_eq!(auto.commit_mode, CommitMode::Auto);
+    assert_eq!(auto.kind(), SettingsKind::Kit);
+    Ok(())
+}

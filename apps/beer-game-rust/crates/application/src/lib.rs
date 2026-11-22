@@ -19,8 +19,8 @@ pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
     JoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter, assign_or_replace_role,
     assign_role, authenticate, commit_week, create_game, join_game, pause_session, recover,
-    reissue_credential, resume_session, revoke_credential, save_decision, start_game,
-    submit_proxy_decision,
+    reissue_credential, resume_session, revoke_credential, save_decision, set_commit_mode,
+    start_game, submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use seal::{open, seal};

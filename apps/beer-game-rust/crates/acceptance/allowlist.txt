@@ -56,3 +56,4 @@ continuation/credentials.feature :: 入れ替えられた旧担当者が、以�
 
 # B8: カスタム条件（US1.1）
 game-setup/custom-conditions.feature
+weekly-play/auto-commit.feature

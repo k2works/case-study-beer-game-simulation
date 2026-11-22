@@ -220,3 +220,61 @@ async fn ac3_2_5__開始後の入れ替えで旧担当者全員の資格が失�
     assert_eq!(status, StatusCode::OK);
     Ok(())
 }
+
+#[tokio::test]
+async fn ac2_4_4__自動確定の有効化と手動の確定が競合しても_結果は_1_回分だけである()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = prepared(&app, &env.pool).await?;
+    let (status, _, _) = send(
+        &app,
+        "POST",
+        &format!("/api/v1/games/{}/start", game.id),
+        &[("cookie", &game.facilitator), ("idempotency-key", "s")],
+        "",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    for (i, (_, _, cookie)) in game.players.iter().enumerate() {
+        let (status, _) = save(&app, &game, cookie, &format!("k{i}"), 0, 4).await?;
+        assert_eq!(status, StatusCode::OK);
+    }
+    // 入力がそろった状態で、自動確定の有効化と、進行役の手動の確定を同時に送る
+    let basis = json!({"FACTORY": 1, "DISTRIBUTOR": 1, "WHOLESALER": 1, "RETAILER": 1});
+    let mode_uri = format!("/api/v1/sessions/{}/commit-mode", game.id);
+    let mode_body = json!({"commitMode": "AUTO"}).to_string();
+    let mode_headers = [
+        ("cookie", game.facilitator.as_str()),
+        ("idempotency-key", "m"),
+    ];
+    let commit_uri = format!("/api/v1/sessions/{}/weeks/1/commit", game.id);
+    let commit_body = json!({"requestedWeek": 1, "basis": basis}).to_string();
+    let commit_headers = [
+        ("cookie", game.facilitator.as_str()),
+        ("idempotency-key", "c"),
+    ];
+    let enable = send(&app, "PUT", &mode_uri, &mode_headers, &mode_body);
+    let manual = send(&app, "POST", &commit_uri, &commit_headers, &commit_body);
+    let (enable, manual) = tokio::join!(enable, manual);
+    let (enable, manual) = (enable?, manual?);
+    let committed: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM week_commits WHERE game_id = $1::uuid AND week = 1",
+    )
+    .bind(&game.id)
+    .fetch_one(&env.pool)
+    .await
+    .map_err(e)?;
+    assert_eq!(committed, 1, "確定は 1 回だけ: {enable:?} {manual:?}");
+    let events: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM events WHERE game_id = $1::uuid AND event_type = 'WeekCommitted'",
+    )
+    .bind(&game.id)
+    .fetch_one(&env.pool)
+    .await
+    .map_err(e)?;
+    assert_eq!(events, 1);
+    Ok(())
+}
