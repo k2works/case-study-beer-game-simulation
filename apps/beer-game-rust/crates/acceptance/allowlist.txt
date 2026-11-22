@@ -62,3 +62,7 @@ weekly-play/auto-commit.feature
 observation/observer-invitation.feature
 observation/observation.feature
 observation/observation-disclosure.feature
+
+# B11: 結果の出力（US4.3）
+export/export.feature
+export/export-custom.feature

@@ -12,13 +12,13 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
-    AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
-    GameSnapshot, Idempotency, ObservationSnapshot, ResponseShape, SealedIdempotency, Secret,
-    SessionSnapshot, SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role,
-    authenticate, commit_week, create_game, digest, find_invitation, invite_observer, join_game,
-    join_observer, open_sealed, pause_session, recover, reissue_credential, resume_session,
-    revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode, start_game,
-    submit_proxy_decision,
+    AppFailure, AppSettings, CreateGameInput, CredentialLookup, EXPORT_SCHEMA_VERSION, Env,
+    EventStore, Executed, ExportInput, GameSnapshot, Idempotency, ObservationSnapshot,
+    ResponseShape, SealedIdempotency, Secret, SessionSnapshot, SessionWriter, StartExecuted,
+    StoredResponse, assign_or_replace_role, authenticate, build_csv, build_json, checksum,
+    commit_week, create_game, digest, find_invitation, invite_observer, join_game, join_observer,
+    open_sealed, pause_session, recover, reissue_credential, resume_session, revoke_credential,
+    revoke_observer_invitation, save_decision, set_commit_mode, start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
@@ -149,6 +149,7 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route("/api/v1/games/{game_id}/lobby", get(lobby::<B>))
         .route("/api/v1/games/{game_id}/review", get(review::<B>))
         .route("/api/v1/games/{game_id}/observation", get(observation::<B>))
+        .route("/api/v1/games/{game_id}/exports", get(export::<B>))
         .route(
             "/api/v1/games/{game_id}/observer-invitations",
             post(invite::<B>),
@@ -2070,6 +2071,87 @@ async fn observe<B: Backend>(
         });
         let cookie = session_cookie(&*backend, &headers, outcome.session.expose());
         Ok(json_response(StatusCode::OK, &view, Some(&cookie), None))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 終了後の結果の出力（進行役だけ。CSV または JSON。ダウンロードとして返す）。
+async fn export<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    axum::extract::RawQuery(query): axum::extract::RawQuery,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if !actor.is_facilitator_of(game_id) {
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
+        let format = query
+            .as_deref()
+            .and_then(|q| q.split('&').find_map(|pair| pair.strip_prefix("format=")))
+            .filter(|f| matches!(*f, "csv" | "json"))
+            .ok_or_else(|| {
+                Box::new(validation_problem(vec![field(
+                    "format",
+                    "形式は csv か json にしてください。",
+                )]))
+            })?;
+        let session = backend
+            .session_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .filter(|s| s.status == "ENDED")
+            .ok_or_else(|| Box::new(game_not_ended_problem()))?;
+        let snapshot = backend
+            .game_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        let id_text = Uuid::from_u128(game_id.get()).to_string();
+        let input = ExportInput {
+            game_id: &id_text,
+            final_week: session.final_week,
+            settings_kind: &snapshot.settings_kind,
+            changes: &snapshot.changed_settings,
+            commit_mode: &snapshot.commit_mode,
+            results: &session.results,
+        };
+        let (content_type, extension, body) = if format == "csv" {
+            ("text/csv; charset=utf-8", "csv", build_csv(&input))
+        } else {
+            ("application/json", "json", build_json(&input))
+        };
+        let mut response = (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, content_type)],
+            body.clone(),
+        )
+            .into_response();
+        for (name, value) in [
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"beer-game-{id_text}.{extension}\""),
+            ),
+            (
+                HeaderName::from_static("x-export-checksum"),
+                checksum(&body),
+            ),
+            (
+                HeaderName::from_static("x-export-schema-version"),
+                EXPORT_SCHEMA_VERSION.to_owned(),
+            ),
+        ] {
+            if let Ok(value) = HeaderValue::from_str(&value) {
+                response.headers_mut().insert(name, value);
+            }
+        }
+        Ok(response)
     }
     .await;
     result

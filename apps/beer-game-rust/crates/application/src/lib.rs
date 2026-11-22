@@ -9,6 +9,7 @@ use beergame_domain::{
 };
 
 mod commands;
+mod export;
 mod idempotency;
 mod seal;
 mod sealed_replay;
@@ -24,6 +25,7 @@ pub use commands::{
     resume_session, revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode,
     start_game, submit_proxy_decision,
 };
+pub use export::{EXPORT_SCHEMA_VERSION, ExportInput, build_csv, build_json, checksum};
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use seal::{open, seal};
 pub use sealed_replay::{SealedFields, SealedIdempotency, open_sealed, sealed_write};

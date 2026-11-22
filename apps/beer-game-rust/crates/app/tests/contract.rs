@@ -411,3 +411,59 @@ async fn tech__観察者の招待_参加_観察画面_ロビーの応答は契�
     validate(&doc, "Problem", &problem)?;
     Ok(())
 }
+
+#[tokio::test]
+async fn tech__出力_json_は契約のスキーマに適合し_csv_と同じ値を持つ() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let doc = contract()?;
+    let app = app(env.pool.clone());
+    let game = started(&app, &env.pool).await?;
+    // 全員が入力して 2 週を確定する
+    let basis = json!({"FACTORY": 1, "DISTRIBUTOR": 1, "WHOLESALER": 1, "RETAILER": 1});
+    for week in 1..=2 {
+        for (i, (_, _, cookie)) in game.players.iter().enumerate() {
+            send(
+                &app,
+                "PUT",
+                &format!("/api/v1/sessions/{}/decisions", game.id),
+                &[
+                    ("cookie", cookie),
+                    ("idempotency-key", &format!("d{week}{i}")),
+                    ("if-match", "0"),
+                ],
+                &json!({"week": week, "quantity": 4}).to_string(),
+            )
+            .await?;
+        }
+        send(
+            &app,
+            "POST",
+            &format!("/api/v1/sessions/{}/weeks/{week}/commit", game.id),
+            &[
+                ("cookie", &game.facilitator),
+                ("idempotency-key", &format!("c{week}")),
+            ],
+            &json!({"requestedWeek": week, "basis": basis}).to_string(),
+        )
+        .await?;
+    }
+    let (status, headers, body) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/exports?format=json", game.id),
+        &[("cookie", &game.facilitator)],
+        "",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    validate(&doc, "ExportDocument", &body)?;
+    assert_eq!(
+        headers
+            .get("x-export-schema-version")
+            .and_then(|v| v.to_str().ok()),
+        Some("beer-game-kotlin.export.v1")
+    );
+    Ok(())
+}

@@ -85,6 +85,10 @@ pub struct Reply {
     pub recovery: Option<String>,
     /// `Retry-After`（秒）。
     pub retry_after: Option<String>,
+    /// 本文のそのままの文字列（CSV など）。
+    pub text: String,
+    /// 応答ヘッダー（名前は小文字）。
+    pub headers: BTreeMap<String, String>,
 }
 
 /// 1 つのゲーム。
@@ -141,6 +145,9 @@ pub struct ApiWorld {
     /// 発行した観察用の招待（招待の ID・招待コード）と、参加した観察者のブラウザセッション。
     pub invitation: Option<(String, String)>,
     pub observer_cookie: Option<String>,
+    /// 直近に出力した CSV・JSON の応答。
+    pub export_csv: Option<Reply>,
+    pub export_json: Option<Reply>,
 }
 
 impl ApiWorld {
@@ -165,6 +172,8 @@ impl ApiWorld {
             history_size: 0,
             invitation: None,
             observer_cookie: None,
+            export_csv: None,
+            export_json: None,
         }
     }
 
@@ -312,6 +321,16 @@ impl ApiWorld {
             cookie,
             location,
             recovery,
+            text: String::from_utf8_lossy(&bytes).into_owned(),
+            headers: parts
+                .headers
+                .iter()
+                .filter_map(|(k, v)| {
+                    v.to_str()
+                        .ok()
+                        .map(|v| (k.as_str().to_owned(), v.to_owned()))
+                })
+                .collect(),
             retry_after: parts
                 .headers
                 .get("retry-after")

@@ -3,7 +3,9 @@
 use cucumber::{given, then, when};
 use serde_json::{Value, json};
 
-use crate::world::{ApiWorld, GameCtx};
+use std::collections::BTreeMap;
+
+use crate::world::{ApiWorld, GameCtx, Reply};
 
 type R = Result<(), String>;
 
@@ -3713,5 +3715,360 @@ async fn no_join_code_in_reply(world: &mut ApiWorld) -> R {
     expect(
         !world.reply()?.body.to_string().contains(&join_code),
         "参加コードが含まれている",
+    )
+}
+
+// ---- 結果の出力（US4.3） ----
+
+const CSV_COLUMNS: [&str; 14] = [
+    "schema_version",
+    "game_id",
+    "settings_kind",
+    "settings_changes",
+    "commit_mode",
+    "week",
+    "role",
+    "orders",
+    "shipped",
+    "ordered",
+    "ending_inventory",
+    "ending_backlog",
+    "weekly_cost_minor",
+    "cumulative_cost_minor",
+];
+
+/// CSV の列名と、JSON の `records` の項目名の対応（数量と費用の列）。
+const VALUE_COLUMNS: [(&str, &str); 7] = [
+    ("orders", "orders"),
+    ("shipped", "shipped"),
+    ("ordered", "ordered"),
+    ("ending_inventory", "endingInventory"),
+    ("ending_backlog", "endingBacklog"),
+    ("weekly_cost_minor", "weeklyCostMinor"),
+    ("cumulative_cost_minor", "cumulativeCostMinor"),
+];
+
+async fn export_with(
+    world: &mut ApiWorld,
+    format: Option<&str>,
+    cookie: Option<String>,
+) -> Result<Reply, String> {
+    let id = world.game()?.id.clone();
+    let query = format.map_or(String::new(), |f| format!("?format={f}"));
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/exports{query}"),
+            cookie.as_deref(),
+            None,
+            "",
+        )
+        .await
+}
+
+#[when(regex = r"^進行役が結果を (CSV|JSON) で(?:も)?出力(する|しようとする)$")]
+async fn facilitator_exports(world: &mut ApiWorld, format: String, kind: String) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    let reply = export_with(world, Some(&format.to_lowercase()), Some(cookie)).await?;
+    if kind == "する" {
+        expect(
+            reply.status == 200,
+            &format!("出力できない: {}", reply.text),
+        )?;
+    }
+    if format == "CSV" {
+        world.export_csv = Some(reply);
+    } else {
+        world.export_json = Some(reply);
+    }
+    Ok(())
+}
+
+#[when(regex = r"^(工場|一次卸|二次卸|小売店)の参加者が結果を CSV で出力しようとする$")]
+async fn participant_exports(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
+    export_with(world, Some("csv"), Some(cookie))
+        .await
+        .map(|_| ())
+}
+
+#[when("資格の無い人が結果を CSV で出力しようとする")]
+async fn anonymous_exports(world: &mut ApiWorld) -> R {
+    export_with(world, Some("csv"), None).await.map(|_| ())
+}
+
+#[when("進行役が、形式を指定せずに結果を出力しようとする")]
+async fn export_without_format(world: &mut ApiWorld) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    export_with(world, None, Some(cookie)).await.map(|_| ())
+}
+
+#[when(regex = r"^進行役が、形式「(.+)」で結果を出力しようとする$")]
+async fn export_unknown_format(world: &mut ApiWorld, format: String) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    export_with(world, Some(&format), Some(cookie))
+        .await
+        .map(|_| ())
+}
+
+fn is_download(reply: &Reply, content_type: &str, extension: &str, game_id: &str) -> R {
+    let disposition = reply
+        .headers
+        .get("content-disposition")
+        .cloned()
+        .unwrap_or_default();
+    expect(
+        reply
+            .headers
+            .get("content-type")
+            .is_some_and(|t| t.starts_with(content_type)),
+        "種類が違う",
+    )?;
+    expect(
+        disposition.starts_with("attachment")
+            && disposition.contains(&format!("beer-game-{game_id}.{extension}")),
+        &format!("ダウンロードの名前が付いていない: {disposition}"),
+    )
+}
+
+#[then("出力は CSV として返り、ダウンロードの名前が付く")]
+async fn csv_is_download(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    is_download(
+        world.export_csv.as_ref().ok_or("CSV が無い")?,
+        "text/csv",
+        "csv",
+        &id,
+    )
+}
+
+#[then("出力は JSON として返り、ダウンロードの名前が付く")]
+async fn json_is_download(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    is_download(
+        world.export_json.as_ref().ok_or("JSON が無い")?,
+        "application/json",
+        "json",
+        &id,
+    )
+}
+
+/// CSV を、見出しと、列名 → 値の行にする（引用・`'` を含まない前提の単純な分割。出力はキット・カスタムの固定値）。
+fn csv_rows(text: &str) -> (Vec<String>, Vec<BTreeMap<String, String>>) {
+    let mut lines = text.split("\r\n").filter(|l| !l.is_empty());
+    let header: Vec<String> = lines
+        .next()
+        .map(|l| l.split(',').map(str::to_owned).collect())
+        .unwrap_or_default();
+    let rows = lines
+        .map(|line| {
+            header
+                .iter()
+                .cloned()
+                .zip(line.split(',').map(str::to_owned))
+                .collect()
+        })
+        .collect();
+    (header, rows)
+}
+
+#[then(
+    regex = r"^CSV に、設定の種別「キット準拠」と、4 役割のそれぞれについて (\d+) 週分の受注・出荷・発注・在庫・受注残・費用が含まれる$"
+)]
+async fn csv_has_everything(world: &mut ApiWorld, weeks: usize) -> R {
+    let id = world.game()?.id.clone();
+    let reply = world.export_csv.as_ref().ok_or("CSV が無い")?;
+    let (header, rows) = csv_rows(&reply.text);
+    expect(header == CSV_COLUMNS, &format!("列が違う: {header:?}"))?;
+    expect(
+        rows.len() == weeks * 4,
+        &format!("行数が違う: {}", rows.len()),
+    )?;
+    expect(
+        rows.iter().all(|r| {
+            r.get("settings_kind").map(String::as_str) == Some("KIT")
+                && r.get("game_id") == Some(&id)
+        }),
+        "種別・ゲームの ID が違う行がある",
+    )?;
+    for (_, role) in ROLES {
+        let mut found: Vec<usize> = rows
+            .iter()
+            .filter(|r| r.get("role").map(String::as_str) == Some(role))
+            .filter_map(|r| r.get("week").and_then(|w| w.parse().ok()))
+            .collect();
+        found.sort_unstable();
+        expect(
+            found == (1..=weeks).collect::<Vec<_>>(),
+            &format!("{role} の週が不足"),
+        )?;
+    }
+    expect(
+        rows.iter().all(|r| {
+            VALUE_COLUMNS
+                .iter()
+                .all(|(c, _)| r.get(*c).is_some_and(|v| v.parse::<i64>().is_ok()))
+        }),
+        "数値でない値がある",
+    )
+}
+
+fn json_of(reply: &Reply) -> Result<Value, String> {
+    serde_json::from_str(&reply.text).map_err(|e| e.to_string())
+}
+
+#[then(
+    regex = r"^JSON に、設定の種別「キット準拠」と、4 役割のそれぞれについて (\d+) 週分の受注・出荷・発注・在庫・受注残・費用が含まれる$"
+)]
+async fn json_has_everything(world: &mut ApiWorld, weeks: usize) -> R {
+    let id = world.game()?.id.clone();
+    let body = json_of(world.export_json.as_ref().ok_or("JSON が無い")?)?;
+    expect(
+        body.get("gameId") == Some(&json!(id))
+            && body.pointer("/settings/kind") == Some(&json!("KIT")),
+        "ゲームの ID・種別が違う",
+    )?;
+    let records = body
+        .get("records")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    expect(records.len() == weeks * 4, "記録の数が違う")?;
+    expect(
+        records
+            .iter()
+            .all(|r| VALUE_COLUMNS.iter().all(|(_, f)| r.get(*f).is_some())),
+        "項目が不足している記録がある",
+    )
+}
+
+#[then("JSON に、設定の種別「カスタム」と、変更した項目「初期在庫」「配送の遅延」が含まれる")]
+async fn json_is_custom(world: &mut ApiWorld) -> R {
+    let body = json_of(world.export_json.as_ref().ok_or("JSON が無い")?)?;
+    let mut changes: Vec<String> = body
+        .pointer("/settings/changes")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    changes.sort();
+    expect(
+        body.pointer("/settings/kind") == Some(&json!("CUSTOM"))
+            && changes == ["INITIAL_INVENTORY", "SHIPMENT_DELAY"],
+        &format!("種別・変更した項目が違う: {body}"),
+    )
+}
+
+#[then("2 つの形式の数量と費用が、週と役割ごとにすべて一致する")]
+async fn values_match(world: &mut ApiWorld) -> R {
+    let (_, rows) = csv_rows(&world.export_csv.as_ref().ok_or("CSV が無い")?.text);
+    let body = json_of(world.export_json.as_ref().ok_or("JSON が無い")?)?;
+    let records = body
+        .get("records")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    expect(rows.len() == records.len(), "件数が違う")?;
+    for row in &rows {
+        let record = records
+            .iter()
+            .find(|r| {
+                r.get("week").map(Value::to_string) == row.get("week").cloned()
+                    && r.get("role").and_then(Value::as_str) == row.get("role").map(String::as_str)
+            })
+            .ok_or("対応する記録が無い")?;
+        for (column, field) in VALUE_COLUMNS {
+            expect(
+                record.get(field).map(Value::to_string) == row.get(column).cloned(),
+                &format!("{column} が違う"),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[then("2 つの形式に、同じスキーマ版が記録される")]
+async fn same_schema_version(world: &mut ApiWorld) -> R {
+    let csv = world.export_csv.as_ref().ok_or("CSV が無い")?;
+    let json = world.export_json.as_ref().ok_or("JSON が無い")?;
+    let (_, rows) = csv_rows(&csv.text);
+    let from_json = json_of(json)?
+        .get("schemaVersion")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    expect(
+        !from_json.is_empty()
+            && rows
+                .iter()
+                .all(|r| r.get("schema_version") == Some(&from_json))
+            && [csv, json]
+                .iter()
+                .all(|r| r.headers.get("x-export-schema-version") == Some(&from_json)),
+        "スキーマ版が違う",
+    )
+}
+
+#[then("出力の本文の SHA-256 が、チェックサムのヘッダーと一致する")]
+async fn checksum_matches(world: &mut ApiWorld) -> R {
+    for reply in [
+        world.export_csv.as_ref().ok_or("CSV が無い")?,
+        world.export_json.as_ref().ok_or("JSON が無い")?,
+    ] {
+        let expected: String = sqlx::query_scalar("SELECT encode(sha256($1::bytea), 'hex')")
+            .bind(reply.text.as_bytes())
+            .fetch_one(world.pool()?)
+            .await
+            .map_err(|e| e.to_string())?;
+        expect(
+            reply.headers.get("x-export-checksum") == Some(&format!("sha256-{expected}")),
+            "チェックサムが一致しない",
+        )?;
+    }
+    Ok(())
+}
+
+#[then("出力に、参加者の表示名と参加コードは含まれない")]
+async fn export_has_no_private_values(world: &mut ApiWorld) -> R {
+    let join_code = world.game()?.join_code.clone();
+    let names: Vec<String> = world.game()?.named.keys().cloned().collect();
+    for reply in [
+        world.export_csv.as_ref().ok_or("CSV が無い")?,
+        world.export_json.as_ref().ok_or("JSON が無い")?,
+    ] {
+        expect(!reply.text.contains(&join_code), "参加コードが含まれている")?;
+        expect(
+            names.iter().all(|n| !reply.text.contains(n.as_str())),
+            "表示名が含まれている",
+        )?;
+    }
+    Ok(())
+}
+
+#[then("出力の本文は返らない")]
+async fn no_export_body(world: &mut ApiWorld) -> R {
+    let reply = world.reply()?;
+    expect(
+        reply.status != 200
+            && reply
+                .headers
+                .get("content-type")
+                .is_some_and(|t| t.contains("problem"))
+            && !reply.text.contains("schema_version"),
+        "出力が返っている",
+    )
+}
+
+#[then("形式の誤りとして拒否される")]
+async fn format_rejected(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 422
+            && error_list(world)?
+                .iter()
+                .any(|e| e.get("field") == Some(&json!("format"))),
+        "形式の誤りではない",
     )
 }
