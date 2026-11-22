@@ -16,7 +16,7 @@
         <link rel="prev" href="../bolt_4_report/">
       
       
-        <link rel="next" href="../../../operation/">
+        <link rel="next" href="../bolt_6_plan/">
       
       
         
@@ -6145,6 +6145,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#2026-11-22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        承認の記録（2026-11-22、ユーザー）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6159,6 +6170,41 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_6_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 6 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
     </li>
   
 
@@ -12623,6 +12669,73 @@
 <h2 id="release-01">Release 0.1 の範囲の状況<a class="headerlink" href="#release-01" title="Permanent link">&para;</a></h2>
 <p>B1〜B5 の実装と記録は完了。ただしリリース計画の Release 0.1 の完了条件には、人のゲート承認と、許可リスト外（作成の冪等など）の扱いの判断が含まれるため、<strong>リリース完了とは宣言しない</strong>。リリース完了報告書は作らない（人の判断後）。</p>
 <hr />
+<h2 id="2026-11-22">承認の記録（2026-11-22、ユーザー）<a class="headerlink" href="#2026-11-22" title="Permanent link">&para;</a></h2>
+<p>「承認」への確認の回答（複数選択）で、次が承認された。<strong>これ以外は承認されていない。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">承認された範囲</th>
+<th style="text-align: left;">扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">B1〜B4 の人のゲート</td>
+<td style="text-align: left;">承認として扱う。コードの全行理解の実施有無は確認していない</td>
+</tr>
+<tr>
+<td style="text-align: left;">Release 0.1 の完了（B1〜B5）</td>
+<td style="text-align: left;">承認。許可リスト外（作成の冪等など）は現状のまま受け入れる。<strong>リリース完了報告書は B6 の前に作成しない（別途指示）</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">判断待ちの項目を「推奨案どおり」</td>
+<td style="text-align: left;">下の表</td>
+</tr>
+<tr>
+<td style="text-align: left;">B6 の計画に進む</td>
+<td style="text-align: left;"><a href="../bolt_6_plan/">Bolt 6 計画</a>（草案。承認待ち）</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">判断待ちの項目</th>
+<th style="text-align: left;">推奨案（承認された内容）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">暗号化クレート（作成・参加の冪等記録）</td>
+<td style="text-align: left;">AES-GCM 系のクレートを B6 の冒頭で導入する。<strong>版は導入の直前に再確認し、<code>cargo deny</code> を通す</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">契約テストのクレート（jsonschema・YAML）</td>
+<td style="text-align: left;">導入する。B6 の API 追加から契約テストを使う。版は導入の直前に再確認</td>
+</tr>
+<tr>
+<td style="text-align: left;">hook・必須ジョブ</td>
+<td style="text-align: left;">守りの導入（git の hook、Claude Code の hook、CI の必須ジョブ）は、B6 の着手前に別途計画を示して確認する（この承認では導入しない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">投影の簡略化、認証の位置</td>
+<td style="text-align: left;">現状を受け入れる。認証を <code>execute</code> の中へ移すのは B6（失効の競合）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P2 の方式</td>
+<td style="text-align: left;">3 秒ポーリングのまま進め、最終判断は B16（実測は p95 約 0.2 秒 + ポーリング間隔）</td>
+</tr>
+<tr>
+<td style="text-align: left;">RT1 の区切り</td>
+<td style="text-align: left;"><code>__</code> と <code>allow(non_snake_case)</code> を維持する</td>
+</tr>
+<tr>
+<td style="text-align: left;">設計書への反映</td>
+<td style="text-align: left;">反映は B6 の記録時にまとめて行い、<code>verified</code> の再確認を人に依頼する</td>
+</tr>
+</tbody>
+</table>
+<hr />
 <h2 id="_4">更新履歴<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -12641,6 +12754,11 @@
 <tr>
 <td style="text-align: left;">2026-11-22</td>
 <td style="text-align: left;">ユーザーの「承認」を Bolt 5 の範囲で記録</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-22</td>
+<td style="text-align: left;">2 回目の「承認」の範囲（B1〜B4 のゲート、Release 0.1、推奨案、B6 の計画）を記録</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
