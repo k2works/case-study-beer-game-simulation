@@ -16,3 +16,6 @@ game-setup/joining.feature :: すでに小売店にいる参加者を二次卸�
 weekly-play/situation.feature
 weekly-play/decision.feature
 weekly-play/week-commit.feature
+
+# B5: 役割別の振り返り（US4.2。観察者の認可は B9）
+review/retrospective.feature

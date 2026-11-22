@@ -153,3 +153,16 @@ pub(crate) fn lobby_view(g: &GameSnapshot) -> Value {
         "versions": {"game": g.game_version, "session": g.session_version},
     })
 }
+
+/// 終了後の振り返り。全役割の全週の結果を、週・役割の順に並べる（`SessionSnapshot.results` は並べ済み）。
+pub(crate) fn review_view(s: &SessionSnapshot, g: &GameSnapshot) -> Value {
+    json!({
+        "gameId": uuid_text(s.game_id.get()),
+        "finalWeek": s.final_week,
+        "settingsKind": "KIT",
+        "changedSettings": [],
+        "commitMode": g.commit_mode,
+        "results": s.results.iter().map(result_row).collect::<Vec<_>>(),
+        "versions": {"game": s.game_version, "session": s.session_version},
+    })
+}

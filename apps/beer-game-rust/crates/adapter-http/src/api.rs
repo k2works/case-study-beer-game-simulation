@@ -24,10 +24,10 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::problem::{
-    FieldError, Problem, bad_request_problem, invitation_invalid_problem, not_ready_problem,
-    problem_of, timeout_problem, validation_problem,
+    FieldError, Problem, bad_request_problem, game_not_ended_problem, invitation_invalid_problem,
+    not_ready_problem, problem_of, timeout_problem, validation_problem,
 };
-use crate::views::{Viewer, game_view, lobby_view, session_view};
+use crate::views::{Viewer, game_view, lobby_view, review_view, session_view};
 
 /// 外側（永続化・環境）への入口。アプリのバイナリが組み立てて渡す。
 pub trait Backend: Send + Sync + 'static {
@@ -94,6 +94,7 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         )
         .route("/api/v1/games/{game_id}/state", get(game_state::<B>))
         .route("/api/v1/games/{game_id}/lobby", get(lobby::<B>))
+        .route("/api/v1/games/{game_id}/review", get(review::<B>))
         .route(
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
@@ -920,6 +921,43 @@ async fn lobby<B: Backend>(
         Ok(json_response(
             StatusCode::OK,
             &lobby_view(&snapshot),
+            None,
+            None,
+        ))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 終了後の振り返り（進行役・参加者。観察者は B9）。終了するまでは開示しない（409）。
+async fn review<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if matches!(actor, Actor::Anonymous) {
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
+        let ended = backend
+            .session_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .filter(|s| s.status == "ENDED")
+            .ok_or_else(|| Box::new(game_not_ended_problem()))?;
+        let snapshot = backend
+            .game_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        Ok(json_response(
+            StatusCode::OK,
+            &review_view(&ended, &snapshot),
             None,
             None,
         ))

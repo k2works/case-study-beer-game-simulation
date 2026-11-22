@@ -793,3 +793,170 @@ async fn same_results(world: &mut ApiWorld) -> R {
         "2 つのゲームの結果が違う",
     )
 }
+
+// ---- 振り返り（US4.2） ----
+
+#[given(regex = r"^進行役が、最終週 (\d+) のキット準拠のゲームを作成している$")]
+async fn created_with_final_week(world: &mut ApiWorld, final_week: usize) -> R {
+    let reply = world
+        .create_game(
+            i64::try_from(final_week).map_err(|e| e.to_string())?,
+            &kit_demand(final_week),
+        )
+        .await?;
+    expect(reply.status == 201, "作成できなかった")
+}
+
+/// 4 役割が同じ数量を保存し、進行役がその週を確定する。
+async fn commit_week_with(world: &mut ApiWorld, week: usize, quantity: i64) -> R {
+    let (id, facilitator) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    for (_, role) in ROLES {
+        let (_, cookie) = world
+            .game()?
+            .players
+            .get(role)
+            .cloned()
+            .ok_or("参加者が無い")?;
+        let key = world.next_key();
+        let reply = world
+            .call(
+                "PUT",
+                &format!("/api/v1/sessions/{id}/decisions"),
+                Some(&cookie),
+                Some(&key),
+                &json!({"week": week, "quantity": quantity}).to_string(),
+            )
+            .await?;
+        expect(
+            reply.status == 200,
+            &format!("保存できない: {}", reply.body),
+        )?;
+    }
+    let basis: serde_json::Map<String, Value> = ROLES
+        .iter()
+        .map(|(_, en)| ((*en).to_owned(), json!(1)))
+        .collect();
+    let key = world.next_key();
+    let reply = world
+        .call(
+            "POST",
+            &format!("/api/v1/sessions/{id}/weeks/{week}/commit"),
+            Some(&facilitator),
+            Some(&key),
+            &json!({"requestedWeek": week, "basis": basis}).to_string(),
+        )
+        .await?;
+    expect(
+        reply.status == 200,
+        &format!("確定できない: {}", reply.body),
+    )
+}
+
+#[given(regex = r"^全 (\d+) 週が、各役割 (\d+) の入力で確定され、ゲームが終了している$")]
+async fn all_weeks_committed(world: &mut ApiWorld, weeks: usize, quantity: i64) -> R {
+    for week in 1..=weeks {
+        commit_week_with(world, week, quantity).await?;
+    }
+    let state = facilitator_state(world).await?;
+    expect(
+        state.get("status") == Some(&json!("ENDED")),
+        "ゲームが終了していない",
+    )
+}
+
+#[given(regex = r"^第 (\d+) 週が、各役割 (\d+) の入力で確定されている$")]
+async fn week_committed(world: &mut ApiWorld, week: usize, quantity: i64) -> R {
+    commit_week_with(world, week, quantity).await
+}
+
+async fn fetch_review(world: &mut ApiWorld, cookie: Option<String>) -> R {
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/review"),
+            cookie.as_deref(),
+            None,
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^進行役が振り返りを取得(する|しようとする)$")]
+async fn facilitator_review(world: &mut ApiWorld, _kind: String) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    fetch_review(world, Some(cookie)).await
+}
+
+#[when(regex = r"^(.+)の参加者が振り返りを取得(する|しようとする)$")]
+async fn participant_review(world: &mut ApiWorld, role: String, _kind: String) -> R {
+    let (_, cookie) = world
+        .game()?
+        .players
+        .get(en(&role)?)
+        .cloned()
+        .ok_or("参加者が無い")?;
+    fetch_review(world, Some(cookie)).await
+}
+
+#[when("資格の無い人が振り返りを取得しようとする")]
+async fn anonymous_review(world: &mut ApiWorld) -> R {
+    fetch_review(world, None).await
+}
+
+#[then(
+    regex = r"^振り返りに、4 役割のそれぞれについて (\d+) 週分の注文・在庫・受注残・出荷・費用が含まれる$"
+)]
+async fn review_has_all(world: &mut ApiWorld, weeks: usize) -> R {
+    expect(status(world)? == 200, "取得できていない")?;
+    let results = world
+        .reply()?
+        .body
+        .get("results")
+        .and_then(Value::as_array)
+        .cloned()
+        .ok_or("results が無い")?;
+    expect(results.len() == 4 * weeks, "結果の件数が違う")?;
+    for (_, role) in ROLES {
+        let mut found: Vec<i64> = results
+            .iter()
+            .filter(|row| row.get("role") == Some(&json!(role)))
+            .filter_map(|row| row.get("week").and_then(Value::as_i64))
+            .collect();
+        found.sort_unstable();
+        let expected: Vec<i64> = (1..=i64::try_from(weeks).map_err(|e| e.to_string())?).collect();
+        expect(found == expected, &format!("{role} の週が不足: {found:?}"))?;
+    }
+    expect(
+        results.iter().all(|row| {
+            [
+                "orders",
+                "order",
+                "inventory",
+                "backlog",
+                "shipment",
+                "cost",
+            ]
+            .iter()
+            .all(|key| row.get(*key).is_some())
+        }),
+        "指標が不足している行がある",
+    )
+}
+
+#[then("ゲームがまだ終了していないという理由で拒否される")]
+async fn rejected_not_ended(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "game.not_ended",
+        &format!("終了前の拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then("結果の一覧は含まれない")]
+async fn no_results_list(world: &mut ApiWorld) -> R {
+    expect(
+        world.reply()?.body.get("results").is_none(),
+        "値が含まれている",
+    )
+}

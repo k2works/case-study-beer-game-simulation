@@ -133,6 +133,7 @@ fn title_of(code: &str) -> &'static str {
         "session.decision_conflict" => "入力が、別の操作で更新されました。",
         "session.decisions_changed" => "確定の根拠にした入力が、変わりました。",
         "session.incomplete_decisions" => "入力がそろっていないため、確定できません。",
+        "game.not_ended" => "ゲームがまだ終了していないため、開示できません。",
         "session.save_limit_reached" => "この週の保存回数の上限（9 回）に達しました。",
         _ => "リクエストを処理できません。",
     }
@@ -314,6 +315,12 @@ pub fn invitation_invalid_problem() -> Problem {
         "game.invitation_invalid",
         title_of("game.invitation_invalid"),
     )
+}
+
+/// ゲームが終了するまで、振り返りを開示しない（409。AC4.2.2）。
+#[must_use]
+pub fn game_not_ended_problem() -> Problem {
+    Problem::new(409, "game.not_ended", title_of("game.not_ended"))
 }
 
 /// 準備ができていない（503。`/ready`）。
