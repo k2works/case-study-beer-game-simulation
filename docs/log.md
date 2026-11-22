@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-22
+* **Creation**: [bolt_6_plan](/development/beer-game-rust/bolt_6_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_5_report](/development/beer-game-rust/bolt_5_report.md) を更新（承認の記録。claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_5_report](/development/beer-game-rust/bolt_5_report.md) を作成（claude-code/claude-sonnet-5-5）
 
 ## 2026-11-21
