@@ -86,6 +86,10 @@ pub struct GameSnapshot {
     pub join_code: String,
     pub final_week: i64,
     pub commit_mode: String,
+    /// `KIT`・`CUSTOM`。
+    pub settings_kind: String,
+    /// キットの値から変えた項目（`INITIAL_INVENTORY` など）。
+    pub changed_settings: Vec<String>,
     pub participants: Vec<LobbyParticipantRow>,
     pub game_version: u64,
     /// 開始前は `None`。

@@ -298,3 +298,53 @@ async fn tech__進行の状態_停止_代理入力_確定_振り返りの応答�
     validate(&doc, "Review", &review)?;
     Ok(())
 }
+
+#[tokio::test]
+async fn tech__カスタム条件で作成したゲームの状態は契約のスキーマに適合し_種別と変更した項目を示す()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let doc = contract()?;
+    let app = app(env.pool.clone());
+    let body = json!({
+        "kind": "CUSTOM", "finalWeek": 2, "demand": [4, 4],
+        "conditions": {"initialInventory": {"RETAILER": 20}, "shipmentDelayWeeks": 3, "disclosurePolicy": "NONE"},
+    });
+    let (status, headers, created) =
+        send(&app, "POST", "/api/v1/games", &[], &body.to_string()).await?;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    validate(&doc, "CreateGameResponse", &created)?;
+    let id = headers
+        .get("location")
+        .and_then(|v| v.to_str().ok())
+        .map(|l| {
+            l.trim_start_matches("/api/v1/games/")
+                .trim_end_matches("/state")
+                .to_owned()
+        })
+        .ok_or("Location が無い")?;
+    let (_, _, state) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{id}/state"),
+        &[("cookie", &cookie_of(&headers)?)],
+        "",
+    )
+    .await?;
+    validate(&doc, "GameState", &state)?;
+    assert_eq!(state["settingsKind"], json!("CUSTOM"));
+    assert_eq!(
+        state["changedSettings"],
+        json!(["INITIAL_INVENTORY", "SHIPMENT_DELAY", "DISCLOSURE"])
+    );
+    // 範囲外は、項目ごとに集めた 422（契約の ValidationProblemBody）
+    let bad = json!({
+        "kind": "CUSTOM", "finalWeek": 2, "demand": [4, 4],
+        "conditions": {"shipmentDelayWeeks": 0, "holdingCostMinor": -1},
+    });
+    let (status, _, problem) = send(&app, "POST", "/api/v1/games", &[], &bad.to_string()).await?;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    validate(&doc, "ValidationProblemBody", &problem)?;
+    Ok(())
+}

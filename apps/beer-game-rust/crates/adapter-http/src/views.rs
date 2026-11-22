@@ -163,8 +163,8 @@ pub(crate) fn game_view(g: &GameSnapshot, actor: &Actor, role: Option<Role>) -> 
         },
     );
     view.insert("status".to_owned(), json!(g.status));
-    view.insert("settingsKind".to_owned(), json!("KIT"));
-    view.insert("changedSettings".to_owned(), json!([]));
+    view.insert("settingsKind".to_owned(), json!(g.settings_kind));
+    view.insert("changedSettings".to_owned(), json!(g.changed_settings));
     view.insert("commitMode".to_owned(), json!(g.commit_mode));
     view.insert(
         "versions".to_owned(),
@@ -203,8 +203,8 @@ pub(crate) fn lobby_view(g: &GameSnapshot) -> Value {
         "gameId": uuid_text(g.game_id.get()),
         "status": g.status,
         "joinCode": g.join_code,
-        "settingsKind": "KIT",
-        "changedSettings": [],
+        "settingsKind": g.settings_kind,
+        "changedSettings": g.changed_settings,
         "commitMode": g.commit_mode,
         "participants": participants,
         "invitations": [],
@@ -218,8 +218,8 @@ pub(crate) fn review_view(s: &SessionSnapshot, g: &GameSnapshot) -> Value {
     json!({
         "gameId": uuid_text(s.game_id.get()),
         "finalWeek": s.final_week,
-        "settingsKind": "KIT",
-        "changedSettings": [],
+        "settingsKind": g.settings_kind,
+        "changedSettings": g.changed_settings,
         "commitMode": g.commit_mode,
         "results": s.results.iter().map(result_row).collect::<Vec<_>>(),
         "versions": {"game": s.game_version, "session": s.session_version},

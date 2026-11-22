@@ -97,6 +97,26 @@ pub fn field_error(error: &ValidationError) -> FieldError {
         ValidationError::MoneyNegative { .. } => {
             plain("money", "金額は 0 以上にしてください。".to_owned())
         }
+        ValidationError::ConditionOutOfRange {
+            field,
+            role,
+            min,
+            max,
+        } => plain(
+            &role.map_or_else(
+                || format!("conditions.{field}"),
+                |r| format!("conditions.{field}.{}", role_name(r)),
+            ),
+            format!("{min} 以上 {max} 以下の整数にしてください。"),
+        ),
+        ValidationError::DisclosureInvalid => plain(
+            "conditions.disclosurePolicy",
+            "公開範囲は TEAM_TOTAL か NONE にしてください。".to_owned(),
+        ),
+        ValidationError::ConditionsOnKit => plain(
+            "conditions",
+            "条件を指定するときは、種別を CUSTOM にして、カスタムで作成してください。".to_owned(),
+        ),
         ValidationError::DisplayNameInvalid { .. } => plain(
             "displayName",
             "表示名は 1 文字以上 80 文字以下にしてください。".to_owned(),

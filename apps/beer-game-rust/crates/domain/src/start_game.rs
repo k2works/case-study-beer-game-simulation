@@ -2,7 +2,6 @@
 
 use crate::foundation::{Actor, ErrorCategory};
 use crate::game::{GameError, GameEvent, GameState};
-use crate::kit_preset::KitPreset;
 use crate::role::Role;
 use crate::session::{SessionError, SessionEvent, SessionState};
 use crate::values::Instant;
@@ -83,7 +82,7 @@ pub fn start_game(
             game_id: data.game_id,
             settings: data.settings.clone(),
             assignments,
-            initial_states: KitPreset::initial_states(&data.settings.demand),
+            initial_states: data.settings.initial_states(),
             commit_mode: data.settings.commit_mode,
         }],
     })

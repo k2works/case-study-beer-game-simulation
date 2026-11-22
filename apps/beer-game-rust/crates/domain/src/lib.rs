@@ -1,5 +1,6 @@
 //! ビールゲームのドメイン。純粋な関数と型だけを持つ（I/O・時計・乱数に依存しない）。
 
+pub mod conditions;
 pub mod error;
 pub mod foundation;
 pub mod game;
@@ -12,6 +13,7 @@ pub mod simulate;
 pub mod start_game;
 pub mod values;
 
+pub use conditions::{Conditions, ConditionsInput, DisclosurePolicy, SettingsField, SettingsKind};
 pub use error::ValidationError;
 pub use foundation::{Actor, ErrorCategory, Evolution};
 pub use game::{

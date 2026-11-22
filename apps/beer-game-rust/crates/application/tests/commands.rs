@@ -110,6 +110,7 @@ async fn ac1_1_2__無効な需要系列は作成せず_対象の週ごとの誤�
     let input = CreateGameInput {
         final_week: 12,
         demand: vec![4, 4, 4, 4, 1001, 4, 4, 4, 4, 4, 4, 4],
+        ..CreateGameInput::default()
     };
     let result = create_game(
         &store,
@@ -136,6 +137,7 @@ async fn ac1_1_1__作成は進行役の資格を一度だけ返し_保存はダ�
     let input = CreateGameInput {
         final_week: 3,
         demand: vec![4, 4, 4],
+        ..CreateGameInput::default()
     };
     let outcome = create_game(
         &store,
@@ -200,6 +202,7 @@ async fn ac1_2_1__参加は表示名を周辺ストアにだけ書き_イベン�
         &CreateGameInput {
             final_week: 3,
             demand: vec![4, 4, 4],
+            ..CreateGameInput::default()
         },
         None,
     )
@@ -275,6 +278,7 @@ async fn nf_s__資格の鍵が空なら作成できない() {
         &CreateGameInput {
             final_week: 3,
             demand: vec![4, 4, 4],
+            ..CreateGameInput::default()
         },
         None,
     )

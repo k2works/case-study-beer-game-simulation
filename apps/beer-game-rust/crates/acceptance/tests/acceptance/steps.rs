@@ -2868,3 +2868,274 @@ async fn former_holder_resends(world: &mut ApiWorld, role: String) -> R {
     permission_denied(world).await?;
     stored_response_not_returned(world).await
 }
+
+// ---- カスタム条件（AC1.1.3〜1.1.5） ----
+
+const ROLE_LABELS: [&str; 4] = ["小売店", "二次卸", "一次卸", "工場"];
+
+/// 「条件の呼び名」と、`conditions` の項目名。
+fn condition_name(label: &str) -> Result<&'static str, String> {
+    Ok(match label {
+        "初期の流れ" => "initialFlow",
+        "注文の遅延" => "orderDelayWeeks",
+        "配送の遅延" => "shipmentDelayWeeks",
+        "生産の遅延" => "productionDelayWeeks",
+        "在庫の単価" => "holdingCostMinor",
+        "受注残の単価" => "backlogCostMinor",
+        "公開範囲" => "disclosurePolicy",
+        other => return Err(format!("知らない条件: {other}")),
+    })
+}
+
+/// 変更した項目の呼び名と、API の値。
+fn field_value(label: &str) -> Result<&'static str, String> {
+    Ok(match label {
+        "初期在庫" => "INITIAL_INVENTORY",
+        "初期の流れ" => "INITIAL_FLOW",
+        "注文の遅延" => "ORDER_DELAY",
+        "配送の遅延" => "SHIPMENT_DELAY",
+        "生産の遅延" => "PRODUCTION_DELAY",
+        "在庫の単価" => "HOLDING_COST",
+        "受注残の単価" => "BACKLOG_COST",
+        "公開範囲" => "DISCLOSURE",
+        other => return Err(format!("知らない項目: {other}")),
+    })
+}
+
+/// `小売店の初期在庫を 20、配送の遅延を 3 週` のような言い方を、`conditions` の JSON にする。
+fn conditions_json(phrase: &str) -> Result<Value, String> {
+    let mut conditions = serde_json::Map::new();
+    let mut inventory = serde_json::Map::new();
+    for part in phrase.split('、').map(str::trim).filter(|p| !p.is_empty()) {
+        let (label, raw) = part
+            .split_once('を')
+            .ok_or_else(|| format!("条件の言い方が違う: {part}"))?;
+        let value = raw
+            .trim()
+            .trim_end_matches('週')
+            .trim()
+            .trim_matches(|c| c == '「' || c == '」');
+        let role_label = ROLE_LABELS
+            .iter()
+            .find(|r| label == format!("{r}の初期在庫"));
+        if let Some(role_label) = role_label {
+            inventory.insert(
+                en(role_label)?.to_owned(),
+                json!(value.parse::<i64>().map_err(|e| e.to_string())?),
+            );
+        } else {
+            let name = condition_name(label)?;
+            let json_value = if name == "disclosurePolicy" {
+                json!(match value {
+                    "なし" => "NONE",
+                    "チーム合計" => "TEAM_TOTAL",
+                    other => other,
+                })
+            } else {
+                json!(value.parse::<i64>().map_err(|e| e.to_string())?)
+            };
+            conditions.insert(name.to_owned(), json_value);
+        }
+    }
+    if !inventory.is_empty() {
+        conditions.insert("initialInventory".to_owned(), Value::Object(inventory));
+    }
+    Ok(Value::Object(conditions))
+}
+
+fn custom_body(phrase: &str, kind: &str) -> Result<Value, String> {
+    Ok(
+        json!({"kind": kind, "finalWeek": 12, "demand": kit_demand(12), "conditions": conditions_json(phrase)?}),
+    )
+}
+
+#[when(regex = r"^進行役が、(.+)に変えて、ゲームを作成(?:する|しようとする)$")]
+async fn create_custom(world: &mut ApiWorld, phrase: String) -> R {
+    let body = custom_body(&phrase, "CUSTOM")?;
+    world.create_with(&body).await.map(|_| ())
+}
+
+#[given(regex = r"^進行役が、(.+)に変えて、ゲームを作成している$")]
+async fn created_custom(world: &mut ApiWorld, phrase: String) -> R {
+    let body = custom_body(&phrase, "CUSTOM")?;
+    let reply = world.create_with(&body).await?;
+    expect(
+        reply.status == 201,
+        &format!("作成できない: {}", reply.body),
+    )
+}
+
+#[when("進行役が、キットの値のままの条件を指定して、ゲームをカスタムで作成する")]
+async fn create_custom_with_kit_values(world: &mut ApiWorld) -> R {
+    let body = custom_body(
+        "初期の流れを 4、注文の遅延を 2、配送の遅延を 2、生産の遅延を 2、在庫の単価を 50、受注残の単価を 100、公開範囲を チーム合計",
+        "CUSTOM",
+    )?;
+    world.create_with(&body).await.map(|_| ())
+}
+
+#[when("進行役が、キット準拠の作成に、配送の遅延 3 週の条件を付けて作成しようとする")]
+async fn create_kit_with_conditions(world: &mut ApiWorld) -> R {
+    let body = custom_body("配送の遅延を 3 週", "KIT")?;
+    world.create_with(&body).await.map(|_| ())
+}
+
+#[when(regex = r"^進行役が、最終週 (\d+) の設定でゲームを作成しようとする$")]
+async fn create_with_final_week(world: &mut ApiWorld, final_week: usize) -> R {
+    world
+        .create_game(
+            i64::try_from(final_week).map_err(|e| e.to_string())?,
+            &kit_demand(final_week),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[then("ゲームが作成される")]
+async fn game_is_created(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 201 && world.games.len() == 1,
+        &format!("作成されていない: {}", world.reply()?.body),
+    )
+}
+
+async fn settings_of_created(world: &mut ApiWorld) -> Result<(String, Vec<String>), String> {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    let body = world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?
+        .body;
+    let kind = body
+        .get("settingsKind")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let mut changes: Vec<String> = body
+        .get("changedSettings")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    changes.sort();
+    Ok((kind, changes))
+}
+
+#[then(regex = r"^ゲームの設定の種別は「カスタム」で、変更した項目は(.+)である$")]
+async fn kind_is_custom(world: &mut ApiWorld, labels: String) -> R {
+    let mut expected: Vec<String> = labels
+        .split('」')
+        .filter_map(|part| part.split_once('「').map(|(_, label)| label))
+        .map(|label| field_value(label).map(str::to_owned))
+        .collect::<Result<_, _>>()?;
+    expected.sort();
+    let (kind, changes) = settings_of_created(world).await?;
+    expect(
+        kind == "CUSTOM" && changes == expected,
+        &format!("種別・変更した項目が違う: {kind} {changes:?}（期待 {expected:?}）"),
+    )
+}
+
+#[then("ゲームの設定の種別は「キット準拠」で、変更した項目は無い")]
+async fn kind_is_kit(world: &mut ApiWorld) -> R {
+    let (kind, changes) = settings_of_created(world).await?;
+    expect(
+        kind == "KIT" && changes.is_empty(),
+        &format!("キット準拠ではない: {kind} {changes:?}"),
+    )
+}
+
+fn error_list(world: &ApiWorld) -> Result<Vec<Value>, String> {
+    Ok(world
+        .reply()?
+        .body
+        .get("errors")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default())
+}
+
+/// 誤りの項目名（`conditions.` の接頭辞と、役割の添え字を除く）。
+fn error_target(error: &Value) -> String {
+    error
+        .get("field")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim_start_matches("conditions.")
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
+#[then("誤りの対象は「条件」であり、カスタムで作成するという修正内容が示される")]
+async fn error_says_use_custom(world: &mut ApiWorld) -> R {
+    let errors = error_list(world)?;
+    let found = errors
+        .iter()
+        .find(|e| e.get("field") == Some(&json!("conditions")));
+    expect(
+        found.is_some_and(|e| {
+            e.get("message")
+                .and_then(Value::as_str)
+                .is_some_and(|m| m.contains("カスタム") || m.contains("CUSTOM"))
+        }),
+        &format!("条件の誤りが無い: {errors:?}"),
+    )
+}
+
+#[then(regex = r"^誤りの対象は「([^」]+)」であり、「([^」]+)」にするという修正内容が示される$")]
+async fn error_points_at(world: &mut ApiWorld, name: String, correction: String) -> R {
+    expect(status(world)? == 422, "拒否されていない")?;
+    let errors = error_list(world)?;
+    let found = errors.iter().find(|e| error_target(e) == name);
+    let norm = |s: &str| s.replace(' ', "");
+    expect(
+        found.is_some_and(|e| {
+            e.get("message")
+                .and_then(Value::as_str)
+                .is_some_and(|m| norm(m).contains(&norm(&correction)))
+        }),
+        &format!("「{name}」「{correction}」を示す誤りが無い: {errors:?}"),
+    )
+}
+
+#[then(regex = r"^誤りの対象として「([^」]+)」と「([^」]+)」の両方が示される$")]
+async fn both_errors_shown(world: &mut ApiWorld, first: String, second: String) -> R {
+    expect(status(world)? == 422, "拒否されていない")?;
+    let targets: Vec<String> = error_list(world)?.iter().map(error_target).collect();
+    expect(
+        targets.contains(&first) && targets.contains(&second),
+        &format!("両方が示されていない: {targets:?}"),
+    )
+}
+
+#[then("最終週は 1 以上 50 以下の整数にするという修正内容が示される")]
+async fn final_week_correction_shown(world: &mut ApiWorld) -> R {
+    expect(status(world)? == 422, "拒否されていない")?;
+    let ok = error_list(world)?.iter().any(|e| {
+        e.get("message")
+            .and_then(Value::as_str)
+            .is_some_and(|m| m.contains('1') && m.contains("50") && m.contains("整数"))
+    });
+    expect(ok, "最終週の修正内容が示されていない")
+}
+
+#[then(regex = r"^小売店の第 (\d+) 週の在庫は (\d+) である$")]
+async fn retailer_inventory(world: &mut ApiWorld, week: i64, inventory: i64) -> R {
+    fetch_state(world, "小売店", "").await?;
+    let body = world.reply()?.body.clone();
+    expect(
+        body.get("week") == Some(&json!(week))
+            && body.pointer("/roleStatus/inventory") == Some(&json!(inventory)),
+        &format!("在庫・週が違う: {body}"),
+    )
+}

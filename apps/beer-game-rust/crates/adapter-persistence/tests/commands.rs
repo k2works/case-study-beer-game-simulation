@@ -60,6 +60,7 @@ async fn ac1_1_1__作成と参加と割り当てが_イベント_投影_周辺�
     let input = CreateGameInput {
         final_week: 3,
         demand: vec![4, 4, 4],
+        ..CreateGameInput::default()
     };
     // 作成: ゲームの ID は作成時に決まるので、ストアは ID ごとに作る。まず ID を知るため、作成だけ専用の ID でストアを作る
     // （PgGameStore はゲームの ID を持つので、Env が返す ID と同じ値でストアを作る）
@@ -222,6 +223,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
         &CreateGameInput {
             final_week: 2,
             demand: vec![4, 4],
+            ..CreateGameInput::default()
         },
         None,
     )

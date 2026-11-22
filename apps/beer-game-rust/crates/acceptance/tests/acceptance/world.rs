@@ -319,12 +319,18 @@ impl ApiWorld {
 
     /// ゲームを作成し、進行役の資格・参加コードを控える（ゲームを `games` に足す）。
     pub async fn create_game(&mut self, final_week: i64, demand: &[i64]) -> Result<Reply, String> {
+        let body = json!({"kind": "KIT", "finalWeek": final_week, "demand": demand});
+        self.create_with(&body).await
+    }
+
+    /// 本文を指定してゲームを作成する（カスタム条件など）。
+    pub async fn create_with(&mut self, body: &Value) -> Result<Reply, String> {
         self.ready().await?;
         self.roots_before = sqlx::query_scalar("SELECT count(*) FROM game_roots")
             .fetch_one(self.pool()?)
             .await
             .map_err(|e| e.to_string())?;
-        let body = json!({"kind": "KIT", "finalWeek": final_week, "demand": demand}).to_string();
+        let body = body.to_string();
         let key = self.next_key();
         self.create_request = Some((key.clone(), body.clone()));
         let reply = self

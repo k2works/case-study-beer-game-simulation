@@ -1,5 +1,6 @@
 //! キット準拠の既定値（BR-13、BR-09）。
 
+use crate::conditions::Conditions;
 use crate::role::{Role, RoleMap};
 use crate::settings::{CostPolicy, DemandSeries};
 use crate::simulate::{Pipeline, RoleState};
@@ -9,9 +10,9 @@ use crate::values::{Money, Units, Week};
 pub struct KitPreset;
 
 impl KitPreset {
-    const INITIAL_INVENTORY: u32 = 12;
-    const INITIAL_FLOW: u32 = 4;
-    const DELAY_WEEKS: usize = 2;
+    pub(crate) const INITIAL_INVENTORY: u32 = 12;
+    pub(crate) const INITIAL_FLOW: u32 = 4;
+    pub(crate) const DELAY_WEEKS: u8 = 2;
     const HOLDING_COST_MINOR: u32 = 50;
     const BACKLOG_COST_MINOR: u32 = 100;
 
@@ -24,21 +25,34 @@ impl KitPreset {
         }
     }
 
-    /// 第 1 週の開始時の状態。小売店の受注は第 1 週の顧客需要。工場は上流が無いので、注文の待ち行列は空。
-    /// 待ち行列の長さは「遅延 − 1」。
+    /// 第 1 週の開始時の状態（キット準拠）。
     #[must_use]
     pub fn initial_states(demand: &DemandSeries) -> RoleMap<RoleState> {
-        let flow = Units::new(Self::INITIAL_FLOW);
-        let queue = || Pipeline(vec![flow; Self::DELAY_WEEKS.saturating_sub(1)]);
+        Self::initial_states_with(demand, &Conditions::kit())
+    }
+
+    /// 第 1 週の開始時の状態。小売店の受注は第 1 週の顧客需要。工場は上流が無いので、注文の待ち行列は空。
+    /// 待ち行列の長さは「遅延 − 1」（注文は注文の遅延、品物は配送の遅延。工場の品物は生産の遅延）。
+    #[must_use]
+    pub fn initial_states_with(
+        demand: &DemandSeries,
+        conditions: &Conditions,
+    ) -> RoleMap<RoleState> {
+        let flow = conditions.initial_flow;
+        let queue = |delay: u8| Pipeline(vec![flow; usize::from(delay).saturating_sub(1)]);
         RoleMap::of(|role| RoleState {
-            inventory: Units::new(Self::INITIAL_INVENTORY),
+            inventory: *conditions.initial_inventory.get(role),
             backlog: Units::ZERO,
             order_pipeline: if role.upstream().is_none() {
                 Pipeline(Vec::new())
             } else {
-                queue()
+                queue(conditions.order_delay)
             },
-            delivery_pipeline: queue(),
+            delivery_pipeline: queue(if role.upstream().is_none() {
+                conditions.production_delay
+            } else {
+                conditions.shipment_delay
+            }),
             cumulative_cost: Money::ZERO,
             arrivals: flow,
             orders: if role == Role::Retailer {

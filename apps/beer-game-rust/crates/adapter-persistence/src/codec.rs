@@ -4,9 +4,9 @@
 use std::collections::BTreeSet;
 
 use beergame_domain::{
-    CommitKind, CommitMode, DecisionVersion, Editor, EndReason, GameEvent, GameId, GameSettings,
-    Instant, JoinCode, Money, ParticipantId, Pipeline, Quantity, RetentionDays, Role, RoleMap,
-    RoleState, RoleWeekResult, SessionEvent, Units, Week,
+    CommitKind, CommitMode, ConditionsInput, DecisionVersion, DisclosurePolicy, Editor, EndReason,
+    GameEvent, GameId, GameSettings, Instant, JoinCode, Money, ParticipantId, Pipeline, Quantity,
+    RetentionDays, Role, RoleMap, RoleState, RoleWeekResult, SessionEvent, Units, Week,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -176,9 +176,25 @@ fn settings(s: &GameSettings) -> Value {
         "holdingCost": s.cost_policy.holding.minor(),
         "backlogCost": s.cost_policy.backlog.minor(),
         "commitMode": commit_mode_name(s.commit_mode),
+        "conditions": {
+            "initialInventory": per_role(&s.conditions.initial_inventory, |u| json!(u.get())),
+            "initialFlow": s.conditions.initial_flow.get(),
+            "orderDelayWeeks": s.conditions.order_delay,
+            "shipmentDelayWeeks": s.conditions.shipment_delay,
+            "productionDelayWeeks": s.conditions.production_delay,
+            "disclosurePolicy": disclosure_name(s.conditions.disclosure),
+        },
     })
 }
 
+fn disclosure_name(policy: DisclosurePolicy) -> &'static str {
+    match policy {
+        DisclosurePolicy::TeamTotal => "TEAM_TOTAL",
+        DisclosurePolicy::None => "NONE",
+    }
+}
+
+/// 設定を読む。`conditions` が無いイベント（B7 まで）は、キットの値として読む（後方互換）。
 fn read_settings(v: &Value) -> R<GameSettings> {
     let demand: Vec<i64> = field(v, "demand")?
         .as_array()
@@ -187,20 +203,33 @@ fn read_settings(v: &Value) -> R<GameSettings> {
         .map(|n| n.as_i64().ok_or_else(|| "整数ではない: demand".to_owned()))
         .collect::<R<_>>()?;
     let final_week = week_of(int(v, "finalWeek")?)?;
-    let kit = GameSettings::kit(
+    let mut input = ConditionsInput {
+        holding_cost_minor: Some(int(v, "holdingCost")?),
+        backlog_cost_minor: Some(int(v, "backlogCost")?),
+        ..ConditionsInput::default()
+    };
+    if let Some(c) = v.get("conditions") {
+        let inventory = read_per_role(field(c, "initialInventory")?, |n| {
+            n.as_i64()
+                .ok_or_else(|| "整数ではない: initialInventory".to_owned())
+        })?;
+        input.initial_inventory = Role::ALL
+            .into_iter()
+            .map(|role| (role, *inventory.get(role)))
+            .collect();
+        input.initial_flow = Some(int(c, "initialFlow")?);
+        input.order_delay_weeks = Some(int(c, "orderDelayWeeks")?);
+        input.shipment_delay_weeks = Some(int(c, "shipmentDelayWeeks")?);
+        input.production_delay_weeks = Some(int(c, "productionDelayWeeks")?);
+        input.disclosure_policy = Some(text(c, "disclosurePolicy")?.to_owned());
+    }
+    GameSettings::custom(
         i64::from(final_week.get()),
         &demand,
         read_commit_mode(text(v, "commitMode")?)?,
+        &input,
     )
-    .map_err(e)?;
-    // 費用の単価は、キット準拠の値であることを確かめる（カスタム条件は B8）
-    let holding = int(v, "holdingCost")?;
-    let backlog = int(v, "backlogCost")?;
-    if holding == kit.cost_policy.holding.minor() && backlog == kit.cost_policy.backlog.minor() {
-        Ok(kit)
-    } else {
-        Err("キット準拠でない費用方針は未対応（カスタム条件は B8）".to_owned())
-    }
+    .map_err(e)
 }
 
 fn assignments(a: &RoleMap<BTreeSet<ParticipantId>>) -> Value {

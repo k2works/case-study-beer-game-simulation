@@ -53,3 +53,6 @@ continuation/credentials.feature :: 進行役以外は、役割を入れ替え�
 continuation/credentials.feature :: 開始後に、別の役割にいる参加者を割り当てようとすると、準備中でないという理由で拒否される
 continuation/credentials.feature :: 資格が失効している参加者を、新担当者として入れ替えようとすると、拒否される
 continuation/credentials.feature :: 入れ替えられた旧担当者が、以前に成功した識別子で再送しても、権限エラーになる
+
+# B8: カスタム条件（US1.1）
+game-setup/custom-conditions.feature

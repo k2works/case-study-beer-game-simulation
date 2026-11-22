@@ -307,3 +307,38 @@ fn ac3_2_5__役割の入れ替えのイベントは_JSON_に変換して戻す�
     );
     Ok(())
 }
+
+#[test]
+fn ac1_1_3__カスタム条件つきの_GameCreated_は往復でき_条件の無い従来のイベントはキットとして読める()
+-> R<()> {
+    use beergame_domain::{ConditionsInput, GameEvent};
+    let mut input = ConditionsInput::default();
+    input.initial_inventory.insert(Role::Retailer, 20);
+    input.shipment_delay_weeks = Some(3);
+    input.holding_cost_minor = Some(80);
+    input.disclosure_policy = Some("NONE".to_owned());
+    let settings = GameSettings::custom(3, &[4, 4, 4], CommitMode::Auto, &input).map_err(e)?;
+    let created = GameEvent::GameCreated {
+        game_id: GAME,
+        join_code: JoinCode::of("abcd1234").map_err(e)?,
+        settings: settings.clone(),
+        retention_days: RetentionDays::of(30).map_err(e)?,
+        facilitator_credential_expires_at: Instant::from_epoch_millis(1_000),
+    };
+    roundtrip(&GameCodec, &created)?;
+    // conditions の無いイベント（B7 まで）は、キットの値として読む
+    let (name, schema, mut payload) = GameCodec.encode(&created)?;
+    if let Some(settings_json) = payload
+        .get_mut("settings")
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        settings_json.remove("conditions");
+        settings_json.insert("holdingCost".to_owned(), serde_json::json!(50));
+    }
+    let legacy = GameCodec.decode(&name, schema, payload)?;
+    let GameEvent::GameCreated { settings: read, .. } = legacy else {
+        return Err("GameCreated ではない".to_owned());
+    };
+    assert_eq!(read.conditions, beergame_domain::Conditions::kit());
+    Ok(())
+}

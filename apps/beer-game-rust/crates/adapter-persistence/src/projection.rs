@@ -4,8 +4,8 @@
 
 use beergame_application::{CredentialKind, PeripheralWrite};
 use beergame_domain::{
-    DecisionVersion, Editor, GameEvent, Pipeline, Quantity, Role, RoleMap, RoleState, SessionEvent,
-    Week,
+    Conditions, DecisionVersion, DisclosurePolicy, Editor, GameEvent, Pipeline, Quantity, Role,
+    RoleMap, RoleState, SessionEvent, SettingsField, SettingsKind, Week,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -57,7 +57,7 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
         } => vec![
             st(
                 "INSERT INTO game_overview (game_id, status, final_week, commit_mode, settings_kind, settings_changes, \
-                 retention_days, created_at) VALUES ($1, 'PREPARING', $2, $3, 'KIT', '[]'::jsonb, $4, now())",
+                 retention_days, created_at) VALUES ($1, 'PREPARING', $2, $3, $5, $6, $4, now())",
                 vec![
                     Bind::Uuid(game),
                     Bind::Int(i64::from(settings.final_week.get())),
@@ -69,6 +69,20 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
                         .to_owned(),
                     ),
                     Bind::Int(i64::from(retention_days.get())),
+                    Bind::Text(
+                        match settings.kind() {
+                            SettingsKind::Kit => "KIT",
+                            SettingsKind::Custom => "CUSTOM",
+                        }
+                        .to_owned(),
+                    ),
+                    Bind::Json(json!(
+                        settings
+                            .changed_fields()
+                            .iter()
+                            .map(|f| field_name(*f))
+                            .collect::<Vec<_>>()
+                    )),
                 ],
             ),
             st(
@@ -76,12 +90,28 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
                 vec![Bind::Uuid(game), Bind::Text(join_code.as_str().to_owned())],
             ),
             st(
-                "INSERT INTO game_settings (game_id, demand, holding_cost_minor, backlog_cost_minor) VALUES ($1, $2, $3, $4)",
+                "INSERT INTO game_settings (game_id, demand, initial_conditions, holding_cost_minor, backlog_cost_minor, \
+                 order_delay_weeks, shipment_delay_weeks, production_delay_weeks, disclosure_policy) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
                 vec![
                     Bind::Uuid(game),
                     Bind::Json(json!(settings.demand.to_ints())),
+                    Bind::Json(json!({
+                        "initialInventory": role_inventory(&settings.conditions),
+                        "initialFlow": settings.conditions.initial_flow.get(),
+                    })),
                     Bind::Int(settings.cost_policy.holding.minor()),
                     Bind::Int(settings.cost_policy.backlog.minor()),
+                    Bind::Int(i64::from(settings.conditions.order_delay)),
+                    Bind::Int(i64::from(settings.conditions.shipment_delay)),
+                    Bind::Int(i64::from(settings.conditions.production_delay)),
+                    Bind::Text(
+                        match settings.conditions.disclosure {
+                            DisclosurePolicy::TeamTotal => "TEAM_TOTAL",
+                            DisclosurePolicy::None => "NONE",
+                        }
+                        .to_owned(),
+                    ),
                 ],
             ),
         ],
@@ -337,6 +367,34 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
             ),
         ],
     }
+}
+
+/// 変更した項目の API の値（`SettingsField`）。
+fn field_name(field: SettingsField) -> &'static str {
+    match field {
+        SettingsField::InitialInventory => "INITIAL_INVENTORY",
+        SettingsField::InitialFlow => "INITIAL_FLOW",
+        SettingsField::OrderDelay => "ORDER_DELAY",
+        SettingsField::ShipmentDelay => "SHIPMENT_DELAY",
+        SettingsField::ProductionDelay => "PRODUCTION_DELAY",
+        SettingsField::HoldingCost => "HOLDING_COST",
+        SettingsField::BacklogCost => "BACKLOG_COST",
+        SettingsField::Disclosure => "DISCLOSURE",
+    }
+}
+
+fn role_inventory(conditions: &Conditions) -> Value {
+    Value::Object(
+        Role::ALL
+            .into_iter()
+            .map(|role| {
+                (
+                    role_name(role).to_owned(),
+                    json!(conditions.initial_inventory.get(role).get()),
+                )
+            })
+            .collect(),
+    )
 }
 
 fn kind_text(kind: CredentialKind) -> &'static str {

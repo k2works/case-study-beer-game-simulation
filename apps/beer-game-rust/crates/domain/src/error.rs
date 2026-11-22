@@ -28,6 +28,18 @@ pub enum ValidationError {
     RetentionOutOfRange {
         actual: i64,
     },
+    /// カスタム条件の値が範囲外（整数）。`field` は条件の項目名（`conditions.<field>` として示す）。
+    /// `role` は役割ごとの値（初期在庫）のときの対象。
+    ConditionOutOfRange {
+        field: &'static str,
+        role: Option<crate::role::Role>,
+        min: i64,
+        max: i64,
+    },
+    /// 公開範囲が `TEAM_TOTAL`・`NONE` のどちらでもない。
+    DisclosureInvalid,
+    /// キット準拠の作成に、条件が付いている（カスタムで作成する）。
+    ConditionsOnKit,
     /// 需要系列の誤り。`week_index` は対象の週（1 始まり）で、利用者に修正すべき週を示す（AC1.1.2）。
     DemandSeriesInvalid {
         week_index: usize,

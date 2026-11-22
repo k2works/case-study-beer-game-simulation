@@ -155,7 +155,8 @@ async fn ac2_2_3__同じ版から_2_人が保存すると_2_人目は競合し_�
             .as_str()
             .is_some_and(|t| t.len() == 24 && t.ends_with('Z'))
     );
-    assert!(!body.to_string().contains("77"), "競合した入力は含めない");
+    // 競合した入力（77）は、どの数値にも含めない（文字列の相関 ID に 77 が現れうるので、数値だけを見る）
+    assert!(body.get("quantity").is_none() && latest["quantity"] != json!(77));
     // 最新の版を指定して保存し直すと受け付けられ、保存者は自分になる
     let (status, _) = save(&app, &game, &suzuki, "k3", 1, 77).await?;
     assert_eq!(status, StatusCode::OK);

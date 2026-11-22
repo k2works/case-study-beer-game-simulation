@@ -20,8 +20,8 @@ use beergame_application::{
     submit_proxy_decision,
 };
 use beergame_domain::{
-    Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
-    SessionEvent, Week,
+    Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
+    Quantity, Role, RoleMap, SessionEvent, Week,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -452,16 +452,91 @@ fn parse_create(body: &Value) -> Result<CreateGameInput, Vec<FieldError>> {
             week: None,
         }),
     }
-    if body.get("kind").and_then(Value::as_str) == Some("CUSTOM") {
-        errors.push(FieldError {
-            field: "kind".to_owned(),
-            message: "カスタム条件は、まだ使えません。".to_owned(),
-            week: None,
-        });
+    // 種別 KIT に条件を付けると、カスタムで作成するよう示す（AC1.1.3）。値は null でも条件の指定とみなす
+    let conditions = body.get("conditions").filter(|c| !c.is_null());
+    if conditions.is_some() && body.get("kind").and_then(Value::as_str) != Some("CUSTOM") {
+        errors.push(crate::field_error(
+            &beergame_domain::ValidationError::ConditionsOnKit,
+        ));
     }
+    let conditions_input = conditions
+        .map(parse_conditions)
+        .transpose()
+        .map_err(|more| errors.extend(more))
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let commit_mode = match body.get("commitMode").and_then(Value::as_str) {
+        None | Some("MANUAL") => CommitMode::Manual,
+        Some("AUTO") => CommitMode::Auto,
+        Some(_) => {
+            errors.push(field(
+                "commitMode",
+                "確定方式は MANUAL か AUTO にしてください。",
+            ));
+            CommitMode::Manual
+        }
+    };
     match (final_week, errors.is_empty()) {
-        (Some(final_week), true) => Ok(CreateGameInput { final_week, demand }),
+        (Some(final_week), true) => Ok(CreateGameInput {
+            final_week,
+            demand,
+            conditions: conditions_input,
+            commit_mode,
+        }),
         (_, _) => Err(errors),
+    }
+}
+
+/// カスタム条件の入力（整数でない値は、項目ごとの誤りにする。範囲は domain が検証する）。
+fn parse_conditions(value: &Value) -> Result<ConditionsInput, Vec<FieldError>> {
+    let mut errors = Vec::new();
+    let mut int = |name: &str| -> Option<i64> {
+        let raw = value.get(name).filter(|v| !v.is_null())?;
+        let parsed = raw.as_i64();
+        if parsed.is_none() {
+            errors.push(field(&format!("conditions.{name}"), "整数にしてください。"));
+        }
+        parsed
+    };
+    let initial_flow = int("initialFlow");
+    let order_delay_weeks = int("orderDelayWeeks");
+    let shipment_delay_weeks = int("shipmentDelayWeeks");
+    let production_delay_weeks = int("productionDelayWeeks");
+    let holding_cost_minor = int("holdingCostMinor");
+    let backlog_cost_minor = int("backlogCostMinor");
+    let mut initial_inventory = std::collections::BTreeMap::new();
+    if let Some(map) = value.get("initialInventory").and_then(Value::as_object) {
+        for (name, raw) in map {
+            match (role_of_name(name), raw.as_i64()) {
+                (Some(role), Some(n)) => {
+                    initial_inventory.insert(role, n);
+                }
+                _ => errors.push(field(
+                    &format!("conditions.initialInventory.{name}"),
+                    "役割は FACTORY・DISTRIBUTOR・WHOLESALER・RETAILER、値は整数にしてください。",
+                )),
+            }
+        }
+    }
+    // 文字列でない値は、どの公開範囲でもない（domain が拒否する）
+    let disclosure_policy = value
+        .get("disclosurePolicy")
+        .filter(|v| !v.is_null())
+        .map(|raw| raw.as_str().unwrap_or("").to_owned());
+    if errors.is_empty() {
+        Ok(ConditionsInput {
+            initial_inventory,
+            initial_flow,
+            order_delay_weeks,
+            shipment_delay_weeks,
+            production_delay_weeks,
+            holding_cost_minor,
+            backlog_cost_minor,
+            disclosure_policy,
+        })
+    } else {
+        Err(errors)
     }
 }
 

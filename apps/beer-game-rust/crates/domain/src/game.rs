@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::conditions::{Conditions, ConditionsInput, SettingsField, SettingsKind};
 use crate::error::ValidationError;
 use crate::foundation::{Actor, ErrorCategory, Evolution};
 use crate::kit_preset::KitPreset;
@@ -12,8 +13,9 @@ use crate::simulate::SimulationSettings;
 use crate::values::{DisplayName, GameId, Instant, JoinCode, ParticipantId, RetentionDays, Week};
 
 /// 確定方式。手動（進行役が確定する）か、自動（4 役割の入力がそろったら、同じ追記で確定する。B8）。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CommitMode {
+    #[default]
     Manual,
     Auto,
 }
@@ -24,6 +26,8 @@ pub struct GameSettings {
     pub final_week: Week,
     pub demand: DemandSeries,
     pub cost_policy: CostPolicy,
+    /// 初期在庫・遅延・公開範囲（キット準拠は [`Conditions::kit`]）。
+    pub conditions: Conditions,
     pub commit_mode: CommitMode,
 }
 
@@ -45,6 +49,7 @@ impl GameSettings {
                 final_week,
                 demand,
                 cost_policy: KitPreset::cost_policy(),
+                conditions: Conditions::kit(),
                 commit_mode,
             }),
             (week, series) => Err(week
@@ -53,6 +58,55 @@ impl GameSettings {
                 .chain(series.err().into_iter().flatten())
                 .collect()),
         }
+    }
+
+    /// カスタム条件つきの設定。最終週・需要系列と条件の誤りを、項目ごとにすべて集めて返す。
+    ///
+    /// # Errors
+    /// 最終週・需要系列・条件の誤りのすべて。
+    pub fn custom(
+        final_week: i64,
+        demand: &[i64],
+        commit_mode: CommitMode,
+        input: &ConditionsInput,
+    ) -> Result<Self, Vec<ValidationError>> {
+        let base = GameSettings::kit(final_week, demand, commit_mode);
+        let conditions = Conditions::of(input);
+        match (base, conditions) {
+            (Ok(base), Ok((conditions, cost_policy))) => Ok(GameSettings {
+                cost_policy,
+                conditions,
+                ..base
+            }),
+            (base, conditions) => Err(base
+                .err()
+                .into_iter()
+                .flatten()
+                .chain(conditions.err().into_iter().flatten())
+                .collect()),
+        }
+    }
+
+    /// キットの値から変えた項目。
+    #[must_use]
+    pub fn changed_fields(&self) -> Vec<SettingsField> {
+        self.conditions.changed_fields(&self.cost_policy)
+    }
+
+    /// 設定の種別。キットの値と同じなら `Kit`（最終週と需要系列は判定に含めない）。
+    #[must_use]
+    pub fn kind(&self) -> SettingsKind {
+        if self.changed_fields().is_empty() {
+            SettingsKind::Kit
+        } else {
+            SettingsKind::Custom
+        }
+    }
+
+    /// 第 1 週の開始時の、役割別の状態。
+    #[must_use]
+    pub fn initial_states(&self) -> RoleMap<crate::simulate::RoleState> {
+        KitPreset::initial_states_with(&self.demand, &self.conditions)
     }
 
     /// 週次計算に渡す最小の設定。

@@ -247,7 +247,7 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
     async fn game_snapshot(&self, game_id: GameId) -> Result<Option<GameSnapshot>, AppFailure> {
         let game = Uuid::from_u128(game_id.get());
         let Some(row) = sqlx::query(
-            "SELECT o.status, o.final_week, o.commit_mode, c.join_code \
+            "SELECT o.status, o.final_week, o.commit_mode, o.settings_kind, ARRAY(SELECT jsonb_array_elements_text(o.settings_changes)) AS changes, c.join_code \
              FROM game_overview o JOIN game_join_codes c USING (game_id) WHERE game_id = $1",
         )
         .bind(game)
@@ -283,6 +283,8 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             join_code: row.try_get("join_code").map_err(storage)?,
             final_week: i64::from(row.try_get::<i32, _>("final_week").map_err(storage)?),
             commit_mode: row.try_get("commit_mode").map_err(storage)?,
+            settings_kind: row.try_get("settings_kind").map_err(storage)?,
+            changed_settings: row.try_get("changes").map_err(storage)?,
             participants: list,
             game_version,
             session_version,

@@ -4,10 +4,10 @@
 use std::future::Future;
 
 use beergame_domain::{
-    Actor, AssignOrReplace, CommitMode, DecisionVersion, DisplayName, GameCommand, GameError,
-    GameEvent, GameId, GameSettings, GameState, Instant, JoinCode, ParticipantId, Quantity,
-    RetentionDays, Role, RoleMap, SessionCommand, SessionEvent, SessionState, StartGame, Week,
-    assign_or_replace, evolve_game, evolve_session,
+    Actor, AssignOrReplace, CommitMode, ConditionsInput, DecisionVersion, DisplayName, GameCommand,
+    GameError, GameEvent, GameId, GameSettings, GameState, Instant, JoinCode, ParticipantId,
+    Quantity, RetentionDays, Role, RoleMap, SessionCommand, SessionEvent, SessionState, StartGame,
+    Week, assign_or_replace, evolve_game, evolve_session,
 };
 
 use crate::{
@@ -59,10 +59,14 @@ impl AppSettings {
 }
 
 /// ゲームの作成の入力（境界で受け取った値）。
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CreateGameInput {
     pub final_week: i64,
     pub demand: Vec<i64>,
+    /// カスタム条件（省略した項目は、キットの値）。
+    pub conditions: ConditionsInput,
+    /// 確定方式（省略は手動）。
+    pub commit_mode: CommitMode,
 }
 
 /// 作成の結果。資格の生の値は、この応答に一度だけ載せる（保存はダイジェストだけ）。
@@ -166,8 +170,13 @@ pub async fn create_game<St: EventStore<GameEvent>>(
     input: &CreateGameInput,
     idem: Option<&SealedIdempotency>,
 ) -> Result<CreateOutcome, AppFailure> {
-    let game_settings = GameSettings::kit(input.final_week, &input.demand, CommitMode::Manual)
-        .map_err(AppFailure::Invalid)?;
+    let game_settings = GameSettings::custom(
+        input.final_week,
+        &input.demand,
+        input.commit_mode,
+        &input.conditions,
+    )
+    .map_err(AppFailure::Invalid)?;
     let retention =
         RetentionDays::of(settings.retention_days).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let code_text = env.join_code();
