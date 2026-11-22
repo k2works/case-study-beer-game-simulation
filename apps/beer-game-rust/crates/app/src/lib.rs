@@ -4,7 +4,7 @@ use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{
     AppFailure, AppSettings, Env, GameSnapshot, LobbyParticipantRow, PersistenceFailure, ResultRow,
-    RoleSnapshot, SessionSnapshot,
+    RoleSnapshot, SessionSnapshot, StoredResponse,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -300,6 +300,36 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
         .await
         .map(|_| ())
         .map_err(storage)
+    }
+
+    async fn stored_response(
+        &self,
+        game_id: Option<GameId>,
+        scope: &str,
+        key_digest: &str,
+    ) -> Result<Option<(GameId, StoredResponse)>, AppFailure> {
+        // 期限内の記録だけ。作成は、ゲームがまだ分からないので、(scope, key_digest) だけで引く（部分一意索引 uq_idempotency_create）
+        let row = sqlx::query(
+            "SELECT game_id, request_digest, status_code, response FROM idempotency_records \
+             WHERE scope = $1 AND key_digest = $2 AND ($3::uuid IS NULL OR game_id = $3) AND expires_at > now()",
+        )
+        .bind(scope)
+        .bind(key_digest)
+        .bind(game_id.map(|g| Uuid::from_u128(g.get())))
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage)?;
+        let Some(row) = row else { return Ok(None) };
+        let found: Uuid = row.try_get("game_id").map_err(storage)?;
+        let status: i32 = row.try_get("status_code").map_err(storage)?;
+        Ok(Some((
+            GameId::new(found.as_u128()),
+            StoredResponse {
+                request_digest: row.try_get("request_digest").map_err(storage)?,
+                status_code: u16::try_from(status).unwrap_or(500),
+                body: row.try_get("response").map_err(storage)?,
+            },
+        )))
     }
 
     async fn is_ready(&self) -> bool {

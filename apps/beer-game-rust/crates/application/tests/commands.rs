@@ -117,6 +117,7 @@ async fn ac1_1_2__無効な需要系列は作成せず_対象の週ごとの誤�
         &settings(),
         GameId::new(1),
         &input,
+        None,
     )
     .await;
     assert!(matches!(
@@ -142,6 +143,7 @@ async fn ac1_1_1__作成は進行役の資格を一度だけ返し_保存はダ�
         &settings(),
         GameId::new(1),
         &input,
+        None,
     )
     .await
     .map_err(|e| format!("{e:?}"))?;
@@ -199,10 +201,11 @@ async fn ac1_2_1__参加は表示名を周辺ストアにだけ書き_イベン�
             final_week: 3,
             demand: vec![4, 4, 4],
         },
+        None,
     )
     .await
     .map_err(|e| format!("{e:?}"))?;
-    let joined = join_game(&store, &env, &settings(), created.game_id, "  山本  ")
+    let joined = join_game(&store, &env, &settings(), created.game_id, "  山本  ", None)
         .await
         .map_err(|e| format!("{e:?}"))?;
     let writes = store.writes.lock().map_err(|e| e.to_string())?.clone();
@@ -231,6 +234,7 @@ async fn ac1_2_1__表示名が空なら参加せず_入力の誤りを返す() -
         &settings(),
         GameId::new(1),
         "   ",
+        None,
     )
     .await;
     assert!(matches!(result.err(), Some(AppFailure::Invalid(_))));
@@ -246,6 +250,7 @@ async fn ac1_2_2__作成されていないゲームへの参加は_NotPreparing(
         &settings(),
         GameId::new(1),
         "山本",
+        None,
     )
     .await;
     assert!(matches!(
@@ -271,6 +276,7 @@ async fn nf_s__資格の鍵が空なら作成できない() {
             final_week: 3,
             demand: vec![4, 4, 4],
         },
+        None,
     )
     .await;
     assert!(matches!(result.err(), Some(AppFailure::Persistence(_))));

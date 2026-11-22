@@ -6,7 +6,8 @@
 # B6 まで許可しない（共同担当）: game-setup/co-assignment.feature
 
 # B2: ウォーキングスケルトン（HTTP 越し。実 PostgreSQL）
-# 作成の冪等（同じ要求の再送）は、資格を運ぶ応答の暗号化の承認待ちのため、game-creation の 1 本目は許可しない。
+# 作成の冪等（同じ要求の再送）は、B6 で暗号化して保存する（AES-256-GCM）ようにし、game-creation の 1 本目も許可する。
+game-setup/game-creation.feature :: 有効なキット準拠の設定で作成すると、参加コード付きの準備中のゲームが一度だけ作成される
 game-setup/game-creation.feature :: 無効な需要系列では作成せず、対象の週と修正内容を示す
 game-setup/joining.feature :: 有効な参加コードで表示名を入力すると、ロビーに参加し、復帰資格が保存される
 game-setup/joining.feature :: 無効な参加コードでは参加せず、理由を示す

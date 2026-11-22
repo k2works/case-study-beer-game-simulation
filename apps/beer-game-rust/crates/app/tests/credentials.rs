@@ -408,3 +408,133 @@ async fn nf_s11__復帰の失敗が上限を超えると_有効な復帰コー�
     assert_eq!(status, StatusCode::OK);
     Ok(())
 }
+
+#[tokio::test]
+async fn nf_s5__資格を運ぶ応答は暗号化して保存し_同じキーの再送には同じ値を返す()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let body = json!({"kind": "KIT", "finalWeek": 2, "demand": [4, 4]}).to_string();
+    let first = send(
+        &app,
+        "POST",
+        "/api/v1/games",
+        &[("idempotency-key", "create-1")],
+        &body,
+    )
+    .await?;
+    let again = send(
+        &app,
+        "POST",
+        "/api/v1/games",
+        &[("idempotency-key", "create-1")],
+        &body,
+    )
+    .await?;
+    assert_eq!(
+        (first.0, again.0),
+        (StatusCode::CREATED, StatusCode::CREATED)
+    );
+    assert_eq!(first.2, again.2, "同じ復帰コード");
+    assert_eq!(cookie_of(&first.1)?, cookie_of(&again.1)?);
+    assert_eq!(first.1.get("location"), again.1.get("location"));
+    // 内容が違えば 409
+    let other = json!({"kind": "KIT", "finalWeek": 3, "demand": [4, 4, 4]}).to_string();
+    let (status, _, problem) = send(
+        &app,
+        "POST",
+        "/api/v1/games",
+        &[("idempotency-key", "create-1")],
+        &other,
+    )
+    .await?;
+    assert_eq!(
+        (status, problem["code"].clone()),
+        (StatusCode::CONFLICT, json!("app.idempotency_key_reused"))
+    );
+    let games: i64 = sqlx::query_scalar("SELECT count(*) FROM game_roots")
+        .fetch_one(&env.pool)
+        .await
+        .map_err(e)?;
+    assert_eq!(games, 1);
+    // 保存した応答に、復帰コードの平文が無い
+    let recovery = first.2["recoveryCode"].as_str().ok_or("復帰コードが無い")?;
+    let stored: Vec<u8> =
+        sqlx::query_scalar("SELECT response FROM idempotency_records WHERE scope = 'create'")
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    assert!(!String::from_utf8_lossy(&stored).contains(recovery));
+    assert!(stored.len() > 12 + 16, "ノンスと認証タグを含む");
+    Ok(())
+}
+
+#[tokio::test]
+async fn nf_s5__参加と再発行も_同じキーの再送には同じ資格_同じ復帰コードを返す()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = create(&app).await?;
+    let code: String =
+        sqlx::query_scalar("SELECT join_code FROM game_join_codes WHERE game_id = $1::uuid")
+            .bind(&game.id)
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    let join_body = json!({"joinCode": code, "displayName": "田中"}).to_string();
+    let first = send(
+        &app,
+        "POST",
+        "/api/v1/participations/join",
+        &[("idempotency-key", "join-1")],
+        &join_body,
+    )
+    .await?;
+    let again = send(
+        &app,
+        "POST",
+        "/api/v1/participations/join",
+        &[("idempotency-key", "join-1")],
+        &join_body,
+    )
+    .await?;
+    assert_eq!((first.0, again.0), (StatusCode::OK, StatusCode::OK));
+    assert_eq!(cookie_of(&first.1)?, cookie_of(&again.1)?);
+    assert_eq!(recovery_of(&first.1)?, recovery_of(&again.1)?);
+    let participants: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM lobby_participants WHERE game_id = $1::uuid")
+            .bind(&game.id)
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    assert_eq!(participants, 1, "再送で参加者は増えない");
+    // 失効 → 再発行（同じキーで再送すると、同じ復帰コード）
+    let pid: String = sqlx::query_scalar(
+        "SELECT participant_id::text FROM lobby_participants WHERE game_id = $1::uuid",
+    )
+    .bind(&game.id)
+    .fetch_one(&env.pool)
+    .await
+    .map_err(e)?;
+    let subject = json!({"subject": {"kind": "PARTICIPANT", "id": pid}}).to_string();
+    let uri = |action: &str| format!("/api/v1/games/{}/credentials/{action}", game.id);
+    send(
+        &app,
+        "POST",
+        &uri("revoke"),
+        &[("cookie", &game.session), ("idempotency-key", "rv")],
+        &subject,
+    )
+    .await?;
+    let reissue_headers = [("cookie", game.session.as_str()), ("idempotency-key", "ri")];
+    let r1 = send(&app, "POST", &uri("reissue"), &reissue_headers, &subject).await?;
+    let r2 = send(&app, "POST", &uri("reissue"), &reissue_headers, &subject).await?;
+    assert_eq!((r1.0, r2.0), (StatusCode::OK, StatusCode::OK), "{:?}", r2.2);
+    assert_eq!(r1.2["recoveryCode"], r2.2["recoveryCode"]);
+    assert_eq!(r1.2["expiresAt"], r2.2["expiresAt"]);
+    Ok(())
+}

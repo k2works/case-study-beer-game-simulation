@@ -87,12 +87,13 @@ async fn ac1_1_1__作成と参加と割り当てが_イベント_投影_周辺�
         &settings(),
         GameId::new(game_uuid.as_u128()),
         &input,
+        None,
     )
     .await
     .map_err(e)?;
     assert_eq!(created.game_id, GameId::new(game_uuid.as_u128()));
 
-    let joined = join_game(&store, &RealEnv, &settings(), created.game_id, "山本")
+    let joined = join_game(&store, &RealEnv, &settings(), created.game_id, "山本", None)
         .await
         .map_err(e)?;
     assign_role(
@@ -162,6 +163,7 @@ async fn ac1_2_2__存在しないゲームへの参加は拒否され_何も残�
         &settings(),
         GameId::new(ghost.as_u128()),
         "山本",
+        None,
     )
     .await;
     assert!(result.is_err());
@@ -221,6 +223,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
             final_week: 2,
             demand: vec![4, 4],
         },
+        None,
     )
     .await
     .map_err(e)?;
@@ -237,6 +240,7 @@ async fn ac2_3_1__認証した操作者で_開始から入力と確定まで通�
             &settings(),
             created.game_id,
             "参加者",
+            None,
         )
         .await
         .map_err(e)?;

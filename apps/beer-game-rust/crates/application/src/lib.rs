@@ -9,6 +9,8 @@ use beergame_domain::{
 
 mod commands;
 mod idempotency;
+mod seal;
+mod sealed_replay;
 mod secret;
 mod snapshot;
 mod start;
@@ -20,6 +22,8 @@ pub use commands::{
     resume_session, revoke_credential, save_decision, start_game, submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
+pub use seal::{open, seal};
+pub use sealed_replay::{SealedFields, SealedIdempotency, open_sealed, sealed_write};
 pub use secret::{Secret, digest, encode_token};
 pub use snapshot::{GameSnapshot, LobbyParticipantRow, ResultRow, RoleSnapshot, SessionSnapshot};
 pub use start::{StartExecuted, execute_start};

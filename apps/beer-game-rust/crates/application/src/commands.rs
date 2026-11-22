@@ -12,7 +12,8 @@ use beergame_domain::{
 
 use crate::{
     AppFailure, CredentialKind, Decision, DomainError, EventStore, Executed, Idempotency,
-    PeripheralWrite, Secret, digest, encode_token, execute_decision, execute_idempotent,
+    PeripheralWrite, SealedFields, SealedIdempotency, Secret, digest, encode_token,
+    execute_decision, execute_idempotent, sealed_write,
 };
 
 /// 外の世界（時計・ID・乱数）。テストでは固定の実装に差し替える。
@@ -163,6 +164,7 @@ pub async fn create_game<St: EventStore<GameEvent>>(
     settings: &AppSettings,
     game_id: GameId,
     input: &CreateGameInput,
+    idem: Option<&SealedIdempotency>,
 ) -> Result<CreateOutcome, AppFailure> {
     let game_settings = GameSettings::kit(input.final_week, &input.demand, CommitMode::Manual)
         .map_err(AppFailure::Invalid)?;
@@ -195,10 +197,19 @@ pub async fn create_game<St: EventStore<GameEvent>>(
         &evolve_game,
         &|state, cmd| {
             let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
-            Ok(Decision {
-                events,
-                writes: issued.writes.clone(),
-            })
+            // 同じ `Idempotency-Key` の再送に、同じ応答（同じ資格）を返すための記録（暗号化して保存）
+            let mut writes = issued.writes.clone();
+            if let Some(idem) = idem {
+                let fields = SealedFields {
+                    game_version: 1,
+                    first: issued.session.clone(),
+                    second: issued.recovery.clone(),
+                };
+                writes.extend(sealed_write(
+                    env, settings, game_id, idem, 201, &fields, now,
+                ));
+            }
+            Ok(Decision { events, writes })
         },
         &command,
         settings.max_attempts,
@@ -224,6 +235,7 @@ pub async fn join_game<St: EventStore<GameEvent>>(
     settings: &AppSettings,
     game_id: GameId,
     display_name: &str,
+    idem: Option<&SealedIdempotency>,
 ) -> Result<JoinOutcome, AppFailure> {
     let name = DisplayName::of(display_name).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let participant_id = ParticipantId::new(env.new_id());
@@ -250,20 +262,25 @@ pub async fn join_game<St: EventStore<GameEvent>>(
         &evolve_game,
         &|state, cmd| {
             let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
-            Ok(Decision {
-                events,
-                writes: issued
-                    .writes
-                    .iter()
-                    .cloned()
-                    .chain(std::iter::once(PeripheralWrite::DisplayName {
-                        game_id,
-                        participant_id,
-                        name: name.as_str().to_owned(),
-                        at: now,
-                    }))
-                    .collect(),
-            })
+            let mut writes = issued.writes.clone();
+            writes.push(PeripheralWrite::DisplayName {
+                game_id,
+                participant_id,
+                name: name.as_str().to_owned(),
+                at: now,
+            });
+            // 同じ `Idempotency-Key` の再送に、同じ資格を返すための記録（暗号化して保存。版は再送の時点の最新を返す）
+            if let Some(idem) = idem {
+                let fields = SealedFields {
+                    game_version: 0,
+                    first: issued.session.clone(),
+                    second: issued.recovery.clone(),
+                };
+                writes.extend(sealed_write(
+                    env, settings, game_id, idem, 200, &fields, now,
+                ));
+            }
+            Ok(Decision { events, writes })
         },
         &command,
         settings.max_attempts,
@@ -588,6 +605,7 @@ pub async fn reissue_credential<St: EventStore<GameEvent>>(
     settings: &AppSettings,
     actor: Actor,
     participant_id: ParticipantId,
+    idem: Option<&SealedIdempotency>,
 ) -> Result<ReissueOutcome, AppFailure> {
     let now = env.now();
     let expires_at = after(now, settings.credential_ttl_millis);
@@ -604,21 +622,31 @@ pub async fn reissue_credential<St: EventStore<GameEvent>>(
         &evolve_game,
         &|state, cmd| {
             let game_id = state.data().map(|d| d.game_id);
-            Ok(Decision {
-                events: beergame_domain::decide_game(state, cmd).map_err(domain)?,
-                writes: game_id
-                    .map(|game_id| PeripheralWrite::Credential {
-                        digest: token_digest.clone(),
-                        game_id,
-                        kind: CredentialKind::Participant,
-                        subject_id: participant_id.get(),
-                        key_version: settings.key_version,
-                        issued_at: now,
-                        expires_at,
-                    })
-                    .into_iter()
-                    .collect(),
-            })
+            let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
+            let mut writes = Vec::new();
+            if let Some(game_id) = game_id {
+                writes.push(PeripheralWrite::Credential {
+                    digest: token_digest.clone(),
+                    game_id,
+                    kind: CredentialKind::Participant,
+                    subject_id: participant_id.get(),
+                    key_version: settings.key_version,
+                    issued_at: now,
+                    expires_at,
+                });
+                // 同じ `Idempotency-Key` の再送に、同じ復帰コードを返す（暗号化して保存。版は再送の時点の最新）
+                if let Some(idem) = idem {
+                    let fields = SealedFields {
+                        game_version: 0,
+                        first: token.clone(),
+                        second: Secret::new(expires_at.epoch_millis().to_string()),
+                    };
+                    writes.extend(sealed_write(
+                        env, settings, game_id, idem, 200, &fields, now,
+                    ));
+                }
+            }
+            Ok(Decision { events, writes })
         },
         &command,
         settings.max_attempts,

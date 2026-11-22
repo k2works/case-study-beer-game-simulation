@@ -2015,3 +2015,54 @@ async fn join_accepted(world: &mut ApiWorld) -> R {
         &format!("受け付けられない: {}", world.reply()?.body),
     )
 }
+
+#[then("参加コードの付いた、準備中のゲームが作成される")]
+async fn game_created_preparing(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 201,
+        &format!("作成できていない: {}", world.reply()?.body),
+    )?;
+    let id = world.game()?.id.clone();
+    let (join_code, state): (String, String) = sqlx::query_as(
+        "SELECT c.join_code, o.status FROM game_join_codes c JOIN game_overview o USING (game_id) WHERE c.game_id = $1::uuid",
+    )
+    .bind(&id)
+    .fetch_one(world.pool()?)
+    .await
+    .map_err(|e| e.to_string())?;
+    expect(
+        !join_code.is_empty() && state == "PREPARING",
+        "参加コード・準備中の状態が違う",
+    )
+}
+
+#[then("作成を同じ要求でもう一度送っても、ゲームは 1 つのままである")]
+async fn resend_create_keeps_one(world: &mut ApiWorld) -> R {
+    let first = world.reply()?.clone();
+    let (key, body) = world.create_request.clone().ok_or("作成の要求が無い")?;
+    let before: i64 = sqlx::query_scalar("SELECT count(*) FROM game_roots")
+        .fetch_one(world.pool()?)
+        .await
+        .map_err(|e| e.to_string())?;
+    let again = world
+        .call("POST", "/api/v1/games", None, Some(&key), &body)
+        .await?;
+    let after: i64 = sqlx::query_scalar("SELECT count(*) FROM game_roots")
+        .fetch_one(world.pool()?)
+        .await
+        .map_err(|e| e.to_string())?;
+    expect(
+        again.status == 201,
+        &format!("再送の応答が違う: {}", again.body),
+    )?;
+    expect(
+        again.location == first.location,
+        "再送で別のゲームが作られた",
+    )?;
+    expect(again.cookie == first.cookie, "再送で別の資格が発行された")?;
+    expect(
+        again.body.get("recoveryCode") == first.body.get("recoveryCode"),
+        "復帰コードが違う",
+    )?;
+    expect(before == after, "ゲームの数が増えた")
+}

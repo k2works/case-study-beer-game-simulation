@@ -13,10 +13,10 @@ use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
-    GameSnapshot, Idempotency, ResponseShape, Secret, SessionSnapshot, SessionWriter,
-    StartExecuted, assign_role, authenticate, commit_week, create_game, digest, join_game,
-    pause_session, recover, reissue_credential, resume_session, revoke_credential, save_decision,
-    start_game, submit_proxy_decision,
+    GameSnapshot, Idempotency, ResponseShape, SealedIdempotency, Secret, SessionSnapshot,
+    SessionWriter, StartExecuted, StoredResponse, assign_role, authenticate, commit_week,
+    create_game, digest, join_game, open_sealed, pause_session, recover, reissue_credential,
+    resume_session, revoke_credential, save_decision, start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
@@ -73,6 +73,13 @@ pub trait Backend: Send + Sync + 'static {
         key_digest: &str,
         window_start: Instant,
     ) -> impl Future<Output = Result<i64, AppFailure>> + Send;
+    /// 暗号化して保存した冪等記録（作成・参加・再発行）を引く。`game_id` が無いのは作成（ゲームがまだ分からない）。
+    fn stored_response(
+        &self,
+        game_id: Option<GameId>,
+        scope: &str,
+        key_digest: &str,
+    ) -> impl Future<Output = Result<Option<(GameId, StoredResponse)>, AppFailure>> + Send;
     /// 足した 1 を戻す（認可の失敗でなかったとき）。0 を下回らない。
     fn forgive_attempt(
         &self,
@@ -281,6 +288,81 @@ impl Attempt {
     }
 }
 
+/// 秘密を含む応答（作成・参加・再発行）の冪等性。`Idempotency-Key` が無ければ記録しない（`None`）。
+fn sealed_idempotency<B: Backend>(
+    backend: &B,
+    headers: &HeaderMap,
+    scope: &str,
+    request: &str,
+) -> Result<Option<SealedIdempotency>, Box<Problem>> {
+    let Some(key) = headers
+        .get("idempotency-key")
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| !v.is_empty() && v.len() <= 200)
+    else {
+        return Ok(None);
+    };
+    let secret_key = &backend.settings().credential_key;
+    let internal = || {
+        Box::new(problem_of(&AppFailure::Persistence(
+            beergame_application::PersistenceFailure::Storage(
+                "資格の鍵が設定されていない".to_owned(),
+            ),
+        )))
+    };
+    Ok(Some(SealedIdempotency {
+        scope: scope.to_owned(),
+        key_digest: digest(secret_key, &Secret::new(format!("idem:{key}"))).ok_or_else(internal)?,
+        request_digest: digest(secret_key, &Secret::new(format!("{scope}\n{request}")))
+            .ok_or_else(internal)?,
+    }))
+}
+
+/// 作成の応答（201）。再送のときも同じ値で組み立てる。
+fn created_response<B: Backend>(
+    backend: &B,
+    headers: &HeaderMap,
+    game_id: GameId,
+    game_version: u64,
+    session: &str,
+    recovery: &str,
+) -> Response {
+    let location = format!("/api/v1/games/{}/state", Uuid::from_u128(game_id.get()));
+    let body = json!({
+        "versions": {"game": game_version, "session": Value::Null},
+        "recoveryCode": recovery,
+    });
+    let response = json_response(
+        StatusCode::CREATED,
+        &body,
+        Some(&session_cookie(backend, headers, session)),
+        Some(&location),
+    );
+    with_cookie(response, &recovery_cookie(backend, recovery))
+}
+
+/// 参加の応答（200）。再送のときも同じ値で組み立てる。
+fn joined_response<B: Backend>(
+    backend: &B,
+    headers: &HeaderMap,
+    game_id: GameId,
+    game_version: u64,
+    session: &str,
+    recovery: &str,
+) -> Response {
+    let body = json!({
+        "versions": {"game": game_version, "session": Value::Null},
+        "gameId": Uuid::from_u128(game_id.get()).to_string(),
+    });
+    let response = json_response(
+        StatusCode::OK,
+        &body,
+        Some(&session_cookie(backend, headers, session)),
+        None,
+    );
+    with_cookie(response, &recovery_cookie(backend, recovery))
+}
+
 /// 復帰資格の Cookie（`bg_recovery`。復帰の経路にだけ送る）。
 fn recovery_cookie<B: Backend>(backend: &B, token: &str) -> String {
     let secure = if backend.secure_cookies() {
@@ -391,27 +473,59 @@ async fn create<B: Backend>(
         Ok(input) => input,
         Err(errors) => return problem_response(&validation_problem(errors), &correlation),
     };
+    // 同じ `Idempotency-Key` の再送には、保存した（暗号化した）応答を返す。内容が違えば 409
+    let sealed = match sealed_idempotency(&*backend, &headers, "create", &parsed.to_string()) {
+        Ok(sealed) => sealed,
+        Err(problem) => return problem_response(&problem, &correlation),
+    };
+    if let Some(sealed) = &sealed {
+        match backend
+            .stored_response(None, "create", &sealed.key_digest)
+            .await
+        {
+            Ok(Some((game_id, stored))) => {
+                return match open_sealed(backend.settings(), &sealed.request_digest, &stored) {
+                    Ok(fields) => with_correlation(
+                        created_response(
+                            &*backend,
+                            &headers,
+                            game_id,
+                            fields.game_version,
+                            fields.first.expose(),
+                            fields.second.expose(),
+                        ),
+                        &correlation,
+                    ),
+                    Err(failure) => problem_response(&problem_of(&failure), &correlation),
+                };
+            }
+            Ok(None) => {}
+            Err(failure) => return problem_response(&problem_of(&failure), &correlation),
+        }
+    }
     let game_id = GameId::new(backend.env().new_id());
     let store = backend.store(game_id);
-    match create_game(&store, backend.env(), backend.settings(), game_id, &input).await {
-        Ok(outcome) => {
-            let location = format!("/api/v1/games/{}/state", Uuid::from_u128(game_id.get()));
-            let cookie =
-                session_cookie(&*backend, &headers, outcome.facilitator_credential.expose());
-            let body = json!({
-                "versions": {"game": outcome.game_version, "session": Value::Null},
-                "recoveryCode": outcome.recovery_code.expose(),
-            });
-            let response =
-                json_response(StatusCode::CREATED, &body, Some(&cookie), Some(&location));
-            with_correlation(
-                with_cookie(
-                    response,
-                    &recovery_cookie(&*backend, outcome.recovery_code.expose()),
-                ),
-                &correlation,
-            )
-        }
+    match create_game(
+        &store,
+        backend.env(),
+        backend.settings(),
+        game_id,
+        &input,
+        sealed.as_ref(),
+    )
+    .await
+    {
+        Ok(outcome) => with_correlation(
+            created_response(
+                &*backend,
+                &headers,
+                game_id,
+                outcome.game_version,
+                outcome.facilitator_credential.expose(),
+                outcome.recovery_code.expose(),
+            ),
+            &correlation,
+        ),
         Err(failure) => problem_response(&problem_of(&failure), &correlation),
     }
 }
@@ -463,22 +577,64 @@ async fn join<B: Backend>(
     let store = backend.store(game_id);
     // 参加コードが有効なら、認可の失敗ではない（以降の結果にかかわらず、窓の失敗には数えない）
     attempt.forgive(&*backend).await;
-    match join_game(&store, backend.env(), backend.settings(), game_id, name).await {
-        Ok(outcome) => {
-            let cookie = session_cookie(&*backend, &headers, outcome.credential.expose());
-            let body = json!({
-                "versions": {"game": outcome.game_version, "session": Value::Null},
-                "gameId": Uuid::from_u128(game_id.get()).to_string(),
-            });
-            let response = json_response(StatusCode::OK, &body, Some(&cookie), None);
-            with_correlation(
-                with_cookie(
-                    response,
-                    &recovery_cookie(&*backend, outcome.recovery_code.expose()),
-                ),
-                &correlation,
-            )
+    let sealed = match sealed_idempotency(&*backend, &headers, "join", &parsed.to_string()) {
+        Ok(sealed) => sealed,
+        Err(problem) => return problem_response(&problem, &correlation),
+    };
+    if let Some(sealed) = &sealed {
+        match backend
+            .stored_response(Some(game_id), "join", &sealed.key_digest)
+            .await
+        {
+            Ok(Some((_, stored))) => {
+                return match open_sealed(backend.settings(), &sealed.request_digest, &stored) {
+                    Ok(fields) => {
+                        let version = backend
+                            .game_snapshot(game_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .map_or(fields.game_version, |s| s.game_version);
+                        with_correlation(
+                            joined_response(
+                                &*backend,
+                                &headers,
+                                game_id,
+                                version,
+                                fields.first.expose(),
+                                fields.second.expose(),
+                            ),
+                            &correlation,
+                        )
+                    }
+                    Err(failure) => problem_response(&problem_of(&failure), &correlation),
+                };
+            }
+            Ok(None) => {}
+            Err(failure) => return problem_response(&problem_of(&failure), &correlation),
         }
+    }
+    match join_game(
+        &store,
+        backend.env(),
+        backend.settings(),
+        game_id,
+        name,
+        sealed.as_ref(),
+    )
+    .await
+    {
+        Ok(outcome) => with_correlation(
+            joined_response(
+                &*backend,
+                &headers,
+                game_id,
+                outcome.game_version,
+                outcome.credential.expose(),
+                outcome.recovery_code.expose(),
+            ),
+            &correlation,
+        ),
         Err(failure) => problem_response(&problem_of(&failure), &correlation),
     }
 }
@@ -1402,7 +1558,7 @@ async fn reissue<B: Backend>(
         let actor = authenticate_for(&*backend, &headers, game_id).await?;
         let parsed = parse_json(&body)?;
         let participant_id = parse_subject(&parsed)?;
-        // Idempotency-Key は必須（保存はしない）
+        // Idempotency-Key は必須。再送には、暗号化して保存した同じ復帰コードを返す
         idempotency_for(
             &*backend,
             &headers,
@@ -1411,12 +1567,44 @@ async fn reissue<B: Backend>(
             &parsed.to_string(),
             ResponseShape::Game,
         )?;
+        let sealed = sealed_idempotency(
+            &*backend,
+            &headers,
+            "reissue_credential",
+            &parsed.to_string(),
+        )?;
+        if let Some(sealed) = &sealed
+            && let Some((_, stored)) = backend
+                .stored_response(Some(game_id), "reissue_credential", &sealed.key_digest)
+                .await
+                .map_err(|f| Box::new(problem_of(&f)))?
+        {
+            let fields = open_sealed(backend.settings(), &sealed.request_digest, &stored)
+                .map_err(|f| Box::new(problem_of(&f)))?;
+            let expires = fields.second.expose().parse::<i64>().unwrap_or_default();
+            let version = backend
+                .game_snapshot(game_id)
+                .await
+                .ok()
+                .flatten()
+                .map_or(0, |s| s.game_version);
+            let view = json!({
+                "versions": {"game": version, "session": Value::Null},
+                "recoveryCode": fields.first.expose(),
+                "expiresAt": expires_at_text(Instant::from_epoch_millis(expires)),
+            });
+            return Ok(with_correlation(
+                json_response(StatusCode::OK, &view, None, None),
+                &correlation_task,
+            ));
+        }
         let outcome = reissue_credential(
             &backend.store(game_id),
             backend.env(),
             backend.settings(),
             actor,
             participant_id,
+            sealed.as_ref(),
         )
         .await
         .map_err(|failure| Box::new(problem_of(&failure)))?;

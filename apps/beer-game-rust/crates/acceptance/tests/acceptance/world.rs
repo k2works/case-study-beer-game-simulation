@@ -130,6 +130,8 @@ pub struct ApiWorld {
     pub source: String,
     /// 直近の一連の呼び出しの状態（複数回の参加など）。
     pub statuses: Vec<u16>,
+    /// 直近の作成の冪等キーと本文（同じ要求の再送に使う）。
+    pub create_request: Option<(String, String)>,
 }
 
 impl ApiWorld {
@@ -148,6 +150,7 @@ impl ApiWorld {
             if_match: None,
             source: uuid_source(),
             statuses: Vec::new(),
+            create_request: None,
         }
     }
 
@@ -230,7 +233,8 @@ impl ApiWorld {
 
     pub fn next_key(&mut self) -> String {
         self.counter += 1;
-        format!("key-{}", self.counter)
+        // 世界ごとに別の接続元の名前を含める（作成の冪等キーは、ゲームをまたいで照合されるため、シナリオ間で重ならない値にする）
+        format!("{}-key-{}", self.source, self.counter)
     }
 
     /// HTTP を呼ぶ。応答を `last` に保存して返す。
@@ -312,8 +316,10 @@ impl ApiWorld {
             .await
             .map_err(|e| e.to_string())?;
         let body = json!({"kind": "KIT", "finalWeek": final_week, "demand": demand}).to_string();
+        let key = self.next_key();
+        self.create_request = Some((key.clone(), body.clone()));
         let reply = self
-            .call("POST", "/api/v1/games", None, None, &body)
+            .call("POST", "/api/v1/games", None, Some(&key), &body)
             .await?;
         if reply.status == 201 {
             let id = reply
