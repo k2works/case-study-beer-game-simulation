@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game-rust の開発戦略（DS-15・17・18・21・22、git の hook、Claude Code の hook、CI の必須ジョブ、機械が読める承認記録）の導入計画の草案。B6 の承認の記録に従い、導入の前に示して確認する。人の承認待ち。">
+        <meta name="description" content="beer-game-rust の開発戦略（DS-15・17・18・21・22、git の hook、Claude Code の hook、CI の必須ジョブ、機械が読める承認記録）の導入計画。2026-11-22 にユーザーが承認。導入は、ステップごとに人が確認する。">
       
       
         <meta name="author" content="k2works">
       
       
       
-        <link rel="prev" href="../bolt_11_report/">
+        <link rel="prev" href="../bolt_12_plan/">
       
       
         <link rel="next" href="../../../operation/">
@@ -6339,6 +6339,41 @@
     
   
     Bolt 11 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_12_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 12 計画
   
 
     
@@ -12865,7 +12900,10 @@
   
 
 
-<h1 id="_1">守りの導入計画（草案。人の承認待ち。導入しない）<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<h1 id="_1">守りの導入計画<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>2026-11-22 にユーザーが「承認」（範囲を確認: この計画を計画どおり導入する。導入は下の順序のステップごとに、人が確認する）。</strong> 必須ジョブ（GitHub のブランチ保護）は、人が設定する。</p>
+</blockquote>
 <h2 id="_2">背景<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p><a href="../development_strategy/">開発戦略</a> は、適用漏れを防ぐ守り（DS-1〜22）を定めている。<strong>実装済み</strong>は DS-1〜6・10・11・13・14（テストと CI の <code>check</code> ジョブ）。<strong>未導入</strong>は、次の 5 件と、git・Claude Code の hook、CI の必須ジョブの設定（B2〜B9 の承認の記録で、「着手前に計画を示して確認する」とした）。</p>
 <h2 id="_3">提案<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
@@ -12966,6 +13004,11 @@
 <tr>
 <td style="text-align: left;">2026-11-22</td>
 <td style="text-align: left;">初版作成（草案。人の承認待ち。導入していない）</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-22</td>
+<td style="text-align: left;">ユーザーの「承認」を記録（導入は、ステップごとに確認）</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
