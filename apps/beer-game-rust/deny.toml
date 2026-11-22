@@ -23,7 +23,8 @@ include-dev = true
 # 許可の追加は DS-17 の対象なので、暫定・人の承認待ち。
 # ISC・BSD-3-Clause・Zlib は sqlx・axum・testcontainers の依存（rustls・ring・subtle・matchit・foldhash）の許可。
 # いずれも寛容な OSI 承認のライセンスだが、許可の追加は DS-17 の対象なので、暫定・人の承認待ち。
-allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BlueOak-1.0.0", "ISC", "BSD-3-Clause", "Zlib"]
+# MIT-0 は、契約テストの jsonschema（開発時のみ）の推移依存 borrow-or-share のライセンス（2026-11-22 にユーザーが承認）
+allow = ["MIT", "Apache-2.0", "Unicode-3.0", "BlueOak-1.0.0", "ISC", "BSD-3-Clause", "Zlib", "MIT-0"]
 
 [licenses.private]
 ignore = true

@@ -17,16 +17,20 @@ mod start;
 
 pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
-    JoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter, assign_role, authenticate,
-    commit_week, create_game, join_game, pause_session, recover, reissue_credential,
-    resume_session, revoke_credential, save_decision, start_game, submit_proxy_decision,
+    JoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter, assign_or_replace_role,
+    assign_role, authenticate, commit_week, create_game, join_game, pause_session, recover,
+    reissue_credential, resume_session, revoke_credential, save_decision, start_game,
+    submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use seal::{open, seal};
 pub use sealed_replay::{SealedFields, SealedIdempotency, open_sealed, sealed_write};
 pub use secret::{Secret, digest, encode_token};
-pub use snapshot::{GameSnapshot, LobbyParticipantRow, ResultRow, RoleSnapshot, SessionSnapshot};
-pub use start::{StartExecuted, execute_start};
+pub use snapshot::{
+    CoHolderRow, EditorSnapshot, GameSnapshot, LobbyParticipantRow, ResultRow, RoleSnapshot,
+    SessionSnapshot,
+};
+pub use start::{BothDecision, StartExecuted, execute_both, execute_start};
 
 /// `decide` が返した業務上の失敗。
 #[derive(Clone, Debug, PartialEq, Eq)]

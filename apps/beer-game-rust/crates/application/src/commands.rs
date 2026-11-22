@@ -4,10 +4,10 @@
 use std::future::Future;
 
 use beergame_domain::{
-    Actor, CommitMode, DecisionVersion, DisplayName, GameCommand, GameError, GameEvent, GameId,
-    GameSettings, GameState, Instant, JoinCode, ParticipantId, Quantity, RetentionDays, Role,
-    RoleMap, SessionCommand, SessionEvent, SessionState, StartGame, Week, evolve_game,
-    evolve_session,
+    Actor, AssignOrReplace, CommitMode, DecisionVersion, DisplayName, GameCommand, GameError,
+    GameEvent, GameId, GameSettings, GameState, Instant, JoinCode, ParticipantId, Quantity,
+    RetentionDays, Role, RoleMap, SessionCommand, SessionEvent, SessionState, StartGame, Week,
+    assign_or_replace, evolve_game, evolve_session,
 };
 
 use crate::{
@@ -759,6 +759,70 @@ where
         &StartGame {
             actor,
             at: env.now(),
+        },
+        settings.max_attempts,
+        idem,
+    )
+    .await
+}
+
+/// 役割の割り当て（準備中）と入れ替え（開始後）。開始後の入れ替えは、`game` と `session` の両方へ追記し、外れた旧担当者の
+/// 資格（復帰資格とブラウザセッション）を同じトランザクションで失効させる。進行役だけ。
+///
+/// # Errors
+/// 権限・対象・資格の失効・準備中でない・終了後の誤り、永続化の失敗。
+pub async fn assign_or_replace_role<St>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    participant_id: ParticipantId,
+    role: Role,
+    idem: Option<&Idempotency>,
+) -> Result<crate::StartExecuted, AppFailure>
+where
+    St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
+{
+    let command = AssignOrReplace {
+        actor,
+        at: env.now(),
+        participant_id,
+        role,
+    };
+    crate::execute_both(
+        store,
+        &|game, session| {
+            let decision = assign_or_replace(game, session, &command)
+                .map_err(|e| AppFailure::Domain(DomainError::Start(e)))?;
+            // 外れた旧担当者の資格を、同じトランザクションで失効させる
+            let writes = game
+                .data()
+                .map(|data| data.game_id)
+                .into_iter()
+                .flat_map(|game_id| {
+                    decision.game.iter().flat_map(move |event| match event {
+                        GameEvent::ParticipantReplaced { replaced, .. } => replaced
+                            .iter()
+                            .map(|old| PeripheralWrite::RevokeCredentials {
+                                game_id,
+                                subject_id: old.get(),
+                            })
+                            .collect::<Vec<_>>(),
+                        GameEvent::GameCreated { .. }
+                        | GameEvent::ParticipantJoined { .. }
+                        | GameEvent::RoleAssigned { .. }
+                        | GameEvent::RoleUnassigned { .. }
+                        | GameEvent::GameStarted { .. }
+                        | GameEvent::CredentialRevoked { .. }
+                        | GameEvent::CredentialReissued { .. } => Vec::new(),
+                    })
+                })
+                .collect();
+            Ok(crate::BothDecision {
+                game: decision.game,
+                session: decision.session,
+                writes,
+            })
         },
         settings.max_attempts,
         idem,

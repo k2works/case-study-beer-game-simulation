@@ -4,6 +4,7 @@ pub mod error;
 pub mod foundation;
 pub mod game;
 pub mod kit_preset;
+pub mod replace_role;
 pub mod role;
 pub mod session;
 pub mod settings;
@@ -18,6 +19,7 @@ pub use game::{
     evolve_game, replay_game,
 };
 pub use kit_preset::KitPreset;
+pub use replace_role::{AssignOrReplace, assign_or_replace};
 pub use role::{Role, RoleMap};
 pub use session::{
     CommitKind, DecisionEntry, Editor, EndReason, SAVE_LIMIT_PER_ROLE_WEEK, SessionCommand,

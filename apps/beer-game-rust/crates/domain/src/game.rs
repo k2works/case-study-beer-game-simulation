@@ -193,6 +193,13 @@ pub enum GameEvent {
     },
     /// EV-G11 StartGame。進行役、準備中、各役割に 1 人以上。
     GameStarted { game_id: GameId },
+    /// 開始後の役割の入れ替え（EV-G12）。役割の担当者全員が外れ（資格は失効）、新しい担当者が引き継ぐ。
+    ParticipantReplaced {
+        participant_id: ParticipantId,
+        role: Role,
+        /// 外れた旧担当者（昇順）。
+        replaced: Vec<ParticipantId>,
+    },
     /// 参加者の資格の失効。
     CredentialRevoked { participant_id: ParticipantId },
     /// 参加者の資格の再発行。
@@ -438,6 +445,30 @@ pub fn evolve_game(state: GameState, event: &GameEvent) -> Evolution<GameState> 
         GameEvent::RoleUnassigned { participant_id, .. } => {
             update_preparing(state, |data| data.with_role(*participant_id, None))
         }
+        GameEvent::ParticipantReplaced {
+            participant_id,
+            role,
+            replaced,
+        } => match state {
+            GameState::Started(mut data) => {
+                let valid = data.participants.get(participant_id) == Some(&None)
+                    && !replaced.is_empty()
+                    && replaced
+                        .iter()
+                        .all(|r| data.participants.get(r) == Some(&Some(*role)));
+                if valid {
+                    data.participants.insert(*participant_id, Some(*role));
+                    for old in replaced {
+                        data.participants.insert(*old, None);
+                        data.revoked.insert(*old);
+                    }
+                    Evolution::Applied(GameState::Started(data))
+                } else {
+                    Evolution::Ignored(GameState::Started(data))
+                }
+            }
+            other @ (GameState::NotCreated | GameState::Preparing(_)) => Evolution::Ignored(other),
+        },
         GameEvent::CredentialRevoked { participant_id } => update_created(state, |mut data| {
             if data.participants.contains_key(participant_id)
                 && data.revoked.insert(*participant_id)

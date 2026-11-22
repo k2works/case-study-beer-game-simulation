@@ -103,6 +103,30 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
             "UPDATE lobby_participants SET role = NULL WHERE participant_id = $1",
             vec![pid(participant_id.get())],
         )],
+        GameEvent::ParticipantReplaced {
+            participant_id,
+            role,
+            replaced,
+        } => {
+            // 旧担当者の行は消さず（履歴・入力者のラベルのため）、役割を外して入れ替えの時刻を書く。新担当者に役割を付ける
+            let mut statements: Vec<Statement> = replaced
+                .iter()
+                .map(|old| {
+                    st(
+                        "UPDATE lobby_participants SET role = NULL, replaced_at = now() WHERE participant_id = $1",
+                        vec![pid(old.get())],
+                    )
+                })
+                .collect();
+            statements.push(st(
+                "UPDATE lobby_participants SET role = $2 WHERE participant_id = $1",
+                vec![
+                    pid(participant_id.get()),
+                    Bind::Text(role_name(*role).to_owned()),
+                ],
+            ));
+            statements
+        }
         // 資格の失効・再発行は、周辺ストア（credentials・browser_sessions）に書く。投影の表は変わらない
         GameEvent::CredentialRevoked { .. } | GameEvent::CredentialReissued { .. } => Vec::new(),
         GameEvent::GameStarted { .. } => vec![st(
@@ -292,6 +316,8 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
             ("FACILITATOR", operator.get()),
             *submitted_role_count,
         ),
+        // 担当者の入れ替えは、投影（lobby_participants）が game ストリームのイベントで更新する
+        SessionEvent::RoleReplaced { .. } => Vec::new(),
         SessionEvent::SessionPaused => vec![st(
             "UPDATE session_overview SET status = 'PAUSED' WHERE game_id = $1",
             vec![Bind::Uuid(game)],

@@ -13,6 +13,28 @@ pub struct RoleSnapshot {
     /// 当週の入力値（未入力は `None`）。
     pub decision: Option<i64>,
     pub decision_version: i64,
+    /// 当週の入力を最後に保存した人（未入力は `None`）。
+    pub editor: Option<EditorSnapshot>,
+    /// 当週の入力の保存の時刻（エポックのミリ秒。未入力は `None`）。
+    pub saved_at_millis: Option<i64>,
+}
+
+/// 入力を保存した人。表示名は個人情報（周辺ストア）で、同じ役割の共同担当と進行役にだけ示す。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EditorSnapshot {
+    /// 進行役の代理入力か。
+    pub is_proxy: bool,
+    /// 参加者の ID（代理入力なら `None`）。
+    pub participant_id: Option<ParticipantId>,
+    pub display_name: Option<String>,
+}
+
+/// 役割の担当者（共同担当を含む）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoHolderRow {
+    pub role: Role,
+    pub participant_id: ParticipantId,
+    pub display_name: Option<String>,
 }
 
 /// 確定した週の、役割別の結果（`week_role_results`）。
@@ -40,6 +62,8 @@ pub struct SessionSnapshot {
     pub final_week: i64,
     pub roles: Vec<RoleSnapshot>,
     pub results: Vec<ResultRow>,
+    /// 役割ごとの担当者（共同担当を含む）。
+    pub co_holders: Vec<CoHolderRow>,
     pub game_version: u64,
     pub session_version: u64,
 }

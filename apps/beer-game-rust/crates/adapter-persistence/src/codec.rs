@@ -287,6 +287,17 @@ impl EventCodec<GameEvent> for GameCodec {
                 "RoleUnassigned",
                 json!({"participantId": uuid_of(participant_id.get()), "role": role_name(*role)}),
             ),
+            GameEvent::ParticipantReplaced {
+                participant_id,
+                role,
+                replaced,
+            } => (
+                "ParticipantReplaced",
+                json!({
+                    "participantId": uuid_of(participant_id.get()), "role": role_name(*role),
+                    "replaced": replaced.iter().map(|r| uuid_of(r.get())).collect::<Vec<_>>(),
+                }),
+            ),
             GameEvent::CredentialRevoked { participant_id } => (
                 "CredentialRevoked",
                 json!({"participantId": uuid_of(participant_id.get())}),
@@ -329,6 +340,21 @@ impl EventCodec<GameEvent> for GameCodec {
                 participant_id: ParticipantId::new(id(&p, "participantId")?),
                 role: role_field(&p, "role")?,
             }),
+            "ParticipantReplaced" => Ok(GameEvent::ParticipantReplaced {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                role: role_field(&p, "role")?,
+                replaced: field(&p, "replaced")?
+                    .as_array()
+                    .ok_or("replaced が配列でない")?
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .and_then(|t| Uuid::parse_str(t).ok())
+                            .map(|u| ParticipantId::new(u.as_u128()))
+                            .ok_or_else(|| "replaced の要素が UUID でない".to_owned())
+                    })
+                    .collect::<R<Vec<_>>>()?,
+            }),
             "CredentialRevoked" => Ok(GameEvent::CredentialRevoked {
                 participant_id: ParticipantId::new(id(&p, "participantId")?),
             }),
@@ -361,6 +387,7 @@ impl EventCodec<SessionEvent> for SessionCodec {
             | SessionEvent::WeekCommitted { .. }
             | SessionEvent::SessionEnded { .. }
             | SessionEvent::SessionPaused
+            | SessionEvent::RoleReplaced { .. }
             | SessionEvent::SessionResumed => ("ANONYMOUS", None),
         }
     }
@@ -420,6 +447,10 @@ impl EventCodec<SessionEvent> for SessionCodec {
                     "contributors": contributors,
                 }),
             ),
+            SessionEvent::RoleReplaced { role, new_holder } => (
+                "RoleReplaced",
+                json!({"role": role_name(*role), "newHolder": uuid_of(new_holder.get())}),
+            ),
             SessionEvent::SessionPaused => ("SessionPaused", json!({})),
             SessionEvent::SessionResumed => ("SessionResumed", json!({})),
             SessionEvent::ProxyDecisionSubmitted {
@@ -474,6 +505,10 @@ impl EventCodec<SessionEvent> for SessionCodec {
                 results: read_per_role(field(&p, "results")?, read_role_result)?,
                 next_states: read_per_role(field(&p, "nextStates")?, read_role_state)?,
                 contributors: usize::try_from(int(&p, "contributors")?).map_err(e)?,
+            }),
+            "RoleReplaced" => Ok(SessionEvent::RoleReplaced {
+                role: role_field(&p, "role")?,
+                new_holder: ParticipantId::new(id(&p, "newHolder")?),
             }),
             "SessionPaused" => Ok(SessionEvent::SessionPaused),
             "SessionResumed" => Ok(SessionEvent::SessionResumed),

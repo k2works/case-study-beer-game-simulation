@@ -254,7 +254,16 @@ async fn ac2_2_2__数量が範囲外なら_422_版が違えば_409_で最新を�
         (status, problem["code"].clone()),
         (StatusCode::CONFLICT, json!("session.decision_conflict"))
     );
-    assert_eq!(problem["latest"], json!({"quantity": 5, "version": 1}));
+    assert_eq!(
+        (
+            &problem["latest"]["quantity"],
+            &problem["latest"]["version"]
+        ),
+        (&json!(5), &json!(1))
+    );
+    // 保存者と保存の時刻も示す（共同担当。AC2.2.3）
+    assert_eq!(problem["latest"]["editor"]["kind"], json!("PARTICIPANT"));
+    assert!(problem["latest"]["savedAt"].is_string());
     // 古い週は week_advanced（週の判定が先）
     let (status, _, problem) = send(
         &app,

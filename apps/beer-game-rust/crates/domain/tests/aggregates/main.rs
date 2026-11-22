@@ -6,5 +6,6 @@
 mod fixtures;
 mod game;
 mod property;
+mod replace_role;
 mod session;
 mod start_game;

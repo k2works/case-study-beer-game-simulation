@@ -158,10 +158,12 @@ async fn assign(world: &mut ApiWorld, name: &str, role_ja: &str) -> R {
         )
         .await?;
     expect(reply.status == 200, "割り当てられなかった")?;
+    // 同じ役割に複数人（共同担当）がいるとき、「その役割の参加者」は最初に割り当てた人
     world
         .game_mut()?
         .players
-        .insert(role.to_owned(), (pid, cookie));
+        .entry(role.to_owned())
+        .or_insert((pid, cookie));
     Ok(())
 }
 
@@ -470,7 +472,13 @@ async fn save_in_week(world: &mut ApiWorld, role_ja: &str, week: i64, quantity: 
         .ok_or("参加者が無い")?;
     let id = world.game()?.id.clone();
     let key = world.next_key();
-    let version = world.game()?.versions.get(role).copied().unwrap_or(0);
+    // 意思決定の版は、サーバーの現在の版（共同担当が別に保存していても追随する）
+    let state = facilitator_state(world).await?;
+    let version = state
+        .pointer(&format!("/roles/{role}/decisionVersion"))
+        .and_then(Value::as_u64)
+        .and_then(|v| u32::try_from(v).ok())
+        .unwrap_or(0);
     world.if_match = Some(version.to_string());
     let reply = world
         .call(
@@ -584,13 +592,16 @@ async fn inputs_partial(world: &mut ApiWorld, list: String, _missing: String) ->
 
 async fn commit(world: &mut ApiWorld, key: Option<String>) -> Result<Value, String> {
     let (id, facilitator) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
-    let versions = world.game()?.versions.clone();
+    let state = facilitator_state(world).await?;
     let basis: serde_json::Map<String, Value> = ROLES
         .iter()
         .map(|(_, en)| {
             (
                 (*en).to_owned(),
-                json!(versions.get(*en).copied().unwrap_or(0)),
+                state
+                    .pointer(&format!("/roles/{en}/decisionVersion"))
+                    .cloned()
+                    .unwrap_or(json!(0)),
             )
         })
         .collect();
@@ -2065,4 +2076,795 @@ async fn resend_create_keeps_one(world: &mut ApiWorld) -> R {
         "復帰コードが違う",
     )?;
     expect(before == after, "ゲームの数が増えた")
+}
+
+// ---- 共同担当（AC1.2.4・AC1.2.5） ----
+
+#[given(regex = r"^参加者「(.+)」が、役割なしで参加している$")]
+async fn joined_without_role(world: &mut ApiWorld, name: String) -> R {
+    join_named(world, &name).await?;
+    expect(status(world)? == 200, "参加できなかった")
+}
+
+#[then("ゲームは開始されている")]
+async fn game_is_started(world: &mut ApiWorld) -> R {
+    let state = facilitator_state(world).await?;
+    expect(
+        state.get("status") == Some(&json!("ACTIVE")),
+        &format!("開始されていない: {state}"),
+    )
+}
+
+#[then(regex = r"^(.+)に (\d+) 人の参加者が割り当てられている$")]
+async fn role_has_n_participants(world: &mut ApiWorld, role: String, count: i64) -> R {
+    let id = world.game()?.id.clone();
+    let actual: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM lobby_participants WHERE game_id = $1::uuid AND role = $2",
+    )
+    .bind(&id)
+    .bind(en(&role)?)
+    .fetch_one(world.pool()?)
+    .await
+    .map_err(|e| e.to_string())?;
+    expect(actual == count, &format!("{role} の人数が違う: {actual}"))
+}
+
+// ---- 共同入力（AC2.1.4・AC2.2.3・AC2.2.4・確定の区別） ----
+
+/// 参加者（「小売店の参加者」はその役割の最初の担当者。それ以外は表示名）。（参加者 ID、Cookie、役割）
+async fn holder(world: &ApiWorld, who: &str) -> Result<(String, String, String), String> {
+    if let Some(label) = who.strip_suffix("の参加者") {
+        let role = en(label)?.to_owned();
+        let (pid, cookie) = world
+            .game()?
+            .players
+            .get(&role)
+            .cloned()
+            .ok_or("参加者が無い")?;
+        return Ok((pid, cookie, role));
+    }
+    let (pid, cookie) = world
+        .game()?
+        .named
+        .get(who.trim())
+        .cloned()
+        .ok_or_else(|| format!("参加者が無い: {who}"))?;
+    let role: Option<String> =
+        sqlx::query_scalar("SELECT role FROM lobby_participants WHERE participant_id = $1::uuid")
+            .bind(&pid)
+            .fetch_one(world.pool()?)
+            .await
+            .map_err(|e| e.to_string())?;
+    Ok((pid, cookie, role.ok_or("役割が無い")?))
+}
+
+async fn holder_state(world: &mut ApiWorld, who: &str) -> Result<Value, String> {
+    let (_, cookie, _) = holder(world, who).await?;
+    let id = world.game()?.id.clone();
+    Ok(world
+        .call(
+            "GET",
+            &format!("/api/v1/sessions/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?
+        .body)
+}
+
+#[when(regex = r"^共同担当の(.+)が、自分の役割の状況を取得する$")]
+async fn co_holder_fetches(world: &mut ApiWorld, name: String) -> R {
+    holder_state(world, &name).await.map(|_| ())
+}
+
+async fn should_see(world: &mut ApiWorld, name: &str, quantity: i64, version: i64) -> R {
+    let state = holder_state(world, name).await?;
+    expect(
+        state.pointer("/roleStatus/decision") == Some(&json!(quantity))
+            && state.pointer("/roleStatus/decisionVersion") == Some(&json!(version)),
+        &format!("{name} が見る入力値・版が違う: {state}"),
+    )
+}
+
+#[then(regex = r"^(.+)が見る入力値は (\d+)、版は (\d+) である$")]
+async fn sees_decision(world: &mut ApiWorld, name: String, quantity: i64, version: i64) -> R {
+    should_see(world, &name, quantity, version).await
+}
+
+#[then(regex = r"^共同担当の(.+)が取得した状況は、入力値 (\d+)、版 (\d+) になる$")]
+async fn co_holder_sees(world: &mut ApiWorld, name: String, quantity: i64, version: i64) -> R {
+    should_see(world, &name, quantity, version).await
+}
+
+/// 誰が見ても同じ値になる項目（「自分かどうか」の印は、見る人ごとに違うので除く）。
+fn shared_view(state: &Value) -> Value {
+    let mut status = state.get("roleStatus").cloned().unwrap_or(Value::Null);
+    let editor = status
+        .as_object_mut()
+        .and_then(|m| m.remove("decisionEditor"));
+    json!({
+        "status": state.get("status"), "week": state.get("week"), "role": state.get("role"),
+        "submittedRoleCount": state.get("submittedRoleCount"), "roleStatus": status,
+        "editorKind": editor.as_ref().and_then(|e| e.get("kind")),
+        "editorName": editor.as_ref().and_then(|e| e.get("displayName")),
+    })
+}
+
+#[then(regex = r"^(.+)が見る状況は、(.+)が見る状況と同じである$")]
+async fn sees_same_situation(world: &mut ApiWorld, one: String, other: String) -> R {
+    let first = shared_view(&holder_state(world, &one).await?);
+    let second = shared_view(&holder_state(world, &other).await?);
+    expect(
+        first == second,
+        &format!("見える状況が違う: {first} / {second}"),
+    )
+}
+
+#[then(regex = r"^同じ役割の共同担当として、(.+)と(.+)が示される$")]
+async fn co_holders_shown(world: &mut ApiWorld, one: String, other: String) -> R {
+    let body = world.reply()?.body.clone();
+    let entries = body
+        .get("coHolders")
+        .and_then(Value::as_array)
+        .cloned()
+        .ok_or("coHolders が無い")?;
+    let mut names: Vec<String> = entries
+        .iter()
+        .filter_map(|e| {
+            e.get("displayName")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect();
+    names.sort();
+    let mut expected = vec![
+        display_name_of(world, &one)?,
+        display_name_of(world, &other)?,
+    ];
+    expected.sort();
+    let selves = entries
+        .iter()
+        .filter(|e| e.get("isSelf") == Some(&json!(true)))
+        .count();
+    expect(
+        names == expected && selves == 1,
+        &format!("共同担当が違う: {names:?} / 自分の印 {selves}"),
+    )
+}
+
+/// 表示名。「小売店の参加者」は、参加時の表示名（「参加者N」）を周辺ストアから引く。
+fn display_name_of(world: &ApiWorld, who: &str) -> Result<String, String> {
+    if who.ends_with("の参加者") {
+        let pid = world
+            .game()?
+            .players
+            .get(en(who.trim_end_matches("の参加者"))?)
+            .map(|(p, _)| p.clone())
+            .ok_or("参加者が無い")?;
+        world
+            .game()?
+            .named
+            .iter()
+            .find(|(_, (p, _))| *p == pid)
+            .map(|(name, _)| name.clone())
+            .ok_or_else(|| "表示名が無い".to_owned())
+    } else {
+        Ok(who.trim().to_owned())
+    }
+}
+
+#[then(regex = r"^(.+)が見る最後の保存者は、(.+)である$")]
+async fn sees_last_editor(world: &mut ApiWorld, name: String, editor: String) -> R {
+    let state = holder_state(world, &name).await?;
+    let me_self = editor == "自分自身";
+    let expected = if me_self {
+        display_name_of(world, &name)?
+    } else {
+        display_name_of(world, &editor)?
+    };
+    let actual = state.pointer("/roleStatus/decisionEditor").cloned();
+    expect(
+        actual.as_ref().and_then(|e| e.get("kind")) == Some(&json!("PARTICIPANT"))
+            && actual.as_ref().and_then(|e| e.get("displayName")) == Some(&json!(expected))
+            && actual.as_ref().and_then(|e| e.get("isSelf")) == Some(&json!(me_self)),
+        &format!("最後の保存者が違う: {actual:?}"),
+    )
+}
+
+#[then("他の役割の担当者の表示名・ID は、どの項目にも含まれない")]
+async fn others_not_disclosed(world: &mut ApiWorld) -> R {
+    let text = world.reply()?.body.to_string();
+    let own_role = world
+        .reply()?
+        .body
+        .get("role")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let game = world.game()?.clone();
+    let mut checked = 0;
+    for (role, (pid, _)) in &game.players {
+        if *role == own_role {
+            continue;
+        }
+        checked += 1;
+        let name = game
+            .named
+            .iter()
+            .find(|(_, (p, _))| p == pid)
+            .map(|(n, _)| n.clone())
+            .unwrap_or_default();
+        expect(
+            !text.contains(pid.as_str())
+                && (name.is_empty() || !text.contains(&format!("\"{name}\""))),
+            &format!("他の役割の担当者が含まれている: {text}"),
+        )?;
+    }
+    expect(checked > 0, "他の役割の参加者がいない")
+}
+
+#[then("入力値・版は、自分の役割のもの（入力なし、版 0）である")]
+async fn values_are_own(world: &mut ApiWorld) -> R {
+    let body = world.reply()?.body.clone();
+    expect(
+        body.pointer("/roleStatus/decision")
+            .is_none_or(Value::is_null)
+            && body.pointer("/roleStatus/decisionVersion") == Some(&json!(0))
+            && body
+                .pointer("/roleStatus/decisionEditor")
+                .is_none_or(Value::is_null),
+        &format!("自分の役割のものではない: {body}"),
+    )
+}
+
+#[given(regex = r"^(.+)と(.+)が、同じ版の画面を見ている$")]
+async fn both_see_same_version(world: &mut ApiWorld, one: String, other: String) -> R {
+    let a = holder_state(world, &one).await?;
+    let b = holder_state(world, &other).await?;
+    let version = |s: &Value| {
+        s.pointer("/roleStatus/decisionVersion")
+            .and_then(Value::as_u64)
+    };
+    expect(version(&a) == version(&b), "同じ版を見ていない")?;
+    world.stale_version = u32::try_from(version(&a).unwrap_or(0)).unwrap_or(0);
+    Ok(())
+}
+
+async fn save_at_viewed(world: &mut ApiWorld, who: &str, quantity: i64) -> R {
+    let (_, cookie, _) = holder(world, who).await?;
+    let state = facilitator_state(world).await?;
+    let week = state.get("week").and_then(Value::as_i64).unwrap_or(1);
+    let id = world.game()?.id.clone();
+    let key = world.next_key();
+    world.if_match = Some(world.stale_version.to_string());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/decisions"),
+            Some(&cookie),
+            Some(&key),
+            &json!({"week": week, "quantity": quantity}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[given(regex = r"^(.+)が、見ていた版のまま、数量 (\d+) を保存している$")]
+async fn has_saved_at_viewed(world: &mut ApiWorld, who: String, quantity: i64) -> R {
+    save_at_viewed(world, &who, quantity).await?;
+    expect(
+        status(world)? == 200,
+        &format!("保存できない: {}", world.reply()?.body),
+    )
+}
+
+#[when(regex = r"^(.+)が、見ていた版のまま、数量 (\d+) を保存しようとする$")]
+async fn tries_to_save_at_viewed(world: &mut ApiWorld, who: String, quantity: i64) -> R {
+    save_at_viewed(world, &who, quantity).await
+}
+
+#[given(regex = r"^(.+)が、見ていた版のまま、数量 (\d+) を保存しようとして、競合している$")]
+async fn has_conflicted(world: &mut ApiWorld, who: String, quantity: i64) -> R {
+    save_at_viewed(world, &who, quantity).await?;
+    expect(
+        status(world)? == 409 && code(world)? == "session.decision_conflict",
+        "競合になっていない",
+    )
+}
+
+async fn save_now(world: &mut ApiWorld, who: &str, quantity: i64) -> R {
+    let (_, cookie, role) = holder(world, who).await?;
+    let state = facilitator_state(world).await?;
+    let week = state.get("week").and_then(Value::as_i64).unwrap_or(1);
+    let version = state
+        .pointer(&format!("/roles/{role}/decisionVersion"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let id = world.game()?.id.clone();
+    let key = world.next_key();
+    world.if_match = Some(version.to_string());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/decisions"),
+            Some(&cookie),
+            Some(&key),
+            &json!({"week": week, "quantity": quantity}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^(.+)が、最新の版を指定して、数量 (\d+) を保存し直す$")]
+async fn saves_again_at_latest(world: &mut ApiWorld, who: String, quantity: i64) -> R {
+    save_now(world, &who, quantity).await
+}
+
+#[then("保存は競合として拒否される")]
+async fn rejected_as_conflict(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "session.decision_conflict",
+        &format!("競合として拒否されていない: {}", world.reply()?.body),
+    )
+}
+
+fn latest_of(world: &ApiWorld) -> Result<Value, String> {
+    world
+        .reply()?
+        .body
+        .get("latest")
+        .cloned()
+        .ok_or_else(|| "競合の応答に latest が無い".to_owned())
+}
+
+#[then(regex = r"^競合の応答に、最新の入力 (\d+)、版 (\d+) が含まれる$")]
+async fn conflict_has_latest(world: &mut ApiWorld, quantity: i64, version: i64) -> R {
+    let latest = latest_of(world)?;
+    expect(
+        latest.get("quantity") == Some(&json!(quantity))
+            && latest.get("version") == Some(&json!(version)),
+        &format!("最新の入力・版が違う: {latest}"),
+    )
+}
+
+#[then(regex = r"^最後の保存者として(.+)が、保存の時刻とともに示される$")]
+async fn conflict_has_editor_and_time(world: &mut ApiWorld, name: String) -> R {
+    let latest = latest_of(world)?;
+    let editor = latest.get("editor").cloned().unwrap_or(Value::Null);
+    let saved_at = latest
+        .get("savedAt")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    expect(
+        editor.get("kind") == Some(&json!("PARTICIPANT"))
+            && editor.get("displayName") == Some(&json!(display_name_of(world, &name)?))
+            && editor.get("isSelf") == Some(&json!(false))
+            && saved_at.len() == 24
+            && saved_at.ends_with('Z'),
+        &format!("保存者・時刻が違う: {latest}"),
+    )
+}
+
+#[then("最後の保存者は、進行役の代理入力として示される")]
+async fn editor_is_proxy(world: &mut ApiWorld) -> R {
+    let latest = latest_of(world)?;
+    let editor = latest.get("editor").cloned().unwrap_or(Value::Null);
+    expect(
+        editor.get("kind") == Some(&json!("FACILITATOR_PROXY"))
+            && editor.get("displayName").is_none_or(Value::is_null),
+        &format!("代理入力ではない: {editor}"),
+    )
+}
+
+#[then(regex = r"^競合した入力 (\d+) は、応答に含まれない$")]
+async fn conflicted_not_echoed(world: &mut ApiWorld, quantity: i64) -> R {
+    let body = world.reply()?.body.clone();
+    fn leaves(v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::Object(m) => m.values().for_each(|x| leaves(x, out)),
+            Value::Array(a) => a.iter().for_each(|x| leaves(x, out)),
+            other @ (Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_)) => {
+                out.push(other.to_string());
+            }
+        }
+    }
+    let mut all = Vec::new();
+    leaves(&body, &mut all);
+    expect(
+        !all.contains(&quantity.to_string()),
+        &format!("競合した入力が含まれている: {body}"),
+    )
+}
+
+#[then("保存が受け付けられる")]
+async fn save_accepted(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200,
+        &format!("保存が受け付けられていない: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^当週の(工場|一次卸|二次卸|小売店)の入力は (\d+)、版は (\d+) である$")]
+async fn role_has_decision_and_version(
+    world: &mut ApiWorld,
+    role: String,
+    quantity: i64,
+    version: i64,
+) -> R {
+    let state = facilitator_state(world).await?;
+    let r = en(&role)?;
+    expect(
+        state.pointer(&format!("/roles/{r}/decision")) == Some(&json!(quantity))
+            && state.pointer(&format!("/roles/{r}/decisionVersion")) == Some(&json!(version)),
+        &format!("{role} の入力・版が違う: {state}"),
+    )
+}
+
+#[given(regex = r"^共同担当の(.+)が、当週の数量をさらに (\d+) 回保存している$")]
+async fn co_holder_saved_more(world: &mut ApiWorld, name: String, times: i64) -> R {
+    for i in 0..times {
+        save_now(world, &name, 10 + i).await?;
+        expect(status(world)? == 200, "保存できない")?;
+    }
+    Ok(())
+}
+
+#[given(regex = r"^(.+)が、当週の数量をあと (\d+) 回保存している$")]
+async fn holder_saved_more(world: &mut ApiWorld, name: String, times: i64) -> R {
+    co_holder_saved_more(world, name, times).await
+}
+
+#[when(regex = r"^共同担当の(.+)が、当週の数量をもう 1 回保存しようとする$")]
+async fn co_holder_tries_one_more(world: &mut ApiWorld, name: String) -> R {
+    save_now(world, &name, 100).await
+}
+
+#[given(regex = r"^共同担当の(.+)が、当週の数量を (\d+) に保存し直している$")]
+async fn co_holder_saved_again(world: &mut ApiWorld, name: String, quantity: i64) -> R {
+    save_now(world, &name, quantity).await?;
+    expect(
+        status(world)? == 200,
+        &format!("保存し直せない: {}", world.reply()?.body),
+    )
+}
+
+#[given("進行役が、確定の確認画面を開いて、各役割の入力の版を控えている")]
+async fn facilitator_remembers_basis(world: &mut ApiWorld) -> R {
+    let state = facilitator_state(world).await?;
+    let basis: serde_json::Map<String, Value> = ROLES
+        .iter()
+        .map(|(_, en)| {
+            (
+                (*en).to_owned(),
+                state
+                    .pointer(&format!("/roles/{en}/decisionVersion"))
+                    .cloned()
+                    .unwrap_or(json!(0)),
+            )
+        })
+        .collect();
+    world.remembered_basis = Some(Value::Object(basis));
+    Ok(())
+}
+
+#[when(regex = r"^進行役が、控えた版のまま第 (\d+) 週を確定しようとする$")]
+async fn commit_with_remembered(world: &mut ApiWorld, week: i64) -> R {
+    let basis = world.remembered_basis.clone().ok_or("版を控えていない")?;
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    let key = world.next_key();
+    world
+        .call(
+            "POST",
+            &format!("/api/v1/sessions/{id}/weeks/{week}/commit"),
+            Some(&cookie),
+            Some(&key),
+            &json!({"requestedWeek": week, "basis": basis}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[then("確定の根拠にした入力が変わったという理由で拒否される")]
+async fn rejected_decisions_changed(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "session.decisions_changed",
+        &format!("根拠の変化の拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then(
+    regex = r"^現在の入力として、(工場|一次卸|二次卸|小売店)の (\d+)（保存者: (.+)）が示される$"
+)]
+async fn current_decision_shown(
+    world: &mut ApiWorld,
+    role: String,
+    quantity: i64,
+    editor: String,
+) -> R {
+    let entry = world
+        .reply()?
+        .body
+        .pointer(&format!("/current/{}", en(&role)?))
+        .cloned()
+        .ok_or("current が無い")?;
+    expect(
+        entry.get("quantity") == Some(&json!(quantity))
+            && entry.pointer("/editor/displayName") == Some(&json!(editor)),
+        &format!("現在の入力・保存者が違う: {entry}"),
+    )
+}
+
+#[then("確定の根拠が変わったという理由ではない")]
+async fn not_decisions_changed(world: &mut ApiWorld) -> R {
+    expect(
+        code(world)? != "session.decisions_changed",
+        "根拠の変化の理由になっている",
+    )
+}
+
+// ---- 役割の入れ替え（AC3.2.5。開始後） ----
+
+async fn assign_to(world: &mut ApiWorld, cookie: &str, pid: &str, role: &str) -> R {
+    let (id, key) = (world.game()?.id.clone(), world.next_key());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/games/{id}/participants/{pid}/role"),
+            Some(cookie),
+            Some(&key),
+            &json!({"role": role}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^進行役が、(工場|一次卸|二次卸|小売店)の担当を(.+)に入れ替え(?:る|ようとする)$")]
+async fn facilitator_replaces(world: &mut ApiWorld, role: String, name: String) -> R {
+    let (old_pid, _) = world
+        .game()?
+        .players
+        .get(en(&role)?)
+        .cloned()
+        .ok_or("参加者が無い")?;
+    let (pid, cookie) = world
+        .game()?
+        .named
+        .get(name.trim())
+        .cloned()
+        .ok_or("参加者が無い")?;
+    let facilitator = world.game()?.facilitator.clone();
+    assign_to(world, &facilitator, &pid, en(&role)?).await?;
+    if status(world)? == 200 {
+        world.replaced = Some(old_pid);
+        // 「最新の状況」は、役割を引き継いだ新担当者から見た状況
+        world.recovered = Some((cookie, pid));
+    }
+    Ok(())
+}
+
+#[when(
+    regex = r"^(工場|一次卸|二次卸|小売店)の参加者が、(工場|一次卸|二次卸|小売店)の担当を(.+)に入れ替えようとする$"
+)]
+async fn participant_tries_to_replace(
+    world: &mut ApiWorld,
+    actor: String,
+    role: String,
+    name: String,
+) -> R {
+    let (_, cookie, _) = holder(world, &format!("{actor}の参加者")).await?;
+    let (pid, _) = world
+        .game()?
+        .named
+        .get(name.trim())
+        .cloned()
+        .ok_or("参加者が無い")?;
+    assign_to(world, &cookie, &pid, en(&role)?).await
+}
+
+#[when(
+    regex = r"^進行役が、(工場|一次卸|二次卸|小売店)の参加者を(工場|一次卸|二次卸|小売店)に割り当て(?:直す|ようとする)$"
+)]
+async fn facilitator_reassigns(world: &mut ApiWorld, current: String, role: String) -> R {
+    let id = world.game()?.id.clone();
+    world.history_size = sqlx::query_scalar("SELECT count(*) FROM events WHERE game_id = $1::uuid")
+        .bind(&id)
+        .fetch_one(world.pool()?)
+        .await
+        .map_err(|e| e.to_string())?;
+    let (pid, _) = world
+        .game()?
+        .players
+        .get(en(&current)?)
+        .cloned()
+        .ok_or("参加者が無い")?;
+    let facilitator = world.game()?.facilitator.clone();
+    assign_to(world, &facilitator, &pid, en(&role)?).await
+}
+
+#[given(regex = r"^進行役が、([^の]+)の資格を失効させている$")]
+async fn facilitator_revoked_named(world: &mut ApiWorld, name: String) -> R {
+    let (pid, _) = world
+        .game()?
+        .named
+        .get(name.trim())
+        .cloned()
+        .ok_or("参加者が無い")?;
+    revoke(world, &pid).await
+}
+
+#[then("割り当ては受け付けられるが、履歴に何も足されない")]
+async fn assigned_without_history(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    let size: i64 = sqlx::query_scalar("SELECT count(*) FROM events WHERE game_id = $1::uuid")
+        .bind(&id)
+        .fetch_one(world.pool()?)
+        .await
+        .map_err(|e| e.to_string())?;
+    expect(
+        status(world)? == 200 && size == world.history_size,
+        &format!(
+            "履歴が増えた、または拒否された: {} → {size}",
+            world.history_size
+        ),
+    )
+}
+
+#[then("権限エラーになる")]
+async fn permission_denied(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 403 && code(world)? == "app.unauthorized",
+        &format!("権限エラーではない: {}", world.reply()?.body),
+    )
+}
+
+#[then("準備中でないという理由で、割り当ては拒否される")]
+async fn assign_rejected_not_preparing(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "game.not_preparing",
+        &format!("準備中でない拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^(工場|一次卸|二次卸|小売店)の参加者の資格は、失効していない$")]
+async fn credential_not_revoked(world: &mut ApiWorld, role: String) -> R {
+    credential_remains(world, role).await
+}
+
+#[then(regex = r"^(.+)が(工場|一次卸|二次卸|小売店)の担当になる$")]
+async fn becomes_holder(world: &mut ApiWorld, name: String, role: String) -> R {
+    expect(status(world)? == 200, "入れ替えられていない")?;
+    let (_, cookie) = world
+        .game()?
+        .named
+        .get(name.trim())
+        .cloned()
+        .ok_or("参加者が無い")?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(
+        status(world)? == 200 && world.reply()?.body.get("role") == Some(&json!(en(&role)?)),
+        &format!("役割が違う: {}", world.reply()?.body),
+    )
+}
+
+async fn old_holder_cannot_use(world: &mut ApiWorld, pid: &str, cookie: &str) -> R {
+    let recovery = world
+        .game()?
+        .recoveries
+        .get(pid)
+        .cloned()
+        .ok_or("復帰資格が無い")?;
+    recover_with(world, &recovery, false, None).await?;
+    expect(
+        status(world)? == 403 && world.reply()?.cookie.is_none(),
+        "復帰できてしまう",
+    )?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(status(world)? == 403, "以前のブラウザセッションが使える")
+}
+
+#[then(regex = r"^以前の(工場|一次卸|二次卸|小売店)の参加者の資格は、自動で失効している$")]
+async fn replaced_revoked(world: &mut ApiWorld, role: String) -> R {
+    let pid = world
+        .replaced
+        .clone()
+        .ok_or("入れ替えられた参加者がいない")?;
+    let (_, cookie) = world
+        .game()?
+        .players
+        .get(en(&role)?)
+        .cloned()
+        .ok_or("参加者が無い")?;
+    old_holder_cannot_use(world, &pid, &cookie).await
+}
+
+#[then(regex = r"^共同担当だった(.+)の資格も、自動で失効している$")]
+async fn co_holder_revoked(world: &mut ApiWorld, name: String) -> R {
+    let (pid, cookie) = world
+        .game()?
+        .named
+        .get(name.trim())
+        .cloned()
+        .ok_or("参加者が無い")?;
+    old_holder_cannot_use(world, &pid, &cookie).await
+}
+
+#[then(regex = r"^(.+)は、第 (\d+) 週の数量として (\d+) を保存できる$")]
+async fn named_can_save(world: &mut ApiWorld, name: String, week: i64, quantity: i64) -> R {
+    let (_, cookie, role) = holder(world, &name).await?;
+    let state = facilitator_state(world).await?;
+    let version = state
+        .pointer(&format!("/roles/{role}/decisionVersion"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let (id, key) = (world.game()?.id.clone(), world.next_key());
+    world.if_match = Some(version.to_string());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/decisions"),
+            Some(&cookie),
+            Some(&key),
+            &json!({"week": week, "quantity": quantity}).to_string(),
+        )
+        .await?;
+    expect(
+        status(world)? == 200,
+        &format!("保存できない: {}", world.reply()?.body),
+    )
+}
+
+#[then(
+    regex = r"^(工場|一次卸|二次卸|小売店)の入力 (\d+) の入力者は、以前の(?:工場|一次卸|二次卸|小売店)の参加者として残っている$"
+)]
+async fn editor_label_remains(world: &mut ApiWorld, role: String, quantity: i64) -> R {
+    let old = world
+        .replaced
+        .clone()
+        .ok_or("入れ替えられた参加者がいない")?;
+    let id = world.game()?.id.clone();
+    let (q, editor): (i64, String) = sqlx::query_as(
+        "SELECT (payload->>'quantity')::bigint, payload->'editor'->>'id' FROM events \
+         WHERE game_id = $1::uuid AND event_type = 'DecisionSaved' AND payload->>'role' = $2 \
+         ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(&id)
+    .bind(en(&role)?)
+    .fetch_one(world.pool()?)
+    .await
+    .map_err(|e| e.to_string())?;
+    expect(
+        q == quantity && editor == old,
+        &format!("入力者が以前の担当者として残っていない: {q} {editor}"),
+    )
+}
+
+#[given(regex = r"^(.+)の参加者が、識別子つきで第 (\d+) 週の数量として (\d+) を保存している$")]
+async fn saved_with_identifier(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    saved_with_key(world, role, week, quantity).await
+}
+
+#[then(regex = r"^以前の(.+)の参加者が、同じ識別子で同じ保存を再送すると、権限エラーになる$")]
+async fn former_holder_resends(world: &mut ApiWorld, role: String) -> R {
+    save_keyed(world, &role, 1, 4).await?;
+    permission_denied(world).await?;
+    stored_response_not_returned(world).await
 }

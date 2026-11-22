@@ -14,8 +14,10 @@ use crate::{
 /// 開始の結果。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StartExecuted {
-    /// 開始した。両ストリームの追記後の版。
+    /// 実行した。両ストリームの追記後の版。
     Fresh(u64, u64),
+    /// 実行した。`game` ストリームだけへ追記した（`session` は変わらない）。追記後の版。
+    FreshGame(u64),
     /// 同じキー・同じ内容の再送。保存した応答を返す。
     Replayed(StoredResponse),
 }
@@ -33,10 +35,50 @@ pub async fn execute_start<St>(
 where
     St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
 {
+    execute_both(
+        store,
+        &|game, session| {
+            start_game(game, session, command)
+                .map(|decision| BothDecision {
+                    game: decision.game,
+                    session: decision.session,
+                    writes: Vec::new(),
+                })
+                .map_err(|e| AppFailure::Domain(DomainError::Start(e)))
+        },
+        max_attempts,
+        idem,
+    )
+    .await
+}
+
+/// 2 本のストリームを読んで決め、1 つのトランザクションで両方へ追記する判断の結果。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BothDecision {
+    pub game: Vec<GameEvent>,
+    pub session: Vec<SessionEvent>,
+    /// 同じトランザクションで書く周辺ストアの内容。
+    pub writes: Vec<PeripheralWrite>,
+}
+
+/// 2 本のストリームにまたがる判断（開始・開始後の役割の入れ替え）を実行する。`session` へ追記するイベントが空なら、
+/// 応答の版は `game` だけ（`FreshGame`）。追記の競合は上限まで再試行する。
+///
+/// # Errors
+/// 業務上の失敗、永続化の失敗、再試行の上限（`RetryExhausted`）。
+pub async fn execute_both<St>(
+    store: &St,
+    decide: &(dyn Fn(&GameState, &SessionState) -> Result<BothDecision, AppFailure> + Sync),
+    max_attempts: u32,
+    idem: Option<&Idempotency>,
+) -> Result<StartExecuted, AppFailure>
+where
+    St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
+{
     let mut attempt = 0;
     loop {
         attempt += 1;
-        match run_once(store, command, idem).await {
+        match run_once(store, decide, idem).await {
             Err(AppFailure::ConcurrencyConflict) if attempt < max_attempts => {}
             Err(AppFailure::ConcurrencyConflict) => return Err(AppFailure::RetryExhausted),
             other => return other,
@@ -46,15 +88,15 @@ where
 
 async fn run_once<St>(
     store: &St,
-    command: &StartGame,
+    decide: &(dyn Fn(&GameState, &SessionState) -> Result<BothDecision, AppFailure> + Sync),
     idem: Option<&Idempotency>,
 ) -> Result<StartExecuted, AppFailure>
 where
     St: EventStore<GameEvent> + EventStore<SessionEvent, Tx = <St as EventStore<GameEvent>>::Tx>,
 {
     let mut tx = <St as EventStore<GameEvent>>::begin(store).await?;
-    match step(store, &mut tx, command, idem).await {
-        Ok(fresh @ StartExecuted::Fresh(..)) => {
+    match step(store, &mut tx, decide, idem).await {
+        Ok(fresh @ (StartExecuted::Fresh(..) | StartExecuted::FreshGame(_))) => {
             <St as EventStore<GameEvent>>::commit(store, tx).await?;
             Ok(fresh)
         }
@@ -72,7 +114,7 @@ where
 async fn step<St>(
     store: &St,
     tx: &mut <St as EventStore<GameEvent>>::Tx,
-    command: &StartGame,
+    decide: &(dyn Fn(&GameState, &SessionState) -> Result<BothDecision, AppFailure> + Sync),
     idem: Option<&Idempotency>,
 ) -> Result<StartExecuted, AppFailure>
 where
@@ -102,24 +144,38 @@ where
         &session_read.events,
         &evolve_session,
     )?;
-    let decision = start_game(&game, &session, command)
-        .map_err(|e| AppFailure::Domain(DomainError::Start(e)))?;
+    let decision = decide(&game, &session)?;
     let game_version =
         <St as EventStore<GameEvent>>::append(store, tx, game_read.version, decision.game).await?;
-    let session_version =
+    let game_only = decision.session.is_empty();
+    let session_version = if game_only {
+        session_read.version
+    } else {
         <St as EventStore<SessionEvent>>::append(store, tx, session_read.version, decision.session)
-            .await?;
+            .await?
+    };
+    let mut writes = decision.writes;
     if let Some(idem) = idem {
-        let record = PeripheralWrite::Idempotency {
+        writes.push(PeripheralWrite::Idempotency {
             game_id: idem.game_id,
             scope: idem.scope.clone(),
             key_digest: idem.key_digest.clone(),
             request_digest: idem.request_digest.clone(),
             status_code: 200,
-            response: ResponseShape::body_both(game_version, session_version),
+            response: if game_only {
+                ResponseShape::Game.body(game_version)
+            } else {
+                ResponseShape::body_both(game_version, session_version)
+            },
             expires_at: idem.expires_at,
-        };
-        <St as EventStore<GameEvent>>::write_peripheral(store, tx, &[record]).await?;
+        });
     }
-    Ok(StartExecuted::Fresh(game_version, session_version))
+    if !writes.is_empty() {
+        <St as EventStore<GameEvent>>::write_peripheral(store, tx, &writes).await?;
+    }
+    Ok(if game_only {
+        StartExecuted::FreshGame(game_version)
+    } else {
+        StartExecuted::Fresh(game_version, session_version)
+    })
 }

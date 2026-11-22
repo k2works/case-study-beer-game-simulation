@@ -132,6 +132,12 @@ pub struct ApiWorld {
     pub statuses: Vec<u16>,
     /// 直近の作成の冪等キーと本文（同じ要求の再送に使う）。
     pub create_request: Option<(String, String)>,
+    /// 進行役が確認画面で控えた、役割ごとの入力の版。
+    pub remembered_basis: Option<Value>,
+    /// 入れ替えられた旧担当者（参加者 ID）。
+    pub replaced: Option<String>,
+    /// 割り当て直しの前のイベントの件数。
+    pub history_size: i64,
 }
 
 impl ApiWorld {
@@ -151,6 +157,9 @@ impl ApiWorld {
             source: uuid_source(),
             statuses: Vec::new(),
             create_request: None,
+            remembered_basis: None,
+            replaced: None,
+            history_size: 0,
         }
     }
 

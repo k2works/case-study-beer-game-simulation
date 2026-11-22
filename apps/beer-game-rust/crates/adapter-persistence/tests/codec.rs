@@ -267,3 +267,43 @@ fn ac3_2_5__資格の失効と再発行のイベントは_JSON_に変換して�
     }
     Ok(())
 }
+
+#[test]
+fn ac3_2_5__役割の入れ替えのイベントは_JSON_に変換して戻すと同じになる() -> R<()> {
+    use beergame_domain::{GameEvent, SessionEvent};
+    roundtrip(
+        &GameCodec,
+        &GameEvent::ParticipantReplaced {
+            participant_id: ParticipantId::new(5),
+            role: Role::Retailer,
+            replaced: vec![ParticipantId::new(3), ParticipantId::new(4)],
+        },
+    )?;
+    roundtrip(
+        &SessionCodec,
+        &SessionEvent::RoleReplaced {
+            role: Role::Retailer,
+            new_holder: ParticipantId::new(5),
+        },
+    )?;
+    // 旧担当者の一覧が配列でない・UUID でない値は変換に失敗する
+    assert!(
+        GameCodec
+            .decode(
+                "ParticipantReplaced",
+                1,
+                serde_json::json!({"participantId": "00000000-0000-0000-0000-000000000005", "role": "RETAILER", "replaced": "x"})
+            )
+            .is_err()
+    );
+    assert!(
+        GameCodec
+            .decode(
+                "ParticipantReplaced",
+                1,
+                serde_json::json!({"participantId": "00000000-0000-0000-0000-000000000005", "role": "RETAILER", "replaced": [1]})
+            )
+            .is_err()
+    );
+    Ok(())
+}

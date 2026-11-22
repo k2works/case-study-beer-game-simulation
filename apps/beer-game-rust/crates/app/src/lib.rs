@@ -3,8 +3,8 @@
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{
-    AppFailure, AppSettings, Env, GameSnapshot, LobbyParticipantRow, PersistenceFailure, ResultRow,
-    RoleSnapshot, SessionSnapshot, StoredResponse,
+    AppFailure, AppSettings, CoHolderRow, EditorSnapshot, Env, GameSnapshot, LobbyParticipantRow,
+    PersistenceFailure, ResultRow, RoleSnapshot, SessionSnapshot, StoredResponse,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -138,8 +138,11 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             return Ok(None);
         };
         let roles = sqlx::query(
-            "SELECT s.role, s.inventory, s.backlog, s.arrivals, s.orders, d.quantity, COALESCE(d.decision_version, 0) AS version \
+            "SELECT s.role, s.inventory, s.backlog, s.arrivals, s.orders, d.quantity, COALESCE(d.decision_version, 0) AS version, \
+             d.editor_kind, d.editor_id, p.display_name AS editor_name, \
+             (extract(epoch FROM d.updated_at) * 1000)::bigint AS saved_ms \
              FROM role_current_states s LEFT JOIN current_decisions d ON d.game_id = s.game_id AND d.role = s.role \
+             LEFT JOIN display_profiles p ON p.game_id = s.game_id AND p.actor_kind = 'PARTICIPANT' AND p.actor_id = d.editor_id \
              WHERE s.game_id = $1",
         )
         .bind(game)
@@ -163,6 +166,8 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
                     .map_err(storage)?
                     .map(i64::from),
                 decision_version: row.try_get::<i64, _>("version").map_err(storage)?,
+                editor: editor_of(row)?,
+                saved_at_millis: row.try_get::<Option<i64>, _>("saved_ms").map_err(storage)?,
             });
         }
         role_rows.sort_by_key(|r| r.role);
@@ -198,6 +203,28 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             });
         }
         result_rows.sort_by_key(|r| (r.week, r.role));
+        let holders = sqlx::query(
+            "SELECT p.role, p.participant_id, d.display_name FROM lobby_participants p \
+             LEFT JOIN display_profiles d ON d.game_id = p.game_id AND d.actor_kind = 'PARTICIPANT' AND d.actor_id = p.participant_id \
+             WHERE p.game_id = $1 AND p.role IS NOT NULL ORDER BY p.joined_at, p.participant_id",
+        )
+        .bind(game)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage)?;
+        let mut co_holders = Vec::new();
+        for row in &holders {
+            let name: String = row.try_get("role").map_err(storage)?;
+            let Some(role) = role_of_text(&name) else {
+                continue;
+            };
+            let id: Uuid = row.try_get("participant_id").map_err(storage)?;
+            co_holders.push(CoHolderRow {
+                role,
+                participant_id: ParticipantId::new(id.as_u128()),
+                display_name: row.try_get("display_name").map_err(storage)?,
+            });
+        }
         let (game_version, session_version) = versions(&self.pool, game).await?;
         Ok(Some(SessionSnapshot {
             game_id,
@@ -211,6 +238,7 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             final_week: i64::from(overview.try_get::<i32, _>("final_week").map_err(storage)?),
             roles: role_rows,
             results: result_rows,
+            co_holders,
             game_version,
             session_version: session_version.unwrap_or(0),
         }))
@@ -346,6 +374,25 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
     fn secure_cookies(&self) -> bool {
         self.secure_cookies
     }
+}
+
+/// 当週の入力の保存者（`current_decisions` の行）。未入力なら `None`。
+fn editor_of(row: &sqlx::postgres::PgRow) -> Result<Option<EditorSnapshot>, AppFailure> {
+    let kind: Option<String> = row.try_get("editor_kind").map_err(storage)?;
+    let id: Option<Uuid> = row.try_get("editor_id").map_err(storage)?;
+    Ok(match (kind.as_deref(), id) {
+        (Some("FACILITATOR"), _) => Some(EditorSnapshot {
+            is_proxy: true,
+            participant_id: None,
+            display_name: None,
+        }),
+        (Some("PARTICIPANT"), Some(id)) => Some(EditorSnapshot {
+            is_proxy: false,
+            participant_id: Some(ParticipantId::new(id.as_u128())),
+            display_name: row.try_get("editor_name").map_err(storage)?,
+        }),
+        _ => None,
+    })
 }
 
 fn storage(e: sqlx::Error) -> AppFailure {

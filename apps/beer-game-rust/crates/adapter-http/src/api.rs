@@ -14,9 +14,10 @@ use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
     GameSnapshot, Idempotency, ResponseShape, SealedIdempotency, Secret, SessionSnapshot,
-    SessionWriter, StartExecuted, StoredResponse, assign_role, authenticate, commit_week,
-    create_game, digest, join_game, open_sealed, pause_session, recover, reissue_credential,
-    resume_session, revoke_credential, save_decision, start_game, submit_proxy_decision,
+    SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role, authenticate,
+    commit_week, create_game, digest, join_game, open_sealed, pause_session, recover,
+    reissue_credential, resume_session, revoke_credential, save_decision, start_game,
+    submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
@@ -166,10 +167,15 @@ fn with_correlation(mut response: Response, correlation: &str) -> Response {
 
 fn problem_response(problem: &Problem, correlation: &str) -> Response {
     let status = StatusCode::from_u16(problem.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    // 契約（`Problem`）は、相関 ID（`correlationId`）を本文にも持つ
+    let mut body = problem.body();
+    if let Some(object) = body.as_object_mut() {
+        object.insert("correlationId".to_owned(), json!(correlation));
+    }
     let mut response = (
         status,
         [(header::CONTENT_TYPE, "application/problem+json")],
-        problem.body().to_string(),
+        body.to_string(),
     )
         .into_response();
     if let Some(seconds) = problem.retry_after_seconds
@@ -819,7 +825,8 @@ async fn assign<B: Backend>(
             ResponseShape::Game,
         )?;
         let store = backend.store(game_id);
-        assign_role(
+        // 準備中は割り当て・付け替え、開始後は入れ替え（旧担当者の資格を同じトランザクションで失効）
+        assign_or_replace_role(
             &store,
             backend.env(),
             backend.settings(),
@@ -829,7 +836,17 @@ async fn assign<B: Backend>(
             Some(&idem),
         )
         .await
-        .map(|executed| executed_response(&executed, ResponseShape::Game, &correlation))
+        .map(|executed| match executed {
+            StartExecuted::Fresh(g, s) => {
+                raw_json(200, &ResponseShape::body_both(g, s), &correlation)
+            }
+            StartExecuted::FreshGame(g) => {
+                raw_json(200, &ResponseShape::Game.body(g), &correlation)
+            }
+            StartExecuted::Replayed(stored) => {
+                raw_json(stored.status_code, &stored.body, &correlation)
+            }
+        })
         .map_err(|failure| Box::new(problem_of(&failure)))
     })
     .await;
@@ -871,6 +888,9 @@ async fn start<B: Backend>(
             StartExecuted::Fresh(g, s) => {
                 raw_json(200, &ResponseShape::body_both(g, s), &correlation)
             }
+            StartExecuted::FreshGame(g) => {
+                raw_json(200, &ResponseShape::Game.body(g), &correlation)
+            }
             StartExecuted::Replayed(stored) => {
                 raw_json(stored.status_code, &stored.body, &correlation)
             }
@@ -896,6 +916,85 @@ fn parse_if_match(headers: &HeaderMap) -> Result<DecisionVersion, Box<Problem>> 
                 "If-Match は意思決定の版（整数）にしてください。",
             )]))
         })
+}
+
+/// 失敗を problem にする。競合（`session.decision_conflict`・`session.decisions_changed`）には、最新の入力に
+/// 保存者（`DecisionEditor`）と保存の時刻を添える（表示名は、同じ役割の共同担当と進行役にだけ。呼び出した人の見え方で作る）。
+async fn conflict_problem<B: Backend>(
+    backend: &B,
+    game_id: GameId,
+    actor: &Actor,
+    failure: &AppFailure,
+) -> Problem {
+    use beergame_application::DomainError;
+    use beergame_domain::SessionError;
+    let mut problem = problem_of(failure);
+    let AppFailure::Domain(DomainError::Session(error)) = failure else {
+        return problem;
+    };
+    let viewer = match actor {
+        Actor::Participant(id) => backend
+            .participant_role(game_id, *id)
+            .await
+            .ok()
+            .flatten()
+            .map(|role| Viewer::Participant(id.get(), role)),
+        Actor::Facilitator(_) => Some(Viewer::Facilitator),
+        Actor::Anonymous => None,
+    };
+    let (Some(viewer), Ok(Some(snapshot))) = (viewer, backend.session_snapshot(game_id).await)
+    else {
+        return problem;
+    };
+    let entry_json = |role: Role, entry: &beergame_domain::DecisionEntry| {
+        let current = snapshot.roles.iter().find(|r| r.role == role);
+        let editor = current
+            .and_then(|r| r.editor.as_ref())
+            .map(|e| crate::views::editor_json(e, &viewer));
+        json!({
+            "quantity": entry.quantity.get(),
+            "version": entry.version.get(),
+            "editor": editor.unwrap_or(Value::Null),
+            "savedAt": current
+                .and_then(|r| r.saved_at_millis)
+                .map_or(Value::Null, |ms| json!(crate::views::rfc3339_millis(ms))),
+        })
+    };
+    match error {
+        SessionError::DecisionConflict {
+            role,
+            latest: Some(entry),
+        } => {
+            problem
+                .extras
+                .insert("latest".to_owned(), entry_json(*role, entry));
+        }
+        SessionError::DecisionsChanged { current, .. } => {
+            let entries: serde_json::Map<String, Value> = current
+                .iter()
+                .map(|(role, entry)| {
+                    (
+                        crate::views::role_name(*role).to_owned(),
+                        entry_json(*role, entry),
+                    )
+                })
+                .collect();
+            problem
+                .extras
+                .insert("current".to_owned(), Value::Object(entries));
+        }
+        SessionError::DecisionConflict { latest: None, .. }
+        | SessionError::NotActive
+        | SessionError::AlreadyEnded
+        | SessionError::AlreadyStarted
+        | SessionError::SaveLimitReached
+        | SessionError::Paused
+        | SessionError::NotPaused
+        | SessionError::Forbidden(_)
+        | SessionError::WeekAdvanced { .. }
+        | SessionError::IncompleteDecisions { .. } => {}
+    }
+    problem
 }
 
 async fn decide<B: Backend>(
@@ -962,7 +1061,7 @@ async fn decide<B: Backend>(
             ResponseShape::Session,
         )?;
         let store = backend.store(game_id);
-        save_decision(
+        match save_decision(
             &store,
             backend.env(),
             backend.settings(),
@@ -974,8 +1073,16 @@ async fn decide<B: Backend>(
             Some(&idem),
         )
         .await
-        .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
-        .map_err(|failure| Box::new(problem_of(&failure)))
+        {
+            Ok(executed) => Ok(executed_response(
+                &executed,
+                ResponseShape::Session,
+                &correlation,
+            )),
+            Err(failure) => Err(Box::new(
+                conflict_problem(&*backend, game_id, &actor, &failure).await,
+            )),
+        }
     })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
@@ -1049,7 +1156,7 @@ async fn commit<B: Backend>(
                 wholesaler,
                 retailer,
             };
-            commit_week(
+            match commit_week(
                 &store,
                 backend.env(),
                 backend.settings(),
@@ -1059,8 +1166,16 @@ async fn commit<B: Backend>(
                 Some(&idem),
             )
             .await
-            .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation))
-            .map_err(|failure| Box::new(problem_of(&failure)))
+            {
+                Ok(executed) => Ok(executed_response(
+                    &executed,
+                    ResponseShape::Session,
+                    &correlation,
+                )),
+                Err(failure) => Err(Box::new(
+                    conflict_problem(&*backend, game_id, &actor, &failure).await,
+                )),
+            }
         })
         .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
@@ -1622,32 +1737,9 @@ async fn reissue<B: Backend>(
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
 
-/// 期限を RFC 3339（UTC、ミリ秒）の文字列にする（暦の計算は days-from-civil の逆算）。
+/// 期限を RFC 3339（UTC、ミリ秒）の文字列にする。
 fn expires_at_text(at: Instant) -> String {
-    let millis = at.epoch_millis();
-    let days = millis.div_euclid(86_400_000);
-    let in_day = millis.rem_euclid(86_400_000);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let day_of_era = z.rem_euclid(146_097);
-    let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_index = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = if month_index < 10 {
-        month_index + 3
-    } else {
-        month_index - 9
-    };
-    let year = year_of_era + era * 400 + i64::from(month <= 2);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
-        in_day / 3_600_000,
-        in_day / 60_000 % 60,
-        in_day / 1_000 % 60,
-        in_day % 1_000
-    )
+    crate::views::rfc3339_millis(at.epoch_millis())
 }
 
 #[cfg(test)]

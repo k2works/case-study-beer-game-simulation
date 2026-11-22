@@ -177,6 +177,11 @@ pub enum SessionEvent {
     },
     SessionPaused,
     SessionResumed,
+    /// 開始後の役割の入れ替え。役割の担当者が、新しい担当者だけになる。
+    RoleReplaced {
+        role: Role,
+        new_holder: ParticipantId,
+    },
     /// 進行役の代理入力（監査のため、`DecisionSaved` とは別の事実として残す）。
     ProxyDecisionSubmitted {
         week: Week,
@@ -571,6 +576,19 @@ pub fn evolve_session(state: SessionState, event: &SessionEvent) -> Evolution<Se
                     editor: Editor::ByFacilitator(*operator),
                 },
             )
+        }),
+        SessionEvent::RoleReplaced { role, new_holder } => update_active(state, |data| {
+            let assignments = data.assignments.map(|r, holders| {
+                if r == *role {
+                    BTreeSet::from([*new_holder])
+                } else {
+                    holders.clone()
+                }
+            });
+            SessionData {
+                assignments,
+                ..data
+            }
         }),
         SessionEvent::SessionPaused => update_active(state, |data| SessionData {
             paused: true,

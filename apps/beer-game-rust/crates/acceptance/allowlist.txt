@@ -3,7 +3,7 @@
 # 形式: `<機能領域>/<ファイル>.feature`（@api の全シナリオ）、または `... :: <シナリオ名>`。
 
 # B1 の検証（ドメインに対して実行。B2 で HTTP に差し替える）
-# B6 まで許可しない（共同担当）: game-setup/co-assignment.feature
+
 
 # B2: ウォーキングスケルトン（HTTP 越し。実 PostgreSQL）
 # 作成の冪等（同じ要求の再送）は、B6 で暗号化して保存する（AES-256-GCM）ようにし、game-creation の 1 本目も許可する。
@@ -41,3 +41,15 @@ continuation/credentials.feature :: 旧版の鍵を設定から外すと、そ�
 
 # B6: 参加の試行の窓（NF-S11）
 game-setup/join-rate-limit.feature
+
+# B7: 共同担当と共同入力
+game-setup/co-assignment.feature
+weekly-play/co-input.feature
+continuation/credentials.feature :: 役割を入れ替えると、旧担当者の資格は自動で失効し、新担当者がその役割を引き継ぐ
+continuation/credentials.feature :: 共同担当のいる役割を入れ替えると、担当者全員の資格が自動で失効し、新担当者が引き継ぐ
+continuation/credentials.feature :: 入れ替えられた旧担当者が保存した入力と、その入力者のラベルは、入れ替え後も残る
+continuation/credentials.feature :: 開始後に、すでに担当している役割へ割り当て直しても、何も変わらず、履歴に足されない
+continuation/credentials.feature :: 進行役以外は、役割を入れ替えられない
+continuation/credentials.feature :: 開始後に、別の役割にいる参加者を割り当てようとすると、準備中でないという理由で拒否される
+continuation/credentials.feature :: 資格が失効している参加者を、新担当者として入れ替えようとすると、拒否される
+continuation/credentials.feature :: 入れ替えられた旧担当者が、以前に成功した識別子で再送しても、権限エラーになる
