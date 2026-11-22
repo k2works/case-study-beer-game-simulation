@@ -26,6 +26,8 @@ pub fn app(pool: PgPool) -> Router {
         max_attempts: 3,
         retired_keys: Vec::new(),
         session_ttl_millis: 86_400_000,
+        max_failed_attempts: 10,
+        attempt_window_millis: 600_000,
     };
     router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)))
 }

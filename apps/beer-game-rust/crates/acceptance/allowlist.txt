@@ -37,3 +37,6 @@ continuation/credentials.feature :: 失効した資格が、以前に成功し�
 continuation/credentials.feature :: 失効した復帰資格が、以前に成功した復帰の要求を同じキーで再送しても、拒否される
 continuation/credentials.feature :: 署名鍵を新しい版へ更新しても、更新前に発行した資格は期限まで使える
 continuation/credentials.feature :: 旧版の鍵を設定から外すと、その版で発行した資格は使えなくなる
+
+# B6: 参加の試行の窓（NF-S11）
+game-setup/join-rate-limit.feature

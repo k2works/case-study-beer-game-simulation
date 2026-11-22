@@ -329,6 +329,15 @@ pub fn game_not_ended_problem() -> Problem {
     Problem::new(409, "game.not_ended", title_of("game.not_ended"))
 }
 
+/// 試行が多すぎる（429。`Retry-After` に窓の残り秒数）。
+#[must_use]
+pub fn rate_limited_problem(retry_after_seconds: u32) -> Problem {
+    let mut problem = Problem::new(429, "app.rate_limited", "試行が多すぎます。");
+    problem.detail = Some("しばらく待ってから、もう一度お試しください。".to_owned());
+    problem.retry_after_seconds = Some(retry_after_seconds);
+    problem
+}
+
 /// 準備ができていない（503。`/ready`）。
 #[must_use]
 pub fn not_ready_problem() -> Problem {

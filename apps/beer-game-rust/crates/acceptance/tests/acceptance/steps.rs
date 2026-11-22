@@ -1929,3 +1929,89 @@ async fn participant_has_recovered(world: &mut ApiWorld, role: String) -> R {
     recover_participant(world, &role, None).await?;
     expect(status(world)? == 200, "復帰できなかった")
 }
+
+// ---- 参加の試行の窓（NF-S11） ----
+
+async fn join_raw(world: &mut ApiWorld, body: &Value) -> R {
+    world
+        .call(
+            "POST",
+            "/api/v1/participations/join",
+            None,
+            None,
+            &body.to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[given("同じ接続元が、存在しない参加コードで、上限の回数まで参加に失敗している")]
+async fn failed_up_to_limit(world: &mut ApiWorld) -> R {
+    for i in 0..10 {
+        join_raw(
+            world,
+            &json!({"joinCode": "no-such-code", "displayName": format!("失敗{i}")}),
+        )
+        .await?;
+        expect(status(world)? == 403, "403 ではない")?;
+    }
+    Ok(())
+}
+
+#[then("参加は、試行が多すぎるという理由で拒否される")]
+async fn rejected_rate_limited(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 429 && code(world)? == "app.rate_limited",
+        &format!("試行の上限の拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then("再試行までの待ち時間が示される")]
+async fn retry_after_shown(world: &mut ApiWorld) -> R {
+    let seconds = world
+        .reply()?
+        .retry_after
+        .as_deref()
+        .and_then(|v| v.parse::<u32>().ok());
+    expect(
+        seconds.is_some_and(|s| (1..=600).contains(&s)),
+        "Retry-After が無い、または範囲外",
+    )
+}
+
+#[when("同じ接続元から、表示名の違う参加者が、上限を超える人数、有効な参加コードで参加する")]
+async fn many_successful_joins(world: &mut ApiWorld) -> R {
+    world.statuses.clear();
+    for i in 0..12 {
+        join_named(world, &format!("多数{i}")).await?;
+        let reply = world.reply()?.status;
+        world.statuses.push(reply);
+    }
+    Ok(())
+}
+
+#[then("どの参加も受け付けられる")]
+async fn all_accepted(world: &mut ApiWorld) -> R {
+    expect(
+        !world.statuses.is_empty() && world.statuses.iter().all(|s| *s == 200),
+        &format!("受け付けられない参加がある: {:?}", world.statuses),
+    )
+}
+
+#[given("同じ接続元が、表示名の無い参加を、上限を超える回数送っている")]
+async fn malformed_joins(world: &mut ApiWorld) -> R {
+    let code = world.game()?.join_code.clone();
+    for _ in 0..12 {
+        join_raw(world, &json!({"joinCode": code})).await?;
+        expect(status(world)? == 422, "422 ではない")?;
+    }
+    Ok(())
+}
+
+#[then("参加は受け付けられる")]
+async fn join_accepted(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200,
+        &format!("受け付けられない: {}", world.reply()?.body),
+    )
+}

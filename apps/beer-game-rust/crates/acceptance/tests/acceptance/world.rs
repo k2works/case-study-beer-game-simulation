@@ -64,6 +64,16 @@ async fn database() -> Result<PgPool, String> {
     Ok(pool.clone())
 }
 
+fn uuid_source() -> String {
+    // 世界ごとに別の接続元（乱数の源は時刻とアドレス。テスト専用で、暗号的な強さは要らない）
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    format!("scenario-{nanos}-{n}")
+}
+
 /// 直近の応答。
 #[derive(Clone, Debug)]
 pub struct Reply {
@@ -73,6 +83,8 @@ pub struct Reply {
     pub location: Option<String>,
     /// 復帰資格（Cookie `bg_recovery` の値）。
     pub recovery: Option<String>,
+    /// `Retry-After`（秒）。
+    pub retry_after: Option<String>,
 }
 
 /// 1 つのゲーム。
@@ -114,6 +126,10 @@ pub struct ApiWorld {
     pub stale_version: u32,
     /// 次の呼び出しに付ける `If-Match`（意思決定の版）。使うと空に戻る。
     pub if_match: Option<String>,
+    /// このシナリオの接続元（`X-Forwarded-For`）。試行の窓がシナリオの間で混ざらないよう、世界ごとに別の値にする。
+    pub source: String,
+    /// 直近の一連の呼び出しの状態（複数回の参加など）。
+    pub statuses: Vec<u16>,
 }
 
 impl ApiWorld {
@@ -130,6 +146,8 @@ impl ApiWorld {
             recovered: None,
             stale_version: 0,
             if_match: None,
+            source: uuid_source(),
+            statuses: Vec::new(),
         }
     }
 
@@ -163,6 +181,8 @@ impl ApiWorld {
                 .map(|(version, k)| (version, Secret::new(vec![k; 32])))
                 .collect(),
             session_ttl_millis: 86_400_000,
+            max_failed_attempts: 10,
+            attempt_window_millis: 600_000,
         }
     }
 
@@ -233,6 +253,7 @@ impl ApiWorld {
         if let Some(key) = key {
             builder = builder.header("idempotency-key", key);
         }
+        builder = builder.header("x-forwarded-for", self.source.as_str());
         if let Some(version) = self.if_match.take() {
             builder = builder.header("if-match", version);
         }
@@ -273,6 +294,11 @@ impl ApiWorld {
             cookie,
             location,
             recovery,
+            retry_after: parts
+                .headers
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .map(str::to_owned),
         };
         self.last = Some(reply.clone());
         Ok(reply)

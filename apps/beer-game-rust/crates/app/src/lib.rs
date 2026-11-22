@@ -261,6 +261,47 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
         }))
     }
 
+    async fn note_attempt(
+        &self,
+        scope: &str,
+        key_digest: &str,
+        window_start: Instant,
+    ) -> Result<i64, AppFailure> {
+        sqlx::query_scalar::<_, i32>(
+            "INSERT INTO participation_attempts (scope, key_digest, window_start, failure_count) \
+             VALUES ($1, $2, to_timestamp($3::double precision / 1000), 1) \
+             ON CONFLICT (scope, key_digest, window_start) \
+             DO UPDATE SET failure_count = participation_attempts.failure_count + 1 \
+             RETURNING failure_count",
+        )
+        .bind(scope)
+        .bind(key_digest)
+        .bind(window_start.epoch_millis())
+        .fetch_one(&self.pool)
+        .await
+        .map(i64::from)
+        .map_err(storage)
+    }
+
+    async fn forgive_attempt(
+        &self,
+        scope: &str,
+        key_digest: &str,
+        window_start: Instant,
+    ) -> Result<(), AppFailure> {
+        sqlx::query(
+            "UPDATE participation_attempts SET failure_count = GREATEST(failure_count - 1, 0) \
+             WHERE scope = $1 AND key_digest = $2 AND window_start = to_timestamp($3::double precision / 1000)",
+        )
+        .bind(scope)
+        .bind(key_digest)
+        .bind(window_start.epoch_millis())
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(storage)
+    }
+
     async fn is_ready(&self) -> bool {
         sqlx::query_scalar::<_, i32>("SELECT 1")
             .fetch_one(&self.pool)

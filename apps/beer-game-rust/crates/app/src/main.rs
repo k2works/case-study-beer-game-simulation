@@ -127,6 +127,8 @@ async fn main() -> ExitCode {
         max_attempts: 3,
         retired_keys,
         session_ttl_millis: 86_400_000,
+        max_failed_attempts: 10,
+        attempt_window_millis: 600_000,
     };
     let app = router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)));
     let listener = match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {

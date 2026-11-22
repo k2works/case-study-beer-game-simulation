@@ -27,7 +27,7 @@ use uuid::Uuid;
 
 use crate::problem::{
     FieldError, Problem, bad_request_problem, game_not_ended_problem, invitation_invalid_problem,
-    not_ready_problem, problem_of, timeout_problem, validation_problem,
+    not_ready_problem, problem_of, rate_limited_problem, timeout_problem, validation_problem,
 };
 use crate::views::{Viewer, game_view, lobby_view, review_view, session_view};
 
@@ -66,6 +66,20 @@ pub trait Backend: Send + Sync + 'static {
         game_id: GameId,
     ) -> impl Future<Output = Result<Option<GameSnapshot>, AppFailure>> + Send;
     /// 依存先（DB）に接続できるか。
+    /// 参加・復帰の失敗の窓に 1 を足し、足した後の回数を返す（検査の前に足す。NF-S11）。
+    fn note_attempt(
+        &self,
+        scope: &str,
+        key_digest: &str,
+        window_start: Instant,
+    ) -> impl Future<Output = Result<i64, AppFailure>> + Send;
+    /// 足した 1 を戻す（認可の失敗でなかったとき）。0 を下回らない。
+    fn forgive_attempt(
+        &self,
+        scope: &str,
+        key_digest: &str,
+        window_start: Instant,
+    ) -> impl Future<Output = Result<(), AppFailure>> + Send;
     fn is_ready(&self) -> impl Future<Output = bool> + Send;
     /// コマンドの応答を待つ上限。超えても、コマンドの処理は最後まで走る（504 を返す）。
     fn command_timeout(&self) -> std::time::Duration {
@@ -206,6 +220,65 @@ fn session_cookie<B: Backend>(backend: &B, headers: &HeaderMap, token: &str) -> 
         "{}={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={SESSION_MAX_AGE_SECONDS}{secure}",
         cookie_name(headers)
     )
+}
+
+/// 接続元の鍵付き要約（生の IP は保存しない）。`X-Forwarded-For` の先頭（信頼するリバースプロキシの付けた接続元）を使う。
+fn source_digest<B: Backend>(backend: &B, headers: &HeaderMap) -> String {
+    let source = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map_or("unknown", str::trim);
+    digest(
+        &backend.settings().credential_key,
+        &Secret::new(format!("source:{source}")),
+    )
+    .unwrap_or_default()
+}
+
+/// 参加・復帰の失敗の窓。検査の前に 1 を足し、上限を超えていれば 429（再試行までの秒数つき）。
+struct Attempt {
+    scope: &'static str,
+    key_digest: String,
+    window_start: Instant,
+}
+
+impl Attempt {
+    async fn begin<B: Backend>(
+        backend: &B,
+        headers: &HeaderMap,
+        scope: &'static str,
+    ) -> Result<Attempt, Box<Problem>> {
+        let settings = backend.settings();
+        let now = backend.env().now().epoch_millis();
+        let window = settings.attempt_window_millis.max(1);
+        let start = now - now.rem_euclid(window);
+        let attempt = Attempt {
+            scope,
+            key_digest: source_digest(backend, headers),
+            window_start: Instant::from_epoch_millis(start),
+        };
+        let count = backend
+            .note_attempt(scope, &attempt.key_digest, attempt.window_start)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?;
+        if count > i64::from(settings.max_failed_attempts) {
+            let remaining = start.saturating_add(window).saturating_sub(now);
+            let seconds = u32::try_from(remaining.saturating_add(999) / 1000).unwrap_or(1);
+            return Err(Box::new(rate_limited_problem(seconds.max(1))));
+        }
+        Ok(attempt)
+    }
+
+    /// 認可の失敗でなかったとき、足した 1 を戻す。
+    async fn forgive<B: Backend>(&self, backend: &B) {
+        // 戻せなくても、応答は変えない（数えすぎる側の誤り）
+        drop(
+            backend
+                .forgive_attempt(self.scope, &self.key_digest, self.window_start)
+                .await,
+        );
+    }
 }
 
 /// 復帰資格の Cookie（`bg_recovery`。復帰の経路にだけ送る）。
@@ -373,13 +446,23 @@ async fn join<B: Backend>(
         }
         return problem_response(&validation_problem(errors), &correlation);
     };
-    // 参加コードの不明・形式不正は、区別せず同じ 403（列挙の防止）
+    // 試行の窓: 検査の前に 1 を足す。上限を超えていれば、正しい参加コードでも 429（NF-S11）
+    let attempt = match Attempt::begin(&*backend, &headers, "join").await {
+        Ok(attempt) => attempt,
+        Err(problem) => return problem_response(&problem, &correlation),
+    };
+    // 参加コードの不明・形式不正は、区別せず同じ 403（列挙の防止。窓の失敗に数える）
     let game_id = match backend.game_by_join_code(code).await {
         Ok(Some(game_id)) => game_id,
         Ok(None) => return problem_response(&invitation_invalid_problem(), &correlation),
-        Err(failure) => return problem_response(&problem_of(&failure), &correlation),
+        Err(failure) => {
+            attempt.forgive(&*backend).await;
+            return problem_response(&problem_of(&failure), &correlation);
+        }
     };
     let store = backend.store(game_id);
+    // 参加コードが有効なら、認可の失敗ではない（以降の結果にかかわらず、窓の失敗には数えない）
+    attempt.forgive(&*backend).await;
     match join_game(&store, backend.env(), backend.settings(), game_id, name).await {
         Ok(outcome) => {
             let cookie = session_cookie(&*backend, &headers, outcome.credential.expose());
@@ -1198,6 +1281,8 @@ async fn recover_route<B: Backend>(
                 )]))
             })
             .and_then(parse_game_id)?;
+        // 試行の窓: 検査の前に 1 を足し、復帰できたら戻す（失敗だけが数えられる）
+        let attempt = Attempt::begin(&*backend, &headers, "recover").await?;
         let token = parsed
             .get("recoveryCode")
             .and_then(Value::as_str)
@@ -1213,6 +1298,7 @@ async fn recover_route<B: Backend>(
         )
         .await
         .map_err(|f| Box::new(problem_of(&f)))?;
+        attempt.forgive(&*backend).await;
         let snapshot = backend
             .game_snapshot(game_id)
             .await

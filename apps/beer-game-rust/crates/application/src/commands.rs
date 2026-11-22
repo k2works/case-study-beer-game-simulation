@@ -40,6 +40,10 @@ pub struct AppSettings {
     pub retired_keys: Vec<(i32, Secret<Vec<u8>>)>,
     /// ブラウザセッションの有効期間（ミリ秒）。`credential_ttl_millis` は復帰資格の有効期間。
     pub session_ttl_millis: i64,
+    /// 参加・復帰の失敗の上限（窓の中。接続元ごと。NF-S11。既定は 10 分に 10 回。未計測の仮置き）。
+    pub max_failed_attempts: u32,
+    /// 失敗を数える窓の長さ（ミリ秒）。
+    pub attempt_window_millis: i64,
 }
 
 impl AppSettings {

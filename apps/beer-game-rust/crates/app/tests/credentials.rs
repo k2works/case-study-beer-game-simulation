@@ -367,3 +367,44 @@ async fn ac3_2_5__失効するとセッションも復帰も使えず_再発行�
     assert_eq!(status, StatusCode::FORBIDDEN);
     Ok(())
 }
+
+#[tokio::test]
+async fn nf_s11__復帰の失敗が上限を超えると_有効な復帰コードでも_429_で_成功は数えない()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = create(&app).await?;
+    // 成功した復帰は、上限を超えて繰り返しても数えない
+    for _ in 0..12 {
+        let (status, _, _) = recover(&app, &game.id, None, Some(&game.code)).await?;
+        assert_eq!(status, StatusCode::OK);
+    }
+    for _ in 0..10 {
+        let (status, _, _) = recover(&app, &game.id, None, Some("wrong-code")).await?;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
+    let (status, headers, body) = recover(&app, &game.id, None, Some(&game.code)).await?;
+    assert_eq!(
+        (status, body["code"].clone()),
+        (StatusCode::TOO_MANY_REQUESTS, json!("app.rate_limited"))
+    );
+    let retry: u32 = headers
+        .get("retry-after")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok())
+        .ok_or("Retry-After が無い")?;
+    assert!((1..=600).contains(&retry));
+    // 接続元が違えば、別の窓
+    let (status, _, _) = send(
+        &app,
+        "POST",
+        "/api/v1/participations/recover",
+        &[("x-forwarded-for", "203.0.113.9")],
+        &json!({"gameId": game.id, "recoveryCode": game.code}).to_string(),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    Ok(())
+}
