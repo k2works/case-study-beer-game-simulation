@@ -14,11 +14,12 @@ use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, EXPORT_SCHEMA_VERSION, Env,
     EventStore, Executed, ExportInput, GameSnapshot, Idempotency, ObservationSnapshot,
-    ResponseShape, SealedIdempotency, Secret, SessionSnapshot, SessionWriter, StartExecuted,
-    StoredResponse, assign_or_replace_role, authenticate, build_csv, build_json, checksum,
-    commit_week, create_game, digest, find_invitation, invite_observer, join_game, join_observer,
-    open_sealed, pause_session, recover, reissue_credential, resume_session, revoke_credential,
-    revoke_observer_invitation, save_decision, set_commit_mode, start_game, submit_proxy_decision,
+    ResponseShape, RetentionState, SealedIdempotency, Secret, SessionSnapshot, SessionWriter,
+    StartExecuted, StoredResponse, assign_or_replace_role, authenticate, build_csv, build_json,
+    checksum, commit_week, create_game, digest, find_invitation, invite_observer, join_game,
+    join_observer, open_sealed, pause_session, recover, reissue_credential, resume_session,
+    revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode, start_game,
+    submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
@@ -73,6 +74,11 @@ pub trait Backend: Send + Sync + 'static {
         &self,
         game_id: GameId,
     ) -> impl Future<Output = Result<Option<ObservationSnapshot>, AppFailure>> + Send;
+    /// 保持状態（`retention_policies` と削除の進行）。
+    fn retention_state(
+        &self,
+        game_id: GameId,
+    ) -> impl Future<Output = Result<Option<RetentionState>, AppFailure>> + Send;
     /// 参加・復帰の失敗の窓に 1 を足し、足した後の回数を返す（検査の前に足す。NF-S11）。
     fn note_attempt(
         &self,
@@ -150,6 +156,7 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route("/api/v1/games/{game_id}/review", get(review::<B>))
         .route("/api/v1/games/{game_id}/observation", get(observation::<B>))
         .route("/api/v1/games/{game_id}/exports", get(export::<B>))
+        .route("/api/v1/games/{game_id}/retention", get(retention::<B>))
         .route(
             "/api/v1/games/{game_id}/observer-invitations",
             post(invite::<B>),
@@ -504,6 +511,7 @@ fn parse_create(body: &Value) -> Result<CreateGameInput, Vec<FieldError>> {
             demand,
             conditions: conditions_input,
             commit_mode,
+            retention_days: body.get("retentionDays").and_then(Value::as_i64),
         }),
         (_, _) => Err(errors),
     }
@@ -2152,6 +2160,37 @@ async fn export<B: Backend>(
             }
         }
         Ok(response)
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 保持状態（進行役だけ）。
+async fn retention<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if !actor.is_facilitator_of(game_id) {
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
+        let state = backend
+            .retention_state(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        Ok(json_response(
+            StatusCode::OK,
+            &crate::views::retention_view(&state),
+            None,
+            None,
+        ))
     }
     .await;
     result

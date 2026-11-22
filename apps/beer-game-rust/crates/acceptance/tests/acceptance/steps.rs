@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::world::{ApiWorld, GameCtx, Reply};
 
-type R = Result<(), String>;
+pub(crate) type R = Result<(), String>;
 
 const ROLES: [(&str, &str); 4] = [
     ("工場", "FACTORY"),
@@ -24,11 +24,11 @@ fn en(role: &str) -> Result<&'static str, String> {
         .ok_or_else(|| format!("未知の役割: {role}"))
 }
 
-fn kit_demand(final_week: usize) -> Vec<i64> {
+pub(crate) fn kit_demand(final_week: usize) -> Vec<i64> {
     vec![4; final_week]
 }
 
-fn expect(condition: bool, message: &str) -> R {
+pub(crate) fn expect(condition: bool, message: &str) -> R {
     if condition {
         Ok(())
     } else {
@@ -112,7 +112,7 @@ async fn demand_error(world: &mut ApiWorld) -> R {
 
 // ---- 参加・割り当て・開始 ----
 
-async fn join_named(world: &mut ApiWorld, name: &str) -> R {
+pub(crate) async fn join_named(world: &mut ApiWorld, name: &str) -> R {
     let join_code = world.game()?.join_code.clone();
     let key = world.next_key();
     let body = json!({"joinCode": join_code, "displayName": name}).to_string();

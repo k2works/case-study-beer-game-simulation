@@ -11,6 +11,7 @@ use beergame_domain::{
 mod commands;
 mod export;
 mod idempotency;
+mod retention;
 mod seal;
 mod sealed_replay;
 mod secret;
@@ -27,6 +28,10 @@ pub use commands::{
 };
 pub use export::{EXPORT_SCHEMA_VERSION, ExportInput, build_csv, build_json, checksum};
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
+pub use retention::{
+    BACKUP_RETENTION_DAYS, DueGame, MAX_ATTEMPTS, RetentionReport, RetentionState, RetentionStore,
+    next_attempt_after_failure, run_retention,
+};
 pub use seal::{open, seal};
 pub use sealed_replay::{SealedFields, SealedIdempotency, open_sealed, sealed_write};
 pub use secret::{Secret, digest, encode_token};

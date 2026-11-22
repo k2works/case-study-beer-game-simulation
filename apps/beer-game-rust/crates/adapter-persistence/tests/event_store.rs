@@ -190,7 +190,7 @@ async fn rb2__tx_の_drop_は_ロックを解放する_測定して記録する(
 }
 
 #[tokio::test]
-async fn tech__マイグレーション_0001_から_0007_が適用され_game_roots_の削除が全表へ連鎖する()
+async fn tech__マイグレーション_0001_から_0009_が適用され_game_roots_の削除が全表へ連鎖する()
 -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());
@@ -202,8 +202,8 @@ async fn tech__マイグレーション_0001_から_0007_が適用され_game_ro
     .fetch_all(&env.pool)
     .await
     .map_err(e)?;
-    // game_roots、events、projection_checkpoints と、周辺ストア 4、投影 12、参加・復帰の失敗の窓 1（設計: data-model）
-    if tables.len() != 3 + 4 + 12 + 1 {
+    // game_roots、events、projection_checkpoints と、周辺ストア 4、投影 12、参加・復帰の失敗の窓 1、保持と削除 4（設計: data-model）
+    if tables.len() != 3 + 4 + 12 + 1 + 4 {
         return Err(format!("表の数が違う: {tables:?}"));
     }
     let game = new_game(&env.pool).await?;

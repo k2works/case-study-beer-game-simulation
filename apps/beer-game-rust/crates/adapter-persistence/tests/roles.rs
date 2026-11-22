@@ -209,3 +209,62 @@ async fn nf_s18__削除ロールは_events_の_DELETE_権限が無くても_ゲ�
     assert_eq!(left, 0, "連鎖削除で全表から消える");
     Ok(())
 }
+
+#[tokio::test]
+async fn nf_s18__削除ロールは_保持方針を連鎖で消し_削除の記録と受領記録を扱え_読み取りロールは書けない()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = seed(&env.pool).await?;
+    sqlx::query("INSERT INTO retention_policies (game_id, retention_days, retention_starts_at, delete_after) VALUES ($1, 1, now(), now() + interval '1 day')")
+        .bind(game).execute(&env.pool).await.map_err(e)?;
+    let deletion = Uuid::new_v4();
+    // 削除の進行の記録は、削除の完了のあとも再試行の記録が残るよう、game_roots への外部キーを持たない
+    assert_eq!(
+        run_as(
+            &env.pool,
+            "beergame_deleter",
+            &format!("INSERT INTO deletion_runs (deletion_id, game_id, status, attempt, requested_at) VALUES ('{deletion}', '{game}', 'IN_PROGRESS', 1, now())")
+        )
+        .await?,
+        None
+    );
+    assert_eq!(
+        run_as(
+            &env.pool,
+            "beergame_reader",
+            &format!("DELETE FROM deletion_runs WHERE deletion_id = '{deletion}'")
+        )
+        .await?
+        .as_deref(),
+        Some("42501"),
+        "読み取りロールは削除の記録を消せない"
+    );
+    assert_eq!(
+        run_as(
+            &env.pool,
+            "beergame_deleter",
+            &format!("DELETE FROM game_roots WHERE game_id = '{game}'")
+        )
+        .await?,
+        None
+    );
+    let left: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM retention_policies WHERE game_id = $1")
+            .bind(game)
+            .fetch_one(&env.pool)
+            .await
+            .map_err(e)?;
+    assert_eq!(left, 0, "保持方針は連鎖削除で消える");
+    assert_eq!(
+        run_as(
+            &env.pool,
+            "beergame_deleter",
+            &format!("DELETE FROM deletion_runs WHERE deletion_id = '{deletion}'")
+        )
+        .await?,
+        None
+    );
+    Ok(())
+}

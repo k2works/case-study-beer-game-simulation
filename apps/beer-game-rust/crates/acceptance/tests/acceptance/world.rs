@@ -148,6 +148,15 @@ pub struct ApiWorld {
     /// 直近に出力した CSV・JSON の応答。
     pub export_csv: Option<Reply>,
     pub export_json: Option<Reply>,
+    /// 削除処理（掃引）に渡す時計を、実時間からずらす量（ミリ秒）。実際には待たない。
+    pub clock_offset_millis: i64,
+    /// 削除の処理が、この回数だけ失敗する（差し込み口）。
+    pub deletion_failures: Arc<std::sync::atomic::AtomicUsize>,
+    /// 直近の掃引の前の受領記録の件数。
+    pub receipts_before: i64,
+    /// 直近の一連の掃引で完了した削除の数と、再試行をやめて通知されたゲームの数。
+    pub completed: usize,
+    pub abandoned: usize,
 }
 
 impl ApiWorld {
@@ -174,6 +183,11 @@ impl ApiWorld {
             observer_cookie: None,
             export_csv: None,
             export_json: None,
+            clock_offset_millis: 0,
+            deletion_failures: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            receipts_before: 0,
+            completed: 0,
+            abandoned: 0,
         }
     }
 
@@ -195,12 +209,12 @@ impl ApiWorld {
         Ok(())
     }
 
-    fn settings(key_version: i32, key: u8, retired: Vec<(i32, u8)>) -> AppSettings {
+    pub fn settings(key_version: i32, key: u8, retired: Vec<(i32, u8)>) -> AppSettings {
         AppSettings {
             credential_key: Secret::new(vec![key; 32]),
             key_version,
             credential_ttl_millis: 86_400_000,
-            retention_days: 30,
+            retention_days: 90,
             max_attempts: 3,
             retired_keys: retired
                 .into_iter()

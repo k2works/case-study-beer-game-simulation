@@ -1,6 +1,7 @@
 //! 共有する `features/`（Kotlin 版と同じ日本語 Gherkin）を、Rust のバックエンド（HTTP。実 PostgreSQL 18.6）に対して実行する。
 //! 許可リスト（`allowlist.txt`）のシナリオだけを実行する。定義のないステップ（Undefined）は失敗にする（`fail_on_skipped`）。
 
+mod retention_steps;
 mod steps;
 mod world;
 

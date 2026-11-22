@@ -467,3 +467,26 @@ async fn tech__出力_json_は契約のスキーマに適合し_csv_と同じ値
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn tech__保持状態の応答は契約のスキーマに適合する() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let doc = contract()?;
+    let app = app(env.pool.clone());
+    let game = prepared(&app, &env.pool).await?;
+    let (status, _, body) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/retention", game.id),
+        &[("cookie", &game.facilitator)],
+        "",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    validate(&doc, "Retention", &body)?;
+    assert_eq!(body.get("status"), Some(&json!("SCHEDULED")));
+    assert_eq!(body.get("backupRetentionDays"), Some(&json!(7)));
+    Ok(())
+}

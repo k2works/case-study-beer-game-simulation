@@ -67,6 +67,8 @@ pub struct CreateGameInput {
     pub conditions: ConditionsInput,
     /// 確定方式（省略は手動）。
     pub commit_mode: CommitMode,
+    /// 保持日数（省略は設定の既定。90 日）。
+    pub retention_days: Option<i64>,
 }
 
 /// 作成の結果。資格の生の値は、この応答に一度だけ載せる（保存はダイジェストだけ）。
@@ -177,8 +179,8 @@ pub async fn create_game<St: EventStore<GameEvent>>(
         &input.conditions,
     )
     .map_err(AppFailure::Invalid)?;
-    let retention =
-        RetentionDays::of(settings.retention_days).map_err(|e| AppFailure::Invalid(vec![e]))?;
+    let retention = RetentionDays::of(input.retention_days.unwrap_or(settings.retention_days))
+        .map_err(|e| AppFailure::Invalid(vec![e]))?;
     let code_text = env.join_code();
     let join_code = JoinCode::of(&code_text).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let now = env.now();

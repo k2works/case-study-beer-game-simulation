@@ -69,10 +69,10 @@ async fn main() -> ExitCode {
     if mode == "healthcheck" {
         return healthcheck().await;
     }
-    if mode != "api" && mode != "migrate" {
+    if mode != "api" && mode != "migrate" && mode != "retention" {
         drop(writeln!(
             std::io::stderr(),
-            "未実装の起動モード: {mode}（api・migrate・healthcheck）"
+            "未実装の起動モード: {mode}（api・migrate・retention・healthcheck）"
         ));
         return ExitCode::from(64);
     }
@@ -102,6 +102,45 @@ async fn main() -> ExitCode {
     if mode == "migrate" {
         return ExitCode::SUCCESS;
     }
+    let settings_for_retention = || AppSettings {
+        credential_key: Secret::new(key.clone()),
+        key_version: 1,
+        credential_ttl_millis: 2_592_000_000,
+        retention_days: 90,
+        max_attempts: 3,
+        retired_keys: Vec::new(),
+        session_ttl_millis: 86_400_000,
+        max_failed_attempts: 10,
+        attempt_window_millis: 600_000,
+    };
+    if mode == "retention" {
+        // 期限に達したゲームを削除して終了する（定期の起動は運用側。B15）
+        let store = beergame_adapter_persistence::PgRetentionStore::new(pool);
+        return match beergame_application::run_retention(
+            &store,
+            &SystemEnv,
+            &settings_for_retention(),
+            None,
+        )
+        .await
+        {
+            Ok(report) => {
+                tracing::info!(
+                    completed = report.completed,
+                    abandoned = report.abandoned.len(),
+                    "retention"
+                );
+                if !report.abandoned.is_empty() {
+                    tracing::error!(
+                        abandoned = report.abandoned.len(),
+                        "削除の再試行の上限に達したゲームがある"
+                    );
+                }
+                ExitCode::SUCCESS
+            }
+            Err(_) => ExitCode::FAILURE,
+        };
+    }
     // 鍵の版（既定 1）と、旧版の鍵（`版:鍵` をカンマ区切り。残している間は旧版の資格を使える。外すと使えなくなる）
     let key_version: i32 = std::env::var("CREDENTIAL_KEY_VERSION")
         .ok()
@@ -123,7 +162,7 @@ async fn main() -> ExitCode {
         key_version,
         // 復帰資格は 30 日、ブラウザセッションは 24 時間
         credential_ttl_millis: 2_592_000_000,
-        retention_days: 30,
+        retention_days: 90,
         max_attempts: 3,
         retired_keys,
         session_ttl_millis: 86_400_000,

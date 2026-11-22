@@ -85,6 +85,12 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
                     )),
                 ],
             ),
+            // 保持の方針。起点は暫定で作成時（M5。人の確認が要る）。削除予定日は、起点 + 保持日数
+            st(
+                "INSERT INTO retention_policies (game_id, retention_days, retention_starts_at, delete_after) \
+                 VALUES ($1, $2::integer, now(), now() + make_interval(days => $2::integer))",
+                vec![Bind::Uuid(game), Bind::Int(i64::from(retention_days.get()))],
+            ),
             st(
                 "INSERT INTO game_join_codes (game_id, join_code) VALUES ($1, $2)",
                 vec![Bind::Uuid(game), Bind::Text(join_code.as_str().to_owned())],

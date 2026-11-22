@@ -23,7 +23,7 @@ fn app_with(pool: PgPool, limit: Duration) -> Router {
         credential_key: Secret::new(vec![5; 32]),
         key_version: 1,
         credential_ttl_millis: 86_400_000,
-        retention_days: 30,
+        retention_days: 90,
         max_attempts: 3,
         retired_keys: Vec::new(),
         session_ttl_millis: 86_400_000,

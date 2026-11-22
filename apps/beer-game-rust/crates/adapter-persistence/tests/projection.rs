@@ -34,7 +34,8 @@ fn tech__投影は純粋_同じイベントから同じ文を導く() -> Result<
     let game = Uuid::from_u128(7);
     let event = created(id)?;
     assert_eq!(game_statements(game, &event), game_statements(game, &event));
-    assert_eq!(game_statements(game, &event).len(), 3);
+    // game_overview・retention_policies・game_join_codes・game_settings
+    assert_eq!(game_statements(game, &event).len(), 4);
     Ok(())
 }
 

@@ -66,3 +66,6 @@ observation/observation-disclosure.feature
 # B11: 結果の出力（US4.3）
 export/export.feature
 export/export-custom.feature
+
+# B12: 保持と削除（US5.1）。retention-ui.feature は @ui なので対象外
+retention/retention.feature

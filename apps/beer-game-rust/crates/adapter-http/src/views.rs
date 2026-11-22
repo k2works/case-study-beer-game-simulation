@@ -2,7 +2,8 @@
 //! 参加者には自分の役割の値だけを返し、他の役割の値と将来の週の需要は返さない。小売店だけが当週の顧客需要を見られる。
 
 use beergame_application::{
-    EditorSnapshot, GameSnapshot, ObservationSnapshot, ResultRow, RoleSnapshot, SessionSnapshot,
+    EditorSnapshot, GameSnapshot, ObservationSnapshot, ResultRow, RetentionState, RoleSnapshot,
+    SessionSnapshot,
 };
 use beergame_domain::{Actor, Role};
 use serde_json::{Map, Value, json};
@@ -272,4 +273,18 @@ pub(crate) fn observation_view(o: &ObservationSnapshot) -> Value {
         json!({"game": o.game_version, "session": o.session_version}),
     );
     Value::Object(view)
+}
+
+/// 保持状態。削除が完了したゲームは、記録ごと無くなるので、完了の状態は無い。
+pub(crate) fn retention_view(r: &RetentionState) -> Value {
+    json!({
+        "retentionDays": r.retention_days,
+        "startsAt": rfc3339_millis(r.starts_at_millis),
+        "deleteAfter": rfc3339_millis(r.delete_after_millis),
+        "status": r.status,
+        "attempt": r.attempt,
+        "nextAttemptAt": r.next_attempt_at_millis.map(rfc3339_millis),
+        "lastFailureCode": r.last_failure_code,
+        "backupRetentionDays": beergame_application::BACKUP_RETENTION_DAYS,
+    })
 }

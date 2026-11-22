@@ -5,7 +5,7 @@ use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{
     AppFailure, AppSettings, CoHolderRow, EditorSnapshot, Env, GameSnapshot, InvitationRow,
     LobbyParticipantRow, ObservationSnapshot, ObservedSession, ObserverRow, PersistenceFailure,
-    ResultRow, RoleSnapshot, SessionSnapshot, StoredResponse, TeamWeekRow,
+    ResultRow, RetentionState, RoleSnapshot, SessionSnapshot, StoredResponse, TeamWeekRow,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -398,6 +398,45 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             weeks,
             game_version,
             session_version,
+        }))
+    }
+
+    async fn retention_state(&self, game_id: GameId) -> Result<Option<RetentionState>, AppFailure> {
+        let row = sqlx::query(
+            "SELECT p.retention_days, (extract(epoch FROM p.retention_starts_at) * 1000)::bigint AS starts_ms, \
+             (extract(epoch FROM p.delete_after) * 1000)::bigint AS delete_ms, r.status, r.attempt, \
+             (extract(epoch FROM r.next_attempt_at) * 1000)::bigint AS next_ms, r.last_failure_code \
+             FROM retention_policies p LEFT JOIN deletion_runs r ON r.game_id = p.game_id WHERE p.game_id = $1",
+        )
+        .bind(Uuid::from_u128(game_id.get()))
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage)?;
+        let Some(row) = row else { return Ok(None) };
+        let run_status: Option<String> = row.try_get("status").map_err(storage)?;
+        let next: Option<i64> = row.try_get("next_ms").map_err(storage)?;
+        // 予定（まだ試行していない）・削除中・再試行待ち・再試行の上限に達した（再試行の時刻が無い）
+        let status = match (run_status.as_deref(), next) {
+            (None, _) => "SCHEDULED",
+            (Some("IN_PROGRESS"), _) => "IN_PROGRESS",
+            (Some(_), Some(_)) => "RETRY_PENDING",
+            (Some(_), None) => "ABANDONED",
+        };
+        Ok(Some(RetentionState {
+            retention_days: i64::from(row.try_get::<i32, _>("retention_days").map_err(storage)?),
+            starts_at_millis: row.try_get("starts_ms").map_err(storage)?,
+            delete_after_millis: row.try_get("delete_ms").map_err(storage)?,
+            status: status.to_owned(),
+            attempt: row
+                .try_get::<Option<i32>, _>("attempt")
+                .map_err(storage)?
+                .map_or(0, i64::from),
+            next_attempt_at_millis: if status == "RETRY_PENDING" {
+                next
+            } else {
+                None
+            },
+            last_failure_code: row.try_get("last_failure_code").map_err(storage)?,
         }))
     }
 
