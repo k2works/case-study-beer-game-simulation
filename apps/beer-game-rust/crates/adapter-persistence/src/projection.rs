@@ -103,6 +103,8 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
             "UPDATE lobby_participants SET role = NULL WHERE participant_id = $1",
             vec![pid(participant_id.get())],
         )],
+        // 資格の失効・再発行は、周辺ストア（credentials・browser_sessions）に書く。投影の表は変わらない
+        GameEvent::CredentialRevoked { .. } | GameEvent::CredentialReissued { .. } => Vec::new(),
         GameEvent::GameStarted { .. } => vec![st(
             "UPDATE game_overview SET status = 'STARTED', started_at = now() WHERE game_id = $1",
             vec![Bind::Uuid(game)],
@@ -311,6 +313,13 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
     }
 }
 
+fn kind_text(kind: CredentialKind) -> &'static str {
+    match kind {
+        CredentialKind::Facilitator => "FACILITATOR",
+        CredentialKind::Participant => "PARTICIPANT",
+    }
+}
+
 /// 周辺ストアへの書き込み（資格のダイジェスト・表示名）の文。イベントには入れない値（D7）。
 #[must_use]
 pub fn peripheral_statements(write: &PeripheralWrite) -> Statement {
@@ -329,18 +338,40 @@ pub fn peripheral_statements(write: &PeripheralWrite) -> Statement {
             vec![
                 Bind::Text(digest.clone()),
                 pid(game_id.get()),
-                Bind::Text(
-                    match kind {
-                        CredentialKind::Facilitator => "FACILITATOR",
-                        CredentialKind::Participant => "PARTICIPANT",
-                    }
-                    .to_owned(),
-                ),
+                Bind::Text(kind_text(*kind).to_owned()),
                 pid(*subject_id),
                 Bind::Int(i64::from(*key_version)),
                 Bind::Int(issued_at.epoch_millis()),
                 Bind::Int(expires_at.epoch_millis()),
             ],
+        ),
+        PeripheralWrite::BrowserSession {
+            digest,
+            game_id,
+            kind,
+            subject_id,
+            key_version,
+            expires_at,
+        } => st(
+            "INSERT INTO browser_sessions (credential_digest, game_id, actor_kind, actor_id, key_version, expires_at) \
+             VALUES ($1, $2, $3, $4, $5, to_timestamp($6::double precision / 1000))",
+            vec![
+                Bind::Text(digest.clone()),
+                pid(game_id.get()),
+                Bind::Text(kind_text(*kind).to_owned()),
+                pid(*subject_id),
+                Bind::Int(i64::from(*key_version)),
+                Bind::Int(expires_at.epoch_millis()),
+            ],
+        ),
+        PeripheralWrite::RevokeCredentials {
+            game_id,
+            subject_id,
+        } => st(
+            // 復帰資格を失効させ、発行済みのブラウザセッションを使えなくする（同じトランザクション）
+            "WITH revoked AS (UPDATE credentials SET revoked_at = now() WHERE game_id = $1 AND subject_id = $2 AND revoked_at IS NULL) \
+             DELETE FROM browser_sessions WHERE game_id = $1 AND actor_id = $2",
+            vec![pid(game_id.get()), pid(*subject_id)],
         ),
         PeripheralWrite::Idempotency {
             game_id,

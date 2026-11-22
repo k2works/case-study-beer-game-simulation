@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use beergame_application::{
     AppFailure, CredentialKind, CredentialLookup, CredentialRecord, EventStore, PeripheralWrite,
-    PersistenceFailure, StoredResponse, StreamRead,
+    PersistenceFailure, SessionWriter, StoredResponse, StreamRead,
 };
 use beergame_domain::{GameEvent, GameId, Instant, SessionEvent};
 
@@ -57,6 +57,10 @@ pub trait EventCodec<E>: Sync {
 }
 
 async fn run_statement(tx: &mut PgTx, statement: &Statement) -> Result<(), AppFailure> {
+    run_on(&mut tx.0, statement).await
+}
+
+async fn run_on(conn: &mut sqlx::PgConnection, statement: &Statement) -> Result<(), AppFailure> {
     let mut query = sqlx::query(statement.sql);
     for bind in &statement.binds {
         query = match bind {
@@ -69,7 +73,7 @@ async fn run_statement(tx: &mut PgTx, statement: &Statement) -> Result<(), AppFa
         };
     }
     query
-        .execute(&mut *tx.0)
+        .execute(conn)
         .await
         .map(|_| ())
         .map_err(|e| storage(&e))
@@ -377,22 +381,15 @@ impl EventStore<SessionEvent> for PgGameStore {
     }
 }
 
-impl CredentialLookup for PgGameStore {
-    async fn find(&self, digest: &str) -> Result<Option<CredentialRecord>, AppFailure> {
-        let row = sqlx::query(
-            "SELECT game_id, kind, subject_id, (extract(epoch FROM expires_at) * 1000)::bigint AS expires_ms, \
-             revoked_at IS NOT NULL AS revoked FROM credentials WHERE credential_digest = $1",
-        )
-        .bind(digest)
-        .fetch_optional(&self.game.pool)
-        .await
-        .map_err(|e| storage(&e))?;
-        let Some(row) = row else { return Ok(None) };
+impl PgGameStore {
+    /// 資格の行（復帰資格・ブラウザセッション）を `CredentialRecord` にする。
+    fn record_of(row: &sqlx::postgres::PgRow) -> Result<CredentialRecord, AppFailure> {
         let game: Uuid = row.try_get("game_id").map_err(|e| storage(&e))?;
         let kind: String = row.try_get("kind").map_err(|e| storage(&e))?;
         let subject: Uuid = row.try_get("subject_id").map_err(|e| storage(&e))?;
         let expires: i64 = row.try_get("expires_ms").map_err(|e| storage(&e))?;
         let revoked: bool = row.try_get("revoked").map_err(|e| storage(&e))?;
+        let key_version: i32 = row.try_get("key_version").map_err(|e| storage(&e))?;
         let kind = match kind.as_str() {
             "FACILITATOR" => CredentialKind::Facilitator,
             "PARTICIPANT" => CredentialKind::Participant,
@@ -403,12 +400,65 @@ impl CredentialLookup for PgGameStore {
                 )));
             }
         };
-        Ok(Some(CredentialRecord {
+        Ok(CredentialRecord {
             game_id: GameId::new(game.as_u128()),
             kind,
             subject_id: subject.as_u128(),
             expires_at: Instant::from_epoch_millis(expires),
             revoked,
-        }))
+            key_version,
+        })
+    }
+}
+
+impl CredentialLookup for PgGameStore {
+    /// ブラウザセッション。対象の復帰資格に、失効していないものが 1 つも無ければ `revoked`。
+    async fn find(&self, digest: &str) -> Result<Option<CredentialRecord>, AppFailure> {
+        let row = sqlx::query(
+            "SELECT s.game_id, s.actor_kind AS kind, s.actor_id AS subject_id, s.key_version, \
+             (extract(epoch FROM s.expires_at) * 1000)::bigint AS expires_ms, \
+             NOT EXISTS (SELECT 1 FROM credentials c WHERE c.game_id = s.game_id AND c.subject_id = s.actor_id \
+                         AND c.revoked_at IS NULL) AS revoked \
+             FROM browser_sessions s WHERE s.credential_digest = $1",
+        )
+        .bind(digest)
+        .fetch_optional(&self.game.pool)
+        .await
+        .map_err(|e| storage(&e))?;
+        row.as_ref().map(Self::record_of).transpose()
+    }
+
+    async fn find_recovery(&self, digest: &str) -> Result<Option<CredentialRecord>, AppFailure> {
+        let row = sqlx::query(
+            "SELECT game_id, kind, subject_id, key_version, (extract(epoch FROM expires_at) * 1000)::bigint AS expires_ms, \
+             revoked_at IS NOT NULL AS revoked FROM credentials WHERE credential_digest = $1",
+        )
+        .bind(digest)
+        .fetch_optional(&self.game.pool)
+        .await
+        .map_err(|e| storage(&e))?;
+        row.as_ref().map(Self::record_of).transpose()
+    }
+}
+
+impl SessionWriter for PgGameStore {
+    async fn start_session(
+        &self,
+        recovery_digest: &str,
+        session: &PeripheralWrite,
+        recovery_expires_at: Instant,
+    ) -> Result<(), AppFailure> {
+        let mut tx = self.game.pool.begin().await.map_err(|e| storage(&e))?;
+        let statement = crate::projection::peripheral_statements(session);
+        run_on(&mut tx, &statement).await?;
+        sqlx::query(
+            "UPDATE credentials SET expires_at = to_timestamp($2::double precision / 1000) WHERE credential_digest = $1",
+        )
+        .bind(recovery_digest)
+        .bind(recovery_expires_at.epoch_millis())
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| storage(&e))?;
+        tx.commit().await.map_err(|e| storage(&e))
     }
 }

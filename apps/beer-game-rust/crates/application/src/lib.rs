@@ -15,8 +15,9 @@ mod start;
 
 pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
-    JoinOutcome, assign_role, authenticate, commit_week, create_game, join_game, pause_session,
-    resume_session, save_decision, start_game, submit_proxy_decision,
+    JoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter, assign_role, authenticate,
+    commit_week, create_game, join_game, pause_session, recover, reissue_credential,
+    resume_session, revoke_credential, save_decision, start_game, submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use secret::{Secret, digest, encode_token};
@@ -96,6 +97,17 @@ pub enum PeripheralWrite {
         response: Vec<u8>,
         expires_at: Instant,
     },
+    /// ブラウザセッションのダイジェスト（生の値は含めない）。復帰資格とは別のダイジェストで持つ。
+    BrowserSession {
+        digest: String,
+        game_id: GameId,
+        kind: CredentialKind,
+        subject_id: u128,
+        key_version: i32,
+        expires_at: Instant,
+    },
+    /// 対象の資格（復帰資格）を失効させ、発行済みのブラウザセッションを使えなくする。
+    RevokeCredentials { game_id: GameId, subject_id: u128 },
     /// 表示名（参加者のみ）。
     DisplayName {
         game_id: GameId,

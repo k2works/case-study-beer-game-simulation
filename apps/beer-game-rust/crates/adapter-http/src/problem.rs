@@ -134,6 +134,8 @@ fn title_of(code: &str) -> &'static str {
         "session.decisions_changed" => "確定の根拠にした入力が、変わりました。",
         "session.incomplete_decisions" => "入力がそろっていないため、確定できません。",
         "game.not_ended" => "ゲームがまだ終了していないため、開示できません。",
+        "game.credential_already_revoked" => "この資格は、すでに失効しています。",
+        "game.credential_not_revoked" => "この資格は失効していないため、再発行できません。",
         "session.paused" => "一時停止中です。",
         "session.not_paused" => "一時停止中ではありません。",
         "session.save_limit_reached" => "この週の保存回数の上限（9 回）に達しました。",

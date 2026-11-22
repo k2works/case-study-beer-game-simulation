@@ -22,3 +22,18 @@ review/retrospective.feature
 
 # B6: 進行の継続（停止・再開・代理入力）
 continuation/pause-resume.feature
+
+# B6: 復帰・資格（US3.2）。役割の入れ替えと共同担当を含むシナリオは B7（co-assignment と合わせる）
+continuation/recovery.feature
+continuation/credentials.feature :: 参加の応答は、参加したゲームの ID を含む
+continuation/credentials.feature :: 進行役が漏れた資格を失効させると、その参加者は復帰も操作もできなくなる
+continuation/credentials.feature :: 進行役が失効させた資格を再発行すると、新しい復帰コードで復帰できる
+continuation/credentials.feature :: 準備中でも開始後でも、失効・再発行・復帰ができる
+continuation/credentials.feature :: すでに失効した資格をもう一度失効させようとすると、拒否される
+continuation/credentials.feature :: 進行役でない人は、資格を失効も再発行もできない
+continuation/credentials.feature :: 別のゲームの進行役は、資格を失効させられない
+continuation/credentials.feature :: 期限が切れたブラウザセッションでは、状況を取得できない
+continuation/credentials.feature :: 失効した資格が、以前に成功した保存の要求を同じキーで再送しても、拒否される
+continuation/credentials.feature :: 失効した復帰資格が、以前に成功した復帰の要求を同じキーで再送しても、拒否される
+continuation/credentials.feature :: 署名鍵を新しい版へ更新しても、更新前に発行した資格は期限まで使える
+continuation/credentials.feature :: 旧版の鍵を設定から外すと、その版で発行した資格は使えなくなる

@@ -13,9 +13,10 @@ use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
-    GameSnapshot, Idempotency, ResponseShape, Secret, SessionSnapshot, StartExecuted, assign_role,
-    authenticate, commit_week, create_game, digest, join_game, pause_session, resume_session,
-    save_decision, start_game, submit_proxy_decision,
+    GameSnapshot, Idempotency, ResponseShape, Secret, SessionSnapshot, SessionWriter,
+    StartExecuted, assign_role, authenticate, commit_week, create_game, digest, join_game,
+    pause_session, recover, reissue_credential, resume_session, revoke_credential, save_decision,
+    start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
@@ -36,6 +37,7 @@ pub trait Backend: Send + Sync + 'static {
     type Store: EventStore<GameEvent>
         + EventStore<SessionEvent, Tx = <Self::Store as EventStore<GameEvent>>::Tx>
         + CredentialLookup
+        + SessionWriter
         + Send;
 
     fn env(&self) -> &Self::Env;
@@ -75,6 +77,9 @@ pub trait Backend: Send + Sync + 'static {
 
 const SESSION_COOKIE: &str = "bg_session";
 const SESSION_MAX_AGE_SECONDS: i64 = 86_400;
+const RECOVERY_COOKIE: &str = "bg_recovery";
+const RECOVERY_MAX_AGE_SECONDS: i64 = 2_592_000;
+const RECOVER_PATH: &str = "/api/v1/participations/recover";
 
 /// ルーターを作る。
 pub fn router<B: Backend>(backend: Arc<B>) -> Router {
@@ -83,6 +88,15 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route("/api/v1/ready", get(ready::<B>))
         .route("/api/v1/games", post(create::<B>))
         .route("/api/v1/participations/join", post(join::<B>))
+        .route("/api/v1/participations/recover", post(recover_route::<B>))
+        .route(
+            "/api/v1/games/{game_id}/credentials/revoke",
+            post(revoke::<B>),
+        )
+        .route(
+            "/api/v1/games/{game_id}/credentials/reissue",
+            post(reissue::<B>),
+        )
         .route(
             "/api/v1/games/{game_id}/participants/{participant_id}/role",
             put(assign::<B>),
@@ -194,6 +208,26 @@ fn session_cookie<B: Backend>(backend: &B, headers: &HeaderMap, token: &str) -> 
     )
 }
 
+/// 復帰資格の Cookie（`bg_recovery`。復帰の経路にだけ送る）。
+fn recovery_cookie<B: Backend>(backend: &B, token: &str) -> String {
+    let secure = if backend.secure_cookies() {
+        "; Secure"
+    } else {
+        ""
+    };
+    format!(
+        "{RECOVERY_COOKIE}={token}; Path={RECOVER_PATH}; HttpOnly; SameSite=Strict; Max-Age={RECOVERY_MAX_AGE_SECONDS}{secure}"
+    )
+}
+
+/// 応答に Set-Cookie を足す。
+fn with_cookie(mut response: Response, cookie: &str) -> Response {
+    if let Ok(value) = HeaderValue::from_str(cookie) {
+        response.headers_mut().append(header::SET_COOKIE, value);
+    }
+    response
+}
+
 async fn health<B: Backend>(State(backend): State<Arc<B>>, headers: HeaderMap) -> Response {
     let correlation = correlation_id(&*backend, &headers);
     with_correlation(
@@ -291,9 +325,17 @@ async fn create<B: Backend>(
             let location = format!("/api/v1/games/{}/state", Uuid::from_u128(game_id.get()));
             let cookie =
                 session_cookie(&*backend, &headers, outcome.facilitator_credential.expose());
-            let body = json!({"versions": {"game": outcome.game_version, "session": Value::Null}});
+            let body = json!({
+                "versions": {"game": outcome.game_version, "session": Value::Null},
+                "recoveryCode": outcome.recovery_code.expose(),
+            });
+            let response =
+                json_response(StatusCode::CREATED, &body, Some(&cookie), Some(&location));
             with_correlation(
-                json_response(StatusCode::CREATED, &body, Some(&cookie), Some(&location)),
+                with_cookie(
+                    response,
+                    &recovery_cookie(&*backend, outcome.recovery_code.expose()),
+                ),
                 &correlation,
             )
         }
@@ -345,8 +387,12 @@ async fn join<B: Backend>(
                 "versions": {"game": outcome.game_version, "session": Value::Null},
                 "gameId": Uuid::from_u128(game_id.get()).to_string(),
             });
+            let response = json_response(StatusCode::OK, &body, Some(&cookie), None);
             with_correlation(
-                json_response(StatusCode::OK, &body, Some(&cookie), None),
+                with_cookie(
+                    response,
+                    &recovery_cookie(&*backend, outcome.recovery_code.expose()),
+                ),
                 &correlation,
             )
         }
@@ -1120,4 +1166,231 @@ async fn proxy_decision<B: Backend>(
     })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 復帰資格を、Cookie `bg_recovery` から取り出す。
+fn recovery_token_from_cookie(headers: &HeaderMap) -> Option<Secret<String>> {
+    headers
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())?
+        .split(';')
+        .filter_map(|pair| pair.trim().split_once('='))
+        .find(|(k, _)| *k == RECOVERY_COOKIE)
+        .map(|(_, v)| Secret::new(v.to_owned()))
+}
+
+/// 復帰（復帰資格が認可）。復帰コード（本文）か Cookie `bg_recovery`。無効な資格は、理由を区別しない 403。
+async fn recover_route<B: Backend>(
+    State(backend): State<Arc<B>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let parsed = parse_json(&body)?;
+        let game_id = parsed
+            .get("gameId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                Box::new(validation_problem(vec![field(
+                    "gameId",
+                    "復帰するゲームの ID が必要です。",
+                )]))
+            })
+            .and_then(parse_game_id)?;
+        let token = parsed
+            .get("recoveryCode")
+            .and_then(Value::as_str)
+            .map(|code| Secret::new(code.to_owned()))
+            .or_else(|| recovery_token_from_cookie(&headers))
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        let outcome = recover(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            game_id,
+            &token,
+        )
+        .await
+        .map_err(|f| Box::new(problem_of(&f)))?;
+        let snapshot = backend
+            .game_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?;
+        let (game_version, session_version) =
+            snapshot.map_or((0, None), |s| (s.game_version, s.session_version));
+        let (kind, role) = match outcome.actor {
+            Actor::Participant(id) => (
+                "PARTICIPANT",
+                backend
+                    .participant_role(game_id, id)
+                    .await
+                    .map_err(|f| Box::new(problem_of(&f)))?,
+            ),
+            Actor::Facilitator(_) | Actor::Anonymous => ("FACILITATOR", None),
+        };
+        let mut view = json!({
+            "versions": {"game": game_version, "session": session_version},
+            "gameId": Uuid::from_u128(game_id.get()).to_string(),
+            "kind": kind,
+        });
+        if let (Some(role), Some(object)) = (role, view.as_object_mut()) {
+            object.insert("role".to_owned(), json!(crate::views::role_name(role)));
+        }
+        let cookie = session_cookie(&*backend, &headers, outcome.session.expose());
+        Ok(json_response(StatusCode::OK, &view, Some(&cookie), None))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 失効・再発行の対象（`{"subject": {"kind": "PARTICIPANT", "id": <uuid>}}`）。
+fn parse_subject(parsed: &Value) -> Result<ParticipantId, Box<Problem>> {
+    let subject = parsed.get("subject");
+    let kind = subject.and_then(|s| s.get("kind")).and_then(Value::as_str);
+    let id = subject
+        .and_then(|s| s.get("id"))
+        .and_then(Value::as_str)
+        .and_then(|text| Uuid::parse_str(text).ok());
+    match (kind, id) {
+        (Some("PARTICIPANT"), Some(id)) => Ok(ParticipantId::new(id.as_u128())),
+        _ => Err(Box::new(validation_problem(vec![field(
+            "subject",
+            "対象は {kind: PARTICIPANT, id: 参加者の ID} にしてください。",
+        )]))),
+    }
+}
+
+async fn revoke<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let participant_id = parse_subject(&parsed)?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "revoke_credential",
+            &parsed.to_string(),
+            ResponseShape::Game,
+        )?;
+        revoke_credential(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+            participant_id,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| executed_response(&executed, ResponseShape::Game, &correlation_task))
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 再発行。新しい復帰コードを、この応答で一度だけ示す（応答は冪等記録に保存しない。秘密を含むため）。
+async fn reissue<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let participant_id = parse_subject(&parsed)?;
+        // Idempotency-Key は必須（保存はしない）
+        idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "reissue_credential",
+            &parsed.to_string(),
+            ResponseShape::Game,
+        )?;
+        let outcome = reissue_credential(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+            participant_id,
+        )
+        .await
+        .map_err(|failure| Box::new(problem_of(&failure)))?;
+        let view = json!({
+            "versions": {"game": outcome.game_version, "session": Value::Null},
+            "recoveryCode": outcome.recovery_code.expose(),
+            "expiresAt": expires_at_text(outcome.expires_at),
+        });
+        Ok(with_correlation(
+            json_response(StatusCode::OK, &view, None, None),
+            &correlation_task,
+        ))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 期限を RFC 3339（UTC、ミリ秒）の文字列にする（暦の計算は days-from-civil の逆算）。
+fn expires_at_text(at: Instant) -> String {
+    let millis = at.epoch_millis();
+    let days = millis.div_euclid(86_400_000);
+    let in_day = millis.rem_euclid(86_400_000);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let day_of_era = z.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = if month_index < 10 {
+        month_index + 3
+    } else {
+        month_index - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
+        in_day / 3_600_000,
+        in_day / 60_000 % 60,
+        in_day / 1_000 % 60,
+        in_day % 1_000
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expires_at_text;
+    use beergame_domain::Instant;
+
+    #[test]
+    #[allow(non_snake_case)] // 理由: RT1 の命名（承認済み）の `__` を使うため。
+    fn tech__期限は_RFC3339_UTC_のミリ秒つきで書く() {
+        // 2026-11-22T01:02:03.004Z、うるう年の 2024-02-29、紀元（1970-01-01）
+        for (millis, text) in [
+            (1_795_309_323_004, "2026-11-22T01:02:03.004Z"),
+            (1_709_164_800_000, "2024-02-29T00:00:00.000Z"),
+            (0, "1970-01-01T00:00:00.000Z"),
+        ] {
+            assert_eq!(expires_at_text(Instant::from_epoch_millis(millis)), text);
+        }
+    }
 }

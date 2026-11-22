@@ -130,10 +130,10 @@ async fn join_named(world: &mut ApiWorld, name: &str) -> R {
             .await
             .map_err(|e| e.to_string())?;
         let cookie = reply.cookie.clone().ok_or("参加者の Cookie が無い")?;
-        world
-            .game_mut()?
-            .named
-            .insert(name.to_owned(), (pid, cookie));
+        let recovery = reply.recovery.clone().unwrap_or_default();
+        let game = world.game_mut()?;
+        game.recoveries.insert(pid.clone(), recovery);
+        game.named.insert(name.to_owned(), (pid, cookie));
     }
     Ok(())
 }
@@ -1240,4 +1240,692 @@ async fn rejected_save_limit(world: &mut ApiWorld) -> R {
         status(world)? == 409 && code(world)? == "session.save_limit_reached",
         &format!("上限の拒否ではない: {}", world.reply()?.body),
     )
+}
+
+// ---- 復帰・失効・再発行・鍵の版（US3.2） ----
+
+fn participant_of(world: &ApiWorld, role_ja: &str) -> Result<(String, String), String> {
+    world
+        .game()?
+        .players
+        .get(en(role_ja)?)
+        .cloned()
+        .ok_or_else(|| format!("参加者が無い: {role_ja}"))
+}
+
+/// 復帰を要求する。`recovery` は復帰資格の値、`as_code` なら本文の復帰コード、でなければ Cookie `bg_recovery`。
+async fn recover_with(world: &mut ApiWorld, recovery: &str, as_code: bool, key: Option<&str>) -> R {
+    let game_id = world.game()?.id.clone();
+    let (body, cookie) = if as_code {
+        (json!({"gameId": game_id, "recoveryCode": recovery}), None)
+    } else {
+        (
+            json!({"gameId": game_id}),
+            Some(format!("bg_recovery={recovery}")),
+        )
+    };
+    world
+        .call(
+            "POST",
+            "/api/v1/participations/recover",
+            cookie.as_deref(),
+            key,
+            &body.to_string(),
+        )
+        .await?;
+    Ok(())
+}
+
+async fn recover_participant(world: &mut ApiWorld, role_ja: &str, key: Option<&str>) -> R {
+    let (pid, _) = participant_of(world, role_ja)?;
+    let recovery = world
+        .game()?
+        .recoveries
+        .get(&pid)
+        .cloned()
+        .ok_or("復帰資格が無い")?;
+    recover_with(world, &recovery, false, key).await?;
+    if status(world)? == 200 {
+        let cookie = world
+            .reply()?
+            .cookie
+            .clone()
+            .ok_or("復帰の Cookie が無い")?;
+        world.recovered = Some((cookie, pid));
+    }
+    Ok(())
+}
+
+#[given(regex = r"^(.+)の参加者のブラウザセッションが失われている$")]
+async fn lost_session(_world: &mut ApiWorld, _role: String) -> R {
+    Ok(())
+}
+
+#[given("進行役のブラウザセッションが失われている")]
+async fn facilitator_lost_session(_world: &mut ApiWorld) -> R {
+    Ok(())
+}
+
+#[given("進行役のブラウザセッションと復帰資格が失われている")]
+async fn facilitator_lost_all(_world: &mut ApiWorld) -> R {
+    Ok(())
+}
+
+#[when(regex = r"^(.+)の参加者が、復帰資格で再接続(する|しようとする)$")]
+async fn participant_recovers(world: &mut ApiWorld, role: String, _k: String) -> R {
+    recover_participant(world, &role, None).await
+}
+
+#[given(regex = r"^(.+)の参加者が、冪等キー付きで復帰資格で再接続している$")]
+async fn participant_recovered_with_key(world: &mut ApiWorld, role: String) -> R {
+    recover_participant(world, &role, Some("recover-fixed")).await?;
+    expect(status(world)? == 200, "復帰できなかった")
+}
+
+#[when(regex = r"^(.+)の参加者が、以前に成功した復帰の要求を、同じキーでもう一度送る$")]
+async fn participant_recover_again(world: &mut ApiWorld, role: String) -> R {
+    recover_participant(world, &role, Some("recover-fixed")).await
+}
+
+#[when(regex = r"^(.+)の参加者が、新しい復帰コードで復帰する$")]
+async fn recover_with_new_code(world: &mut ApiWorld, role: String) -> R {
+    recover_with_reissued(world, &role).await?;
+    expect(status(world)? == 200, "復帰できなかった")
+}
+
+async fn recover_with_reissued(world: &mut ApiWorld, role_ja: &str) -> R {
+    let (pid, _) = participant_of(world, role_ja)?;
+    let code = world
+        .game()?
+        .reissued
+        .get(&pid)
+        .cloned()
+        .ok_or("再発行した復帰コードが無い")?;
+    recover_with(world, &code, true, None).await?;
+    if status(world)? == 200 {
+        let cookie = world
+            .reply()?
+            .cookie
+            .clone()
+            .ok_or("復帰の Cookie が無い")?;
+        world.recovered = Some((cookie, pid));
+    }
+    Ok(())
+}
+
+#[then(regex = r"^(.+)の参加者は、新しい復帰コードで同じゲームの(.+)として復帰できる$")]
+async fn can_recover_with_new_code(world: &mut ApiWorld, who: String, role: String) -> R {
+    recover_with_reissued(world, &who).await?;
+    recovered_as(world, role).await
+}
+
+#[then(regex = r"^同じゲームの(工場|一次卸|二次卸|小売店)として復帰する$")]
+async fn recovered_as(world: &mut ApiWorld, role: String) -> R {
+    expect(
+        status(world)? == 200,
+        &format!("復帰できていない: {}", world.reply()?.body),
+    )?;
+    let game_id = world.game()?.id.clone();
+    expect(
+        world.reply()?.body.get("gameId") == Some(&json!(game_id)),
+        "別のゲームに復帰した",
+    )?;
+    let (cookie, pid) = world.recovered.clone().ok_or("復帰の Cookie が無い")?;
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{game_id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    let body = world.reply()?.body.clone();
+    expect(
+        status(world)? == 200
+            && body.get("role") == Some(&json!(en(&role)?))
+            && body.get("participantId") == Some(&json!(pid)),
+        &format!("役割・参加者が違う: {body}"),
+    )
+}
+
+#[then(regex = r"^最新の状況に、保存済みの入力 (\d+) が含まれる$")]
+async fn latest_has_decision(world: &mut ApiWorld, quantity: i64) -> R {
+    let (cookie, _) = world.recovered.clone().ok_or("復帰の Cookie が無い")?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/sessions/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    let body = world.reply()?.body.clone();
+    expect(
+        body.pointer("/roleStatus/decision") == Some(&json!(quantity)),
+        &format!("保存済みの入力が無い: {body}"),
+    )
+}
+
+#[given(regex = r"^(.+)の参加者の復帰資格が「(.+)」になっている$")]
+async fn recovery_credential_is(world: &mut ApiWorld, role: String, state: String) -> R {
+    let (pid, _) = participant_of(world, &role)?;
+    match state.as_str() {
+        "不明" => {
+            world
+                .game_mut()?
+                .recoveries
+                .insert(pid, "unknown-recovery-credential".to_owned());
+            Ok(())
+        }
+        "失効" => revoke(world, &pid).await,
+        "期限切れ" => {
+            sqlx::query(
+                "UPDATE credentials SET expires_at = now() - interval '1 day' WHERE subject_id = $1::uuid",
+            )
+            .bind(&pid)
+            .execute(world.pool()?)
+            .await
+            .map_err(|e| e.to_string())?;
+            Ok(())
+        }
+        other => Err(format!("知らない状態: {other}")),
+    }
+}
+
+#[then("復帰は拒否される")]
+async fn recovery_rejected(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 403 && code(world)? == "app.unauthorized",
+        &format!("権限エラーではない: {}", world.reply()?.body),
+    )
+}
+
+#[then("拒否の応答は、不明な復帰資格のときと同じである")]
+async fn rejection_is_indistinguishable(world: &mut ApiWorld) -> R {
+    let actual = world.reply()?.clone();
+    recover_with(world, "unknown-credential-xyz", false, None).await?;
+    let unknown = world.reply()?.clone();
+    expect(actual.status == unknown.status, "状態が違う")?;
+    for key in ["type", "title", "status", "detail", "code"] {
+        expect(
+            actual.body.get(key) == unknown.body.get(key),
+            &format!("{key} が不明な資格と違う"),
+        )?;
+    }
+    Ok(())
+}
+
+#[then("新しいブラウザセッションは発行されない")]
+async fn no_new_session(world: &mut ApiWorld) -> R {
+    expect(
+        world.reply()?.cookie.is_none(),
+        "新しいブラウザセッションが発行された",
+    )
+}
+
+// 複数のタブ（AC3.2.3）
+
+#[given(regex = r"^(.+)の参加者が、2 つのタブで第 (\d+) 週の画面を開いている$")]
+async fn two_tabs(world: &mut ApiWorld, role: String, _week: i64) -> R {
+    world.stale_version = world.game()?.versions.get(en(&role)?).copied().unwrap_or(0);
+    Ok(())
+}
+
+#[when(regex = r"^(.+)の参加者の古いタブが、第 (\d+) 週の数量として (\d+) を保存しようとする$")]
+async fn stale_tab_saves(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    let (_, cookie) = participant_of(world, &role)?;
+    let id = world.game()?.id.clone();
+    let key = world.next_key();
+    world.if_match = Some(world.stale_version.to_string());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/decisions"),
+            Some(&cookie),
+            Some(&key),
+            &json!({"week": week, "quantity": quantity}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[then(regex = r"^古いタブの保存は、第 (\d+) 週はすでに確定されているという理由で拒否される$")]
+async fn stale_tab_rejected(world: &mut ApiWorld, week: i64) -> R {
+    let body = world.reply()?.body.clone();
+    expect(
+        status(world)? == 409
+            && code(world)? == "session.week_advanced"
+            && body.get("requestedWeek") == Some(&json!(week))
+            && body.get("currentWeek") == Some(&json!(week + 1)),
+        &format!("週の拒否ではない: {body}"),
+    )
+}
+
+#[then(regex = r"^(.+)の参加者のもう一方のタブは、最新の状況として第 (\d+) 週を表示する$")]
+async fn other_tab_latest(world: &mut ApiWorld, role: String, week: i64) -> R {
+    fetch_state(world, &role, "").await?;
+    let body = world.reply()?.body.clone();
+    expect(
+        status(world)? == 200
+            && body.get("week") == Some(&json!(week))
+            && body
+                .pointer("/roleStatus/decision")
+                .is_none_or(Value::is_null),
+        &format!("最新の状況ではない: {body}"),
+    )
+}
+
+// 進行役の復帰（AC3.2.4）
+
+#[when("進行役が、画面を再読み込みする")]
+async fn facilitator_reloads(world: &mut ApiWorld) -> R {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    world.recovered = Some((cookie.clone(), String::new()));
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+async fn facilitator_recover(world: &mut ApiWorld, as_code: bool) -> R {
+    let recovery = world.game()?.recovery.clone();
+    recover_with(world, &recovery, as_code, None).await?;
+    if status(world)? == 200 {
+        let cookie = world
+            .reply()?
+            .cookie
+            .clone()
+            .ok_or("復帰の Cookie が無い")?;
+        world.recovered = Some((cookie, String::new()));
+    }
+    Ok(())
+}
+
+#[when("進行役が、復帰資格で再接続する")]
+async fn facilitator_recovers(world: &mut ApiWorld) -> R {
+    facilitator_recover(world, false).await
+}
+
+#[when("進行役が、作成時に控えた復帰コードで再接続する")]
+async fn facilitator_recovers_with_code(world: &mut ApiWorld) -> R {
+    facilitator_recover(world, true).await
+}
+
+#[then("同じゲームの進行コンソールが表示される")]
+async fn console_shown(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200,
+        &format!("進行コンソールに戻れない: {}", world.reply()?.body),
+    )?;
+    let (cookie, _) = world.recovered.clone().ok_or("Cookie が無い")?;
+    let (id, join_code) = (world.game()?.id.clone(), world.game()?.join_code.clone());
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(
+        world.reply()?.body.get("joinCode") == Some(&json!(join_code)),
+        "進行役の状態を取得できない",
+    )?;
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/sessions/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    Ok(())
+}
+
+// 参加の応答のゲーム ID
+
+#[then("応答に、参加したゲームの ID が含まれる")]
+async fn response_has_game_id(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    expect(
+        status(world)? == 200 && world.reply()?.body.get("gameId") == Some(&json!(id)),
+        "参加の応答にゲームの ID が無い",
+    )
+}
+
+// 失効・再発行（AC3.2.5）
+
+async fn credential_call(
+    world: &mut ApiWorld,
+    action: &str,
+    pid: &str,
+    cookie: &str,
+    game_id: &str,
+) -> R {
+    let key = world.next_key();
+    world
+        .call(
+            "POST",
+            &format!("/api/v1/games/{game_id}/credentials/{action}"),
+            Some(cookie),
+            Some(&key),
+            &json!({"subject": {"kind": "PARTICIPANT", "id": pid}}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+async fn revoke(world: &mut ApiWorld, pid: &str) -> R {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    credential_call(world, "revoke", pid, &cookie, &id).await?;
+    expect(
+        status(world)? == 200,
+        &format!("失効できない: {}", world.reply()?.body),
+    )
+}
+
+#[when(regex = r"^進行役が、(.+)の参加者の資格を失効させ(る|ようとする)$")]
+async fn facilitator_revokes(world: &mut ApiWorld, role: String, _k: String) -> R {
+    let (pid, _) = participant_of(world, &role)?;
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    credential_call(world, "revoke", &pid, &cookie, &id).await
+}
+
+#[given(regex = r"^進行役が、(.+)の参加者の資格を失効させている$")]
+async fn facilitator_has_revoked(world: &mut ApiWorld, role: String) -> R {
+    let (pid, _) = participant_of(world, &role)?;
+    revoke(world, &pid).await
+}
+
+#[when(regex = r"^(.+)の参加者が、(.+)の参加者の資格を失効させようとする$")]
+async fn participant_tries_to_revoke(world: &mut ApiWorld, actor: String, target: String) -> R {
+    let (_, cookie) = participant_of(world, &actor)?;
+    let (pid, _) = participant_of(world, &target)?;
+    let id = world.game()?.id.clone();
+    credential_call(world, "revoke", &pid, &cookie, &id).await
+}
+
+#[given("別のゲームの進行役がいる")]
+async fn another_game_exists(world: &mut ApiWorld) -> R {
+    let current = world.games.len().saturating_sub(1);
+    let reply = world.create_game(12, &kit_demand(12)).await?;
+    expect(reply.status == 201, "別のゲームを作成できない")?;
+    // 操作中のゲームは元のまま（別のゲームの進行役は、最後に作ったゲームの資格）
+    world.current = Some(current);
+    Ok(())
+}
+
+#[when(regex = r"^別のゲームの進行役が、(.+)の参加者の資格を失効させようとする$")]
+async fn other_facilitator_revokes(world: &mut ApiWorld, role: String) -> R {
+    let (pid, _) = participant_of(world, &role)?;
+    let cookie = world
+        .games
+        .last()
+        .map(|g| g.facilitator.clone())
+        .ok_or("別のゲームが無い")?;
+    let id = world.game()?.id.clone();
+    credential_call(world, "revoke", &pid, &cookie, &id).await
+}
+
+#[then("失効が受け付けられる")]
+async fn revoke_accepted(world: &mut ApiWorld) -> R {
+    expect(status(world)? == 200, "失効が受け付けられていない")
+}
+
+#[then("資格はすでに失効しているという理由で拒否される")]
+async fn already_revoked(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "game.credential_already_revoked",
+        &format!("失効済みの拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+async fn cannot_recover(world: &mut ApiWorld, role: &str) -> R {
+    recover_participant(world, role, None).await?;
+    expect(
+        status(world)? == 403 && world.reply()?.cookie.is_none(),
+        "復帰できてしまう",
+    )
+}
+
+#[then(
+    regex = r"^(.+)の参加者は、(?:復帰資格で復帰できない|失効した古い復帰資格では復帰できない)$"
+)]
+async fn participant_cannot_recover(world: &mut ApiWorld, role: String) -> R {
+    cannot_recover(world, &role).await
+}
+
+#[then(regex = r"^(.+)の参加者は、以前のブラウザセッションでも状況を取得できない$")]
+async fn old_session_unusable(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie) = participant_of(world, &role)?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(
+        status(world)? == 403 && code(world)? == "app.unauthorized",
+        "以前のブラウザセッションが使えてしまう",
+    )
+}
+
+#[then(regex = r"^(.+)の参加者の資格(?:には影響しない|は有効なままである)$")]
+async fn credential_remains(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie) = participant_of(world, &role)?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(status(world)? == 200, "資格が使えない")
+}
+
+async fn reissue(world: &mut ApiWorld, role: &str) -> R {
+    let (pid, _) = participant_of(world, role)?;
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    credential_call(world, "reissue", &pid, &cookie, &id).await?;
+    if status(world)? == 200
+        && let Some(code) = world
+            .reply()?
+            .body
+            .get("recoveryCode")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    {
+        world.game_mut()?.reissued.insert(pid, code);
+    }
+    Ok(())
+}
+
+#[when(regex = r"^進行役が、(.+)の参加者の資格を再発行する$")]
+async fn facilitator_reissues(world: &mut ApiWorld, role: String) -> R {
+    reissue(world, &role).await
+}
+
+#[given(regex = r"^進行役が、(.+)の参加者の資格を再発行している$")]
+async fn facilitator_has_reissued(world: &mut ApiWorld, role: String) -> R {
+    reissue(world, &role).await?;
+    expect(status(world)? == 200, "再発行できない")
+}
+
+#[then("再発行が受け付けられる")]
+async fn reissue_accepted(world: &mut ApiWorld) -> R {
+    expect(status(world)? == 200, "再発行が受け付けられていない")
+}
+
+#[then("新しい復帰コードと、現在より後の有効期限が示される")]
+async fn new_code_and_expiry(world: &mut ApiWorld) -> R {
+    let body = world.reply()?.body.clone();
+    let code_ok = body
+        .get("recoveryCode")
+        .and_then(Value::as_str)
+        .is_some_and(|c| !c.is_empty());
+    let expires = body
+        .get("expiresAt")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let now: String =
+        sqlx::query_scalar("SELECT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS')")
+            .fetch_one(world.pool()?)
+            .await
+            .map_err(|e| e.to_string())?;
+    // RFC 3339（UTC）の文字列は、辞書順が時刻順
+    expect(
+        code_ok && expires.len() >= 19 && expires[..19] > *now.as_str(),
+        &format!("復帰コード・期限が違う: {body}"),
+    )
+}
+
+#[given(regex = r"^ゲームは「(準備中|開始後)」である$")]
+async fn game_is_in_phase(world: &mut ApiWorld, phase: String) -> R {
+    if phase == "開始後" {
+        expect(start_game(world).await? == 200, "開始できない")?;
+    }
+    Ok(())
+}
+
+// 期限切れ・失効後の再送（ADR-004）
+
+#[given(regex = r"^(.+)の参加者のブラウザセッションの有効期限が切れている$")]
+async fn session_expired(world: &mut ApiWorld, role: String) -> R {
+    let (pid, _) = participant_of(world, &role)?;
+    sqlx::query("UPDATE browser_sessions SET expires_at = now() - interval '1 day' WHERE actor_id = $1::uuid")
+        .bind(&pid)
+        .execute(world.pool()?)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[when(regex = r"^(.+)の参加者が、期限が切れた資格で状況を取得しようとする$")]
+async fn get_with_expired(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie) = participant_of(world, &role)?;
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+async fn save_keyed(world: &mut ApiWorld, role: &str, week: i64, quantity: i64) -> R {
+    let (_, cookie) = participant_of(world, role)?;
+    let id = world.game()?.id.clone();
+    world.if_match = Some("0".to_owned());
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/decisions"),
+            Some(&cookie),
+            Some("save-fixed"),
+            &json!({"week": week, "quantity": quantity}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[given(regex = r"^(.+)の参加者が、冪等キー付きで第 (\d+) 週の数量 (\d+) を保存している$")]
+async fn saved_with_key(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    save_keyed(world, &role, week, quantity).await?;
+    expect(status(world)? == 200, "保存できなかった")
+}
+
+#[when(regex = r"^(.+)の参加者が、以前に成功した保存の要求を、同じキーでもう一度送る$")]
+async fn save_again_same_key(world: &mut ApiWorld, role: String) -> R {
+    save_keyed(world, &role, 1, 4).await
+}
+
+#[then("保存済みの応答は返らない")]
+async fn stored_response_not_returned(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 403 && world.reply()?.body.get("versions").is_none(),
+        "保存済みの応答が返った",
+    )
+}
+
+// 鍵のローテーション（NF-S4）
+
+#[when("運営者が、資格の署名鍵を新しい版へ更新する")]
+async fn rotate_key_when(world: &mut ApiWorld) -> R {
+    world.rebuild_with_keys(2, 6, vec![(1, 5)]).await
+}
+
+#[given("運営者が、資格の署名鍵を新しい版へ更新している")]
+async fn rotate_key_given(world: &mut ApiWorld) -> R {
+    world.rebuild_with_keys(2, 6, vec![(1, 5)]).await
+}
+
+#[when("運営者が、旧版の鍵を設定から外す")]
+async fn drop_old_key(world: &mut ApiWorld) -> R {
+    world.rebuild_with_keys(2, 6, Vec::new()).await
+}
+
+#[then(regex = r"^(.+)の参加者は、更新前に発行した復帰資格で復帰できる$")]
+async fn recover_after_rotation(world: &mut ApiWorld, role: String) -> R {
+    recover_participant(world, &role, None).await?;
+    expect(status(world)? == 200, "復帰できない")
+}
+
+#[then(regex = r"^更新前に発行した(.+)の参加者のブラウザセッションで、状況を取得できる$")]
+async fn session_after_rotation(world: &mut ApiWorld, role: String) -> R {
+    credential_remains(world, role).await
+}
+
+#[then(
+    regex = r"^更新前に発行した(.+)の参加者の資格は、復帰もブラウザセッションも権限エラーになる$"
+)]
+async fn old_credentials_rejected(world: &mut ApiWorld, role: String) -> R {
+    cannot_recover(world, &role).await?;
+    old_session_unusable(world, role).await
+}
+
+#[then("別のゲームの進行役の資格は、まだ使える")]
+async fn other_facilitator_still_works(world: &mut ApiWorld) -> R {
+    let (id, cookie) = world
+        .games
+        .last()
+        .map(|g| (g.id.clone(), g.facilitator.clone()))
+        .ok_or("別のゲームが無い")?;
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/state"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?;
+    expect(status(world)? == 200, "別のゲームの進行役の資格が使えない")
+}
+
+#[given(regex = r"^(.+)の参加者が、復帰資格で再接続している$")]
+async fn participant_has_recovered(world: &mut ApiWorld, role: String) -> R {
+    recover_participant(world, &role, None).await?;
+    expect(status(world)? == 200, "復帰できなかった")
 }

@@ -102,12 +102,31 @@ async fn main() -> ExitCode {
     if mode == "migrate" {
         return ExitCode::SUCCESS;
     }
+    // 鍵の版（既定 1）と、旧版の鍵（`版:鍵` をカンマ区切り。残している間は旧版の資格を使える。外すと使えなくなる）
+    let key_version: i32 = std::env::var("CREDENTIAL_KEY_VERSION")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
+    let retired_keys: Vec<(i32, Secret<Vec<u8>>)> = std::env::var("CREDENTIAL_RETIRED_KEYS")
+        .unwrap_or_default()
+        .split(',')
+        .filter_map(|pair| pair.split_once(':'))
+        .filter_map(|(version, key)| {
+            Some((
+                version.trim().parse().ok()?,
+                Secret::new(key.trim().as_bytes().to_vec()),
+            ))
+        })
+        .collect();
     let settings = AppSettings {
         credential_key: Secret::new(key),
-        key_version: 1,
-        credential_ttl_millis: 86_400_000,
+        key_version,
+        // 復帰資格は 30 日、ブラウザセッションは 24 時間
+        credential_ttl_millis: 2_592_000_000,
         retention_days: 30,
         max_attempts: 3,
+        retired_keys,
+        session_ttl_millis: 86_400_000,
     };
     let app = router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)));
     let listener = match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {

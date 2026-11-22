@@ -287,6 +287,17 @@ impl EventCodec<GameEvent> for GameCodec {
                 "RoleUnassigned",
                 json!({"participantId": uuid_of(participant_id.get()), "role": role_name(*role)}),
             ),
+            GameEvent::CredentialRevoked { participant_id } => (
+                "CredentialRevoked",
+                json!({"participantId": uuid_of(participant_id.get())}),
+            ),
+            GameEvent::CredentialReissued {
+                participant_id,
+                credential_expires_at,
+            } => (
+                "CredentialReissued",
+                json!({"participantId": uuid_of(participant_id.get()), "credentialExpiresAt": credential_expires_at.epoch_millis()}),
+            ),
             GameEvent::GameStarted { game_id } => {
                 ("GameStarted", json!({"gameId": uuid_of(game_id.get())}))
             }
@@ -317,6 +328,13 @@ impl EventCodec<GameEvent> for GameCodec {
             "RoleUnassigned" => Ok(GameEvent::RoleUnassigned {
                 participant_id: ParticipantId::new(id(&p, "participantId")?),
                 role: role_field(&p, "role")?,
+            }),
+            "CredentialRevoked" => Ok(GameEvent::CredentialRevoked {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+            }),
+            "CredentialReissued" => Ok(GameEvent::CredentialReissued {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                credential_expires_at: Instant::from_epoch_millis(int(&p, "credentialExpiresAt")?),
             }),
             "GameStarted" => Ok(GameEvent::GameStarted {
                 game_id: GameId::new(id(&p, "gameId")?),

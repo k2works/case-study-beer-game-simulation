@@ -72,6 +72,8 @@ pub struct GameData {
     pub settings: GameSettings,
     /// 参加者と、割り当て済みの役割（未割り当ては `None`）。
     pub participants: BTreeMap<ParticipantId, Option<Role>>,
+    /// 失効した資格の参加者（再発行で外れる）。
+    pub revoked: BTreeSet<ParticipantId>,
 }
 
 impl GameData {
@@ -149,6 +151,19 @@ pub enum GameCommand {
         participant_id: ParticipantId,
         role: Role,
     },
+    /// 参加者の資格の失効（進行役だけ。準備中・開始後の両方）。
+    RevokeCredential {
+        actor: Actor,
+        at: Instant,
+        participant_id: ParticipantId,
+    },
+    /// 失効した参加者の資格の再発行（進行役だけ。準備中・開始後の両方）。
+    ReissueCredential {
+        actor: Actor,
+        at: Instant,
+        participant_id: ParticipantId,
+        credential_expires_at: Instant,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -178,6 +193,13 @@ pub enum GameEvent {
     },
     /// EV-G11 StartGame。進行役、準備中、各役割に 1 人以上。
     GameStarted { game_id: GameId },
+    /// 参加者の資格の失効。
+    CredentialRevoked { participant_id: ParticipantId },
+    /// 参加者の資格の再発行。
+    CredentialReissued {
+        participant_id: ParticipantId,
+        credential_expires_at: Instant,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,6 +211,10 @@ pub enum GameError {
     ParticipantNotFound(ParticipantId),
     /// 開始の条件（4 役割のそれぞれに 1 人以上）を満たさない。不足している役割を上流から下流の順に示す（AC1.2.3）。
     StartConditionNotMet(Vec<Role>),
+    /// すでに失効している資格の失効。
+    CredentialAlreadyRevoked(ParticipantId),
+    /// 失効していない資格の再発行（有効な資格は置き換えない）。
+    CredentialNotRevoked(ParticipantId),
 }
 
 impl GameError {
@@ -202,13 +228,18 @@ impl GameError {
             GameError::Forbidden(_) => "game.forbidden",
             GameError::ParticipantNotFound(_) => "game.participant_not_found",
             GameError::StartConditionNotMet(_) => "game.start_condition_not_met",
+            GameError::CredentialAlreadyRevoked(_) => "game.credential_already_revoked",
+            GameError::CredentialNotRevoked(_) => "game.credential_not_revoked",
         }
     }
 
     #[must_use]
     pub const fn category(&self) -> ErrorCategory {
         match self {
-            GameError::AlreadyCreated | GameError::NotPreparing => ErrorCategory::InvalidState,
+            GameError::AlreadyCreated
+            | GameError::NotPreparing
+            | GameError::CredentialAlreadyRevoked(_)
+            | GameError::CredentialNotRevoked(_) => ErrorCategory::InvalidState,
             GameError::Forbidden(_) => ErrorCategory::Forbidden,
             GameError::ParticipantNotFound(_) => ErrorCategory::NotFound,
             GameError::StartConditionNotMet(_) => ErrorCategory::RuleViolation,
@@ -248,6 +279,34 @@ fn decide_assign(
             },
         ],
     })
+}
+
+/// 資格の失効・再発行。進行役だけ。準備中・開始後の両方で受け付ける。
+fn decide_credential(
+    state: &GameState,
+    actor: &Actor,
+    participant_id: ParticipantId,
+    reissue: Option<Instant>,
+) -> Result<Vec<GameEvent>, GameError> {
+    let data = state.data().ok_or(GameError::NotPreparing)?;
+    if !actor.is_facilitator_of(data.game_id) {
+        return Err(GameError::Forbidden(
+            "資格の失効・再発行は進行役だけができる",
+        ));
+    }
+    if !data.participants.contains_key(&participant_id) {
+        return Err(GameError::ParticipantNotFound(participant_id));
+    }
+    let revoked = data.revoked.contains(&participant_id);
+    match reissue {
+        None if revoked => Err(GameError::CredentialAlreadyRevoked(participant_id)),
+        None => Ok(vec![GameEvent::CredentialRevoked { participant_id }]),
+        Some(_) if !revoked => Err(GameError::CredentialNotRevoked(participant_id)),
+        Some(credential_expires_at) => Ok(vec![GameEvent::CredentialReissued {
+            participant_id,
+            credential_expires_at,
+        }]),
+    }
 }
 
 /// 作成・参加・役割の割り当ての規則は、すべてここに集まる（`evolve` は事実を採用するだけで、規則を持たない）。
@@ -300,6 +359,17 @@ pub fn decide_game(state: &GameState, command: &GameCommand) -> Result<Vec<GameE
             role,
             ..
         } => decide_assign(state, actor, *participant_id, *role),
+        GameCommand::RevokeCredential {
+            actor,
+            participant_id,
+            ..
+        } => decide_credential(state, actor, *participant_id, None),
+        GameCommand::ReissueCredential {
+            actor,
+            participant_id,
+            credential_expires_at,
+            ..
+        } => decide_credential(state, actor, *participant_id, Some(*credential_expires_at)),
     }
 }
 
@@ -317,6 +387,24 @@ fn update_preparing(
     }
 }
 
+/// 作成済み（準備中・開始済み）のときにデータを更新する。更新できない列は `Ignored`。
+fn update_created(
+    state: GameState,
+    update: impl FnOnce(GameData) -> Option<GameData>,
+) -> Evolution<GameState> {
+    match state {
+        GameState::Preparing(data) => match update(data.clone()) {
+            Some(next) => Evolution::Applied(GameState::Preparing(next)),
+            None => Evolution::Ignored(GameState::Preparing(data)),
+        },
+        GameState::Started(data) => match update(data.clone()) {
+            Some(next) => Evolution::Applied(GameState::Started(next)),
+            None => Evolution::Ignored(GameState::Started(data)),
+        },
+        GameState::NotCreated => Evolution::Ignored(GameState::NotCreated),
+    }
+}
+
 /// イベントを状態へ畳み込む。全域（`panic` しない）。
 /// decide が作らない列は、状態を変えずに `Ignored` で返す（検知は再生側）。
 #[must_use]
@@ -329,6 +417,7 @@ pub fn evolve_game(state: GameState, event: &GameEvent) -> Evolution<GameState> 
                 game_id: *game_id,
                 settings: settings.clone(),
                 participants: BTreeMap::new(),
+                revoked: BTreeSet::new(),
             })),
             other @ (GameState::Preparing(_) | GameState::Started(_)) => Evolution::Ignored(other),
         },
@@ -348,6 +437,24 @@ pub fn evolve_game(state: GameState, event: &GameEvent) -> Evolution<GameState> 
         } => update_preparing(state, |data| data.with_role(*participant_id, Some(*role))),
         GameEvent::RoleUnassigned { participant_id, .. } => {
             update_preparing(state, |data| data.with_role(*participant_id, None))
+        }
+        GameEvent::CredentialRevoked { participant_id } => update_created(state, |mut data| {
+            if data.participants.contains_key(participant_id)
+                && data.revoked.insert(*participant_id)
+            {
+                Some(data)
+            } else {
+                None
+            }
+        }),
+        GameEvent::CredentialReissued { participant_id, .. } => {
+            update_created(state, |mut data| {
+                if data.revoked.remove(participant_id) {
+                    Some(data)
+                } else {
+                    None
+                }
+            })
         }
         GameEvent::GameStarted { .. } => match state {
             GameState::Preparing(data) => Evolution::Applied(GameState::Started(data)),

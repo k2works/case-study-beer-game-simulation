@@ -30,6 +30,8 @@ fn app(pool: PgPool, secure: bool) -> Router {
         credential_ttl_millis: 86_400_000,
         retention_days: 30,
         max_attempts: 3,
+        retired_keys: Vec::new(),
+        session_ttl_millis: 86_400_000,
     };
     router(Arc::new(PgBackend::new(pool, SystemEnv, settings, secure)))
 }
@@ -93,7 +95,9 @@ async fn ac1_1_1__作成は_201_で_Location_と資格の_Cookie_と版を返す
     let app = app(env.pool.clone(), false);
     let (status, headers, body) = send(&app, "POST", "/api/v1/games", &[], &create_body()).await?;
     assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(body, json!({"versions": {"game": 1, "session": null}}));
+    // 進行役の復帰コードを、一度だけ示す（復帰資格の Cookie と同じ値）
+    assert_eq!(body["versions"], json!({"game": 1, "session": null}));
+    assert!(body["recoveryCode"].as_str().is_some_and(|c| c.len() == 43));
     let location = headers
         .get("location")
         .and_then(|v| v.to_str().ok())

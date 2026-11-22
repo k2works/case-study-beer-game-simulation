@@ -24,6 +24,8 @@ pub fn app(pool: PgPool) -> Router {
         credential_ttl_millis: 86_400_000,
         retention_days: 30,
         max_attempts: 3,
+        retired_keys: Vec::new(),
+        session_ttl_millis: 86_400_000,
     };
     router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)))
 }

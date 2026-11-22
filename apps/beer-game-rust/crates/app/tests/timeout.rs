@@ -25,6 +25,8 @@ fn app_with(pool: PgPool, limit: Duration) -> Router {
         credential_ttl_millis: 86_400_000,
         retention_days: 30,
         max_attempts: 3,
+        retired_keys: Vec::new(),
+        session_ttl_millis: 86_400_000,
     };
     router(Arc::new(
         PgBackend::new(pool, SystemEnv, settings, false).with_command_timeout(limit),

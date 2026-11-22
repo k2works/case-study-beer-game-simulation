@@ -36,6 +36,21 @@ pub struct AppSettings {
     pub retention_days: i64,
     /// 追記の競合の再試行の上限。
     pub max_attempts: u32,
+    /// 更新前（旧版）の鍵。ここに残っている間は、その版で発行した資格を使える。外すと使えなくなる（NF-S4）。
+    pub retired_keys: Vec<(i32, Secret<Vec<u8>>)>,
+    /// ブラウザセッションの有効期間（ミリ秒）。`credential_ttl_millis` は復帰資格の有効期間。
+    pub session_ttl_millis: i64,
+}
+
+impl AppSettings {
+    /// 資格のダイジェストに使う鍵（現在の版、旧版の順）。
+    pub fn keys(&self) -> impl Iterator<Item = (i32, &Secret<Vec<u8>>)> {
+        std::iter::once((self.key_version, &self.credential_key)).chain(
+            self.retired_keys
+                .iter()
+                .map(|(version, key)| (*version, key)),
+        )
+    }
 }
 
 /// ゲームの作成の入力（境界で受け取った値）。
@@ -50,7 +65,10 @@ pub struct CreateGameInput {
 pub struct CreateOutcome {
     pub game_id: GameId,
     pub join_code: String,
+    /// ブラウザセッション（Cookie）。
     pub facilitator_credential: Secret<String>,
+    /// 進行役の復帰コード（応答に一度だけ示す）。
+    pub recovery_code: Secret<String>,
     /// 追記後の `game` ストリームの版。
     pub game_version: u64,
 }
@@ -59,7 +77,10 @@ pub struct CreateOutcome {
 #[derive(Debug)]
 pub struct JoinOutcome {
     pub participant_id: ParticipantId,
+    /// ブラウザセッション（Cookie）。
     pub credential: Secret<String>,
+    /// 復帰資格（Cookie）。
+    pub recovery_code: Secret<String>,
     /// 追記後の `game` ストリームの版。
     pub game_version: u64,
 }
@@ -76,6 +97,56 @@ fn issue(env: &impl Env, settings: &AppSettings) -> Result<(Secret<String>, Stri
         ))
     })?;
     Ok((token, digest))
+}
+
+/// 発行した資格（復帰資格とブラウザセッション）。生の値は応答に一度だけ載せ、保存はダイジェストだけ。
+struct Issued {
+    recovery: Secret<String>,
+    session: Secret<String>,
+    writes: Vec<PeripheralWrite>,
+}
+
+/// 復帰資格とブラウザセッションを発行する（別のダイジェストで持つ）。
+fn issue_pair(
+    env: &impl Env,
+    settings: &AppSettings,
+    game_id: GameId,
+    kind: CredentialKind,
+    subject_id: u128,
+    now: Instant,
+) -> Result<Issued, AppFailure> {
+    let (recovery, recovery_digest) = issue(env, settings)?;
+    let (session, session_digest) = issue(env, settings)?;
+    let recovery_expires = after(now, settings.credential_ttl_millis);
+    let session_expires = after(now, settings.session_ttl_millis);
+    let writes = vec![
+        PeripheralWrite::Credential {
+            digest: recovery_digest,
+            game_id,
+            kind,
+            subject_id,
+            key_version: settings.key_version,
+            issued_at: now,
+            expires_at: recovery_expires,
+        },
+        PeripheralWrite::BrowserSession {
+            digest: session_digest,
+            game_id,
+            kind,
+            subject_id,
+            key_version: settings.key_version,
+            expires_at: session_expires,
+        },
+    ];
+    Ok(Issued {
+        recovery,
+        session,
+        writes,
+    })
+}
+
+fn after(now: Instant, millis: i64) -> Instant {
+    Instant::from_epoch_millis(now.epoch_millis().saturating_add(millis))
 }
 
 /// ゲームの作成（US1.1。匿名）。`game_id` は境界が決める（ストアはゲームごとに作るため）。入力の誤りは、項目ごとにすべて集めて返す（AC1.1.2）。
@@ -95,12 +166,16 @@ pub async fn create_game<St: EventStore<GameEvent>>(
         RetentionDays::of(settings.retention_days).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let code_text = env.join_code();
     let join_code = JoinCode::of(&code_text).map_err(|e| AppFailure::Invalid(vec![e]))?;
-    let (token, token_digest) = issue(env, settings)?;
     let now = env.now();
-    let expires = Instant::from_epoch_millis(
-        now.epoch_millis()
-            .saturating_add(settings.credential_ttl_millis),
-    );
+    let expires = after(now, settings.credential_ttl_millis);
+    let issued = issue_pair(
+        env,
+        settings,
+        game_id,
+        CredentialKind::Facilitator,
+        game_id.get(),
+        now,
+    )?;
     let command = GameCommand::CreateGame {
         actor: Actor::Anonymous,
         at: now,
@@ -118,15 +193,7 @@ pub async fn create_game<St: EventStore<GameEvent>>(
             let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
             Ok(Decision {
                 events,
-                writes: vec![PeripheralWrite::Credential {
-                    digest: token_digest.clone(),
-                    game_id,
-                    kind: CredentialKind::Facilitator,
-                    subject_id: game_id.get(),
-                    key_version: settings.key_version,
-                    issued_at: now,
-                    expires_at: expires,
-                }],
+                writes: issued.writes.clone(),
             })
         },
         &command,
@@ -136,7 +203,8 @@ pub async fn create_game<St: EventStore<GameEvent>>(
     Ok(CreateOutcome {
         game_id,
         join_code: code_text,
-        facilitator_credential: token,
+        facilitator_credential: issued.session,
+        recovery_code: issued.recovery,
         game_version,
     })
 }
@@ -155,12 +223,16 @@ pub async fn join_game<St: EventStore<GameEvent>>(
 ) -> Result<JoinOutcome, AppFailure> {
     let name = DisplayName::of(display_name).map_err(|e| AppFailure::Invalid(vec![e]))?;
     let participant_id = ParticipantId::new(env.new_id());
-    let (token, token_digest) = issue(env, settings)?;
     let now = env.now();
-    let expires = Instant::from_epoch_millis(
-        now.epoch_millis()
-            .saturating_add(settings.credential_ttl_millis),
-    );
+    let expires = after(now, settings.credential_ttl_millis);
+    let issued = issue_pair(
+        env,
+        settings,
+        game_id,
+        CredentialKind::Participant,
+        participant_id.get(),
+        now,
+    )?;
     let command = GameCommand::JoinGame {
         actor: Actor::Anonymous,
         at: now,
@@ -176,23 +248,17 @@ pub async fn join_game<St: EventStore<GameEvent>>(
             let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
             Ok(Decision {
                 events,
-                writes: vec![
-                    PeripheralWrite::Credential {
-                        digest: token_digest.clone(),
-                        game_id,
-                        kind: CredentialKind::Participant,
-                        subject_id: participant_id.get(),
-                        key_version: settings.key_version,
-                        issued_at: now,
-                        expires_at: expires,
-                    },
-                    PeripheralWrite::DisplayName {
+                writes: issued
+                    .writes
+                    .iter()
+                    .cloned()
+                    .chain(std::iter::once(PeripheralWrite::DisplayName {
                         game_id,
                         participant_id,
                         name: name.as_str().to_owned(),
                         at: now,
-                    },
-                ],
+                    }))
+                    .collect(),
             })
         },
         &command,
@@ -201,7 +267,8 @@ pub async fn join_game<St: EventStore<GameEvent>>(
     .await?;
     Ok(JoinOutcome {
         participant_id,
-        credential: token,
+        credential: issued.session,
+        recovery_code: issued.recovery,
         game_version,
     })
 }
@@ -250,18 +317,49 @@ pub struct CredentialRecord {
     pub subject_id: u128,
     pub expires_at: Instant,
     pub revoked: bool,
+    /// 発行に使った鍵の版。
+    pub key_version: i32,
 }
 
 /// 資格の問い合わせのポート。
 pub trait CredentialLookup: Sync {
+    /// ブラウザセッションをダイジェストで引く（`revoked` は、対象の復帰資格に有効なものが無いこと）。
     fn find(
+        &self,
+        digest: &str,
+    ) -> impl Future<Output = Result<Option<CredentialRecord>, AppFailure>> + Send;
+
+    /// 復帰資格をダイジェストで引く。
+    fn find_recovery(
         &self,
         digest: &str,
     ) -> impl Future<Output = Result<Option<CredentialRecord>, AppFailure>> + Send;
 }
 
-/// 認証。資格の生の値から、ダイジェストで資格を引き、有効（存在・失効なし・期限内）なら、操作者とゲームを返す。
-/// 無効な資格は、理由を区別せず `Unauthorized`（列挙の防止）。
+/// 復帰のときに、新しいブラウザセッションを書き、復帰資格の期限を更新するポート（1 つのトランザクション）。
+pub trait SessionWriter: Sync {
+    fn start_session(
+        &self,
+        recovery_digest: &str,
+        session: &PeripheralWrite,
+        recovery_expires_at: Instant,
+    ) -> impl Future<Output = Result<(), AppFailure>> + Send;
+}
+
+fn actor_of(record: &CredentialRecord) -> Actor {
+    match record.kind {
+        CredentialKind::Facilitator => Actor::Facilitator(record.game_id),
+        CredentialKind::Participant => Actor::Participant(ParticipantId::new(record.subject_id)),
+    }
+}
+
+/// 有効（失効なし・期限内・鍵の版が一致）か。
+fn is_valid(record: &CredentialRecord, version: i32, now: Instant) -> bool {
+    !record.revoked && record.expires_at > now && record.key_version == version
+}
+
+/// 認証。ブラウザセッションの生の値から、鍵の版ごとにダイジェストで引き、有効（存在・失効なし・期限内）なら、操作者とゲームを返す。
+/// 現在の鍵と、まだ設定に残っている旧版の鍵を試す。無効な資格は、理由を区別せず `Unauthorized`（列挙の防止）。
 ///
 /// # Errors
 /// 資格が無効（`Unauthorized`）、永続化の失敗。
@@ -271,21 +369,74 @@ pub async fn authenticate(
     settings: &AppSettings,
     token: &Secret<String>,
 ) -> Result<(GameId, Actor), AppFailure> {
-    let Some(digest) = digest(&settings.credential_key, token) else {
-        return Err(AppFailure::Unauthorized);
-    };
-    match lookup.find(&digest).await? {
-        Some(record) if !record.revoked && record.expires_at > env.now() => {
-            let actor = match record.kind {
-                CredentialKind::Facilitator => Actor::Facilitator(record.game_id),
-                CredentialKind::Participant => {
-                    Actor::Participant(ParticipantId::new(record.subject_id))
-                }
-            };
-            Ok((record.game_id, actor))
+    for (version, key) in settings.keys() {
+        let Some(digest) = digest(key, token) else {
+            continue;
+        };
+        if let Some(record) = lookup.find(&digest).await?
+            && is_valid(&record, version, env.now())
+        {
+            return Ok((record.game_id, actor_of(&record)));
         }
-        Some(_) | None => Err(AppFailure::Unauthorized),
     }
+    Err(AppFailure::Unauthorized)
+}
+
+/// 復帰の結果。
+#[derive(Debug)]
+pub struct RecoverOutcome {
+    pub game_id: GameId,
+    pub actor: Actor,
+    /// 新しいブラウザセッション（Cookie）。
+    pub session: Secret<String>,
+}
+
+/// 復帰（US3.2。復帰資格が認可）。指定のゲームの、有効な復帰資格なら、新しいブラウザセッションを発行し、復帰資格の期限を更新する。
+/// 不明・失効・期限切れ・別のゲームは区別せず `Unauthorized`。
+///
+/// # Errors
+/// 資格が無効（`Unauthorized`）、永続化の失敗。
+pub async fn recover<S: CredentialLookup + SessionWriter>(
+    store: &S,
+    env: &impl Env,
+    settings: &AppSettings,
+    game_id: GameId,
+    token: &Secret<String>,
+) -> Result<RecoverOutcome, AppFailure> {
+    let now = env.now();
+    for (version, key) in settings.keys() {
+        let Some(recovery_digest) = digest(key, token) else {
+            continue;
+        };
+        let Some(record) = store.find_recovery(&recovery_digest).await? else {
+            continue;
+        };
+        if !is_valid(&record, version, now) || record.game_id != game_id {
+            continue;
+        }
+        let (session, session_digest) = issue(env, settings)?;
+        let write = PeripheralWrite::BrowserSession {
+            digest: session_digest,
+            game_id,
+            kind: record.kind,
+            subject_id: record.subject_id,
+            key_version: settings.key_version,
+            expires_at: after(now, settings.session_ttl_millis),
+        };
+        store
+            .start_session(
+                &recovery_digest,
+                &write,
+                after(now, settings.credential_ttl_millis),
+            )
+            .await?;
+        return Ok(RecoverOutcome {
+            game_id,
+            actor: actor_of(&record),
+            session,
+        });
+    }
+    Err(AppFailure::Unauthorized)
 }
 
 fn session_domain(e: beergame_domain::SessionError) -> DomainError {
@@ -372,6 +523,113 @@ pub async fn commit_week<St: EventStore<SessionEvent>>(
         idem,
     )
     .await
+}
+
+/// 参加者の資格の失効（US3.2。進行役だけ。準備中・開始後の両方）。復帰資格と発行済みのブラウザセッションをともに使えなくする。
+///
+/// # Errors
+/// 権限・対象・失効済みの誤り、永続化の失敗。
+pub async fn revoke_credential<St: EventStore<GameEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    participant_id: ParticipantId,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    let command = GameCommand::RevokeCredential {
+        actor,
+        at: env.now(),
+        participant_id,
+    };
+    execute_idempotent(
+        store,
+        &GameState::NotCreated,
+        &evolve_game,
+        &|state, cmd| {
+            let game_id = state.data().map(|d| d.game_id);
+            Ok(Decision {
+                events: beergame_domain::decide_game(state, cmd).map_err(domain)?,
+                writes: game_id
+                    .map(|game_id| PeripheralWrite::RevokeCredentials {
+                        game_id,
+                        subject_id: participant_id.get(),
+                    })
+                    .into_iter()
+                    .collect(),
+            })
+        },
+        &command,
+        settings.max_attempts,
+        idem,
+    )
+    .await
+}
+
+/// 再発行の結果。新しい復帰コードは、この応答で一度だけ示す。
+#[derive(Debug)]
+pub struct ReissueOutcome {
+    pub game_version: u64,
+    pub recovery_code: Secret<String>,
+    pub expires_at: Instant,
+}
+
+/// 参加者の資格の再発行（US3.2。進行役だけ。失効した資格だけ）。
+///
+/// # Errors
+/// 権限・対象・失効していない誤り、永続化の失敗。
+pub async fn reissue_credential<St: EventStore<GameEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    participant_id: ParticipantId,
+) -> Result<ReissueOutcome, AppFailure> {
+    let now = env.now();
+    let expires_at = after(now, settings.credential_ttl_millis);
+    let (token, token_digest) = issue(env, settings)?;
+    let command = GameCommand::ReissueCredential {
+        actor,
+        at: now,
+        participant_id,
+        credential_expires_at: expires_at,
+    };
+    let executed = execute_idempotent(
+        store,
+        &GameState::NotCreated,
+        &evolve_game,
+        &|state, cmd| {
+            let game_id = state.data().map(|d| d.game_id);
+            Ok(Decision {
+                events: beergame_domain::decide_game(state, cmd).map_err(domain)?,
+                writes: game_id
+                    .map(|game_id| PeripheralWrite::Credential {
+                        digest: token_digest.clone(),
+                        game_id,
+                        kind: CredentialKind::Participant,
+                        subject_id: participant_id.get(),
+                        key_version: settings.key_version,
+                        issued_at: now,
+                        expires_at,
+                    })
+                    .into_iter()
+                    .collect(),
+            })
+        },
+        &command,
+        settings.max_attempts,
+        None,
+    )
+    .await?;
+    let game_version = match executed {
+        Executed::Fresh(version) => version,
+        Executed::Replayed(_) => 0,
+    };
+    Ok(ReissueOutcome {
+        game_version,
+        recovery_code: token,
+        expires_at,
+    })
 }
 
 /// 一時停止（US3.1。進行役だけ）。

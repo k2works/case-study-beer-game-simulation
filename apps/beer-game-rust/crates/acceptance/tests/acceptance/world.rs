@@ -71,6 +71,8 @@ pub struct Reply {
     pub body: Value,
     pub cookie: Option<String>,
     pub location: Option<String>,
+    /// 復帰資格（Cookie `bg_recovery` の値）。
+    pub recovery: Option<String>,
 }
 
 /// 1 つのゲーム。
@@ -85,6 +87,12 @@ pub struct GameCtx {
     pub named: BTreeMap<String, (String, String)>,
     /// 役割（英語名）→ 当週に保存した意思決定の版。
     pub versions: BTreeMap<String, u32>,
+    /// 進行役の復帰資格（作成時に控えた復帰コードと同じ）。
+    pub recovery: String,
+    /// 参加者 ID → 復帰資格（参加の応答の Cookie）。
+    pub recoveries: BTreeMap<String, String>,
+    /// 参加者 ID → 再発行した復帰コード。
+    pub reissued: BTreeMap<String, String>,
 }
 
 #[derive(Debug, World)]
@@ -100,6 +108,10 @@ pub struct ApiWorld {
     pub moved_from: Option<(String, String)>,
     /// 操作中のゲーム（`None` は最後に作ったゲーム）。2 つのゲームを比べるシナリオが切り替える。
     pub current: Option<usize>,
+    /// 復帰で発行されたブラウザセッション（Cookie）と、最後に復帰した参加者 ID。
+    pub recovered: Option<(String, String)>,
+    /// 2 つのタブの古い側が見ている、意思決定の版。
+    pub stale_version: u32,
     /// 次の呼び出しに付ける `If-Match`（意思決定の版）。使うと空に戻る。
     pub if_match: Option<String>,
 }
@@ -115,7 +127,42 @@ impl ApiWorld {
             roots_before: 0,
             moved_from: None,
             current: None,
+            recovered: None,
+            stale_version: 0,
             if_match: None,
+        }
+    }
+
+    /// 署名鍵を入れ替えてアプリを組み直す（鍵のローテーション。旧版の鍵を残すか外すかを選ぶ）。
+    pub async fn rebuild_with_keys(
+        &mut self,
+        key_version: i32,
+        key: u8,
+        retired: Vec<(i32, u8)>,
+    ) -> Result<(), String> {
+        let pool = database().await?;
+        self.app = Some(router(Arc::new(PgBackend::new(
+            pool.clone(),
+            SystemEnv,
+            Self::settings(key_version, key, retired),
+            false,
+        ))));
+        self.pool = Some(pool);
+        Ok(())
+    }
+
+    fn settings(key_version: i32, key: u8, retired: Vec<(i32, u8)>) -> AppSettings {
+        AppSettings {
+            credential_key: Secret::new(vec![key; 32]),
+            key_version,
+            credential_ttl_millis: 86_400_000,
+            retention_days: 30,
+            max_attempts: 3,
+            retired_keys: retired
+                .into_iter()
+                .map(|(version, k)| (version, Secret::new(vec![k; 32])))
+                .collect(),
+            session_ttl_millis: 86_400_000,
         }
     }
 
@@ -123,13 +170,7 @@ impl ApiWorld {
     pub async fn ready(&mut self) -> Result<(), String> {
         if self.app.is_none() {
             let pool = database().await?;
-            let settings = AppSettings {
-                credential_key: Secret::new(vec![5; 32]),
-                key_version: 1,
-                credential_ttl_millis: 86_400_000,
-                retention_days: 30,
-                max_attempts: 3,
-            };
+            let settings = Self::settings(1, 5, Vec::new());
             self.app = Some(router(Arc::new(PgBackend::new(
                 pool.clone(),
                 SystemEnv,
@@ -206,11 +247,20 @@ impl ApiWorld {
             .map_err(|e| e.to_string())?;
         let (parts, body) = response.into_parts();
         let bytes = body.collect().await.map_err(|e| e.to_string())?.to_bytes();
-        let cookie = parts
+        let set_cookies: Vec<&str> = parts
             .headers
-            .get("set-cookie")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.split(';').next())
+            .get_all("set-cookie")
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .filter_map(|v| v.split(';').next())
+            .collect();
+        let cookie = set_cookies
+            .iter()
+            .find(|c| c.starts_with("bg_session"))
+            .map(|c| (*c).to_owned());
+        let recovery = set_cookies
+            .iter()
+            .find_map(|c| c.strip_prefix("bg_recovery="))
             .map(str::to_owned);
         let location = parts
             .headers
@@ -222,6 +272,7 @@ impl ApiWorld {
             body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
             cookie,
             location,
+            recovery,
         };
         self.last = Some(reply.clone());
         Ok(reply)
@@ -257,6 +308,7 @@ impl ApiWorld {
             self.games.push(GameCtx {
                 id,
                 facilitator,
+                recovery: reply.recovery.clone().unwrap_or_default(),
                 join_code,
                 ..GameCtx::default()
             });

@@ -36,6 +36,8 @@ fn settings() -> AppSettings {
         credential_ttl_millis: 86_400_000,
         retention_days: 30,
         max_attempts: 3,
+        retired_keys: Vec::new(),
+        session_ttl_millis: 86_400_000,
     }
 }
 
@@ -143,6 +145,7 @@ async fn ac1_1_1__作成は進行役の資格を一度だけ返し_保存はダ�
     .map_err(|e| format!("{e:?}"))?;
     assert_eq!(outcome.join_code, "abcd1234");
     let writes = store.writes.lock().map_err(|e| e.to_string())?.clone();
+    // 復帰資格（credentials）とブラウザセッション（browser_sessions）を、別のダイジェストで保存する
     let [
         PeripheralWrite::Credential {
             digest,
@@ -150,15 +153,28 @@ async fn ac1_1_1__作成は進行役の資格を一度だけ返し_保存はダ�
             subject_id,
             ..
         },
+        PeripheralWrite::BrowserSession {
+            digest: session_digest,
+            ..
+        },
     ] = writes.as_slice()
     else {
-        return Err(format!("資格の書き込みが 1 件ではない: {writes:?}"));
+        return Err(format!("資格の書き込みが 2 件ではない: {writes:?}"));
     };
     assert_eq!(*kind, CredentialKind::Facilitator);
     assert_eq!(*subject_id, outcome.game_id.get());
     assert_eq!(digest.len(), 64);
+    assert_ne!(
+        digest, session_digest,
+        "復帰資格とセッションは別のダイジェスト"
+    );
+    assert_ne!(
+        outcome.recovery_code.expose(),
+        outcome.facilitator_credential.expose()
+    );
     assert!(
-        !digest.contains(outcome.facilitator_credential.expose().as_str()),
+        !digest.contains(outcome.facilitator_credential.expose().as_str())
+            && !session_digest.contains(outcome.recovery_code.expose().as_str()),
         "生の値を保存しない"
     );
     assert!(

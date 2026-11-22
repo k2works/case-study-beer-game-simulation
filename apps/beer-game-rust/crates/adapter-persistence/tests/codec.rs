@@ -250,3 +250,20 @@ fn ac3_1_2__停止_再開_代理入力のイベントは_JSON_に変換して戻
     );
     Ok(())
 }
+
+#[test]
+fn ac3_2_5__資格の失効と再発行のイベントは_JSON_に変換して戻すと同じになる() -> R<()> {
+    use beergame_domain::GameEvent;
+    for event in [
+        GameEvent::CredentialRevoked {
+            participant_id: ParticipantId::new(4),
+        },
+        GameEvent::CredentialReissued {
+            participant_id: ParticipantId::new(4),
+            credential_expires_at: Instant::from_epoch_millis(1_000),
+        },
+    ] {
+        roundtrip(&GameCodec, &event)?;
+    }
+    Ok(())
+}

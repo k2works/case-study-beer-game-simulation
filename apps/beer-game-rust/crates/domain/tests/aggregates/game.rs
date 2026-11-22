@@ -2,8 +2,8 @@
 
 use crate::fixtures::*;
 use beergame_domain::{
-    Actor, ErrorCategory, GameError, GameEvent, GameState, Role, decide_game, evolve_game,
-    replay_game,
+    Actor, ErrorCategory, GameCommand, GameError, GameEvent, GameState, Role, decide_game,
+    evolve_game, replay_game,
 };
 
 #[test]
@@ -275,6 +275,16 @@ fn tech__エラーの_code_と_category_は_API_の契約として固定され�
             ErrorCategory::NotFound,
         ),
         (
+            GameError::CredentialAlreadyRevoked(pid(1)),
+            "game.credential_already_revoked",
+            ErrorCategory::InvalidState,
+        ),
+        (
+            GameError::CredentialNotRevoked(pid(1)),
+            "game.credential_not_revoked",
+            ErrorCategory::InvalidState,
+        ),
+        (
             GameError::StartConditionNotMet(vec![Role::Factory]),
             "game.start_condition_not_met",
             ErrorCategory::RuleViolation,
@@ -284,4 +294,125 @@ fn tech__エラーの_code_と_category_は_API_の契約として固定され�
         assert_eq!(error.code(), code);
         assert_eq!(error.category(), category);
     }
+}
+
+fn revoke(actor: Actor, n: u128) -> GameCommand {
+    GameCommand::RevokeCredential {
+        actor,
+        at: at(),
+        participant_id: pid(n),
+    }
+}
+
+fn reissue(actor: Actor, n: u128) -> GameCommand {
+    GameCommand::ReissueCredential {
+        actor,
+        at: at(),
+        participant_id: pid(n),
+        credential_expires_at: expires(),
+    }
+}
+
+fn revoked_event(n: u128) -> GameEvent {
+    GameEvent::CredentialRevoked {
+        participant_id: pid(n),
+    }
+}
+
+#[test]
+fn ac3_2_5__進行役は準備中も開始後も資格を失効させ_再発行できる() -> R<()> {
+    let mut events = fully_assigned_events()?;
+    for phase in 0..2 {
+        let state = game_of(&events)?;
+        assert_eq!(
+            decide_game(&state, &revoke(facilitator(), 4)),
+            Ok(vec![revoked_event(4)])
+        );
+        let revoked = {
+            let mut with = events.clone();
+            with.push(revoked_event(4));
+            game_of(&with)?
+        };
+        assert_eq!(
+            decide_game(&revoked, &reissue(facilitator(), 4)),
+            Ok(vec![GameEvent::CredentialReissued {
+                participant_id: pid(4),
+                credential_expires_at: expires(),
+            }])
+        );
+        if phase == 0 {
+            events.push(GameEvent::GameStarted { game_id: GAME });
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn ac3_2_5__失効済みの再失効と_失効していない再発行は拒否する() -> R<()> {
+    let mut events = fully_assigned_events()?;
+    assert_eq!(
+        decide_game(&game_of(&events)?, &reissue(facilitator(), 4)),
+        Err(GameError::CredentialNotRevoked(pid(4)))
+    );
+    events.push(revoked_event(4));
+    assert_eq!(
+        decide_game(&game_of(&events)?, &revoke(facilitator(), 4)),
+        Err(GameError::CredentialAlreadyRevoked(pid(4)))
+    );
+    // 再発行すると、失効が外れる（もう一度失効できる）
+    events.push(GameEvent::CredentialReissued {
+        participant_id: pid(4),
+        credential_expires_at: expires(),
+    });
+    assert_eq!(
+        decide_game(&game_of(&events)?, &revoke(facilitator(), 4)),
+        Ok(vec![revoked_event(4)])
+    );
+    Ok(())
+}
+
+#[test]
+fn ac3_2_5__進行役以外と_未知の参加者と_未作成は拒否する() -> R<()> {
+    let state = game_of(&fully_assigned_events()?)?;
+    for actor in [participant(2), Actor::Anonymous] {
+        assert!(matches!(
+            decide_game(&state, &revoke(actor, 4)),
+            Err(GameError::Forbidden(_))
+        ));
+        assert!(matches!(
+            decide_game(&state, &reissue(actor, 4)),
+            Err(GameError::Forbidden(_))
+        ));
+    }
+    assert_eq!(
+        decide_game(&state, &revoke(facilitator(), 9)),
+        Err(GameError::ParticipantNotFound(pid(9)))
+    );
+    assert_eq!(
+        decide_game(&GameState::NotCreated, &revoke(facilitator(), 4)),
+        Err(GameError::NotPreparing)
+    );
+    Ok(())
+}
+
+#[test]
+fn evolve__資格の失効と再発行が採用されない列は_Ignored() -> R<()> {
+    let state = game_of(&fully_assigned_events()?)?;
+    // 未作成、未知の参加者の失効、二重の失効、失効していない再発行
+    assert!(evolve_game(GameState::NotCreated, &revoked_event(4)).is_ignored());
+    assert!(evolve_game(state.clone(), &revoked_event(9)).is_ignored());
+    let reissued = GameEvent::CredentialReissued {
+        participant_id: pid(4),
+        credential_expires_at: expires(),
+    };
+    assert!(evolve_game(state.clone(), &reissued).is_ignored());
+    let revoked = evolve_game(state, &revoked_event(4)).into_state();
+    assert!(evolve_game(revoked.clone(), &revoked_event(4)).is_ignored());
+    // 開始後の失効・再発行は採用する
+    let started = evolve_game(revoked, &GameEvent::GameStarted { game_id: GAME }).into_state();
+    let reissued_started = evolve_game(started, &reissued);
+    assert!(!reissued_started.is_ignored());
+    // 開始後の、未知の参加者の失効は Ignored（Started 側の分岐）
+    assert!(evolve_game(reissued_started.into_state(), &revoked_event(9)).is_ignored());
+    Ok(())
 }
