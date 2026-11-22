@@ -227,6 +227,7 @@ nav:
           - Bolt 9 終了報告: development/beer-game-rust/bolt_9_report.md
           - Bolt 10 終了報告: development/beer-game-rust/bolt_10_report.md
           - Bolt 11 終了報告: development/beer-game-rust/bolt_11_report.md
+          - Bolt 12 計画: development/beer-game-rust/bolt_12_plan.md
           - 守りの導入計画: development/beer-game-rust/guard_plan.md
   - 運用:
       - 概要: operation/index.md
