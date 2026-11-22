@@ -134,6 +134,8 @@ fn title_of(code: &str) -> &'static str {
         "session.decisions_changed" => "確定の根拠にした入力が、変わりました。",
         "session.incomplete_decisions" => "入力がそろっていないため、確定できません。",
         "game.not_ended" => "ゲームがまだ終了していないため、開示できません。",
+        "session.paused" => "一時停止中です。",
+        "session.not_paused" => "一時停止中ではありません。",
         "session.save_limit_reached" => "この週の保存回数の上限（9 回）に達しました。",
         _ => "リクエストを処理できません。",
     }
@@ -228,6 +230,8 @@ fn extras_of(error: &DomainError) -> Map<String, Value> {
             | SessionError::AlreadyEnded
             | SessionError::AlreadyStarted
             | SessionError::SaveLimitReached
+            | SessionError::Paused
+            | SessionError::NotPaused
             | SessionError::Forbidden(_),
         )
         | None => {}

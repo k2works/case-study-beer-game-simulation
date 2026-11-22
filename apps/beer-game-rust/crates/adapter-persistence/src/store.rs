@@ -45,6 +45,11 @@ pub trait EventCodec<E>: Sync {
         payload: serde_json::Value,
     ) -> Result<E, String>;
 
+    /// イベントの操作者（`actor_kind`・`actor_id`）。既定は匿名（B2 の簡略化）。入力者がイベントに残るものは、それを返す（監査）。
+    fn actor(&self, _event: &E) -> (&'static str, Option<uuid::Uuid>) {
+        ("ANONYMOUS", None)
+    }
+
     /// イベントが書く投影（追記と同じトランザクションで実行する）。既定は投影なし。
     fn projection(&self, _game_id: Uuid, _event: &E) -> Vec<Statement> {
         Vec::new()
@@ -186,11 +191,12 @@ where
                 .codec
                 .encode(event)
                 .map_err(|m| AppFailure::Persistence(PersistenceFailure::Storage(m)))?;
+            let (actor_kind, actor_id) = self.codec.actor(event);
             version = version.saturating_add(1);
             sqlx::query(
                 "INSERT INTO events (event_id, game_id, stream_type, stream_version, event_type, \
                  schema_version, payload, actor_kind, actor_id, correlation_id, command_id, occurred_at) \
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, 'ANONYMOUS', NULL, $1, $1, now())",
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $1, $1, now())",
             )
             .bind(Uuid::new_v4())
             .bind(self.game_id)
@@ -199,6 +205,8 @@ where
             .bind(event_type)
             .bind(schema_version)
             .bind(payload)
+            .bind(actor_kind)
+            .bind(actor_id)
             .execute(&mut *tx.0)
             .await
             .map_err(|e| append_failure(&e))?;

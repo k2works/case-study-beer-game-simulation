@@ -374,6 +374,82 @@ pub async fn commit_week<St: EventStore<SessionEvent>>(
     .await
 }
 
+/// 一時停止（US3.1。進行役だけ）。
+///
+/// # Errors
+/// 権限・停止中・未開始・終了後の誤り、永続化の失敗。
+pub async fn pause_session<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::PauseSession {
+            actor,
+            at: env.now(),
+        },
+        idem,
+    )
+    .await
+}
+
+/// 再開（US3.1。進行役だけ）。
+///
+/// # Errors
+/// 権限・停止中でない・未開始・終了後の誤り、永続化の失敗。
+pub async fn resume_session<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::ResumeSession {
+            actor,
+            at: env.now(),
+        },
+        idem,
+    )
+    .await
+}
+
+/// 代理入力（US3.1。進行役だけ。停止中も受け付ける）。
+///
+/// # Errors
+/// 権限・週・上限の誤り、永続化の失敗。
+#[allow(clippy::too_many_arguments)] // 理由: コマンドの項目をそのまま受け取る（境界で作った値）
+pub async fn submit_proxy_decision<St: EventStore<SessionEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    role: Role,
+    requested_week: Week,
+    quantity: Quantity,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    run_session(
+        store,
+        settings,
+        &SessionCommand::SubmitProxyDecision {
+            actor,
+            at: env.now(),
+            role,
+            requested_week,
+            quantity,
+        },
+        idem,
+    )
+    .await
+}
+
 /// ゲームの開始（US1.2。進行役だけ）。`game` と `session` の 2 本へ 1 つのトランザクションで追記する。
 ///
 /// # Errors

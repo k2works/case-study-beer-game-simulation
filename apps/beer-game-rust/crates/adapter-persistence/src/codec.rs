@@ -330,6 +330,23 @@ impl EventCodec<GameEvent> for GameCodec {
 pub struct SessionCodec;
 
 impl EventCodec<SessionEvent> for SessionCodec {
+    fn actor(&self, event: &SessionEvent) -> (&'static str, Option<Uuid>) {
+        match event {
+            SessionEvent::DecisionSaved { editor, .. } => match editor {
+                Editor::ByParticipant(p) => ("PARTICIPANT", Some(Uuid::from_u128(p.get()))),
+                Editor::ByFacilitator(g) => ("FACILITATOR", Some(Uuid::from_u128(g.get()))),
+            },
+            SessionEvent::ProxyDecisionSubmitted { operator, .. } => {
+                ("FACILITATOR", Some(Uuid::from_u128(operator.get())))
+            }
+            SessionEvent::SessionStarted { .. }
+            | SessionEvent::WeekCommitted { .. }
+            | SessionEvent::SessionEnded { .. }
+            | SessionEvent::SessionPaused
+            | SessionEvent::SessionResumed => ("ANONYMOUS", None),
+        }
+    }
+
     fn projection(&self, game_id: Uuid, event: &SessionEvent) -> Vec<crate::projection::Statement> {
         crate::projection::session_statements(game_id, event)
     }
@@ -385,6 +402,23 @@ impl EventCodec<SessionEvent> for SessionCodec {
                     "contributors": contributors,
                 }),
             ),
+            SessionEvent::SessionPaused => ("SessionPaused", json!({})),
+            SessionEvent::SessionResumed => ("SessionResumed", json!({})),
+            SessionEvent::ProxyDecisionSubmitted {
+                week,
+                role,
+                quantity: q,
+                decision_version,
+                operator,
+                submitted_role_count,
+            } => (
+                "ProxyDecisionSubmitted",
+                json!({
+                    "week": week.get(), "role": role_name(*role), "quantity": q.get(),
+                    "decisionVersion": decision_version.get(), "operator": uuid_of(operator.get()),
+                    "submittedRoleCount": submitted_role_count,
+                }),
+            ),
             SessionEvent::SessionEnded { reason } => (
                 "SessionEnded",
                 json!({"reason": match reason { EndReason::FinalWeek => "FINAL_WEEK" }}),
@@ -422,6 +456,18 @@ impl EventCodec<SessionEvent> for SessionCodec {
                 results: read_per_role(field(&p, "results")?, read_role_result)?,
                 next_states: read_per_role(field(&p, "nextStates")?, read_role_state)?,
                 contributors: usize::try_from(int(&p, "contributors")?).map_err(e)?,
+            }),
+            "SessionPaused" => Ok(SessionEvent::SessionPaused),
+            "SessionResumed" => Ok(SessionEvent::SessionResumed),
+            "ProxyDecisionSubmitted" => Ok(SessionEvent::ProxyDecisionSubmitted {
+                week: week_of(int(&p, "week")?)?,
+                role: role_field(&p, "role")?,
+                quantity: quantity(field(&p, "quantity")?)?,
+                decision_version: DecisionVersion::new(
+                    u32::try_from(int(&p, "decisionVersion")?).map_err(e)?,
+                ),
+                operator: GameId::new(id(&p, "operator")?),
+                submitted_role_count: usize::try_from(int(&p, "submittedRoleCount")?).map_err(e)?,
             }),
             "SessionEnded" => match text(&p, "reason")? {
                 "FINAL_WEEK" => Ok(SessionEvent::SessionEnded {

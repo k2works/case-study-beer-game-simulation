@@ -391,6 +391,16 @@ fn tech__エラーの_code_と_category_は_API_の契約として固定され�
             ErrorCategory::InvalidState,
         ),
         (
+            SessionError::Paused,
+            "session.paused",
+            ErrorCategory::InvalidState,
+        ),
+        (
+            SessionError::NotPaused,
+            "session.not_paused",
+            ErrorCategory::InvalidState,
+        ),
+        (
             SessionError::Forbidden("x"),
             "session.forbidden",
             ErrorCategory::Forbidden,
@@ -428,6 +438,189 @@ fn tech__エラーの_code_と_category_は_API_の契約として固定され�
     for (error, code, category) in cases {
         assert_eq!(error.code(), code);
         assert_eq!(error.category(), category);
+    }
+    Ok(())
+}
+
+fn pause_cmd(actor: Actor) -> SessionCommand {
+    SessionCommand::PauseSession { actor, at: at() }
+}
+
+fn resume_cmd(actor: Actor) -> SessionCommand {
+    SessionCommand::ResumeSession { actor, at: at() }
+}
+
+fn proxy(actor: Actor, role: Role, week_n: i64, q: i64) -> R<SessionCommand> {
+    Ok(SessionCommand::SubmitProxyDecision {
+        actor,
+        at: at(),
+        role,
+        requested_week: week(week_n)?,
+        quantity: quantity(q)?,
+    })
+}
+
+fn paused() -> R<SessionState> {
+    session_of(&[session_started()?, SessionEvent::SessionPaused])
+}
+
+#[test]
+fn ac3_1_1__進行役は停止でき_再開できる() -> R<()> {
+    assert_eq!(
+        decide_session(&active()?, &pause_cmd(facilitator())),
+        Ok(vec![SessionEvent::SessionPaused])
+    );
+    assert_eq!(
+        decide_session(&paused()?, &resume_cmd(facilitator())),
+        Ok(vec![SessionEvent::SessionResumed])
+    );
+    let resumed = session_of(&[
+        session_started()?,
+        SessionEvent::SessionPaused,
+        SessionEvent::SessionResumed,
+    ])?;
+    assert_eq!(resumed, active()?);
+    Ok(())
+}
+
+#[test]
+fn ac3_1_1__停止は進行役だけ_停止中の停止と停止していない再開は拒否する() -> R<()> {
+    for actor in [participant(4), Actor::Anonymous] {
+        assert!(matches!(
+            decide_session(&active()?, &pause_cmd(actor)),
+            Err(SessionError::Forbidden(_))
+        ));
+        assert!(matches!(
+            decide_session(&paused()?, &resume_cmd(actor)),
+            Err(SessionError::Forbidden(_))
+        ));
+    }
+    assert_eq!(
+        decide_session(&paused()?, &pause_cmd(facilitator())),
+        Err(SessionError::Paused)
+    );
+    assert_eq!(
+        decide_session(&active()?, &resume_cmd(facilitator())),
+        Err(SessionError::NotPaused)
+    );
+    assert_eq!(
+        decide_session(&SessionState::NotStarted, &pause_cmd(facilitator())),
+        Err(SessionError::NotActive)
+    );
+    Ok(())
+}
+
+#[test]
+fn ac3_1_1__停止中は入力の保存も週の確定も_Paused_で拒否する() -> R<()> {
+    let mut events = vec![session_started()?];
+    events.extend(all_saved(1, 4)?);
+    events.push(SessionEvent::SessionPaused);
+    let state = session_of(&events)?;
+    assert_eq!(
+        decide_session(&state, &save(participant(4), Role::Retailer, 1, 8, 1)?),
+        Err(SessionError::Paused)
+    );
+    assert_eq!(
+        decide_session(&state, &commit(1, 1)?),
+        Err(SessionError::Paused)
+    );
+    // 権限の誤りが先（停止中でも、他の役割の参加者は Forbidden）
+    assert!(matches!(
+        decide_session(&state, &save(participant(1), Role::Retailer, 1, 8, 1)?),
+        Err(SessionError::Forbidden(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn ac3_1_2__代理入力は停止中も受け付け_週は確定しない() -> R<()> {
+    let result = decide_session(&paused()?, &proxy(facilitator(), Role::Factory, 1, 6)?);
+    let Ok(events) = result else {
+        return Err(format!("受け付けられない: {result:?}"));
+    };
+    let [
+        SessionEvent::ProxyDecisionSubmitted {
+            role,
+            quantity: q,
+            decision_version,
+            operator,
+            submitted_role_count,
+            ..
+        },
+    ] = events.as_slice()
+    else {
+        return Err(format!("代理入力の 1 件ではない: {events:?}"));
+    };
+    assert_eq!(
+        (
+            *role,
+            q.get(),
+            decision_version.get(),
+            *submitted_role_count
+        ),
+        (Role::Factory, 6, 1, 1)
+    );
+    assert_eq!(*operator, GAME);
+    // 取り込むと入力として残り、停止のまま
+    let state = session_of(&[
+        session_started()?,
+        SessionEvent::SessionPaused,
+        events[0].clone(),
+    ])?;
+    let SessionState::Active(data) = &state else {
+        return Err("進行中ではない".to_owned());
+    };
+    assert!(data.paused);
+    assert_eq!(
+        data.decisions.get(&Role::Factory).map(|e| e.quantity.get()),
+        Some(6)
+    );
+    Ok(())
+}
+
+#[test]
+fn ac3_1_2__代理入力は進行役だけ_古い週は拒否_保存回数に数える() -> R<()> {
+    assert!(matches!(
+        decide_session(&active()?, &proxy(participant(1), Role::Factory, 1, 6)?),
+        Err(SessionError::Forbidden(_))
+    ));
+    assert_eq!(
+        decide_session(&active()?, &proxy(facilitator(), Role::Factory, 2, 6)?),
+        Err(SessionError::WeekAdvanced {
+            requested: week(2)?,
+            current: week(1)?
+        })
+    );
+    let mut events = vec![session_started()?];
+    for v in 1..=SAVE_LIMIT_PER_ROLE_WEEK {
+        events.push(saved(Role::Retailer, 1, 4, v, 4, 1)?);
+    }
+    assert_eq!(
+        decide_session(
+            &session_of(&events)?,
+            &proxy(facilitator(), Role::Retailer, 1, 5)?
+        ),
+        Err(SessionError::SaveLimitReached)
+    );
+    Ok(())
+}
+
+#[test]
+fn evolve__停止と再開と代理入力は進行中のときだけ採用する() -> R<()> {
+    let proxied = SessionEvent::ProxyDecisionSubmitted {
+        week: week(1)?,
+        role: Role::Factory,
+        quantity: quantity(6)?,
+        decision_version: version(1),
+        operator: GAME,
+        submitted_role_count: 1,
+    };
+    for event in [
+        SessionEvent::SessionPaused,
+        SessionEvent::SessionResumed,
+        proxied,
+    ] {
+        assert!(evolve_session(SessionState::NotStarted, &event).is_ignored());
     }
     Ok(())
 }

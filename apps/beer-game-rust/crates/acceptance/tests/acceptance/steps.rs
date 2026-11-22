@@ -457,6 +457,10 @@ async fn no_future_demand(world: &mut ApiWorld) -> R {
 // ---- 意思決定 ----
 
 async fn save(world: &mut ApiWorld, role_ja: &str, quantity: Value) -> R {
+    save_in_week(world, role_ja, 1, quantity).await
+}
+
+async fn save_in_week(world: &mut ApiWorld, role_ja: &str, week: i64, quantity: Value) -> R {
     let role = en(role_ja)?;
     let (_, cookie) = world
         .game()?
@@ -467,13 +471,14 @@ async fn save(world: &mut ApiWorld, role_ja: &str, quantity: Value) -> R {
     let id = world.game()?.id.clone();
     let key = world.next_key();
     let version = world.game()?.versions.get(role).copied().unwrap_or(0);
+    world.if_match = Some(version.to_string());
     let reply = world
         .call(
             "PUT",
             &format!("/api/v1/sessions/{id}/decisions"),
             Some(&cookie),
             Some(&key),
-            &json!({"week": 1, "quantity": quantity}).to_string(),
+            &json!({"week": week, "quantity": quantity}).to_string(),
         )
         .await?;
     if reply.status == 200 {
@@ -591,7 +596,7 @@ async fn commit(world: &mut ApiWorld, key: Option<String>) -> Result<Value, Stri
         .collect();
     let key = key.unwrap_or_else(|| world.next_key());
     let body = json!({"requestedWeek": 1, "basis": basis}).to_string();
-    Ok(world
+    let reply = world
         .call(
             "POST",
             &format!("/api/v1/sessions/{id}/weeks/1/commit"),
@@ -599,8 +604,12 @@ async fn commit(world: &mut ApiWorld, key: Option<String>) -> Result<Value, Stri
             Some(&key),
             &body,
         )
-        .await?
-        .body)
+        .await?;
+    if reply.status == 200 {
+        // 確定すると、次の週の意思決定の版は 0 に戻る
+        world.game_mut()?.versions.clear();
+    }
+    Ok(reply.body)
 }
 
 #[given("進行役が第 1 週を確定している")]
@@ -958,5 +967,277 @@ async fn no_results_list(world: &mut ApiWorld) -> R {
     expect(
         world.reply()?.body.get("results").is_none(),
         "値が含まれている",
+    )
+}
+
+// ---- 停止・再開・代理入力（US3.1） ----
+
+async fn facilitator_post(world: &mut ApiWorld, path: &str, body: &str) -> R {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    let key = world.next_key();
+    world
+        .call(
+            "POST",
+            &format!("/api/v1/sessions/{id}/{path}"),
+            Some(&cookie),
+            Some(&key),
+            body,
+        )
+        .await
+        .map(|_| ())
+}
+
+#[given("進行役がセッションを一時停止している")]
+async fn paused(world: &mut ApiWorld) -> R {
+    facilitator_post(world, "pause", "").await?;
+    expect(status(world)? == 200, "停止できなかった")
+}
+
+#[when("進行役がセッションを一時停止する")]
+async fn pause_when(world: &mut ApiWorld) -> R {
+    facilitator_post(world, "pause", "").await
+}
+
+#[given("進行役がセッションを再開している")]
+async fn resumed(world: &mut ApiWorld) -> R {
+    facilitator_post(world, "resume", "").await?;
+    expect(status(world)? == 200, "再開できなかった")
+}
+
+#[when("進行役がセッションを再開する")]
+async fn resume_when(world: &mut ApiWorld) -> R {
+    facilitator_post(world, "resume", "").await
+}
+
+#[when(regex = r"^(.+)の参加者が、セッションを一時停止しようとする$")]
+async fn participant_pause(world: &mut ApiWorld, role: String) -> R {
+    let (id, cookie) = (
+        world.game()?.id.clone(),
+        world
+            .game()?
+            .players
+            .get(en(&role)?)
+            .map(|(_, c)| c.clone())
+            .ok_or("参加者が無い")?,
+    );
+    let key = world.next_key();
+    world
+        .call(
+            "POST",
+            &format!("/api/v1/sessions/{id}/pause"),
+            Some(&cookie),
+            Some(&key),
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+#[then("停止中であるという理由で拒否される")]
+async fn rejected_paused(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "session.paused",
+        &format!("停止中の拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^セッションの状態は(進行中|停止中)である$")]
+async fn session_status_is(world: &mut ApiWorld, label: String) -> R {
+    let state = facilitator_state(world).await?;
+    let expected = if label == "停止中" {
+        "PAUSED"
+    } else {
+        "ACTIVE"
+    };
+    expect(
+        state.get("status") == Some(&json!(expected)),
+        &format!("状態が違う: {state}"),
+    )
+}
+
+#[then(regex = r"^当週の(.+)の入力は (\d+) のまま残っている$")]
+async fn input_remains(world: &mut ApiWorld, role: String, quantity: i64) -> R {
+    let state = facilitator_state(world).await?;
+    expect(
+        state.pointer(&format!("/roles/{}/decision", en(&role)?)) == Some(&json!(quantity)),
+        &format!("入力が残っていない: {state}"),
+    )
+}
+
+#[then(regex = r"^当週の(.+)の入力は保存されていない$")]
+async fn input_absent(world: &mut ApiWorld, role: String) -> R {
+    let state = facilitator_state(world).await?;
+    expect(
+        state
+            .pointer(&format!("/roles/{}/decision", en(&role)?))
+            .is_none_or(Value::is_null),
+        &format!("入力が保存されている: {state}"),
+    )
+}
+
+#[given(regex = r"^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存している$")]
+async fn saved_in_week_given(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    save_in_week(world, &role, week, json!(quantity)).await?;
+    expect(status(world)? == 200, "保存できなかった")
+}
+
+#[then(regex = r"^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存できる$")]
+async fn can_save_in_week(world: &mut ApiWorld, role: String, week: i64, quantity: i64) -> R {
+    save_in_week(world, &role, week, json!(quantity)).await?;
+    expect(
+        status(world)? == 200,
+        &format!("保存できない: {}", world.reply()?.body),
+    )
+}
+
+async fn proxy(world: &mut ApiWorld, role_ja: &str, week: i64, quantity: i64) -> R {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    let key = world.next_key();
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/proxy-decisions/{}", en(role_ja)?),
+            Some(&cookie),
+            Some(&key),
+            &json!({"requestedWeek": week, "quantity": quantity}).to_string(),
+        )
+        .await?;
+    if status(world)? == 200 {
+        let role = en(role_ja)?.to_owned();
+        let next = world.game()?.versions.get(&role).copied().unwrap_or(0) + 1;
+        world.game_mut()?.versions.insert(role, next);
+    }
+    Ok(())
+}
+
+#[when(
+    regex = r"^進行役が、(工場|一次卸|二次卸|小売店)の代理入力として (\d+) を入力(する|しようとする)$"
+)]
+async fn proxy_when(world: &mut ApiWorld, role: String, quantity: i64, _k: String) -> R {
+    proxy(world, &role, 1, quantity).await
+}
+
+#[given(regex = r"^進行役が、(工場|一次卸|二次卸|小売店)の代理入力として (\d+) を入力している$")]
+async fn proxy_given(world: &mut ApiWorld, role: String, quantity: i64) -> R {
+    proxy(world, &role, 1, quantity).await?;
+    expect(status(world)? == 200, "代理入力できなかった")
+}
+
+#[when(
+    regex = r"^進行役が、第 (\d+) 週の画面を見たまま、(工場|一次卸|二次卸|小売店)の代理入力として (\d+) を入力しようとする$"
+)]
+async fn proxy_stale(world: &mut ApiWorld, week: i64, role: String, quantity: i64) -> R {
+    proxy(world, &role, week, quantity).await
+}
+
+#[when(regex = r"^(.+)の参加者が、(.+)の代理入力として (\d+) を入力しようとする$")]
+async fn proxy_by_participant(world: &mut ApiWorld, who: String, role: String, quantity: i64) -> R {
+    let (id, cookie) = (
+        world.game()?.id.clone(),
+        world
+            .game()?
+            .players
+            .get(en(&who)?)
+            .map(|(_, c)| c.clone())
+            .ok_or("参加者が無い")?,
+    );
+    let key = world.next_key();
+    world
+        .call(
+            "PUT",
+            &format!("/api/v1/sessions/{id}/proxy-decisions/{}", en(&role)?),
+            Some(&cookie),
+            Some(&key),
+            &json!({"requestedWeek": 1, "quantity": quantity}).to_string(),
+        )
+        .await
+        .map(|_| ())
+}
+
+#[then(regex = r"^(.+)の代理入力 (\d+) が受け付けられる$")]
+async fn proxy_accepted(world: &mut ApiWorld, role: String, quantity: i64) -> R {
+    expect(
+        status(world)? == 200,
+        &format!("受け付けられない: {}", world.reply()?.body),
+    )?;
+    input_remains(world, role, quantity).await
+}
+
+#[then(regex = r"^第 (\d+) 週の結果はまだ記録されていない$")]
+async fn week_result_absent(world: &mut ApiWorld, week: i64) -> R {
+    let state = facilitator_state(world).await?;
+    let results = state
+        .get("results")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    expect(
+        results.iter().all(|r| r.get("week") != Some(&json!(week))),
+        "結果が記録されている",
+    )
+}
+
+#[then(regex = r"^第 (\d+) 週はすでに確定されているという理由で、代理入力は拒否される$")]
+async fn proxy_week_advanced(world: &mut ApiWorld, week: i64) -> R {
+    expect(
+        status(world)? == 409
+            && code(world)? == "session.week_advanced"
+            && world.reply()?.body.get("requestedWeek") == Some(&json!(week)),
+        &format!("週の拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+async fn proxy_row(world: &ApiWorld) -> Result<(String, Value, bool), String> {
+    let id = world.game()?.id.clone();
+    let row: (String, Value, bool) = sqlx::query_as(
+        "SELECT actor_kind, payload, occurred_at > now() - interval '5 minutes' FROM events \
+         WHERE game_id = $1::uuid AND event_type = 'ProxyDecisionSubmitted' ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(&id)
+    .fetch_one(world.pool()?)
+    .await
+    .map_err(|e| format!("監査履歴に代理入力が無い: {e}"))?;
+    Ok(row)
+}
+
+#[then(regex = r"^監査履歴に、操作者が進行役、役割が(.+)、値が (\d+) の代理入力が残っている$")]
+async fn audit_has_proxy(world: &mut ApiWorld, role: String, quantity: i64) -> R {
+    let (kind, payload, _) = proxy_row(world).await?;
+    expect(kind == "FACILITATOR", "操作者が進行役ではない")?;
+    expect(
+        payload.get("role") == Some(&json!(en(&role)?))
+            && payload.get("quantity") == Some(&json!(quantity)),
+        &format!("役割・値が違う: {payload}"),
+    )
+}
+
+#[then("その代理入力の時刻が記録されている")]
+async fn proxy_time(world: &mut ApiWorld) -> R {
+    let (_, _, recent) = proxy_row(world).await?;
+    expect(recent, "時刻が記録されていない、または古い")
+}
+
+#[given(regex = r"^(.+)の参加者が、当週の数量を (\d+) 回保存している$")]
+async fn saved_many(world: &mut ApiWorld, role: String, times: i64) -> R {
+    for quantity in 1..=times {
+        save(world, &role, json!(quantity)).await?;
+        expect(
+            status(world)? == 200,
+            &format!("{quantity} 回目の保存ができない: {}", world.reply()?.body),
+        )?;
+    }
+    Ok(())
+}
+
+#[when(regex = r"^(.+)の参加者が、当週の数量をもう 1 回保存しようとする$")]
+async fn save_one_more(world: &mut ApiWorld, role: String) -> R {
+    save(world, &role, json!(99)).await
+}
+
+#[then("保存回数の上限に達しているという理由で拒否される")]
+async fn rejected_save_limit(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 409 && code(world)? == "session.save_limit_reached",
+        &format!("上限の拒否ではない: {}", world.reply()?.body),
     )
 }

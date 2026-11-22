@@ -52,6 +52,8 @@ pub struct SessionData {
     /// 当週の、役割ごとの意思決定の版（保存のたびに 1 増える）。
     pub decision_versions: RoleMap<DecisionVersion>,
     pub commit_mode: CommitMode,
+    /// 一時停止中（入力の保存と週の確定を拒否する。代理入力は受け付ける）。
+    pub paused: bool,
 }
 
 impl SessionData {
@@ -131,6 +133,18 @@ pub enum SessionCommand {
         /// 確定の根拠にした、役割ごとの意思決定の版。
         basis: RoleMap<DecisionVersion>,
     },
+    /// 一時停止（進行役だけ）。
+    PauseSession { actor: Actor, at: Instant },
+    /// 再開（進行役だけ）。
+    ResumeSession { actor: Actor, at: Instant },
+    /// 進行役の代理入力（意思決定の版は要求しない。停止中も受け付ける）。
+    SubmitProxyDecision {
+        actor: Actor,
+        at: Instant,
+        role: Role,
+        requested_week: Week,
+        quantity: Quantity,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -161,6 +175,17 @@ pub enum SessionEvent {
     SessionEnded {
         reason: EndReason,
     },
+    SessionPaused,
+    SessionResumed,
+    /// 進行役の代理入力（監査のため、`DecisionSaved` とは別の事実として残す）。
+    ProxyDecisionSubmitted {
+        week: Week,
+        role: Role,
+        quantity: Quantity,
+        decision_version: DecisionVersion,
+        operator: GameId,
+        submitted_role_count: usize,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -170,6 +195,10 @@ pub enum SessionError {
     AlreadyEnded,
     AlreadyStarted,
     SaveLimitReached,
+    /// 一時停止中。
+    Paused,
+    /// 停止中でないものの再開。
+    NotPaused,
     Forbidden(&'static str),
     /// 古い画面からの要求（週がすでに進んでいる）。
     WeekAdvanced {
@@ -201,6 +230,8 @@ impl SessionError {
             SessionError::AlreadyEnded => "session.already_ended",
             SessionError::AlreadyStarted => "session.already_started",
             SessionError::SaveLimitReached => "session.save_limit_reached",
+            SessionError::Paused => "session.paused",
+            SessionError::NotPaused => "session.not_paused",
             SessionError::Forbidden(_) => "session.forbidden",
             SessionError::WeekAdvanced { .. } => "session.week_advanced",
             SessionError::DecisionConflict { .. } => "session.decision_conflict",
@@ -215,7 +246,9 @@ impl SessionError {
             SessionError::NotActive
             | SessionError::AlreadyEnded
             | SessionError::AlreadyStarted
-            | SessionError::SaveLimitReached => ErrorCategory::InvalidState,
+            | SessionError::SaveLimitReached
+            | SessionError::Paused
+            | SessionError::NotPaused => ErrorCategory::InvalidState,
             SessionError::Forbidden(_) => ErrorCategory::Forbidden,
             SessionError::WeekAdvanced { .. }
             | SessionError::DecisionConflict { .. }
@@ -261,6 +294,9 @@ fn save_decision_events(
     expected: DecisionVersion,
 ) -> Result<Vec<SessionEvent>, SessionError> {
     let editor = editor_of(actor, role, &data.assignments)?;
+    if data.paused {
+        return Err(SessionError::Paused);
+    }
     if requested_week != data.week {
         return Err(SessionError::WeekAdvanced {
             requested: requested_week,
@@ -289,6 +325,67 @@ fn save_decision_events(
         quantity,
         decision_version: current.next(),
         editor,
+        submitted_role_count: submitted,
+    }])
+}
+
+fn require_facilitator(
+    data: &SessionData,
+    actor: &Actor,
+    message: &'static str,
+) -> Result<(), SessionError> {
+    if actor.is_facilitator_of(data.game_id) {
+        Ok(())
+    } else {
+        Err(SessionError::Forbidden(message))
+    }
+}
+
+fn pause_events(data: &SessionData, actor: &Actor) -> Result<Vec<SessionEvent>, SessionError> {
+    require_facilitator(data, actor, "一時停止は進行役だけができる")?;
+    if data.paused {
+        return Err(SessionError::Paused);
+    }
+    Ok(vec![SessionEvent::SessionPaused])
+}
+
+fn resume_events(data: &SessionData, actor: &Actor) -> Result<Vec<SessionEvent>, SessionError> {
+    require_facilitator(data, actor, "再開は進行役だけができる")?;
+    if !data.paused {
+        return Err(SessionError::NotPaused);
+    }
+    Ok(vec![SessionEvent::SessionResumed])
+}
+
+fn proxy_events(
+    data: &SessionData,
+    actor: &Actor,
+    role: Role,
+    requested_week: Week,
+    quantity: Quantity,
+) -> Result<Vec<SessionEvent>, SessionError> {
+    require_facilitator(data, actor, "代理入力は進行役だけができる")?;
+    if requested_week != data.week {
+        return Err(SessionError::WeekAdvanced {
+            requested: requested_week,
+            current: data.week,
+        });
+    }
+    if !data.has_save_capacity(role) {
+        return Err(SessionError::SaveLimitReached);
+    }
+    let submitted = data
+        .decisions
+        .keys()
+        .chain(std::iter::once(&role))
+        .collect::<BTreeSet<_>>()
+        .len();
+    Ok(vec![SessionEvent::ProxyDecisionSubmitted {
+        week: data.week,
+        role,
+        quantity,
+        decision_version: data.decision_versions.get(role).next(),
+        operator: data.game_id,
         submitted_role_count: submitted,
     }])
 }
@@ -333,6 +430,9 @@ fn commit_week_events(
 ) -> Result<Vec<SessionEvent>, SessionError> {
     if !actor.is_facilitator_of(data.game_id) {
         return Err(SessionError::Forbidden("確定は進行役だけができる"));
+    }
+    if data.paused {
+        return Err(SessionError::Paused);
     }
     // 判定順 1: 週が違えば WeekAdvanced
     if requested_week != data.week {
@@ -386,6 +486,21 @@ pub fn decide_session(
             basis,
             ..
         } => commit_week_events(state.active_data()?, actor, *requested_week, basis),
+        SessionCommand::PauseSession { actor, .. } => pause_events(state.active_data()?, actor),
+        SessionCommand::ResumeSession { actor, .. } => resume_events(state.active_data()?, actor),
+        SessionCommand::SubmitProxyDecision {
+            actor,
+            role,
+            requested_week,
+            quantity,
+            ..
+        } => proxy_events(
+            state.active_data()?,
+            actor,
+            *role,
+            *requested_week,
+            *quantity,
+        ),
     }
 }
 
@@ -421,6 +536,7 @@ pub fn evolve_session(state: SessionState, event: &SessionEvent) -> Evolution<Se
                 decisions: BTreeMap::new(),
                 decision_versions: RoleMap::all(&DecisionVersion::ZERO),
                 commit_mode: *commit_mode,
+                paused: false,
             })),
             other @ (SessionState::Active(_) | SessionState::Ended(_)) => Evolution::Ignored(other),
         },
@@ -439,6 +555,30 @@ pub fn evolve_session(state: SessionState, event: &SessionEvent) -> Evolution<Se
                     editor: *editor,
                 },
             )
+        }),
+        SessionEvent::ProxyDecisionSubmitted {
+            role,
+            quantity,
+            decision_version,
+            operator,
+            ..
+        } => update_active(state, |data| {
+            data.with_decision(
+                *role,
+                DecisionEntry {
+                    quantity: *quantity,
+                    version: *decision_version,
+                    editor: Editor::ByFacilitator(*operator),
+                },
+            )
+        }),
+        SessionEvent::SessionPaused => update_active(state, |data| SessionData {
+            paused: true,
+            ..data
+        }),
+        SessionEvent::SessionResumed => update_active(state, |data| SessionData {
+            paused: false,
+            ..data
         }),
         SessionEvent::WeekCommitted { next_states, .. } => {
             update_active(state, |data| data.after_commit(next_states))

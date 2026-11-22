@@ -15,8 +15,8 @@ mod start;
 
 pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
-    JoinOutcome, assign_role, authenticate, commit_week, create_game, join_game, save_decision,
-    start_game,
+    JoinOutcome, assign_role, authenticate, commit_week, create_game, join_game, pause_session,
+    resume_session, save_decision, start_game, submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use secret::{Secret, digest, encode_token};

@@ -19,3 +19,6 @@ weekly-play/week-commit.feature
 
 # B5: 役割別の振り返り（US4.2。観察者の認可は B9）
 review/retrospective.feature
+
+# B6: 進行の継続（停止・再開・代理入力）
+continuation/pause-resume.feature

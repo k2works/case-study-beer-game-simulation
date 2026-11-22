@@ -100,6 +100,8 @@ pub struct ApiWorld {
     pub moved_from: Option<(String, String)>,
     /// 操作中のゲーム（`None` は最後に作ったゲーム）。2 つのゲームを比べるシナリオが切り替える。
     pub current: Option<usize>,
+    /// 次の呼び出しに付ける `If-Match`（意思決定の版）。使うと空に戻る。
+    pub if_match: Option<String>,
 }
 
 impl ApiWorld {
@@ -113,6 +115,7 @@ impl ApiWorld {
             roots_before: 0,
             moved_from: None,
             current: None,
+            if_match: None,
         }
     }
 
@@ -188,6 +191,9 @@ impl ApiWorld {
         }
         if let Some(key) = key {
             builder = builder.header("idempotency-key", key);
+        }
+        if let Some(version) = self.if_match.take() {
+            builder = builder.header("if-match", version);
         }
         let app = self.app.clone().ok_or("アプリが無い")?;
         let response = app

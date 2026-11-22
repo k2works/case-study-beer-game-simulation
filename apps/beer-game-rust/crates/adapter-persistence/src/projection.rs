@@ -3,7 +3,10 @@
 //! 簡略化: 設計の `Projection(Event -> List<RowChange>)` の `RowChange` は、SQL の文と束縛値の列で表した（表の型づけは、投影の表が増える B5 以降に見直す）。
 
 use beergame_application::{CredentialKind, PeripheralWrite};
-use beergame_domain::{Editor, GameEvent, Pipeline, Role, RoleMap, RoleState, SessionEvent};
+use beergame_domain::{
+    DecisionVersion, Editor, GameEvent, Pipeline, Quantity, Role, RoleMap, RoleState, SessionEvent,
+    Week,
+};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -149,6 +152,43 @@ fn editor_parts(editor: &Editor) -> (&'static str, u128) {
     }
 }
 
+/// 当週の入力の保存（参加者の保存と進行役の代理入力で共通）。
+fn decision_statements(
+    game: Uuid,
+    week: Week,
+    role: Role,
+    quantity: Quantity,
+    decision_version: DecisionVersion,
+    (kind, who): (&'static str, u128),
+    submitted_role_count: usize,
+) -> Vec<Statement> {
+    vec![
+        st(
+            "INSERT INTO current_decisions (game_id, role, week, quantity, decision_version, editor_kind, editor_id, updated_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, now()) \
+             ON CONFLICT (game_id, role) DO UPDATE SET week = EXCLUDED.week, quantity = EXCLUDED.quantity, \
+             decision_version = EXCLUDED.decision_version, editor_kind = EXCLUDED.editor_kind, \
+             editor_id = EXCLUDED.editor_id, updated_at = EXCLUDED.updated_at",
+            vec![
+                Bind::Uuid(game),
+                Bind::Text(role_name(role).to_owned()),
+                Bind::Int(i64::from(week.get())),
+                Bind::Int(i64::from(quantity.get())),
+                Bind::Int(i64::from(decision_version.get())),
+                Bind::Text(kind.to_owned()),
+                pid(who),
+            ],
+        ),
+        st(
+            "UPDATE session_overview SET submitted_role_count = $2 WHERE game_id = $1",
+            vec![
+                Bind::Uuid(game),
+                Bind::Int(i64::try_from(submitted_role_count).unwrap_or(0)),
+            ],
+        ),
+    ]
+}
+
 /// `session` ストリームのイベントが書く投影（`session_overview`・`role_current_states`・`current_decisions`・`week_commits`・`week_role_results`）。
 /// `week_team_totals`（観察者向けのチーム合計）は B9 まで書かない。
 #[must_use]
@@ -170,34 +210,15 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
             decision_version,
             editor,
             submitted_role_count,
-        } => {
-            let (kind, who) = editor_parts(editor);
-            vec![
-                st(
-                    "INSERT INTO current_decisions (game_id, role, week, quantity, decision_version, editor_kind, editor_id, updated_at) \
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, now()) \
-                     ON CONFLICT (game_id, role) DO UPDATE SET week = EXCLUDED.week, quantity = EXCLUDED.quantity, \
-                     decision_version = EXCLUDED.decision_version, editor_kind = EXCLUDED.editor_kind, \
-                     editor_id = EXCLUDED.editor_id, updated_at = EXCLUDED.updated_at",
-                    vec![
-                        Bind::Uuid(game),
-                        Bind::Text(role_name(*role).to_owned()),
-                        Bind::Int(i64::from(week.get())),
-                        Bind::Int(i64::from(quantity.get())),
-                        Bind::Int(i64::from(decision_version.get())),
-                        Bind::Text(kind.to_owned()),
-                        pid(who),
-                    ],
-                ),
-                st(
-                    "UPDATE session_overview SET submitted_role_count = $2 WHERE game_id = $1",
-                    vec![
-                        Bind::Uuid(game),
-                        Bind::Int(i64::try_from(*submitted_role_count).unwrap_or(0)),
-                    ],
-                ),
-            ]
-        }
+        } => decision_statements(
+            game,
+            *week,
+            *role,
+            *quantity,
+            *decision_version,
+            editor_parts(editor),
+            *submitted_role_count,
+        ),
         SessionEvent::WeekCommitted {
             week,
             commit_kind: _,
@@ -253,6 +274,30 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
             ));
             statements
         }
+        SessionEvent::ProxyDecisionSubmitted {
+            week,
+            role,
+            quantity,
+            decision_version,
+            operator,
+            submitted_role_count,
+        } => decision_statements(
+            game,
+            *week,
+            *role,
+            *quantity,
+            *decision_version,
+            ("FACILITATOR", operator.get()),
+            *submitted_role_count,
+        ),
+        SessionEvent::SessionPaused => vec![st(
+            "UPDATE session_overview SET status = 'PAUSED' WHERE game_id = $1",
+            vec![Bind::Uuid(game)],
+        )],
+        SessionEvent::SessionResumed => vec![st(
+            "UPDATE session_overview SET status = 'ACTIVE' WHERE game_id = $1",
+            vec![Bind::Uuid(game)],
+        )],
         SessionEvent::SessionEnded { .. } => vec![
             st(
                 "UPDATE session_overview SET status = 'ENDED', ended_at = now() WHERE game_id = $1",

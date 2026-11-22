@@ -208,3 +208,45 @@ fn d7__イベントに表示名を含めない() -> R<()> {
         Ok(())
     }
 }
+
+#[test]
+fn ac3_1_2__停止_再開_代理入力のイベントは_JSON_に変換して戻すと同じになり_操作者が残る() -> R<()> {
+    use beergame_domain::SessionEvent;
+    let proxied = SessionEvent::ProxyDecisionSubmitted {
+        week: Week::of(1).map_err(e)?,
+        role: Role::Factory,
+        quantity: Quantity::of(6).map_err(e)?,
+        decision_version: DecisionVersion::new(1),
+        operator: GAME,
+        submitted_role_count: 1,
+    };
+    for event in [
+        SessionEvent::SessionPaused,
+        SessionEvent::SessionResumed,
+        proxied.clone(),
+    ] {
+        roundtrip(&SessionCodec, &event)?;
+    }
+    // 監査: 代理入力の操作者は進行役（ゲームの ID）
+    assert_eq!(
+        SessionCodec.actor(&proxied),
+        ("FACILITATOR", Some(uuid::Uuid::from_u128(GAME.get())))
+    );
+    assert_eq!(
+        SessionCodec.actor(&SessionEvent::SessionPaused),
+        ("ANONYMOUS", None)
+    );
+    let by_participant = SessionEvent::DecisionSaved {
+        week: Week::of(1).map_err(e)?,
+        role: Role::Retailer,
+        quantity: Quantity::of(4).map_err(e)?,
+        decision_version: DecisionVersion::new(1),
+        editor: beergame_domain::Editor::ByParticipant(ParticipantId::new(4)),
+        submitted_role_count: 1,
+    };
+    assert_eq!(
+        SessionCodec.actor(&by_participant),
+        ("PARTICIPANT", Some(uuid::Uuid::from_u128(4)))
+    );
+    Ok(())
+}

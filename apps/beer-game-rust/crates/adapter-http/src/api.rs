@@ -14,7 +14,8 @@ use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
     GameSnapshot, Idempotency, ResponseShape, Secret, SessionSnapshot, StartExecuted, assign_role,
-    authenticate, commit_week, create_game, digest, join_game, save_decision, start_game,
+    authenticate, commit_week, create_game, digest, join_game, pause_session, resume_session,
+    save_decision, start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, DecisionVersion, GameEvent, GameId, Instant, ParticipantId, Quantity, Role, RoleMap,
@@ -91,6 +92,12 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route(
             "/api/v1/sessions/{session_id}/weeks/{week}/commit",
             post(commit::<B>),
+        )
+        .route("/api/v1/sessions/{session_id}/pause", post(pause::<B>))
+        .route("/api/v1/sessions/{session_id}/resume", post(resume::<B>))
+        .route(
+            "/api/v1/sessions/{session_id}/proxy-decisions/{role}",
+            put(proxy_decision::<B>),
         )
         .route("/api/v1/games/{game_id}/state", get(game_state::<B>))
         .route("/api/v1/games/{game_id}/lobby", get(lobby::<B>))
@@ -966,4 +973,151 @@ async fn review<B: Backend>(
     result
         .map(|response: Response| with_correlation(response, &correlation))
         .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 停止・再開（進行役だけ。本文なし）。`scope` は冪等記録の範囲、`run` が実際の操作。
+async fn session_control<B, F, Fut>(
+    backend: Arc<B>,
+    session: String,
+    headers: HeaderMap,
+    scope: &'static str,
+    run: F,
+) -> Response
+where
+    B: Backend,
+    F: FnOnce(Arc<B>, GameId, Actor, Idempotency) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<Executed, AppFailure>> + Send + 'static,
+{
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&session)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            scope,
+            "",
+            ResponseShape::Session,
+        )?;
+        run(backend, game_id, actor, idem)
+            .await
+            .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation_task))
+            .map_err(|failure| Box::new(problem_of(&failure)))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+async fn pause<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(session): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    session_control(
+        backend,
+        session,
+        headers,
+        "pause_session",
+        |b, game, actor, idem| async move {
+            pause_session(&b.store(game), b.env(), b.settings(), actor, Some(&idem)).await
+        },
+    )
+    .await
+}
+
+async fn resume<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(session): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    session_control(
+        backend,
+        session,
+        headers,
+        "resume_session",
+        |b, game, actor, idem| async move {
+            resume_session(&b.store(game), b.env(), b.settings(), actor, Some(&idem)).await
+        },
+    )
+    .await
+}
+
+/// 進行役の代理入力。意思決定の版は要求せず、`requestedWeek` で古い画面を区別する。
+async fn proxy_decision<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path((session, role_path)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&session)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let parsed = parse_json(&body)?;
+        let role = role_of_name(&role_path).ok_or_else(|| {
+            Box::new(validation_problem(vec![field(
+                "role",
+                "役割は FACTORY・DISTRIBUTOR・WHOLESALER・RETAILER のどれかにしてください。",
+            )]))
+        })?;
+        let week = parsed
+            .get("requestedWeek")
+            .and_then(Value::as_i64)
+            .map(|n| Week::of(n).map_err(|e| crate::field_error(&e)));
+        let quantity = parsed
+            .get("quantity")
+            .and_then(Value::as_i64)
+            .map(|n| Quantity::of(n).map_err(|e| crate::field_error(&e)));
+        let (week, quantity) = match (week, quantity) {
+            (Some(Ok(w)), Some(Ok(q))) => (w, q),
+            (w, q) => {
+                let mut errors: Vec<FieldError> = Vec::new();
+                match w {
+                    None => errors.push(field(
+                        "requestedWeek",
+                        "週は 1 以上 50 以下の整数にしてください。",
+                    )),
+                    Some(Err(e)) => errors.push(e),
+                    Some(Ok(_)) => {}
+                }
+                match q {
+                    None => errors.push(field(
+                        "quantity",
+                        "数量は 0 以上 1000 以下の整数にしてください。",
+                    )),
+                    Some(Err(e)) => errors.push(e),
+                    Some(Ok(_)) => {}
+                }
+                return Err(Box::new(validation_problem(errors)));
+            }
+        };
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "proxy_decision",
+            &format!("{role_path}\n{parsed}"),
+            ResponseShape::Session,
+        )?;
+        submit_proxy_decision(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+            role,
+            week,
+            quantity,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| executed_response(&executed, ResponseShape::Session, &correlation_task))
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
 }
