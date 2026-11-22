@@ -363,3 +363,24 @@ fn ac2_4_5__確定方式の変更は_JSON_に変換して戻すと同じにな�
     );
     Ok(())
 }
+
+#[test]
+fn ac1_3_1__観察用の招待と観察者の参加のイベントは_JSON_に変換して戻すと同じになる() -> R<()> {
+    use beergame_domain::{GameEvent, InvitationId, ObserverId};
+    for event in [
+        GameEvent::ObserverInvited {
+            invitation_id: InvitationId::new(1),
+            expires_at: Instant::from_epoch_millis(1_000),
+        },
+        GameEvent::ObserverInvitationRevoked {
+            invitation_id: InvitationId::new(1),
+        },
+        GameEvent::ObserverJoined {
+            observer_id: ObserverId::new(2),
+            invitation_id: InvitationId::new(1),
+        },
+    ] {
+        roundtrip(&GameCodec, &event)?;
+    }
+    Ok(())
+}

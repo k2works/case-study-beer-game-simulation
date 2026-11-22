@@ -2,8 +2,8 @@
 
 use crate::fixtures::*;
 use beergame_domain::{
-    Actor, ErrorCategory, GameCommand, GameError, GameEvent, GameState, Role, decide_game,
-    evolve_game, replay_game,
+    Actor, ErrorCategory, GameCommand, GameError, GameEvent, GameState, InvitationId, Role,
+    decide_game, evolve_game, replay_game,
 };
 
 #[test]
@@ -285,6 +285,21 @@ fn tech__エラーの_code_と_category_は_API_の契約として固定され�
             ErrorCategory::InvalidState,
         ),
         (
+            GameError::InvitationInvalid,
+            "game.invitation_invalid",
+            ErrorCategory::Forbidden,
+        ),
+        (
+            GameError::InvitationNotFound(InvitationId::new(1)),
+            "game.invitation_not_found",
+            ErrorCategory::NotFound,
+        ),
+        (
+            GameError::InvitationAlreadyRevoked(InvitationId::new(1)),
+            "game.credential_already_revoked",
+            ErrorCategory::InvalidState,
+        ),
+        (
             GameError::StartConditionNotMet(vec![Role::Factory]),
             "game.start_condition_not_met",
             ErrorCategory::RuleViolation,
@@ -414,5 +429,158 @@ fn evolve__資格の失効と再発行が採用されない列は_Ignored() -> R
     assert!(!reissued_started.is_ignored());
     // 開始後の、未知の参加者の失効は Ignored（Started 側の分岐）
     assert!(evolve_game(reissued_started.into_state(), &revoked_event(9)).is_ignored());
+    Ok(())
+}
+
+fn inv(n: u128) -> InvitationId {
+    InvitationId::new(n)
+}
+
+fn invite_cmd(actor: Actor, n: u128) -> GameCommand {
+    GameCommand::InviteObserver {
+        actor,
+        at: at(),
+        invitation_id: inv(n),
+        expires_at: expires(),
+    }
+}
+
+fn invited(n: u128) -> GameEvent {
+    GameEvent::ObserverInvited {
+        invitation_id: inv(n),
+        expires_at: expires(),
+    }
+}
+
+fn join_observer_cmd(n: u128, at_ms: beergame_domain::Instant) -> GameCommand {
+    GameCommand::JoinAsObserver {
+        at: at_ms,
+        observer_id: beergame_domain::ObserverId::new(9),
+        invitation_id: inv(n),
+    }
+}
+
+#[test]
+fn ac1_3_1__進行役だけが観察用の招待を発行でき_未作成は拒否する() -> R<()> {
+    let state = game_of(&fully_assigned_events()?)?;
+    assert_eq!(
+        decide_game(&state, &invite_cmd(facilitator(), 1)),
+        Ok(vec![invited(1)])
+    );
+    // 開始後も受け付ける
+    let mut events = fully_assigned_events()?;
+    events.push(GameEvent::GameStarted { game_id: GAME });
+    assert_eq!(
+        decide_game(&game_of(&events)?, &invite_cmd(facilitator(), 1)),
+        Ok(vec![invited(1)])
+    );
+    for actor in [participant(1), Actor::Anonymous] {
+        assert!(matches!(
+            decide_game(&state, &invite_cmd(actor, 1)),
+            Err(GameError::Forbidden(_))
+        ));
+    }
+    assert_eq!(
+        decide_game(&GameState::NotCreated, &invite_cmd(facilitator(), 1)),
+        Err(GameError::NotPreparing)
+    );
+    Ok(())
+}
+
+#[test]
+fn ac1_3_3__有効な招待で観察者が参加でき_失効_期限切れ_不明は区別なく拒否する() -> R<()> {
+    let mut events = fully_assigned_events()?;
+    events.push(invited(1));
+    let state = game_of(&events)?;
+    let join = join_observer_cmd(1, at());
+    assert_eq!(
+        decide_game(&state, &join),
+        Ok(vec![GameEvent::ObserverJoined {
+            observer_id: beergame_domain::ObserverId::new(9),
+            invitation_id: inv(1),
+        }])
+    );
+    // 不明な招待
+    assert_eq!(
+        decide_game(&state, &join_observer_cmd(2, at())),
+        Err(GameError::InvitationInvalid)
+    );
+    // 期限切れ（期限と同時刻を含む）
+    assert_eq!(
+        decide_game(&state, &join_observer_cmd(1, expires())),
+        Err(GameError::InvitationInvalid)
+    );
+    // 失効
+    events.push(GameEvent::ObserverInvitationRevoked {
+        invitation_id: inv(1),
+    });
+    assert_eq!(
+        decide_game(&game_of(&events)?, &join),
+        Err(GameError::InvitationInvalid)
+    );
+    // 参加はゲームがあるときだけ
+    assert_eq!(
+        decide_game(&GameState::NotCreated, &join),
+        Err(GameError::NotPreparing)
+    );
+    // 他のコマンドを、観察者の判断に渡しても拒否する（到達しない経路。fail closed）
+    Ok(())
+}
+
+#[test]
+fn ac1_3_4__進行役だけが招待を失効でき_存在しない招待と二重の失効は拒否する() -> R<()> {
+    let mut events = fully_assigned_events()?;
+    events.push(invited(1));
+    let revoke = |actor, n| GameCommand::RevokeObserverInvitation {
+        actor,
+        at: at(),
+        invitation_id: inv(n),
+    };
+    let state = game_of(&events)?;
+    assert_eq!(
+        decide_game(&state, &revoke(facilitator(), 1)),
+        Ok(vec![GameEvent::ObserverInvitationRevoked {
+            invitation_id: inv(1)
+        }])
+    );
+    assert!(matches!(
+        decide_game(&state, &revoke(participant(1), 1)),
+        Err(GameError::Forbidden(_))
+    ));
+    assert_eq!(
+        decide_game(&state, &revoke(facilitator(), 2)),
+        Err(GameError::InvitationNotFound(inv(2)))
+    );
+    events.push(GameEvent::ObserverInvitationRevoked {
+        invitation_id: inv(1),
+    });
+    assert_eq!(
+        decide_game(&game_of(&events)?, &revoke(facilitator(), 1)),
+        Err(GameError::InvitationAlreadyRevoked(inv(1)))
+    );
+    Ok(())
+}
+
+#[test]
+fn evolve__観察者の招待と参加が採用されない列は_Ignored() -> R<()> {
+    let state = game_of(&fully_assigned_events()?)?;
+    let joined = GameEvent::ObserverJoined {
+        observer_id: beergame_domain::ObserverId::new(9),
+        invitation_id: inv(1),
+    };
+    let revoked = GameEvent::ObserverInvitationRevoked {
+        invitation_id: inv(1),
+    };
+    // 招待が無い状態の失効・参加、未作成
+    assert!(evolve_game(state.clone(), &revoked).is_ignored());
+    assert!(evolve_game(state.clone(), &joined).is_ignored());
+    assert!(evolve_game(GameState::NotCreated, &invited(1)).is_ignored());
+    // 同じ招待の再発行は採用しない。失効の二重・観察者の二重参加も採用しない
+    let with_invitation = evolve_game(state, &invited(1)).into_state();
+    assert!(evolve_game(with_invitation.clone(), &invited(1)).is_ignored());
+    let revoked_state = evolve_game(with_invitation.clone(), &revoked).into_state();
+    assert!(evolve_game(revoked_state, &revoked).is_ignored());
+    let joined_state = evolve_game(with_invitation, &joined).into_state();
+    assert!(evolve_game(joined_state, &joined).is_ignored());
     Ok(())
 }

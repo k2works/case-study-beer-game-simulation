@@ -1,6 +1,6 @@
 //! 集約に共通の土台。操作者、エラーの分類、再生の結果。時刻・ID・乱数はここでも作らない。
 
-use crate::values::{GameId, ParticipantId};
+use crate::values::{GameId, ObserverId, ParticipantId};
 
 /// エラーの分類。HTTP の状態への写像（アダプターの責務）の入力になる。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,6 +17,8 @@ pub enum ErrorCategory {
 pub enum Actor {
     Facilitator(GameId),
     Participant(ParticipantId),
+    /// 観察者（役割を持たない。観察と、終了後の振り返りだけ）。
+    Observer(ObserverId),
     Anonymous,
 }
 

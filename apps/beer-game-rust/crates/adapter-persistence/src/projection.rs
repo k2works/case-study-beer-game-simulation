@@ -157,6 +157,33 @@ pub fn game_statements(game: Uuid, event: &GameEvent) -> Vec<Statement> {
             ));
             statements
         }
+        GameEvent::ObserverInvited {
+            invitation_id,
+            expires_at,
+        } => vec![st(
+            "INSERT INTO lobby_observer_invitations (invitation_id, game_id, expires_at, created_at) \
+             VALUES ($1, $2, to_timestamp($3::double precision / 1000), now())",
+            vec![
+                pid(invitation_id.get()),
+                Bind::Uuid(game),
+                Bind::Int(expires_at.epoch_millis()),
+            ],
+        )],
+        GameEvent::ObserverInvitationRevoked { invitation_id } => vec![st(
+            "UPDATE lobby_observer_invitations SET revoked_at = now() WHERE invitation_id = $1",
+            vec![pid(invitation_id.get())],
+        )],
+        GameEvent::ObserverJoined {
+            observer_id,
+            invitation_id,
+        } => vec![st(
+            "INSERT INTO lobby_observers (observer_id, game_id, invitation_id, joined_at) VALUES ($1, $2, $3, now())",
+            vec![
+                pid(observer_id.get()),
+                Bind::Uuid(game),
+                pid(invitation_id.get()),
+            ],
+        )],
         // 資格の失効・再発行は、周辺ストア（credentials・browser_sessions）に書く。投影の表は変わらない
         GameEvent::CredentialRevoked { .. } | GameEvent::CredentialReissued { .. } => Vec::new(),
         GameEvent::GameStarted { .. } => vec![st(
@@ -299,6 +326,22 @@ pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
                     ),
                 ],
             )];
+            // 観察者向けのチーム合計（役割別の値は含まない。寄与者が 2 未満の週は、問い合わせの側で値を隠す）
+            let sum = |f: &dyn Fn(&beergame_domain::RoleWeekResult) -> i64| -> i64 {
+                results.values().iter().map(|r| f(r)).sum()
+            };
+            statements.push(st(
+                "INSERT INTO week_team_totals (game_id, week, total_ordered, total_inventory, total_backlog, contributors) \
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+                vec![
+                    Bind::Uuid(game),
+                    Bind::Int(i64::from(week.get())),
+                    Bind::Int(sum(&|r| i64::from(r.ordered.get()))),
+                    Bind::Int(sum(&|r| i64::from(r.ending_inventory.get()))),
+                    Bind::Int(sum(&|r| i64::from(r.ending_backlog.get()))),
+                    Bind::Int(i64::try_from(*contributors).unwrap_or(0)),
+                ],
+            ));
             for role in Role::ALL {
                 let r = results.get(role);
                 statements.push(st(
@@ -421,6 +464,8 @@ fn kind_text(kind: CredentialKind) -> &'static str {
     match kind {
         CredentialKind::Facilitator => "FACILITATOR",
         CredentialKind::Participant => "PARTICIPANT",
+        CredentialKind::Observer => "OBSERVER",
+        CredentialKind::ObserverInvitation => "OBSERVER_INVITATION",
     }
 }
 
@@ -496,6 +541,21 @@ pub fn peripheral_statements(write: &PeripheralWrite) -> Statement {
                 Bind::Int(i64::from(*status_code)),
                 Bind::Bytes(response.clone()),
                 Bind::Int(expires_at.epoch_millis()),
+            ],
+        ),
+        PeripheralWrite::ObserverName {
+            game_id,
+            observer_id,
+            name,
+            at,
+        } => st(
+            "INSERT INTO display_profiles (game_id, actor_kind, actor_id, display_name, created_at) \
+             VALUES ($1, 'OBSERVER', $2, $3, to_timestamp($4::double precision / 1000))",
+            vec![
+                pid(game_id.get()),
+                pid(observer_id.get()),
+                Bind::Text(name.clone()),
+                Bind::Int(at.epoch_millis()),
             ],
         ),
         PeripheralWrite::DisplayName {

@@ -2,7 +2,7 @@
 //! 参加者には自分の役割の値だけを返し、他の役割の値と将来の週の需要は返さない。小売店だけが当週の顧客需要を見られる。
 
 use beergame_application::{
-    EditorSnapshot, GameSnapshot, ResultRow, RoleSnapshot, SessionSnapshot,
+    EditorSnapshot, GameSnapshot, ObservationSnapshot, ResultRow, RoleSnapshot, SessionSnapshot,
 };
 use beergame_domain::{Actor, Role};
 use serde_json::{Map, Value, json};
@@ -181,7 +181,7 @@ pub(crate) fn game_view(g: &GameSnapshot, actor: &Actor, role: Option<Role>) -> 
                 view.insert("role".to_owned(), json!(role_name(role)));
             }
         }
-        Actor::Anonymous => {}
+        Actor::Anonymous | Actor::Observer(_) => {}
     }
     Value::Object(view)
 }
@@ -207,8 +207,17 @@ pub(crate) fn lobby_view(g: &GameSnapshot) -> Value {
         "changedSettings": g.changed_settings,
         "commitMode": g.commit_mode,
         "participants": participants,
-        "invitations": [],
-        "observers": [],
+        "invitations": g.invitations.iter().map(|i| json!({
+            "invitationId": uuid_text(i.invitation_id),
+            "expiresAt": rfc3339_millis(i.expires_at_millis),
+            "revoked": i.revoked,
+            "createdAt": rfc3339_millis(i.created_at_millis),
+        })).collect::<Vec<_>>(),
+        "observers": g.observers.iter().map(|o| json!({
+            "observerId": uuid_text(o.observer_id),
+            "displayName": o.display_name,
+            "joinedAt": rfc3339_millis(o.joined_at_millis),
+        })).collect::<Vec<_>>(),
         "versions": {"game": g.game_version, "session": g.session_version},
     })
 }
@@ -224,4 +233,43 @@ pub(crate) fn review_view(s: &SessionSnapshot, g: &GameSnapshot) -> Value {
         "results": s.results.iter().map(result_row).collect::<Vec<_>>(),
         "versions": {"game": s.game_version, "session": s.session_version},
     })
+}
+
+/// 観察画面。現在週・完了状況・チーム合計だけ（役割別の値・将来の需要・参加コード・入力者は含まない）。
+/// 公開範囲が `NONE` なら合計を出さず理由を示す。寄与者が 2 未満の週は、値を出さず `hidden` と理由だけ（逆算の防止）。
+pub(crate) fn observation_view(o: &ObservationSnapshot) -> Value {
+    let mut view = Map::new();
+    view.insert("gameId".to_owned(), json!(uuid_text(o.game_id.get())));
+    view.insert("status".to_owned(), json!(o.status));
+    view.insert("finalWeek".to_owned(), json!(o.final_week));
+    if let Some(session) = &o.session {
+        view.insert("sessionStatus".to_owned(), json!(session.status));
+        view.insert("week".to_owned(), json!(session.week));
+        view.insert(
+            "submittedRoleCount".to_owned(),
+            json!(session.submitted_role_count),
+        );
+    }
+    let totals = if o.disclosure == "NONE" {
+        json!({"policy": "NONE", "hiddenReason": "DISCLOSURE_NONE", "weeks": []})
+    } else {
+        let weeks: Vec<Value> = o
+            .weeks
+            .iter()
+            .map(|w| {
+                if w.contributors < 2 {
+                    json!({"week": w.week, "hidden": true, "reason": "CONTRIBUTORS_BELOW_MINIMUM"})
+                } else {
+                    json!({"week": w.week, "order": w.ordered, "inventory": w.inventory, "backlog": w.backlog})
+                }
+            })
+            .collect();
+        json!({"policy": "TEAM_TOTAL", "weeks": weeks})
+    };
+    view.insert("totals".to_owned(), totals);
+    view.insert(
+        "versions".to_owned(),
+        json!({"game": o.game_version, "session": o.session_version}),
+    );
+    Value::Object(view)
 }

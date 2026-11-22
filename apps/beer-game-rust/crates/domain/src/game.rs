@@ -10,7 +10,10 @@ use crate::kit_preset::KitPreset;
 use crate::role::{Role, RoleMap};
 use crate::settings::{CostPolicy, DemandSeries};
 use crate::simulate::SimulationSettings;
-use crate::values::{DisplayName, GameId, Instant, JoinCode, ParticipantId, RetentionDays, Week};
+use crate::values::{
+    DisplayName, GameId, Instant, InvitationId, JoinCode, ObserverId, ParticipantId, RetentionDays,
+    Week,
+};
 
 /// 確定方式。手動（進行役が確定する）か、自動（4 役割の入力がそろったら、同じ追記で確定する。B8）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -128,6 +131,17 @@ pub struct GameData {
     pub participants: BTreeMap<ParticipantId, Option<Role>>,
     /// 失効した資格の参加者（再発行で外れる）。
     pub revoked: BTreeSet<ParticipantId>,
+    /// 観察用の招待（失効しても残す）。
+    pub invitations: BTreeMap<InvitationId, Invitation>,
+    /// 参加した観察者（役割を持たない）。
+    pub observers: BTreeSet<ObserverId>,
+}
+
+/// 観察用の招待。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Invitation {
+    pub expires_at: Instant,
+    pub revoked: bool,
 }
 
 impl GameData {
@@ -211,6 +225,25 @@ pub enum GameCommand {
         at: Instant,
         participant_id: ParticipantId,
     },
+    /// 観察用の招待の発行（進行役だけ。準備中・開始後の両方）。
+    InviteObserver {
+        actor: Actor,
+        at: Instant,
+        invitation_id: InvitationId,
+        expires_at: Instant,
+    },
+    /// 観察用の招待の失効（進行役だけ）。すでに参加した観察者は、そのまま続けられる。
+    RevokeObserverInvitation {
+        actor: Actor,
+        at: Instant,
+        invitation_id: InvitationId,
+    },
+    /// 観察者としての参加（招待コードが認可。境界が招待を引いて渡す）。
+    JoinAsObserver {
+        at: Instant,
+        observer_id: ObserverId,
+        invitation_id: InvitationId,
+    },
     /// 失効した参加者の資格の再発行（進行役だけ。準備中・開始後の両方）。
     ReissueCredential {
         actor: Actor,
@@ -254,6 +287,18 @@ pub enum GameEvent {
         /// 外れた旧担当者（昇順）。
         replaced: Vec<ParticipantId>,
     },
+    /// 観察用の招待の発行（EV-G13）。
+    ObserverInvited {
+        invitation_id: InvitationId,
+        expires_at: Instant,
+    },
+    /// 観察用の招待の失効。
+    ObserverInvitationRevoked { invitation_id: InvitationId },
+    /// 観察者の参加。
+    ObserverJoined {
+        observer_id: ObserverId,
+        invitation_id: InvitationId,
+    },
     /// 参加者の資格の失効。
     CredentialRevoked { participant_id: ParticipantId },
     /// 参加者の資格の再発行。
@@ -276,6 +321,12 @@ pub enum GameError {
     CredentialAlreadyRevoked(ParticipantId),
     /// 失効していない資格の再発行（有効な資格は置き換えない）。
     CredentialNotRevoked(ParticipantId),
+    /// 観察用の招待が、不明・失効・期限切れ（区別しない）。
+    InvitationInvalid,
+    /// このゲームに無い招待。
+    InvitationNotFound(InvitationId),
+    /// すでに失効している招待の失効。
+    InvitationAlreadyRevoked(InvitationId),
 }
 
 impl GameError {
@@ -291,6 +342,9 @@ impl GameError {
             GameError::StartConditionNotMet(_) => "game.start_condition_not_met",
             GameError::CredentialAlreadyRevoked(_) => "game.credential_already_revoked",
             GameError::CredentialNotRevoked(_) => "game.credential_not_revoked",
+            GameError::InvitationInvalid => "game.invitation_invalid",
+            GameError::InvitationNotFound(_) => "game.invitation_not_found",
+            GameError::InvitationAlreadyRevoked(_) => "game.credential_already_revoked",
         }
     }
 
@@ -300,9 +354,12 @@ impl GameError {
             GameError::AlreadyCreated
             | GameError::NotPreparing
             | GameError::CredentialAlreadyRevoked(_)
-            | GameError::CredentialNotRevoked(_) => ErrorCategory::InvalidState,
-            GameError::Forbidden(_) => ErrorCategory::Forbidden,
-            GameError::ParticipantNotFound(_) => ErrorCategory::NotFound,
+            | GameError::CredentialNotRevoked(_)
+            | GameError::InvitationAlreadyRevoked(_) => ErrorCategory::InvalidState,
+            GameError::Forbidden(_) | GameError::InvitationInvalid => ErrorCategory::Forbidden,
+            GameError::ParticipantNotFound(_) | GameError::InvitationNotFound(_) => {
+                ErrorCategory::NotFound
+            }
             GameError::StartConditionNotMet(_) => ErrorCategory::RuleViolation,
         }
     }
@@ -370,6 +427,63 @@ fn decide_credential(
     }
 }
 
+/// 観察用の招待の発行。進行役だけ。準備中・開始後の両方。
+fn invite_events(
+    state: &GameState,
+    actor: &Actor,
+    invitation_id: InvitationId,
+    expires_at: Instant,
+) -> Result<Vec<GameEvent>, GameError> {
+    let data = state.data().ok_or(GameError::NotPreparing)?;
+    if !actor.is_facilitator_of(data.game_id) {
+        return Err(GameError::Forbidden("観察用の招待は進行役だけが発行できる"));
+    }
+    Ok(vec![GameEvent::ObserverInvited {
+        invitation_id,
+        expires_at,
+    }])
+}
+
+/// 観察用の招待の失効。進行役だけ。すでに参加した観察者は、そのまま続けられる。
+fn revoke_invitation_events(
+    state: &GameState,
+    actor: &Actor,
+    invitation_id: InvitationId,
+) -> Result<Vec<GameEvent>, GameError> {
+    let data = state.data().ok_or(GameError::NotPreparing)?;
+    if !actor.is_facilitator_of(data.game_id) {
+        return Err(GameError::Forbidden(
+            "観察用の招待の失効は進行役だけができる",
+        ));
+    }
+    match data.invitations.get(&invitation_id) {
+        None => Err(GameError::InvitationNotFound(invitation_id)),
+        Some(invitation) if invitation.revoked => {
+            Err(GameError::InvitationAlreadyRevoked(invitation_id))
+        }
+        Some(_) => Ok(vec![GameEvent::ObserverInvitationRevoked { invitation_id }]),
+    }
+}
+
+/// 観察者の参加。有効な招待（存在・失効なし・期限内）だけ。無効な理由は区別しない。
+fn observer_join_events(
+    state: &GameState,
+    at: Instant,
+    observer_id: ObserverId,
+    invitation_id: InvitationId,
+) -> Result<Vec<GameEvent>, GameError> {
+    let data = state.data().ok_or(GameError::NotPreparing)?;
+    match data.invitations.get(&invitation_id) {
+        Some(invitation) if !invitation.revoked && invitation.expires_at > at => {
+            Ok(vec![GameEvent::ObserverJoined {
+                observer_id,
+                invitation_id,
+            }])
+        }
+        Some(_) | None => Err(GameError::InvitationInvalid),
+    }
+}
+
 /// 作成・参加・役割の割り当ての規則は、すべてここに集まる（`evolve` は事実を採用するだけで、規則を持たない）。
 ///
 /// # Errors
@@ -420,6 +534,22 @@ pub fn decide_game(state: &GameState, command: &GameCommand) -> Result<Vec<GameE
             role,
             ..
         } => decide_assign(state, actor, *participant_id, *role),
+        GameCommand::InviteObserver {
+            actor,
+            invitation_id,
+            expires_at,
+            ..
+        } => invite_events(state, actor, *invitation_id, *expires_at),
+        GameCommand::RevokeObserverInvitation {
+            actor,
+            invitation_id,
+            ..
+        } => revoke_invitation_events(state, actor, *invitation_id),
+        GameCommand::JoinAsObserver {
+            at,
+            observer_id,
+            invitation_id,
+        } => observer_join_events(state, *at, *observer_id, *invitation_id),
         GameCommand::RevokeCredential {
             actor,
             participant_id,
@@ -479,6 +609,8 @@ pub fn evolve_game(state: GameState, event: &GameEvent) -> Evolution<GameState> 
                 settings: settings.clone(),
                 participants: BTreeMap::new(),
                 revoked: BTreeSet::new(),
+                invitations: BTreeMap::new(),
+                observers: BTreeSet::new(),
             })),
             other @ (GameState::Preparing(_) | GameState::Started(_)) => Evolution::Ignored(other),
         },
@@ -523,6 +655,37 @@ pub fn evolve_game(state: GameState, event: &GameEvent) -> Evolution<GameState> 
             }
             other @ (GameState::NotCreated | GameState::Preparing(_)) => Evolution::Ignored(other),
         },
+        GameEvent::ObserverInvited {
+            invitation_id,
+            expires_at,
+        } => update_created(state, |mut data| {
+            let fresh = !data.invitations.contains_key(invitation_id);
+            data.invitations.insert(
+                *invitation_id,
+                Invitation {
+                    expires_at: *expires_at,
+                    revoked: false,
+                },
+            );
+            fresh.then_some(data)
+        }),
+        GameEvent::ObserverInvitationRevoked { invitation_id } => {
+            update_created(state, |mut data| {
+                let invitation = data
+                    .invitations
+                    .get_mut(invitation_id)
+                    .filter(|i| !i.revoked)?;
+                invitation.revoked = true;
+                Some(data)
+            })
+        }
+        GameEvent::ObserverJoined {
+            observer_id,
+            invitation_id,
+        } => update_created(state, |mut data| {
+            (data.invitations.contains_key(invitation_id) && data.observers.insert(*observer_id))
+                .then_some(data)
+        }),
         GameEvent::CredentialRevoked { participant_id } => update_created(state, |mut data| {
             if data.participants.contains_key(participant_id)
                 && data.revoked.insert(*participant_id)

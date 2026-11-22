@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 
 use beergame_domain::{
     CommitKind, CommitMode, ConditionsInput, DecisionVersion, DisclosurePolicy, Editor, EndReason,
-    GameEvent, GameId, GameSettings, Instant, JoinCode, Money, ParticipantId, Pipeline, Quantity,
-    RetentionDays, Role, RoleMap, RoleState, RoleWeekResult, SessionEvent, Units, Week,
+    GameEvent, GameId, GameSettings, Instant, InvitationId, JoinCode, Money, ObserverId,
+    ParticipantId, Pipeline, Quantity, RetentionDays, Role, RoleMap, RoleState, RoleWeekResult,
+    SessionEvent, Units, Week,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -327,6 +328,24 @@ impl EventCodec<GameEvent> for GameCodec {
                     "replaced": replaced.iter().map(|r| uuid_of(r.get())).collect::<Vec<_>>(),
                 }),
             ),
+            GameEvent::ObserverInvited {
+                invitation_id,
+                expires_at,
+            } => (
+                "ObserverInvited",
+                json!({"invitationId": uuid_of(invitation_id.get()), "expiresAt": expires_at.epoch_millis()}),
+            ),
+            GameEvent::ObserverInvitationRevoked { invitation_id } => (
+                "ObserverInvitationRevoked",
+                json!({"invitationId": uuid_of(invitation_id.get())}),
+            ),
+            GameEvent::ObserverJoined {
+                observer_id,
+                invitation_id,
+            } => (
+                "ObserverJoined",
+                json!({"observerId": uuid_of(observer_id.get()), "invitationId": uuid_of(invitation_id.get())}),
+            ),
             GameEvent::CredentialRevoked { participant_id } => (
                 "CredentialRevoked",
                 json!({"participantId": uuid_of(participant_id.get())}),
@@ -383,6 +402,17 @@ impl EventCodec<GameEvent> for GameCodec {
                             .ok_or_else(|| "replaced の要素が UUID でない".to_owned())
                     })
                     .collect::<R<Vec<_>>>()?,
+            }),
+            "ObserverInvited" => Ok(GameEvent::ObserverInvited {
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
+                expires_at: Instant::from_epoch_millis(int(&p, "expiresAt")?),
+            }),
+            "ObserverInvitationRevoked" => Ok(GameEvent::ObserverInvitationRevoked {
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
+            }),
+            "ObserverJoined" => Ok(GameEvent::ObserverJoined {
+                observer_id: ObserverId::new(id(&p, "observerId")?),
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
             }),
             "CredentialRevoked" => Ok(GameEvent::CredentialRevoked {
                 participant_id: ParticipantId::new(id(&p, "participantId")?),

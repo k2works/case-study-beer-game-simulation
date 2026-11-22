@@ -148,3 +148,9 @@ fn ac1_1_1__需要系列は整数の列として取り出せる() -> Result<(), 
     assert_eq!(series.to_ints(), vec![4, 8, 12]);
     Ok(())
 }
+
+#[test]
+fn tech__招待と観察者の識別子は値を保つ() {
+    assert_eq!(beergame_domain::InvitationId::new(7).get(), 7);
+    assert_eq!(beergame_domain::ObserverId::new(8).get(), 8);
+}

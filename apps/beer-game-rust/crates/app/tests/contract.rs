@@ -348,3 +348,66 @@ async fn tech__カスタム条件で作成したゲームの状態は契約の�
     validate(&doc, "ValidationProblemBody", &problem)?;
     Ok(())
 }
+
+#[tokio::test]
+async fn tech__観察者の招待_参加_観察画面_ロビーの応答は契約のスキーマに適合する()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let doc = contract()?;
+    let app = app(env.pool.clone());
+    let game = started(&app, &env.pool).await?;
+    let (status, _, invite) = send(
+        &app,
+        "POST",
+        &format!("/api/v1/games/{}/observer-invitations", game.id),
+        &[("cookie", &game.facilitator), ("idempotency-key", "i")],
+        "{}",
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    validate(&doc, "InviteObserverResponse", &invite)?;
+    let (status, headers, joined) = send(
+        &app,
+        "POST",
+        "/api/v1/participations/observe",
+        &[],
+        &json!({"invitationCode": invite.get("invitationCode"), "displayName": "見学者"})
+            .to_string(),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK);
+    validate(&doc, "JoinObserverResponse", &joined)?;
+    let cookie = cookie_of(&headers)?;
+    let (_, _, observation) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/observation", game.id),
+        &[("cookie", &cookie)],
+        "",
+    )
+    .await?;
+    validate(&doc, "Observation", &observation)?;
+    let (_, _, lobby) = send(
+        &app,
+        "GET",
+        &format!("/api/v1/games/{}/lobby", game.id),
+        &[("cookie", &game.facilitator)],
+        "",
+    )
+    .await?;
+    validate(&doc, "Lobby", &lobby)?;
+    // 不明な招待コードは、区別しない 403（problem）
+    let (status, _, problem) = send(
+        &app,
+        "POST",
+        "/api/v1/participations/observe",
+        &[],
+        &json!({"invitationCode": "unknown", "displayName": "x"}).to_string(),
+    )
+    .await?;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    validate(&doc, "Problem", &problem)?;
+    Ok(())
+}

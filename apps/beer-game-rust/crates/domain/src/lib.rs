@@ -17,8 +17,8 @@ pub use conditions::{Conditions, ConditionsInput, DisclosurePolicy, SettingsFiel
 pub use error::ValidationError;
 pub use foundation::{Actor, ErrorCategory, Evolution};
 pub use game::{
-    CommitMode, GameCommand, GameData, GameError, GameEvent, GameSettings, GameState, decide_game,
-    evolve_game, replay_game,
+    CommitMode, GameCommand, GameData, GameError, GameEvent, GameSettings, GameState, Invitation,
+    decide_game, evolve_game, replay_game,
 };
 pub use kit_preset::KitPreset;
 pub use replace_role::{AssignOrReplace, assign_or_replace};
@@ -35,6 +35,6 @@ pub use simulate::{
 };
 pub use start_game::{StartDecision, StartError, StartGame, start_game};
 pub use values::{
-    DecisionVersion, DisplayName, GameId, Instant, JoinCode, Money, ParticipantId, Quantity,
-    RetentionDays, Units, Week,
+    DecisionVersion, DisplayName, GameId, Instant, InvitationId, JoinCode, Money, ObserverId,
+    ParticipantId, Quantity, RetentionDays, Units, Week,
 };

@@ -138,6 +138,9 @@ pub struct ApiWorld {
     pub replaced: Option<String>,
     /// 割り当て直しの前のイベントの件数。
     pub history_size: i64,
+    /// 発行した観察用の招待（招待の ID・招待コード）と、参加した観察者のブラウザセッション。
+    pub invitation: Option<(String, String)>,
+    pub observer_cookie: Option<String>,
 }
 
 impl ApiWorld {
@@ -160,6 +163,8 @@ impl ApiWorld {
             remembered_basis: None,
             replaced: None,
             history_size: 0,
+            invitation: None,
+            observer_cookie: None,
         }
     }
 

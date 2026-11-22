@@ -393,6 +393,8 @@ impl PgGameStore {
         let kind = match kind.as_str() {
             "FACILITATOR" => CredentialKind::Facilitator,
             "PARTICIPANT" => CredentialKind::Participant,
+            "OBSERVER" => CredentialKind::Observer,
+            "OBSERVER_INVITATION" => CredentialKind::ObserverInvitation,
             // 不明な種類は、無効な資格として扱う（fail closed）
             other => {
                 return Err(AppFailure::Persistence(PersistenceFailure::Storage(
@@ -417,8 +419,8 @@ impl CredentialLookup for PgGameStore {
         let row = sqlx::query(
             "SELECT s.game_id, s.actor_kind AS kind, s.actor_id AS subject_id, s.key_version, \
              (extract(epoch FROM s.expires_at) * 1000)::bigint AS expires_ms, \
-             NOT EXISTS (SELECT 1 FROM credentials c WHERE c.game_id = s.game_id AND c.subject_id = s.actor_id \
-                         AND c.revoked_at IS NULL) AS revoked \
+             (s.actor_kind <> 'OBSERVER' AND NOT EXISTS (SELECT 1 FROM credentials c WHERE c.game_id = s.game_id \
+                         AND c.subject_id = s.actor_id AND c.revoked_at IS NULL)) AS revoked \
              FROM browser_sessions s WHERE s.credential_digest = $1",
         )
         .bind(digest)

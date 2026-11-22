@@ -5,9 +5,9 @@ use std::future::Future;
 
 use beergame_domain::{
     Actor, AssignOrReplace, CommitMode, ConditionsInput, DecisionVersion, DisplayName, GameCommand,
-    GameError, GameEvent, GameId, GameSettings, GameState, Instant, JoinCode, ParticipantId,
-    Quantity, RetentionDays, Role, RoleMap, SessionCommand, SessionEvent, SessionState, StartGame,
-    Week, assign_or_replace, evolve_game, evolve_session,
+    GameError, GameEvent, GameId, GameSettings, GameState, Instant, InvitationId, JoinCode,
+    ObserverId, ParticipantId, Quantity, RetentionDays, Role, RoleMap, SessionCommand,
+    SessionEvent, SessionState, StartGame, Week, assign_or_replace, evolve_game, evolve_session,
 };
 
 use crate::{
@@ -380,6 +380,10 @@ fn actor_of(record: &CredentialRecord) -> Actor {
     match record.kind {
         CredentialKind::Facilitator => Actor::Facilitator(record.game_id),
         CredentialKind::Participant => Actor::Participant(ParticipantId::new(record.subject_id)),
+        // 観察者のブラウザセッション。招待コードは、認証ではなく参加（`join_observer`）にだけ使う
+        CredentialKind::Observer | CredentialKind::ObserverInvitation => {
+            Actor::Observer(ObserverId::new(record.subject_id))
+        }
     }
 }
 
@@ -847,6 +851,9 @@ where
                         | GameEvent::RoleAssigned { .. }
                         | GameEvent::RoleUnassigned { .. }
                         | GameEvent::GameStarted { .. }
+                        | GameEvent::ObserverInvited { .. }
+                        | GameEvent::ObserverInvitationRevoked { .. }
+                        | GameEvent::ObserverJoined { .. }
                         | GameEvent::CredentialRevoked { .. }
                         | GameEvent::CredentialReissued { .. } => Vec::new(),
                     })
@@ -862,4 +869,197 @@ where
         idem,
     )
     .await
+}
+
+/// 観察用の招待の発行の結果。招待コードは、この応答で一度だけ示す。
+#[derive(Debug)]
+pub struct InviteOutcome {
+    pub game_version: u64,
+    pub invitation_id: InvitationId,
+    pub invitation_code: Secret<String>,
+    pub expires_at: Instant,
+}
+
+/// 観察用の招待の有効期間（7 日。設計の未決の仮置き）。
+const INVITATION_TTL_MILLIS: i64 = 7 * 24 * 60 * 60 * 1000;
+
+/// 観察用の招待の発行（US1.3。進行役だけ。準備中・開始後の両方）。参加コードとは別の乱数・別のダイジェスト。
+///
+/// # Errors
+/// 権限の誤り、永続化の失敗。
+pub async fn invite_observer<St: EventStore<GameEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+) -> Result<InviteOutcome, AppFailure> {
+    let now = env.now();
+    let expires_at = after(now, INVITATION_TTL_MILLIS);
+    let invitation_id = InvitationId::new(env.new_id());
+    let (code, code_digest) = issue(env, settings)?;
+    let command = GameCommand::InviteObserver {
+        actor,
+        at: now,
+        invitation_id,
+        expires_at,
+    };
+    let executed = execute_idempotent(
+        store,
+        &GameState::NotCreated,
+        &evolve_game,
+        &|state, cmd| {
+            let game_id = state.data().map(|d| d.game_id);
+            let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
+            let writes = game_id
+                .map(|game_id| PeripheralWrite::Credential {
+                    digest: code_digest.clone(),
+                    game_id,
+                    kind: CredentialKind::ObserverInvitation,
+                    subject_id: invitation_id.get(),
+                    key_version: settings.key_version,
+                    issued_at: now,
+                    expires_at,
+                })
+                .into_iter()
+                .collect();
+            Ok(Decision { events, writes })
+        },
+        &command,
+        settings.max_attempts,
+        None,
+    )
+    .await?;
+    Ok(InviteOutcome {
+        game_version: match executed {
+            Executed::Fresh(version) => version,
+            Executed::Replayed(_) => 0,
+        },
+        invitation_id,
+        invitation_code: code,
+        expires_at,
+    })
+}
+
+/// 観察用の招待の失効（US1.3。進行役だけ）。すでに参加した観察者は、そのまま続けられる。
+///
+/// # Errors
+/// 権限・対象・失効済みの誤り、永続化の失敗。
+pub async fn revoke_observer_invitation<St: EventStore<GameEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    actor: Actor,
+    invitation_id: InvitationId,
+    idem: Option<&Idempotency>,
+) -> Result<Executed, AppFailure> {
+    let command = GameCommand::RevokeObserverInvitation {
+        actor,
+        at: env.now(),
+        invitation_id,
+    };
+    execute_idempotent(
+        store,
+        &GameState::NotCreated,
+        &evolve_game,
+        &|state, cmd| {
+            Ok(Decision {
+                events: beergame_domain::decide_game(state, cmd).map_err(domain)?,
+                writes: Vec::new(),
+            })
+        },
+        &command,
+        settings.max_attempts,
+        idem,
+    )
+    .await
+}
+
+/// 観察者の参加の結果。
+#[derive(Debug)]
+pub struct ObserverJoinOutcome {
+    pub game_version: u64,
+    pub session: Secret<String>,
+}
+
+/// 観察者としての参加（US1.3。招待コードが認可）。`invitation_id` は、招待コードのダイジェストから境界が引いた値。
+/// ブラウザセッションだけを発行する（復帰資格は発行しない。観察者の復帰は設計の未決）。表示名は周辺ストアへ。
+///
+/// # Errors
+/// 招待が無効（`InvitationInvalid`）、入力の誤り、永続化の失敗。
+pub async fn join_observer<St: EventStore<GameEvent>>(
+    store: &St,
+    env: &impl Env,
+    settings: &AppSettings,
+    game_id: GameId,
+    invitation_id: InvitationId,
+    display_name: &str,
+) -> Result<ObserverJoinOutcome, AppFailure> {
+    let name = DisplayName::of(display_name).map_err(|e| AppFailure::Invalid(vec![e]))?;
+    let now = env.now();
+    let observer_id = ObserverId::new(env.new_id());
+    let (session, session_digest) = issue(env, settings)?;
+    let command = GameCommand::JoinAsObserver {
+        at: now,
+        observer_id,
+        invitation_id,
+    };
+    let game_version = execute_decision(
+        store,
+        &GameState::NotCreated,
+        &evolve_game,
+        &|state, cmd| {
+            let events = beergame_domain::decide_game(state, cmd).map_err(domain)?;
+            Ok(Decision {
+                events,
+                writes: vec![
+                    PeripheralWrite::BrowserSession {
+                        digest: session_digest.clone(),
+                        game_id,
+                        kind: CredentialKind::Observer,
+                        subject_id: observer_id.get(),
+                        key_version: settings.key_version,
+                        expires_at: after(now, settings.session_ttl_millis),
+                    },
+                    PeripheralWrite::ObserverName {
+                        game_id,
+                        observer_id,
+                        name: name.as_str().to_owned(),
+                        at: now,
+                    },
+                ],
+            })
+        },
+        &command,
+        settings.max_attempts,
+    )
+    .await?;
+    Ok(ObserverJoinOutcome {
+        game_version,
+        session,
+    })
+}
+
+/// 招待コードから、招待（ゲームと招待の ID）を引く。不明・期限切れ・別の種別は `Unauthorized`（失効は `decide` が判定する）。
+///
+/// # Errors
+/// 招待が引けない（`Unauthorized`）、永続化の失敗。
+pub async fn find_invitation(
+    lookup: &impl CredentialLookup,
+    env: &impl Env,
+    settings: &AppSettings,
+    code: &Secret<String>,
+) -> Result<(GameId, InvitationId), AppFailure> {
+    for (version, key) in settings.keys() {
+        let Some(digest) = digest(key, code) else {
+            continue;
+        };
+        if let Some(record) = lookup.find_recovery(&digest).await?
+            && record.kind == CredentialKind::ObserverInvitation
+            && record.key_version == version
+            && record.expires_at > env.now()
+        {
+            return Ok((record.game_id, InvitationId::new(record.subject_id)));
+        }
+    }
+    Err(AppFailure::Unauthorized)
 }

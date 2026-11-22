@@ -296,7 +296,7 @@ fn editor_of(
         Actor::Participant(id) if assignments.get(role).contains(id) => {
             Ok(Editor::ByParticipant(*id))
         }
-        Actor::Participant(_) | Actor::Facilitator(_) | Actor::Anonymous => {
+        Actor::Participant(_) | Actor::Facilitator(_) | Actor::Observer(_) | Actor::Anonymous => {
             Err(SessionError::Forbidden("その役割の参加者だけが入力できる"))
         }
     }

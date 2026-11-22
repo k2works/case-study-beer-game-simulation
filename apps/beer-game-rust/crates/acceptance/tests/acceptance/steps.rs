@@ -3250,3 +3250,468 @@ async fn participant_tries_to_disable(world: &mut ApiWorld, role: String) -> R {
     let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
     change_commit_mode(world, &cookie, "MANUAL").await
 }
+
+// ---- 観察者（US1.3・US4.1） ----
+
+async fn invite_with(world: &mut ApiWorld, cookie: Option<String>) -> R {
+    let id = world.game()?.id.clone();
+    let key = world.next_key();
+    let reply = world
+        .call(
+            "POST",
+            &format!("/api/v1/games/{id}/observer-invitations"),
+            cookie.as_deref(),
+            Some(&key),
+            "{}",
+        )
+        .await?;
+    if reply.status == 200 {
+        let invitation = reply.body.get("invitationId").and_then(Value::as_str);
+        let code = reply.body.get("invitationCode").and_then(Value::as_str);
+        if let (Some(i), Some(c)) = (invitation, code) {
+            world.invitation = Some((i.to_owned(), c.to_owned()));
+        }
+    }
+    Ok(())
+}
+
+#[given("進行役が観察用の招待を発行している")]
+async fn invitation_issued(world: &mut ApiWorld) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    invite_with(world, Some(cookie)).await?;
+    expect(
+        status(world)? == 200,
+        &format!("招待を発行できない: {}", world.reply()?.body),
+    )
+}
+
+#[when("進行役が観察用の招待を求める")]
+async fn facilitator_invites(world: &mut ApiWorld) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    invite_with(world, Some(cookie)).await
+}
+
+#[when(regex = r"^(工場|一次卸|二次卸|小売店)の参加者が観察用の招待を求める$")]
+async fn participant_invites(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
+    invite_with(world, Some(cookie)).await
+}
+
+#[when("資格の無い人が観察用の招待を求める")]
+async fn anonymous_invites(world: &mut ApiWorld) -> R {
+    invite_with(world, None).await
+}
+
+#[when("観察者が、観察用の招待を求める")]
+async fn observer_invites(world: &mut ApiWorld) -> R {
+    let cookie = world.observer_cookie.clone();
+    invite_with(world, cookie).await
+}
+
+async fn revoke_invitation(world: &mut ApiWorld, cookie: Option<String>) -> R {
+    let (invitation, _) = world.invitation.clone().ok_or("招待が無い")?;
+    let (id, key) = (world.game()?.id.clone(), world.next_key());
+    world
+        .call(
+            "POST",
+            &format!("/api/v1/games/{id}/observer-invitations/{invitation}/revoke"),
+            cookie.as_deref(),
+            Some(&key),
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+#[given("進行役が、その観察用の招待を失効させている")]
+async fn invitation_revoked(world: &mut ApiWorld) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    revoke_invitation(world, Some(cookie)).await?;
+    expect(
+        status(world)? == 200,
+        &format!("失効できない: {}", world.reply()?.body),
+    )
+}
+
+#[when(regex = r"^(工場|一次卸|二次卸|小売店)の参加者が、その観察用の招待を失効させようとする$")]
+async fn participant_revokes_invitation(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
+    revoke_invitation(world, Some(cookie)).await
+}
+
+#[when("招待コードを参加コードとして使って、参加者が参加しようとする")]
+async fn invite_code_as_join_code(world: &mut ApiWorld) -> R {
+    let (_, code) = world.invitation.clone().ok_or("招待が無い")?;
+    join_raw(world, &json!({"joinCode": code, "displayName": "紛れ込み"})).await
+}
+
+async fn observer_join(world: &mut ApiWorld, name: &str) -> R {
+    let (_, code) = world.invitation.clone().ok_or("招待が無い")?;
+    let key = world.next_key();
+    let reply = world
+        .call(
+            "POST",
+            "/api/v1/participations/observe",
+            None,
+            Some(&key),
+            &json!({"invitationCode": code, "displayName": name}).to_string(),
+        )
+        .await?;
+    if reply.status == 200 {
+        world.observer_cookie = reply.cookie.clone();
+    }
+    Ok(())
+}
+
+#[when(regex = r"^観察者「(.+)」が、招待コードで参加(?:する|しようとする)$")]
+async fn observer_joins(world: &mut ApiWorld, name: String) -> R {
+    observer_join(world, &name).await
+}
+
+#[given(regex = r"^観察者「(.+)」が、招待コードで参加している$")]
+async fn observer_has_joined(world: &mut ApiWorld, name: String) -> R {
+    observer_join(world, &name).await?;
+    expect(
+        status(world)? == 200 && world.observer_cookie.is_some(),
+        &format!("観察者として参加できない: {}", world.reply()?.body),
+    )
+}
+
+#[then("観察用の招待コードが発行される")]
+async fn code_issued(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200
+            && world
+                .reply()?
+                .body
+                .get("invitationCode")
+                .and_then(Value::as_str)
+                .is_some_and(|c| !c.is_empty()),
+        &format!("発行されていない: {}", world.reply()?.body),
+    )
+}
+
+#[then("招待コードは参加コードと異なる")]
+async fn code_differs_from_join_code(world: &mut ApiWorld) -> R {
+    let join_code = world.game()?.join_code.clone();
+    expect(
+        world.reply()?.body.get("invitationCode") != Some(&json!(join_code)),
+        "招待コードが参加コードと同じ",
+    )
+}
+
+#[then("招待コードは含まれない")]
+async fn no_invitation_code(world: &mut ApiWorld) -> R {
+    expect(
+        !world.reply()?.body.to_string().contains("invitationCode"),
+        "招待コードが含まれている",
+    )
+}
+
+#[then("招待が無効という理由で拒否される")]
+async fn invitation_invalid_reason(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 403
+            && code(world)? == "game.invitation_invalid"
+            && world.reply()?.cookie.is_none(),
+        &format!("招待が無効という拒否ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then("観察者として参加できる")]
+async fn joined_as_observer(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200
+            && world.reply()?.body.get("kind") == Some(&json!("OBSERVER"))
+            && world.reply()?.recovery.is_none(),
+        &format!("観察者として参加できていない: {}", world.reply()?.body),
+    )
+}
+
+async fn lobby_of_facilitator(world: &mut ApiWorld) -> Result<Value, String> {
+    let (id, cookie) = (world.game()?.id.clone(), world.game()?.facilitator.clone());
+    Ok(world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/lobby"),
+            Some(&cookie),
+            None,
+            "",
+        )
+        .await?
+        .body)
+}
+
+#[then(regex = r"^進行役のロビーに、観察者「(.+)」が役割なしで載る$")]
+async fn lobby_has_observer(world: &mut ApiWorld, name: String) -> R {
+    let lobby = lobby_of_facilitator(world).await?;
+    let entry = lobby
+        .get("observers")
+        .and_then(Value::as_array)
+        .and_then(|a| {
+            a.iter()
+                .find(|o| o.get("displayName") == Some(&json!(name)))
+        })
+        .cloned();
+    expect(
+        entry.is_some_and(|e| e.get("role").is_none()),
+        &format!("ロビーに観察者が載っていない: {lobby}"),
+    )
+}
+
+#[then("参加者の一覧に、観察者は含まれない")]
+async fn participants_exclude_observer(world: &mut ApiWorld) -> R {
+    let lobby = lobby_of_facilitator(world).await?;
+    expect(
+        lobby
+            .get("participants")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            == Some(4),
+        "参加者が 4 人ではない",
+    )
+}
+
+async fn observation_with(world: &mut ApiWorld, cookie: Option<String>) -> R {
+    let id = world.game()?.id.clone();
+    world
+        .call(
+            "GET",
+            &format!("/api/v1/games/{id}/observation"),
+            cookie.as_deref(),
+            None,
+            "",
+        )
+        .await
+        .map(|_| ())
+}
+
+#[when("観察者が観察画面を開く")]
+async fn observer_opens_observation(world: &mut ApiWorld) -> R {
+    let cookie = world.observer_cookie.clone();
+    observation_with(world, cookie).await
+}
+
+#[when("進行役が観察画面を開く")]
+async fn facilitator_opens_observation(world: &mut ApiWorld) -> R {
+    let cookie = world.game()?.facilitator.clone();
+    observation_with(world, Some(cookie)).await
+}
+
+#[when("資格の無い人が観察画面を開こうとする")]
+async fn anonymous_opens_observation(world: &mut ApiWorld) -> R {
+    observation_with(world, None).await
+}
+
+#[when(regex = r"^(工場|一次卸|二次卸|小売店)の参加者が観察画面を開こうとする$")]
+async fn participant_opens_observation(world: &mut ApiWorld, role: String) -> R {
+    let (_, cookie, _) = holder(world, &format!("{role}の参加者")).await?;
+    observation_with(world, Some(cookie)).await
+}
+
+#[given(
+    regex = r"^(工場|一次卸|二次卸|小売店)と(工場|一次卸|二次卸|小売店)の参加者が、第 (\d+) 週の入力を保存している$"
+)]
+async fn two_roles_saved(world: &mut ApiWorld, first: String, second: String, week: i64) -> R {
+    for role in [first, second] {
+        save_in_week(world, &role, week, json!(4)).await?;
+        expect(status(world)? == 200, "保存できない")?;
+    }
+    Ok(())
+}
+
+#[then("観察画面の内容が返る")]
+async fn observation_returned(world: &mut ApiWorld) -> R {
+    expect(
+        status(world)? == 200 && world.reply()?.body.get("totals").is_some(),
+        &format!("観察画面の内容ではない: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^観察画面の現在週は (\d+) である$")]
+async fn observation_week(world: &mut ApiWorld, week: i64) -> R {
+    expect(
+        world.reply()?.body.get("week") == Some(&json!(week)),
+        &format!("現在週が違う: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^観察画面の入力済みの役割数は (\d+) である$")]
+async fn observation_submitted(world: &mut ApiWorld, count: i64) -> R {
+    expect(
+        world.reply()?.body.get("submittedRoleCount") == Some(&json!(count)),
+        &format!("入力済みの役割数が違う: {}", world.reply()?.body),
+    )
+}
+
+#[then(regex = r"^観察画面に、第 (\d+) 週のチーム合計として、注文 (\d+)・在庫・受注残が含まれる$")]
+async fn observation_totals(world: &mut ApiWorld, week: i64, order: i64) -> R {
+    let entry = world
+        .reply()?
+        .body
+        .pointer("/totals/weeks")
+        .and_then(Value::as_array)
+        .and_then(|a| a.iter().find(|w| w.get("week") == Some(&json!(week))))
+        .cloned()
+        .ok_or("第 N 週の合計が無い")?;
+    expect(
+        entry.get("order") == Some(&json!(order))
+            && entry.get("inventory").is_some()
+            && entry.get("backlog").is_some(),
+        &format!("合計が違う: {entry}"),
+    )
+}
+
+#[then("観察画面に、役割別の項目は含まれない")]
+async fn no_role_specific(world: &mut ApiWorld) -> R {
+    let text = world.reply()?.body.to_string();
+    let leaked: Vec<&str> = [
+        "FACTORY",
+        "DISTRIBUTOR",
+        "WHOLESALER",
+        "RETAILER",
+        "\"roles\"",
+        "\"roleStatus\"",
+        "\"results\"",
+    ]
+    .into_iter()
+    .filter(|k| text.contains(k))
+    .collect();
+    expect(
+        leaked.is_empty(),
+        &format!("役割別の項目が含まれている: {leaked:?}"),
+    )
+}
+
+#[then("観察画面にチーム合計は含まれず、公開されていないという理由が示される")]
+async fn totals_not_disclosed(world: &mut ApiWorld) -> R {
+    let totals = world
+        .reply()?
+        .body
+        .get("totals")
+        .cloned()
+        .unwrap_or(Value::Null);
+    expect(
+        totals
+            .get("weeks")
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty)
+            && totals.get("hiddenReason") == Some(&json!("DISCLOSURE_NONE")),
+        &format!("合計が含まれている、または理由が無い: {totals}"),
+    )
+}
+
+async fn observer_call(world: &mut ApiWorld, method: &str, path: &str, body: &str) -> R {
+    let cookie = world.observer_cookie.clone();
+    let key = world.next_key();
+    world
+        .call(method, path, cookie.as_deref(), Some(&key), body)
+        .await
+        .map(|_| ())
+}
+
+#[when(regex = r"^観察者が、(工場|一次卸|二次卸|小売店)の状況を取得しようとする$")]
+async fn observer_fetches_role(world: &mut ApiWorld, role: String) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(
+        world,
+        "GET",
+        &format!("/api/v1/sessions/{id}/state?role={}", en(&role)?),
+        "",
+    )
+    .await
+}
+
+#[when("観察者が、ゲームの状態を取得しようとする")]
+async fn observer_fetches_game_state(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(world, "GET", &format!("/api/v1/games/{id}/state"), "").await
+}
+
+#[when("観察者が、ロビーを取得しようとする")]
+async fn observer_fetches_lobby(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(world, "GET", &format!("/api/v1/games/{id}/lobby"), "").await
+}
+
+#[when(regex = r"^観察者が、(工場|一次卸|二次卸|小売店)の入力として (\d+) を保存しようとする$")]
+async fn observer_saves(world: &mut ApiWorld, _role: String, quantity: i64) -> R {
+    let id = world.game()?.id.clone();
+    world.if_match = Some("0".to_owned());
+    observer_call(
+        world,
+        "PUT",
+        &format!("/api/v1/sessions/{id}/decisions"),
+        &json!({"week": 1, "quantity": quantity}).to_string(),
+    )
+    .await
+}
+
+#[when(regex = r"^観察者が、第 (\d+) 週を確定しようとする$")]
+async fn observer_commits(world: &mut ApiWorld, week: i64) -> R {
+    let id = world.game()?.id.clone();
+    let basis = json!({"FACTORY": 0, "DISTRIBUTOR": 0, "WHOLESALER": 0, "RETAILER": 0});
+    observer_call(
+        world,
+        "POST",
+        &format!("/api/v1/sessions/{id}/weeks/{week}/commit"),
+        &json!({"requestedWeek": week, "basis": basis}).to_string(),
+    )
+    .await
+}
+
+#[when("観察者が、ゲームを一時停止しようとする")]
+async fn observer_pauses(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(world, "POST", &format!("/api/v1/sessions/{id}/pause"), "").await
+}
+
+#[when(regex = r"^観察者が、(工場|一次卸|二次卸|小売店)の参加者の資格を失効させようとする$")]
+async fn observer_revokes_credential(world: &mut ApiWorld, role: String) -> R {
+    let (pid, _, _) = holder(world, &format!("{role}の参加者")).await?;
+    let id = world.game()?.id.clone();
+    observer_call(
+        world,
+        "POST",
+        &format!("/api/v1/games/{id}/credentials/revoke"),
+        &json!({"subject": {"kind": "PARTICIPANT", "id": pid}}).to_string(),
+    )
+    .await
+}
+
+#[when(regex = r"^観察者が、自分に(工場|一次卸|二次卸|小売店)の役割を割り当てようとする$")]
+async fn observer_assigns_self(world: &mut ApiWorld, role: String) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(
+        world,
+        "PUT",
+        &format!("/api/v1/games/{id}/participants/00000000-0000-4000-8000-000000000001/role"),
+        &json!({"role": en(&role)?}).to_string(),
+    )
+    .await
+}
+
+#[when(regex = r"^観察者が振り返りを取得(?:する|しようとする)$")]
+async fn observer_review(world: &mut ApiWorld) -> R {
+    let id = world.game()?.id.clone();
+    observer_call(world, "GET", &format!("/api/v1/games/{id}/review"), "").await
+}
+
+#[then("将来の需要は含まれない")]
+async fn no_future_demand_in_reply(world: &mut ApiWorld) -> R {
+    // キットの需要は一定（4）で、将来の需要の値そのものは、どの項目にも出てはならない
+    let text = world.reply()?.body.to_string();
+    expect(
+        !text.contains("demand") && !text.contains("futureDemand"),
+        "将来の需要が含まれている",
+    )
+}
+
+#[then("参加コードは含まれない")]
+async fn no_join_code_in_reply(world: &mut ApiWorld) -> R {
+    let join_code = world.game()?.join_code.clone();
+    expect(
+        !world.reply()?.body.to_string().contains(&join_code),
+        "参加コードが含まれている",
+    )
+}

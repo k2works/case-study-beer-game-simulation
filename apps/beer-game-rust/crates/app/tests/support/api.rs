@@ -77,14 +77,17 @@ pub struct Game {
 
 /// 作成 → 4 人の参加 → 割り当て（開始はしない）。
 pub async fn prepared(app: &Router, pool: &PgPool) -> Result<Game, String> {
-    let (status, headers, _) = send(
+    prepared_with(
         app,
-        "POST",
-        "/api/v1/games",
-        &[],
-        &json!({"kind": "KIT", "finalWeek": 2, "demand": [4, 4]}).to_string(),
+        pool,
+        &json!({"kind": "KIT", "finalWeek": 2, "demand": [4, 4]}),
     )
-    .await?;
+    .await
+}
+
+/// 作成の本文を指定して、作成 → 4 人の参加 → 割り当て（開始はしない）。
+pub async fn prepared_with(app: &Router, pool: &PgPool, body: &Value) -> Result<Game, String> {
+    let (status, headers, _) = send(app, "POST", "/api/v1/games", &[], &body.to_string()).await?;
     assert_eq!(status, StatusCode::CREATED);
     let facilitator = cookie_of(&headers)?;
     let location = headers

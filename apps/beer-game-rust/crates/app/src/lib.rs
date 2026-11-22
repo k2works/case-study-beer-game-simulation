@@ -3,8 +3,9 @@
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{
-    AppFailure, AppSettings, CoHolderRow, EditorSnapshot, Env, GameSnapshot, LobbyParticipantRow,
-    PersistenceFailure, ResultRow, RoleSnapshot, SessionSnapshot, StoredResponse,
+    AppFailure, AppSettings, CoHolderRow, EditorSnapshot, Env, GameSnapshot, InvitationRow,
+    LobbyParticipantRow, ObservationSnapshot, ObservedSession, ObserverRow, PersistenceFailure,
+    ResultRow, RoleSnapshot, SessionSnapshot, StoredResponse, TeamWeekRow,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -276,6 +277,47 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
                 display_name: p.try_get("display_name").map_err(storage)?,
             });
         }
+        let invitation_rows = sqlx::query(
+            "SELECT invitation_id, (extract(epoch FROM expires_at) * 1000)::bigint AS expires_ms, \
+             revoked_at IS NOT NULL AS revoked, (extract(epoch FROM created_at) * 1000)::bigint AS created_ms \
+             FROM lobby_observer_invitations WHERE game_id = $1 ORDER BY created_at, invitation_id",
+        )
+        .bind(game)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage)?;
+        let mut invitations = Vec::new();
+        for row in &invitation_rows {
+            invitations.push(InvitationRow {
+                invitation_id: row
+                    .try_get::<Uuid, _>("invitation_id")
+                    .map_err(storage)?
+                    .as_u128(),
+                expires_at_millis: row.try_get("expires_ms").map_err(storage)?,
+                revoked: row.try_get("revoked").map_err(storage)?,
+                created_at_millis: row.try_get("created_ms").map_err(storage)?,
+            });
+        }
+        let observer_rows = sqlx::query(
+            "SELECT o.observer_id, (extract(epoch FROM o.joined_at) * 1000)::bigint AS joined_ms, d.display_name FROM lobby_observers o \
+             LEFT JOIN display_profiles d ON d.game_id = o.game_id AND d.actor_kind = 'OBSERVER' AND d.actor_id = o.observer_id \
+             WHERE o.game_id = $1 ORDER BY o.joined_at, o.observer_id",
+        )
+        .bind(game)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage)?;
+        let mut observers = Vec::new();
+        for row in &observer_rows {
+            observers.push(ObserverRow {
+                observer_id: row
+                    .try_get::<Uuid, _>("observer_id")
+                    .map_err(storage)?
+                    .as_u128(),
+                display_name: row.try_get("display_name").map_err(storage)?,
+                joined_at_millis: row.try_get("joined_ms").map_err(storage)?,
+            });
+        }
         let (game_version, session_version) = versions(&self.pool, game).await?;
         Ok(Some(GameSnapshot {
             game_id,
@@ -286,6 +328,74 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
             settings_kind: row.try_get("settings_kind").map_err(storage)?,
             changed_settings: row.try_get("changes").map_err(storage)?,
             participants: list,
+            invitations,
+            observers,
+            game_version,
+            session_version,
+        }))
+    }
+
+    async fn observation_snapshot(
+        &self,
+        game_id: GameId,
+    ) -> Result<Option<ObservationSnapshot>, AppFailure> {
+        let game = Uuid::from_u128(game_id.get());
+        // 観察者向けの表だけ（`game_overview`・`session_overview`・`week_team_totals`）と、公開範囲（`game_settings`）から作る
+        let Some(overview) = sqlx::query(
+            "SELECT o.status, o.final_week, COALESCE(s.disclosure_policy, 'TEAM_TOTAL') AS disclosure \
+             FROM game_overview o LEFT JOIN game_settings s USING (game_id) WHERE game_id = $1",
+        )
+        .bind(game)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage)?
+        else {
+            return Ok(None);
+        };
+        let session = sqlx::query(
+            "SELECT status, week, submitted_role_count FROM session_overview WHERE game_id = $1",
+        )
+        .bind(game)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage)?;
+        let session = match session {
+            Some(row) => Some(ObservedSession {
+                status: row.try_get("status").map_err(storage)?,
+                week: i64::from(row.try_get::<i32, _>("week").map_err(storage)?),
+                submitted_role_count: i64::from(
+                    row.try_get::<i32, _>("submitted_role_count")
+                        .map_err(storage)?,
+                ),
+            }),
+            None => None,
+        };
+        let rows = sqlx::query(
+            "SELECT week, total_ordered, total_inventory, total_backlog, contributors FROM week_team_totals \
+             WHERE game_id = $1 ORDER BY week",
+        )
+        .bind(game)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage)?;
+        let mut weeks = Vec::new();
+        for row in &rows {
+            weeks.push(TeamWeekRow {
+                week: i64::from(row.try_get::<i32, _>("week").map_err(storage)?),
+                ordered: i64::from(row.try_get::<i32, _>("total_ordered").map_err(storage)?),
+                inventory: i64::from(row.try_get::<i32, _>("total_inventory").map_err(storage)?),
+                backlog: i64::from(row.try_get::<i32, _>("total_backlog").map_err(storage)?),
+                contributors: i64::from(row.try_get::<i32, _>("contributors").map_err(storage)?),
+            });
+        }
+        let (game_version, session_version) = versions(&self.pool, game).await?;
+        Ok(Some(ObservationSnapshot {
+            game_id,
+            status: overview.try_get("status").map_err(storage)?,
+            final_week: i64::from(overview.try_get::<i32, _>("final_week").map_err(storage)?),
+            session,
+            disclosure: overview.try_get("disclosure").map_err(storage)?,
+            weeks,
             game_version,
             session_version,
         }))

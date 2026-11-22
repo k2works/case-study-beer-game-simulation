@@ -4,7 +4,8 @@
 use std::future::Future;
 
 use beergame_domain::{
-    Evolution, GameError, GameId, Instant, ParticipantId, SessionError, StartError, ValidationError,
+    Evolution, GameError, GameId, Instant, ObserverId, ParticipantId, SessionError, StartError,
+    ValidationError,
 };
 
 mod commands;
@@ -17,9 +18,10 @@ mod start;
 
 pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
-    JoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter, assign_or_replace_role,
-    assign_role, authenticate, commit_week, create_game, join_game, pause_session, recover,
-    reissue_credential, resume_session, revoke_credential, save_decision, set_commit_mode,
+    InviteOutcome, JoinOutcome, ObserverJoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter,
+    assign_or_replace_role, assign_role, authenticate, commit_week, create_game, find_invitation,
+    invite_observer, join_game, join_observer, pause_session, recover, reissue_credential,
+    resume_session, revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode,
     start_game, submit_proxy_decision,
 };
 pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
@@ -27,8 +29,9 @@ pub use seal::{open, seal};
 pub use sealed_replay::{SealedFields, SealedIdempotency, open_sealed, sealed_write};
 pub use secret::{Secret, digest, encode_token};
 pub use snapshot::{
-    CoHolderRow, EditorSnapshot, GameSnapshot, LobbyParticipantRow, ResultRow, RoleSnapshot,
-    SessionSnapshot,
+    CoHolderRow, EditorSnapshot, GameSnapshot, InvitationRow, LobbyParticipantRow,
+    ObservationSnapshot, ObservedSession, ObserverRow, ResultRow, RoleSnapshot, SessionSnapshot,
+    TeamWeekRow,
 };
 pub use start::{BothDecision, StartExecuted, execute_both, execute_start};
 
@@ -80,6 +83,10 @@ pub struct StreamRead<E> {
 pub enum CredentialKind {
     Facilitator,
     Participant,
+    /// 観察者（ブラウザセッションだけ。復帰資格は無い）。
+    Observer,
+    /// 観察用の招待コード（`credentials` の行。参加コードとは別のダイジェスト）。
+    ObserverInvitation,
 }
 
 /// 周辺ストアへの書き込み（イベントには入れない値。D7）。内容は純粋に導出し、追記と同じトランザクションで書く。
@@ -113,6 +120,13 @@ pub enum PeripheralWrite {
         subject_id: u128,
         key_version: i32,
         expires_at: Instant,
+    },
+    /// 観察者の表示名（周辺ストア。観察者の表示は進行役のロビーだけ）。
+    ObserverName {
+        game_id: GameId,
+        observer_id: ObserverId,
+        name: String,
+        at: Instant,
     },
     /// 対象の資格（復帰資格）を失効させ、発行済みのブラウザセッションを使えなくする。
     RevokeCredentials { game_id: GameId, subject_id: u128 },

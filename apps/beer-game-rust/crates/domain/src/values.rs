@@ -286,6 +286,38 @@ impl ParticipantId {
     }
 }
 
+/// 観察用の招待の識別子。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct InvitationId(u128);
+
+impl InvitationId {
+    #[must_use]
+    pub const fn new(n: u128) -> Self {
+        InvitationId(n)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u128 {
+        self.0
+    }
+}
+
+/// 観察者の識別子。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ObserverId(u128);
+
+impl ObserverId {
+    #[must_use]
+    pub const fn new(n: u128) -> Self {
+        ObserverId(n)
+    }
+
+    #[must_use]
+    pub const fn get(self) -> u128 {
+        self.0
+    }
+}
+
 /// 時刻（UNIX エポックからのミリ秒）。時計は読まず、コマンドの値として受け取る。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instant(i64);

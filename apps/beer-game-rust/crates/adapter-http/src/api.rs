@@ -13,11 +13,12 @@ use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, Env, EventStore, Executed,
-    GameSnapshot, Idempotency, ResponseShape, SealedIdempotency, Secret, SessionSnapshot,
-    SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role, authenticate,
-    commit_week, create_game, digest, join_game, open_sealed, pause_session, recover,
-    reissue_credential, resume_session, revoke_credential, save_decision, set_commit_mode,
-    start_game, submit_proxy_decision,
+    GameSnapshot, Idempotency, ObservationSnapshot, ResponseShape, SealedIdempotency, Secret,
+    SessionSnapshot, SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role,
+    authenticate, commit_week, create_game, digest, find_invitation, invite_observer, join_game,
+    join_observer, open_sealed, pause_session, recover, reissue_credential, resume_session,
+    revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode, start_game,
+    submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
@@ -30,7 +31,7 @@ use crate::problem::{
     FieldError, Problem, bad_request_problem, game_not_ended_problem, invitation_invalid_problem,
     not_ready_problem, problem_of, rate_limited_problem, timeout_problem, validation_problem,
 };
-use crate::views::{Viewer, game_view, lobby_view, review_view, session_view};
+use crate::views::{Viewer, game_view, lobby_view, observation_view, review_view, session_view};
 
 /// 外側（永続化・環境）への入口。アプリのバイナリが組み立てて渡す。
 pub trait Backend: Send + Sync + 'static {
@@ -67,6 +68,11 @@ pub trait Backend: Send + Sync + 'static {
         game_id: GameId,
     ) -> impl Future<Output = Result<Option<GameSnapshot>, AppFailure>> + Send;
     /// 依存先（DB）に接続できるか。
+    /// 観察の内容の元（観察者向けの表と公開範囲だけから作る）。
+    fn observation_snapshot(
+        &self,
+        game_id: GameId,
+    ) -> impl Future<Output = Result<Option<ObservationSnapshot>, AppFailure>> + Send;
     /// 参加・復帰の失敗の窓に 1 を足し、足した後の回数を返す（検査の前に足す。NF-S11）。
     fn note_attempt(
         &self,
@@ -142,6 +148,16 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
         .route("/api/v1/games/{game_id}/state", get(game_state::<B>))
         .route("/api/v1/games/{game_id}/lobby", get(lobby::<B>))
         .route("/api/v1/games/{game_id}/review", get(review::<B>))
+        .route("/api/v1/games/{game_id}/observation", get(observation::<B>))
+        .route(
+            "/api/v1/games/{game_id}/observer-invitations",
+            post(invite::<B>),
+        )
+        .route(
+            "/api/v1/games/{game_id}/observer-invitations/{invitation_id}/revoke",
+            post(revoke_invitation::<B>),
+        )
+        .route("/api/v1/participations/observe", post(observe::<B>))
         .route(
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
@@ -1019,7 +1035,7 @@ async fn conflict_problem<B: Backend>(
             .flatten()
             .map(|role| Viewer::Participant(id.get(), role)),
         Actor::Facilitator(_) => Some(Viewer::Facilitator),
-        Actor::Anonymous => None,
+        Actor::Anonymous | Actor::Observer(_) => None,
     };
     let (Some(viewer), Ok(Some(snapshot))) = (viewer, backend.session_snapshot(game_id).await)
     else {
@@ -1128,7 +1144,7 @@ async fn decide<B: Backend>(
                 .participant_role(game_id, id)
                 .await
                 .map_err(|f| Box::new(problem_of(&f)))?,
-            Actor::Facilitator(_) | Actor::Anonymous => None,
+            Actor::Facilitator(_) | Actor::Observer(_) | Actor::Anonymous => None,
         }
         .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
         let idem = idempotency_for(
@@ -1269,6 +1285,10 @@ async fn game_state<B: Backend>(
     let result = async {
         let game_id = parse_game_id(&game)?;
         let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if matches!(actor, Actor::Observer(_)) {
+            // 観察者は、ゲームの状態（参加コードを含む）を取得できない。観察画面だけ
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
         let snapshot = backend
             .game_snapshot(game_id)
             .await
@@ -1279,7 +1299,7 @@ async fn game_state<B: Backend>(
                 .participant_role(game_id, id)
                 .await
                 .map_err(|f| Box::new(problem_of(&f)))?,
-            Actor::Facilitator(_) | Actor::Anonymous => None,
+            Actor::Facilitator(_) | Actor::Observer(_) | Actor::Anonymous => None,
         };
         Ok(json_response(
             StatusCode::OK,
@@ -1319,7 +1339,9 @@ async fn session_state<B: Backend>(
                 }
                 Viewer::Participant(id.get(), own)
             }
-            Actor::Anonymous => return Err(Box::new(problem_of(&AppFailure::Unauthorized))),
+            Actor::Anonymous | Actor::Observer(_) => {
+                return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+            }
         };
         let snapshot = backend
             .session_snapshot(game_id)
@@ -1663,7 +1685,7 @@ async fn recover_route<B: Backend>(
                     .await
                     .map_err(|f| Box::new(problem_of(&f)))?,
             ),
-            Actor::Facilitator(_) | Actor::Anonymous => ("FACILITATOR", None),
+            Actor::Facilitator(_) | Actor::Observer(_) | Actor::Anonymous => ("FACILITATOR", None),
         };
         let mut view = json!({
             "versions": {"game": game_version, "session": session_version},
@@ -1873,6 +1895,186 @@ async fn commit_mode<B: Backend>(
     })
     .await;
     result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 観察画面（進行役と、そのゲームの観察者。参加者・資格の無い人・別のゲームは 403）。
+async fn observation<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        if !matches!(actor, Actor::Facilitator(_) | Actor::Observer(_)) {
+            return Err(Box::new(problem_of(&AppFailure::Unauthorized)));
+        }
+        let snapshot = backend
+            .observation_snapshot(game_id)
+            .await
+            .map_err(|f| Box::new(problem_of(&f)))?
+            .ok_or_else(|| Box::new(problem_of(&AppFailure::Unauthorized)))?;
+        Ok(json_response(
+            StatusCode::OK,
+            &observation_view(&snapshot),
+            None,
+            None,
+        ))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
+}
+
+/// 観察用の招待の発行（進行役だけ）。招待コードは、この応答で一度だけ示す。
+async fn invite<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path(game): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let outcome = invite_observer(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+        )
+        .await
+        .map_err(|f| Box::new(problem_of(&f)))?;
+        let view = json!({
+            "versions": {"game": outcome.game_version, "session": Value::Null},
+            "invitationId": Uuid::from_u128(outcome.invitation_id.get()).to_string(),
+            "invitationCode": outcome.invitation_code.expose(),
+            "expiresAt": expires_at_text(outcome.expires_at),
+        });
+        Ok(with_correlation(
+            json_response(StatusCode::OK, &view, None, None),
+            &correlation_task,
+        ))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 観察用の招待の失効（進行役だけ）。
+async fn revoke_invitation<B: Backend>(
+    State(backend): State<Arc<B>>,
+    Path((game, invitation)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let correlation_task = correlation.clone();
+    let limit = backend.command_timeout();
+    let result = detached(limit, async move {
+        let game_id = parse_game_id(&game)?;
+        let actor = authenticate_for(&*backend, &headers, game_id).await?;
+        let invitation_id = Uuid::parse_str(&invitation)
+            .map(|u| beergame_domain::InvitationId::new(u.as_u128()))
+            .map_err(|_| Box::new(not_found()))?;
+        let idem = idempotency_for(
+            &*backend,
+            &headers,
+            game_id,
+            "revoke_invitation",
+            &invitation,
+            ResponseShape::Game,
+        )?;
+        revoke_observer_invitation(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            actor,
+            invitation_id,
+            Some(&idem),
+        )
+        .await
+        .map(|executed| executed_response(&executed, ResponseShape::Game, &correlation_task))
+        .map_err(|failure| Box::new(problem_of(&failure)))
+    })
+    .await;
+    result.unwrap_or_else(|problem| problem_response(&problem, &correlation))
+}
+
+/// 観察者としての参加（招待コードが認可）。不明・失効・期限切れ・形式不正は、区別しない同じ 403（`game.invitation_invalid`）。
+async fn observe<B: Backend>(
+    State(backend): State<Arc<B>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let correlation = correlation_id(&*backend, &headers);
+    let result = async {
+        let parsed = parse_json(&body)?;
+        let code = parsed.get("invitationCode").and_then(Value::as_str);
+        let name = parsed.get("displayName").and_then(Value::as_str);
+        let (Some(code), Some(name)) = (code, name) else {
+            let mut errors = Vec::new();
+            if code.is_none() {
+                errors.push(field("invitationCode", "招待コードを入力してください。"));
+            }
+            if name.is_none() {
+                errors.push(field("displayName", "表示名を入力してください。"));
+            }
+            return Err(Box::new(validation_problem(errors)));
+        };
+        let attempt = Attempt::begin(&*backend, &headers, "join").await?;
+        // 招待コードを引く（ゲームが分からないので、検索だけの用途の保存場所を使う）
+        let lookup = backend.store(GameId::new(0));
+        let (game_id, invitation_id) = find_invitation(
+            &lookup,
+            backend.env(),
+            backend.settings(),
+            &Secret::new(code.to_owned()),
+        )
+        .await
+        .map_err(|failure| {
+            if matches!(failure, AppFailure::Unauthorized) {
+                Box::new(invitation_invalid_problem())
+            } else {
+                Box::new(problem_of(&failure))
+            }
+        })?;
+        let outcome = join_observer(
+            &backend.store(game_id),
+            backend.env(),
+            backend.settings(),
+            game_id,
+            invitation_id,
+            name,
+        )
+        .await
+        .map_err(|failure| {
+            if matches!(
+                failure,
+                AppFailure::Domain(beergame_application::DomainError::Game(
+                    beergame_domain::GameError::InvitationInvalid
+                ))
+            ) {
+                Box::new(invitation_invalid_problem())
+            } else {
+                Box::new(problem_of(&failure))
+            }
+        })?;
+        // 招待が有効だったので、窓の失敗には数えない
+        attempt.forgive(&*backend).await;
+        let view = json!({
+            "versions": {"game": outcome.game_version, "session": Value::Null},
+            "gameId": Uuid::from_u128(game_id.get()).to_string(),
+            "kind": "OBSERVER",
+        });
+        let cookie = session_cookie(&*backend, &headers, outcome.session.expose());
+        Ok(json_response(StatusCode::OK, &view, Some(&cookie), None))
+    }
+    .await;
+    result
+        .map(|response: Response| with_correlation(response, &correlation))
+        .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
 }
 
 #[cfg(test)]

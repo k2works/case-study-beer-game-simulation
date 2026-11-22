@@ -57,3 +57,8 @@ continuation/credentials.feature :: 入れ替えられた旧担当者が、以�
 # B8: カスタム条件（US1.1）
 game-setup/custom-conditions.feature
 weekly-play/auto-commit.feature
+
+# B10: 観察者（US1.3・US4.1）
+observation/observer-invitation.feature
+observation/observation.feature
+observation/observation-disclosure.feature

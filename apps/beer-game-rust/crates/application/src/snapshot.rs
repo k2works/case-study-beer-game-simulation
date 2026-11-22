@@ -91,7 +91,61 @@ pub struct GameSnapshot {
     /// キットの値から変えた項目（`INITIAL_INVENTORY` など）。
     pub changed_settings: Vec<String>,
     pub participants: Vec<LobbyParticipantRow>,
+    /// 観察用の招待（コードの値は含まない）。
+    pub invitations: Vec<InvitationRow>,
+    /// 参加した観察者。
+    pub observers: Vec<ObserverRow>,
     pub game_version: u64,
     /// 開始前は `None`。
     pub session_version: Option<u64>,
+}
+
+/// 観察用の招待（ロビー用）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InvitationRow {
+    pub invitation_id: u128,
+    pub expires_at_millis: i64,
+    pub revoked: bool,
+    pub created_at_millis: i64,
+}
+
+/// 参加した観察者（ロビー用）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObserverRow {
+    pub observer_id: u128,
+    pub display_name: Option<String>,
+    pub joined_at_millis: i64,
+}
+
+/// 確定した 1 週のチーム合計（観察用）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TeamWeekRow {
+    pub week: i64,
+    pub ordered: i64,
+    pub inventory: i64,
+    pub backlog: i64,
+    pub contributors: i64,
+}
+
+/// 観察の内容の元（`game_overview`・`session_overview`・`week_team_totals` と、公開範囲だけ）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObservationSnapshot {
+    pub game_id: GameId,
+    pub status: String,
+    pub final_week: i64,
+    /// 開始後だけ。
+    pub session: Option<ObservedSession>,
+    /// `TEAM_TOTAL`・`NONE`。
+    pub disclosure: String,
+    pub weeks: Vec<TeamWeekRow>,
+    pub game_version: u64,
+    pub session_version: Option<u64>,
+}
+
+/// 開始後の、進行の外形（役割別の値は含まない）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObservedSession {
+    pub status: String,
+    pub week: i64,
+    pub submitted_role_count: i64,
 }
