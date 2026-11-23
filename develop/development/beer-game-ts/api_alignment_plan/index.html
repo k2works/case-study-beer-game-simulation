@@ -4387,15 +4387,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-2026-11-24" class="md-nav__link">
+  <a href="#3-2026-11-243" class="md-nav__link">
     <span class="md-ellipsis">
       
-        段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）
+        段階 3 の前の確認事項（2026-11-24。3 案とも承認済み）
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）">
+    <nav class="md-nav" aria-label="段階 3 の前の確認事項（2026-11-24。3 案とも承認済み）">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4435,7 +4435,7 @@
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        承認の確認事項
+        承認された内容
       
     </span>
   </a>
@@ -13816,8 +13816,9 @@
 </tbody>
 </table>
 <p><strong>ゲート（人の確認が要る点）</strong>: ①DB のスキーマ変更（<code>versions.game</code> の持ち方。既存の列から導出できなければ、段階 2 の前に止まって案を示す）、②ガイドツアーの第 10 ステップ（<code>ui/src/features/play.tsx</code> の <code>@guidedTour</code>）の移し先か、ツアーを縮めるか、③TS 独自の機能（SSE・unassign・console）を捨てることの確認、④契約そのものの変更が要る場合。</p>
-<h2 id="3-2026-11-24">段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）<a class="headerlink" href="#3-2026-11-24" title="Permanent link">&para;</a></h2>
-<p>段階 3（コマンド）に入る前に、スキーマ変更とドメインの規則の変更が要る 3 件の案。<strong>いずれも、承認されるまで実装しない</strong>（スキーマ変更・業務ルールの変更は確認必須）。AWS は未適用なので、既存データへの影響は開発 DB だけ。</p>
+<h2 id="3-2026-11-243">段階 3 の前の確認事項（2026-11-24。<strong>3 案とも承認済み</strong>）<a class="headerlink" href="#3-2026-11-243" title="Permanent link">&para;</a></h2>
+<p>段階 3（コマンド）に入る前に、スキーマ変更とドメインの規則の変更が要る 3 件の案。スキーマ変更・業務ルールの変更は確認必須。AWS は未適用なので、既存データへの影響は開発 DB だけ。</p>
+<p><strong>承認の記録（2026-11-24、ユーザー）</strong>: 案 1「承認する」（条件の範囲を契約に合わせることを含む）、案 2「段階 3 で実装する」、案 3「承認する」。承認の範囲はこの 3 件のマイグレーション（008・009・010）と、それに伴うドメインの変更。それ以外のスキーマ変更は、改めて確認する。</p>
 <h3 id="1-008">案 1: カスタム条件（役割ごとの初期在庫と、初期の流れ）— マイグレーション 008<a class="headerlink" href="#1-008" title="Permanent link">&para;</a></h3>
 <p><strong>なぜ要るか</strong>: 契約の <code>CustomConditions</code> は、役割ごとの初期在庫（<code>initialInventory: {役割: 数}</code>）と、初期の流れ（<code>initialFlow</code>。遅延の各段にある数量。キットは 4）を持つ。TS は、全役割に共通の初期在庫 1 つだけを持ち、初期の流れは定数（<code>INITIAL_PIPELINE = 4</code>）。共有 UI の <code>custom-conditions-ui</code>（「<strong>小売店の</strong>初期在庫を 20 に変える」）は役割ごとの値を送るので、<strong>この変更が無いと <code>@ui</code> の 1 シナリオが TS で通らない</strong>。ロビーの「カスタム（変更: 初期在庫、配送の遅延）」の表示にも、<code>INITIAL_INVENTORY</code>・<code>INITIAL_FLOW</code> の区別が要る。</p>
 <p><strong>スキーマ（案）</strong>: <code>games</code> の整数列 <code>initial_inventory</code> を、<strong>役割ごとの 4 列</strong>に置き換え、<code>initial_flow</code> を足す（<code>games</code> は、条件を平らな列で持つ現在の流儀のまま。CHECK 制約で守れる）。<code>sessions.settings</code>（jsonb。開始時点の条件の写し）も、同じ形に変換する。</p>
@@ -13872,11 +13873,11 @@
 </code></pre></div>
 <p><strong>ほかの変更系の冪等</strong>（<code>joinGame</code>・<code>recoverParticipation</code>・<code>joinAsObserver</code> など）は、対象のゲームが先に決まる（参加コード・本文の <code>gameId</code>・招待から）ので、<strong>既存の表と主キーのまま</strong>で足りる（スキーマ変更なし）。</p>
 <p><strong>却下した案</strong>: 作成だけ冪等を保存しない — 再送で、ゲームが重複して作られる（共有 UI が再送する前提と合わない）。</p>
-<h3 id="_4">承認の確認事項<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<h3 id="_4">承認された内容<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <ol>
-<li>案 1（マイグレーション 008。範囲を契約に合わせることを含む）を実装してよいか。</li>
-<li>案 2（マイグレーション 009）を、段階 3 で実装してよいか。それとも、<code>@ui</code> が TS で通ってから（段階 6 の後の追加作業）にするか。</li>
-<li>案 3（マイグレーション 010）を実装してよいか。</li>
+<li>案 1（マイグレーション 008。範囲を契約に合わせることを含む）— <strong>承認</strong></li>
+<li>案 2（マイグレーション 009）— <strong>段階 3 で実装する</strong></li>
+<li>案 3（マイグレーション 010）— <strong>承認</strong></li>
 </ol>
 <h2 id="_5">進捗<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <table>
