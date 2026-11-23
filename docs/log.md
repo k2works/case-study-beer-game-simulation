@@ -1,6 +1,8 @@
 # Docs Update Log
 
 ## 2026-11-23
+* **Creation**: [bolt_16_report](/development/beer-game-rust/bolt_16_report.md)・[nfr_results](/development/beer-game-rust/nfr_results.md)・[release_readiness](/development/beer-game-rust/release_readiness.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_16_plan](/development/beer-game-rust/bolt_16_plan.md) を更新（承認の記録。claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_16_plan](/development/beer-game-rust/bolt_16_plan.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_15_report](/development/beer-game-rust/bolt_15_report.md) を更新（承認の記録: B15 の報告と U5 の完了。claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_15_report](/development/beer-game-rust/bolt_15_report.md) を作成（claude-code/claude-sonnet-5-5）

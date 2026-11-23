@@ -363,7 +363,7 @@ async fn nf_p1__15_ゲーム_75_並行の保存_状態の取得_確定_と_反�
     record(
         "NF-C 保存（同時）で、再試行の上限超過の 503 になり、再送が要った件数",
         &format!(
-            "{retried} / {}（自動再試行の既定 3 回。同じゲームの 4 人が同時に保存）",
+            "{retried} / {}（自動再試行の上限 MAX_ATTEMPTS。同じゲームの 4 人が同時に保存）",
             saves.0.len()
         ),
     );
@@ -392,6 +392,12 @@ async fn nf_p1__15_ゲーム_75_並行の保存_状態の取得_確定_と_反�
         &reflection.summary(),
     );
 
+    // Release 0.2 の条件: 4 人同時の保存で、再試行の上限超過（503）が出ない（上限 `MAX_ATTEMPTS` ≥ 同時の書き手の数）
+    if retried > 0 {
+        return Err(format!(
+            "同時の保存で、再試行の上限超過の 503 が {retried} 件あった"
+        ));
+    }
     within("保存", &saves, 1000.0)?;
     within("状態の取得", &states, 1000.0)?;
     within("確定", &commits, 1000.0)

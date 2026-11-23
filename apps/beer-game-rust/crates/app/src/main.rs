@@ -129,7 +129,7 @@ async fn main() -> ExitCode {
         key_version: 1,
         credential_ttl_millis: 2_592_000_000,
         retention_days: 90,
-        max_attempts: 3,
+        max_attempts: beergame_app::config::MAX_ATTEMPTS,
         retired_keys: Vec::new(),
         session_ttl_millis: 86_400_000,
         max_failed_attempts: 10,
@@ -187,7 +187,7 @@ async fn main() -> ExitCode {
         // 復帰資格は 30 日、ブラウザセッションは 24 時間
         credential_ttl_millis: 2_592_000_000,
         retention_days: 90,
-        max_attempts: 3,
+        max_attempts: beergame_app::config::MAX_ATTEMPTS,
         retired_keys,
         session_ttl_millis: 86_400_000,
         max_failed_attempts: 10,

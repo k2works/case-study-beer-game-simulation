@@ -28,7 +28,7 @@ pub fn app_with_metrics(pool: PgPool, metrics: Arc<dyn MetricSink>) -> Router {
         key_version: 1,
         credential_ttl_millis: 86_400_000,
         retention_days: 90,
-        max_attempts: 3,
+        max_attempts: beergame_app::config::MAX_ATTEMPTS,
         retired_keys: Vec::new(),
         session_ttl_millis: 86_400_000,
         max_failed_attempts: 10,

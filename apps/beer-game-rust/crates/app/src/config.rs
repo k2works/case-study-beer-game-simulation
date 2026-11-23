@@ -1,6 +1,16 @@
 //! 設定の読み取り（環境変数）。ECS では、Secrets Manager の値を 1 つの URL に合成して渡せないため、
 //! 接続 URL は、`DATABASE_URL`（あればそれを優先。ローカル・試験）か、部品（`DB_HOST`・`DB_USER`・`DB_PASSWORD` ほか）から組み立てる。
 
+/// 追記の競合の自動再試行の上限（`AppSettings::max_attempts`）。
+/// 同じストリームへの**同時の書き手**（4 役割 + 進行役 + 共同担当）の数以上にする。競合した書き手は、再試行のたびに、
+/// 他の書き手が先に 1 人成功しているので、書き手が `n` 人なら、最大でも `n - 1` 回の再試行で成功する。
+/// 3 回では、同じゲームの 4 人が同時に保存すると、上限を超えて 503（`app.retry_exhausted`）になることがあった（B16 の計測）。
+pub const MAX_ATTEMPTS: u32 = 6;
+
+/// 同じストリームへの同時の書き手の数（4 役割 + 進行役 + 共同担当）。`MAX_ATTEMPTS` が、これ未満になるとコンパイルが通らない（NF-C2）。
+const CONCURRENT_WRITERS: u32 = 6;
+const _: () = assert!(MAX_ATTEMPTS >= CONCURRENT_WRITERS);
+
 /// Cookie に `Secure` を付けるか（NF-S2）。`ENVIRONMENT` が無い・`local` のときだけ付けない（手元の HTTP で動くように）。
 /// staging・production は、CloudFront（HTTPS）が前に立つので、ALB までの区間が HTTP でも、ブラウザには `Secure` の Cookie を返す。
 #[must_use]
