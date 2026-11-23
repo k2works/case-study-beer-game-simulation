@@ -56,4 +56,4 @@ v1 の週確定のイベントは、全役割の**合計だけ**を持ち、振�
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-003](../beer-game/003-outbox-projection-over-event-sourcing.md)（変更）
-- 参照: [データモデル（v2）](../../design/beer-game2/data-model.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
+- 参照: [データモデル（v2）](../../design/beer-game-ts/data-model.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)

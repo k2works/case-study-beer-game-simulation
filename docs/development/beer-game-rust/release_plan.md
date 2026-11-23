@@ -15,7 +15,7 @@ verified:
 
 本書は、beer-game-rust（beer-game-kotlin の Rust 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が提案し、人が承認ゲートで検証・承認します。本書は 2026-11-21 に、ユーザーが承認しました（スコープ、Bolt の割り当て、日程の仮定、価値指標の目標、リスク）。**
 
-- 機能・振る舞いは beer-game-kotlin（元は beer-game2）と同じです。要件・ストーリー・Unit・受入条件は新規に作らず参照します（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)）。
+- 機能・振る舞いは beer-game-kotlin（元は beer-game2）と同じです。要件・ストーリー・Unit・受入条件は新規に作らず参照します（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[Unit 定義](../../requirements/beer-game-ts/unit_definition.md)）。
 - 設計は [beer-game-rust の設計](../../design/beer-game-rust/index.md)（ES + CQRS、axum + sqlx + tokio。**設計文書 10 本は 2026-11-21 に `verified`**）と [ADR-001](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) です。
 - 計画の形式は [Kotlin 版のリリース計画](../beer-game-kotlin/release_plan.md) に合わせ、**ストーリーポイントでなく Bolt の稼働日**で見積もります（ベロシティは計測前のため）。
 - **日付と所要は仮定です。** B1・B2 の実績（人の検証時間を含む）で B3 以降を再調整します。

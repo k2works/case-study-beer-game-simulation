@@ -1,6 +1,6 @@
 # beer-game-kotlin — 設計
 
-beer-game-kotlin（[beer-game2](../beer-game2/index.md) の Kotlin 版）の設計ドキュメントです。機能・API の振る舞い・画面は beer-game2 を引き継ぎ、バックエンドを **Kotlin（Ktor + Arrow + kotlinx.coroutines）、イベントソーシング + CQRS** で再設計します。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。フロントエンドは React/TypeScript を踏襲します。要件と ADR は beer-game2 のものを参照します（本プロジェクトでは新規に作りません）。
+beer-game-kotlin（[beer-game2](../beer-game-ts/index.md) の Kotlin 版）の設計ドキュメントです。機能・API の振る舞い・画面は beer-game2 を引き継ぎ、バックエンドを **Kotlin（Ktor + Arrow + kotlinx.coroutines）、イベントソーシング + CQRS** で再設計します。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。フロントエンドは React/TypeScript を踏襲します。要件と ADR は beer-game2 のものを参照します（本プロジェクトでは新規に作りません）。
 
 ## ドキュメント一覧
 

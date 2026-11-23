@@ -170,7 +170,7 @@ stop
 | 8 | マイグレーションは手動 | デプロイ時に、1 回限りのタスクで適用 |
 | 9 | PostgreSQL の版が環境で異なる（CI は 16） | すべて 18 に揃える（RDS、Docker、CI） |
 
-## 設計判断（[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)）
+## 設計判断（[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game-ts/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)）
 
 - CloudFront の単一オリジンと、独自ドメイン・TLS 1.2 以上・セキュリティヘッダー。
 - API はステートレスで、Fargate で水平に増減する。
@@ -198,4 +198,4 @@ v1 から**引き継ぐ**判断: CloudFront の単一オリジン（[ADR-007](..
 - [バックエンドアーキテクチャ（v2）](./architecture-backend.md)、[データモデル（v2）](./data-model.md)、[運用要件](./operation.md)、[非機能要件](./non-functional.md)
 - v1 の [インフラストラクチャアーキテクチャ](../beer-game/architecture-infrastructure.md)
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

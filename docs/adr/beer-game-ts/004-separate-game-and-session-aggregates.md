@@ -55,4 +55,4 @@ v1 は、1 つの `Game` 集約に、設定、参加者、セッション、意�
 
 - 著者: claude-code
 - 関連 ADR: [ADR-003](./003-ports-and-adapters-with-lint.md)、v1 の [ADR-002](../beer-game/002-stateless-api-row-lock.md)
-- 参照: [ドメインモデル（v2）](../../design/beer-game2/domain-model.md)、[データモデル（v2）](../../design/beer-game2/data-model.md)
+- 参照: [ドメインモデル（v2）](../../design/beer-game-ts/domain-model.md)、[データモデル（v2）](../../design/beer-game-ts/data-model.md)

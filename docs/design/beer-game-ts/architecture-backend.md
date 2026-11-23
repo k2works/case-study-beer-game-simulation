@@ -107,7 +107,7 @@ Out --> DB
 ### ディレクトリ構成（提案）
 
 ```text
-apps/beer-game2/
+apps/beer-game-ts/
 ├── src/
 │   ├── domain/        game/ session/ retention/ shared/（値オブジェクト）simulation/
 │   ├── ports/
@@ -247,7 +247,7 @@ R --> P : 200（版）
 
 ## 設計判断（ADR の対象）
 
-次の判断を、v2 の ADR として記録しました（[ADR-003](../../adr/beer-game2/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game2/006-sse-version-only.md)、[007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game2/009-credential-key-versions.md)）。v1 の判断の扱いは [ADR-002](../../adr/beer-game2/002-adopt-v1-adrs.md) にまとめました。
+次の判断を、v2 の ADR として記録しました（[ADR-003](../../adr/beer-game-ts/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game-ts/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game-ts/006-sse-version-only.md)、[007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game-ts/009-credential-key-versions.md)）。v1 の判断の扱いは [ADR-002](../../adr/beer-game-ts/002-adopt-v1-adrs.md) にまとめました。
 
 - ドメインモデル + ポートとアダプター。層の依存を lint で守る。
 - `Game`（準備）と `Session`（進行）の集約を分ける。開始だけが同一トランザクション。
@@ -277,4 +277,4 @@ v1 から**引き継ぐ**判断: 週次計算の純粋関数による分離（[A
 - [ドメインモデル設計（v2）](./domain-model.md)、[データモデル設計（v2）](./data-model.md)、[非機能要件](./non-functional.md)、[運用要件](./operation.md)
 - v1 の [バックエンドアーキテクチャ](../beer-game/architecture-backend.md)
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 本書は、beer-game2（v2）を本番で運用するための要件を、運用フロー、監視、バックアップ、障害対応、変更管理の順に定義します。**`docs/` を正本**とします。
 
-beer-game（v1）の [運用要件](../beer-game/operation.md)（11 件の差分を記録）を出発点に、v2 の設計（[インフラ](./architecture-infrastructure.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)）と、[非機能要件（v2）](./non-functional.md) を反映して**改訂**しました。表の「v1 の状態」は v1 の実装・設定の状況で、**△・✗ は v2 で満たす対象**です。
+beer-game（v1）の [運用要件](../beer-game/operation.md)（11 件の差分を記録）を出発点に、v2 の設計（[インフラ](./architecture-infrastructure.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)）と、[非機能要件（v2）](./non-functional.md) を反映して**改訂**しました。表の「v1 の状態」は v1 の実装・設定の状況で、**△・✗ は v2 で満たす対象**です。
 
 - [非機能要件](./non-functional.md)（SLO、RPO/RTO、監視の閾値）
 - `aidlc/` の Unit ごとの監視・CI/CD・インフラ設計（`construction/*/infrastructure-design/`）
@@ -81,7 +81,7 @@ beer-game（v1）の [運用要件](../beer-game/operation.md)（11 件の差分
 
 ### 実装済みのアラーム（Bolt 11。Terraform で定義、AWS には未適用）
 
-上の表のうち、Critical の次の項目を、`infra/modules/observability` に定義しました（[Bolt 11 計画](../../development/beer-game2/bolt_11_plan.md)）。メトリクスはアプリが EMF で出します（名前空間 `BeerGame2`、次元 `Environment`）。通知は SNS のトピック（`<name>-alerts`）で、メールの購読は変数 `alert_email` で作ります。
+上の表のうち、Critical の次の項目を、`infra/modules/observability` に定義しました（[Bolt 11 計画](../../development/beer-game-ts/bolt_11_plan.md)）。メトリクスはアプリが EMF で出します（名前空間 `BeerGame2`、次元 `Environment`）。通知は SNS のトピック（`<name>-alerts`）で、メールの購読は変数 `alert_email` で作ります。
 
 | 監視項目                 | アラーム                              | メトリクス                                                                      | 条件                                         |
 | :----------------------- | :------------------------------------ | :------------------------------------------------------------------------------ | :------------------------------------------- |
@@ -161,9 +161,9 @@ stop
 | Web の静的ファイル                                                          | S3 のバージョニング、ビルド成果物（版つきで不変）                                                                                    | バージョンごと |                            ✓                             |
 | イメージ                                                                    | レジストリの不変の版（ダイジェスト固定）                                                                                             | 直近の複数世代 |         △（レジストリが未確定。変更管理を参照）          |
 | インフラの定義                                                              | Git（Terraform）                                                                                                                     | 無期限         |                            ✓                             |
-| Terraform の状態                                                            | 暗号化した S3 のリモートの保管と排他ロック。環境ごとに分離（[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)） | 版つき         |            ✗（v1 は `backend` の定義が無い）             |
-| 秘密情報                                                                    | Secrets Manager。資格の鍵は**複数の版を同時に保持**（[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)）                | —              | △（v1 は注入のみで、版管理とローテーションの手順が無い） |
-| エクスポートの成果物                                                        | 保存しない（要求のたびに組み立てる。[Bolt 9](../../development/beer-game2/bolt_9_report.md)）                                        | —              |                            —                             |
+| Terraform の状態                                                            | 暗号化した S3 のリモートの保管と排他ロック。環境ごとに分離（[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)） | 版つき         |            ✗（v1 は `backend` の定義が無い）             |
+| 秘密情報                                                                    | Secrets Manager。資格の鍵は**複数の版を同時に保持**（[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)）                | —              | △（v1 は注入のみで、版管理とローテーションの手順が無い） |
+| エクスポートの成果物                                                        | 保存しない（要求のたびに組み立てる。[Bolt 9](../../development/beer-game-ts/bolt_9_report.md)）                                        | —              |                            —                             |
 
 ### RPO と RTO
 
@@ -183,7 +183,7 @@ stop
 
 ### バックアップと削除の関係
 
-保持期間後に削除しても、**自動バックアップには最大 7 日間、削除前のデータが残ります**。保持方針（「期限後に削除する」）との関係を、運営者に明示する必要があります（例: 「期限後、最大 7 日以内にバックアップからも消える」）。v2 では、この期間を、**保持方針に明記し、運営者へ示します**（NF-S16）。進行役のロビーに、保持期間・削除予定日と「データベースのバックアップには、削除後も最大 7 日残ります」を表示します（[Bolt 10](../../development/beer-game2/bolt_10_plan.md)）。復元時は、上の手順 2 で、削除済みのゲームを再び削除します。
+保持期間後に削除しても、**自動バックアップには最大 7 日間、削除前のデータが残ります**。保持方針（「期限後に削除する」）との関係を、運営者に明示する必要があります（例: 「期限後、最大 7 日以内にバックアップからも消える」）。v2 では、この期間を、**保持方針に明記し、運営者へ示します**（NF-S16）。進行役のロビーに、保持期間・削除予定日と「データベースのバックアップには、削除後も最大 7 日残ります」を表示します（[Bolt 10](../../development/beer-game-ts/bolt_10_plan.md)）。復元時は、上の手順 2 で、削除済みのゲームを再び削除します。
 
 保持の定期タスク（`node dist/retention.js`）は、EventBridge Scheduler から 5 分ごとに起動します。削除は 1 ゲームずつ 1 つのトランザクションで行い、失敗したら何も消えず、次の起動で再試行します。5 回失敗したゲームは再試行をやめ、エラーのログ（`保持の削除で恒久的な失敗があります`）と終了コード 1 を残します（通知は観測の完成で扱う）。削除の受領記録（`deletion_receipts`）は、ゲームを特定できない参照で 1 年残します。
 
@@ -285,7 +285,7 @@ stop
 
 | 項目           | 要件                                                                                                                                                                                                        |           v1 の状態           |
 | :------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------: |
-| 保持と削除     | 保持期間（既定 90 日、1〜3650 日）の後に削除。期限到達の 99% を 24 時間以内に完了。**`games` のカスケード削除で、漏れなく消える**（[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)） |   △（v1 は削除対象に漏れ）    |
+| 保持と削除     | 保持期間（既定 90 日、1〜3650 日）の後に削除。期限到達の 99% を 24 時間以内に完了。**`games` のカスケード削除で、漏れなく消える**（[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)） |   △（v1 は削除対象に漏れ）    |
 | 削除の運用     | 失敗した削除を、運営側が状況を確認し、再試行できる（保持状態の画面と API）                                                                                                                                  |               ✓               |
 | 削除の証跡     | ゲームを特定できない形の受領記録を 1 年残し、期限後に削除する                                                                                                                                               |               ✓               |
 | 復元後の扱い   | 復元後に、保持の定期タスクを実行して、期限切れのゲームを再び削除する                                                                                                                                        | 新（v1 の復元ゲートの代わり） |
@@ -303,7 +303,7 @@ stop
 
 ## 運用手順書の一覧（作成予定）
 
-`docs/operation/beer-game2/` に作成する手順書です。v1 では、環境構築の 4 件を含め、**すべて未作成**でした。v2 では、Bolt の進行に合わせて作成します。
+`docs/operation/beer-game-ts/` に作成する手順書です。v1 では、環境構築の 4 件を含め、**すべて未作成**でした。v2 では、Bolt の進行に合わせて作成します。
 
 | 手順書                               | 内容                                                               | 優先度 |
 | :----------------------------------- | :----------------------------------------------------------------- | :----: |
@@ -327,12 +327,12 @@ v1 の差分（11 件）への対応です。**すべて v2 の要件として�
 | :-- | :------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | ログ、メトリクス、ダッシュボードが無い                              | 構造化ログ、エラーの記録、メトリクス（EMF）、ダッシュボードを最初から実装する（NF-O1〜NF-O5）                                        |
 | 2   | `/health` がデータベースを確認しない                                | `GET /ready`（`SELECT 1`）を ALB のヘルスチェックにする（NF-O10）                                                                    |
-| 3   | デプロイが未実装。レジストリが GHCR と ECR で不一致                 | ECR に統一。ステージング自動、本番は承認 + ブルー/グリーン（[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)） |
+| 3   | デプロイが未実装。レジストリが GHCR と ECR で不一致                 | ECR に統一。ステージング自動、本番は承認 + ブルー/グリーン（[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)） |
 | 4   | 通知先と体制が未定義                                                | **未決**（組織の判断）。下記の未決事項                                                                                               |
 | 5   | 復元の訓練が無い。バックアップ（7 日）と保持削除の関係が未整理      | 訓練を四半期とリリース前に行う。バックアップの保持を保持方針に明記する                                                               |
 | 6   | Terraform の状態の保管先が未定義。ネットワーク・ECR・WAF が定義の外 | リモートの状態とネットワークのモジュール（ADR-012）                                                                                  |
 | 7   | マイグレーションが手動で、履歴が無い                                | node-pg-migrate で履歴管理し、デプロイ時に自動で適用する                                                                             |
-| 8   | 資格の失効と鍵のローテーションの手段が無い                          | 資格の失効・再発行と、鍵の版管理を実装する（[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)）                         |
+| 8   | 資格の失効と鍵のローテーションの手段が無い                          | 資格の失効・再発行と、鍵の版管理を実装する（[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)）                         |
 | 9   | 運用手順書がすべて未作成                                            | Bolt の進行に合わせて作成する（優先度「高」から）                                                                                    |
 | 10  | 研修の実施日時を運用側へ伝える仕組みが無い                          | **未決**。運営者が日時を連絡する手順と、運用の予定表を決める                                                                         |
 | 11  | 削除の運用のアラートが、インフラに定義されていない                  | 監視項目の表のとおり、アラームを定義する（キューは廃止したため、期限超過の経過時間と失敗の件数が中心）                               |
@@ -350,4 +350,4 @@ v1 の差分（11 件）への対応です。**すべて v2 の要件として�
 - [運用要件定義ガイド](../../reference/運用要件定義ガイド.md)
 - `aidlc/spaces/default/intents/261027-beer-game-development/construction/`（`u1-walking-skeleton`、`u4-retention-operations`、`u5-accessible-experience` の `infrastructure-design/`）
 - v1 の実装と設定: `apps/beer-game/infra/main.tf`、`src/api/app.ts`（`/health`）、`.github/workflows/`
-- [インフラ（v2）](./architecture-infrastructure.md)、[バックエンド（v2）](./architecture-backend.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)
+- [インフラ（v2）](./architecture-infrastructure.md)、[バックエンド（v2）](./architecture-backend.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)

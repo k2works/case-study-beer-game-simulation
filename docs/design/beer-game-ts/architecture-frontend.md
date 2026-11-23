@@ -202,7 +202,7 @@ Review --> [*]
 | 7 | 観察者の入口が無い | `/observe` と観察用の招待 |
 | 8 | SSE の再生に頼る実装 | 版の通知のみ。再接続時にスナップショットを取得 |
 
-## 設計判断（[ADR-010](../../adr/beer-game2/010-url-router-and-features.md)、[ADR-006](../../adr/beer-game2/006-sse-version-only.md)）
+## 設計判断（[ADR-010](../../adr/beer-game-ts/010-url-router-and-features.md)、[ADR-006](../../adr/beer-game-ts/006-sse-version-only.md)）
 
 - URL ルーターを導入し、ゲームを URL で表す（資格は Cookie）。
 - 機能単位（`features/`）の構成にする。
@@ -223,4 +223,4 @@ v1 から**引き継ぐ**判断: SPA の採用（[ADR-006](../../adr/beer-game/0
 - [バックエンドアーキテクチャ（v2）](./architecture-backend.md)、[ドメインモデル（v2）](./domain-model.md)、[UI 設計](./ui-design.md)
 - v1 の [フロントエンドアーキテクチャ](../beer-game/architecture-frontend.md)
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

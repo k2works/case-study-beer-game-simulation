@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 
 本書は、beer-game-kotlin の実行環境と配信の構成を定義します。**`docs/` を設計の正本**とします。実装コードも、インフラのコードも、まだ存在しません。
 
-[beer-game2 のインフラストラクチャアーキテクチャ](../beer-game2/architecture-infrastructure.md) の構成（CloudFront の単一オリジン、ECS Fargate、RDS for PostgreSQL、ECR、Terraform、GitHub Actions の OIDC、ステージング自動・本番承認とブルー/グリーン、観測）を**そのまま踏襲**します。変わるのは、バックエンドが **Node.js から JVM（Kotlin）になったこと**と、**ES + CQRS** に起因する点だけです。
+[beer-game2 のインフラストラクチャアーキテクチャ](../beer-game-ts/architecture-infrastructure.md) の構成（CloudFront の単一オリジン、ECS Fargate、RDS for PostgreSQL、ECR、Terraform、GitHub Actions の OIDC、ステージング自動・本番承認とブルー/グリーン、観測）を**そのまま踏襲**します。変わるのは、バックエンドが **Node.js から JVM（Kotlin）になったこと**と、**ES + CQRS** に起因する点だけです。
 
 - コンテナと起動、メモリ、終了の扱い（JVM 固有）
 - ビルド（Gradle）と CI の手順
@@ -52,7 +52,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 | Micrometer | 最新は 1.18.0 の RC のみ確認した。採用しない案（バックエンドの BD9）のため、確認は不要 |
 | H2 の PostgreSQL モードで動く範囲、H2 と JDK 25・Flyway の組み合わせ | 公式ドキュメント（features）では、アドバイザリロック、LISTEN/NOTIFY、部分インデックス、ロール/GRANT、JSONB、SQLSTATE、分離レベルの差異を**確認できなかった**。**B1 の最初に実測して確定する** |
 
-**beer-game2 から変えないバージョン**（beer-game2 の [技術スタック](../beer-game2/tech-stack.md) が 2026-11-09 に確認した値を引き継ぐ）: PostgreSQL 18（RDS の標準サポートは 2031-02-28 まで）、Node.js 26（フロントエンドのビルド用。Active LTS、EOL 2029-04-30）、Terraform 1.17 以上、AWS プロバイダー `~> 6.0`、`postgres:18-alpine`（ローカルの DB）。この日付の確認結果を、本書は再確認していません。
+**beer-game2 から変えないバージョン**（beer-game2 の [技術スタック](../beer-game-ts/tech-stack.md) が 2026-11-09 に確認した値を引き継ぐ）: PostgreSQL 18（RDS の標準サポートは 2031-02-28 まで）、Node.js 26（フロントエンドのビルド用。Active LTS、EOL 2029-04-30）、Terraform 1.17 以上、AWS プロバイダー `~> 6.0`、`postgres:18-alpine`（ローカルの DB）。この日付の確認結果を、本書は再確認していません。
 
 ## 決定の整理
 
@@ -126,7 +126,7 @@ Mon --> SNS
 
 ### 構成要素
 
-CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネットワーク、観測の基本は、[beer-game2](../beer-game2/architecture-infrastructure.md) と同じです。**変更する要素と、JVM に固有の設定**を示します。
+CloudFront、S3（Web）、ALB、保持の定期タスク、RDS、ECR、ネットワーク、観測の基本は、[beer-game2](../beer-game-ts/architecture-infrastructure.md) と同じです。**変更する要素と、JVM に固有の設定**を示します。
 
 | 要素 | 設定 |
 | :--- | :--- |
@@ -445,8 +445,8 @@ stop
 ## 出典
 
 - [バックエンドアーキテクチャ（Kotlin 版）](./architecture-backend.md)、[データモデル（Kotlin 版）](./data-model.md)、[運用要件](./operation.md)、[非機能要件](./non-functional.md)
-- [beer-game2 のインフラストラクチャアーキテクチャ](../beer-game2/architecture-infrastructure.md)、[beer-game2 の技術スタック](../beer-game2/tech-stack.md)
+- [beer-game2 のインフラストラクチャアーキテクチャ](../beer-game-ts/architecture-infrastructure.md)、[beer-game2 の技術スタック](../beer-game-ts/tech-stack.md)
 - バージョンの確認元（2026-11-14）: Maven Central のメタデータ（H2、Kotlin、Ktor、Arrow、kotlinx.coroutines、kotlinx.serialization、PostgreSQL JDBC、HikariCP、Flyway、Logback、detekt、ktlint、Micrometer）、Gradle の公式のバージョン情報（`services.gradle.org/versions/current`）、endoflife.date（`eclipse-temurin`）、Docker Hub（`eclipse-temurin` のタグ）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
 - [ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 9 章（静的解析）
-- [ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)
+- [ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-011](../../adr/beer-game-ts/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)

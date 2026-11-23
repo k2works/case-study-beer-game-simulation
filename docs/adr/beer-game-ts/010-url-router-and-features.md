@@ -57,4 +57,4 @@ v1 は、URL ルーターを使わず、`useState` で画面を切り替えて�
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-006](../beer-game/006-spa-without-router-or-store.md)（一部変更）
-- 参照: [フロントエンドアーキテクチャ（v2）](../../design/beer-game2/architecture-frontend.md)
+- 参照: [フロントエンドアーキテクチャ（v2）](../../design/beer-game-ts/architecture-frontend.md)

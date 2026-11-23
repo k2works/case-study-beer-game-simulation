@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:23Z }
 
 本書は、beer-game2（v2）の技術スタックを、バージョンとサポート期限とあわせて一覧にします。**`docs/` を設計の正本**とします。
 
-beer-game（v1）の [技術スタック](../beer-game/tech-stack.md) を出発点に、「踏襲し、版だけ更新する」方針（[ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)）で改訂しました。
+beer-game（v1）の [技術スタック](../beer-game/tech-stack.md) を出発点に、「踏襲し、版だけ更新する」方針（[ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)）で改訂しました。
 
 - **バージョンとサポート期限は、2026-11-09 に、公式の情報源で確認した値**です（npm のレジストリ、Node.js の公式リリーススケジュール、endoflife.date、Docker Hub、Terraform Registry）。
 - 版は、実装の開始時に、最新の安定版へ更新して固定します（`package-lock.json`）。
@@ -169,4 +169,4 @@ AWS SDK（SQS）は、キューを廃止するため、**依存関係に含め�
 - Node.js の公式リリーススケジュール（nodejs/Release の `schedule.json`）、`https://nodejs.org/dist/index.json`
 - endoflife.date（PostgreSQL、Amazon RDS for PostgreSQL、Terraform）、Docker Hub（`node:26-alpine`、`postgres:18-alpine`）、Terraform Registry（`hashicorp/aws`）
 - v1 の [技術スタック](../beer-game/tech-stack.md)、[バックエンドアーキテクチャ（v2）](./architecture-backend.md)、[フロントエンドアーキテクチャ（v2）](./architecture-frontend.md)、[インフラ（v2）](./architecture-infrastructure.md)
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)、[ADR-013](../../adr/beer-game2/013-tech-stack-versions.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)、[ADR-013](../../adr/beer-game-ts/013-tech-stack-versions.md)

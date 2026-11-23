@@ -56,4 +56,4 @@ v1 は、ルールが `GameService`（約 650 行）に集中し、`domain/` は
 
 - 著者: claude-code
 - 関連 ADR: [ADR-004](./004-separate-game-and-session-aggregates.md)
-- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game2/architecture-backend.md)、[ドメインモデル（v2）](../../design/beer-game2/domain-model.md)
+- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game-ts/architecture-backend.md)、[ドメインモデル（v2）](../../design/beer-game-ts/domain-model.md)

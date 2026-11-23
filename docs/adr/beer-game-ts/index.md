@@ -22,5 +22,6 @@ beer-game2 プロジェクトの ADR ドキュメントです。
 
 ## 補足
 
+- **改名の記録（2026-11-23）**: `beer-game2` は `beer-game-ts` に改名した（`apps/beer-game2` → `apps/beer-game-ts`、`docs/*/beer-game2` → `docs/*/beer-game-ts`、ワークフローとインフラ定義の名前）。Kotlin 版・Rust 版の名前（実装言語）にそろえるため。**決定の本文と過去の報告書・計画書にある「beer-game2」は、改名前の呼び名**で、当時の記録として書き換えていない（ADR-001 のファイル名も同じ）。出力の形の版 `beer-game2.export.v1` は、出力ファイルの互換のため変えていない。
 - 実ドキュメントを追加したら、この一覧を更新します。
 - beer-game（v1）の ADR は [こちら](../beer-game/index.md) です。v2 で引き継ぐ判断は、v2 の ADR として改めて記録します。

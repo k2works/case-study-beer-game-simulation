@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T08:13:26Z }
 
 本書は、beer-game-kotlin の UI を、画面一覧、画面遷移、画面イメージ、インタラクションの順に定義します。**`docs/` を設計の正本**とします。
 
-画面、遷移、表示名、アクセシビリティは [beer-game2 の UI 設計](../beer-game2/ui-design.md) を正本として**そのまま引き継ぎ**ます。フロントエンドは、既存の React / TypeScript を踏襲します（[フロントエンドアーキテクチャ](./architecture-frontend.md)）。バックエンドが Kotlin のイベントソーシング + CQRS になっても、利用者が見る画面は変わりません。
+画面、遷移、表示名、アクセシビリティは [beer-game2 の UI 設計](../beer-game-ts/ui-design.md) を正本として**そのまま引き継ぎ**ます。フロントエンドは、既存の React / TypeScript を踏襲します（[フロントエンドアーキテクチャ](./architecture-frontend.md)）。バックエンドが Kotlin のイベントソーシング + CQRS になっても、利用者が見る画面は変わりません。
 
 見直すのは、次の ES + CQRS の影響だけです。
 
@@ -26,7 +26,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T08:13:26Z }
 
 入力は次のとおりです。
 
-- [ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)
+- [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)
 - [フロントエンドアーキテクチャ](./architecture-frontend.md)、[ドメインモデル](./domain-model.md)（エラーの分類、投影）、[データモデル](./data-model.md)（追記と冪等性、投影の更新の方式）
 - `aidlc/` の精緻化済みモックアップ（M01〜M08）、アクセシビリティのチェックリスト（beer-game2 と同じ）
 
@@ -555,7 +555,7 @@ end
 | :--- | :--- |
 | 現在の同期投影 | 投影は、追記と同じトランザクションで更新されるため、応答の後の取得は、通常 `M >= N`。**反映待ちの状態は、まれ**（読み取りレプリカや、将来の非同期投影の導入時に起きうる） |
 | 画面の保証 | 保存の成功を、**取得したスナップショットの版が応答の `versions` 以上になってから**表示に反映する。更新の経路は、スナップショットの 1 つに統一する。自分の保存が、画面に出ないまま通知だけが先に来る状態を作らない |
-| SSE | SSE は、**他の人の変更**を、版が進んだこととして通知する（[ADR-006](../../adr/beer-game2/006-sse-version-only.md) を引き継ぐ）。通知を受けたら再取得する。取得した版が通知の版より小さければ、同じ規則で再取得する。**SSE が切れていても、自分の保存は、応答の後のスナップショットの取得で画面に出る** |
+| SSE | SSE は、**他の人の変更**を、版が進んだこととして通知する（[ADR-006](../../adr/beer-game-ts/006-sse-version-only.md) を引き継ぐ）。通知を受けたら再取得する。取得した版が通知の版より小さければ、同じ規則で再取得する。**SSE が切れていても、自分の保存は、応答の後のスナップショットの取得で画面に出る** |
 | 楽観的な表示 | **行わない。** 保存直後に、サーバーの結果を待たずに値を書き換えると、競合や拒否のときに画面と状態がずれる。待ち時間は、ボタンの処理中の表示で示す |
 | 再取得 | 間隔と上限の回数は、実測で決める。上限に達したら、「保存は完了しています」と示し、手動更新を促す（保存の失敗と取り違えさせない） |
 | 他の人の保存 | 共同担当の他の人が保存したときは、SSE の通知で最新になる。**同じ週の間は、入力中の値を保持する**。**週が変わった場合（409 でも SSE の通知でも）は例外で、入力欄を空にし**、直前の値を「第 N 週に入力していた値: 10（未保存）」と参考として表示する。自動確定では、共同担当の保存で週が確定するため、打ちかけの値が次の週に残って誤って保存されることを防ぐ |
@@ -787,9 +787,9 @@ Kotlin 版で加わる未決事項:
 
 ## 出典
 
-- [beer-game2 UI 設計](../beer-game2/ui-design.md)
-- [ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)
+- [beer-game2 UI 設計](../beer-game-ts/ui-design.md)
+- [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[要件定義](../../requirements/beer-game-ts/requirements_definition.md)
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[フロントエンドアーキテクチャ](./architecture-frontend.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[UI 設計ガイド](../../reference/UI設計ガイド.md)
 - [ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（§7.4 コマンドの検証、§7.5 CQRS、§7.6 永続化とトランザクション境界）
-- [ADR-006](../../adr/beer-game2/006-sse-version-only.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)
+- [ADR-006](../../adr/beer-game-ts/006-sse-version-only.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)
 - `aidlc/spaces/default/intents/261027-beer-game-development/inception/refined-mockups/`

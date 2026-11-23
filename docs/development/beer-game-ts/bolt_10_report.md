@@ -54,7 +54,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T04:15:00Z }
 
 ## 人の承認が必要な項目
 
-- **マイグレーション 006**（`apps/beer-game2/migrations/006_retention.sql`）: `games` に `retention_days`・`delete_after`・`deletion_attempts`・`deletion_failed_at`、`deletion_receipts` 表を追加。既存のゲームの削除期限は作成から 90 日。ローカルとテスト DB にだけ適用済み。
+- **マイグレーション 006**（`apps/beer-game-ts/migrations/006_retention.sql`）: `games` に `retention_days`・`delete_after`・`deletion_attempts`・`deletion_failed_at`、`deletion_receipts` 表を追加。既存のゲームの削除期限は作成から 90 日。ローカルとテスト DB にだけ適用済み。
 - **Terraform**（`infra/modules/ecs`）: 保持のタスク定義、EventBridge Scheduler のスケジュール（5 分ごと）、スケジューラーの IAM ロール。**適用していない**。
 - 判断項目 1〜7 と、上の「計画と異なる点」1〜3。
 

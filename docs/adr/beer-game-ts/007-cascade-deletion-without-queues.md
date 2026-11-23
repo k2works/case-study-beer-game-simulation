@@ -57,4 +57,4 @@ v1 の保持削除は、所有者（U1〜U3）別の SQS キューとワーカ�
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-008](../beer-game/008-retention-saga.md)（置き換え）
-- 参照: [データモデル（v2）](../../design/beer-game2/data-model.md)、[インフラ（v2）](../../design/beer-game2/architecture-infrastructure.md)
+- 参照: [データモデル（v2）](../../design/beer-game-ts/data-model.md)、[インフラ（v2）](../../design/beer-game-ts/architecture-infrastructure.md)

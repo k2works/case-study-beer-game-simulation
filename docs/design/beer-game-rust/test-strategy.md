@@ -360,7 +360,7 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 
 - **Gherkin のシナリオ**: タグ `@US<番号>`・`@AC<番号>` と層のタグから抽出し、cucumber-rs の実行結果と突き合わせる。**実行結果の形式（JSON、JUnit XML など）は、cucumber-rs が出せるものを B1 で確認して選ぶ**。
 - **Rust の `#[test]`**: テスト名の接頭辞（`us<番号>_ac<番号>`。RT1）を、テスト結果から抽出する。**テスト結果の形式**（`cargo test` の標準出力、または JUnit XML への変換）は、B1 で選ぶ（**`cargo-nextest` などの導入は未選定で、承認が要る**）。
-- **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)）に存在しない ID、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。
+- **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)）に存在しない ID、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。
 
 ## B1 の受入条件（未確認の前提を、観察できる形にする。レビュー H8・M10）
 
@@ -450,5 +450,5 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 - 日本語の関数名のテストと、トレイト差し替えの非同期テストの実行: ローカルの rustc 1.97.1（edition 2024）、2026-11-19。DB の検証: ローカルの Docker の `postgres:18.6`（使い捨てのコンテナ）、2026-11-19。
 - [テスト戦略（beer-game-kotlin）](../beer-game-kotlin/test-strategy.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[技術スタック](./tech-stack.md)、[ドメインモデル](./domain-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[データモデル](./data-model.md)
-- [ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)
+- [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)
 - team の規約: `aidlc/active-memory/team.md`（Testing Posture、Deployment、Code Style）

@@ -18,7 +18,7 @@ beer-game（v1）の [ドメインモデル](../beer-game/domain-model.md) を�
 - v2 の範囲: 同一役割の共同担当（FR-16）、カスタム条件（FR-01）、観察者の独立した立場（FR-17）、週の自動確定（FR-18）
 - v1 の設計上の差分: ルールがサービスに集中し、集約が振る舞いを持たなかったこと。週の確定結果に役割別の値が無かったこと。削除対象に漏れがあったこと
 
-入力は [要件定義](../../requirements/beer-game2/requirements_definition.md)（BR-01〜BR-17）、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md) です。
+入力は [要件定義](../../requirements/beer-game-ts/requirements_definition.md)（BR-01〜BR-17）、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) です。
 
 ### 設計の前提と原則
 
@@ -371,7 +371,7 @@ R --> [*]
 
 ## 出典
 
-- [要件定義](../../requirements/beer-game2/requirements_definition.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
+- [要件定義](../../requirements/beer-game-ts/requirements_definition.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)
 - v1 の [ドメインモデル](../beer-game/domain-model.md)、[データモデル](../beer-game/data-model.md)、[ADR](../../adr/beer-game/index.md)
 - `aidlc/spaces/default/intents/261027-beer-game-development/inception/domain-design/`
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

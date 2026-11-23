@@ -55,4 +55,4 @@ v1 の SSE は、版の通知に加えて、`Last-Event-ID` によるイベン�
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-004](../beer-game/004-sse-version-notification.md)（一部変更）
-- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game2/architecture-backend.md)、[フロントエンドアーキテクチャ（v2）](../../design/beer-game2/architecture-frontend.md)
+- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game-ts/architecture-backend.md)、[フロントエンドアーキテクチャ（v2）](../../design/beer-game-ts/architecture-frontend.md)

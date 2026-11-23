@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T12:52:22Z }
 
 本書は、beer-game-kotlin の技術スタックを、バージョンとサポート期限とあわせて一覧にします。**`docs/` を設計の正本**とします。実装コードはまだ存在せず、本書の版は**選定の記録**です。
 
-[beer-game2 の技術スタック](../beer-game2/tech-stack.md) を出発点に、次の方針で改訂しました。
+[beer-game2 の技術スタック](../beer-game-ts/tech-stack.md) を出発点に、次の方針で改訂しました。
 
 - バックエンドは **Kotlin（Ktor + Arrow + kotlinx.coroutines）** に変更する。フロントエンドは、既存の React / TypeScript を踏襲する。
 - アーキテクチャは**イベントソーシング + CQRS**（[ドメインモデル](./domain-model.md)、[データモデル](./data-model.md)）。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠する。
@@ -375,7 +375,7 @@ Flyway の版 13.12.2 は、Maven Central の `flyway-core` の最新を確認�
 - Maven Central の `com/h2database/h2/maven-metadata.xml` と `2.5.252/` の一覧・pom、H2 公式ドキュメント `https://h2database.com/html/features.html`（PostgreSQL 互換モード）、2026-11-14
 - Ktor 公式ドキュメント（`https://ktor.io/docs/server-server-sent-events.html`、`https://ktor.io/docs/server-rate-limit.html`）、2026-11-14
 - [開発戦略（Kotlin 版）](../../development/beer-game-kotlin/development_strategy.md)（静的解析の厳格な適用、BDD と Cucumber の導入）
-- [beer-game2 の技術スタック](../beer-game2/tech-stack.md)（フロントエンド・インフラの版。2026-11-09 の確認値）
+- [beer-game2 の技術スタック](../beer-game-ts/tech-stack.md)（フロントエンド・インフラの版。2026-11-09 の確認値）
 - [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 3 章、第 4 章、第 7 章、第 8 章、第 9 章、第 10 章
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[テスト戦略](./test-strategy.md)、[非機能要件](./non-functional.md)
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)、[ADR-013](../../adr/beer-game2/013-tech-stack-versions.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)、[ADR-013](../../adr/beer-game-ts/013-tech-stack-versions.md)

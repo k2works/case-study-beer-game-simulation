@@ -66,5 +66,5 @@ beer-game2 は、ポートとアダプターで依存の向きを守り、集約
 ## 備考
 
 - 著者: claude-code
-- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-013](./013-tech-stack-versions.md)、beer-game2 の [ADR-003](../beer-game2/003-ports-and-adapters-with-lint.md)
+- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-013](./013-tech-stack-versions.md)、beer-game2 の [ADR-003](../beer-game-ts/003-ports-and-adapters-with-lint.md)
 - 参照: [バックエンドアーキテクチャ](../../design/beer-game-kotlin/architecture-backend.md)、[ドメインモデル](../../design/beer-game-kotlin/domain-model.md)、[テスト戦略](../../design/beer-game-kotlin/test-strategy.md)、[開発戦略](../../development/beer-game-kotlin/development_strategy.md)、[関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md)

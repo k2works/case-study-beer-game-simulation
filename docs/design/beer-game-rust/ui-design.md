@@ -175,6 +175,6 @@ Kotlin 版の次の節を、そのまま引き継ぎます（内容は複製し�
 
 ## 出典
 
-- [UI 設計（beer-game-kotlin）](../beer-game-kotlin/ui-design.md)、[beer-game2 の UI 設計](../beer-game2/ui-design.md)
+- [UI 設計（beer-game-kotlin）](../beer-game-kotlin/ui-design.md)、[beer-game2 の UI 設計](../beer-game-ts/ui-design.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[ドメインモデル](./domain-model.md)、[非機能要件](./non-functional.md)、[テスト戦略](./test-strategy.md)
-- [ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)
+- [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)

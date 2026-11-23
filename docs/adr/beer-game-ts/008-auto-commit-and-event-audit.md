@@ -56,4 +56,4 @@ v2 では、4 役割の入力がそろった時点で、週を自動で確定す
 
 - 著者: claude-code
 - 関連 ADR: [ADR-004](./004-separate-game-and-session-aggregates.md)
-- 参照: [ドメインモデル（v2）](../../design/beer-game2/domain-model.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
+- 参照: [ドメインモデル（v2）](../../design/beer-game-ts/domain-model.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)

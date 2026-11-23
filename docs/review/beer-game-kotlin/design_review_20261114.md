@@ -139,4 +139,4 @@ ES+CQRS の骨格は健全である。2 ストリーム、`StartGame` の原子�
 
 - [設計書一覧](../../design/beer-game-kotlin/index.md)
 - [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md)
-- [beer-game2 の要件定義](../../requirements/beer-game2/requirements_definition.md)
+- [beer-game2 の要件定義](../../requirements/beer-game-ts/requirements_definition.md)

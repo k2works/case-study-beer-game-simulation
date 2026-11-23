@@ -1,15 +1,15 @@
 ---
 type: Reference
-title: "AWS プロダクション環境セットアップ・運用手順書 - beer-game2"
+title: "AWS プロダクション環境セットアップ・運用手順書 - beer-game-ts"
 description: "本番環境の構成、人が行う準備と手順、同じダイジェストでの昇格、ロールバック、鍵のローテーション、復元の訓練。コードと定義は用意したが、AWS では未実行・未検証。"
 tags: [operation, setup]
 status: draft
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:08:00Z }
 ---
 
-# AWS プロダクション環境セットアップ・運用手順書（beer-game2）
+# AWS プロダクション環境セットアップ・運用手順書（beer-game-ts）
 
-本番環境の構築と運用の手順です。**コードと定義（Terraform、ワークフロー、スクリプト）は用意しましたが、AWS では実行も検証もしていません**（2026-11-11 の方針「コードと定義まで」。[Bolt 12 計画](../../development/beer-game2/bolt_12_plan.md)）。ステージングの手順は [AWS ステージング環境セットアップ手順書](./aws_staging_setup.md) を参照してください。
+本番環境の構築と運用の手順です。**コードと定義（Terraform、ワークフロー、スクリプト）は用意しましたが、AWS では実行も検証もしていません**（2026-11-11 の方針「コードと定義まで」。[Bolt 12 計画](../../development/beer-game-ts/bolt_12_plan.md)）。ステージングの手順は [AWS ステージング環境セットアップ手順書](./aws_staging_setup.md) を参照してください。
 
 ## 構成（ステージングとの違い）
 
@@ -23,7 +23,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:08:00Z }
 | デプロイ           | コミットからビルド      | **ステージングで検証したダイジェストを昇格**（ビルドしない）                                                             |
 | 承認               | なし                    | GitHub の `production` 環境の保護（必須のレビュアー）                                                                    |
 
-観測（アラーム、合成監視、ダッシュボード、SNS）は、両環境で同じ `infra/modules/observability` を使います（[運用要件](../../design/beer-game2/operation.md)の「実装済みのアラーム」）。
+観測（アラーム、合成監視、ダッシュボード、SNS）は、両環境で同じ `infra/modules/observability` を使います（[運用要件](../../design/beer-game-ts/operation.md)の「実装済みのアラーム」）。
 
 ## 人が行う準備（AI は認証情報を扱わない）
 
@@ -38,7 +38,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:08:00Z }
 ### 1. 初回の構築
 
 ```bash
-cd apps/beer-game2/infra/envs/production
+cd apps/beer-game-ts/infra/envs/production
 cp backend.hcl.example backend.hcl            # 状態の保管先（ステージングと同じバケット、キーは production/）
 cp terraform.tfvars.example terraform.tfvars  # ダイジェスト、ドメイン、証明書、通知先
 terraform init -backend-config=backend.hcl
@@ -51,14 +51,14 @@ terraform apply
 ### 2. デプロイ（同じダイジェストの昇格。AC6.2.2）
 
 1. ステージングでデプロイし、スモークテストと確認を終える。そのイメージのダイジェスト（`sha256:...`）とコミット SHA を控える。
-2. GitHub Actions の `beer-game2-deploy-production` を、ダイジェストとコミット SHA を入力して起動する。
+2. GitHub Actions の `beer-game-ts-deploy-production` を、ダイジェストとコミット SHA を入力して起動する。
 3. `production` 環境のレビュアーが承認すると、イメージを**マニフェストを変えずに**本番の ECR へ写し、ダイジェストが一致することを検査してから、マイグレーション → ローリング更新 → 静的ファイル → スモークテストの順に進む。
 
 ### 3. ロールバック（AC6.2.3）
 
-`beer-game2-rollback-production` を起動する（戻す先のコミット SHA は省略可。省略すると直前の成功した版）。イメージのダイジェストと静的ファイルの版を戻します。マイグレーションは戻しません（スキーマは、拡張 → 互換 → 縮小の順で、旧アプリと互換にしてあります。AC6.2.4）。ローリング更新の失敗は、ECS のサーキットブレーカーが自動で直前の版へ戻します。
+`beer-game-ts-rollback-production` を起動する（戻す先のコミット SHA は省略可。省略すると直前の成功した版）。イメージのダイジェストと静的ファイルの版を戻します。マイグレーションは戻しません（スキーマは、拡張 → 互換 → 縮小の順で、旧アプリと互換にしてあります。AC6.2.4）。ローリング更新の失敗は、ECS のサーキットブレーカーが自動で直前の版へ戻します。
 
-**ブルー/グリーンは使いません**（[Bolt 12 計画](../../development/beer-game2/bolt_12_plan.md)の判断項目 1）。
+**ブルー/グリーンは使いません**（[Bolt 12 計画](../../development/beer-game-ts/bolt_12_plan.md)の判断項目 1）。
 
 ### 4. 資格の鍵のローテーション
 
@@ -73,7 +73,7 @@ EventBridge Scheduler が 5 分ごとに `node dist/retention.js` を起動し�
 ### 6. 復元の訓練（AC6.2.5。四半期ごと、リリース前、バックアップの方針の変更時）
 
 ```bash
-cd apps/beer-game2
+cd apps/beer-game-ts
 AWS_REGION=ap-northeast-1 SOURCE_DB_INSTANCE=<本番の RDS の識別子> bash scripts/deploy/restore-drill.sh
 ```
 

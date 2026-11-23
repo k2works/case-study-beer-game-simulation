@@ -353,7 +353,7 @@ Kotlin 版と同じです（保持と削除、削除の運用と証跡、復元�
 
 ## 出典
 
-- [運用要件定義（beer-game-kotlin）](../beer-game-kotlin/operation.md)、[beer-game2 運用要件定義](../beer-game2/operation.md)、[運用要件定義ガイド](../../reference/運用要件定義ガイド.md)
+- [運用要件定義（beer-game-kotlin）](../beer-game-kotlin/operation.md)、[beer-game2 運用要件定義](../beer-game-ts/operation.md)、[運用要件定義ガイド](../../reference/運用要件定義ガイド.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[非機能要件](./non-functional.md)、[技術スタック](./tech-stack.md)、[データモデル](./data-model.md)、[ドメインモデル](./domain-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[テスト戦略](./test-strategy.md)
 - [インフラストラクチャ（Rust 版）](./architecture-infrastructure.md)、[インフラストラクチャ（beer-game-kotlin）](../beer-game-kotlin/architecture-infrastructure.md)（出発点）
 - 取り残しの検知と自動切断の実測: ローカルの Docker の `postgres:18.6`（使い捨てのコンテナ。終了後に削除）、2026-11-19。

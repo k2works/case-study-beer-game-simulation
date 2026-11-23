@@ -19,7 +19,7 @@ verified:
 - ADT（State・Command・Event・Error）は `enum` と `struct` で表し、不正な値は newtype とスマートコンストラクタで作れなくします。失敗は例外でなく `Result` で返します。
 - 読み取りは、イベントを畳み込む純粋関数（投影）に分けます（CQRS）。
 
-入力は [要件定義](../../requirements/beer-game2/requirements_definition.md)（BR・FR・NFR）、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md) です。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。
+入力は [要件定義](../../requirements/beer-game-ts/requirements_definition.md)（BR・FR・NFR）、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) です。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。
 
 ### 本書の位置づけと確認の範囲
 
@@ -465,4 +465,4 @@ Kotlin 版は detekt の `ForbiddenMethodCall` で時計・乱数の呼び出し
 - [ドメインモデル設計（beer-game-kotlin）](../beer-game-kotlin/domain-model.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[技術スタック（Rust 版）](./tech-stack.md)
 - [関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)
-- [要件定義](../../requirements/beer-game2/requirements_definition.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
+- [要件定義](../../requirements/beer-game-ts/requirements_definition.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)

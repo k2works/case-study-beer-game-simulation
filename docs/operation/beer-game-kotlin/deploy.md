@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:00:00Z }
 - Terraform の適用（`apps/beer-game-kotlin/infra/`）。適用前に人が確認する項目と適用の順序は、[Bolt 3 計画](../../development/beer-game-kotlin/bolt_3_plan.md) の「Step 2 の結果」にある「AWS への適用の前に、人が確認すべき項目」と「設計書との食い違い・未決・未確認」（特に、初回のイメージの扱い）を参照する。**本書では創作しない。**
 - アカウント、OIDC プロバイダー、状態用の S3、ドメインの準備。同じく上記と、[インフラストラクチャ](../../design/beer-game-kotlin/architecture-infrastructure.md) を参照する。
 - GitHub の Environment（`staging`、`production`）の作成と、変数の設定（次節）。**`production` には、必須のレビュアー（保護ルール）を設定する。**
-- beer-game2 の同種の手順書は書式の参考: [AWS ステージング環境セットアップ手順書](../beer-game2/aws_staging_setup.md)、[AWS プロダクション環境セットアップ・運用](../beer-game2/aws_production_setup.md)。Kotlin 版で変わる点は、JVM のコンテナ（ポート 8080、`/api/v1/ready`）、migrate モード、必要な秘密が 5 つ（DB の資格、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`）であること。
+- beer-game2 の同種の手順書は書式の参考: [AWS ステージング環境セットアップ手順書](../beer-game-ts/aws_staging_setup.md)、[AWS プロダクション環境セットアップ・運用](../beer-game-ts/aws_production_setup.md)。Kotlin 版で変わる点は、JVM のコンテナ（ポート 8080、`/api/v1/ready`）、migrate モード、必要な秘密が 5 つ（DB の資格、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`）であること。
 
 ## ワークフロー
 

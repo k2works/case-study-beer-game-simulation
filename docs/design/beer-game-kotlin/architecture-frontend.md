@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T08:13:26Z }
 
 本書は、beer-game-kotlin のフロントエンドのアーキテクチャを定義します。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。
 
-フロントエンドは、[beer-game2 のフロントエンドアーキテクチャ](../beer-game2/architecture-frontend.md) を**そのまま踏襲**します（React / TypeScript、Vite、URL ルーター、`features/` の構成、カスタムフック、表示名の辞書、アクセシビリティ）。画面と画面遷移は [UI 設計](./ui-design.md)、機能と振る舞いは beer-game2 の要件が正本です。
+フロントエンドは、[beer-game2 のフロントエンドアーキテクチャ](../beer-game-ts/architecture-frontend.md) を**そのまま踏襲**します（React / TypeScript、Vite、URL ルーター、`features/` の構成、カスタムフック、表示名の辞書、アクセシビリティ）。画面と画面遷移は [UI 設計](./ui-design.md)、機能と振る舞いは beer-game2 の要件が正本です。
 
 変わるのは、**バックエンドが Kotlin（Ktor、ES + CQRS）になったことで影響を受ける点だけ**です。本書は、その変更点を丁寧に扱い、変わらない点は beer-game2 の該当節を参照します。
 
@@ -45,7 +45,7 @@ beer-game2 の決定のうち、**変更する点を太字**で示します。
 
 ## 全体構成
 
-`features/` と `shared/` の構成は、[beer-game2](../beer-game2/architecture-frontend.md) と同じです。**追加または変更する要素**は次のとおりです。
+`features/` と `shared/` の構成は、[beer-game2](../beer-game-ts/architecture-frontend.md) と同じです。**追加または変更する要素**は次のとおりです。
 
 ```plantuml
 @startuml
@@ -78,7 +78,7 @@ Contract ..> Routes
 @enduml
 ```
 
-画面ごとの機能（`game-setup/`、`participation/`、`observer/`、`play/`、`console/`、`review/`、`retention/`）、ルーティングの表、画面遷移は、beer-game2 から変更しません（[beer-game2 の全体構成](../beer-game2/architecture-frontend.md)）。
+画面ごとの機能（`game-setup/`、`participation/`、`observer/`、`play/`、`console/`、`review/`、`retention/`）、ルーティングの表、画面遷移は、beer-game2 から変更しません（[beer-game2 の全体構成](../beer-game-ts/architecture-frontend.md)）。
 
 ### 開発と配信
 
@@ -316,7 +316,7 @@ beer-game2 から変更しません（画面の位置は URL、サーバー状�
 ## 出典
 
 - [バックエンドアーキテクチャ（Kotlin 版）](./architecture-backend.md)、[ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[UI 設計](./ui-design.md)
-- [beer-game2 のフロントエンドアーキテクチャ](../beer-game2/architecture-frontend.md)
+- [beer-game2 のフロントエンドアーキテクチャ](../beer-game-ts/architecture-frontend.md)
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
 - [ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) §3.4（誤りを集める）
-- [ADR-006](../../adr/beer-game2/006-sse-version-only.md)、[ADR-010](../../adr/beer-game2/010-url-router-and-features.md)
+- [ADR-006](../../adr/beer-game-ts/006-sse-version-only.md)、[ADR-010](../../adr/beer-game-ts/010-url-router-and-features.md)

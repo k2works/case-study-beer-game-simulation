@@ -15,7 +15,7 @@ verified:
 
 本書は、beer-game2（v2）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が計画を提案し、人が承認ゲートで検証・承認します。**
 
-- Unit の分解と評価は [Unit 定義](../../requirements/beer-game2/unit_definition.md)、ストーリーは [ユーザーストーリー](../../requirements/beer-game2/user_story.md) を参照してください。
+- Unit の分解と評価は [Unit 定義](../../requirements/beer-game-ts/unit_definition.md)、ストーリーは [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) を参照してください。
 - 計画の根拠: [リリース・イテレーション計画ガイド（AI-DLC 版）](../../reference/リリース・イテレーション計画ガイド_AI-DLC版.md)
 - **日付と所要は、仮定にもとづく初期の見積もりです**（体制と稼働時間の確認が必要。下記）。ウォーキングスケルトン（B1）の実績で、再調整します。
 
@@ -27,7 +27,7 @@ verified:
 | Intent | 学習用のビールゲームを、複数人で実行し、**役割別に、遅延と意思決定が変動を増幅する過程を振り返れる**、運用できるシステムとして作る |
 | 対象ユーザー | 進行役、参加者（工場・一次卸・二次卸・小売店。共同担当を含む）、観察者、運用担当 |
 | 開発体制 | モブ（人 1 名 + AI）。人は、承認ゲートで、計画・設計・コードを検証し、判断する |
-| 実装の場所 | `apps/beer-game2/`（beer-game は参照用に残す） |
+| 実装の場所 | `apps/beer-game-ts/`（beer-game は参照用に残す） |
 
 ---
 
@@ -46,7 +46,7 @@ verified:
 
 ### ビジネス価値と測定基準
 
-[Unit 定義](../../requirements/beer-game2/unit_definition.md) の「測定基準」を参照してください。最優先の価値は、**役割別の振り返り**（ブルウィップ効果の確認）です。
+[Unit 定義](../../requirements/beer-game-ts/unit_definition.md) の「測定基準」を参照してください。最優先の価値は、**役割別の振り返り**（ブルウィップ効果の確認）です。
 
 ### スケジュール（仮定）
 
@@ -62,7 +62,7 @@ verified:
 ### リソース
 
 - **開発**: 人 1 名（承認・判断）+ AI（計画・生成）。
-- **人の時間**: 承認ゲートでの検証が中心。ゲートの密度は、Unit の評価で決める（[Unit 定義](../../requirements/beer-game2/unit_definition.md)）。
+- **人の時間**: 承認ゲートでの検証が中心。ゲートの密度は、Unit の評価で決める（[Unit 定義](../../requirements/beer-game-ts/unit_definition.md)）。
 - **外部の依存**: 独自ドメインの取得、通知先とオンコールの体制、運営者との数値目標の合意（組織の判断）。
 
 ### リスク
@@ -75,11 +75,11 @@ verified:
 
 AI が提案し、人が承認するワークフローです（承認済みの項目は Inception の成果物として `docs/` に永続化済み）。
 
-- [x] 要件の改訂（v2 の範囲の確定）: [要件定義](../../requirements/beer-game2/requirements_definition.md)
-- [x] ユースケースとストーリーの改訂: [システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
-- [x] 設計の改訂（ドメイン、データ、アーキテクチャ、UI、テスト、非機能、運用）: [設計](../../design/beer-game2/index.md)
-- [x] 技術スタックの更新と ADR（12 件）: [ADR](../../adr/beer-game2/index.md)
-- [x] Unit への分解と評価: [Unit 定義](../../requirements/beer-game2/unit_definition.md)
+- [x] 要件の改訂（v2 の範囲の確定）: [要件定義](../../requirements/beer-game-ts/requirements_definition.md)
+- [x] ユースケースとストーリーの改訂: [システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)
+- [x] 設計の改訂（ドメイン、データ、アーキテクチャ、UI、テスト、非機能、運用）: [設計](../../design/beer-game-ts/index.md)
+- [x] 技術スタックの更新と ADR（12 件）: [ADR](../../adr/beer-game-ts/index.md)
+- [x] Unit への分解と評価: [Unit 定義](../../requirements/beer-game-ts/unit_definition.md)
 - [x] **リリース計画の承認（本書）**（2026-11-09、人が承認）
 - [ ] Bolt 1 の計画（ステップ計画）の作成と承認
 - [ ] Bolt の実行（Mob Construction）。各 Bolt の終わりに、Bolt 終了報告と、計画の更新
@@ -258,7 +258,7 @@ Must は、バッファの対象にしません（US4.2 役割別の振り返り
 | R4 | 情報の開示の誤りで、役割別の値や将来の需要が漏れる | U4 | 高 | 低 | 否定テスト（観察者・他役割）を先に書く。開示判定をドメインの純粋な関数にする |
 | R5 | Node 26 / TypeScript 6.0 / PostgreSQL 18 の組み合わせに、未知の不具合がある | U1 | 中 | 低 | B1 で、CI を含めて確認する。問題があれば、版を一段下げる（Node 24、PG 17）判断をする |
 | R6 | 独自ドメインの取得・DNS が遅れ、本番（B12）が止まる | U5 | 中 | 中 | **B10 までに取得を依頼する**。遅れる場合は、ステージングの検証を先に進め、本番の公開を後ろ倒しにする |
-| R7 | 運営者との数値目標・資格の有効期間・体制の合意が遅れる | U2、U5、U6 | 中 | 中 | 該当 Bolt の前に、決定を依頼する（[Unit 定義](../../requirements/beer-game2/unit_definition.md) の未決事項）。仮の既定値で進め、後で調整する |
+| R7 | 運営者との数値目標・資格の有効期間・体制の合意が遅れる | U2、U5、U6 | 中 | 中 | 該当 Bolt の前に、決定を依頼する（[Unit 定義](../../requirements/beer-game-ts/unit_definition.md) の未決事項）。仮の既定値で進め、後で調整する |
 | R8 | CSP の導入で画面が壊れる | U5 | 中 | 中 | ステージングで、段階的に導入する（report-only から） |
 | R9 | AI が生成するコードの品質（過剰設計、層の違反、テストの不足） | 全体 | 中 | 中 | lint で層を守る。TDD の三原則。承認ゲートで、コードを全行理解する。B1 で密度を調整 |
 | R10 | v1 との二重のメンテナンスで、注意が分散する | 全体 | 低 | 中 | beer-game は参照のみ（修正しない）。廃止は、v2 の完成後に ADR で判断する |
@@ -280,7 +280,7 @@ AI-DLC では、ストーリーポイントとベロシティを使わず、**Un
 | Bolt のリードタイム | 計画（1〜3 稼働日）との差を記録する |
 | テストカバレッジ | 行・関数・文 85% 以上、分岐 75% 以上（CI のゲート） |
 | 受入条件の達成数 | 全受入条件のうち、パスした数（トレーサビリティの表から自動で集計） |
-| 価値の指標 | [Unit 定義](../../requirements/beer-game2/unit_definition.md) の測定基準 |
+| 価値の指標 | [Unit 定義](../../requirements/beer-game-ts/unit_definition.md) の測定基準 |
 
 ### 進捗状況
 
@@ -327,7 +327,7 @@ xychart-beta
 - **各 Bolt の承認ゲート通過時**に見直す（XP 版の「イテレーション開始時」より高頻度）。
 - **B1（ウォーキングスケルトン）の結果**で、以降の深さ、テスト戦略、ゲート密度、所要を調整する。
 - Unit の完了実績（Bolt 数、リードタイム、手戻り）で、残りの Unit の評価を更新する。
-- スコープの変更は、このリリース計画と [Unit 定義](../../requirements/beer-game2/unit_definition.md) に反映し、削った項目・足した項目を記録する。
+- スコープの変更は、このリリース計画と [Unit 定義](../../requirements/beer-game-ts/unit_definition.md) に反映し、削った項目・足した項目を記録する。
 
 ---
 

@@ -32,7 +32,7 @@ Rust 版は、同じ学習の価値を、型システムによる不正な状態
 
 ## 決定
 
-- **機能と振る舞いは、beer-game2 を正本として引き継ぐ。** 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、`docs/requirements/beer-game2/` を参照する。範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）。
+- **機能と振る舞いは、beer-game2 を正本として引き継ぐ。** 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、`docs/requirements/beer-game-ts/` を参照する。範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）。
 - **設計の構造は、beer-game-kotlin を正本として引き継ぐ。** ES + CQRS、`game` と `session` の 2 ストリーム、`decide` / `evolve` の純粋関数、投影、保持削除などの構造は変えず、Rust の表現に置き換える。設計書は `docs/design/beer-game-rust/` に、beer-game-kotlin と同じ文書構成で作り、各文書に「beer-game-kotlin からの変更」を設ける。
 - **技術スタックは、バックエンドを Rust（axum + sqlx + tokio）、フロントエンドを既存の React / TypeScript とする。** API の契約は、beer-game-kotlin の `contracts/openapi.yaml`（手書き）を正本として共有する方針を第一候補とし、扱いは技術スタックの設計で定める。版は設計時に実際に確認して固定し、**技術スタック（[tech-stack.md](../../design/beer-game-rust/tech-stack.md)）の設計判断 R7 と確認した版の表に記録する**（版を固定する時点で ADR が必要になれば、別の ADR を起票する。2026-11-21 のレビューで、存在しない「別の ADR」への参照を直した）。
 - **コーディングは、関数型プログラミングガイド（Rust 編）に準拠する。** 失敗は `Result` と型付きのエラー（列挙型）で表し、ドメインを副作用のない関数で書く。
@@ -98,5 +98,5 @@ Rust 版は、同じ学習の価値を、型システムによる不正な状態
 - 確認済み: 引き継ぎ表は、beer-game-kotlin の ADR 002〜020 の本文で検証した（2026-11-19）。
 - 追記（2026-11-19、ユーザーの決定。表の判定は変えない）: 表の **014（ローカル開発だけ H2）の「見直す」は、ローカルの DB を PostgreSQL 18（Docker）とすることで解決した**。**020（資格の Cookie の名前をタブごとにする）は、Rust 版のバックエンドでも扱う**（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断）。
 - 未確認: Rust 各ライブラリの版と機能（axum・sqlx・tokio、Cucumber の Rust 実装）は未確認で、技術スタックの設計で確認する。
-- 関連 ADR: beer-game-kotlin の [ADR-001](../beer-game-kotlin/001-kotlin-version-of-beer-game2.md)、[ADR-002](../beer-game-kotlin/002-event-sourcing-and-cqrs.md)、[ADR-007](../beer-game-kotlin/007-functional-core-with-arrow.md)。beer-game2 の [ADR-001](../beer-game2/001-rebuild-as-beer-game2.md)
-- 参照: [beer-game-kotlin の設計書](../../design/beer-game-kotlin/index.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)
+- 関連 ADR: beer-game-kotlin の [ADR-001](../beer-game-kotlin/001-kotlin-version-of-beer-game2.md)、[ADR-002](../beer-game-kotlin/002-event-sourcing-and-cqrs.md)、[ADR-007](../beer-game-kotlin/007-functional-core-with-arrow.md)。beer-game2 の [ADR-001](../beer-game-ts/001-rebuild-as-beer-game2.md)
+- 参照: [beer-game-kotlin の設計書](../../design/beer-game-kotlin/index.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[Unit 定義](../../requirements/beer-game-ts/unit_definition.md)

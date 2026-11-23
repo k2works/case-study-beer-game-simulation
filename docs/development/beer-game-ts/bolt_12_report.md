@@ -48,7 +48,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T06:10:00Z }
 ## 人の承認が必要な項目
 
 - 判断項目 1〜6。特に **ブルー/グリーンを作らず、ローリング更新とサーキットブレーカーで代えること**。
-- Terraform（`infra/modules/web` の独自ドメイン、`infra/envs/production`）、ワークフロー（本番の昇格・ロールバック、CI の検査）、スクリプト（復元の訓練）、[本番の手順書](../../operation/beer-game2/aws_production_setup.md)。**いずれも AWS で未実行**。
+- Terraform（`infra/modules/web` の独自ドメイン、`infra/envs/production`）、ワークフロー（本番の昇格・ロールバック、CI の検査）、スクリプト（復元の訓練）、[本番の手順書](../../operation/beer-game-ts/aws_production_setup.md)。**いずれも AWS で未実行**。
 
 ## U5 の完了の判定
 

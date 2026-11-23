@@ -66,7 +66,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T01:50:00Z }
 
 ## 人の承認が必要な項目
 
-- **マイグレーション 003**（`apps/beer-game2/migrations/003_continuity_and_credentials.sql`）: `sessions.status` に `PAUSED`、`role_decisions.saved_by` を文字列に、`browser_sessions.revoked_at`、復帰コードの列（`participants`、`games`）、`rate_limits` 表。ローカルとテスト DB にだけ適用済み。
+- **マイグレーション 003**（`apps/beer-game-ts/migrations/003_continuity_and_credentials.sql`）: `sessions.status` に `PAUSED`、`role_decisions.saved_by` を文字列に、`browser_sessions.revoked_at`、復帰コードの列（`participants`、`games`）、`rate_limits` 表。ローカルとテスト DB にだけ適用済み。
 - **資格の有効期間の仮の既定値**（未決事項 1）: ブラウザセッション 24 時間、復帰コード 30 日（`src/domain/credential.ts` の 1 か所）。運営者との合意が要る。
 - 上の「計画と異なる点」1〜4。
 

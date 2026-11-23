@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 beer-game（v1）の [UI 設計](../beer-game/ui-design.md)（14 件の差分を記録）を出発点に、v2 の範囲（共同担当、カスタム条件、観察者、自動確定）と、v1 の差分の解消を反映して**改訂**しました。入力は次のとおりです。
 
-- [ユーザーストーリー（v2）](../../requirements/beer-game2/user_story.md)、[システムユースケース（v2）](../../requirements/beer-game2/system_usecase.md)
+- [ユーザーストーリー（v2）](../../requirements/beer-game-ts/user_story.md)、[システムユースケース（v2）](../../requirements/beer-game-ts/system_usecase.md)
 - [フロントエンドアーキテクチャ（v2）](./architecture-frontend.md)（URL ルーティング、機能単位の構成）
 - `aidlc/` の精緻化済みモックアップ（M01〜M08）、アクセシビリティのチェックリスト
 
@@ -433,7 +433,7 @@ v1 のプレイ画面は、独自の 12 項目（「週を確認」「到着を�
 
 ## 出典
 
-- [ユーザーストーリー（v2）](../../requirements/beer-game2/user_story.md)、[システムユースケース（v2）](../../requirements/beer-game2/system_usecase.md)、[要件定義（v2）](../../requirements/beer-game2/requirements_definition.md)
+- [ユーザーストーリー（v2）](../../requirements/beer-game-ts/user_story.md)、[システムユースケース（v2）](../../requirements/beer-game-ts/system_usecase.md)、[要件定義（v2）](../../requirements/beer-game-ts/requirements_definition.md)
 - [フロントエンドアーキテクチャ（v2）](./architecture-frontend.md)、[ドメインモデル（v2）](./domain-model.md)、[UI 設計ガイド](../../reference/UI設計ガイド.md)
 - v1 の [UI 設計](../beer-game/ui-design.md)
 - `aidlc/spaces/default/intents/261027-beer-game-development/inception/refined-mockups/`

@@ -58,4 +58,4 @@ v1 では、資格のダイジェスト用の鍵が、未設定だと固定の�
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-005](../beer-game/005-credential-digest-only.md)（引き継ぎ、拡張）
-- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game2/architecture-backend.md)、[非機能要件](../../design/beer-game2/non-functional.md)
+- 参照: [バックエンドアーキテクチャ（v2）](../../design/beer-game-ts/architecture-backend.md)、[非機能要件](../../design/beer-game-ts/non-functional.md)

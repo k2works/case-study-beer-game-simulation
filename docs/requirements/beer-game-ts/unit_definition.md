@@ -13,9 +13,9 @@ verified:
 
 ## 概要
 
-本書は、beer-game2（v2）の Intent を **Unit**（疎結合・高凝集な作業単位）に分解し、境界、依存、ユーザーストーリーとの対応、評価を定義します。AI-DLC の Inception の成果物で、[リリース計画](../../development/beer-game2/release_plan.md) の入力です。
+本書は、beer-game2（v2）の Intent を **Unit**（疎結合・高凝集な作業単位）に分解し、境界、依存、ユーザーストーリーとの対応、評価を定義します。AI-DLC の Inception の成果物で、[リリース計画](../../development/beer-game-ts/release_plan.md) の入力です。
 
-- 入力: [ユーザーストーリー（v2）](./user_story.md)（15 件）、[システムユースケース（v2）](./system_usecase.md)、[要件定義（v2）](./requirements_definition.md)、設計（[ドメイン](../../design/beer-game2/domain-model.md)、[アーキテクチャ](../../design/beer-game2/architecture-backend.md)）、[ADR](../../adr/beer-game2/index.md)
+- 入力: [ユーザーストーリー（v2）](./user_story.md)（15 件）、[システムユースケース（v2）](./system_usecase.md)、[要件定義（v2）](./requirements_definition.md)、設計（[ドメイン](../../design/beer-game-ts/domain-model.md)、[アーキテクチャ](../../design/beer-game-ts/architecture-backend.md)）、[ADR](../../adr/beer-game-ts/index.md)
 - 方針: v1 は、UI を最後の Unit（U5）に置いたため、画面が最後まで揃わず、運用の不足（ログ、デプロイ）も後回しになった。**v2 は、縦割り（画面から DB まで）で Unit を切り、観測性とデプロイを最初の Unit に含める。**
 
 ## Intent
@@ -201,6 +201,6 @@ AI-DLC の「実装エントロピー」の 5 軸を、LOW／MED／HIGH で評�
 ## 出典
 
 - [ユーザーストーリー（v2）](./user_story.md)、[システムユースケース（v2）](./system_usecase.md)、[要件定義（v2）](./requirements_definition.md)
-- [ドメインモデル（v2）](../../design/beer-game2/domain-model.md)、[非機能要件（v2）](../../design/beer-game2/non-functional.md)、[ADR](../../adr/beer-game2/index.md)
+- [ドメインモデル（v2）](../../design/beer-game-ts/domain-model.md)、[非機能要件（v2）](../../design/beer-game-ts/non-functional.md)、[ADR](../../adr/beer-game-ts/index.md)
 - [リリース・イテレーション計画ガイド（AI-DLC 版）](../../reference/リリース・イテレーション計画ガイド_AI-DLC版.md)
 - v1 の Unit: `aidlc/spaces/default/intents/261027-beer-game-development/inception/units-generation/unit-of-work.md`

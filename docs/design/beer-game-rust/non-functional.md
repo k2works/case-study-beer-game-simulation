@@ -17,7 +17,7 @@ verified:
 
 [ADR-001](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md) により、[beer-game-kotlin の非機能要件](../beer-game-kotlin/non-functional.md)（84 件。beer-game2 の 69 件 + Kotlin 版で追加した 15 件）を**正本として引き継ぎ**、Rust の実行環境で変わるものだけを見直しました。
 
-- **すべての ID を維持**しました（削除はありません）。要件定義の NFR-01〜NFR-12 は変えません（[要件定義](../../requirements/beer-game2/requirements_definition.md)）。
+- **すべての ID を維持**しました（削除はありません）。要件定義の NFR-01〜NFR-12 は変えません（[要件定義](../../requirements/beer-game-ts/requirements_definition.md)）。
 - 凡例は Kotlin 版と同じです。**継続**は Kotlin 版と内容が同じ、**変更**は ID は同じで内容を Rust 版に合わせて変えた、**新**は Rust 版で追加した要件です。
 - 数値目標は、運営者と合意する前提の**提案**です。**Kotlin 版で提案した数値も、Rust 版の実測で見直す前提**で、実測のない数値を Rust 版の都合で**厳しくも緩くもしていません**（設計判断 RN1）。
 - 新しく加えた要件は 2 件（NF-R18、NF-S22）で、合計 **86 件**です。
@@ -294,7 +294,7 @@ Kotlin 版は、キャンセルの扱い（`NonCancellable`、`CancellationExcep
 
 ## 出典
 
-- [非機能要件定義（beer-game-kotlin）](../beer-game-kotlin/non-functional.md)（84 件）、[beer-game2 の非機能要件](../beer-game2/non-functional.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)（NFR-01〜NFR-12）
+- [非機能要件定義（beer-game-kotlin）](../beer-game-kotlin/non-functional.md)（84 件）、[beer-game2 の非機能要件](../beer-game-ts/non-functional.md)、[要件定義](../../requirements/beer-game-ts/requirements_definition.md)（NFR-01〜NFR-12）
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[技術スタック](./tech-stack.md)、[ドメインモデル](./domain-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[データモデル](./data-model.md)、[テスト戦略](./test-strategy.md)
 - [非機能要件定義ガイド](../../reference/非機能要件定義ガイド.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)
 - DB の権限と連鎖削除の実測: ローカルの Docker の `postgres:18.6`（使い捨てのコンテナ）、2026-11-19。型の守りの確認: rustc 1.97.1、2026-11-19。

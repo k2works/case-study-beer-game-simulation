@@ -1,13 +1,13 @@
 ---
 type: Reference
-title: "アプリケーション開発環境セットアップ手順書 - beer-game2"
-description: "beer-game2 をローカルで開発・実行するための手順。Node 26、PostgreSQL 18、マイグレーション、テスト、E2E。Bolt 1 時点の初版。"
+title: "アプリケーション開発環境セットアップ手順書 - beer-game-ts"
+description: "beer-game-ts をローカルで開発・実行するための手順。Node 26、PostgreSQL 18、マイグレーション、テスト、E2E。Bolt 1 時点の初版。"
 tags: [operation, setup]
 status: draft
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-10T01:30:00Z }
 ---
 
-# アプリケーション開発環境セットアップ手順書（beer-game2）
+# アプリケーション開発環境セットアップ手順書（beer-game-ts）
 
 Bolt 1（2026-11-10）時点の初版です。ステージング・本番の手順は B2 以降で追加します。
 
@@ -15,14 +15,14 @@ Bolt 1（2026-11-10）時点の初版です。ステージング・本番の手�
 
 | 項目    | 版                                  | 備考                                              |
 | :------ | :---------------------------------- | :------------------------------------------------ |
-| Node.js | 26（`apps/beer-game2/.nvmrc`）      | `nvm install 26 && nvm use`                       |
+| Node.js | 26（`apps/beer-game-ts/.nvmrc`）      | `nvm install 26 && nvm use`                       |
 | Docker  | 任意の最近の版                      | PostgreSQL 18 の実行に使う                        |
 | ポート  | 5433（DB）、3000（API）、5173（UI） | `apps/beer-game`（v1）と衝突しないよう DB は 5433 |
 
 ## 手順
 
 ```bash
-cd apps/beer-game2
+cd apps/beer-game-ts
 nvm use
 npm ci
 npm run db:up          # PostgreSQL 18 を起動

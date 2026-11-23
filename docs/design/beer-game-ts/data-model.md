@@ -451,6 +451,6 @@ v1 の差分（[データモデル（v1）](../beer-game/data-model.md) の差�
 
 ## 出典
 
-- [ドメインモデル設計（v2）](./domain-model.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)
+- [ドメインモデル設計（v2）](./domain-model.md)、[要件定義](../../requirements/beer-game-ts/requirements_definition.md)
 - v1 の [データモデル設計](../beer-game/data-model.md)、`apps/beer-game/migrations/001`〜`005`
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

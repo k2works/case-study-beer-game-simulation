@@ -1,6 +1,6 @@
 ---
 type: Reference
-title: "AWS ステージング環境セットアップ手順書 - beer-game2"
+title: "AWS ステージング環境セットアップ手順書 - beer-game-ts"
 description: "ステージング環境の構成、費用の概算（未確認）、人が行う準備と手順、デプロイとロールバック。コードは用意したが、AWS では未実行・未検証。"
 tags: [operation, setup]
 status: draft
@@ -11,11 +11,11 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-10T04:55:00Z }
 
 > **状態: 準備のみ。AWS では何も作っていない・実行していない。** Terraform、デプロイ・ロールバックのスクリプトとワークフローは用意し、ローカルと CI でできる検査（`fmt`、`validate`、`shellcheck`、`actionlint`、コンテナの検証）は通した。AWS 上での動作（`plan`/`apply`、デプロイ、SSE が CloudFront と ALB を通ること、ロールバック）は**未検証**で、下の手順で人が確認する。
 >
-> 計画: [Bolt 2](../../development/beer-game2/bolt_2_plan.md)
+> 計画: [Bolt 2](../../development/beer-game-ts/bolt_2_plan.md)
 
 ## 構成（ステージング）
 
-[インフラ設計](../../design/beer-game2/architecture-infrastructure.md)から、費用を抑える次の差分を提案する。本番の構成は B12 で設計どおりにする。
+[インフラ設計](../../design/beer-game-ts/architecture-infrastructure.md)から、費用を抑える次の差分を提案する。本番の構成は B12 で設計どおりにする。
 
 | 要素                  | 設計（本番）                                           | ステージング（提案）                                                                  |
 | :-------------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------------ |
@@ -53,11 +53,11 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-10T04:55:00Z }
 
 | 種類                   | 場所                                                                                                                           | 検証したこと                                                                                                                                |
 | :--------------------- | :----------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| 本番用イメージ         | `apps/beer-game2/Dockerfile`                                                                                                   | `npm run container:check`（非 root、開発依存なし、マイグレーション、`/ready` 200・DB 停止で 503、鍵が無ければ起動に失敗、RDS の CA を信頼） |
-| Terraform              | `apps/beer-game2/infra/`（`modules/`、`envs/staging/`）                                                                        | `terraform fmt -check`、`validate`（認証情報なし）。`plan` は未実施                                                                         |
-| デプロイ・ロールバック | `apps/beer-game2/scripts/deploy/`、`.github/workflows/beer-game2-deploy-staging.yml`、`…-rollback-staging.yml`（手動起動のみ） | `shellcheck`、`actionlint`。AWS では未実行                                                                                                  |
-| 動作確認               | `apps/beer-game2/scripts/smoke.ts`                                                                                             | ローカルで通過（`/ready`、1 ゲーム、SSE の受信）。デプロイ後は `API_URL` / `ORIGIN` にステージングの URL を渡す                             |
-| CI                     | `.github/workflows/beer-game2.yml`                                                                                             | verify、e2e、container、infra、scripts の 5 ジョブ                                                                                          |
+| 本番用イメージ         | `apps/beer-game-ts/Dockerfile`                                                                                                   | `npm run container:check`（非 root、開発依存なし、マイグレーション、`/ready` 200・DB 停止で 503、鍵が無ければ起動に失敗、RDS の CA を信頼） |
+| Terraform              | `apps/beer-game-ts/infra/`（`modules/`、`envs/staging/`）                                                                        | `terraform fmt -check`、`validate`（認証情報なし）。`plan` は未実施                                                                         |
+| デプロイ・ロールバック | `apps/beer-game-ts/scripts/deploy/`、`.github/workflows/beer-game-ts-deploy-staging.yml`、`…-rollback-staging.yml`（手動起動のみ） | `shellcheck`、`actionlint`。AWS では未実行                                                                                                  |
+| 動作確認               | `apps/beer-game-ts/scripts/smoke.ts`                                                                                             | ローカルで通過（`/ready`、1 ゲーム、SSE の受信）。デプロイ後は `API_URL` / `ORIGIN` にステージングの URL を渡す                             |
+| CI                     | `.github/workflows/beer-game-ts.yml`                                                                                             | verify、e2e、container、infra、scripts の 5 ジョブ                                                                                          |
 
 ## 手順（人が行う）
 
@@ -67,14 +67,14 @@ AWS の認証情報は、**人が自分の端末で設定**する。AI は扱わ
 
 ```bash
 ACCOUNT=<アカウント ID>; REGION=ap-northeast-1
-aws s3api create-bucket --bucket beer-game2-tfstate-$ACCOUNT --region $REGION \
+aws s3api create-bucket --bucket beer-game-ts-tfstate-$ACCOUNT --region $REGION \
   --create-bucket-configuration LocationConstraint=$REGION
-aws s3api put-bucket-versioning --bucket beer-game2-tfstate-$ACCOUNT --versioning-configuration Status=Enabled
-aws s3api put-bucket-encryption --bucket beer-game2-tfstate-$ACCOUNT \
+aws s3api put-bucket-versioning --bucket beer-game-ts-tfstate-$ACCOUNT --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption --bucket beer-game-ts-tfstate-$ACCOUNT \
   --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-aws s3api put-public-access-block --bucket beer-game2-tfstate-$ACCOUNT \
+aws s3api put-public-access-block --bucket beer-game-ts-tfstate-$ACCOUNT \
   --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-aws dynamodb create-table --table-name beer-game2-tfstate-lock \
+aws dynamodb create-table --table-name beer-game-ts-tfstate-lock \
   --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST --region $REGION
 ```
@@ -84,7 +84,7 @@ aws dynamodb create-table --table-name beer-game2-tfstate-lock \
 ### 2. Terraform の初期化と最初の適用
 
 ```bash
-cd apps/beer-game2/infra/envs/staging
+cd apps/beer-game-ts/infra/envs/staging
 cp backend.hcl.example backend.hcl           # 値を入れる
 cp terraform.tfvars.example terraform.tfvars  # 値を入れる
 terraform init -backend-config=backend.hcl
@@ -96,12 +96,12 @@ terraform apply -target=module.ecr
 最初のイメージは、人の端末から ECR へ push する（ECR の URL は `terraform output ecr_repository_url`）。
 
 ```bash
-cd apps/beer-game2
+cd apps/beer-game-ts
 aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin <ECR のレジストリ>
 docker build -t <ECR の URL>:initial .
 docker push <ECR の URL>:initial
 # ダイジェストを控える
-aws ecr describe-images --repository-name beer-game2-staging --image-ids imageTag=initial \
+aws ecr describe-images --repository-name beer-game-ts-staging --image-ids imageTag=initial \
   --query 'imageDetails[0].imageDigest' --output text
 ```
 
@@ -120,7 +120,7 @@ Environment `staging` を作り、次の**変数**（Variables。秘密ではな
 | :---------------------------------------- | :------------------------------------------- |
 | `AWS_ROLE_ARN`                            | `deploy_role_arn`                            |
 | `AWS_REGION`                              | `ap-northeast-1`                             |
-| `ECR_REPOSITORY`                          | `beer-game2-staging`                         |
+| `ECR_REPOSITORY`                          | `beer-game-ts-staging`                         |
 | `ECS_CLUSTER` / `ECS_SERVICE`             | `ecs_cluster` / `ecs_service`                |
 | `API_TASK_FAMILY` / `MIGRATE_TASK_FAMILY` | `api_task_family` / `migrate_task_family`    |
 | `WEB_BUCKET` / `DISTRIBUTION_ID`          | `web_bucket` / `distribution_id`             |
@@ -131,9 +131,9 @@ Environment `staging` を作り、次の**変数**（Variables。秘密ではな
 
 ### 4. デプロイとロールバック
 
-1. Actions の `beer-game2-deploy-staging` を手動で起動する。イメージのビルド → ECR → マイグレーション（失敗したら中止）→ ローリング更新（失敗したら自動で戻る）→ 静的ファイル → スモークテスト、の順に進む。
+1. Actions の `beer-game-ts-deploy-staging` を手動で起動する。イメージのビルド → ECR → マイグレーション（失敗したら中止）→ ローリング更新（失敗したら自動で戻る）→ 静的ファイル → スモークテスト、の順に進む。
 2. 動作を確認できたら、ワークフローの `push` トリガー（main へのマージ）を有効にする。
-3. 戻すときは `beer-game2-rollback-staging` を起動する（戻す先のコミット SHA を指定できる）。マイグレーションは戻さない。
+3. 戻すときは `beer-game-ts-rollback-staging` を起動する（戻す先のコミット SHA を指定できる）。マイグレーションは戻さない。
 4. **初回の確認項目**: SSE が CloudFront と ALB を通って届くか（スモークテストの SSE）、Cookie（`Secure`、`SameSite=Strict`）と Origin の検査が正しく働くか、壊した版をデプロイして戻せるか。
 
 ## 既知の制約と未確認事項

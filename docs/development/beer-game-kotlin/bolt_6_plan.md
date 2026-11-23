@@ -38,7 +38,7 @@ verified:
 
 ### 対象の受入条件
 
-出典は [ユーザーストーリー](../../requirements/beer-game2/user_story.md)（Kotlin 版は beer-game2 の要件を引き継ぐ）。**シナリオの期待値は、原文の意味と一致させる**（タグ `@US`・`@AC`）。
+出典は [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)（Kotlin 版は beer-game2 の要件を引き継ぐ）。**シナリオの期待値は、原文の意味と一致させる**（タグ `@US`・`@AC`）。
 
 | ID | 内容（原文の要点） | 現状（実コードで確認。Step 0 で再確認） |
 | :--- | :--- | :--- |

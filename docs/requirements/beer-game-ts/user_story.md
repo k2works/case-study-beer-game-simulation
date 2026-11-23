@@ -11,7 +11,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T08:42:17Z }
 
 ## 概要
 
-本書は、[システムユースケース](./system_usecase.md) から導出した、開発可能な粒度の**ユーザーストーリーと受入条件**を定義します。ストーリーと受入条件は、人と AI の間の契約です。リリース計画・イテレーション計画は `docs/development/beer-game2/` で別に扱います。
+本書は、[システムユースケース](./system_usecase.md) から導出した、開発可能な粒度の**ユーザーストーリーと受入条件**を定義します。ストーリーと受入条件は、人と AI の間の契約です。リリース計画・イテレーション計画は `docs/development/beer-game-ts/` で別に扱います。
 
 **`docs/` を正本**とします。beer-game（v1）のユーザーストーリー（11 件）を出発点に、**v2 で改訂**しました。
 
@@ -332,7 +332,7 @@ Unit は、v1 の分割（U1〜U5）を仮に引き継いだものです。v2 �
 
 - **優先度**: Must
 - **依存**: US2.3
-- **ユースケース**: なし（要件: NFR-11、NFR-09、[非機能要件](../../design/beer-game2/non-functional.md)）
+- **ユースケース**: なし（要件: NFR-11、NFR-09、[非機能要件](../../design/beer-game-ts/non-functional.md)）
 
 **受入条件**:
 
@@ -353,7 +353,7 @@ Unit は、v1 の分割（U1〜U5）を仮に引き継いだものです。v2 �
 
 - **優先度**: Must
 - **依存**: US6.1
-- **ユースケース**: なし（要件: NFR-12、[運用要件](../../design/beer-game2/operation.md)）
+- **ユースケース**: なし（要件: NFR-12、[運用要件](../../design/beer-game-ts/operation.md)）
 
 **受入条件**:
 
@@ -420,4 +420,4 @@ v1 で、受入条件を満たしていなかったものを、優先度の高�
 - `aidlc/spaces/default/intents/261027-beer-game-development/inception/user-stories/stories.md`、`personas.md`
 - `aidlc/spaces/default/intents/261027-beer-game-development/inception/units-generation/unit-of-work-story-map.md`
 - v1 の実装: `apps/beer-game/src`
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)

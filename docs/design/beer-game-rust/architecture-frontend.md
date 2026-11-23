@@ -179,8 +179,8 @@ Kotlin 版と同じです（アクセシビリティ、堅牢性（版比較・�
 
 ## 出典
 
-- [フロントエンドアーキテクチャ（beer-game-kotlin）](../beer-game-kotlin/architecture-frontend.md)、[beer-game2 のフロントエンドアーキテクチャ](../beer-game2/architecture-frontend.md)
+- [フロントエンドアーキテクチャ（beer-game-kotlin）](../beer-game-kotlin/architecture-frontend.md)、[beer-game2 のフロントエンドアーキテクチャ](../beer-game-ts/architecture-frontend.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[UI 設計](./ui-design.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[テスト戦略](./test-strategy.md)、[非機能要件](./non-functional.md)、[インフラストラクチャ](./architecture-infrastructure.md)
 - 既存の `web/` の調査（読み取り専用、2026-11-19）: `apps/beer-game-kotlin/web/` の `package.json`、`vite.config.ts`、`cucumber.mjs`、`support/hooks.mjs`、`src/api/client.ts`、`src/features/play/PlayPage.tsx`
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
-- [ADR-006](../../adr/beer-game2/006-sse-version-only.md)、[ADR-010](../../adr/beer-game2/010-url-router-and-features.md)
+- [ADR-006](../../adr/beer-game-ts/006-sse-version-only.md)、[ADR-010](../../adr/beer-game-ts/010-url-router-and-features.md)

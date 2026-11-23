@@ -28,8 +28,8 @@ verified:
 
 ### 確認したい仮説
 
-1. `Game` と `Session` の集約の粒度、層の構造（ポートとアダプター）は、妥当か（[ADR-003](../../adr/beer-game2/003-ports-and-adapters-with-lint.md)、[ADR-004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)）。
-2. Node 26 / TypeScript 6.0 / PostgreSQL 18 の組み合わせで、ツール（Vitest 5、ESLint 10、Vite 8、Playwright）が問題なく動くか（[ADR-013](../../adr/beer-game2/013-tech-stack-versions.md)）。
+1. `Game` と `Session` の集約の粒度、層の構造（ポートとアダプター）は、妥当か（[ADR-003](../../adr/beer-game-ts/003-ports-and-adapters-with-lint.md)、[ADR-004](../../adr/beer-game-ts/004-separate-game-and-session-aggregates.md)）。
+2. Node 26 / TypeScript 6.0 / PostgreSQL 18 の組み合わせで、ツール（Vitest 5、ESLint 10、Vite 8、Playwright）が問題なく動くか（[ADR-013](../../adr/beer-game-ts/013-tech-stack-versions.md)）。
 3. AI の出力の質は、どの密度の承認ゲートが要るか（以降の Bolt のゲート密度を決める）。
 
 ### 対象の受入条件
@@ -54,8 +54,8 @@ CI/CD とステージング（B2）、役割別の振り返りの画面（B3）�
 | # | 項目 | 内容 | 提案 |
 | :--- | :--- | :--- | :--- |
 | 1 | **ローカルの Node.js を 26 にする** | 現在は 24.11.0。`nvm` で 26 を入れ、`.nvmrc` で固定する（環境の変更） | 承認をお願いします。`nvm install 26` はこちらで実行できます |
-| 2 | **新しい依存関係の導入** | `node-pg-migrate`（マイグレーション）、`react-router`（URL ルーティング）、`fast-check`（プロパティベーステスト） | 3 件とも、[技術スタック](../../design/beer-game2/tech-stack.md) で導入を推奨したもの。承認をお願いします |
-| 3 | **新規ファイルの作成** | `apps/beer-game2/` の一式（`package.json`、`tsconfig.json`、`eslint.config.js`、`vitest.config.ts`、`compose.yaml`、`.nvmrc`、`src/`、`tests/`、`ui/`、`migrations/` ほか）と、CI の `.github/workflows/beer-game2.yml`（検証のみ） | この計画の承認で、作成してよいとします |
+| 2 | **新しい依存関係の導入** | `node-pg-migrate`（マイグレーション）、`react-router`（URL ルーティング）、`fast-check`（プロパティベーステスト） | 3 件とも、[技術スタック](../../design/beer-game-ts/tech-stack.md) で導入を推奨したもの。承認をお願いします |
+| 3 | **新規ファイルの作成** | `apps/beer-game-ts/` の一式（`package.json`、`tsconfig.json`、`eslint.config.js`、`vitest.config.ts`、`compose.yaml`、`.nvmrc`、`src/`、`tests/`、`ui/`、`migrations/` ほか）と、CI の `.github/workflows/beer-game2.yml`（検証のみ） | この計画の承認で、作成してよいとします |
 | 4 | **仮の既定値** | ブラウザセッション 24 時間、復帰資格 30 日、進行役の資格 30 日（暫定）、数量の上限 1000、最終週の上限 50。B4・B6 で、運営者と合意して確定する | 暫定の値で進めます |
 | 5 | **v1 のコードの扱い** | `apps/beer-game` は参照のみ（変更しない）。`simulateWeek` などは、v1 を**参考にして、テストを先に書いて、新しく実装する**（コピーしない） | この方針で進めます |
 
@@ -192,7 +192,7 @@ CI/CD とステージング（B2）、役割別の振り返りの画面（B3）�
 
 ## 完了後の流れ
 
-- Bolt 終了報告（`bolt_1_report.md`）、判断と学びを、ジャーナル（`docs/journal/beer-game2/`）へ。
+- Bolt 終了報告（`bolt_1_report.md`）、判断と学びを、ジャーナル（`docs/journal/beer-game-ts/`）へ。
 - B2（CI/CD とステージング）の計画を作成し、承認を得る。
 
 ## 更新履歴

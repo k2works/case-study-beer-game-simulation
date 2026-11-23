@@ -32,14 +32,14 @@ beer-game（v1）は、ウォーキングスケルトン（U1）から U5 まで
 
 ## 決定
 
-- `beer-game2` として、`docs/` と `apps/` に、新しいプロジェクトを作る（`apps/beer-game2/`）。
+- `beer-game2` として、`docs/` と `apps/` に、新しいプロジェクトを作る（`apps/beer-game-ts/`）。
 - 分析成果物（要件、ユースケース、ストーリー、設計）は、beer-game の `docs/` を複製して出発点とし、差分を反映して**改訂**する。
 - v2 の範囲に、次の 4 件を含める（beer-game で未実装・未決定だったもの）。
   - 同一役割の共同担当
   - カスタム条件（初期在庫、遅延、費用単価、公開範囲の変更と、「カスタム」の記録）
   - 観察者の独立した立場
   - 週の自動確定（進行役の確定操作は残す）
-- 技術スタックは、beer-game を踏襲し、版だけ更新する（TypeScript、Fastify、React、Vite、PostgreSQL、AWS、Terraform）。版は [技術スタック](../../design/beer-game2/tech-stack.md) に従う（確認の結果、Node は、決定時に想定した 24 ではなく、最新の LTS である 26 を採用した。[ADR-013](./013-tech-stack-versions.md)）。
+- 技術スタックは、beer-game を踏襲し、版だけ更新する（TypeScript、Fastify、React、Vite、PostgreSQL、AWS、Terraform）。版は [技術スタック](../../design/beer-game-ts/tech-stack.md) に従う（確認の結果、Node は、決定時に想定した 24 ではなく、最新の LTS である 26 を採用した。[ADR-013](./013-tech-stack-versions.md)）。
 - beer-game は、未コミットだった U3〜U5 の作業をコミットして保全し（`1af35d2`、`9615c9e`）、参照用に残す。beer-game2 の完成後に、廃止を判断する。
 - beer-game の ADR（`docs/adr/beer-game/001`〜`008`）は、履歴として残す。v2 で引き継ぐ判断は、v2 の ADR として改めて記録する。
 
@@ -64,7 +64,7 @@ beer-game（v1）は、ウォーキングスケルトン（U1）から U5 まで
 
 ## コンプライアンス
 
-- beer-game2 の分析成果物が、`docs/*/beer-game2/` に置かれ、`apply-okf` と構成の検査が通ること。
+- beer-game2 の分析成果物が、`docs/*/beer-game-ts/` に置かれ、`apply-okf` と構成の検査が通ること。
 - beer-game の ADR を、v2 で引き継ぐものは、v2 の ADR に記録されていること。
 - beer-game2 の完成時に、beer-game の廃止の判断（ADR）を行うこと。
 

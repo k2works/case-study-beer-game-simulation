@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-23
+* **Update**: `apps/beer-game2` と `docs/*/beer-game2` を `beer-game-ts` に改名（リンク・パス・ナビ・運用手順書・ワークフロー名・インフラ定義の名前。過去の記録の呼び名は残した。[ADR 索引の記録](/adr/beer-game-ts/index.md)。claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend（Rust）](/design/beer-game-rust/architecture-frontend.md)・[tech-stack（Rust）](/design/beer-game-rust/tech-stack.md)・[index（Rust）](/design/beer-game-rust/index.md)・[architecture-backend（Kotlin）](/design/beer-game-kotlin/architecture-backend.md)・[ADR-008](/adr/beer-game-kotlin/008-api-contract-and-error-codes.md) を更新（契約を `apps/beer-game-contracts/` へ移動。claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend（Rust）](/design/beer-game-rust/architecture-frontend.md)・[architecture-frontend（Kotlin）](/design/beer-game-kotlin/architecture-frontend.md)・[deploy（Rust）](/operation/beer-game-rust/deploy.md) を更新（web を `apps/beer-game-web/` へ移動。claude-code/claude-sonnet-5-5）
 * **Update**: [non-functional](/design/beer-game-rust/non-functional.md)・[index](/design/beer-game-rust/index.md)・[architecture-frontend](/design/beer-game-rust/architecture-frontend.md)・[ui-design](/design/beer-game-rust/ui-design.md) を更新（NF-P2 の目標を p95 4 秒以下へ再定義。verified は人の再確認待ち）。[release_readiness](/development/beer-game-rust/release_readiness.md)・[nfr_results](/development/beer-game-rust/nfr_results.md) の該当行も更新（claude-code/claude-sonnet-5-5）
@@ -334,129 +335,129 @@
 * **Update**: [architecture-backend](/design/beer-game-kotlin/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
 
 ## 2026-11-11
-* **Creation**: [release_report-0_2_0](/development/beer-game2/release_report-0_2_0.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [ui-design](/design/beer-game2/ui-design.md) を更新（進行役のコンソールの 4 分割。claude-code/claude-opus-5-5）
-* **Verification**: [bolt_12_plan](/development/beer-game2/bolt_12_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
-* **Verification**: [bolt_11_plan](/development/beer-game2/bolt_11_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
-* **Creation**: [bolt_12_report](/development/beer-game2/bolt_12_report.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [aws_production_setup](/operation/beer-game2/aws_production_setup.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_12_plan](/development/beer-game2/bolt_12_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_11_report](/development/beer-game2/bolt_11_report.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [operation](/design/beer-game2/operation.md) を更新（実装済みのアラーム。claude-code/claude-opus-5-5）
-* **Creation**: [bolt_11_plan](/development/beer-game2/bolt_11_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Verification**: [bolt_10_plan](/development/beer-game2/bolt_10_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 006 を含む）
-* **Creation**: [bolt_10_report](/development/beer-game2/bolt_10_report.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [operation](/design/beer-game2/operation.md) を更新（出力の成果物を保存しないこと、保持の定期タスク。claude-code/claude-opus-5-5）
-* **Update**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を更新（保持の削除の実行。claude-code/claude-opus-5-5）
-* **Creation**: [bolt_10_plan](/development/beer-game2/bolt_10_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Verification**: [bolt_9_plan](/development/beer-game2/bolt_9_plan.md) を human:kakimomokuri が検証（「すべて承認」。U4 完了）
-* **Verification**: [bolt_8_plan](/development/beer-game2/bolt_8_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 005 を含む）
-* **Creation**: [bolt_9_report](/development/beer-game2/bolt_9_report.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_9_plan](/development/beer-game2/bolt_9_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_8_report](/development/beer-game2/bolt_8_report.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [sightseeing-map](/design/beer-game2/sightseeing-map.md) を生成（観察の開示の判定を追加。script:apps/beer-game2/scripts/guided-tour.ts）
-* **Creation**: [bolt_8_plan](/development/beer-game2/bolt_8_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Verification**: [bolt_7_plan](/development/beer-game2/bolt_7_plan.md) を human:kakimomokuri が検証（「すべて承認」。U3 完了）
-* **Verification**: [bolt_6_plan](/development/beer-game2/bolt_6_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 004 を含む）
-* **Creation**: [bolt_7_report](/development/beer-game2/bolt_7_report.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [bolt_6_report](/development/beer-game2/bolt_6_report.md) を更新（学び 2 の見立ての訂正。claude-code/claude-opus-5-5）
-* **Creation**: [bolt_7_plan](/development/beer-game2/bolt_7_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_6_report](/development/beer-game2/bolt_6_report.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_6_plan](/development/beer-game2/bolt_6_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Verification**: [bolt_5_plan](/development/beer-game2/bolt_5_plan.md) を human:kakimomokuri が検証（「すべて承認」。U2 完了）
-* **Verification**: [bolt_4_plan](/development/beer-game2/bolt_4_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 003 を含む）
-* **Creation**: [bolt_5_report](/development/beer-game2/bolt_5_report.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_5_plan](/development/beer-game2/bolt_5_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Creation**: [bolt_4_report](/development/beer-game2/bolt_4_report.md) を作成（claude-code/claude-opus-5-5）
-* **Update**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を更新（鍵の版とレート制限の設定。claude-code/claude-opus-5-5）
-* **Creation**: [bolt_4_plan](/development/beer-game2/bolt_4_plan.md) を作成（claude-code/claude-opus-5-5）
-* **Verification**: [bolt_1_plan](/development/beer-game2/bolt_1_plan.md) を human:kakimomokuri が検証（「B1 とマイグレーション 001・002 の承認です」）
-* **Update**: [release_plan](/development/beer-game2/release_plan.md) を更新（進捗。claude-code/claude-opus-5-5）
+* **Creation**: [release_report-0_2_0](/development/beer-game-ts/release_report-0_2_0.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [ui-design](/design/beer-game-ts/ui-design.md) を更新（進行役のコンソールの 4 分割。claude-code/claude-opus-5-5）
+* **Verification**: [bolt_12_plan](/development/beer-game-ts/bolt_12_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
+* **Verification**: [bolt_11_plan](/development/beer-game-ts/bolt_11_plan.md) を human:kakimomokuri が検証（「すべて承認」。コードと定義まで。AWS は未適用）
+* **Creation**: [bolt_12_report](/development/beer-game-ts/bolt_12_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [aws_production_setup](/operation/beer-game-ts/aws_production_setup.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_12_plan](/development/beer-game-ts/bolt_12_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_11_report](/development/beer-game-ts/bolt_11_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [operation](/design/beer-game-ts/operation.md) を更新（実装済みのアラーム。claude-code/claude-opus-5-5）
+* **Creation**: [bolt_11_plan](/development/beer-game-ts/bolt_11_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_10_plan](/development/beer-game-ts/bolt_10_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 006 を含む）
+* **Creation**: [bolt_10_report](/development/beer-game-ts/bolt_10_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [operation](/design/beer-game-ts/operation.md) を更新（出力の成果物を保存しないこと、保持の定期タスク。claude-code/claude-opus-5-5）
+* **Update**: [application_dev_setup](/operation/beer-game-ts/application_dev_setup.md) を更新（保持の削除の実行。claude-code/claude-opus-5-5）
+* **Creation**: [bolt_10_plan](/development/beer-game-ts/bolt_10_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_9_plan](/development/beer-game-ts/bolt_9_plan.md) を human:kakimomokuri が検証（「すべて承認」。U4 完了）
+* **Verification**: [bolt_8_plan](/development/beer-game-ts/bolt_8_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 005 を含む）
+* **Creation**: [bolt_9_report](/development/beer-game-ts/bolt_9_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_9_plan](/development/beer-game-ts/bolt_9_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_8_report](/development/beer-game-ts/bolt_8_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [sightseeing-map](/design/beer-game-ts/sightseeing-map.md) を生成（観察の開示の判定を追加。script:apps/beer-game-ts/scripts/guided-tour.ts）
+* **Creation**: [bolt_8_plan](/development/beer-game-ts/bolt_8_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_7_plan](/development/beer-game-ts/bolt_7_plan.md) を human:kakimomokuri が検証（「すべて承認」。U3 完了）
+* **Verification**: [bolt_6_plan](/development/beer-game-ts/bolt_6_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 004 を含む）
+* **Creation**: [bolt_7_report](/development/beer-game-ts/bolt_7_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [bolt_6_report](/development/beer-game-ts/bolt_6_report.md) を更新（学び 2 の見立ての訂正。claude-code/claude-opus-5-5）
+* **Creation**: [bolt_7_plan](/development/beer-game-ts/bolt_7_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_6_report](/development/beer-game-ts/bolt_6_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_6_plan](/development/beer-game-ts/bolt_6_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_5_plan](/development/beer-game-ts/bolt_5_plan.md) を human:kakimomokuri が検証（「すべて承認」。U2 完了）
+* **Verification**: [bolt_4_plan](/development/beer-game-ts/bolt_4_plan.md) を human:kakimomokuri が検証（「すべて承認」。マイグレーション 003 を含む）
+* **Creation**: [bolt_5_report](/development/beer-game-ts/bolt_5_report.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_5_plan](/development/beer-game-ts/bolt_5_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Creation**: [bolt_4_report](/development/beer-game-ts/bolt_4_report.md) を作成（claude-code/claude-opus-5-5）
+* **Update**: [application_dev_setup](/operation/beer-game-ts/application_dev_setup.md) を更新（鍵の版とレート制限の設定。claude-code/claude-opus-5-5）
+* **Creation**: [bolt_4_plan](/development/beer-game-ts/bolt_4_plan.md) を作成（claude-code/claude-opus-5-5）
+* **Verification**: [bolt_1_plan](/development/beer-game-ts/bolt_1_plan.md) を human:kakimomokuri が検証（「B1 とマイグレーション 001・002 の承認です」）
+* **Update**: [release_plan](/development/beer-game-ts/release_plan.md) を更新（進捗。claude-code/claude-opus-5-5）
 
 ## 2026-11-10
-* **Creation**: [sightseeing-map](/design/beer-game2/sightseeing-map.md) を生成（script:apps/beer-game2/scripts/guided-tour.ts）
-* **Creation**: [guided-tour-walking-skeleton](/design/beer-game2/guided-tour-walking-skeleton.md) を生成（script:apps/beer-game2/scripts/guided-tour.ts）
-* **Verification**: [bolt_3_plan](/development/beer-game2/bolt_3_plan.md) を human:kakimomokuri が検証（「承認」の一言）
-* **Creation**: [bolt_3_report](/development/beer-game2/bolt_3_report.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [bolt_3_plan](/development/beer-game2/bolt_3_plan.md) を更新（進捗。claude-code/claude-sonnet-5-5）
-* **Creation**: [bolt_3_plan](/development/beer-game2/bolt_3_plan.md) を作成（claude-code/claude-sonnet-5-5）
-* **Verification**: [bolt_2_plan](/development/beer-game2/bolt_2_plan.md) を human:kakimomokuri が検証
-* **Creation**: [aws_staging_setup](/operation/beer-game2/aws_staging_setup.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を更新（PostgreSQL 17 → 18。claude-code/claude-sonnet-5-5）
-* **Creation**: [bolt_2_plan](/development/beer-game2/bolt_2_plan.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [journal/beer-game2/20261110](/journal/beer-game2/20261110.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [bolt_1_report](/development/beer-game2/bolt_1_report.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [application_dev_setup](/operation/beer-game2/application_dev_setup.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [bolt_1_plan](/development/beer-game2/bolt_1_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [sightseeing-map](/design/beer-game-ts/sightseeing-map.md) を生成（script:apps/beer-game-ts/scripts/guided-tour.ts）
+* **Creation**: [guided-tour-walking-skeleton](/design/beer-game-ts/guided-tour-walking-skeleton.md) を生成（script:apps/beer-game-ts/scripts/guided-tour.ts）
+* **Verification**: [bolt_3_plan](/development/beer-game-ts/bolt_3_plan.md) を human:kakimomokuri が検証（「承認」の一言）
+* **Creation**: [bolt_3_report](/development/beer-game-ts/bolt_3_report.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_3_plan](/development/beer-game-ts/bolt_3_plan.md) を更新（進捗。claude-code/claude-sonnet-5-5）
+* **Creation**: [bolt_3_plan](/development/beer-game-ts/bolt_3_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Verification**: [bolt_2_plan](/development/beer-game-ts/bolt_2_plan.md) を human:kakimomokuri が検証
+* **Creation**: [aws_staging_setup](/operation/beer-game-ts/aws_staging_setup.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-ts/architecture-infrastructure.md) を更新（PostgreSQL 17 → 18。claude-code/claude-sonnet-5-5）
+* **Creation**: [bolt_2_plan](/development/beer-game-ts/bolt_2_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [journal/beer-game-ts/20261110](/journal/beer-game-ts/20261110.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [bolt_1_report](/development/beer-game-ts/bolt_1_report.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [application_dev_setup](/operation/beer-game-ts/application_dev_setup.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_1_plan](/development/beer-game-ts/bolt_1_plan.md) を更新（claude-code/claude-sonnet-5-5）
 
 ## 2026-11-09
-* **Creation**: [bolt_1_plan](/development/beer-game2/bolt_1_plan.md) を作成（claude-code/claude-sonnet-5-5）
-* **Verification**: [unit_definition](/requirements/beer-game2/unit_definition.md) を human:kakimomokuri が検証
-* **Verification**: [release_plan](/development/beer-game2/release_plan.md) を human:kakimomokuri が検証
-* **Update**: [release_plan](/development/beer-game2/release_plan.md) を更新（claude-code/claude-sonnet-5-5）
-* **Creation**: [release_plan](/development/beer-game2/release_plan.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [unit_definition](/requirements/beer-game2/unit_definition.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [business_usecase](/requirements/beer-game2/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [requirements_definition](/requirements/beer-game2/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [operation](/design/beer-game2/operation.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [non-functional](/design/beer-game2/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
-* **Creation**: [test-strategy](/design/beer-game2/test-strategy.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [ui-design](/design/beer-game2/ui-design.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [tech-stack](/design/beer-game2/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-frontend](/design/beer-game2/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-backend](/design/beer-game2/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [013-tech-stack-versions](/adr/beer-game2/013-tech-stack-versions.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [012-delivery-pipeline-and-terraform](/adr/beer-game2/012-delivery-pipeline-and-terraform.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [011-cloudfront-domain-tls-headers](/adr/beer-game2/011-cloudfront-domain-tls-headers.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [010-url-router-and-features](/adr/beer-game2/010-url-router-and-features.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [009-credential-key-versions](/adr/beer-game2/009-credential-key-versions.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [008-auto-commit-and-event-audit](/adr/beer-game2/008-auto-commit-and-event-audit.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [007-cascade-deletion-without-queues](/adr/beer-game2/007-cascade-deletion-without-queues.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [006-sse-version-only](/adr/beer-game2/006-sse-version-only.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [005-role-results-and-sql-read-models](/adr/beer-game2/005-role-results-and-sql-read-models.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [004-separate-game-and-session-aggregates](/adr/beer-game2/004-separate-game-and-session-aggregates.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [003-ports-and-adapters-with-lint](/adr/beer-game2/003-ports-and-adapters-with-lint.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [002-adopt-v1-adrs](/adr/beer-game2/002-adopt-v1-adrs.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [tech-stack](/design/beer-game2/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
-* **Creation**: [tech-stack](/design/beer-game2/tech-stack.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [001-rebuild-as-beer-game2](/adr/beer-game2/001-rebuild-as-beer-game2.md) を更新（claude-code/claude-sonnet-5-5）
-* **Creation**: [013-tech-stack-versions](/adr/beer-game2/013-tech-stack-versions.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [012-delivery-pipeline-and-terraform](/adr/beer-game2/012-delivery-pipeline-and-terraform.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [011-cloudfront-domain-tls-headers](/adr/beer-game2/011-cloudfront-domain-tls-headers.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [010-url-router-and-features](/adr/beer-game2/010-url-router-and-features.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [009-credential-key-versions](/adr/beer-game2/009-credential-key-versions.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [008-auto-commit-and-event-audit](/adr/beer-game2/008-auto-commit-and-event-audit.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [007-cascade-deletion-without-queues](/adr/beer-game2/007-cascade-deletion-without-queues.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [006-sse-version-only](/adr/beer-game2/006-sse-version-only.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [005-role-results-and-sql-read-models](/adr/beer-game2/005-role-results-and-sql-read-models.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [004-separate-game-and-session-aggregates](/adr/beer-game2/004-separate-game-and-session-aggregates.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [003-ports-and-adapters-with-lint](/adr/beer-game2/003-ports-and-adapters-with-lint.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [002-adopt-v1-adrs](/adr/beer-game2/002-adopt-v1-adrs.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [architecture-frontend](/design/beer-game2/architecture-frontend.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [architecture-backend](/design/beer-game2/architecture-backend.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [data-model](/design/beer-game2/data-model.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [domain-model](/design/beer-game2/domain-model.md) を作成（claude-code/claude-sonnet-5-5）
-* **Creation**: [user_story](/requirements/beer-game2/user_story.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [business_usecase](/requirements/beer-game2/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Creation**: [001-rebuild-as-beer-game2](/adr/beer-game2/001-rebuild-as-beer-game2.md) を作成（claude-code/claude-sonnet-5-5）
-* **Update**: [operation](/design/beer-game2/operation.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [non-functional](/design/beer-game2/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [test-strategy](/design/beer-game2/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [ui-design](/design/beer-game2/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [tech-stack](/design/beer-game2/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-infrastructure](/design/beer-game2/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-frontend](/design/beer-game2/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [architecture-backend](/design/beer-game2/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [data-model](/design/beer-game2/data-model.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [domain-model](/design/beer-game2/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [user_story](/requirements/beer-game2/user_story.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [system_usecase](/requirements/beer-game2/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [business_usecase](/requirements/beer-game2/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
-* **Update**: [requirements_definition](/requirements/beer-game2/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [bolt_1_plan](/development/beer-game-ts/bolt_1_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Verification**: [unit_definition](/requirements/beer-game-ts/unit_definition.md) を human:kakimomokuri が検証
+* **Verification**: [release_plan](/development/beer-game-ts/release_plan.md) を human:kakimomokuri が検証
+* **Update**: [release_plan](/development/beer-game-ts/release_plan.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [release_plan](/development/beer-game-ts/release_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [unit_definition](/requirements/beer-game-ts/unit_definition.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [system_usecase](/requirements/beer-game-ts/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [business_usecase](/requirements/beer-game-ts/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [requirements_definition](/requirements/beer-game-ts/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [operation](/design/beer-game-ts/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game-ts/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [test-strategy](/design/beer-game-ts/test-strategy.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [ui-design](/design/beer-game-ts/ui-design.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-ts/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-ts/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-ts/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-ts/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [013-tech-stack-versions](/adr/beer-game-ts/013-tech-stack-versions.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [012-delivery-pipeline-and-terraform](/adr/beer-game-ts/012-delivery-pipeline-and-terraform.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [011-cloudfront-domain-tls-headers](/adr/beer-game-ts/011-cloudfront-domain-tls-headers.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [010-url-router-and-features](/adr/beer-game-ts/010-url-router-and-features.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [009-credential-key-versions](/adr/beer-game-ts/009-credential-key-versions.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [008-auto-commit-and-event-audit](/adr/beer-game-ts/008-auto-commit-and-event-audit.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [007-cascade-deletion-without-queues](/adr/beer-game-ts/007-cascade-deletion-without-queues.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [006-sse-version-only](/adr/beer-game-ts/006-sse-version-only.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [005-role-results-and-sql-read-models](/adr/beer-game-ts/005-role-results-and-sql-read-models.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [004-separate-game-and-session-aggregates](/adr/beer-game-ts/004-separate-game-and-session-aggregates.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [003-ports-and-adapters-with-lint](/adr/beer-game-ts/003-ports-and-adapters-with-lint.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [002-adopt-v1-adrs](/adr/beer-game-ts/002-adopt-v1-adrs.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-ts/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [tech-stack](/design/beer-game-ts/tech-stack.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [001-rebuild-as-beer-game2](/adr/beer-game-ts/001-rebuild-as-beer-game2.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [013-tech-stack-versions](/adr/beer-game-ts/013-tech-stack-versions.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [012-delivery-pipeline-and-terraform](/adr/beer-game-ts/012-delivery-pipeline-and-terraform.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [011-cloudfront-domain-tls-headers](/adr/beer-game-ts/011-cloudfront-domain-tls-headers.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [010-url-router-and-features](/adr/beer-game-ts/010-url-router-and-features.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [009-credential-key-versions](/adr/beer-game-ts/009-credential-key-versions.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [008-auto-commit-and-event-audit](/adr/beer-game-ts/008-auto-commit-and-event-audit.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [007-cascade-deletion-without-queues](/adr/beer-game-ts/007-cascade-deletion-without-queues.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [006-sse-version-only](/adr/beer-game-ts/006-sse-version-only.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [005-role-results-and-sql-read-models](/adr/beer-game-ts/005-role-results-and-sql-read-models.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [004-separate-game-and-session-aggregates](/adr/beer-game-ts/004-separate-game-and-session-aggregates.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [003-ports-and-adapters-with-lint](/adr/beer-game-ts/003-ports-and-adapters-with-lint.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [002-adopt-v1-adrs](/adr/beer-game-ts/002-adopt-v1-adrs.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-infrastructure](/design/beer-game-ts/architecture-infrastructure.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-frontend](/design/beer-game-ts/architecture-frontend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [architecture-backend](/design/beer-game-ts/architecture-backend.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [data-model](/design/beer-game-ts/data-model.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [domain-model](/design/beer-game-ts/domain-model.md) を作成（claude-code/claude-sonnet-5-5）
+* **Creation**: [user_story](/requirements/beer-game-ts/user_story.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [system_usecase](/requirements/beer-game-ts/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [business_usecase](/requirements/beer-game-ts/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Creation**: [001-rebuild-as-beer-game2](/adr/beer-game-ts/001-rebuild-as-beer-game2.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [operation](/design/beer-game-ts/operation.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [non-functional](/design/beer-game-ts/non-functional.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [test-strategy](/design/beer-game-ts/test-strategy.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [ui-design](/design/beer-game-ts/ui-design.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [tech-stack](/design/beer-game-ts/tech-stack.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-infrastructure](/design/beer-game-ts/architecture-infrastructure.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-ts/architecture-frontend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-backend](/design/beer-game-ts/architecture-backend.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [data-model](/design/beer-game-ts/data-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [domain-model](/design/beer-game-ts/domain-model.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [user_story](/requirements/beer-game-ts/user_story.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [system_usecase](/requirements/beer-game-ts/system_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [business_usecase](/requirements/beer-game-ts/business_usecase.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [requirements_definition](/requirements/beer-game-ts/requirements_definition.md) を更新（claude-code/claude-sonnet-5-5）
 * **Creation**: [operation](/design/beer-game/operation.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [non-functional](/design/beer-game/non-functional.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [test-strategy](/design/beer-game/test-strategy.md) を作成（claude-code/claude-sonnet-5-5）

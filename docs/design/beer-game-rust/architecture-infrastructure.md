@@ -373,7 +373,7 @@ NF-R18 の要件です。待ちの上限は `stopTimeout` より短く設定し�
 
 ## 出典
 
-- [インフラストラクチャアーキテクチャ（beer-game-kotlin）](../beer-game-kotlin/architecture-infrastructure.md)、[beer-game2 のインフラストラクチャアーキテクチャ](../beer-game2/architecture-infrastructure.md)
+- [インフラストラクチャアーキテクチャ（beer-game-kotlin）](../beer-game-kotlin/architecture-infrastructure.md)、[beer-game2 のインフラストラクチャアーキテクチャ](../beer-game-ts/architecture-infrastructure.md)
 - [ADR-001（Rust 版）](../../adr/beer-game-rust/001-rust-version-of-beer-game-kotlin.md)、[技術スタック](./tech-stack.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[データモデル](./data-model.md)、[テスト戦略](./test-strategy.md)、[非機能要件](./non-functional.md)、[運用要件](./operation.md)
 - ローカル環境の調査: `rustc -vV`、`rustup target list --installed`、`docker info`、`docker images`（2026-11-19）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)、[関数型プログラミングガイド（Rust 編）](../../reference/関数型プログラミングガイド_Rust編.md)

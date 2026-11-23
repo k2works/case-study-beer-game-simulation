@@ -82,7 +82,7 @@ UI -[hidden]down-> UNIT
 - **TDD**: 失敗するテストを書き、失敗を確認してから、最小限を実装する（TDD の三原則）。**v1 の不足を埋めるテスト（役割別の週結果、削除の網羅など）は、実装より先に書く**。
 - **BDD**: 受入条件は、Given / When / Then の形で、テスト名に表す。
 - **ストーリーとの対応（v1 の差分への対応）**: テスト名に、ストーリー・受入条件の ID を含める（例: `[US2.4/AC2.4.1] Given 自動確定が有効 When 4 役割の入力がそろう Then 週が一度だけ確定される`）。ID の一覧から、**トレーサビリティの表を自動で生成**する（Living Documentation）。
-- **配置**: `apps/beer-game2/tests/` に、レベルごと（`unit`、`component`、`integration`、`e2e`）に置く。v1 のデリバリー単位（`u1`〜`u5`）の名前は使わない。
+- **配置**: `apps/beer-game-ts/tests/` に、レベルごと（`unit`、`component`、`integration`、`e2e`）に置く。v1 のデリバリー単位（`u1`〜`u5`）の名前は使わない。
 
 ## カバレッジ目標
 
@@ -195,7 +195,7 @@ stop
 
 ## トレーサビリティ（ユーザーストーリー → テスト）
 
-テスト名にストーリー・受入条件の ID を含める規約により、**対応表を自動で生成**します。下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です（v1 の状態は、[ユーザーストーリー](../../requirements/beer-game2/user_story.md) を参照）。
+テスト名にストーリー・受入条件の ID を含める規約により、**対応表を自動で生成**します。下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です（v1 の状態は、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) を参照）。
 
 | ストーリー | 受入条件 | 主なレベル | 備考 |
 | :--- | :--- | :--- | :--- |
@@ -240,7 +240,7 @@ stop
 
 ## 出典
 
-- [テスト戦略ガイド](../../reference/テスト戦略ガイド.md)、[ユーザーストーリー（v2）](../../requirements/beer-game2/user_story.md)
+- [テスト戦略ガイド](../../reference/テスト戦略ガイド.md)、[ユーザーストーリー（v2）](../../requirements/beer-game-ts/user_story.md)
 - [ドメインモデル（v2）](./domain-model.md)、[データモデル（v2）](./data-model.md)、[バックエンドアーキテクチャ（v2）](./architecture-backend.md)、[フロントエンドアーキテクチャ（v2）](./architecture-frontend.md)、[技術スタック（v2）](./tech-stack.md)
 - v1 の [テスト戦略](../beer-game/test-strategy.md)（実測: 2026-11-09）
-- [ADR-001](../../adr/beer-game2/001-rebuild-as-beer-game2.md)、[ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)
+- [ADR-001](../../adr/beer-game-ts/001-rebuild-as-beer-game2.md)、[ADR-005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)

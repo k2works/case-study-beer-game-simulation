@@ -46,7 +46,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-11T02:45:00Z }
 
 ## 人の承認が必要な項目
 
-- **マイグレーション 004**（`apps/beer-game2/migrations/004_custom_conditions.sql`）: `games` に条件の 5 列と `settings_changes` を追加。既存の行はキットの値になる。ローカルとテスト DB にだけ適用済み。
+- **マイグレーション 004**（`apps/beer-game-ts/migrations/004_custom_conditions.sql`）: `games` に条件の 5 列と `settings_changes` を追加。既存の行はキットの値になる。ローカルとテスト DB にだけ適用済み。
 - **仮の値**（`src/domain/conditions.ts` の 1 か所）: 初期在庫 0〜100、費用単価 0〜1,000（最小単位）、遅延 1〜4 週（0 は採らない）、待ち行列の各段は 4、公開範囲は「チーム合計」「進行状況だけ」。
 
 ## 学び

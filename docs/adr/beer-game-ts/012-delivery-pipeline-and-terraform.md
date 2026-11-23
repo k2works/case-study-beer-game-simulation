@@ -57,4 +57,4 @@ v1 では、CI の staging と production が `echo` のプレースホルダー
 
 - 著者: claude-code
 - 関連 ADR: [ADR-007](./007-cascade-deletion-without-queues.md)、[ADR-011](./011-cloudfront-domain-tls-headers.md)
-- 参照: [インフラ（v2）](../../design/beer-game2/architecture-infrastructure.md)、[運用要件](../../design/beer-game2/operation.md)
+- 参照: [インフラ（v2）](../../design/beer-game-ts/architecture-infrastructure.md)、[運用要件](../../design/beer-game-ts/operation.md)

@@ -55,4 +55,4 @@ v1 の ADR-007 は、CloudFront の単一オリジンを決めたが、既定の
 
 - 著者: claude-code
 - 関連 ADR: v1 の [ADR-007](../beer-game/007-cloudfront-single-origin.md)（引き継ぎ、拡張）
-- 参照: [インフラ（v2）](../../design/beer-game2/architecture-infrastructure.md)
+- 参照: [インフラ（v2）](../../design/beer-game-ts/architecture-infrastructure.md)

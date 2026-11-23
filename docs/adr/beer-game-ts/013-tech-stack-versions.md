@@ -56,4 +56,4 @@ v1 では、Node.js の版がそろっていなかった（開発機 24、CI と
 
 - 著者: claude-code
 - 関連 ADR: [ADR-001](./001-rebuild-as-beer-game2.md)
-- 参照: [技術スタック（v2）](../../design/beer-game2/tech-stack.md)
+- 参照: [技術スタック（v2）](../../design/beer-game-ts/tech-stack.md)

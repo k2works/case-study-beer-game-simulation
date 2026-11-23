@@ -1,6 +1,6 @@
-# beer-game2 — 運用
+# beer-game-ts — 運用
 
-beer-game2 プロジェクトの運用ドキュメントです。
+beer-game-ts プロジェクトの運用ドキュメントです。
 
 ## ドキュメント一覧
 
