@@ -4399,6 +4399,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        段階 2 で、後の段階へ持ち越したもの・分かったこと
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#1" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -13765,9 +13776,56 @@
 <td style="text-align: left;"><code>getHealth</code>・<code>getReady</code> を <code>/api/v1</code> に実装（未実装は 25 → 23 件）。problem+json（<code>code</code>・<code>type</code>・<code>errors[]</code>・<code>Retry-After</code>）、Origin（<code>ALLOWED_ORIGINS</code>）、<code>Idempotency-Key</code> の検査、本文 64 KB、404 を契約の形で。<strong>旧い経路（<code>/api/*</code>）は従来の形のまま</strong>（段階 4 まで。URL の接頭辞で切り替える）。537 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">2〜7</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;">読み取りの 7 操作（<code>getGameState</code>・<code>getSessionState</code>・<code>getLobby</code>・<code>getObservation</code>・<code>getReview</code>・<code>getExport</code>・<code>getRetention</code>）を <code>/api/v1</code> に実装（未実装は 23 → 16 件）。応答は契約のスキーマに適合し、開示・認可の規則（参加者は自分の役割だけ、観察者に役割別の値を見せない、終了前は 409 <code>game.not_ended</code>、無資格・別ゲーム・存在しないゲームは同じ 403）を契約テスト 26 件で検査。564 件通過。<strong>ゲート 1 で、マイグレーション 007（<code>role_decisions.saved_at</code>）を承認</strong>（2026-11-24、ユーザー）。<code>versions.game</code>・<code>versions.session</code> は、既存の <code>games.version</code>・<code>sessions.version</code> から返せる（スキーマ変更なし）</td>
+</tr>
+<tr>
+<td style="text-align: center;">3〜7</td>
 <td style="text-align: left;">未着手</td>
 <td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<h3 id="2">段階 2 で、後の段階へ持ち越したもの・分かったこと<a class="headerlink" href="#2" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: center;">持ち越し先</th>
+<th style="text-align: left;">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>カスタム条件の形の差（ドメインの変更）</strong></td>
+<td style="text-align: center;">3（開始前にゲート）</td>
+<td style="text-align: left;">契約の <code>CustomConditions</code> は、役割ごとの初期在庫（<code>initialInventory: {役割: 数}</code>）と初期の流れ（<code>initialFlow</code>）を持つ。TS は、全役割に共通の 1 つの初期在庫しか持たず、初期の流れは固定（4）。共有 UI の <code>custom-conditions-ui</code>（「小売店の初期在庫を 20」）は、役割ごとの値を使う。<strong>ドメインの条件（<code>Conditions</code>）の変更と、<code>games.initial_inventory</code>（整数）の保存形式の変更（スキーマ変更）が要る</strong>ので、段階 3 の <code>createGame</code> の前に、案を示して確認する</td>
+</tr>
+<tr>
+<td style="text-align: left;">公開範囲の呼び名</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">契約は <code>TEAM_TOTAL</code>・<code>NONE</code>、TS の内部は <code>TEAM_TOTAL</code>・<code>PROGRESS_ONLY</code>。読み取りは <code>disclosureNameOf</code> で写す。作成の入力は、段階 3 で <code>NONE</code> → <code>PROGRESS_ONLY</code> に写す（保存済みの値は変えない）</td>
+</tr>
+<tr>
+<td style="text-align: left;">出力の形の版</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">契約の出力は <code>beer-game-kotlin.export.v1</code>（Kotlin・Rust と同じ形式なので同じ値）。旧い出力（<code>beer-game2.export.v1</code>）は、旧い経路と一緒に、段階 4 で撤去する（前に「<code>beer-game2.export.v1</code> は変えない」としたのは、旧い経路の出力のこと）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>RoleStatus.decisionSavedAt</code></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: left;">完了。永続化が、新しく保存された入力に <code>now()</code> を付け、既存の入力の時刻は引き継ぐ（別の役割の保存で変わらないことを、PostgreSQL の統合テストで検査）</td>
+</tr>
+<tr>
+<td style="text-align: left;">保持の <code>nextAttemptAt</code>・<code>lastFailureCode</code></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: left;"><code>nextAttemptAt</code> は、再試行を定期のタスクの次の実行で行い、指数の待ちを持たないので null。<code>lastFailureCode</code> は記録していないので null。契約の型は両方とも null を許す。<code>IN_PROGRESS</code> は、状態の記録が無いので現れない</td>
+</tr>
+<tr>
+<td style="text-align: left;">開始後の役割の入れ替え（H4）の <code>replaced</code></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">読み取りは <code>replaced</code> を省略（false）。H4 の実装は、段階 3 の前にスキーマ変更の案を確認する（2026-11-24、実装することは承認済み）</td>
 </tr>
 </tbody>
 </table>
@@ -13836,6 +13894,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">段階 1 の完了を反映（横断の仕組み、<code>getHealth</code>・<code>getReady</code>、持ち越しの一覧）</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">段階 2 の完了を反映（読み取り 7 操作、マイグレーション 007 の承認、段階 3 へ持ち越す差）</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
