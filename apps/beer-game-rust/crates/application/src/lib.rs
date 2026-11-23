@@ -8,10 +8,12 @@ use beergame_domain::{
     ValidationError,
 };
 
+mod alarms;
 mod commands;
 mod export;
 mod idempotency;
 mod maintenance;
+mod metrics;
 mod retention;
 mod seal;
 mod sealed_replay;
@@ -19,6 +21,10 @@ mod secret;
 mod snapshot;
 mod start;
 
+pub use alarms::{
+    AlarmRule, AlarmState, Comparison, EVALUATION_STEP_SECONDS, MetricSpec, MissingData,
+    SYNTHETICS_NAMESPACE, Severity, Statistic, catalog as alarm_catalog, detection_delay, evaluate,
+};
 pub use commands::{
     AppSettings, CreateGameInput, CreateOutcome, CredentialLookup, CredentialRecord, Env,
     InviteOutcome, JoinOutcome, ObserverJoinOutcome, RecoverOutcome, ReissueOutcome, SessionWriter,
@@ -32,6 +38,11 @@ pub use idempotency::{Executed, Idempotency, ResponseShape, StoredResponse};
 pub use maintenance::{
     Inconsistency, ProjectionMaintenance, RebuildOutcome, RebuildReport, VerifyReport,
     rebuild_projections, verify_projections,
+};
+pub use metrics::{
+    AttemptOutcome, MAIN_OPERATIONS, MetricSample, MetricSink, MetricUnit, NoMetrics,
+    RequestOutcome, attempt_metrics, is_main_operation, names as metric_names, request_metrics,
+    sweep_metrics, verify_metrics,
 };
 pub use retention::{
     BACKUP_RETENTION_DAYS, DueGame, MAX_ATTEMPTS, RetentionReport, RetentionState, RetentionStore,
