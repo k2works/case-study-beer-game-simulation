@@ -78,6 +78,94 @@ TS にだけあって契約に無いもの（共有 UI は使わない。削除�
 
 **ゲート（人の確認が要る点）**: ①DB のスキーマ変更（`versions.game` の持ち方。既存の列から導出できなければ、段階 2 の前に止まって案を示す）、②ガイドツアーの第 10 ステップ（`ui/src/features/play.tsx` の `@guidedTour`）の移し先か、ツアーを縮めるか、③TS 独自の機能（SSE・unassign・console）を捨てることの確認、④契約そのものの変更が要る場合。
 
+## 段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）
+
+段階 3（コマンド）に入る前に、スキーマ変更とドメインの規則の変更が要る 3 件の案。**いずれも、承認されるまで実装しない**（スキーマ変更・業務ルールの変更は確認必須）。AWS は未適用なので、既存データへの影響は開発 DB だけ。
+
+### 案 1: カスタム条件（役割ごとの初期在庫と、初期の流れ）— マイグレーション 008
+
+**なぜ要るか**: 契約の `CustomConditions` は、役割ごとの初期在庫（`initialInventory: {役割: 数}`）と、初期の流れ（`initialFlow`。遅延の各段にある数量。キットは 4）を持つ。TS は、全役割に共通の初期在庫 1 つだけを持ち、初期の流れは定数（`INITIAL_PIPELINE = 4`）。共有 UI の `custom-conditions-ui`（「**小売店の**初期在庫を 20 に変える」）は役割ごとの値を送るので、**この変更が無いと `@ui` の 1 シナリオが TS で通らない**。ロビーの「カスタム（変更: 初期在庫、配送の遅延）」の表示にも、`INITIAL_INVENTORY`・`INITIAL_FLOW` の区別が要る。
+
+**スキーマ（案）**: `games` の整数列 `initial_inventory` を、**役割ごとの 4 列**に置き換え、`initial_flow` を足す（`games` は、条件を平らな列で持つ現在の流儀のまま。CHECK 制約で守れる）。`sessions.settings`（jsonb。開始時点の条件の写し）も、同じ形に変換する。
+
+```sql
+-- Up
+ALTER TABLE games
+  ADD COLUMN initial_inventory_factory     integer CHECK (initial_inventory_factory     >= 0),
+  ADD COLUMN initial_inventory_distributor integer CHECK (initial_inventory_distributor >= 0),
+  ADD COLUMN initial_inventory_wholesaler  integer CHECK (initial_inventory_wholesaler  >= 0),
+  ADD COLUMN initial_inventory_retailer    integer CHECK (initial_inventory_retailer    >= 0),
+  ADD COLUMN initial_flow integer NOT NULL DEFAULT 4 CHECK (initial_flow BETWEEN 0 AND 1000);
+UPDATE games SET initial_inventory_factory = initial_inventory, initial_inventory_distributor = initial_inventory,
+                 initial_inventory_wholesaler = initial_inventory, initial_inventory_retailer = initial_inventory;
+ALTER TABLE games
+  ALTER COLUMN initial_inventory_factory SET NOT NULL, ALTER COLUMN initial_inventory_distributor SET NOT NULL,
+  ALTER COLUMN initial_inventory_wholesaler SET NOT NULL, ALTER COLUMN initial_inventory_retailer SET NOT NULL,
+  DROP COLUMN initial_inventory;
+UPDATE sessions SET settings = settings
+  || jsonb_build_object('initialInventory', jsonb_build_object(
+       'FACTORY', settings->'initialInventory', 'DISTRIBUTOR', settings->'initialInventory',
+       'WHOLESALER', settings->'initialInventory', 'RETAILER', settings->'initialInventory'),
+     'initialFlow', 4)
+ WHERE jsonb_typeof(settings->'initialInventory') = 'number';
+-- Down: 4 列 → 1 列（小売店の値。役割ごとの違いは失われる。開発 DB だけの想定）、sessions.settings も数値に戻す
+```
+
+**ドメイン・アプリの変更**: `Conditions.initialInventory: number` → `Record<Role, number>`、`Conditions.initialFlow: number` を追加。`initialRoleStates` は役割ごとの在庫と `initialFlow` を使う。`ConditionItem` に `initialFlow` を追加。`kitPreset`（キットとの差の判定）は、役割ごとに比べる（どれか 1 つでも違えば `INITIAL_INVENTORY`）。永続化（`pg-repositories.ts`）、出力の元データの読み取り（`pg-export-reader.ts`）、HTTP の入力の検証（zod）、`contract-settings.ts` の写像（`initialFlow` → `INITIAL_FLOW`）を直す。
+
+**範囲の合わせ込み**: TS の条件の範囲は「仮の値（運営者と未合意）」で、契約より狭い（初期在庫 0〜100、遅延 1〜4 週、費用 0〜1000。契約は 0〜1000、1〜8、0〜100000。初期の流れは 0〜1000）。共有 UI の入力の検証は契約の範囲なので、**TS も契約の範囲に合わせる**案（`CONDITION_LIMITS` を 1 か所で変更。DB の CHECK は下限だけなので変更不要）。
+
+**公開範囲の呼び名**: 契約は `NONE`、TS の内部は `PROGRESS_ONLY`。入力で `NONE` を受けて `PROGRESS_ONLY` に写す（HTTP の境界。保存済みの値は変えない。スキーマ変更なし）。
+
+**影響**: `initialInventory` を使うテスト・UI が 14 ファイル（テスト 9、`ui/` 5。計 41 か所）。**旧い経路（`/api/*`）と旧い UI は、段階 4・6 で撤去するまで、`settings.initialInventory` を数値で返す必要がある**ので、旧い経路の応答だけ、小売店の値を返す暫定の写し（`settingsView`）を置く（段階 4 で撤去）。
+
+**却下した案**: ①`jsonb` 1 列（`initial_inventory_by_role`）— 列の流儀と CHECK 制約の利点を失う。②今の整数列を残し、「差分だけ」を別の jsonb に持つ — 判定が二重になる。③TS では役割ごとの初期在庫を受けず、`@ui` の当該シナリオを許可リストで除外 — 契約への適合が崩れ、共有 UI の機能が TS だけ欠ける。
+
+### 案 2: 開始後の役割の入れ替え（H4）と資格の失効・再発行 — マイグレーション 009
+
+**なぜ要るか**: 契約の `assignRole`（`PUT /games/{g}/participants/{p}/role`）は、準備中の付け替え（D9）に加え、**開始後**に、役割を持たない参加者を、すでに担当がいる役割へ割り当てる「入れ替え」を受け付け、旧担当者の資格を同じ操作で失効させる。ロビーは、入れ替えられた旧担当者を `replaced: true` で残す（履歴と入力者のラベルのため）。**共有 UI の `@ui` は、入れ替えを使わない**（`replaced` を参照する画面は無い。入れ替えは、`@api` の `credentials.feature` だけ）。**契約への適合のための実装**で、TS で `@ui` を通すだけなら、この案は後に回せる（ご判断）。
+
+**スキーマ（案）**: `participants` に、**入れ替えられた時刻**を 1 列足すだけ。入れ替えられた旧担当者は、`role` を NULL にし、`replaced_at` を設定する。行は残す（`role_decisions.saved_by` が参照する入力者のラベルのため）。
+
+```sql
+-- Up
+ALTER TABLE participants ADD COLUMN replaced_at timestamptz;
+-- Down
+ALTER TABLE participants DROP COLUMN replaced_at;
+```
+
+**ドメイン・アプリの変更**（契約の `assignRole` の規則どおり）:
+- 準備中: **別の役割にいる人を選ぶと「付け替え」**（いまの TS は「すでに ○○ です」と拒否する。契約は `RoleUnassigned` と `RoleAssigned` で付け替える）。同じ役割への割り当て直しは、何も変えず 200（イベントも版も足さない）。
+- 開始後: 担当者のいる役割へ、**役割を持たない参加者**を割り当てると、その役割の**現在の担当者全員**が入れ替わる（共同担当も全員）。旧担当者の復帰資格を失効（`recovery_revoked_at`）し、ブラウザセッション（`browser_sessions`）の行を、同じトランザクションで削除する。`session.holders`（開始時点の写し）を新担当者に更新し、game・session の両方の版を進める。新しいイベント（`RoleReplaced`）を、履歴に足す。
+- 拒否: 別の役割にいる人の開始後の付け替えは `game.not_preparing`（409）、終了後は `session.already_ended`（409）、資格が失効済みの参加者は `game.credential_already_revoked`（409）、存在しない参加者は `game.participant_not_found`（404）。
+- `Participant` に `replaced`（入れ替えられたか）を足し、ロビーの `replaced` に出す。ロビーと `getGameState`（`role`）は、入れ替えられた人を、役割の担当として数えない。
+- **資格の失効・再発行**（`revokeCredential`・`reissueCredential`）は、既存の列（`participants.recovery_revoked_at`・`browser_sessions`）で足りる（**スキーマ変更なし**）。契約は、失効と再発行を別の操作に分け、失効済みでない資格の再発行を `game.credential_not_revoked`（409）、失効済みの再失効を `game.credential_already_revoked`（409）で拒否する。いまの TS の `reissueCredential`（失効＋再発行を 1 つで行う）は、契約の形に分ける。
+
+**却下した案**: `participants` の行を消す（入力者のラベルと、`role_decisions` の参照が失われる）／`participants.role` に履歴を持たせる（担当の判定が複雑になる）。
+
+### 案 3: `createGame` の冪等（`Idempotency-Key`）— マイグレーション 010
+
+**なぜ要るか**: 契約は、変更系すべてに `Idempotency-Key` を必須とし、同じキーの再送は保存した応答を返す。共有 UI は、結果が不明な失敗（切断・`type` の無い 5xx）で、同じキーで最大 2 回再送する。TS の冪等記録（`idempotency_records`）は、`game_id` が `games` への外部キーなので、**ゲームの存在前の `createGame` は載せられなかった**。
+
+**案**: 新しいゲームの ID（作成と同じトランザクションで作る）を `game_id` として、`scope = 'create'` の記録を保存し、**キーのダイジェストだけで検索できる部分一意索引**を足す（**新しい表は作らない**。Kotlin 版の設計（`uq_idempotency_create`）と同じ）。再送は、索引で記録を見つけ、保存した応答（暗号化済み。復帰コードを含む）を返す。本文が違えば `app.idempotency_key_reused`（409）。同時の重複は、一意制約の違反を競合として扱い、再試行で保存済みの応答を返す。
+
+```sql
+-- Up
+CREATE UNIQUE INDEX uq_idempotency_create ON idempotency_records (key_digest) WHERE scope = 'create';
+-- Down
+DROP INDEX uq_idempotency_create;
+```
+
+**ほかの変更系の冪等**（`joinGame`・`recoverParticipation`・`joinAsObserver` など）は、対象のゲームが先に決まる（参加コード・本文の `gameId`・招待から）ので、**既存の表と主キーのまま**で足りる（スキーマ変更なし）。
+
+**却下した案**: 作成だけ冪等を保存しない — 再送で、ゲームが重複して作られる（共有 UI が再送する前提と合わない）。
+
+### 承認の確認事項
+
+1. 案 1（マイグレーション 008。範囲を契約に合わせることを含む）を実装してよいか。
+2. 案 2（マイグレーション 009）を、段階 3 で実装してよいか。それとも、`@ui` が TS で通ってから（段階 6 の後の追加作業）にするか。
+3. 案 3（マイグレーション 010）を実装してよいか。
+
 ## 進捗
 
 | 段階 | 状態 | 備考 |
