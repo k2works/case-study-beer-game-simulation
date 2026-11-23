@@ -102,7 +102,7 @@ Kotlin 版と同じです（デモ項目・受入条件をシナリオにして�
 
 | 項目 | Rust 版 |
 | :--- | :--- |
-| フィーチャーファイル | **Kotlin 版の `apps/beer-game-kotlin/features/` を共有する**（RF1。承認済み。複製しない）。**API の契約が同じなので、シナリオは変わらない見込み** |
+| フィーチャーファイル | **共有の `apps/beer-game-features/` を Kotlin 版と共有する**（RF1。承認済み。複製しない。2026-11-23 に Kotlin 版のディレクトリから移した）。**API の契約が同じなので、シナリオは変わらない見込み** |
 | `@api` の実行 | cucumber-rs（`cucumber` 0.23.0）。`# language: ja` の解釈は**未確認**（[技術スタック](./tech-stack.md) の R5。不可なら、英語のキーワード + 日本語の本文などの代替を比較） |
 | `@ui` の実行 | Cucumber-JS + Playwright（既存。バックエンドが Rust に変わるだけ） |
 | ステップ定義 | `crates/app/tests/acceptance/`（候補）。薄く保ち、業務ロジックを持ち込まない。ステップ定義も静的解析の対象 |

@@ -281,7 +281,7 @@ AI がサイクルを回し、人が承認ゲートでコードを全行理解�
 | 画面 | **Cucumber-JS**（公式。`@cucumber/cucumber`）と Playwright | `@ui` | フロントエンドの E2E。実 Ktor サーバーを通す |
 
 - **1 つのシナリオは、1 つの層だけで実行する**（`@api` か `@ui`）。画面を通す必要のある業務（振り返りの表示、アクセシビリティ）だけを `@ui` にし、そのほかは `@api` にする。同じシナリオを両方の層で実行して、ステップ定義を二重に持たない。
-- **配置（B1 で確定）**: フィーチャーファイルは `apps/beer-game-kotlin/features/<機能領域>/` に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の `acceptanceTest`、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所（Cucumber-JVM は `src/test/resources`、Cucumber-JS は `features/`）と合わせられるかを、B1 で確認する。
+- **配置（B1 で確定）**: フィーチャーファイルは `apps/beer-game-features/<機能領域>/`（2026-11-23 に Kotlin 版から移動）に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の `acceptanceTest`、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所（Cucumber-JVM は `src/test/resources`、Cucumber-JS は `features/`）と合わせられるかを、B1 で確認する。
 - **注意（Cucumber-JS、ガイドより）**: グローバルにインストールしない（プロジェクトの依存として入れる）。依存ツリーに複数の版を混在させない（`npm why @cucumber/cucumber` で確認）。パッケージは旧 `cucumber` ではなく `@cucumber/cucumber`。
 - **導入の手続き**: 導入は決定済み。**具体的な成果物（Cucumber-JVM のモジュール、Cucumber-JS）と版は、[技術スタック](../../design/beer-game-kotlin/tech-stack.md) の手順で、公式の情報で確認してから確定し、依存関係の導入の承認を得る**（B1）。版は、このとき確認する。
 - **実行**: `@api` は Gradle のタスク、`@ui` は `npx cucumber-js` を、CI の毎回の工程に含める（[テスト戦略](../../design/beer-game-kotlin/test-strategy.md) の CI）。
