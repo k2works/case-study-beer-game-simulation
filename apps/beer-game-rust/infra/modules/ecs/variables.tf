@@ -2,7 +2,7 @@ variable "name" { type = string }
 
 variable "environment" {
   type        = string
-  description = "APP_ENV に渡す値（staging または production）"
+  description = "ENVIRONMENT に渡す値（staging または production。メトリクスのディメンション Environment と同じ。アラーム・ダッシュボードが引く）"
 
   validation {
     condition     = contains(["staging", "production"], var.environment)
@@ -13,11 +13,26 @@ variable "environment" {
 variable "subnet_ids" { type = list(string) }
 variable "task_security_group_id" { type = string }
 variable "target_group_arn" { type = string }
-variable "allowed_origin" { type = string }
-
-variable "db_url" {
+variable "allowed_origin" {
   type        = string
-  description = "JDBC の接続 URL（資格を含まない）"
+  default     = ""
+  description = "Rust 版のアプリは使わない（画面は CloudFront の同じオリジン）。環境の定義との互換のために残す"
+}
+
+variable "db_host" {
+  type        = string
+  description = "DB のホスト（RDS のエンドポイント）。アプリが DB_HOST・DB_USER・DB_PASSWORD から接続 URL を組み立てる"
+}
+
+variable "db_port" {
+  type        = number
+  default     = 5432
+  description = "DB のポート"
+}
+
+variable "db_name" {
+  type        = string
+  description = "DB の名前"
 }
 
 variable "image" {
@@ -28,8 +43,16 @@ variable "image" {
 variable "secret_arns" { type = list(string) }
 variable "database_secret_arn" { type = string }
 variable "credential_key_secret_arn" { type = string }
-variable "idempotency_key_secret_arn" { type = string }
-variable "response_key_secret_arn" { type = string }
+# Rust 版のアプリは、資格の鍵（CREDENTIAL_KEY）だけを読む。次の 2 つは使わない（環境の定義との互換のために残す）
+variable "idempotency_key_secret_arn" {
+  type    = string
+  default = ""
+}
+
+variable "response_key_secret_arn" {
+  type    = string
+  default = ""
+}
 
 variable "container_port" {
   type    = number
@@ -163,12 +186,6 @@ variable "batch_memory" {
   type        = number
   default     = 1024
   description = "同メモリの初期案（実測で見直す）"
-}
-
-variable "deleter_role" {
-  type        = string
-  default     = "beergame_deleter"
-  description = "retention が SET ROLE する削除用のロール（マイグレーション V101 が作る NOLOGIN のロール）"
 }
 
 variable "scheduled_tasks_enabled" {

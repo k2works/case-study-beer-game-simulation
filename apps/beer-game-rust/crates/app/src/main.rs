@@ -78,8 +78,10 @@ async fn main() -> ExitCode {
         return ExitCode::from(64);
     }
     init_logging();
-    let Ok(database_url) = std::env::var("DATABASE_URL") else {
-        return config_error("DATABASE_URL が必要です。");
+    // `DATABASE_URL`、または部品（`DB_HOST`・`DB_USER`・`DB_PASSWORD` ほか。ECS は秘密を 1 つの URL に合成できない）から
+    let Some(database_url) = beergame_app::config::database_url(|key| std::env::var(key).ok())
+    else {
+        return config_error("DATABASE_URL、または DB_HOST・DB_USER・DB_PASSWORD が必要です。");
     };
     // メトリクスは EMF の JSON 行を標準出力へ（BD9）。環境の名前は `ENVIRONMENT`（既定 local）
     let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "local".to_owned());

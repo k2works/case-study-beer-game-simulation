@@ -80,28 +80,24 @@ resource "aws_iam_role" "task" {
 }
 
 locals {
-  # ServerConfig（アプリの設定）が読む環境変数。値は秘密を含まない。
-  # APP_ENV は local|test|staging|production の 4 値（AppEnv）。DB_KIND は postgres に固定（H2 は起動時に拒否される。二重の防御）
+  # アプリ（crates/app の main.rs・config.rs）が読む環境変数。値は秘密を含まない。
+  # 接続 URL は、アプリが DB_HOST・DB_PORT・DB_NAME と、秘密の DB_USER・DB_PASSWORD から組み立てる
+  # （ECS は Secrets Manager の値を 1 つの URL に合成できない。DATABASE_URL は、ローカル・試験で使う）。
+  # ENVIRONMENT は、メトリクスのディメンション Environment（アラーム・ダッシュボードが同じ値で引く。staging または production）。
   environment = [
-    { name = "APP_ENV", value = var.environment },
-    { name = "DB_KIND", value = "postgres" },
-    { name = "DB_URL", value = var.db_url },
-    { name = "HOST", value = "0.0.0.0" },
+    { name = "ENVIRONMENT", value = var.environment },
+    { name = "DB_HOST", value = var.db_host },
+    { name = "DB_PORT", value = tostring(var.db_port) },
+    { name = "DB_NAME", value = var.db_name },
     { name = "PORT", value = tostring(var.container_port) },
-    { name = "ALLOWED_ORIGINS", value = var.allowed_origin },
-    # PostgreSQL の api は、起動時にマイグレーションを適用しない（migrate モードの 1 回限りのタスクが適用する）
-    { name = "MIGRATE_ON_START", value = "false" },
   ]
 
-  # 秘密情報（Secrets Manager から注入）。DB の資格は JSON のキーごとに取り出す（"<ARN>:<キー>::"）
-  # ServerConfig.load は、migrate モードでも、local 以外では 3 つの鍵と ALLOWED_ORIGINS を必須とする。
-  # そのため api と migrate で同じ環境変数と秘密を渡す。
+  # 秘密情報（Secrets Manager から注入）。DB の資格は JSON のキーごとに取り出す（"<ARN>:<キー>::"）。
+  # CREDENTIAL_KEY は、資格のダイジェストと冪等記録の暗号化に使う（32 バイト以上）。api と migrate などで同じものを渡す。
   secrets = [
     { name = "DB_USER", valueFrom = "${var.database_secret_arn}:username::" },
     { name = "DB_PASSWORD", valueFrom = "${var.database_secret_arn}:password::" },
     { name = "CREDENTIAL_KEY", valueFrom = var.credential_key_secret_arn },
-    { name = "IDEMPOTENCY_KEY", valueFrom = var.idempotency_key_secret_arn },
-    { name = "RESPONSE_KEY", valueFrom = var.response_key_secret_arn },
   ]
 }
 
@@ -171,7 +167,8 @@ locals {
     "retention" = {
       command     = ["retention"]
       log_group   = aws_cloudwatch_log_group.retention.name
-      environment = concat(local.environment, [{ name = "DB_DELETER_ROLE", value = var.deleter_role }])
+      # 削除ロール（beergame_deleter）への切り替えは、アプリに未実装（接続のログインユーザーのまま動く。B15 報告の未確認事項）
+      environment = local.environment
     }
     "verify-projections" = {
       command     = ["verify-projections"]

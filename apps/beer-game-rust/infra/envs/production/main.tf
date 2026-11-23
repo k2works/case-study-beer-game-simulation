@@ -99,7 +99,9 @@ module "ecs" {
   target_group_arn       = module.alb.target_group_arn
   allowed_origin         = "https://${module.web.public_domain}"
   image                  = var.image
-  db_url                 = module.rds.jdbc_url
+  db_host                = module.rds.endpoint
+  db_port                = module.rds.port
+  db_name                = module.rds.db_name
 
   secret_arns                = module.secrets.secret_arns
   database_secret_arn        = module.secrets.database_arn

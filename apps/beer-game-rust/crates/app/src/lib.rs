@@ -1,5 +1,6 @@
 //! アプリケーションの組み立て（ワイヤリング）。環境（時計・ID・乱数）と、永続化を `Backend` として HTTP に渡す。
 
+pub mod config;
 pub mod log_capture;
 pub mod maintenance_mode;
 pub mod runtime_metrics;
