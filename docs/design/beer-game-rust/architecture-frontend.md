@@ -34,7 +34,7 @@ verified:
 | 1 | 開発時の接続先 | `vite.config.ts` が `/api` を `http://localhost:${API_PORT}` へプロキシする（`API_PORT` の既定は 3000、E2E は 3100）。接続先はポート番号の環境変数だけで、Kotlin に固有の値はない | **変更なし**。Rust のバックエンドを同じポートで起動すれば、そのまま接続できる |
 | 2 | E2E のバックエンド起動の案内 | `support/hooks.mjs` は、バックエンドが**起動済みであること**を前提にし、起動していなければ、`cd apps/beer-game-kotlin && APP_ENV=local DB_KIND=h2 PORT=… ALLOWED_ORIGINS=… ./gradlew :app:run` という**案内の文言**を出して失敗する（実際の起動はしない） | **案内の文言だけが Kotlin 固有**。起動コマンドを差し替えられるようにする（設計判断 RF3） |
 | 3 | 契約と受入条件の場所 | `package.json` の `api:lint`・`api:generate` は `../contracts/openapi.yaml`、`cucumber.mjs` は `../features/**/*.feature` を相対パスで参照する | **契約とフィーチャーファイルの共有方法を決める**（設計判断 RF1。Rust 版の `apps/beer-game-rust/` には現在 `.gitkeep` しかない） |
-| 4 | パッケージ名 | `@beer-game-kotlin/web` | 共有するなら、名前の扱い（変更は構造の変更で確認が要る） |
+| 4 | パッケージ名 | `@beer-game-kotlin/web`（2026-11-23 に `@beer-game/web` へ変更） | 共有するなら、名前の扱い（変更は構造の変更で確認が要る） |
 
 **バックエンドが満たすべき契約の確認事項**（Rust のバックエンドが `web/` と動くための条件。調査で確認した実装の事実）:
 
@@ -66,7 +66,7 @@ Kotlin 版の決定を**そのまま引き継ぎます**（小規模・`features
 @startuml
 title フロントエンドとバックエンドの関係（Rust 版）
 
-package "apps/beer-game-kotlin/web/（既存。複製しない）" {
+package "apps/beer-game-web/（共有。複製しない。旧 apps/beer-game-kotlin/web/）" {
   [features/（画面）] as Features
   [api/（ApiClient・エラー・X-Tab-Id）\n生成した型を使う] as Api
   [api/generated/schema.d.ts\n（OpenAPI から生成。コミット済み）] as Gen
@@ -140,7 +140,7 @@ Kotlin 版と同じです（アクセシビリティ、堅牢性（版比較・�
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用）** | **既存の `apps/beer-game-kotlin/web/` を、そのまま使う**（移動も複製もしない）。Rust 版の CI・E2E は、`web/` を、Rust のバックエンドに向けて実行する。`contracts/openapi.yaml` と `features/` も、現在の場所を共有する | 追加の構造変更が要らない。画面と E2E が 1 か所で、食い違わない。Rust 版が Kotlin 版のディレクトリに依存する（Kotlin 版の変更が Rust 版に影響する） |
+| **A（採用）** | **既存の `web/` を、そのまま使う**（複製しない）。**2026-11-23 に `apps/beer-game-kotlin/web/` から、中立の `apps/beer-game-web/` へ移した**（Kotlin 版にも Rust 版にも属さない共有物にするため。パッケージ名は `@beer-game/web` に変えた。以下の「Kotlin 版のディレクトリに依存する」は、移動前の評価）。Rust 版の CI・E2E は、`web/` を、Rust のバックエンドに向けて実行する。`contracts/openapi.yaml` と `features/` も、現在の場所を共有する | 追加の構造変更が要らない。画面と E2E が 1 か所で、食い違わない。Rust 版が Kotlin 版のディレクトリに依存する（Kotlin 版の変更が Rust 版に影響する） |
 | B | `apps/beer-game-rust/web/` に**複製**する（契約・フィーチャーも複製） | Rust 版が自己完結する。画面・契約・E2E が二重になり、差分の管理が要る（UI 設計の RU1 と同じ問題） |
 | C | `web/`・`contracts/`・`features/` を、**プロジェクトに属さない共通のディレクトリへ移す** | 正本が 1 つになり、依存の向きが自然になる。**ディレクトリ構造の大規模な変更**で、Kotlin 版のビルド・CI・手順書・文書の参照をすべて直す必要がある。**確認必須** |
 

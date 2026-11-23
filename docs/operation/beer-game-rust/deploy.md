@@ -48,7 +48,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-23T00:00:00Z }
 ビルド → ECR への push → 新しいタスク定義の登録（api・migrate・retention・verify-projections を同じイメージへ）→ `migrate`（1 回限りのタスク。失敗したら中止）→ api の更新 → 静的ファイルの公開 → スモークテスト（`/api/v1/ready`・`/api/v1/health`）→ 履歴の記録。失敗したら、直前の版へ自動で戻す。
 
 - イメージは、コミット SHA のタグで ECR へ push し、以降は**ダイジェスト**で固定する。本番へは、ステージングで検証した**同じダイジェスト**を昇格する。
-- 画面（`web/`）は Kotlin 版と共有する（`apps/beer-game-kotlin/web`）。静的ファイルは、`releases/<SHA>/` に置き、`current/` に反映する。
+- 画面（`web/`）は Kotlin 版と共有する（`apps/beer-game-web`。2026-11-23 に Kotlin 版のディレクトリから移動）。静的ファイルは、`releases/<SHA>/` に置き、`current/` に反映する。
 - 自動確定を含む業務のスモークテストは未実装（未確認）。
 
 ## 書く版の切り替え（スキーマの版を上げるとき）

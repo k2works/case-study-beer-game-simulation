@@ -84,7 +84,7 @@ Contract ..> Routes
 
 | 項目 | 設計 |
 | :--- | :--- |
-| 開発 | Vite の開発サーバーが、`/api` を Ktor へプロキシする（接続先は環境変数。ポートは固定の値を書かない）。バックエンドは Gradle で起動し、データベースは Docker の PostgreSQL（**B1 の実装は、ローカルなら H2 でもよい**。`APP_ENV=local DB_KIND=h2`）。**B1 の実装の場所は `apps/beer-game-kotlin/web/`**（設計の `ui/` でなく `web/`。Vite のポートは環境変数 `UI_PORT`・`API_PORT`）。**中継（Vite）を通すと、バックエンドが見る `Host` と `Origin` が一致せず、変更系の要求が 403 になる**（実ブラウザで初めて判明）。バックエンドの Origin 検査を弱めず、`ALLOWED_ORIGINS=http://localhost:<UI のポート>` を指定する（開発手順書への反映は未実施） |
+| 開発 | Vite の開発サーバーが、`/api` を Ktor へプロキシする（接続先は環境変数。ポートは固定の値を書かない）。バックエンドは Gradle で起動し、データベースは Docker の PostgreSQL（**B1 の実装は、ローカルなら H2 でもよい**。`APP_ENV=local DB_KIND=h2`）。**B1 の実装の場所は `apps/beer-game-kotlin/web/`**（2026-11-23 に、Rust 版と共有する `apps/beer-game-web/` へ移動。設計の `ui/` でなく `web/`。Vite のポートは環境変数 `UI_PORT`・`API_PORT`）。**中継（Vite）を通すと、バックエンドが見る `Host` と `Origin` が一致せず、変更系の要求が 403 になる**（実ブラウザで初めて判明）。バックエンドの Origin 検査を弱めず、`ALLOWED_ORIGINS=http://localhost:<UI のポート>` を指定する（開発手順書への反映は未実施） |
 | 型の生成 | `contracts/openapi.yaml` から、`ui/src/shared/api/generated/` へ生成する。**生成物はコミットしない**（ビルドの前に必ず生成する）。仕様が変わると、型エラーで影響する画面が分かる。**B2 の実装（2026-11-15）は、この設計と異なり、生成物 `web/src/api/generated/schema.d.ts` をコミットし、`api:check` で差分 0 を検査する**（変更表 18。人の確認が要る）。**B1 の実装は、生成ツールの選定・承認が B2 のため、`web/src/api/types.ts` に B1 の範囲を手書きした**（ファイルの先頭に明記。`ErrorCode` は openapi.yaml の enum の手写しで、辞書は `Record<ErrorCode, ...>` なので、`code` を足すと型エラーで漏れが分かる。仕様との同期は手動で、自動の検査は B2 の契約テストまで無い） |
 | 配信 | 静的ファイルを、S3 へ版つきで配置し、CloudFront から配信する（[インフラストラクチャ](./architecture-infrastructure.md)）。**フロントエンドは、バックエンドのイメージに含めない**（beer-game2 と同じ） |
 | E2E | Playwright。開発者が使う開発サーバーとは別の、専用のポートで起動する（開発中のサーバーを止めない）。**B1 の実装: Cucumber-JS + Playwright（Chromium）。Vite は 5273、バックエンドは 3100**（3000・5173 は使わない）。前提の準備は実 API、操作は実ブラウザ |
