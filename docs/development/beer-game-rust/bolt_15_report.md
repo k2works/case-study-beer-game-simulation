@@ -59,6 +59,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-23T00:00:00Z }
 5. **共有の画面（`web/`）は Kotlin 版のもの**: デプロイの静的ファイルの公開は、`apps/beer-game-kotlin/web` を使う。
 6. **テストが、偶然通っていた**: 復元スクリプトの「引数が足りなければ失敗」の 2 件は、スクリプトが無い間も（`bash` が失敗するので）通っていた。スクリプトを作った後は、本物の振る舞い（引数の検査）で通る。
 
+7. **CI の `infra` ジョブが、最初の push で 1 度失敗した**（`terraform fmt -check`。私が挿入したコメントが、整形の揃えを崩した）。**ローカルの確認に `terraform fmt -check` を入れていなかったため**で、`validate` だけを確認していた。直して再度 push し、`check`・`infra`・`container` はすべて成功した（最終のコミット `19339ea`）。同じ原因の `terraform fmt` の指摘は、CI が検出する。あわせて、`ecs/main.tf` に残っていた Kotlin 版の古いコメント（`Main.kt`・`SET ROLE`）を改めた。
+
 ## 未確認・簡略化（人の判断が要る項目）
 
 1. **AWS 上の動作は、すべて未確認**: ワークフローの実行、OIDC の引き受け、ブルー/グリーンの切り替えと自動の戻し、定期タスクの起動、復元（`--execute`）、アプリのコンテナの起動、EMF の取り出し、アラームの評価。**適用前の確認（[本番の運用手順書](../../operation/beer-game-rust/production.md)）の 10 項目は、すべて未実施**。
