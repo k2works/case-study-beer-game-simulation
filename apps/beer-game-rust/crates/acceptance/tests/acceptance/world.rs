@@ -165,6 +165,8 @@ pub struct ApiWorld {
     pub metrics: Arc<CapturedMetrics>,
     /// 整合検査（バッチ）が出したメトリクス。
     pub emitted: Vec<beergame_application::MetricSample>,
+    /// 複数の要求の応答（ヘッダーの検査用）。
+    pub replies: Vec<Reply>,
     /// アラームの訓練（模擬の時計と故障を模擬した系列）。
     pub drill: Drill,
 }
@@ -238,6 +240,7 @@ impl ApiWorld {
             findings: None,
             metrics: Arc::new(CapturedMetrics::default()),
             emitted: Vec::new(),
+            replies: Vec::new(),
             drill: Drill::default(),
         }
     }
@@ -300,6 +303,8 @@ impl ApiWorld {
 
     /// アプリを（初回だけ）用意する。
     pub async fn ready(&mut self) -> Result<(), String> {
+        // 構造化ログを捕捉する（受入が、秘密を含まないことを検査する。何度呼んでもよい）
+        beergame_app::log_capture::capture_logs();
         if self.app.is_none() {
             let pool = database().await?;
             let settings = Self::settings(1, 5, Vec::new());

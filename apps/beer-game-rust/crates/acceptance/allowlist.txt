@@ -85,3 +85,7 @@ operations/metrics-and-alarms.feature :: 追記の競合率が急増すると、
 operations/metrics-and-alarms.feature :: 投影の行が壊れていると、不一致のメトリクスが出力され、重大のアラーム「projection-mismatch」が発報する
 operations/metrics-and-alarms.feature :: 投影の進んだ版が遅れていると、投影の遅れのメトリクスが出力され、重大のアラーム「projection-lag」が発報する
 operations/metrics-and-alarms.feature :: 整合した投影では、不一致と遅れのメトリクスは 0 で、アラームは発報しない
+
+# B15: 構造化ログ・セキュリティヘッダー・準備の失敗（AC6.1.1・6.1.4・X-3・X-5）
+operations/observability.feature
+cross-cutting/security-baseline.feature

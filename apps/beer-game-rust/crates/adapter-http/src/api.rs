@@ -1402,6 +1402,32 @@ async fn detached<T: Send + 'static>(
     }
 }
 
+/// すべての応答に付けるセキュリティヘッダー（NF-S9。成功・拒否・存在しない経路のすべて）。
+/// API は JSON だけを返すので、CSP は何も読み込まない設定（画面は CloudFront の別のポリシー）。
+/// HSTS の max-age は、CloudFront のヘッダーポリシー（`infra/modules/web`）と同じ（1 年）。
+const SECURITY_HEADERS: [(&str, &str); 5] = [
+    (
+        "content-security-policy",
+        "default-src 'none'; frame-ancestors 'none'",
+    ),
+    (
+        "strict-transport-security",
+        "max-age=31536000; includeSubDomains",
+    ),
+    ("x-content-type-options", "nosniff"),
+    ("referrer-policy", "no-referrer"),
+    ("cache-control", "no-store"),
+];
+
+fn apply_security_headers(headers: &mut HeaderMap) {
+    for (name, value) in SECURITY_HEADERS {
+        headers.insert(
+            HeaderName::from_static(name),
+            HeaderValue::from_static(value),
+        );
+    }
+}
+
 /// 構造化ログ（AC6.1.1）。**相関 ID・操作（メソッドと経路）・結果（状態）・所要時間**だけを出す。
 /// Cookie（資格）・本文（表示名・数量）・参加コード・クエリは含めない。
 /// あわせて、要求ごとのメトリクス（応答時間・要求数・5xx・主要な操作の成功）を出す（AC6.1.3）。
@@ -1414,7 +1440,8 @@ async fn observe_request<B: Backend>(
     let method = request.method().to_string();
     let path = request.uri().path().to_owned();
     let started = std::time::Instant::now();
-    let response = next.run(request).await;
+    let mut response = next.run(request).await;
+    apply_security_headers(response.headers_mut());
     let status = response.status().as_u16();
     let correlation = response
         .headers()

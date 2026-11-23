@@ -3,6 +3,7 @@
 
 mod maintenance_steps;
 mod metrics_steps;
+mod observability_steps;
 mod retention_steps;
 mod steps;
 mod world;
