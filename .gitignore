@@ -32,6 +32,8 @@ coverage/
 dist/
 test-results/
 playwright-report/
+# IntelliJ のビルド出力（Gradle の build/ とは別。再生成されるもの）
+apps/beer-game-kotlin/**/out/
 .env
 
 # Generated and harness-local files
