@@ -24,25 +24,37 @@ pub fn parse_game_ids(args: &[String]) -> Result<Vec<GameId>, String> {
 }
 
 /// モードを実行する。マイグレーションは行わない（スキーマの適用は `migrate` モードの責務。再構築は、その後に行う）。
-pub async fn run(mode: &str, database_url: &str, args: &[String]) -> std::process::ExitCode {
-    use std::process::ExitCode;
-
+/// 結果は、メトリクスにも出す（再構築は所要時間、検査は不一致・遅れ・検査できなかった数。AC6.1.6）。戻り値は終了コード。
+pub async fn run(
+    mode: &str,
+    pool: sqlx::PgPool,
+    args: &[String],
+    sink: &dyn beergame_application::MetricSink,
+) -> u8 {
     let Ok(targets) = parse_game_ids(args) else {
         tracing::error!("形が不正なゲーム ID がある");
-        return ExitCode::from(EXIT_USAGE);
-    };
-    let Ok(pool) = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(2)
-        .connect(database_url)
-        .await
-    else {
-        tracing::error!("データベースに接続できません");
-        return ExitCode::from(EXIT_UNAVAILABLE);
+        return EXIT_USAGE;
     };
     let port = beergame_adapter_persistence::PgProjectionMaintenance::new(pool);
+    let started = std::time::Instant::now();
+    let now_millis = || {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
+    };
     if mode == "rebuild-projections" {
         match beergame_application::rebuild_projections(&port, &targets).await {
             Ok(report) => {
+                // 所要時間（ミリ秒。f64 に収まる範囲）
+                #[allow(clippy::cast_precision_loss)]
+                let elapsed = started.elapsed().as_millis() as f64;
+                sink.record(&[beergame_application::MetricSample {
+                    name: beergame_application::metric_names::PROJECTION_REBUILD_MILLIS,
+                    unit: beergame_application::MetricUnit::Milliseconds,
+                    value: elapsed,
+                    at_millis: now_millis(),
+                    operation: None,
+                }]);
                 for outcome in &report.rebuilt {
                     tracing::info!(
                         game_id = %uuid::Uuid::from_u128(outcome.game_id.get()),
@@ -59,13 +71,14 @@ pub async fn run(mode: &str, database_url: &str, args: &[String]) -> std::proces
                         "再構築できなかった"
                     );
                 }
-                ExitCode::from(rebuild_exit_code(&report))
+                rebuild_exit_code(&report)
             }
-            Err(_) => ExitCode::from(EXIT_UNAVAILABLE),
+            Err(_) => EXIT_UNAVAILABLE,
         }
     } else {
         match beergame_application::verify_projections(&port, &targets).await {
             Ok(report) => {
+                sink.record(&beergame_application::verify_metrics(&report, now_millis()));
                 tracing::info!(
                     checked = report.checked,
                     inconsistent = report.inconsistent.len(),
@@ -80,9 +93,9 @@ pub async fn run(mode: &str, database_url: &str, args: &[String]) -> std::proces
                         "投影が不一致"
                     );
                 }
-                ExitCode::from(verify_exit_code(&report))
+                verify_exit_code(&report)
             }
-            Err(_) => ExitCode::from(EXIT_UNAVAILABLE),
+            Err(_) => EXIT_UNAVAILABLE,
         }
     }
 }

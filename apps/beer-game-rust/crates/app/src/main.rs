@@ -8,10 +8,10 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use axum::serve;
-use beergame_adapter_http::router;
+use beergame_adapter_http::{EmfMetricSink, router};
 use beergame_adapter_persistence::migrate;
 use beergame_app::{PgBackend, SystemEnv, init_logging};
-use beergame_application::{AppSettings, Secret};
+use beergame_application::{AppSettings, Env, MetricSink, Secret, sweep_metrics};
 use sqlx::postgres::PgPoolOptions;
 
 /// 設定の誤り（終了コード 78）を、標準エラーへ一行で出す。
@@ -81,10 +81,24 @@ async fn main() -> ExitCode {
     let Ok(database_url) = std::env::var("DATABASE_URL") else {
         return config_error("DATABASE_URL が必要です。");
     };
+    // メトリクスは EMF の JSON 行を標準出力へ（BD9）。環境の名前は `ENVIRONMENT`（既定 local）
+    let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "local".to_owned());
+    let metrics: Arc<dyn MetricSink> =
+        Arc::new(EmfMetricSink::new(&environment, std::io::stdout()));
     if maintenance {
         // 資格の鍵は要らない。ゲーム ID は、モードの後ろの引数
         let args: Vec<String> = std::env::args().skip(2).collect();
-        return beergame_app::maintenance_mode::run(&mode, &database_url, &args).await;
+        let Ok(pool) = PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&database_url)
+            .await
+        else {
+            tracing::error!("データベースに接続できません");
+            return ExitCode::from(beergame_app::maintenance_mode::EXIT_UNAVAILABLE);
+        };
+        return ExitCode::from(
+            beergame_app::maintenance_mode::run(&mode, pool, &args, metrics.as_ref()).await,
+        );
     }
     let key = match std::env::var("CREDENTIAL_KEY") {
         Ok(key) if key.len() >= 32 => key.into_bytes(),
@@ -136,6 +150,8 @@ async fn main() -> ExitCode {
                     abandoned = report.abandoned.len(),
                     "retention"
                 );
+                // 心拍（掃引が動くたびに出る）と、再試行をやめたゲームのアラームの元（AC5.1.3・AC6.1.6）
+                metrics.record(&sweep_metrics(&report, SystemEnv.now().epoch_millis()));
                 if !report.abandoned.is_empty() {
                     tracing::error!(
                         abandoned = report.abandoned.len(),
@@ -175,15 +191,26 @@ async fn main() -> ExitCode {
         max_failed_attempts: 10,
         attempt_window_millis: 600_000,
     };
-    let app = router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)));
+    // 実行環境の観測（RSS・タスク数・panic・接続プール）を 60 秒ごとに出す。panic は数えるだけで、継続・終了は変えない
+    beergame_app::runtime_metrics::install_panic_counter();
+    let sampler = beergame_app::runtime_metrics::spawn_sampler(
+        pool.clone(),
+        Arc::clone(&metrics),
+        std::time::Duration::from_secs(60),
+    );
+    let app = router(Arc::new(
+        PgBackend::new(pool, SystemEnv, settings, false).with_metrics(metrics),
+    ));
     let listener = match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {
         Ok(listener) => listener,
         Err(e) => return config_error(&format!("ポート {port} を待ち受けられません: {e}")),
     };
-    match serve(listener, app)
+    let served = serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
-        .await
-    {
+        .await;
+    // 終了するときは、観測の定期の出力も止める
+    sampler.abort();
+    match served {
         Ok(()) => ExitCode::SUCCESS,
         Err(_) => ExitCode::FAILURE,
     }
