@@ -160,7 +160,33 @@ fn ac2_3_4__ゲームの全イベントは_JSON_に変換して戻すと同じ�
     for event in &session_events {
         roundtrip(&SessionCodec, event)?;
     }
-    Ok(())
+    export_golden(&game_events, &session_events)
+}
+
+/// 環境変数 `GOLDEN_EXPORT` があれば、現在の版が書くイベントの見本（golden）を、そのファイルへ書き出す（N-1 互換の確認の入力。
+/// `scripts/n1-compat.sh` が使う）。無ければ何もしない。形: `[{"stream", "event_type", "schema_version", "payload"}]`。
+fn export_golden(
+    game_events: &[beergame_domain::GameEvent],
+    session_events: &[beergame_domain::SessionEvent],
+) -> R<()> {
+    let Some(path) = std::env::var_os("GOLDEN_EXPORT") else {
+        return Ok(());
+    };
+    let mut entries = Vec::new();
+    for event in game_events {
+        let (event_type, schema_version, payload) = GameCodec.encode(event)?;
+        entries.push(serde_json::json!({
+            "stream": "GAME", "event_type": event_type, "schema_version": schema_version, "payload": payload
+        }));
+    }
+    for event in session_events {
+        let (event_type, schema_version, payload) = SessionCodec.encode(event)?;
+        entries.push(serde_json::json!({
+            "stream": "SESSION", "event_type": event_type, "schema_version": schema_version, "payload": payload
+        }));
+    }
+    let text = serde_json::to_string_pretty(&entries).map_err(e)?;
+    std::fs::write(path, text).map_err(e)
 }
 
 #[test]
