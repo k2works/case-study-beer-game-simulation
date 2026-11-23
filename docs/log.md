@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-23
+* **Update**: [release_readiness](/development/beer-game-rust/release_readiness.md) を更新（承認の記録: Release 1.0 の完了。B7・B8・B14 のゲートの状態を反映。claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_7_report](/development/beer-game-rust/bolt_7_report.md) を更新（承認の記録: B7 のゲート。claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_8_report](/development/beer-game-rust/bolt_8_report.md) を更新（承認の記録: B8 のゲート。claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_14_report](/development/beer-game-rust/bolt_14_report.md) を更新（承認の記録: B14 のゲート。claude-code/claude-sonnet-5-5）
