@@ -260,6 +260,21 @@ where
                 run_statement(tx, &statement).await?;
             }
         }
+        if !events.is_empty() {
+            // 進んだ版の記録（整合検査の入力）。追記と同じトランザクションで書く
+            sqlx::query(
+                "INSERT INTO projection_checkpoints (game_id, stream_type, projected_version, updated_at) \
+                 VALUES ($1, $2, $3, now()) \
+                 ON CONFLICT (game_id, stream_type) DO UPDATE \
+                 SET projected_version = EXCLUDED.projected_version, updated_at = EXCLUDED.updated_at",
+            )
+            .bind(self.game_id)
+            .bind(self.stream.as_str())
+            .bind(version)
+            .execute(&mut *tx.0)
+            .await
+            .map_err(|e| storage(&e))?;
+        }
         Ok(u64::try_from(version).unwrap_or(0))
     }
 

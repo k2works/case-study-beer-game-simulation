@@ -228,6 +228,36 @@ async fn tech__マイグレーション_0001_から_0009_が適用され_game_ro
     }
 }
 
+#[tokio::test]
+async fn nf_r15__追記と同じトランザクションで_進んだ版の記録がストリームの最後の版になる()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = new_game(&env.pool).await?;
+    let s = store(&env.pool, game);
+    let mut tx = s.begin().await.map_err(e)?;
+    s.append(&mut tx, 0, vec![1, 2]).await.map_err(e)?;
+    s.commit(tx).await.map_err(e)?;
+    let mut tx = s.begin().await.map_err(e)?;
+    s.append(&mut tx, 2, vec![3]).await.map_err(e)?;
+    s.rollback(tx).await.map_err(e)?;
+    let projected: Option<i64> = sqlx::query_scalar(
+        "SELECT projected_version FROM projection_checkpoints \
+         WHERE game_id = $1 AND stream_type = 'SESSION'",
+    )
+    .bind(game)
+    .fetch_optional(&env.pool)
+    .await
+    .map_err(e)?;
+    // 取り消した追記は記録に残らない
+    if projected == Some(2) {
+        Ok(())
+    } else {
+        Err(format!("進んだ版の記録が 2 のはず: {projected:?}"))
+    }
+}
+
 /// 再構築が握る排他のロックを、別のトランザクションで再現する（鍵は `begin` の共有のロックと同じ）。
 async fn hold_exclusive(
     pool: &PgPool,
