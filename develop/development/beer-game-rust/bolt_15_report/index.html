@@ -13513,7 +13513,12 @@
 <li><strong><code>retention</code> が最小権限の削除ロールに切り替えない（未実装）</strong>: Terraform の <code>DB_DELETER_ROLE</code> は Kotlin 版の変数で、Rust のアプリは読まない（削除用のロール <code>beergame_deleter</code> は、テストだけが使う）。実際の <code>retention</code> は、接続のログインユーザーで動く。<strong>DB のログインロールの分離は、計画どおり定義していない</strong>（人の判断）。</li>
 <li><strong>ステージングの <code>ENVIRONMENT</code> も同じ原因で欠けていた</strong>（1 に含む）。</li>
 <li><strong>共有の画面（<code>web/</code>）は Kotlin 版のもの</strong>: デプロイの静的ファイルの公開は、<code>apps/beer-game-kotlin/web</code> を使う。</li>
-<li><strong>テストが、偶然通っていた</strong>: 復元スクリプトの「引数が足りなければ失敗」の 2 件は、スクリプトが無い間も（<code>bash</code> が失敗するので）通っていた。スクリプトを作った後は、本物の振る舞い（引数の検査）で通る。</li>
+<li>
+<p><strong>テストが、偶然通っていた</strong>: 復元スクリプトの「引数が足りなければ失敗」の 2 件は、スクリプトが無い間も（<code>bash</code> が失敗するので）通っていた。スクリプトを作った後は、本物の振る舞い（引数の検査）で通る。</p>
+</li>
+<li>
+<p><strong>CI の <code>infra</code> ジョブが、最初の push で 1 度失敗した</strong>（<code>terraform fmt -check</code>。私が挿入したコメントが、整形の揃えを崩した）。<strong>ローカルの確認に <code>terraform fmt -check</code> を入れていなかったため</strong>で、<code>validate</code> だけを確認していた。直して再度 push し、<code>check</code>・<code>infra</code>・<code>container</code> はすべて成功した（最終のコミット <code>19339ea</code>）。同じ原因の <code>terraform fmt</code> の指摘は、CI が検出する。あわせて、<code>ecs/main.tf</code> に残っていた Kotlin 版の古いコメント（<code>Main.kt</code>・<code>SET ROLE</code>）を改めた。</p>
+</li>
 </ol>
 <h2 id="_4">未確認・簡略化（人の判断が要る項目）<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ol>
