@@ -4387,7 +4387,68 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#3-2026-11-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-008" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        案 1: カスタム条件（役割ごとの初期在庫と、初期の流れ）— マイグレーション 008
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-h4-009" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        案 2: 開始後の役割の入れ替え（H4）と資格の失効・再発行 — マイグレーション 009
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-creategame-idempotency-key-010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        案 3: createGame の冪等（Idempotency-Key）— マイグレーション 010
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        承認の確認事項
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         進捗
@@ -4426,7 +4487,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_5" class="md-nav__link">
+  <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
         更新履歴
@@ -13755,7 +13816,69 @@
 </tbody>
 </table>
 <p><strong>ゲート（人の確認が要る点）</strong>: ①DB のスキーマ変更（<code>versions.game</code> の持ち方。既存の列から導出できなければ、段階 2 の前に止まって案を示す）、②ガイドツアーの第 10 ステップ（<code>ui/src/features/play.tsx</code> の <code>@guidedTour</code>）の移し先か、ツアーを縮めるか、③TS 独自の機能（SSE・unassign・console）を捨てることの確認、④契約そのものの変更が要る場合。</p>
-<h2 id="_4">進捗<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<h2 id="3-2026-11-24">段階 3 の前の確認事項（案。2026-11-24。人の承認待ち）<a class="headerlink" href="#3-2026-11-24" title="Permanent link">&para;</a></h2>
+<p>段階 3（コマンド）に入る前に、スキーマ変更とドメインの規則の変更が要る 3 件の案。<strong>いずれも、承認されるまで実装しない</strong>（スキーマ変更・業務ルールの変更は確認必須）。AWS は未適用なので、既存データへの影響は開発 DB だけ。</p>
+<h3 id="1-008">案 1: カスタム条件（役割ごとの初期在庫と、初期の流れ）— マイグレーション 008<a class="headerlink" href="#1-008" title="Permanent link">&para;</a></h3>
+<p><strong>なぜ要るか</strong>: 契約の <code>CustomConditions</code> は、役割ごとの初期在庫（<code>initialInventory: {役割: 数}</code>）と、初期の流れ（<code>initialFlow</code>。遅延の各段にある数量。キットは 4）を持つ。TS は、全役割に共通の初期在庫 1 つだけを持ち、初期の流れは定数（<code>INITIAL_PIPELINE = 4</code>）。共有 UI の <code>custom-conditions-ui</code>（「<strong>小売店の</strong>初期在庫を 20 に変える」）は役割ごとの値を送るので、<strong>この変更が無いと <code>@ui</code> の 1 シナリオが TS で通らない</strong>。ロビーの「カスタム（変更: 初期在庫、配送の遅延）」の表示にも、<code>INITIAL_INVENTORY</code>・<code>INITIAL_FLOW</code> の区別が要る。</p>
+<p><strong>スキーマ（案）</strong>: <code>games</code> の整数列 <code>initial_inventory</code> を、<strong>役割ごとの 4 列</strong>に置き換え、<code>initial_flow</code> を足す（<code>games</code> は、条件を平らな列で持つ現在の流儀のまま。CHECK 制約で守れる）。<code>sessions.settings</code>（jsonb。開始時点の条件の写し）も、同じ形に変換する。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- Up</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">games</span>
+<span class="w">  </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_factory</span><span class="w">     </span><span class="nb">integer</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">initial_inventory_factory</span><span class="w">     </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+<span class="w">  </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_distributor</span><span class="w"> </span><span class="nb">integer</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">initial_inventory_distributor</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+<span class="w">  </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_wholesaler</span><span class="w">  </span><span class="nb">integer</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">initial_inventory_wholesaler</span><span class="w">  </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+<span class="w">  </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_retailer</span><span class="w">    </span><span class="nb">integer</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">initial_inventory_retailer</span><span class="w">    </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">),</span>
+<span class="w">  </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_flow</span><span class="w"> </span><span class="nb">integer</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="mi">4</span><span class="w"> </span><span class="k">CHECK</span><span class="w"> </span><span class="p">(</span><span class="n">initial_flow</span><span class="w"> </span><span class="k">BETWEEN</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="mi">1000</span><span class="p">);</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="n">games</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="n">initial_inventory_factory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initial_inventory</span><span class="p">,</span><span class="w"> </span><span class="n">initial_inventory_distributor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initial_inventory</span><span class="p">,</span>
+<span class="w">                 </span><span class="n">initial_inventory_wholesaler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initial_inventory</span><span class="p">,</span><span class="w"> </span><span class="n">initial_inventory_retailer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initial_inventory</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">games</span>
+<span class="w">  </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_factory</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w"> </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_distributor</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_wholesaler</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span><span class="w"> </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory_retailer</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w">  </span><span class="k">DROP</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">initial_inventory</span><span class="p">;</span>
+<span class="k">UPDATE</span><span class="w"> </span><span class="n">sessions</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span>
+<span class="w">  </span><span class="o">||</span><span class="w"> </span><span class="n">jsonb_build_object</span><span class="p">(</span><span class="s1">'initialInventory'</span><span class="p">,</span><span class="w"> </span><span class="n">jsonb_build_object</span><span class="p">(</span>
+<span class="w">       </span><span class="s1">'FACTORY'</span><span class="p">,</span><span class="w"> </span><span class="n">settings</span><span class="o">-&gt;</span><span class="s1">'initialInventory'</span><span class="p">,</span><span class="w"> </span><span class="s1">'DISTRIBUTOR'</span><span class="p">,</span><span class="w"> </span><span class="n">settings</span><span class="o">-&gt;</span><span class="s1">'initialInventory'</span><span class="p">,</span>
+<span class="w">       </span><span class="s1">'WHOLESALER'</span><span class="p">,</span><span class="w"> </span><span class="n">settings</span><span class="o">-&gt;</span><span class="s1">'initialInventory'</span><span class="p">,</span><span class="w"> </span><span class="s1">'RETAILER'</span><span class="p">,</span><span class="w"> </span><span class="n">settings</span><span class="o">-&gt;</span><span class="s1">'initialInventory'</span><span class="p">),</span>
+<span class="w">     </span><span class="s1">'initialFlow'</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">)</span>
+<span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">jsonb_typeof</span><span class="p">(</span><span class="n">settings</span><span class="o">-&gt;</span><span class="s1">'initialInventory'</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'number'</span><span class="p">;</span>
+<span class="c1">-- Down: 4 列 → 1 列（小売店の値。役割ごとの違いは失われる。開発 DB だけの想定）、sessions.settings も数値に戻す</span>
+</code></pre></div>
+<p><strong>ドメイン・アプリの変更</strong>: <code>Conditions.initialInventory: number</code> → <code>Record&lt;Role, number&gt;</code>、<code>Conditions.initialFlow: number</code> を追加。<code>initialRoleStates</code> は役割ごとの在庫と <code>initialFlow</code> を使う。<code>ConditionItem</code> に <code>initialFlow</code> を追加。<code>kitPreset</code>（キットとの差の判定）は、役割ごとに比べる（どれか 1 つでも違えば <code>INITIAL_INVENTORY</code>）。永続化（<code>pg-repositories.ts</code>）、出力の元データの読み取り（<code>pg-export-reader.ts</code>）、HTTP の入力の検証（zod）、<code>contract-settings.ts</code> の写像（<code>initialFlow</code> → <code>INITIAL_FLOW</code>）を直す。</p>
+<p><strong>範囲の合わせ込み</strong>: TS の条件の範囲は「仮の値（運営者と未合意）」で、契約より狭い（初期在庫 0〜100、遅延 1〜4 週、費用 0〜1000。契約は 0〜1000、1〜8、0〜100000。初期の流れは 0〜1000）。共有 UI の入力の検証は契約の範囲なので、<strong>TS も契約の範囲に合わせる</strong>案（<code>CONDITION_LIMITS</code> を 1 か所で変更。DB の CHECK は下限だけなので変更不要）。</p>
+<p><strong>公開範囲の呼び名</strong>: 契約は <code>NONE</code>、TS の内部は <code>PROGRESS_ONLY</code>。入力で <code>NONE</code> を受けて <code>PROGRESS_ONLY</code> に写す（HTTP の境界。保存済みの値は変えない。スキーマ変更なし）。</p>
+<p><strong>影響</strong>: <code>initialInventory</code> を使うテスト・UI が 14 ファイル（テスト 9、<code>ui/</code> 5。計 41 か所）。<strong>旧い経路（<code>/api/*</code>）と旧い UI は、段階 4・6 で撤去するまで、<code>settings.initialInventory</code> を数値で返す必要がある</strong>ので、旧い経路の応答だけ、小売店の値を返す暫定の写し（<code>settingsView</code>）を置く（段階 4 で撤去）。</p>
+<p><strong>却下した案</strong>: ①<code>jsonb</code> 1 列（<code>initial_inventory_by_role</code>）— 列の流儀と CHECK 制約の利点を失う。②今の整数列を残し、「差分だけ」を別の jsonb に持つ — 判定が二重になる。③TS では役割ごとの初期在庫を受けず、<code>@ui</code> の当該シナリオを許可リストで除外 — 契約への適合が崩れ、共有 UI の機能が TS だけ欠ける。</p>
+<h3 id="2-h4-009">案 2: 開始後の役割の入れ替え（H4）と資格の失効・再発行 — マイグレーション 009<a class="headerlink" href="#2-h4-009" title="Permanent link">&para;</a></h3>
+<p><strong>なぜ要るか</strong>: 契約の <code>assignRole</code>（<code>PUT /games/{g}/participants/{p}/role</code>）は、準備中の付け替え（D9）に加え、<strong>開始後</strong>に、役割を持たない参加者を、すでに担当がいる役割へ割り当てる「入れ替え」を受け付け、旧担当者の資格を同じ操作で失効させる。ロビーは、入れ替えられた旧担当者を <code>replaced: true</code> で残す（履歴と入力者のラベルのため）。<strong>共有 UI の <code>@ui</code> は、入れ替えを使わない</strong>（<code>replaced</code> を参照する画面は無い。入れ替えは、<code>@api</code> の <code>credentials.feature</code> だけ）。<strong>契約への適合のための実装</strong>で、TS で <code>@ui</code> を通すだけなら、この案は後に回せる（ご判断）。</p>
+<p><strong>スキーマ（案）</strong>: <code>participants</code> に、<strong>入れ替えられた時刻</strong>を 1 列足すだけ。入れ替えられた旧担当者は、<code>role</code> を NULL にし、<code>replaced_at</code> を設定する。行は残す（<code>role_decisions.saved_by</code> が参照する入力者のラベルのため）。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- Up</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">participants</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">replaced_at</span><span class="w"> </span><span class="n">timestamptz</span><span class="p">;</span>
+<span class="c1">-- Down</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">participants</span><span class="w"> </span><span class="k">DROP</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">replaced_at</span><span class="p">;</span>
+</code></pre></div>
+<p><strong>ドメイン・アプリの変更</strong>（契約の <code>assignRole</code> の規則どおり）:
+- 準備中: <strong>別の役割にいる人を選ぶと「付け替え」</strong>（いまの TS は「すでに ○○ です」と拒否する。契約は <code>RoleUnassigned</code> と <code>RoleAssigned</code> で付け替える）。同じ役割への割り当て直しは、何も変えず 200（イベントも版も足さない）。
+- 開始後: 担当者のいる役割へ、<strong>役割を持たない参加者</strong>を割り当てると、その役割の<strong>現在の担当者全員</strong>が入れ替わる（共同担当も全員）。旧担当者の復帰資格を失効（<code>recovery_revoked_at</code>）し、ブラウザセッション（<code>browser_sessions</code>）の行を、同じトランザクションで削除する。<code>session.holders</code>（開始時点の写し）を新担当者に更新し、game・session の両方の版を進める。新しいイベント（<code>RoleReplaced</code>）を、履歴に足す。
+- 拒否: 別の役割にいる人の開始後の付け替えは <code>game.not_preparing</code>（409）、終了後は <code>session.already_ended</code>（409）、資格が失効済みの参加者は <code>game.credential_already_revoked</code>（409）、存在しない参加者は <code>game.participant_not_found</code>（404）。
+- <code>Participant</code> に <code>replaced</code>（入れ替えられたか）を足し、ロビーの <code>replaced</code> に出す。ロビーと <code>getGameState</code>（<code>role</code>）は、入れ替えられた人を、役割の担当として数えない。
+- <strong>資格の失効・再発行</strong>（<code>revokeCredential</code>・<code>reissueCredential</code>）は、既存の列（<code>participants.recovery_revoked_at</code>・<code>browser_sessions</code>）で足りる（<strong>スキーマ変更なし</strong>）。契約は、失効と再発行を別の操作に分け、失効済みでない資格の再発行を <code>game.credential_not_revoked</code>（409）、失効済みの再失効を <code>game.credential_already_revoked</code>（409）で拒否する。いまの TS の <code>reissueCredential</code>（失効＋再発行を 1 つで行う）は、契約の形に分ける。</p>
+<p><strong>却下した案</strong>: <code>participants</code> の行を消す（入力者のラベルと、<code>role_decisions</code> の参照が失われる）／<code>participants.role</code> に履歴を持たせる（担当の判定が複雑になる）。</p>
+<h3 id="3-creategame-idempotency-key-010">案 3: <code>createGame</code> の冪等（<code>Idempotency-Key</code>）— マイグレーション 010<a class="headerlink" href="#3-creategame-idempotency-key-010" title="Permanent link">&para;</a></h3>
+<p><strong>なぜ要るか</strong>: 契約は、変更系すべてに <code>Idempotency-Key</code> を必須とし、同じキーの再送は保存した応答を返す。共有 UI は、結果が不明な失敗（切断・<code>type</code> の無い 5xx）で、同じキーで最大 2 回再送する。TS の冪等記録（<code>idempotency_records</code>）は、<code>game_id</code> が <code>games</code> への外部キーなので、<strong>ゲームの存在前の <code>createGame</code> は載せられなかった</strong>。</p>
+<p><strong>案</strong>: 新しいゲームの ID（作成と同じトランザクションで作る）を <code>game_id</code> として、<code>scope = 'create'</code> の記録を保存し、<strong>キーのダイジェストだけで検索できる部分一意索引</strong>を足す（<strong>新しい表は作らない</strong>。Kotlin 版の設計（<code>uq_idempotency_create</code>）と同じ）。再送は、索引で記録を見つけ、保存した応答（暗号化済み。復帰コードを含む）を返す。本文が違えば <code>app.idempotency_key_reused</code>（409）。同時の重複は、一意制約の違反を競合として扱い、再試行で保存済みの応答を返す。</p>
+<div class="highlight"><pre><span></span><code><span class="c1">-- Up</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">UNIQUE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">uq_idempotency_create</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">idempotency_records</span><span class="w"> </span><span class="p">(</span><span class="n">key_digest</span><span class="p">)</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="k">scope</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'create'</span><span class="p">;</span>
+<span class="c1">-- Down</span>
+<span class="k">DROP</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">uq_idempotency_create</span><span class="p">;</span>
+</code></pre></div>
+<p><strong>ほかの変更系の冪等</strong>（<code>joinGame</code>・<code>recoverParticipation</code>・<code>joinAsObserver</code> など）は、対象のゲームが先に決まる（参加コード・本文の <code>gameId</code>・招待から）ので、<strong>既存の表と主キーのまま</strong>で足りる（スキーマ変更なし）。</p>
+<p><strong>却下した案</strong>: 作成だけ冪等を保存しない — 再送で、ゲームが重複して作られる（共有 UI が再送する前提と合わない）。</p>
+<h3 id="_4">承認の確認事項<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<ol>
+<li>案 1（マイグレーション 008。範囲を契約に合わせることを含む）を実装してよいか。</li>
+<li>案 2（マイグレーション 009）を、段階 3 で実装してよいか。それとも、<code>@ui</code> が TS で通ってから（段階 6 の後の追加作業）にするか。</li>
+<li>案 3（マイグレーション 010）を実装してよいか。</li>
+</ol>
+<h2 id="_5">進捗<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -13876,7 +13999,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_5">更新履歴<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h2 id="_6">更新履歴<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
