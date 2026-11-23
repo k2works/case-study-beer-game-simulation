@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-24
+* **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 3 の前の確認事項 3 案の承認の記録。マイグレーション 008・009・010。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 2 の完了。読み取り 7 操作、マイグレーション 007 の承認、段階 3 へ持ち越す差。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 1 の完了と、持ち越しの一覧。claude-code/claude-sonnet-5-5）
 * **Creation**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を作成（beer-game-ts の API を共有の契約に合わせ、ui を削除する計画。差分表と段階。claude-code/claude-sonnet-5-5）
