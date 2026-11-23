@@ -4395,6 +4395,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="進捗">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        段階 1 で、後の段階へ持ち越したもの
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -13739,13 +13756,65 @@
 <tbody>
 <tr>
 <td style="text-align: center;">0</td>
-<td style="text-align: left;">実施中</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
 <td style="text-align: left;">契約テストの土台（35 件）は通過。依存の版は 2026-11-24 に公式レジストリで確認（ajv 8.20.0、ajv-formats 3.0.1、yaml 2.9.1。いずれも exact 指定）</td>
 </tr>
 <tr>
-<td style="text-align: center;">1〜7</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;"><code>getHealth</code>・<code>getReady</code> を <code>/api/v1</code> に実装（未実装は 25 → 23 件）。problem+json（<code>code</code>・<code>type</code>・<code>errors[]</code>・<code>Retry-After</code>）、Origin（<code>ALLOWED_ORIGINS</code>）、<code>Idempotency-Key</code> の検査、本文 64 KB、404 を契約の形で。<strong>旧い経路（<code>/api/*</code>）は従来の形のまま</strong>（段階 4 まで。URL の接頭辞で切り替える）。537 件通過</td>
+</tr>
+<tr>
+<td style="text-align: center;">2〜7</td>
 <td style="text-align: left;">未着手</td>
 <td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<h3 id="1">段階 1 で、後の段階へ持ち越したもの<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: center;">持ち越し先</th>
+<th style="text-align: left;">理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>Idempotency-Key</code> の<strong>保存と再生</strong>（同じキーで本文が違えば 409 <code>app.idempotency_key_reused</code>）。いまは、変更系の<strong>存在と形の検査</strong>だけ</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">保存はコマンドごと（既存の <code>idempotency_records</code> はゲーム単位。commit だけが使っている）。<strong><code>createGame</code> はゲームが存在する前なので、この表（<code>game_id</code> が外部キー）に載せられない</strong>。扱い（キーからゲーム ID を決めて再生する、など）を、段階 3 の <code>createGame</code> で決める（スキーマ変更が要るならゲート 1）</td>
+</tr>
+<tr>
+<td style="text-align: left;">業務の失敗の <code>code</code>（<code>session.paused</code> ほか 18 種）への写し。<code>StaleError</code>・<code>DecisionConflictError</code> は、いまは <code>app.internal</code></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">操作ごとに、返す <code>code</code> と拡張メンバー（<code>latest</code>・<code>current</code>・<code>missingRoles</code> など）が違う</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>NotFoundError</code> の扱い（いまは 404 <code>request.not_found</code>）。存在しないゲームを「資格が無い」と区別しない 403 にするかは、操作ごと</td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">契約は、存在の有無を明かさない箇所（資格・ゲーム）と、<code>game.invitation_not_found</code> を持つ</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>405 request.method_not_allowed</code></td>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">経路の表から、同じ経路の別メソッドを判定する必要がある。共有 UI は起こさない</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>x-correlation-id</code> を、UUID のときだけ採用する規則（契約）。いまは、どんな文字列も採用</td>
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">既存の統合テストが、UUID でない値（<code>corr-123</code>）の反映を検査している。旧 API の撤去と同時に直す</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Secure</code> 属性の設定（契約は「HTTPS の環境では Secure」。いまは常に <code>secure: true</code>）</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: left;">共有 UI の E2E は <code>http://localhost</code>（WebKit は Secure の Cookie を受けない）。設定項目（<code>COOKIE_SECURE</code> など）が要る</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ALLOWED_ORIGIN</code>（旧名）の撤去、Terraform（<code>allowed_origin</code>）・<code>container-check.sh</code> の環境変数名の更新</td>
+<td style="text-align: center;">4〜5</td>
+<td style="text-align: left;">現在は旧名も受ける（優先は <code>ALLOWED_ORIGINS</code>）。AWS は未適用</td>
 </tr>
 </tbody>
 </table>
@@ -13762,6 +13831,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">初版作成（段階 0。差分表と段階・ゲート）</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">段階 1 の完了を反映（横断の仕組み、<code>getHealth</code>・<code>getReady</code>、持ち越しの一覧）</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
