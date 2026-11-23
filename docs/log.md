@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-23
+* **Creation**: [bolt_15_report](/development/beer-game-rust/bolt_15_report.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_15_plan](/development/beer-game-rust/bolt_15_plan.md) を更新（承認の記録。claude-code/claude-sonnet-5-5）
+* **Creation**: beer-game-rust の運用手順書（production・deploy・rollback・restore・observability）を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_15_plan](/development/beer-game-rust/bolt_15_plan.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_14_report](/development/beer-game-rust/bolt_14_report.md) を作成（claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_14_plan](/development/beer-game-rust/bolt_14_plan.md) を更新（承認の記録。claude-code/claude-sonnet-5-5）
