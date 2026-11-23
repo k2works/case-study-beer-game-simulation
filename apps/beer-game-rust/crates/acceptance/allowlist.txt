@@ -72,3 +72,16 @@ retention/retention.feature
 
 # B13: 投影の再構築・整合検査（NF-R15）
 operations/projection-rebuild.feature
+
+# B14: 観測（AC6.1.3・6.1.5・6.1.6）。「JVM のヒープの使用率が 90% で続くと、重大のアラームが発報する」は、Rust 版に JVM が無いので許可しない
+# （共有する feature は変更しない。Rust 版のメモリ（RSS）のアラームは、実測後に別の判断で足す。B14 計画の判断項目 4・5）
+operations/metrics-and-alarms.feature :: 要求を処理すると、応答時間と要求数のメトリクスが EMF の行として出力され、資格・表示名を含まない
+operations/metrics-and-alarms.feature :: データベースに接続できないとき、準備のヘルスチェックの失敗が、5xx のエラー率のメトリクスに記録される
+operations/metrics-and-alarms.feature :: 研修中に主要な操作が 1 分間成功しないと、重大のアラーム「main-operation-stall」が 1 分以内に発報する
+operations/metrics-and-alarms.feature :: 主要な操作の成功が途切れても 40 秒までなら、アラームは発報しない
+operations/metrics-and-alarms.feature :: 研修中でないときは、操作が無くても、アラーム「main-operation-stall」は発報しない
+operations/metrics-and-alarms.feature :: 合成監視（1 分ごと）の失敗は、最悪でも 2 分以内に発報する
+operations/metrics-and-alarms.feature :: 追記の競合率が急増すると、警告に続いて重大のアラームが発報する
+operations/metrics-and-alarms.feature :: 投影の行が壊れていると、不一致のメトリクスが出力され、重大のアラーム「projection-mismatch」が発報する
+operations/metrics-and-alarms.feature :: 投影の進んだ版が遅れていると、投影の遅れのメトリクスが出力され、重大のアラーム「projection-lag」が発報する
+operations/metrics-and-alarms.feature :: 整合した投影では、不一致と遅れのメトリクスは 0 で、アラームは発報しない

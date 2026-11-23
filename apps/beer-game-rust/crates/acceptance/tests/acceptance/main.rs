@@ -2,6 +2,7 @@
 //! 許可リスト（`allowlist.txt`）のシナリオだけを実行する。定義のないステップ（Undefined）は失敗にする（`fail_on_skipped`）。
 
 mod maintenance_steps;
+mod metrics_steps;
 mod retention_steps;
 mod steps;
 mod world;
@@ -9,7 +10,7 @@ mod world;
 use std::io::Write;
 use std::path::Path;
 
-use beergame_acceptance::{Allowlist, api_scenarios};
+use beergame_acceptance::{Allowlist, api_scenarios, split_rules};
 use cucumber::{World, WriterExt, writer};
 
 use crate::world::ApiWorld;
@@ -37,7 +38,18 @@ fn allowed_features_dir(allowlist: &Allowlist) -> std::io::Result<std::path::Pat
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::os::unix::fs::symlink(std::fs::canonicalize(features_dir().join(file))?, target)?;
+        let source = std::fs::canonicalize(features_dir().join(file))?;
+        let parts = split_rules(&std::fs::read_to_string(&source)?);
+        if let [(_, _)] = parts.as_slice() {
+            // ルールの無いファイルは、読み取り専用の参照のまま
+            std::os::unix::fs::symlink(source, target)?;
+        } else {
+            // `ルール:` を含むファイルは、実行用のコピーを、ルールごとに別のフィーチャーへ展開する（元は変えない）
+            for (mark, body) in parts {
+                let name = file.replace(".feature", &format!("{mark}.feature"));
+                std::fs::write(root.join(name), body)?;
+            }
+        }
     }
     Ok(root)
 }

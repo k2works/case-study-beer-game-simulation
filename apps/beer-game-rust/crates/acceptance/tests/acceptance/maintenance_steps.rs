@@ -2,7 +2,9 @@
 //! （本番のコードではない）。再構築と検査は、本番の起動モードと同じ `PgProjectionMaintenance` を、同じ DB に対して呼ぶ。
 
 use beergame_adapter_persistence::{PROJECTION_TABLES, PgProjectionMaintenance};
-use beergame_application::{Inconsistency, ProjectionMaintenance};
+use beergame_application::{
+    Inconsistency, ProjectionMaintenance, verify_metrics, verify_projections,
+};
 use beergame_domain::GameId;
 use cucumber::{given, then, when};
 use serde_json::json;
@@ -177,11 +179,25 @@ async fn rewind_checkpoint(world: &mut ApiWorld) -> R {
 async fn verify(world: &mut ApiWorld) -> R {
     let (_, game) = current_game(world)?;
     let port = PgProjectionMaintenance::new(world.pool()?.clone());
-    let findings = port
-        .verify(game)
+    // 本番の `verify-projections` と同じサービス。結果は、メトリクスにもなる（AC6.1.6）
+    let report = verify_projections(&port, &[game])
         .await
         .map_err(|e| format!("検査できない: {e:?}"))?;
-    world.findings = Some(findings);
+    expect(
+        report.failed.is_empty() && report.skipped.is_empty(),
+        &format!("検査できなかった: {report:?}"),
+    )?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(0));
+    world.emitted = verify_metrics(&report, now);
+    world.findings = Some(
+        report
+            .inconsistent
+            .into_iter()
+            .flat_map(|(_, findings)| findings)
+            .collect(),
+    );
     Ok(())
 }
 

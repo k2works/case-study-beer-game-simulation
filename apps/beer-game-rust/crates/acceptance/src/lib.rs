@@ -33,6 +33,8 @@ impl Allowlist {
     /// `path` はフィーチャーファイルのパス（末尾が `<機能領域>/<ファイル名>.feature` であればよい）。
     #[must_use]
     pub fn allows(&self, path: &str, scenario: &str) -> bool {
+        // ルールを別のフィーチャーに展開したファイル（`a~rule1.feature`）は、元のファイル名で照合する
+        let path = without_rule_mark(path);
         self.entries.iter().any(|(file, only)| {
             path.ends_with(file.as_str()) && only.as_deref().is_none_or(|name| name == scenario)
         })
@@ -58,6 +60,54 @@ impl Allowlist {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+}
+
+/// ルールの部分を切り出したフィーチャーの、ファイル名の目印（`<名前>~rule1.feature`）。
+pub const RULE_MARK: &str = "~rule";
+
+/// `ルール:` を含むフィーチャーを、ルールごとに別のフィーチャーへ展開する（Rust の gherkin は `ルール:` を解析できないため。
+/// 共有する feature は変更せず、実行用のコピーだけを変える）。戻り値は（ファイル名の目印, 本文）。
+/// 目印が空の 1 件目は、ルールより前の部分（ルールを含まなければ、本文そのまま）。
+/// ルールの中の `背景:` は、そのルールのシナリオにだけ効くので、ルールごとの別のフィーチャーに置けば意味が保てる。
+#[must_use]
+pub fn split_rules(text: &str) -> Vec<(String, String)> {
+    let is_rule = |line: &str| line.trim_start().starts_with("ルール:");
+    if !text.lines().any(is_rule) {
+        return vec![(String::new(), text.to_owned())];
+    }
+    // ルールの前の部分（言語の指定・機能の行・ルールより前のシナリオ）と、ルールごとの本文
+    let mut head: Vec<&str> = Vec::new();
+    let mut rules: Vec<Vec<&str>> = Vec::new();
+    for line in text.lines() {
+        if is_rule(line) {
+            rules.push(Vec::new());
+        } else if let Some(rule) = rules.last_mut() {
+            rule.push(line);
+        } else {
+            head.push(line);
+        }
+    }
+    let mut parts = vec![(String::new(), head.join("\n") + "\n")];
+    for (index, body) in rules.iter().enumerate() {
+        let number = index + 1;
+        let text = format!(
+            "# language: ja\n機能: ルール {number}\n\n{}\n",
+            body.join("\n")
+        );
+        parts.push((format!("{RULE_MARK}{number}"), text));
+    }
+    parts
+}
+
+/// 許可リストの照合のために、展開したファイル名から目印を取り除く（`a~rule1.feature` → `a.feature`）。
+#[must_use]
+pub fn without_rule_mark(path: &str) -> String {
+    match path.rfind(RULE_MARK) {
+        Some(start) if path.ends_with(".feature") => {
+            format!("{}.feature", path.get(..start).unwrap_or(path))
+        }
+        _ => path.to_owned(),
     }
 }
 
@@ -105,6 +155,54 @@ mod tests {
         let list = Allowlist::parse(TEXT);
         assert!(list.allows("/x/features/game-setup/co-assignment.feature", "任意"));
         assert!(!list.allows("/x/features/game-setup/joining.feature", "任意"));
+    }
+
+    const WITH_RULE: &str = "# language: ja\n機能: x\n\n  @api\n  シナリオ: 前\n    前提 a\n\n  ルール: 1 つ目\n\n    背景:\n      前提 b\n\n    @api\n    シナリオ: 中 1\n      前提 c\n\n  ルール: 2 つ目\n\n    @api\n    シナリオ: 中 2\n      前提 d\n";
+
+    #[test]
+    fn tech__ルールの無いフィーチャーは_そのまま_1_件() {
+        let parts = split_rules("機能: x\n  シナリオ: a\n    前提 b\n");
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].0, "");
+        assert!(parts[0].1.contains("シナリオ: a"));
+    }
+
+    #[test]
+    fn tech__ルールごとに別のフィーチャーへ展開し_背景はそのルールだけに付く() {
+        let parts = split_rules(WITH_RULE);
+        assert_eq!(parts.len(), 3);
+        // ルールより前の部分には、ルールの背景もルールのシナリオも入らない
+        assert!(parts[0].1.contains("シナリオ: 前") && !parts[0].1.contains("背景:"));
+        assert!(!parts[0].1.contains("ルール:") && !parts[0].1.contains("中 1"));
+        // 1 つ目のルール: 背景と自分のシナリオだけ
+        assert_eq!(parts[1].0, "~rule1");
+        assert!(parts[1].1.contains("背景:") && parts[1].1.contains("中 1"));
+        assert!(!parts[1].1.contains("中 2") && !parts[1].1.contains("シナリオ: 前"));
+        // 2 つ目のルール: 背景は持たない（1 つ目の背景は効かない）
+        assert_eq!(parts[2].0, "~rule2");
+        assert!(parts[2].1.contains("中 2") && !parts[2].1.contains("背景:"));
+        // どの部分も、言語の指定と機能の行を持つ（単独で解析できる）
+        assert!(
+            parts
+                .iter()
+                .all(|(_, body)| body.contains("# language: ja") && body.contains("機能:"))
+        );
+    }
+
+    #[test]
+    fn tech__展開したファイル名の目印は_許可リストの照合のために取り除ける() {
+        assert_eq!(
+            without_rule_mark("/x/operations/metrics-and-alarms~rule1.feature"),
+            "/x/operations/metrics-and-alarms.feature"
+        );
+        assert_eq!(without_rule_mark("/x/a.feature"), "/x/a.feature");
+    }
+
+    #[test]
+    fn tech__展開したフィーチャーのシナリオも_許可リストの名前で許される() {
+        let list = Allowlist::parse("operations/m.feature :: 中 1\n");
+        assert!(list.allows("/t/operations/m~rule1.feature", "中 1"));
+        assert!(!list.allows("/t/operations/m~rule1.feature", "中 2"));
     }
 
     #[test]

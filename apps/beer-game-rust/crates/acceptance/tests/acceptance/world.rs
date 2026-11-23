@@ -161,6 +161,48 @@ pub struct ApiWorld {
     pub projection_snapshot: Option<String>,
     /// 直近の整合検査の結果。
     pub findings: Option<Vec<beergame_application::Inconsistency>>,
+    /// アプリが出したメトリクス（要求ごとの観測。EMF の元）。
+    pub metrics: Arc<CapturedMetrics>,
+    /// 整合検査（バッチ）が出したメトリクス。
+    pub emitted: Vec<beergame_application::MetricSample>,
+    /// アラームの訓練（模擬の時計と故障を模擬した系列）。
+    pub drill: Drill,
+}
+
+/// アプリが出したメトリクスを捕まえる出力先。
+#[derive(Debug, Default)]
+pub struct CapturedMetrics(std::sync::Mutex<Vec<beergame_application::MetricSample>>);
+
+impl beergame_application::MetricSink for CapturedMetrics {
+    fn record(&self, samples: &[beergame_application::MetricSample]) {
+        if let Ok(mut all) = self.0.lock() {
+            all.extend_from_slice(samples);
+        }
+    }
+}
+
+impl CapturedMetrics {
+    pub fn all(&self) -> Vec<beergame_application::MetricSample> {
+        self.0.lock().map(|v| v.clone()).unwrap_or_default()
+    }
+}
+
+/// アラームの訓練の状態。時刻は、基準からの秒数（実際の待機はしない）。
+#[derive(Debug)]
+pub struct Drill {
+    pub training: bool,
+    pub samples: Vec<beergame_application::MetricSample>,
+    pub fault_at: i64,
+}
+
+impl Default for Drill {
+    fn default() -> Self {
+        Drill {
+            training: true,
+            samples: Vec::new(),
+            fault_at: 0,
+        }
+    }
 }
 
 impl ApiWorld {
@@ -194,6 +236,9 @@ impl ApiWorld {
             abandoned: 0,
             projection_snapshot: None,
             findings: None,
+            metrics: Arc::new(CapturedMetrics::default()),
+            emitted: Vec::new(),
+            drill: Drill::default(),
         }
     }
 
@@ -205,13 +250,34 @@ impl ApiWorld {
         retired: Vec<(i32, u8)>,
     ) -> Result<(), String> {
         let pool = database().await?;
-        self.app = Some(router(Arc::new(PgBackend::new(
-            pool.clone(),
-            SystemEnv,
-            Self::settings(key_version, key, retired),
-            false,
-        ))));
+        self.app = Some(router(Arc::new(
+            PgBackend::new(
+                pool.clone(),
+                SystemEnv,
+                Self::settings(key_version, key, retired),
+                false,
+            )
+            .with_metrics(self.metrics.clone()),
+        )));
         self.pool = Some(pool);
+        Ok(())
+    }
+
+    /// データベースに接続できなくなったアプリに組み直す（接続できない先を指す遅延接続のプール）。直接の DB 操作用のプールは、そのまま。
+    pub async fn lose_database(&mut self) -> Result<(), String> {
+        let unreachable = sqlx::postgres::PgPoolOptions::new()
+            .acquire_timeout(std::time::Duration::from_millis(500))
+            .connect_lazy("postgres://postgres:pw@127.0.0.1:1/postgres")
+            .map_err(|e| e.to_string())?;
+        self.app = Some(router(Arc::new(
+            PgBackend::new(
+                unreachable,
+                SystemEnv,
+                Self::settings(1, 5, Vec::new()),
+                false,
+            )
+            .with_metrics(self.metrics.clone()),
+        )));
         Ok(())
     }
 
@@ -237,12 +303,10 @@ impl ApiWorld {
         if self.app.is_none() {
             let pool = database().await?;
             let settings = Self::settings(1, 5, Vec::new());
-            self.app = Some(router(Arc::new(PgBackend::new(
-                pool.clone(),
-                SystemEnv,
-                settings,
-                false,
-            ))));
+            self.app = Some(router(Arc::new(
+                PgBackend::new(pool.clone(), SystemEnv, settings, false)
+                    .with_metrics(self.metrics.clone()),
+            )));
             self.pool = Some(pool);
         }
         Ok(())
