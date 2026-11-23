@@ -3,7 +3,7 @@
 
 //! 起動モード（`rebuild-projections`・`verify-projections`）が、結果をメトリクスとして出す（AC6.1.6）。実 PostgreSQL 18.6。
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use beergame_app::maintenance_mode::run;
 use beergame_application::{MetricSample, MetricSink, metric_names};
@@ -159,6 +159,5 @@ async fn ac6_1_6__形が不正なゲーム_ID_は終了コード_64_で_メト�
         sink.latest(metric_names::PROJECTION_MISMATCH_GAMES)
             .is_none()
     );
-    let _unused = Arc::new(());
     Ok(())
 }
