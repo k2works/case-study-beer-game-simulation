@@ -1,5 +1,7 @@
 //! アプリケーションの組み立て（ワイヤリング）。環境（時計・ID・乱数）と、永続化を `Backend` として HTTP に渡す。
 
+pub mod maintenance_mode;
+
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
 use beergame_application::{

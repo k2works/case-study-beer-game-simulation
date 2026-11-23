@@ -69,10 +69,11 @@ async fn main() -> ExitCode {
     if mode == "healthcheck" {
         return healthcheck().await;
     }
-    if mode != "api" && mode != "migrate" && mode != "retention" {
+    let maintenance = mode == "rebuild-projections" || mode == "verify-projections";
+    if mode != "api" && mode != "migrate" && mode != "retention" && !maintenance {
         drop(writeln!(
             std::io::stderr(),
-            "未実装の起動モード: {mode}（api・migrate・retention・healthcheck）"
+            "未実装の起動モード: {mode}（api・migrate・retention・rebuild-projections・verify-projections・healthcheck）"
         ));
         return ExitCode::from(64);
     }
@@ -80,6 +81,11 @@ async fn main() -> ExitCode {
     let Ok(database_url) = std::env::var("DATABASE_URL") else {
         return config_error("DATABASE_URL が必要です。");
     };
+    if maintenance {
+        // 資格の鍵は要らない。ゲーム ID は、モードの後ろの引数
+        let args: Vec<String> = std::env::args().skip(2).collect();
+        return beergame_app::maintenance_mode::run(&mode, &database_url, &args).await;
+    }
     let key = match std::env::var("CREDENTIAL_KEY") {
         Ok(key) if key.len() >= 32 => key.into_bytes(),
         Ok(_) | Err(_) => return config_error("CREDENTIAL_KEY（32 バイト以上）が必要です。"),
