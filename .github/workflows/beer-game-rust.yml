@@ -13,6 +13,7 @@ on:
       - 'apps/beer-game-rust/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
+      - 'apps/beer-game-contracts/**'
       - '.github/workflows/beer-game-rust.yml'
   push:
     branches: [develop, main]
@@ -20,6 +21,7 @@ on:
       - 'apps/beer-game-rust/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
+      - 'apps/beer-game-contracts/**'
       - '.github/workflows/beer-game-rust.yml'
   workflow_dispatch:
 

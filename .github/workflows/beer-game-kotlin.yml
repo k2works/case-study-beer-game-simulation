@@ -26,6 +26,7 @@ on:
       - 'apps/beer-game-kotlin/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
+      - 'apps/beer-game-contracts/**'
       - '.github/workflows/beer-game-kotlin.yml'
   push:
     branches: [develop, main]
@@ -33,6 +34,7 @@ on:
       - 'apps/beer-game-kotlin/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
+      - 'apps/beer-game-contracts/**'
       - '.github/workflows/beer-game-kotlin.yml'
   workflow_dispatch:
 
@@ -63,7 +65,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/beer-game-web/package-lock.json
       - run: npm ci
-      # 1. 仕様の検証: contracts/openapi.yaml が OpenAPI として妥当（Redocly CLI。警告もエラーにする設定）
+      # 1. 仕様の検証: apps/beer-game-contracts/openapi.yaml が OpenAPI として妥当（Redocly CLI。警告もエラーにする設定）
       - name: 仕様の検証（redocly lint）
         run: npm run api:lint
       # 2. 型の生成: 仕様から TypeScript の型を生成し直し、コミット済みの生成物と一致する（差分 0）ことを確かめる

@@ -176,7 +176,7 @@ async fn ac6_1_3__メトリクスの出力に_資格_表示名_ゲーム_ID_参�
 
 /// OpenAPI の `contracts/openapi.yaml` から、（メソッド, 経路のテンプレート, operationId）を読む。
 fn contract_operations() -> Result<Vec<(String, String, String)>, String> {
-    let text = std::fs::read_to_string("../../../beer-game-kotlin/contracts/openapi.yaml")
+    let text = std::fs::read_to_string("../../../beer-game-contracts/openapi.yaml")
         .map_err(|e| format!("openapi.yaml を読めない: {e}"))?;
     let mut found = Vec::new();
     let (mut path, mut method) = (String::new(), String::new());

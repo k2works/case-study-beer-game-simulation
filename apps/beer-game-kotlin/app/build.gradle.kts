@@ -50,10 +50,10 @@ dependencies {
     testImplementation(libs.json.schema.validator)
 }
 
-// 契約テスト（beergame.app.contract）は、仕様 contracts/openapi.yaml を読む。仕様を変えたら test を再実行する（入力に加える）。
+// 契約テスト（beergame.app.contract）は、仕様 apps/beer-game-contracts/openapi.yaml（web・beer-game-rust と共有）を読む。仕様を変えたら test を再実行する（入力に加える）。
 // domain の code の走査は、domain のクラスが classpath にあるため、domain の変更でも再実行される。
 tasks.named<Test>("test") {
-    inputs.file(rootProject.file("contracts/openapi.yaml")).withPropertyName("openApiSpec")
+    inputs.file(rootProject.file("../beer-game-contracts/openapi.yaml")).withPropertyName("openApiSpec")
 }
 
 // acceptanceTest: 受け入れ（Cucumber-JVM。@api のシナリオ）。ADR-012。

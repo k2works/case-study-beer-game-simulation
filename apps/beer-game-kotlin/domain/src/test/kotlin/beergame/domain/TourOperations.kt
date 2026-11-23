@@ -50,14 +50,12 @@ internal class TourOperations private constructor(
     }
 
     companion object {
-        private const val APP = "apps/beer-game-kotlin"
-
         /** アプリケーションの関数名と、仕様の操作の ID が違うもの（問い合わせの入口 `snapshot` は、状態の取得の操作）。 */
         private val OPERATION_ALIAS = mapOf("snapshot" to "getSessionState")
 
         fun load(root: Path): TourOperations =
             TourOperations(
-                Files.readString(root.resolve("$APP/contracts/openapi.yaml")),
+                Files.readString(root.resolve("apps/beer-game-contracts/openapi.yaml")),
                 LivingDocumentation.events(),
             )
     }

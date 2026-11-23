@@ -1,7 +1,7 @@
 // 理由: RT1 の命名（承認済み）の `__` を使うため。
 #![allow(non_snake_case)]
 
-//! 契約テスト。共有する `contracts/openapi.yaml`（変更しない）のスキーマで、実際の応答を検証する。実 PostgreSQL 18.6。
+//! 契約テスト。共有する `apps/beer-game-contracts/openapi.yaml`（変更しない）のスキーマで、実際の応答を検証する。実 PostgreSQL 18.6。
 
 use std::path::Path;
 
@@ -15,7 +15,7 @@ use support::start;
 
 fn contract() -> Result<Value, String> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../beer-game-kotlin/contracts/openapi.yaml");
+        .join("../../../beer-game-contracts/openapi.yaml");
     let text =
         std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
     serde_saphyr::from_str::<Value>(&text).map_err(e)

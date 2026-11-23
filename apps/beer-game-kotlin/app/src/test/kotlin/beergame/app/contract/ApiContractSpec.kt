@@ -34,12 +34,16 @@ private const val UNKNOWN_PARTICIPANT = "00000000-0000-0000-0000-000000000009"
 
 internal fun findSpecFile(): Path =
     generateSequence(Path.of("").toAbsolutePath()) { it.parent }
-        .map { it.resolve("contracts/openapi.yaml") }
+        .map { it.resolve("beer-game-contracts/openapi.yaml") }
         .first { Files.exists(it) }
 
 internal val DOC: OpenApiDocument = OpenApiDocument.load(findSpecFile())
 
-private fun domainSources(): Path = findSpecFile().parent.parent.resolve("domain/src/main/kotlin")
+// 仕様は Kotlin のルートの外（apps/beer-game-contracts）にあるので、domain は、作業ディレクトリから親をたどって探す。
+private fun domainSources(): Path =
+    generateSequence(Path.of("").toAbsolutePath()) { it.parent }
+        .map { it.resolve("domain/src/main/kotlin") }
+        .first { Files.exists(it) }
 
 private fun withContract(
     world: World = World(),
