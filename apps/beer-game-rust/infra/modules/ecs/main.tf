@@ -159,15 +159,14 @@ resource "aws_ecs_task_definition" "migrate" {
   }])
 }
 
-# 保守・定期のタスク（B11・B12・B14）。モードは app の Main.kt の MODES と一致させる（ProductionDefinitionSpec が検査する）。
-# retention は、削除用のロール（DB_DELETER_ROLE。V101 が作る NOLOGIN のロール）に SET ROLE して動く。
-# 所有者のログインが SET ROLE できるか（GRANT ... WITH SET TRUE）は、AWS 上で未確認（運用手順書の適用前の確認項目）。
+# 保守・定期のタスク（B12・B13・B15）。モード（コマンド）は、crates/app/src/main.rs の起動モードと一致させる。
+# retention は、削除用のロール（beergame_deleter）への切り替えを、アプリが実装していない（接続のログインユーザーのまま動く）。
+# DB のログインロールの分離は未定義（B15 報告の未確認事項。人の判断）。
 locals {
   batch_tasks = {
     "retention" = {
       command     = ["retention"]
       log_group   = aws_cloudwatch_log_group.retention.name
-      # 削除ロール（beergame_deleter）への切り替えは、アプリに未実装（接続のログインユーザーのまま動く。B15 報告の未確認事項）
       environment = local.environment
     }
     "verify-projections" = {
