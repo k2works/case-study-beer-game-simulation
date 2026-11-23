@@ -14,8 +14,8 @@ use support::api::{Game, app, cookie_of, e, prepared, send};
 use support::start;
 
 fn contract() -> Result<Value, String> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../beer-game-contracts/openapi.yaml");
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../beer-game-contracts/openapi.yaml");
     let text =
         std::fs::read_to_string(&path).map_err(|err| format!("{}: {err}", path.display()))?;
     serde_saphyr::from_str::<Value>(&text).map_err(e)
