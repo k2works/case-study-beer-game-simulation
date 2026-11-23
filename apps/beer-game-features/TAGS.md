@@ -1,10 +1,10 @@
 # タグの一覧と意味
 
-フィーチャーファイル（日本語 Gherkin、先頭に `# language: ja`）のタグの一覧です。正本は [ADR-012](../../../docs/adr/beer-game-kotlin/012-gherkin-and-cucumber.md) と [テスト戦略](../../../docs/design/beer-game-kotlin/test-strategy.md)。ストーリーとの対応は、タグから自動で抽出します。
+フィーチャーファイル（日本語 Gherkin、先頭に `# language: ja`）のタグの一覧です。正本は [ADR-012](../../docs/adr/beer-game-kotlin/012-gherkin-and-cucumber.md) と [テスト戦略](../../docs/design/beer-game-kotlin/test-strategy.md)。ストーリーとの対応は、タグから自動で抽出します。
 
 ## 配置
 
-- `features/<機能領域>/*.feature`。領域は [ユーザーストーリー](../../../docs/requirements/beer-game2/user_story.md) の Epic に合わせる。
+- `features/<機能領域>/*.feature`。領域は [ユーザーストーリー](../../docs/requirements/beer-game-ts/user_story.md) の Epic に合わせる。
   - `game-setup/` : Epic 1 ゲーム準備と参加（US1.1、US1.2）
   - `weekly-play/` : Epic 2 1 週の意思決定（US2.1〜US2.3）
   - `continuation/` : Epic 3 継続と復旧（US3.1、US3.2）
@@ -21,8 +21,8 @@
 | :--- | :--- |
 | `@US<番号>` | ユーザーストーリー（例: `@US2.3`）。機能（Feature）の行に付ける |
 | `@AC<番号>` | 受入条件（例: `@AC2.3.1`）。シナリオに付ける。**シナリオの期待値は、受入条件の原文と意味が一致していること**。設計書由来の補足や原文との解釈の差は、シナリオの直前にコメントで書く |
-| `@NF-<名前>` | 非機能要件（例: `@NF-S11` 参加・復帰の総当たりの制限）。受入条件の原文が無い確認のシナリオに付ける（B5 Step 5 で追加）。非機能要件の正本は [非機能要件](../../../docs/design/beer-game-kotlin/non-functional.md) |
-| `@X-<番号>` | 横断の受入条件（例: `@X-1`）。機能（Feature）の行に付ける（B15）。正本は [ユーザーストーリー](../../../docs/requirements/beer-game2/user_story.md) の「横断の受入条件」 |
+| `@NF-<名前>` | 非機能要件（例: `@NF-S11` 参加・復帰の総当たりの制限）。受入条件の原文が無い確認のシナリオに付ける（B5 Step 5 で追加）。非機能要件の正本は [非機能要件](../../docs/design/beer-game-kotlin/non-functional.md) |
+| `@X-<番号>` | 横断の受入条件（例: `@X-1`）。機能（Feature）の行に付ける（B15）。正本は [ユーザーストーリー](../../docs/requirements/beer-game-ts/user_story.md) の「横断の受入条件」 |
 
 ## 層
 

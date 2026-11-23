@@ -89,7 +89,7 @@ jobs:
       - name: スモークテスト
         run: apps/beer-game-rust/scripts/container-smoke.sh beer-game-rust:smoke
 
-  # Terraform の定義の検証（適用はしない。AWS 無関係）。beer-game2.yml と同じ action（版のタグ指定。SHA は未固定）。
+  # Terraform の定義の検証（適用はしない。AWS 無関係）。beer-game-ts.yml と同じ action（版のタグ指定。SHA は未固定）。
   infra:
     runs-on: ubuntu-latest
     steps:
