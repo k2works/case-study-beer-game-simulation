@@ -104,6 +104,42 @@ impl<E, C> PgEventStore<E, C> {
     }
 }
 
+/// ロックの待ちの上限（ミリ秒）。初期値。実測で決める（B13 計画の判断項目 2。architecture-backend.md の M4）。
+/// 再構築の間、コマンドが無期限に待って、接続とタスクが積み上がらないようにする。
+pub const LOCK_TIMEOUT_MILLIS: u32 = 2000;
+
+/// 待ちの上限を、このトランザクションにだけ設定する。
+async fn set_lock_timeout(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT set_config('lock_timeout', $1, true)")
+        .bind(format!("{LOCK_TIMEOUT_MILLIS}ms"))
+        .execute(conn)
+        .await
+        .map(|_| ())
+}
+
+/// ロックの取得の失敗を写す。待ちの超過（55P03）は、再送してよい失敗（`RetryExhausted`）。
+fn lock_failure(e: &sqlx::Error) -> AppFailure {
+    if let sqlx::Error::Database(db) = e
+        && db.code().as_deref() == Some("55P03")
+    {
+        AppFailure::RetryExhausted
+    } else {
+        storage(e)
+    }
+}
+
+/// コマンドの共有のロック。コマンド同士は待たせず、再構築（排他）とだけ同時に走らない。
+/// トランザクションの終了で解放される（`_xact_`。接続が切れても残らない）。
+/// 鍵はゲームごと（`hashtextextended(game_id, 0)`）。再構築の排他のロックも同じ鍵を使う。
+async fn acquire_shared(conn: &mut sqlx::PgConnection, game_id: Uuid) -> Result<(), sqlx::Error> {
+    set_lock_timeout(&mut *conn).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock_shared(hashtextextended($1::text, 0))")
+        .bind(game_id)
+        .execute(conn)
+        .await
+        .map(|_| ())
+}
+
 /// マイグレーションを適用する。
 ///
 /// # Errors
@@ -136,14 +172,20 @@ where
     type Tx = PgTx;
 
     async fn begin(&self) -> Result<PgTx, AppFailure> {
-        match self.pool.begin().await {
-            Ok(tx) => Ok(PgTx(tx)),
+        let mut tx = match self.pool.begin().await {
+            Ok(tx) => tx,
             // 接続を取れなかった（コマンドは未実行）。再送してよい失敗に写す
             Err(sqlx::Error::PoolTimedOut | sqlx::Error::PoolClosed) => {
-                Err(AppFailure::RetryExhausted)
+                return Err(AppFailure::RetryExhausted);
             }
-            Err(e) => Err(storage(&e)),
+            Err(e) => return Err(storage(&e)),
+        };
+        if let Err(e) = acquire_shared(&mut tx, self.game_id).await {
+            // 待ちが切れたら、接続をすぐ戻す（drop に任せない）
+            drop(tx.rollback().await);
+            return Err(lock_failure(&e));
         }
+        Ok(PgTx(tx))
     }
 
     async fn read(&self, tx: &mut PgTx) -> Result<StreamRead<E>, AppFailure> {

@@ -227,3 +227,100 @@ async fn tech__マイグレーション_0001_から_0009_が適用され_game_ro
         Err(format!("連鎖削除で events が残った: {left}"))
     }
 }
+
+/// 再構築が握る排他のロックを、別のトランザクションで再現する（鍵は `begin` の共有のロックと同じ）。
+async fn hold_exclusive(
+    pool: &PgPool,
+    game: Uuid,
+) -> Result<sqlx::Transaction<'static, sqlx::Postgres>, String> {
+    let mut tx = pool.begin().await.map_err(e)?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
+        .bind(game)
+        .execute(&mut *tx)
+        .await
+        .map_err(e)?;
+    Ok(tx)
+}
+
+#[tokio::test]
+async fn nf_r15__再構築の排他のロックの間_コマンドの開始は待ちの上限のあと再試行可能な失敗になる()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = new_game(&env.pool).await?;
+    let rebuild = hold_exclusive(&env.pool, game).await?;
+    let started = Instant::now();
+    let result = store(&env.pool, game).begin().await;
+    let waited = started.elapsed();
+    drop(rebuild.rollback().await);
+    match result {
+        Err(AppFailure::RetryExhausted) => {}
+        other => return Err(format!("RetryExhausted になるはず: {:?}", other.err())),
+    }
+    // lock_timeout（初期値 2 秒）で切れる。無期限には待たない
+    if waited < Duration::from_secs(10) {
+        Ok(())
+    } else {
+        Err(format!("待ちが長すぎる: {waited:?}"))
+    }
+}
+
+#[tokio::test]
+async fn nf_r15__再構築が終われば_コマンドの開始は通る() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = new_game(&env.pool).await?;
+    let rebuild = hold_exclusive(&env.pool, game).await?;
+    rebuild.rollback().await.map_err(e)?;
+    let s = store(&env.pool, game);
+    let tx = s.begin().await.map_err(e)?;
+    s.rollback(tx).await.map_err(e)
+}
+
+#[tokio::test]
+async fn nf_r15__コマンド同士の共有のロックは互いを待たせず_別のゲームの再構築にも待たされない()
+-> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = new_game(&env.pool).await?;
+    let other = new_game(&env.pool).await?;
+    let rebuild_other = hold_exclusive(&env.pool, other).await?;
+    let (a, b) = (store(&env.pool, game), store(&env.pool, game));
+    let started = Instant::now();
+    let tx_a = a.begin().await.map_err(e)?;
+    let tx_b = b.begin().await.map_err(e)?;
+    let waited = started.elapsed();
+    a.rollback(tx_a).await.map_err(e)?;
+    b.rollback(tx_b).await.map_err(e)?;
+    rebuild_other.rollback().await.map_err(e)?;
+    if waited < Duration::from_secs(1) {
+        Ok(())
+    } else {
+        Err(format!("共有のロックが待たされた: {waited:?}"))
+    }
+}
+
+#[tokio::test]
+async fn nf_r15__ロックの待ちが切れても_接続は戻りプールは使い続けられる() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let game = new_game(&env.pool).await?;
+    let rebuild = hold_exclusive(&env.pool, game).await?;
+    // 待ちが切れるたびに接続が戻らないと、プールが枯渇する（RT2）。プールの上限より多く繰り返す
+    let attempts = env.pool.options().get_max_connections() + 2;
+    for _ in 0..attempts {
+        let result = store(&env.pool, game).begin().await;
+        if !matches!(result, Err(AppFailure::RetryExhausted)) {
+            drop(rebuild.rollback().await);
+            return Err("待ちが切れて RetryExhausted になるはず".to_owned());
+        }
+    }
+    rebuild.rollback().await.map_err(e)?;
+    let s = store(&env.pool, game);
+    let tx = s.begin().await.map_err(e)?;
+    s.rollback(tx).await.map_err(e)
+}
