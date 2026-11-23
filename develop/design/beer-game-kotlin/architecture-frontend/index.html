@@ -13754,7 +13754,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">開発</td>
-<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Ktor へプロキシする（接続先は環境変数。ポートは固定の値を書かない）。バックエンドは Gradle で起動し、データベースは Docker の PostgreSQL（<strong>B1 の実装は、ローカルなら H2 でもよい</strong>。<code>APP_ENV=local DB_KIND=h2</code>）。<strong>B1 の実装の場所は <code>apps/beer-game-kotlin/web/</code></strong>（設計の <code>ui/</code> でなく <code>web/</code>。Vite のポートは環境変数 <code>UI_PORT</code>・<code>API_PORT</code>）。<strong>中継（Vite）を通すと、バックエンドが見る <code>Host</code> と <code>Origin</code> が一致せず、変更系の要求が 403 になる</strong>（実ブラウザで初めて判明）。バックエンドの Origin 検査を弱めず、<code>ALLOWED_ORIGINS=http://localhost:&lt;UI のポート&gt;</code> を指定する（開発手順書への反映は未実施）</td>
+<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Ktor へプロキシする（接続先は環境変数。ポートは固定の値を書かない）。バックエンドは Gradle で起動し、データベースは Docker の PostgreSQL（<strong>B1 の実装は、ローカルなら H2 でもよい</strong>。<code>APP_ENV=local DB_KIND=h2</code>）。<strong>B1 の実装の場所は <code>apps/beer-game-kotlin/web/</code></strong>（2026-11-23 に、Rust 版と共有する <code>apps/beer-game-web/</code> へ移動。設計の <code>ui/</code> でなく <code>web/</code>。Vite のポートは環境変数 <code>UI_PORT</code>・<code>API_PORT</code>）。<strong>中継（Vite）を通すと、バックエンドが見る <code>Host</code> と <code>Origin</code> が一致せず、変更系の要求が 403 になる</strong>（実ブラウザで初めて判明）。バックエンドの Origin 検査を弱めず、<code>ALLOWED_ORIGINS=http://localhost:&lt;UI のポート&gt;</code> を指定する（開発手順書への反映は未実施）</td>
 </tr>
 <tr>
 <td style="text-align: left;">型の生成</td>

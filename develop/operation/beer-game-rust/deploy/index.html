@@ -13550,7 +13550,7 @@
 <p>ビルド → ECR への push → 新しいタスク定義の登録（api・migrate・retention・verify-projections を同じイメージへ）→ <code>migrate</code>（1 回限りのタスク。失敗したら中止）→ api の更新 → 静的ファイルの公開 → スモークテスト（<code>/api/v1/ready</code>・<code>/api/v1/health</code>）→ 履歴の記録。失敗したら、直前の版へ自動で戻す。</p>
 <ul>
 <li>イメージは、コミット SHA のタグで ECR へ push し、以降は<strong>ダイジェスト</strong>で固定する。本番へは、ステージングで検証した<strong>同じダイジェスト</strong>を昇格する。</li>
-<li>画面（<code>web/</code>）は Kotlin 版と共有する（<code>apps/beer-game-kotlin/web</code>）。静的ファイルは、<code>releases/&lt;SHA&gt;/</code> に置き、<code>current/</code> に反映する。</li>
+<li>画面（<code>web/</code>）は Kotlin 版と共有する（<code>apps/beer-game-web</code>。2026-11-23 に Kotlin 版のディレクトリから移動）。静的ファイルは、<code>releases/&lt;SHA&gt;/</code> に置き、<code>current/</code> に反映する。</li>
 <li>自動確定を含む業務のスモークテストは未実装（未確認）。</li>
 </ul>
 <h2 id="_5">書く版の切り替え（スキーマの版を上げるとき）<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
