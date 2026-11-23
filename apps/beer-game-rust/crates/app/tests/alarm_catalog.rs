@@ -195,3 +195,57 @@ fn nf_o4__食い違いは検出される_閾値を変えた規則は失敗とし
     );
     Ok(())
 }
+
+const DASHBOARD_TF: &str = "../../infra/modules/observability/main.tf";
+
+/// アプリが出すメトリクスの名前（`application` の `metric_names`）。
+const EMITTED: [&str; 16] = [
+    beergame_application::metric_names::REQUEST_COUNT,
+    beergame_application::metric_names::REQUEST_DURATION_MILLIS,
+    beergame_application::metric_names::SERVER_ERROR,
+    beergame_application::metric_names::MAIN_OPERATION_SUCCESS,
+    beergame_application::metric_names::CONCURRENCY_CONFLICT,
+    beergame_application::metric_names::RETRY_EXHAUSTED,
+    beergame_application::metric_names::PROJECTION_MISMATCH_GAMES,
+    beergame_application::metric_names::PROJECTION_LAG_GAMES,
+    beergame_application::metric_names::PROJECTION_UNCHECKED_GAMES,
+    beergame_application::metric_names::PROJECTION_REBUILD_MILLIS,
+    beergame_application::metric_names::RETENTION_ABANDONED_GAMES,
+    beergame_application::metric_names::RETENTION_DELETED_GAMES,
+    beergame_application::metric_names::DB_POOL_UTILIZATION_PERCENT,
+    beergame_application::metric_names::RSS_BYTES,
+    beergame_application::metric_names::TOKIO_ALIVE_TASKS,
+    beergame_application::metric_names::PANIC_COUNT,
+];
+
+/// ダッシュボードが参照するアプリのメトリクスの名前（`[var.namespace, "名前", ...]`）。
+fn dashboard_metrics() -> Result<Vec<String>, String> {
+    let text = std::fs::read_to_string(DASHBOARD_TF).map_err(|e| format!("{DASHBOARD_TF}: {e}"))?;
+    Ok(text
+        .lines()
+        .filter_map(|line| {
+            let rest = line.split_once("[var.namespace, \"")?.1;
+            Some(rest.split('"').next()?.to_owned())
+        })
+        .collect())
+}
+
+#[test]
+fn nf_o5__ダッシュボードが参照するメトリクスは_すべてアプリが出す名前である() -> Result<(), String> {
+    let used = dashboard_metrics()?;
+    assert!(!used.is_empty(), "tf の書式を読めていない");
+    let unknown: Vec<&String> = used.iter().filter(|m| !EMITTED.contains(&m.as_str())).collect();
+    assert!(unknown.is_empty(), "アプリが出さない名前を参照している: {unknown:?}");
+    Ok(())
+}
+
+#[test]
+fn nf_o5__ダッシュボードに_実行環境の項目_RSS_タスク数_panic_接続プールが含まれる() -> Result<(), String> {
+    let used = dashboard_metrics()?;
+    let missing: Vec<&str> = ["RssBytes", "TokioAliveTasks", "PanicCount", "DbPoolUtilizationPercent"]
+        .into_iter()
+        .filter(|name| !used.iter().any(|u| u == name))
+        .collect();
+    assert!(missing.is_empty(), "ダッシュボードに無い項目: {missing:?}");
+    Ok(())
+}

@@ -241,6 +241,20 @@ locals {
       }
     },
     {
+      type = "metric", x = 0, y = 24, width = 12, height = 6
+      properties = {
+        title  = "実行環境（常駐メモリ・tokio のタスク数・panic の件数）。メモリのアラームの閾値は、実測後に決める"
+        region = var.region
+        view   = "timeSeries"
+        period = 60
+        metrics = [
+          [var.namespace, "RssBytes", "Environment", var.environment, { stat = "Maximum", label = "常駐メモリ (bytes)" }],
+          [var.namespace, "TokioAliveTasks", "Environment", var.environment, { stat = "Maximum", yAxis = "right", label = "tokio のタスク数" }],
+          [var.namespace, "PanicCount", "Environment", var.environment, { stat = "Maximum", yAxis = "right", label = "panic の累計" }],
+        ]
+      }
+    },
+    {
       type = "metric", x = 0, y = 18, width = 12, height = 6
       properties = {
         title   = "合成監視の成功率"
