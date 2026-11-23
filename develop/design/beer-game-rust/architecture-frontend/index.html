@@ -13529,7 +13529,7 @@
 <p><strong>現在の <code>web/</code> は、SSE を使いません</strong>（上の確認事項 b）。更新は、<code>PLAY_POLL_MS</code> の間隔の自動更新（黙って状態を取り直す）、手動更新、保存・確定の応答の後の取得（<code>catchUp</code>）です。<strong>Rust 版も同じ</strong>にします。</p>
 <ul>
 <li><strong>SSE の設計</strong>（<code>state-version</code> の通知がストリームの種別と版を運ぶ、ストリームごとの版の比較、<code>useLiveSnapshot</code>、切断時のポーリング、<code>Last-Event-ID</code> による再生はしない）は、Kotlin 版の設計を維持し、<strong>フロントエンドが SSE を使い始める時点</strong>で実装する（バックエンドの SSE は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> の設計どおり、axum の SSE を第一候補とする。未確認）。</li>
-<li><strong>NF-P2（週確定から全画面への反映 p95 2 秒）・NF-P4（SSE が使えないときのポーリング）</strong>は、現在の自動更新の間隔（<code>PLAY_POLL_MS</code>）で満たせるかを、<strong>実測で確かめる必要がある</strong>（未決事項）。ポーリングだけで NF-P2 を満たせるかは、Kotlin 版でも未確認。</li>
+<li><strong>NF-P2（週確定から全画面への反映。2026-11-23 に p95 4 秒以下へ再定義）・NF-P4（SSE が使えないときのポーリング）</strong>: 現在の自動更新の間隔（<code>PLAY_POLL_MS</code>、3 秒）では、反映までの p95 は約 2.86 秒（B2・B16 の推定）で、再定義した 4 秒を満たす。旧目標の 2 秒は満たせなかった。</li>
 <li>同期投影のため、取得したスナップショットの版は、応答の <code>versions</code> 以上であることが保証される（バックエンドの問い合わせの REPEATABLE READ と <code>projection_checkpoints</code> の同時読み取り）。この保証を <strong>Rust 版のバックエンドも満たす</strong>（統合テストの「問い合わせの一貫性」）。</li>
 </ul>
 <h2 id="_7">品質属性への対応<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
@@ -13624,7 +13624,7 @@
 <li>~~<strong>RF3 の承認</strong>~~ <strong>解消（2026-11-19）</strong>: 承認した。ただし既存の <code>web/support/hooks.mjs</code> の編集は、<strong>実際に行う前に改めて確認する</strong>。</li>
 <li><strong>環境変数の名前の揃え方</strong>: Rust のバックエンドの設定名（<code>ALLOWED_ORIGINS</code>・<code>PORT</code>・<code>APP_ENV</code> など）を、Kotlin 版と揃えるか。揃えると、E2E の案内・手順書の差分が減る。<code>DB_KIND</code> は Rust 版にはない（H2 がない）。</li>
 <li>~~<strong>ADR-020（タブごとの Cookie 名）</strong>~~ <strong>解消（2026-11-19）</strong>: Rust 版のバックエンドでも扱うと決定した。</li>
-<li><strong>SSE の優先度と NF-P2</strong>（レビュー H5。<strong>2026-11-21 に「B1 で測って決める」と承認</strong>）: 現在のフロントエンドは SSE を使わず、3 秒間隔のポーリング。<strong>ポーリングだけで NF-P2（p95 2 秒）・NF-P4 を満たせない見込み</strong>で、SSE を作る／ポーリング間隔を詰める（既存の <code>web/</code> の編集を伴う）／目標を再定義する、のどれにするかは<strong>B1 の実測で決める</strong>。実測前に数値や方式を変えない。<strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（<a href="../ui-design/">UI 設計</a> の影響表 #12）。</li>
+<li><strong>SSE の優先度と NF-P2</strong>（レビュー H5。<strong>2026-11-21 に「B1 で測って決める」と承認</strong>）: 現在のフロントエンドは SSE を使わず、3 秒間隔のポーリング。<strong>ポーリングだけでは旧 NF-P2（p95 2 秒）を満たせない見込み</strong>だった。B1・B2・B16 の実測（p95 約 2.86 秒）を受け、<strong>目標を p95 4 秒以下に再定義することを 2026-11-23 に承認</strong>した（SSE は作らず、既存の <code>web/</code> も変えない）。<strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（<a href="../ui-design/">UI 設計</a> の影響表 #12）。</li>
 <li><strong>フロントエンドの Rust 版 CI の構成</strong>: <code>web/</code> のジョブ（<code>npm run verify</code>、<code>api:check</code>、<code>@ui</code>）を、Rust 版のワークフローで、どのバックエンドに向けて実行するか（Kotlin 版のワークフローの <code>web</code>・<code>ui</code> ジョブとの重複）。</li>
 <li><strong>Rust のバックエンドを既存の <code>web/</code> に向けた実際の動作</strong>（RF2）: B1 以降で検証する。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 表示名の辞書の形式（多言語化の要否）、設計トークンの管理とコントラスト比の自動検査、ルーターのライブラリ（現状は <code>react-router</code> 8.5.1）、防御的な再取得の要否、<code>useLiveSnapshot</code> の実装時期、アクセシビリティの自動検査（axe）・200% 拡大・スクリーンリーダーの確認、進行役のコンソールの未実装の機能。いずれも <a href="../../beer-game-kotlin/architecture-frontend/">Kotlin 版の未決事項</a> に追従する。</li>

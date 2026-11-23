@@ -13474,7 +13474,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-P2</td>
-<td style="text-align: left;">週確定から全ブラウザの表示まで p95 2 秒以下（同一の時計で測る。同期投影のため通知の版以上の状態が取れる）。<strong>現行の画面は SSE を使わず 3 秒間隔のポーリングのため、この目標を満たせない見込み</strong>（推定。実測していない）。<strong>SSE を作る／間隔を詰める／目標を再定義する、のどれにするかは、B1 の実測で決める</strong>（2026-11-21 の決定。実測前に数値・方式を変えない。RN1。<a href="../ui-design/">UI 設計</a> の影響表 #12）</td>
+<td style="text-align: left;">週確定から全ブラウザの表示まで <strong>p95 4 秒以下</strong>（同一の時計で測る。同期投影のため通知の版以上の状態が取れる）。<strong>目標の再定義（2026-11-23 にユーザーが承認。旧: p95 2 秒以下）</strong>: 現行の画面は SSE を使わず 3 秒間隔のポーリングで、反映までの p95 は約 2.86 秒（B2・B16 の推定。画面を介した実測ではない。取得の所要は p95 18〜45 ms）。2 秒は 3 秒間隔のポーリングでは満たせず、SSE を作らない方針のため、ポーリングの間隔（3 秒）＋取得の所要に収まる 4 秒に定めた。<strong>SSE を作る場合は、2 秒へ戻すかを改めて決める</strong>（<a href="../ui-design/">UI 設計</a> の影響表 #12、<a href="../../../development/beer-game-rust/nfr_results/">NFR の検証結果</a>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P3</td>

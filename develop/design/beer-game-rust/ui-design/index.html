@@ -13552,7 +13552,7 @@
 <td style="text-align: left;">12</td>
 <td style="text-align: left;"><strong>現行の画面の更新は、SSE でなくポーリング</strong>（レビュー H5）: <code>features/play/PlayPage.tsx</code> は <code>PLAY_POLL_MS</code>（3000 ms）の間隔で、黙って状態を取り直す。S04（ロビー）・S07（観察）にもポーリングがある（S06 には <code>setInterval</code> が見つからなかった）。<strong>ポーリングの失敗（403・レート制限・タイムアウト）は黙って無視され、画面は古いまま何の通知も出ない</strong></td>
 <td style="text-align: left;">tower の<strong>レート制限をポーリングの GET に適用すると</strong>、制限に達した GET が黙って失敗し、画面が古いままになる。<strong>3 秒間隔では、反映の遅れは最大で約 3 秒に GET の時間を足したもの</strong>で、NF-P2（週確定から全画面への反映 p95 2 秒）を満たさない見込みが高い（計算上の推定。<strong>実測していない</strong>）。負荷の想定も SSE 75 本でなく、ポーリングの GET（見込みで毎秒 50 件程度。75 ユーザー ÷ 3 秒に複数の画面を足した推定）</td>
-<td style="text-align: left;">(a) <strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（参加・復帰・招待の専用の制限は別。NF-S11）。(b) <strong>NF-P2 の扱いは B1 で測って決める</strong>（承認済みの方針。SSE を作る／ポーリング間隔を詰める／NF-P2 を再定義する、のどれにするかを実測の結果で決める。RN1 と同じく、実測前に数値や方式を変えない）。(c) ポーリングの失敗が続くときに画面が古いままであることは、Kotlin 版と共通の未解決の課題（未決事項）</td>
+<td style="text-align: left;">(a) <strong>tower のレート制限は、ポーリングの GET を対象外にする</strong>（参加・復帰・招待の専用の制限は別。NF-S11）。(b) <strong>NF-P2 は実測の結果、p95 4 秒以下に再定義した</strong>（2026-11-23 承認。3 秒間隔のポーリングで p95 約 2.86 秒。SSE は作らない）。(c) ポーリングの失敗が続くときに画面が古いままであることは、Kotlin 版と共通の未解決の課題（未決事項）</td>
 </tr>
 <tr>
 <td style="text-align: left;">13</td>
