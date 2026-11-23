@@ -45,6 +45,8 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.3.0",
     "@vitest/coverage-v8": "5.1.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "concurrently": "10.0.7",
     "eslint": "10.14.0",
     "fast-check": "4.10.2",
@@ -55,7 +57,8 @@
     "typescript-eslint": "8.72.1",
     "vite": "8.3.6",
     "vitest": "5.1.0",
-    "wait-on": "9.5.1"
+    "wait-on": "9.5.1",
+    "yaml": "2.9.1"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.5",

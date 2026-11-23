@@ -168,6 +168,7 @@ nav:
           - Bolt 12 計画: development/beer-game-ts/bolt_12_plan.md
           - Bolt 12 終了報告: development/beer-game-ts/bolt_12_report.md
           - リリース完了報告書 0.2: development/beer-game-ts/release_report-0_2_0.md
+          - API を共有の契約に合わせる計画: development/beer-game-ts/api_alignment_plan.md
       - beer-game-kotlin:
           - 概要: development/beer-game-kotlin/index.md
           - リリース計画: development/beer-game-kotlin/release_plan.md

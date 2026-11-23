@@ -1,5 +1,8 @@
 # Docs Update Log
 
+## 2026-11-24
+* **Creation**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を作成（beer-game-ts の API を共有の契約に合わせ、ui を削除する計画。差分表と段階。claude-code/claude-sonnet-5-5）
+
 ## 2026-11-23
 * **Update**: `apps/beer-game2` と `docs/*/beer-game2` を `beer-game-ts` に改名（リンク・パス・ナビ・運用手順書・ワークフロー名・インフラ定義の名前。過去の記録の呼び名は残した。[ADR 索引の記録](/adr/beer-game-ts/index.md)。claude-code/claude-sonnet-5-5）
 * **Update**: [architecture-frontend（Rust）](/design/beer-game-rust/architecture-frontend.md)・[tech-stack（Rust）](/design/beer-game-rust/tech-stack.md)・[index（Rust）](/design/beer-game-rust/index.md)・[architecture-backend（Kotlin）](/design/beer-game-kotlin/architecture-backend.md)・[ADR-008](/adr/beer-game-kotlin/008-api-contract-and-error-codes.md) を更新（契約を `apps/beer-game-contracts/` へ移動。claude-code/claude-sonnet-5-5）
