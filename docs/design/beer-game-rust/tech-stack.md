@@ -213,7 +213,7 @@ team.md の規約（行 80%）に従います。beer-game-kotlin の目標との
 3. **sqlx の機能**: PostgreSQL のアドバイザリロック、`LISTEN/NOTIFY`、マイグレーション、コンパイル時の検査（オフラインの可否）。B1 で確認する。
 4. **cucumber-rs の日本語対応**: R5 のとおり。
 5. **axum の SSE と tower-http のプラグイン**: 使うプラグインの名前と機能を確認する。
-6. ~~**API の契約の共有方法**~~ **解消（2026-11-19。RF1）**: Kotlin 版の `contracts/openapi.yaml` を、現在の場所のまま共有する。
+6. ~~**API の契約の共有方法**~~ **解消（2026-11-19。RF1）**: Kotlin 版の `contracts/openapi.yaml` を、現在の場所のまま共有する（**2026-11-23 に、中立の `apps/beer-game-contracts/openapi.yaml` へ移動した**）。
 7. **MSRV とサポート**: 各クレートの MSRV が Rust 1.97.1 以下であること、各クレートの公開日と保守状況を `cargo info` で確認する。
 8. **エディション**: 2024 を第一候補とするが、ツールチェーンの対応を実装開始時に確認する。
 

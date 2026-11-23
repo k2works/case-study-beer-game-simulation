@@ -672,7 +672,7 @@ apps/beer-game-kotlin/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
 │   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`。B5 Step 5.5 で、`common/V007`・`V008` を足し、`postgres/` は 101＝冪等記録の索引、102＝DB ロールと GRANT に付け替えた**。006（保持）は B11 の予約。h2/ は作らない）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
-├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
+├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源。2026-11-23 に ../beer-game-contracts/ へ移動）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う。**B1 の実装の場所は `web/`**）
 ├── features/                         （日本語 Gherkin。B1 で追加。両処理系が参照する）
 └── infra/                            （Terraform）

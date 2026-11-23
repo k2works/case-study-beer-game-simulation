@@ -53,7 +53,7 @@ beer-game-rust プロジェクトの設計ドキュメントです。
 | RN1〜RN3 | JVM 項目の読み替えと実測前に数値を変えない方針、**NF-R18（キャンセル安全性）と NF-S22（メモリ安全）の新設**、行 80% | [非機能要件](./non-functional.md) |
 | RI1〜RI5 | 最小の実行イメージ、サイズは実測前に縮めない、`healthcheck` サブコマンド、SIGTERM は完了待ちで終了コード 0、Terraform は Rust 版専用に複製 | [インフラストラクチャ](./architecture-infrastructure.md) |
 | RU1・RU2 | UI 設計は参照にとどめる、契約の逸脱はバックエンドで直す | [UI 設計](./ui-design.md) |
-| RF1〜RF3 | `web/`・`contracts/`・`features/` は Kotlin 版のまま共有、既存の `@ui`・E2E で契約の同等性を検証、E2E の起動案内の差し替え | [フロントエンドアーキテクチャ](./architecture-frontend.md) |
+| RF1〜RF3 | `web/`・`contracts/`・`features/` は共有（2026-11-23 に `apps/beer-game-web/`・`apps/beer-game-contracts/`・`apps/beer-game-features/` へ移動）、既存の `@ui`・E2E で契約の同等性を検証、E2E の起動案内の差し替え | [フロントエンドアーキテクチャ](./architecture-frontend.md) |
 | ローカル開発の DB | **PostgreSQL 18（Docker）**。ローカル・CI・統合テスト・ステージング・本番が同じ DB | [技術スタック](./tech-stack.md)、[データモデル](./data-model.md) |
 | ADR-020 の扱い | 資格の Cookie の名前をタブごとにする方式を、Rust 版のバックエンドでも扱う（Kotlin 版の ADR-020 自体の承認は Kotlin 版の判断） | [UI 設計](./ui-design.md) |
 | 新規依存関係 | 導入の承認は、B1 の計画で実際に使うものを確定してから求める（未確認の機能を確かめたうえで絞る） | [技術スタック](./tech-stack.md) |
