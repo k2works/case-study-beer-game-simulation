@@ -16,7 +16,11 @@ export const ORIGIN = 'https://beer.example.test';
 
 /** メモリ上の永続化で、実際の HTTP アダプターを組み立てる（DB は要らない。既存の統合テストと同じ組み立て） */
 export async function bootServer(
-  options: { ready?: () => Promise<boolean> } = {},
+  options: {
+    ready?: () => Promise<boolean>;
+    notifierReady?: () => boolean;
+    allowedOrigins?: readonly string[];
+  } = {},
 ): Promise<FastifyInstance> {
   const mem = memoryUnitOfWork();
   const app = createApplication({
@@ -30,9 +34,13 @@ export async function bootServer(
   const server = buildServer({
     app,
     ready: options.ready ?? (async () => true),
+    ...(options.notifierReady ? { notifierReady: options.notifierReady } : {}),
     notifier: { subscribe: () => () => {} },
     rateLimiter: memoryRateLimiter(1000, 60_000),
-    config: { allowedOrigin: ORIGIN, logLevel: 'silent' },
+    config: {
+      allowedOrigins: options.allowedOrigins ?? [ORIGIN],
+      logLevel: 'silent',
+    },
     logStream: new Writable({
       write(_chunk, _enc, cb) {
         cb();

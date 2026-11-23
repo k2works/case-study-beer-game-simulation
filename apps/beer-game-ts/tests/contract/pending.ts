@@ -29,6 +29,4 @@ export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
   'recoverParticipation',
   'getSessionState',
   'getGameState',
-  'getHealth',
-  'getReady',
 ]);

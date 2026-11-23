@@ -26,6 +26,11 @@ export class PgNotifier implements ChangeNotifier {
     this.retryMs = options.retryMs ?? 1000;
   }
 
+  /** 通知を受信できているか（LISTEN の接続が生きている）。`/api/v1/ready` の確認に使う */
+  isListening(): boolean {
+    return !this.stopped && this.client !== null;
+  }
+
   async start(): Promise<void> {
     this.stopped = false;
     await this.connect();

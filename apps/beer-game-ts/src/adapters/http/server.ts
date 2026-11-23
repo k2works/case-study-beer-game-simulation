@@ -30,15 +30,33 @@ import {
   type RateLimiter,
 } from '../../ports/index.js';
 import { NO_METRICS } from '../observability/emf.js';
+import { idempotencyKeyOf } from './idempotency-key.js';
+import {
+  API_V1,
+  ApiProblem,
+  badRequestProblem,
+  internalProblem,
+  isApiV1,
+  notFoundProblem,
+  notReadyProblem,
+  payloadTooLargeProblem,
+  retryExhaustedProblem,
+  sendApiProblem,
+  unauthorizedProblem,
+  validationProblem,
+} from './problems.js';
 
 export interface HttpConfig {
-  allowedOrigin: string;
+  /** 変更系の要求を受ける送信元（Origin）。画面の配信元。開発・E2E では別のポートも許す */
+  allowedOrigins: readonly string[];
   logLevel: string;
 }
 
 export interface ServerDependencies {
   app: Application;
   ready: () => Promise<boolean>;
+  /** 通知の受信が生きているか（`/api/v1/ready` の確認。省略時は生きているとみなす） */
+  notifierReady?: () => boolean;
   notifier: ChangeNotifier;
   /** 参加・復帰の専用のレート制限（総当たりの対策） */
   rateLimiter: RateLimiter;
@@ -166,6 +184,8 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     },
     requestIdHeader: 'x-correlation-id',
     genReqId: () => randomUUID(),
+    // 本文の上限は 64 KB（NF-P12）。超えたら 413
+    bodyLimit: 65_536,
   });
 
   server.register(cookie);
@@ -221,14 +241,79 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     });
 
   server.addHook('onRequest', async (request, reply) => {
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) {
-      if (request.headers.origin !== config.allowedOrigin) {
-        return problem(reply, 403, 'Forbidden', '許可されていない送信元です');
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return;
+    const origin = request.headers.origin;
+    const allowed =
+      origin !== undefined && config.allowedOrigins.includes(origin);
+    if (isApiV1(request.url)) {
+      // 共有の契約（/api/v1）: 送信元の検査のあと、変更系は Idempotency-Key が必須
+      if (!allowed) return sendApiProblem(reply, unauthorizedProblem());
+      try {
+        idempotencyKeyOf(request);
+      } catch (error) {
+        if (error instanceof ApiProblem) return sendApiProblem(reply, error);
+        throw error;
       }
+      return;
+    }
+    if (!allowed) {
+      return problem(reply, 403, 'Forbidden', '許可されていない送信元です');
     }
   });
 
+  /**
+   * 共有の契約（/api/v1）の失敗を、`code` を持つ problem+json にする。
+   * 業務の失敗の code（session.paused など）は、操作を /api/v1 に実装するときに、ここへ写しを足す
+   * （docs/development/beer-game-ts/api_alignment_plan.md の段階 3）。写しが無い StaleError は、いまは app.internal になる。
+   */
+  const toApiProblem = (error: FastifyError | Error): ApiProblem => {
+    if (error instanceof ApiProblem) return error;
+    if (error instanceof ZodError) {
+      return validationProblem(
+        error.issues.map((i) => ({
+          field: i.path.join('.') || 'body',
+          message: i.message,
+        })),
+      );
+    }
+    if (
+      error instanceof UnauthorizedError ||
+      error instanceof ForbiddenError ||
+      error instanceof PermissionError
+    ) {
+      return unauthorizedProblem();
+    }
+    if (error instanceof NotFoundError) return notFoundProblem();
+    if (error instanceof ConflictError) return retryExhaustedProblem();
+    if (error instanceof DomainError && !(error instanceof StaleError)) {
+      return validationProblem(
+        error.issues.length > 0
+          ? error.issues.map((i) => ({
+              field: 'body',
+              message: i.fix,
+              ...(i.week !== undefined ? { week: i.week } : {}),
+            }))
+          : [{ field: 'body', message: error.message }],
+      );
+    }
+    const status = (error as FastifyError).statusCode;
+    if (status === 413) return payloadTooLargeProblem();
+    if (status === 404) return notFoundProblem();
+    if (status && status >= 400 && status < 500) {
+      return badRequestProblem('要求を処理できません。');
+    }
+    return internalProblem();
+  };
+
   server.setErrorHandler((error: FastifyError | Error, request, reply) => {
+    if (isApiV1(request.url)) {
+      if (error instanceof DuplicateError) invariantViolations.add(request);
+      const mapped = toApiProblem(error);
+      if (mapped.code === 'app.internal') {
+        request.log.error({ err: error }, '予期しないエラー');
+      }
+      return sendApiProblem(reply, mapped);
+    }
     if (error instanceof ZodError) {
       return problem(
         reply,
@@ -290,6 +375,16 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     );
   });
 
+  // 経路が無い。/api/v1 は、code を持つ problem+json。それ以外は従来の形（Fastify の既定）
+  server.setNotFoundHandler((request, reply) => {
+    if (isApiV1(request.url)) return sendApiProblem(reply, notFoundProblem());
+    return reply.code(404).send({
+      message: `Route ${request.method}:${request.url} not found`,
+      error: 'Not Found',
+      statusCode: 404,
+    });
+  });
+
   /** 候補の資格のうち、このゲームのものを選ぶ（別のゲームの古い資格は使わない） */
   const tokenOf = (request: FastifyRequest, ...kinds: Kind[]) => {
     const tokens = kinds
@@ -325,6 +420,20 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   };
 
   server.get('/health', async () => ({ status: 'ok' }));
+  // 共有の契約（getHealth・getReady）。認可なし。負荷分散には /ready を使う
+  server.get(`${API_V1}/health`, async () => ({ status: 'ok' }));
+  server.get(`${API_V1}/ready`, async (_request, reply) => {
+    let database: boolean;
+    try {
+      database = await deps.ready();
+    } catch {
+      database = false;
+    }
+    const notifier = deps.notifierReady ? deps.notifierReady() : true;
+    if (database && notifier) return { status: 'ok' };
+    // 503 は必ず type を持つ problem+json（共有 UI が、負荷分散の外側の 503 と区別する）
+    return sendApiProblem(reply, notReadyProblem({ database, notifier }));
+  });
   // /ready は ALB のヘルスチェック、/api/ready は CloudFront 経由の合成監視（/api/* だけが API へ届く）
   for (const path of ['/ready', '/api/ready'])
     server.get(path, async (_request, reply) => {

@@ -82,11 +82,25 @@ TS にだけあって契約に無いもの（共有 UI は使わない。削除�
 
 | 段階 | 状態 | 備考 |
 | :-: | :--- | :--- |
-| 0 | 実施中 | 契約テストの土台（35 件）は通過。依存の版は 2026-11-24 に公式レジストリで確認（ajv 8.20.0、ajv-formats 3.0.1、yaml 2.9.1。いずれも exact 指定） |
-| 1〜7 | 未着手 | |
+| 0 | 完了（2026-11-24） | 契約テストの土台（35 件）は通過。依存の版は 2026-11-24 に公式レジストリで確認（ajv 8.20.0、ajv-formats 3.0.1、yaml 2.9.1。いずれも exact 指定） |
+| 1 | 完了（2026-11-24） | `getHealth`・`getReady` を `/api/v1` に実装（未実装は 25 → 23 件）。problem+json（`code`・`type`・`errors[]`・`Retry-After`）、Origin（`ALLOWED_ORIGINS`）、`Idempotency-Key` の検査、本文 64 KB、404 を契約の形で。**旧い経路（`/api/*`）は従来の形のまま**（段階 4 まで。URL の接頭辞で切り替える）。537 件通過 |
+| 2〜7 | 未着手 | |
+
+### 段階 1 で、後の段階へ持ち越したもの
+
+| 項目 | 持ち越し先 | 理由 |
+| :--- | :-: | :--- |
+| `Idempotency-Key` の**保存と再生**（同じキーで本文が違えば 409 `app.idempotency_key_reused`）。いまは、変更系の**存在と形の検査**だけ | 3 | 保存はコマンドごと（既存の `idempotency_records` はゲーム単位。commit だけが使っている）。**`createGame` はゲームが存在する前なので、この表（`game_id` が外部キー）に載せられない**。扱い（キーからゲーム ID を決めて再生する、など）を、段階 3 の `createGame` で決める（スキーマ変更が要るならゲート 1） |
+| 業務の失敗の `code`（`session.paused` ほか 18 種）への写し。`StaleError`・`DecisionConflictError` は、いまは `app.internal` | 3 | 操作ごとに、返す `code` と拡張メンバー（`latest`・`current`・`missingRoles` など）が違う |
+| `NotFoundError` の扱い（いまは 404 `request.not_found`）。存在しないゲームを「資格が無い」と区別しない 403 にするかは、操作ごと | 3 | 契約は、存在の有無を明かさない箇所（資格・ゲーム）と、`game.invitation_not_found` を持つ |
+| `405 request.method_not_allowed` | 3 | 経路の表から、同じ経路の別メソッドを判定する必要がある。共有 UI は起こさない |
+| `x-correlation-id` を、UUID のときだけ採用する規則（契約）。いまは、どんな文字列も採用 | 4 | 既存の統合テストが、UUID でない値（`corr-123`）の反映を検査している。旧 API の撤去と同時に直す |
+| `Secure` 属性の設定（契約は「HTTPS の環境では Secure」。いまは常に `secure: true`） | 5 | 共有 UI の E2E は `http://localhost`（WebKit は Secure の Cookie を受けない）。設定項目（`COOKIE_SECURE` など）が要る |
+| `ALLOWED_ORIGIN`（旧名）の撤去、Terraform（`allowed_origin`）・`container-check.sh` の環境変数名の更新 | 4〜5 | 現在は旧名も受ける（優先は `ALLOWED_ORIGINS`）。AWS は未適用 |
 
 ## 更新履歴
 
 | 日付 | 更新内容 | 更新者 |
 | :--- | :--- | :--- |
 | 2026-11-24 | 初版作成（段階 0。差分表と段階・ゲート） | claude-code |
+| 2026-11-24 | 段階 1 の完了を反映（横断の仕組み、`getHealth`・`getReady`、持ち越しの一覧） | claude-code |

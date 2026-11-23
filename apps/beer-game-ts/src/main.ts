@@ -18,12 +18,13 @@ const server = buildServer({
     return true;
   },
   notifier,
+  notifierReady: () => notifier.isListening(),
   metrics: createMetrics(config),
   rateLimiter: new PgRateLimiter(pool, {
     limit: config.authRateLimitPerMinute,
     windowMs: 60_000,
   }),
-  config: { allowedOrigin: config.allowedOrigin, logLevel: config.logLevel },
+  config: { allowedOrigins: config.allowedOrigins, logLevel: config.logLevel },
 });
 
 async function shutdown() {

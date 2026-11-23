@@ -84,8 +84,25 @@ describe('loadConfig', () => {
   it('開発では、鍵が無くても既定値で起動する', () => {
     expect(loadConfig({ NODE_ENV: 'development' })).toMatchObject({
       environment: 'development',
-      allowedOrigin: 'http://localhost:5173',
+      allowedOrigins: ['http://localhost:5173'],
     });
+  });
+
+  it('許可する送信元は、ALLOWED_ORIGINS にカンマ区切りで複数指定できる（空白と空の要素は除く）', () => {
+    expect(
+      loadConfig({
+        ...prod,
+        ALLOWED_ORIGINS: ' https://a.example.test , ,http://localhost:5273',
+      }).allowedOrigins,
+    ).toEqual(['https://a.example.test', 'http://localhost:5273']);
+  });
+
+  it('旧い名前 ALLOWED_ORIGIN（単数）も受ける。両方あれば ALLOWED_ORIGINS が優先', () => {
+    expect(loadConfig(prod).allowedOrigins).toEqual([prod.ALLOWED_ORIGIN]);
+    expect(
+      loadConfig({ ...prod, ALLOWED_ORIGINS: 'https://new.example.test' })
+        .allowedOrigins,
+    ).toEqual(['https://new.example.test']);
   });
 });
 

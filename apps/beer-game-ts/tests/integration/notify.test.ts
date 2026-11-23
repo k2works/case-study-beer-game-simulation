@@ -118,7 +118,7 @@ describe('SSE', () => {
       },
       rateLimiter: memoryRateLimiter(1000, 60_000),
       metrics: { emit: (ms) => emitted.push(...ms) },
-      config: { allowedOrigin: 'https://x.test', logLevel: 'silent' },
+      config: { allowedOrigins: ['https://x.test'], logLevel: 'silent' },
     });
     await server.listen({ port: 0, host: '127.0.0.1' });
     const base = `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`;

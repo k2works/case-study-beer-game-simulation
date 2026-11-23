@@ -48,7 +48,7 @@ async function boot(
     metrics: {
       emit: (metrics, dimensions = {}) => emitted.push({ metrics, dimensions }),
     },
-    config: { allowedOrigin: ORIGIN, logLevel: 'info' },
+    config: { allowedOrigins: [ORIGIN], logLevel: 'info' },
     logStream: new Writable({
       write(chunk, _enc, cb) {
         logs.push(String(chunk));

@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-24
+* **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 1 の完了と、持ち越しの一覧。claude-code/claude-sonnet-5-5）
 * **Creation**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を作成（beer-game-ts の API を共有の契約に合わせ、ui を削除する計画。差分表と段階。claude-code/claude-sonnet-5-5）
 
 ## 2026-11-23

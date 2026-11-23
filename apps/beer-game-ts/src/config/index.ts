@@ -2,7 +2,8 @@ export interface Config {
   environment: 'production' | 'development' | 'test';
   port: number;
   databaseUrl: string;
-  allowedOrigin: string;
+  /** 変更系の要求を受ける送信元。環境変数 ALLOWED_ORIGINS（カンマ区切り） */
+  allowedOrigins: string[];
   logLevel: string;
   /** 資格の鍵（古い順。最後が発行用） */
   credentialKeys: { version: string; key: Buffer }[];
@@ -85,6 +86,14 @@ function required(
   return fallback;
 }
 
+/** カンマ区切りの送信元の一覧。前後の空白と空の要素を除く */
+function originList(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((o) => o.trim())
+    .filter((o) => o.length > 0);
+}
+
 /** 設定を読み込む。本番で鍵などが未設定なら、起動に失敗する */
 export function loadConfig(env: Env): Config {
   const nodeEnv = env.NODE_ENV;
@@ -104,11 +113,14 @@ export function loadConfig(env: Env): Config {
       production,
       'postgres://beer_game2:local-only@localhost:5433/beer_game2',
     ),
-    allowedOrigin: required(
-      env,
-      'ALLOWED_ORIGIN',
-      production,
-      'http://localhost:5173',
+    allowedOrigins: originList(
+      required(
+        // 旧い名前 ALLOWED_ORIGIN（単数）も、段階 4 の旧 API の撤去まで受ける
+        { ...env, ALLOWED_ORIGINS: env.ALLOWED_ORIGINS ?? env.ALLOWED_ORIGIN },
+        'ALLOWED_ORIGINS',
+        production,
+        'http://localhost:5173',
+      ),
     ),
     logLevel: env.LOG_LEVEL ?? 'info',
     credentialKeys: credentialKeys(env, production),
