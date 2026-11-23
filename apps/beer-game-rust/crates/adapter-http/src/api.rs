@@ -13,13 +13,13 @@ use axum::routing::put;
 use axum::routing::{get, post};
 use beergame_application::{
     AppFailure, AppSettings, CreateGameInput, CredentialLookup, EXPORT_SCHEMA_VERSION, Env,
-    EventStore, Executed, ExportInput, GameSnapshot, Idempotency, ObservationSnapshot,
-    ResponseShape, RetentionState, SealedIdempotency, Secret, SessionSnapshot, SessionWriter,
-    StartExecuted, StoredResponse, assign_or_replace_role, authenticate, build_csv, build_json,
-    checksum, commit_week, create_game, digest, find_invitation, invite_observer, join_game,
-    join_observer, open_sealed, pause_session, recover, reissue_credential, resume_session,
-    revoke_credential, revoke_observer_invitation, save_decision, set_commit_mode, start_game,
-    submit_proxy_decision,
+    EventStore, Executed, ExportInput, GameSnapshot, Idempotency, MetricSink, NoMetrics,
+    ObservationSnapshot, RequestOutcome, ResponseShape, RetentionState, SealedIdempotency, Secret,
+    SessionSnapshot, SessionWriter, StartExecuted, StoredResponse, assign_or_replace_role,
+    authenticate, build_csv, build_json, checksum, commit_week, create_game, digest,
+    find_invitation, invite_observer, join_game, join_observer, open_sealed, pause_session,
+    recover, reissue_credential, request_metrics, resume_session, revoke_credential,
+    revoke_observer_invitation, save_decision, set_commit_mode, start_game, submit_proxy_decision,
 };
 use beergame_domain::{
     Actor, CommitMode, ConditionsInput, DecisionVersion, GameEvent, GameId, Instant, ParticipantId,
@@ -28,6 +28,7 @@ use beergame_domain::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::operations::operation_of;
 use crate::problem::{
     FieldError, Problem, bad_request_problem, game_not_ended_problem, invitation_invalid_problem,
     not_ready_problem, problem_of, rate_limited_problem, timeout_problem, validation_problem,
@@ -107,6 +108,10 @@ pub trait Backend: Send + Sync + 'static {
     }
     /// HTTPS の環境では Cookie に `Secure` を付ける。
     fn secure_cookies(&self) -> bool;
+    /// メトリクスの出力先（B14）。既定は出さない。
+    fn metrics(&self) -> &dyn MetricSink {
+        &NoMetrics
+    }
 }
 
 const SESSION_COOKIE: &str = "bg_session";
@@ -170,7 +175,10 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
         )
-        .layer(axum::middleware::from_fn(log_request))
+        .layer(axum::middleware::from_fn_with_state(
+            Arc::clone(&backend),
+            observe_request::<B>,
+        ))
         .with_state(backend)
 }
 
@@ -1396,7 +1404,13 @@ async fn detached<T: Send + 'static>(
 
 /// 構造化ログ（AC6.1.1）。**相関 ID・操作（メソッドと経路）・結果（状態）・所要時間**だけを出す。
 /// Cookie（資格）・本文（表示名・数量）・参加コード・クエリは含めない。
-async fn log_request(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+/// あわせて、要求ごとのメトリクス（応答時間・要求数・5xx・主要な操作の成功）を出す（AC6.1.3）。
+/// メトリクスの操作名は、経路のテンプレートから引く固定の集合（URL の実値は入らない）。
+async fn observe_request<B: Backend>(
+    State(backend): State<Arc<B>>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
     let method = request.method().to_string();
     let path = request.uri().path().to_owned();
     let started = std::time::Instant::now();
@@ -1414,6 +1428,15 @@ async fn log_request(request: axum::extract::Request, next: axum::middleware::Ne
     } else {
         tracing::info!(target: "http", correlation_id = %correlation, %method, %path, status, elapsed_ms, "request");
     }
+    let outcome = RequestOutcome {
+        operation: operation_of(&method, &path).to_owned(),
+        status,
+        duration_millis: elapsed_ms,
+    };
+    backend.metrics().record(&request_metrics(
+        &outcome,
+        backend.env().now().epoch_millis(),
+    ));
     response
 }
 

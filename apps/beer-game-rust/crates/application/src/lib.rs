@@ -204,6 +204,10 @@ pub trait EventStore<E>: Sync {
         async { Ok(None) }
     }
 
+    /// コマンドの試行の結果を記録する（メトリクス。競合率と再試行の上限超過）。既定は何もしない。
+    /// 呼び出しを遅くしない・失敗させないこと。
+    fn record_attempt(&self, _outcome: AttemptOutcome) {}
+
     /// 周辺ストアへ書く（追記と同じトランザクション）。既定は何もしない。
     fn write_peripheral(
         &self,
@@ -371,9 +375,17 @@ where
     loop {
         attempt += 1;
         match run_once(store, initial, evolve, decide, command, idem).await {
-            Err(AppFailure::ConcurrencyConflict) if attempt < max_attempts => {}
-            Err(AppFailure::ConcurrencyConflict) => return Err(AppFailure::RetryExhausted),
-            other => return other,
+            Err(AppFailure::ConcurrencyConflict) if attempt < max_attempts => {
+                store.record_attempt(AttemptOutcome::Conflict);
+            }
+            Err(AppFailure::ConcurrencyConflict) => {
+                store.record_attempt(AttemptOutcome::Exhausted);
+                return Err(AppFailure::RetryExhausted);
+            }
+            other => {
+                store.record_attempt(AttemptOutcome::Proceeded);
+                return other;
+            }
         }
     }
 }

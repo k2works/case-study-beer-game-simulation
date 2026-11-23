@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use beergame_application::{
-    AppFailure, DomainError, EventStore, PersistenceFailure, StreamRead, execute,
+    AppFailure, AttemptOutcome, DomainError, EventStore, PersistenceFailure, StreamRead, execute,
 };
 use beergame_domain::{Evolution, GameError};
 
@@ -19,6 +19,8 @@ struct MemoryStore {
     begun: AtomicU32,
     committed: AtomicU32,
     rolled_back: AtomicU32,
+    /// 試行の結果の記録（メトリクスの入力）。
+    attempts: Mutex<Vec<AttemptOutcome>>,
 }
 
 impl MemoryStore {
@@ -29,7 +31,12 @@ impl MemoryStore {
             begun: AtomicU32::new(0),
             committed: AtomicU32::new(0),
             rolled_back: AtomicU32::new(0),
+            attempts: Mutex::new(Vec::new()),
         }
+    }
+
+    fn attempts(&self) -> Vec<AttemptOutcome> {
+        self.attempts.lock().map(|a| a.clone()).unwrap_or_default()
     }
 
     fn counts(&self) -> (u32, u32, u32) {
@@ -81,6 +88,12 @@ impl EventStore<i32> for MemoryStore {
         self.rolled_back.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
+
+    fn record_attempt(&self, outcome: AttemptOutcome) {
+        if let Ok(mut attempts) = self.attempts.lock() {
+            attempts.push(outcome);
+        }
+    }
 }
 
 /// 状態は合計。決定: 0 以下は業務の失敗、それ以外はそのイベントを 1 件。再生: 負のイベントは Ignored。
@@ -122,6 +135,44 @@ async fn execute__競合が上限まで続くと_すべて_rollback_して_Retry
         Err(AppFailure::RetryExhausted)
     );
     assert_eq!(store.counts(), (3, 0, 3));
+}
+
+#[tokio::test]
+async fn nf_o3__競合の試行ごとに結果を記録し_最後に通った試行は_Proceeded_になる() {
+    let store = MemoryStore::new(vec![], 2);
+    assert_eq!(execute(&store, &0, &evolve, &decide, &5, 3).await, Ok(1));
+    assert_eq!(
+        store.attempts(),
+        vec![
+            AttemptOutcome::Conflict,
+            AttemptOutcome::Conflict,
+            AttemptOutcome::Proceeded
+        ]
+    );
+}
+
+#[tokio::test]
+async fn nf_o3__上限まで競合が続くと_最後の試行は_Exhausted_として記録する() {
+    let store = MemoryStore::new(vec![], 9);
+    assert_eq!(
+        execute(&store, &0, &evolve, &decide, &5, 3).await,
+        Err(AppFailure::RetryExhausted)
+    );
+    assert_eq!(
+        store.attempts(),
+        vec![
+            AttemptOutcome::Conflict,
+            AttemptOutcome::Conflict,
+            AttemptOutcome::Exhausted
+        ]
+    );
+}
+
+#[tokio::test]
+async fn nf_o3__業務の失敗は競合ではないので_Proceeded_として記録する() {
+    let store = MemoryStore::new(vec![], 0);
+    drop(execute(&store, &0, &evolve, &decide, &-1, 3).await);
+    assert_eq!(store.attempts(), vec![AttemptOutcome::Proceeded]);
 }
 
 #[tokio::test]

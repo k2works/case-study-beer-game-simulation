@@ -1,10 +1,12 @@
 //! PostgreSQL のイベントストア。追記専用。楽観的並行制御は `uq_events_stream_version` の違反で検出する。
 
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use beergame_application::{
-    AppFailure, CredentialKind, CredentialLookup, CredentialRecord, EventStore, PeripheralWrite,
-    PersistenceFailure, SessionWriter, StoredResponse, StreamRead,
+    AppFailure, AttemptOutcome, CredentialKind, CredentialLookup, CredentialRecord, EventStore,
+    MetricSink, PeripheralWrite, PersistenceFailure, SessionWriter, StoredResponse, StreamRead,
+    attempt_metrics,
 };
 use beergame_domain::{GameEvent, GameId, Instant, SessionEvent};
 
@@ -88,6 +90,8 @@ pub struct PgEventStore<E, C> {
     game_id: Uuid,
     stream: StreamType,
     codec: C,
+    /// コマンドの試行の結果（競合率・再試行の上限超過）の出力先。既定は出さない。
+    metrics: Option<Arc<dyn MetricSink>>,
     _event: PhantomData<fn() -> E>,
 }
 
@@ -99,7 +103,24 @@ impl<E, C> PgEventStore<E, C> {
             game_id,
             stream,
             codec,
+            metrics: None,
             _event: PhantomData,
+        }
+    }
+
+    /// 試行の結果のメトリクスの出力先を足す。
+    #[must_use]
+    pub fn with_metrics(mut self, metrics: Arc<dyn MetricSink>) -> Self {
+        self.metrics = Some(metrics);
+        self
+    }
+
+    fn record(&self, outcome: AttemptOutcome) {
+        if let Some(sink) = &self.metrics {
+            let at_millis = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
+            sink.record(&attempt_metrics(outcome, at_millis));
         }
     }
 }
@@ -338,6 +359,10 @@ where
     async fn rollback(&self, tx: PgTx) -> Result<(), AppFailure> {
         tx.0.rollback().await.map_err(|e| storage(&e))
     }
+
+    fn record_attempt(&self, outcome: AttemptOutcome) {
+        self.record(outcome);
+    }
 }
 
 /// 1 ゲームの `game` と `session` の 2 本のストリーム。`Tx` を共有するので、`start_game` が 1 つのトランザクションで両方へ追記できる。
@@ -353,6 +378,14 @@ impl PgGameStore {
             game: PgEventStore::new(pool.clone(), game_id, StreamType::Game, GameCodec),
             session: PgEventStore::new(pool, game_id, StreamType::Session, SessionCodec),
         }
+    }
+
+    /// 試行の結果のメトリクスの出力先を足す。
+    #[must_use]
+    pub fn with_metrics(mut self, metrics: Arc<dyn MetricSink>) -> Self {
+        self.game = self.game.with_metrics(Arc::clone(&metrics));
+        self.session = self.session.with_metrics(metrics);
+        self
     }
 }
 
@@ -401,6 +434,10 @@ impl EventStore<GameEvent> for PgGameStore {
     ) -> Result<(), AppFailure> {
         EventStore::<GameEvent>::write_peripheral(&self.game, tx, writes).await
     }
+
+    fn record_attempt(&self, outcome: AttemptOutcome) {
+        self.game.record(outcome);
+    }
 }
 
 impl EventStore<SessionEvent> for PgGameStore {
@@ -448,6 +485,10 @@ impl EventStore<SessionEvent> for PgGameStore {
         writes: &[PeripheralWrite],
     ) -> Result<(), AppFailure> {
         EventStore::<SessionEvent>::write_peripheral(&self.session, tx, writes).await
+    }
+
+    fn record_attempt(&self, outcome: AttemptOutcome) {
+        self.session.record(outcome);
     }
 }
 

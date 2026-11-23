@@ -4,10 +4,13 @@ pub mod maintenance_mode;
 
 use beergame_adapter_http::Backend;
 use beergame_adapter_persistence::PgGameStore;
+use std::sync::Arc;
+
 use beergame_application::{
     AppFailure, AppSettings, CoHolderRow, EditorSnapshot, Env, GameSnapshot, InvitationRow,
-    LobbyParticipantRow, ObservationSnapshot, ObservedSession, ObserverRow, PersistenceFailure,
-    ResultRow, RetentionState, RoleSnapshot, SessionSnapshot, StoredResponse, TeamWeekRow,
+    LobbyParticipantRow, MetricSink, NoMetrics, ObservationSnapshot, ObservedSession, ObserverRow,
+    PersistenceFailure, ResultRow, RetentionState, RoleSnapshot, SessionSnapshot, StoredResponse,
+    TeamWeekRow,
 };
 use beergame_domain::{GameId, Instant, ParticipantId, Role};
 use sqlx::{PgPool, Row};
@@ -54,9 +57,18 @@ pub struct PgBackend<E: Env + Send + Sync + 'static> {
     settings: AppSettings,
     secure_cookies: bool,
     command_timeout: std::time::Duration,
+    /// メトリクスの出力先。既定は出さない。
+    metrics: Arc<dyn MetricSink>,
 }
 
 impl<E: Env + Send + Sync + 'static> PgBackend<E> {
+    /// メトリクスの出力先を変える（既定は出さない）。
+    #[must_use]
+    pub fn with_metrics(mut self, metrics: Arc<dyn MetricSink>) -> Self {
+        self.metrics = metrics;
+        self
+    }
+
     /// コマンドの応答を待つ上限を変える（既定は 10 秒）。
     #[must_use]
     pub const fn with_command_timeout(mut self, limit: std::time::Duration) -> Self {
@@ -72,6 +84,7 @@ impl<E: Env + Send + Sync + 'static> PgBackend<E> {
             settings,
             secure_cookies,
             command_timeout: std::time::Duration::from_secs(10),
+            metrics: Arc::new(NoMetrics),
         }
     }
 }
@@ -90,6 +103,11 @@ impl<E: Env + Send + Sync + 'static> Backend for PgBackend<E> {
 
     fn store(&self, game_id: GameId) -> PgGameStore {
         PgGameStore::new(self.pool.clone(), Uuid::from_u128(game_id.get()))
+            .with_metrics(Arc::clone(&self.metrics))
+    }
+
+    fn metrics(&self) -> &dyn MetricSink {
+        &*self.metrics
     }
 
     async fn game_by_join_code(&self, code: &str) -> Result<Option<GameId>, AppFailure> {

@@ -7,7 +7,7 @@ use axum::body::Body;
 use axum::http::{HeaderMap, Request, StatusCode};
 use beergame_adapter_http::router;
 use beergame_app::{PgBackend, SystemEnv};
-use beergame_application::{AppSettings, Secret};
+use beergame_application::{AppSettings, MetricSink, NoMetrics, Secret};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use sqlx::PgPool;
@@ -18,6 +18,11 @@ pub fn e<T: std::fmt::Debug>(x: T) -> String {
 }
 
 pub fn app(pool: PgPool) -> Router {
+    app_with_metrics(pool, Arc::new(NoMetrics))
+}
+
+/// メトリクスの出力先を指定したルーター（メトリクスの試験が、出力を捕まえる）。
+pub fn app_with_metrics(pool: PgPool, metrics: Arc<dyn MetricSink>) -> Router {
     let settings = AppSettings {
         credential_key: Secret::new(vec![5; 32]),
         key_version: 1,
@@ -29,7 +34,9 @@ pub fn app(pool: PgPool) -> Router {
         max_failed_attempts: 10,
         attempt_window_millis: 600_000,
     };
-    router(Arc::new(PgBackend::new(pool, SystemEnv, settings, false)))
+    router(Arc::new(
+        PgBackend::new(pool, SystemEnv, settings, false).with_metrics(metrics),
+    ))
 }
 
 pub async fn send(
