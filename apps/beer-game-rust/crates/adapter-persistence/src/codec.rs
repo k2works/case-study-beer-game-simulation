@@ -13,8 +13,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::store::EventCodec;
-
-const SCHEMA_VERSION: i32 = 1;
+use crate::upcast::{CURRENT_SCHEMA_VERSION as SCHEMA_VERSION, upcast};
 
 type R<T> = Result<T, String>;
 
@@ -364,7 +363,8 @@ impl EventCodec<GameEvent> for GameCodec {
         Ok((name.to_owned(), SCHEMA_VERSION, payload))
     }
 
-    fn decode(&self, event_type: &str, _schema_version: i32, p: Value) -> R<GameEvent> {
+    fn decode(&self, event_type: &str, schema_version: i32, p: Value) -> R<GameEvent> {
+        let p = upcast(event_type, schema_version, p)?;
         match event_type {
             "GameCreated" => Ok(GameEvent::GameCreated {
                 game_id: GameId::new(id(&p, "gameId")?),
@@ -540,7 +540,8 @@ impl EventCodec<SessionEvent> for SessionCodec {
         Ok((name.to_owned(), SCHEMA_VERSION, payload))
     }
 
-    fn decode(&self, event_type: &str, _schema_version: i32, p: Value) -> R<SessionEvent> {
+    fn decode(&self, event_type: &str, schema_version: i32, p: Value) -> R<SessionEvent> {
+        let p = upcast(event_type, schema_version, p)?;
         match event_type {
             "SessionStarted" => Ok(SessionEvent::SessionStarted {
                 game_id: GameId::new(id(&p, "gameId")?),

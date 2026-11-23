@@ -5,6 +5,7 @@ mod maintenance;
 mod projection;
 mod retention;
 mod store;
+mod upcast;
 
 pub use codec::{GameCodec, SessionCodec};
 pub use maintenance::{PROJECTION_TABLES, PgProjectionMaintenance};

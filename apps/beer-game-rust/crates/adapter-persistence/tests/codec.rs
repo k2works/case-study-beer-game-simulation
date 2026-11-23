@@ -164,6 +164,27 @@ fn ac2_3_4__ゲームの全イベントは_JSON_に変換して戻すと同じ�
 }
 
 #[test]
+fn nf_r15__現行より新しいスキーマの版は_読めないとして拒み_不正な版も拒む() {
+    let payload = serde_json::json!({"gameId": "00000000-0000-0000-0000-000000000001"});
+    // 版の検査が先（ペイロードの正しさに関わらず、版の理由で拒む）
+    let newer = GameCodec.decode("GameStarted", 2, payload.clone());
+    assert!(newer.is_err_and(|m| m.contains("新しい")));
+    let newer = SessionCodec.decode("SessionEnded", 2, serde_json::json!({}));
+    assert!(newer.is_err_and(|m| m.contains("新しい")));
+    assert!(GameCodec.decode("GameStarted", 0, payload).is_err());
+    // 現行の版は読める
+    assert!(
+        GameCodec
+            .decode(
+                "GameStarted",
+                1,
+                serde_json::json!({"gameId": "00000000-0000-0000-0000-000000000001"})
+            )
+            .is_ok()
+    );
+}
+
+#[test]
 fn ac2_3_4__不明なイベントと不正な値は変換に失敗する() {
     assert!(
         GameCodec
