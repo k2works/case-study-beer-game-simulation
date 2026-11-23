@@ -21,9 +21,7 @@ fn secrets(world: &ApiWorld) -> Result<Vec<String>, String> {
         all.push(cookie_name.clone());
         all.push(cookie.clone());
     }
-    for (_, (_, cookie)) in &game.players {
-        all.push(cookie.clone());
-    }
+    all.extend(game.players.values().map(|(_, cookie)| cookie.clone()));
     all.extend(game.recoveries.values().cloned());
     // Cookie は `名前=値`。値だけも、秘密として探す
     let values: Vec<String> = all
