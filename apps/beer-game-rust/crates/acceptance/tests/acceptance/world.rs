@@ -157,6 +157,10 @@ pub struct ApiWorld {
     /// 直近の一連の掃引で完了した削除の数と、再試行をやめて通知されたゲームの数。
     pub completed: usize,
     pub abandoned: usize,
+    /// 控えた投影の内容（再構築の前後を比べる）。
+    pub projection_snapshot: Option<String>,
+    /// 直近の整合検査の結果。
+    pub findings: Option<Vec<beergame_application::Inconsistency>>,
 }
 
 impl ApiWorld {
@@ -188,6 +192,8 @@ impl ApiWorld {
             receipts_before: 0,
             completed: 0,
             abandoned: 0,
+            projection_snapshot: None,
+            findings: None,
         }
     }
 

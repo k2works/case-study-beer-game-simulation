@@ -69,3 +69,6 @@ export/export-custom.feature
 
 # B12: 保持と削除（US5.1）。retention-ui.feature は @ui なので対象外
 retention/retention.feature
+
+# B13: 投影の再構築・整合検査（NF-R15）
+operations/projection-rebuild.feature

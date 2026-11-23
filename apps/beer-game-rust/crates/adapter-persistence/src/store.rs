@@ -109,7 +109,7 @@ impl<E, C> PgEventStore<E, C> {
 pub const LOCK_TIMEOUT_MILLIS: u32 = 2000;
 
 /// 待ちの上限を、このトランザクションにだけ設定する。
-async fn set_lock_timeout(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
+pub(crate) async fn set_lock_timeout(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Error> {
     sqlx::query("SELECT set_config('lock_timeout', $1, true)")
         .bind(format!("{LOCK_TIMEOUT_MILLIS}ms"))
         .execute(conn)
@@ -118,7 +118,7 @@ async fn set_lock_timeout(conn: &mut sqlx::PgConnection) -> Result<(), sqlx::Err
 }
 
 /// ロックの取得の失敗を写す。待ちの超過（55P03）は、再送してよい失敗（`RetryExhausted`）。
-fn lock_failure(e: &sqlx::Error) -> AppFailure {
+pub(crate) fn lock_failure(e: &sqlx::Error) -> AppFailure {
     if let sqlx::Error::Database(db) = e
         && db.code().as_deref() == Some("55P03")
     {
@@ -134,6 +134,19 @@ fn lock_failure(e: &sqlx::Error) -> AppFailure {
 async fn acquire_shared(conn: &mut sqlx::PgConnection, game_id: Uuid) -> Result<(), sqlx::Error> {
     set_lock_timeout(&mut *conn).await?;
     sqlx::query("SELECT pg_advisory_xact_lock_shared(hashtextextended($1::text, 0))")
+        .bind(game_id)
+        .execute(conn)
+        .await
+        .map(|_| ())
+}
+
+/// 再構築の排他のロック。コマンド（共有）の完了を待ち、取っている間はコマンドを入れない。
+pub(crate) async fn acquire_exclusive(
+    conn: &mut sqlx::PgConnection,
+    game_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    set_lock_timeout(&mut *conn).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))")
         .bind(game_id)
         .execute(conn)
         .await
