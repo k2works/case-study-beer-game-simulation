@@ -101,7 +101,12 @@ fn domain(e: GameError) -> DomainError {
 }
 
 fn issue(env: &impl Env, settings: &AppSettings) -> Result<(Secret<String>, String), AppFailure> {
-    let token = encode_token(&env.token_bytes());
+    // 値の接頭辞 `v<版>.` が、発行に使った鍵の版を示す（architecture-backend.md）。ダイジェストは接頭辞つきの値に対して計算する
+    let token = Secret::new(format!(
+        "v{}.{}",
+        settings.key_version,
+        encode_token(&env.token_bytes()).expose()
+    ));
     let digest = digest(&settings.credential_key, &token).ok_or_else(|| {
         AppFailure::Persistence(crate::PersistenceFailure::Storage(
             "資格の鍵が設定されていない".to_owned(),

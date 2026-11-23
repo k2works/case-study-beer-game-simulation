@@ -111,6 +111,20 @@ async fn ac1_3_2__進行役以外の招待の発行は_403_で_招待コード�
 }
 
 #[tokio::test]
+async fn nf_s3__招待コードは鍵の版の接頭辞と乱数の形で発行される() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone());
+    let game = started(&app, &env.pool, None).await?;
+    let (_, code, _) = observer(&app, &game).await?;
+    // 設計（architecture-backend.md）: 値の接頭辞 `v<版>.<乱数>`。テストの設定の鍵の版は 1
+    let random = code.strip_prefix("v1.").ok_or("接頭辞 v1. が無い")?;
+    assert_eq!(random.len(), 43, "乱数は 256 ビットの Base64（43 文字）");
+    Ok(())
+}
+
+#[tokio::test]
 async fn ac4_1_1__観察画面は現在週と入力済みの役割数と確定した週のチーム合計を返す()
 -> Result<(), String> {
     let Some(env) = start().await? else {

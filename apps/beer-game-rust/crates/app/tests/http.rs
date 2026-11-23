@@ -99,7 +99,11 @@ async fn ac1_1_1__作成は_201_で_Location_と資格の_Cookie_と版を返す
     assert_eq!(status, StatusCode::CREATED);
     // 進行役の復帰コードを、一度だけ示す（復帰資格の Cookie と同じ値）
     assert_eq!(body["versions"], json!({"game": 1, "session": null}));
-    assert!(body["recoveryCode"].as_str().is_some_and(|c| c.len() == 43));
+    assert!(
+        body["recoveryCode"]
+            .as_str()
+            .is_some_and(|c| c.starts_with("v1.") && c.len() == 46)
+    );
     let location = headers
         .get("location")
         .and_then(|v| v.to_str().ok())
