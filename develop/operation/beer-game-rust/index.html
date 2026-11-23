@@ -16,7 +16,7 @@
         <link rel="prev" href="../beer-game3/required-check/">
       
       
-        <link rel="next" href="../../review/">
+        <link rel="next" href="production/">
       
       
         
@@ -6604,6 +6604,41 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/beer-game-rust/bolt_15_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 15 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/beer-game-rust/guard_plan/" class="md-nav__link">
         
   
@@ -7619,6 +7654,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#b15aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        本番の運用（B15。定義のみ。AWS に適用していない）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7649,6 +7695,181 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="production/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    本番の運用手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="deploy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    デプロイの手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="rollback/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    戻しの手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="restore/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    復元の手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="observability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    観測の手順書
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
     </li>
   
 
@@ -13157,6 +13378,43 @@
 <tr>
 <td></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="b15aws">本番の運用（B15。<strong>定義のみ。AWS に適用していない</strong>）<a class="headerlink" href="#b15aws" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ドキュメント</th>
+<th style="text-align: left;">概要</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><a href="production/">本番の運用手順書</a>（<code>production.md</code>）</td>
+<td style="text-align: left;">適用前の確認、ブルー/グリーンのデプロイ、定期タスク、再構築・検査の手動の実行、インシデント</td>
+<td style="text-align: left;">定義のみ（未実行）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="deploy/">デプロイの手順書</a>（<code>deploy.md</code>）</td>
+<td style="text-align: left;">ステージングの自動デプロイ、本番の手動デプロイ、必要な変数、書く版の切り替え</td>
+<td style="text-align: left;">定義のみ（未実行）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="rollback/">戻しの手順書</a>（<code>rollback.md</code>）</td>
+<td style="text-align: left;">直前の版へ戻す。マイグレーションは戻さない</td>
+<td style="text-align: left;">定義のみ（未実行）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="restore/">復元の手順書</a>（<code>restore.md</code>）</td>
+<td style="text-align: left;">DB の復元、RPO・RTO の約束の範囲（障害の種類ごと）、投影の再構築、訓練の様式</td>
+<td style="text-align: left;">定義のみ（訓練は未実施）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="observability/">観測の手順書</a>（<code>observability.md</code>）</td>
+<td style="text-align: left;">メトリクス、アラームと対応、ダッシュボード、未確認の項目</td>
+<td style="text-align: left;">定義のみ（AWS 上は未確認）</td>
 </tr>
 </tbody>
 </table>
