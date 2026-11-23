@@ -119,6 +119,8 @@ const SESSION_MAX_AGE_SECONDS: i64 = 86_400;
 const RECOVERY_COOKIE: &str = "bg_recovery";
 const RECOVERY_MAX_AGE_SECONDS: i64 = 2_592_000;
 const RECOVER_PATH: &str = "/api/v1/participations/recover";
+/// リクエストの本文の上限（NF-P12）。
+const MAX_BODY_BYTES: usize = 64 * 1024;
 
 /// ルーターを作る。
 pub fn router<B: Backend>(backend: Arc<B>) -> Router {
@@ -175,6 +177,8 @@ pub fn router<B: Backend>(backend: Arc<B>) -> Router {
             "/api/v1/sessions/{session_id}/state",
             get(session_state::<B>),
         )
+        // 1 リクエストの本文は 64 KB まで（NF-P12。超えたら、本文を読む前に 413）。axum の既定は 2 MiB
+        .layer(axum::extract::DefaultBodyLimit::max(MAX_BODY_BYTES))
         .layer(axum::middleware::from_fn_with_state(
             Arc::clone(&backend),
             observe_request::<B>,

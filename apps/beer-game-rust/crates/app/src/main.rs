@@ -200,8 +200,10 @@ async fn main() -> ExitCode {
         Arc::clone(&metrics),
         std::time::Duration::from_secs(60),
     );
+    // Cookie の Secure は、ENVIRONMENT が local 以外のとき（NF-S2。以前は常に付けていなかった）
+    let secure = beergame_app::config::secure_cookies(|key| std::env::var(key).ok());
     let app = router(Arc::new(
-        PgBackend::new(pool, SystemEnv, settings, false).with_metrics(metrics),
+        PgBackend::new(pool, SystemEnv, settings, secure).with_metrics(metrics),
     ));
     let listener = match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {
         Ok(listener) => listener,

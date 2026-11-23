@@ -22,7 +22,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-23T00:00:00Z }
 | 3 | ドメインの Route 53 ホストゾーンが既にある | `modules/domain` は、ホストゾーンを作らない |
 | 4 | GitHub の Environments（`staging`・`production`）と、その変数・保護ルール（本番は承認者を必須にする） | ワークフローは、設定しない。値は `terraform output` から |
 | 5 | OIDC の信頼（`repo:<リポジトリ>:environment:<環境>`）と、環境の名前が一致する | |
-| 6 | **タスク定義に `ENVIRONMENT`（staging または production）が入っている** | メトリクスのディメンション `Environment` と同じ値。無いと、アラーム・ダッシュボードが永久に欠測になる |
+| 6 | **タスク定義に `ENVIRONMENT`（staging または production）が入っている** | メトリクスのディメンション `Environment` と同じ値。無いと、アラーム・ダッシュボードが永久に欠測になる。**`local` または未設定だと、Cookie に `Secure` が付かない**（staging・production では付く。NF-S2） |
 | 7 | タスクが `DB_HOST`・`DB_USER`・`DB_PASSWORD`・`CREDENTIAL_KEY` を受け取り、起動できる | アプリは、これらから接続 URL を組み立てる。**AWS 上の起動は未確認** |
 | 8 | ステージングで、手動デプロイを 1 回成功させる | その後に、リポジトリの変数 `BEER_GAME_RUST_AUTO_DEPLOY` を `true` にする（[デプロイ](./deploy.md)） |
 | 9 | 通知先（SNS の購読）とオンコールの体制 | 範囲外の承認ゲート |

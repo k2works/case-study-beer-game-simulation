@@ -185,6 +185,27 @@ async fn ac1_1_2__無効な需要系列は_422_で作成されず_対象の週�
 }
 
 #[tokio::test]
+async fn nf_p12__リクエストの本文は_64_KB_を超えると_413_で拒む() -> Result<(), String> {
+    let Some(env) = start().await? else {
+        return Ok(());
+    };
+    let app = app(env.pool.clone(), false);
+    // 64 KB ちょうどは、大きさの上限には当たらない（JSON としては不正で 400 になる）
+    let at_limit = format!("{{\"x\":\"{}\"}}", "a".repeat(64 * 1024 - 8));
+    let (status, _, _) = send(&app, "POST", "/api/v1/games", &[], &at_limit).await?;
+    assert_ne!(
+        status,
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "64 KB 以下は、大きさでは拒まない"
+    );
+    // 64 KB を超えると、本文を読む前に拒む
+    let over = format!("{{\"x\":\"{}\"}}", "a".repeat(64 * 1024));
+    let (status, _, _) = send(&app, "POST", "/api/v1/games", &[], &over).await?;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    Ok(())
+}
+
+#[tokio::test]
 async fn ac1_1_2__JSON_として不正な本文は_400() -> Result<(), String> {
     let Some(env) = start().await? else {
         return Ok(());

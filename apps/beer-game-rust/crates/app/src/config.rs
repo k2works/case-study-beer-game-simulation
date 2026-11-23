@@ -1,6 +1,15 @@
 //! 設定の読み取り（環境変数）。ECS では、Secrets Manager の値を 1 つの URL に合成して渡せないため、
 //! 接続 URL は、`DATABASE_URL`（あればそれを優先。ローカル・試験）か、部品（`DB_HOST`・`DB_USER`・`DB_PASSWORD` ほか）から組み立てる。
 
+/// Cookie に `Secure` を付けるか（NF-S2）。`ENVIRONMENT` が無い・`local` のときだけ付けない（手元の HTTP で動くように）。
+/// staging・production は、CloudFront（HTTPS）が前に立つので、ALB までの区間が HTTP でも、ブラウザには `Secure` の Cookie を返す。
+#[must_use]
+pub fn secure_cookies(get: impl Fn(&str) -> Option<String>) -> bool {
+    get("ENVIRONMENT")
+        .filter(|v| !v.is_empty())
+        .is_some_and(|v| v != "local")
+}
+
 /// 接続 URL。`get` は環境変数の引き方（試験が差し替える）。
 /// 部品から組み立てるとき: `DB_HOST` と `DB_USER` と `DB_PASSWORD` が要る。`DB_PORT`（既定 5432）、`DB_NAME`（既定 postgres）、
 /// `DB_SSLMODE`（既定 require。RDS は SSL 必須）。ユーザー名・パスワードは、URL に入れられるようにパーセント符号化する。
@@ -48,6 +57,24 @@ mod tests {
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
         move |key| map.get(key).cloned()
+    }
+
+    #[test]
+    fn nf_s2__staging_と_production_は_Cookie_に_Secure_を付ける() {
+        assert!(secure_cookies(env(&[("ENVIRONMENT", "staging")])));
+        assert!(secure_cookies(env(&[("ENVIRONMENT", "production")])));
+    }
+
+    #[test]
+    fn nf_s2__ENVIRONMENT_が_local_か_未設定なら_手元の_HTTP_のため_Secure_を付けない() {
+        assert!(!secure_cookies(env(&[("ENVIRONMENT", "local")])));
+        assert!(!secure_cookies(env(&[])));
+        assert!(!secure_cookies(env(&[("ENVIRONMENT", "")])));
+    }
+
+    #[test]
+    fn nf_s2__知らない環境の名前は_安全側で_Secure_を付ける() {
+        assert!(secure_cookies(env(&[("ENVIRONMENT", "preview")])));
     }
 
     #[test]
