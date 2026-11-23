@@ -14679,7 +14679,7 @@
 </table>
 <ul>
 <li><strong>1 つのシナリオは、1 つの層だけで実行する</strong>（<code>@api</code> か <code>@ui</code>）。画面を通す必要のある業務（振り返りの表示、アクセシビリティ）だけを <code>@ui</code> にし、そのほかは <code>@api</code> にする。同じシナリオを両方の層で実行して、ステップ定義を二重に持たない。</li>
-<li><strong>配置（B1 で確定）</strong>: フィーチャーファイルは <code>apps/beer-game-kotlin/features/&lt;機能領域&gt;/</code> に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の <code>acceptanceTest</code>、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所（Cucumber-JVM は <code>src/test/resources</code>、Cucumber-JS は <code>features/</code>）と合わせられるかを、B1 で確認する。</li>
+<li><strong>配置（B1 で確定）</strong>: フィーチャーファイルは <code>apps/beer-game-features/&lt;機能領域&gt;/</code>（2026-11-23 に Kotlin 版から移動）に 1 か所にまとめ、両処理系から参照する案を第一とする。ステップ定義は、Cucumber-JVM は Kotlin の <code>acceptanceTest</code>、Cucumber-JS は E2E のディレクトリに置く。処理系の既定の場所（Cucumber-JVM は <code>src/test/resources</code>、Cucumber-JS は <code>features/</code>）と合わせられるかを、B1 で確認する。</li>
 <li><strong>注意（Cucumber-JS、ガイドより）</strong>: グローバルにインストールしない（プロジェクトの依存として入れる）。依存ツリーに複数の版を混在させない（<code>npm why @cucumber/cucumber</code> で確認）。パッケージは旧 <code>cucumber</code> ではなく <code>@cucumber/cucumber</code>。</li>
 <li><strong>導入の手続き</strong>: 導入は決定済み。<strong>具体的な成果物（Cucumber-JVM のモジュール、Cucumber-JS）と版は、<a href="../../../design/beer-game-kotlin/tech-stack/">技術スタック</a> の手順で、公式の情報で確認してから確定し、依存関係の導入の承認を得る</strong>（B1）。版は、このとき確認する。</li>
 <li><strong>実行</strong>: <code>@api</code> は Gradle のタスク、<code>@ui</code> は <code>npx cucumber-js</code> を、CI の毎回の工程に含める（<a href="../../../design/beer-game-kotlin/test-strategy/">テスト戦略</a> の CI）。</li>
