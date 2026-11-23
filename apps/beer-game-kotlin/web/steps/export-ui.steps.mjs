@@ -1,4 +1,4 @@
-// 画面から結果を出力するシナリオ（features/export/export-ui.feature）のステップ定義。
+// 画面から結果を出力するシナリオ（apps/beer-game-features/export/export-ui.feature）のステップ定義。
 // 業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 // 列・値の中身と形式の一致は @api（export.feature）が確かめるので、ここは、導線とダウンロードの結線だけ。
 import assert from 'node:assert/strict';

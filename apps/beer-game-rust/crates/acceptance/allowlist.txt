@@ -1,4 +1,4 @@
-# Rust 側で実行する共有 features/（Kotlin 版。変更しない）の許可リスト。Bolt ごとに広げる。
+# Rust 側で実行する共有 features（apps/beer-game-features/。Kotlin 版と共有。変更しない）の許可リスト。Bolt ごとに広げる。
 # 許可したシナリオに Undefined・Pending があれば失敗。許可の外の @api は「未対応」として一覧に出る。
 # 形式: `<機能領域>/<ファイル>.feature`（@api の全シナリオ）、または `... :: <シナリオ名>`。
 

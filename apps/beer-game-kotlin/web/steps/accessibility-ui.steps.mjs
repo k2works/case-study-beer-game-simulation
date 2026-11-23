@@ -1,4 +1,4 @@
-// 画面のアクセシビリティ・拡大・狭い画面の案内・ヘルプのシナリオ（features/cross-cutting/accessibility-ui.feature。X-1）のステップ定義。
+// 画面のアクセシビリティ・拡大・狭い画面の案内・ヘルプのシナリオ（apps/beer-game-features/cross-cutting/accessibility-ui.feature。X-1）のステップ定義。
 // 業務ロジックを持たない。ブラウザの実際の描画（キーボードのフォーカス、表示領域の幅、横スクロール）だけを確かめる。
 import assert from 'node:assert/strict';
 import { Given, When, Then } from '@cucumber/cucumber';

@@ -24,11 +24,13 @@ on:
     branches: [develop, main]
     paths:
       - 'apps/beer-game-kotlin/**'
+      - 'apps/beer-game-features/**'
       - '.github/workflows/beer-game-kotlin.yml'
   push:
     branches: [develop, main]
     paths:
       - 'apps/beer-game-kotlin/**'
+      - 'apps/beer-game-features/**'
       - '.github/workflows/beer-game-kotlin.yml'
   workflow_dispatch:
 

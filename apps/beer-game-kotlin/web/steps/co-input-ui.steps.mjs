@@ -1,4 +1,4 @@
-// 画面の共同入力の競合のシナリオ（features/weekly-play/co-input-ui.feature）のステップ定義。
+// 画面の共同入力の競合のシナリオ（apps/beer-game-features/weekly-play/co-input-ui.feature）のステップ定義。
 // 業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 // 窓口のキーは、小売店の 1 人目が RETAILER、2 人目（共同担当）が RETAILER_CO。
 import { Given, When, Then } from '@cucumber/cucumber';

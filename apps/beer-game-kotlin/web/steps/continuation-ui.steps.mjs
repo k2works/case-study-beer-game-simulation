@@ -1,4 +1,4 @@
-// 画面の停止・再開、復帰、参加のシナリオ（features/continuation/*-ui.feature、features/game-setup/joining-ui.feature）の
+// 画面の停止・再開、復帰、参加のシナリオ（apps/beer-game-features/continuation/*-ui.feature、apps/beer-game-features/game-setup/joining-ui.feature）の
 // ステップ定義。業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 import assert from 'node:assert/strict';
 import { Given, When, Then } from '@cucumber/cucumber';

@@ -1,6 +1,6 @@
 # beer-game-rust の開発タスク（apps/beer-game-kotlin/justfile に倣う）
 # 使い方: just <タスク>   一覧: just
-# 画面（web/）と受け入れ条件（features/）は beer-game-kotlin の共有物を読み取り専用で使う。
+# 画面（web/）は beer-game-kotlin の共有物を、受け入れ条件（apps/beer-game-features/）は Kotlin 版と共有する物を、読み取り専用で使う。
 
 set shell := ["bash", "-cu"]
 
@@ -41,7 +41,7 @@ backend:
 backend-test:
     cargo test --workspace
 
-# 受け入れテスト（共有の features/ を実 PostgreSQL で実行）
+# 受け入れテスト（共有の apps/beer-game-features/ を実 PostgreSQL で実行）
 acceptance:
     cargo test -p beergame-acceptance --test acceptance
 

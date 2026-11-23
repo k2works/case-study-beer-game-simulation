@@ -1,4 +1,4 @@
-// 画面から保持状態と削除予定日を確かめるシナリオ（features/retention/retention-ui.feature）のステップ定義。
+// 画面から保持状態と削除予定日を確かめるシナリオ（apps/beer-game-features/retention/retention-ui.feature）のステップ定義。
 // 業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 // 削除の動作・状態の遷移・認可は @api（retention.feature）が確かめる。ここは導線と表示だけ。
 import assert from 'node:assert/strict';

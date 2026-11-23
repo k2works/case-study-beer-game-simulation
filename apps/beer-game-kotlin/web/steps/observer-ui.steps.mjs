@@ -1,4 +1,4 @@
-// 画面で観察者を招き、観察するシナリオ（features/observation/observer-ui.feature）のステップ定義。
+// 画面で観察者を招き、観察するシナリオ（apps/beer-game-features/observation/observer-ui.feature）のステップ定義。
 // 業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 import { Given, When, Then } from '@cucumber/cucumber';
 

@@ -19,7 +19,7 @@ import java.util.UUID
 /*
  * 継続と資格の HTTP の試験（B5 Step 6.1）。経路・認可の行列・冪等の再送・Set-Cookie・code と problem+json を確かめる。
  * 業務の規則の網羅は domain と application の試験が持つので、ここは「境界」だけを確かめる。
- * 受け入れ（features/continuation）は、同じ振る舞いを日本語のシナリオで、実プロセスに対して確かめる。
+ * 受け入れ（apps/beer-game-features/continuation）は、同じ振る舞いを日本語のシナリオで、実プロセスに対して確かめる。
  */
 
 private const val SESSION_MAX_AGE = "Max-Age=86400"

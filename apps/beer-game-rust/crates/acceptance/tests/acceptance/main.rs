@@ -1,4 +1,4 @@
-//! 共有する `features/`（Kotlin 版と同じ日本語 Gherkin）を、Rust のバックエンド（HTTP。実 PostgreSQL 18.6）に対して実行する。
+//! 共有する `apps/beer-game-features/`（Kotlin 版と同じ日本語 Gherkin）を、Rust のバックエンド（HTTP。実 PostgreSQL 18.6）に対して実行する。
 //! 許可リスト（`allowlist.txt`）のシナリオだけを実行する。定義のないステップ（Undefined）は失敗にする（`fail_on_skipped`）。
 
 mod maintenance_steps;
@@ -16,11 +16,11 @@ use cucumber::{World, WriterExt, writer};
 
 use crate::world::ApiWorld;
 
-/// 共有する features/ の場所（Kotlin 版。読み取り専用）。
+/// 共有する features の場所（`apps/beer-game-features/`。Kotlin 版と共有。読み取り専用）。
 fn features_dir() -> std::path::PathBuf {
-    // 調査用に、環境変数 `BEERGAME_FEATURES` で場所を替えられる（既定は Kotlin 版の features/）。
+    // 調査用に、環境変数 `BEERGAME_FEATURES` で場所を替えられる（既定は `apps/beer-game-features/`）。
     std::env::var_os("BEERGAME_FEATURES").map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../beer-game-kotlin/features"),
+        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../beer-game-features"),
         std::path::PathBuf::from,
     )
 }

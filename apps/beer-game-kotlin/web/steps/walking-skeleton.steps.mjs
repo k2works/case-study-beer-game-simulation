@@ -1,4 +1,4 @@
-// 画面のウォーキングスケルトンのシナリオ（features/weekly-play/walking-skeleton-ui.feature）のステップ定義。
+// 画面のウォーキングスケルトンのシナリオ（apps/beer-game-features/weekly-play/walking-skeleton-ui.feature）のステップ定義。
 // 業務ロジックを持たず、画面の窓口（support/console-window.mjs）を呼んで、期待値（受入条件）を確かめるだけにする。
 // 窓口は、実 Ktor サーバーと、Playwright のブラウザ（実際の画面）を通す。
 import assert from 'node:assert/strict';

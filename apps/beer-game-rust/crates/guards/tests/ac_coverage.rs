@@ -29,7 +29,7 @@ fn ds11_許可リストの_ac_のすべてに_rust_のテストが対応して�
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let allowlist = fs::read_to_string(root.join("crates/acceptance/allowlist.txt"))
         .map_err(|e| e.to_string())?;
-    let features = root.join("../beer-game-kotlin/features");
+    let features = root.join("../beer-game-features");
     let mut ids: Vec<String> = Vec::new();
     for file in allowlist
         .lines()

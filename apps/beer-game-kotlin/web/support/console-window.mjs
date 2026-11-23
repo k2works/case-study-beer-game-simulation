@@ -65,7 +65,7 @@ export class ConsoleWindow {
         return state;
     }
 
-    /** 作成の画面（S02）で、カスタム条件を入れてゲームを作成し、ロビーへ進む（features/game-setup/custom-conditions-ui.feature）。 */
+    /** 作成の画面（S02）で、カスタム条件を入れてゲームを作成し、ロビーへ進む（apps/beer-game-features/game-setup/custom-conditions-ui.feature）。 */
     async createCustomGameOnScreen() {
         await this.page.goto('/new');
         await this.page.getByLabel('条件').selectOption('CUSTOM');
@@ -423,7 +423,7 @@ export class ConsoleWindow {
         await page.getByLabel(decisionLabel(role)).waitFor({ timeout: WAIT_MS });
     }
 
-    // ---- 共同入力（features/weekly-play/co-input-ui.feature）。窓口のキーは、1 人目が RETAILER、2 人目が RETAILER_CO ----
+    // ---- 共同入力（apps/beer-game-features/weekly-play/co-input-ui.feature）。窓口のキーは、1 人目が RETAILER、2 人目が RETAILER_CO ----
 
     /** 入力欄に数量を入れて、保存を押す。 */
     async savePlay(key, quantity) {
