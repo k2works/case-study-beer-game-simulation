@@ -230,6 +230,7 @@ nav:
           - Bolt 12 計画: development/beer-game-rust/bolt_12_plan.md
           - Bolt 12 終了報告: development/beer-game-rust/bolt_12_report.md
           - Bolt 13 計画: development/beer-game-rust/bolt_13_plan.md
+          - Bolt 13 終了報告: development/beer-game-rust/bolt_13_report.md
           - 守りの導入計画: development/beer-game-rust/guard_plan.md
   - 運用:
       - 概要: operation/index.md

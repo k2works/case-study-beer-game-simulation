@@ -1,5 +1,11 @@
 # Docs Update Log
 
+## 2026-11-23
+* **Creation**: [bolt_13_report](/development/beer-game-rust/bolt_13_report.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_13_plan](/development/beer-game-rust/bolt_13_plan.md) を更新（承認の記録。claude-code/claude-sonnet-5-5）
+* **Creation**: [bolt_13_plan](/development/beer-game-rust/bolt_13_plan.md) を作成（claude-code/claude-sonnet-5-5）
+* **Update**: [bolt_12_report](/development/beer-game-rust/bolt_12_report.md) を更新（@ui 27/27、資格の接頭辞の不具合、承認の記録。claude-code/claude-sonnet-5-5）
+
 ## 2026-11-22
 * **Creation**: [bolt_12_report](/development/beer-game-rust/bolt_12_report.md) を作成（claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_12_plan](/development/beer-game-rust/bolt_12_plan.md) を作成（claude-code/claude-sonnet-5-5）
