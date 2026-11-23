@@ -231,21 +231,34 @@ fn dashboard_metrics() -> Result<Vec<String>, String> {
 }
 
 #[test]
-fn nf_o5__ダッシュボードが参照するメトリクスは_すべてアプリが出す名前である() -> Result<(), String> {
+fn nf_o5__ダッシュボードが参照するメトリクスは_すべてアプリが出す名前である() -> Result<(), String>
+{
     let used = dashboard_metrics()?;
     assert!(!used.is_empty(), "tf の書式を読めていない");
-    let unknown: Vec<&String> = used.iter().filter(|m| !EMITTED.contains(&m.as_str())).collect();
-    assert!(unknown.is_empty(), "アプリが出さない名前を参照している: {unknown:?}");
+    let unknown: Vec<&String> = used
+        .iter()
+        .filter(|m| !EMITTED.contains(&m.as_str()))
+        .collect();
+    assert!(
+        unknown.is_empty(),
+        "アプリが出さない名前を参照している: {unknown:?}"
+    );
     Ok(())
 }
 
 #[test]
-fn nf_o5__ダッシュボードに_実行環境の項目_RSS_タスク数_panic_接続プールが含まれる() -> Result<(), String> {
+fn nf_o5__ダッシュボードに_実行環境の項目_RSS_タスク数_panic_接続プールが含まれる()
+-> Result<(), String> {
     let used = dashboard_metrics()?;
-    let missing: Vec<&str> = ["RssBytes", "TokioAliveTasks", "PanicCount", "DbPoolUtilizationPercent"]
-        .into_iter()
-        .filter(|name| !used.iter().any(|u| u == name))
-        .collect();
+    let missing: Vec<&str> = [
+        "RssBytes",
+        "TokioAliveTasks",
+        "PanicCount",
+        "DbPoolUtilizationPercent",
+    ]
+    .into_iter()
+    .filter(|name| !used.iter().any(|u| u == name))
+    .collect();
     assert!(missing.is_empty(), "ダッシュボードに無い項目: {missing:?}");
     Ok(())
 }
