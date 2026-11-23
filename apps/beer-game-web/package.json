@@ -1,5 +1,5 @@
 {
-  "name": "@beer-game-kotlin/web",
+  "name": "@beer-game/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,8 +11,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "api:lint": "redocly lint ../contracts/openapi.yaml --config ../contracts/redocly.yaml",
-    "api:generate": "openapi-typescript ../contracts/openapi.yaml -o src/api/generated/schema.d.ts && prettier --write src/api/generated/schema.d.ts",
+    "api:lint": "redocly lint ../beer-game-kotlin/contracts/openapi.yaml --config ../beer-game-kotlin/contracts/redocly.yaml",
+    "api:generate": "openapi-typescript ../beer-game-kotlin/contracts/openapi.yaml -o src/api/generated/schema.d.ts && prettier --write src/api/generated/schema.d.ts",
     "api:check": "node scripts/check-generated.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",

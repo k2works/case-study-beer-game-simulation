@@ -27,15 +27,15 @@ backend-check:
 
 # フロントエンドの依存を入れる
 web-install:
-    cd web && npm ci
+    cd ../beer-game-web && npm ci
 
 # フロントエンドの開発サーバーを起動する（/api は API_PORT へ中継）
 web:
-    cd web && UI_PORT={{ ui_port }} API_PORT={{ api_port }} npm run dev
+    cd ../beer-game-web && UI_PORT={{ ui_port }} API_PORT={{ api_port }} npm run dev
 
 # フロントエンドの検証（format・lint・typecheck・test・build）
 web-verify:
-    cd web && npm run verify
+    cd ../beer-game-web && npm run verify
 
 # ---- 両方 ----
 

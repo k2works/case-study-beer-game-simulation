@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const SPEC = '../contracts/openapi.yaml';
+const SPEC = '../beer-game-kotlin/contracts/openapi.yaml';
 const COMMITTED = 'src/api/generated/schema.d.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'api-check-'));

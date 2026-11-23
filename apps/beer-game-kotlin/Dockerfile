@@ -1,5 +1,5 @@
 # 本番用イメージ（マルチステージ）。設計: docs/design/beer-game-kotlin/architecture-infrastructure.md「コンテナと JVM」
-# ビルド: docker build -t beer-game-kotlin apps/beer-game-kotlin
+# ビルド: docker build --build-context web=apps/beer-game-web -t beer-game-kotlin apps/beer-game-kotlin（web は Rust 版と共有する apps/beer-game-web。docker 23 以上）
 # 起動:   docker run ... beer-game-kotlin [api|migrate|retention|rebuild-projections|verify-projections]（既定 api）
 #         retention は保持削除の掃引を 1 回行って終了する（B11。終了コード 0、放棄したゲームがあれば 1）。
 #         rebuild-projections [ゲーム ID ...] は投影をイベントから作り直す（B12。省くと全ゲーム。終了コード 0、失敗したゲームがあれば 1）。
@@ -21,9 +21,10 @@ RUN ./gradlew --no-daemon :app:installDist :app:copyDemoLibs \
 # ---- 画面: React/Vite のビルド成果物（デモ環境の demo ステージだけが使う）----
 FROM node:24-bookworm-slim AS webbuild
 WORKDIR /web
-COPY web/package.json web/package-lock.json ./
+# web は apps/beer-game-web（Rust 版と共有）にあるので、名前付きのビルドコンテキスト「web」から取り込む（BuildKit。docker 23 以上）。
+COPY --from=web package.json package-lock.json ./
 RUN npm ci
-COPY web/ ./
+COPY --from=web . ./
 RUN npm run build
 
 # ---- 共通: JRE 25 と、ビルド済みの成果物だけ（runtime と demo の土台）----

@@ -74,7 +74,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+          cache-dependency-path: apps/beer-game-web/package-lock.json
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -110,7 +110,7 @@ jobs:
           if aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" >/dev/null 2>&1; then
             echo "同じコミットのイメージが既にあるため、再利用する"
           else
-            docker build -t "$REGISTRY/$REPOSITORY:$RELEASE_ID" .
+            docker build --build-context web=../beer-game-web -t "$REGISTRY/$REPOSITORY:$RELEASE_ID" .
             docker push "$REGISTRY/$REPOSITORY:$RELEASE_ID"
           fi
           DIGEST="$(aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" \
@@ -178,7 +178,7 @@ jobs:
       # 静的ファイル（web/dist）を releases/<SHA>/ に置き、current に反映する
       - name: 静的ファイルの公開
         id: web
-        working-directory: apps/beer-game-kotlin/web
+        working-directory: apps/beer-game-web
         run: |
           echo "published=true" >> "$GITHUB_OUTPUT"
           npm ci

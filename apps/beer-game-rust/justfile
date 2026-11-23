@@ -1,6 +1,6 @@
 # beer-game-rust の開発タスク（apps/beer-game-kotlin/justfile に倣う）
 # 使い方: just <タスク>   一覧: just
-# 画面（web/）は beer-game-kotlin の共有物を、受け入れ条件（apps/beer-game-features/）は Kotlin 版と共有する物を、読み取り専用で使う。
+# 画面（apps/beer-game-web/）と受け入れ条件（apps/beer-game-features/）は、Kotlin 版と共有する物を、読み取り専用で使う。
 
 set shell := ["bash", "-cu"]
 
@@ -10,7 +10,7 @@ db_port := env("DB_PORT", "55432")
 db_name := "beergame-rust-dev"
 db_url := env("DATABASE_URL", "postgres://postgres:pw@127.0.0.1:" + db_port + "/postgres")
 credential_key := env("CREDENTIAL_KEY", "dev-only-credential-key-0123456789abcdef")
-web_dir := "../beer-game-kotlin/web"
+web_dir := "../beer-game-web"
 
 default:
     @just --list
@@ -64,7 +64,7 @@ backend-lint:
     cargo fmt --check
     cargo clippy --workspace --all-targets --locked -- -D warnings
 
-# --- 画面（beer-game-kotlin/web を共有） ---
+# --- 画面（apps/beer-game-web を共有） ---
 
 web-install:
     cd {{web_dir}} && npm ci

@@ -12,12 +12,14 @@ on:
     paths:
       - 'apps/beer-game-rust/**'
       - 'apps/beer-game-features/**'
+      - 'apps/beer-game-web/**'
       - '.github/workflows/beer-game-rust.yml'
   push:
     branches: [develop, main]
     paths:
       - 'apps/beer-game-rust/**'
       - 'apps/beer-game-features/**'
+      - 'apps/beer-game-web/**'
       - '.github/workflows/beer-game-rust.yml'
   workflow_dispatch:
 

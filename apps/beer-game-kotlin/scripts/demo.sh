@@ -15,6 +15,7 @@ APP="${DEMO_APP:-beer-game-kotlin-demo}"
 BRANCH="${DEMO_BRANCH:-develop}"
 WORKFLOW="beer-game-kotlin.yml"
 APP_DIR="apps/beer-game-kotlin"
+WEB_DIR="apps/beer-game-web"
 IMAGE="registry.heroku.com/${APP}/web"
 JAVA_OPTIONS="-Xmx300m -XX:+UseSerialGC -Xss512k -XX:ReservedCodeCacheSize=64m -XX:MaxMetaspaceSize=192m"
 
@@ -29,7 +30,7 @@ guard() {
   git fetch -q origin "$BRANCH"
   git merge-base --is-ancestor HEAD "origin/${BRANCH}" || die "HEAD が origin/${BRANCH} にありません。push して CI を待ってください。"
   local last conclusion
-  last="$(git log -1 --format=%H -- "$APP_DIR" .github/workflows/${WORKFLOW})"
+  last="$(git log -1 --format=%H -- "$APP_DIR" "$WEB_DIR" .github/workflows/${WORKFLOW})"
   conclusion="$(gh run list --workflow "$WORKFLOW" --commit "$last" --json conclusion --jq '[.[]|select(.conclusion=="success")]|length')"
   [ "${conclusion:-0}" -ge 1 ] || die "アプリの最後の変更（${last:0:7}）の CI が緑ではありません。gh run list で確かめてください。"
 }
@@ -51,7 +52,7 @@ web_url() { heroku apps:info -a "$APP" 2>/dev/null | awk '/Web URL/ {print $3}';
 
 build() {
   guard
-  docker buildx build --target demo --provenance=false --sbom=false \
+  docker buildx build --target demo --provenance=false --sbom=false --build-context "web=${WEB_DIR}" \
     --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
     --output "type=image,name=${IMAGE},oci-mediatypes=false" "$APP_DIR"
 }

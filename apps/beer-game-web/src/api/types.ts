@@ -1,4 +1,4 @@
-// API の型。contracts/openapi.yaml から生成した src/api/generated/schema.d.ts（npm run api:generate）を、
+// API の型。apps/beer-game-kotlin/contracts/openapi.yaml から生成した src/api/generated/schema.d.ts（npm run api:generate）を、
 // 画面が使う名前に写す。仕様を直したら型を再生成する（差分は npm run api:check と CI が検査する）。
 // ここに手で書くのは、画面だけの型（CreateGameResult、ProblemBody、入力の緩い CreateGameRequest）と、実行時に要る値（ROLES）だけ。
 import type { components } from './generated/schema';

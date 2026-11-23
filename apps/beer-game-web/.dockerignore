@@ -1,0 +1,3 @@
+# Kotlin 版の Dockerfile が、名前付きのビルドコンテキスト「web」として取り込む（依存と成果物は、イメージの中で作り直す）
+node_modules/
+dist/

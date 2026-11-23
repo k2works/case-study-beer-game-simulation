@@ -159,14 +159,10 @@ fn nf_o11__ワークフローに_他のプロジェクトの名前が残って�
         "rollback-production",
     ] {
         let (text, _) = workflow(name)?;
-        // 画面（web/）は Kotlin 版と共有するので、その経路だけは許す
+        // 画面（apps/beer-game-web）は Kotlin 版と共有するが、中立の場所にあるので、Kotlin への参照は説明の行（「Kotlin 版と共有」）だけ許す
         let leftover: Vec<&str> = text
             .lines()
-            .filter(|l| {
-                l.to_lowercase().contains("kotlin")
-                    && !l.contains("apps/beer-game-kotlin/web")
-                    && !l.contains("Kotlin 版と共有")
-            })
+            .filter(|l| l.to_lowercase().contains("kotlin") && !l.contains("Kotlin 版と共有"))
             .collect();
         assert!(leftover.is_empty(), "{name}: {leftover:?}");
     }

@@ -1,5 +1,5 @@
 # beer-game-rust のステージングへのデプロイ。手動起動、または main の CI（beer-game-rust）の成功後の自動起動（B15。AC6.2.1）。
-# 画面（web/）は Kotlin 版と共有する（apps/beer-game-kotlin/web）。静的ファイルの公開は、その成果物を使う。
+# 画面（web/）は Kotlin 版と共有する（apps/beer-game-web）。静的ファイルの公開は、その成果物を使う。
 #
 # 状態: **AWS で実行していない・検証していない定義。** 書いただけで、一度も動かしていない（YAML の構文検証のみ）。
 # 自動起動は、**リポジトリの変数 BEER_GAME_RUST_AUTO_DEPLOY が 'true' のときだけ**動く（未設定の間は、起動してもジョブが飛ばされる）。
@@ -75,7 +75,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+          cache-dependency-path: apps/beer-game-web/package-lock.json
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -179,7 +179,7 @@ jobs:
       # 静的ファイル（web/dist）を releases/<SHA>/ に置き、current に反映する
       - name: 静的ファイルの公開
         id: web
-        working-directory: apps/beer-game-kotlin/web
+        working-directory: apps/beer-game-web
         run: |
           echo "published=true" >> "$GITHUB_OUTPUT"
           npm ci
