@@ -29,6 +29,22 @@ export class DecisionConflict extends Error {
   }
 }
 
+/** ゲームが終了していない（振り返りと出力は、終了してから） */
+export class NotEndedError extends Error {
+  constructor(message = 'ゲームが終了してから、開けます') {
+    super(message);
+    this.name = 'NotEndedError';
+  }
+}
+
+/** セッションが無い（ゲームがまだ開始されていない） */
+export class NotActiveError extends Error {
+  constructor(message = 'ゲームはまだ開始されていません') {
+    super(message);
+    this.name = 'NotActiveError';
+  }
+}
+
 /** 資格は有効だが、他のゲーム・他の役割の操作 */
 export class ForbiddenError extends Error {
   constructor(message = 'この操作は許可されていません') {

@@ -50,9 +50,25 @@ import {
 import {
   DecisionConflict,
   ForbiddenError,
+  NotActiveError,
+  NotEndedError,
   NotFoundError,
   UnauthorizedError,
 } from './errors.js';
+import {
+  gameStateView,
+  lobbyView,
+  observationView,
+  retentionStateView,
+  reviewView,
+  sessionStateView,
+  versionsOf,
+  type Viewer,
+} from './contract-views.js';
+import {
+  buildContractExport,
+  CONTRACT_EXPORT_SCHEMA_VERSION,
+} from '../domain/contract-export.js';
 
 export interface Dependencies {
   uow: UnitOfWork;
@@ -165,6 +181,14 @@ export function createApplication(deps: Dependencies) {
       : p.kind === 'OBSERVER'
         ? { kind: 'OBSERVER', observerId: p.observerId ?? '' }
         : participant(p.participantId ?? '');
+
+  /** 資格から、投影の「見る人」を作る。観察者は、役割も参加コードも見ないので null */
+  const viewerOf = (p: Principal): Viewer | null =>
+    p.kind === 'FACILITATOR'
+      ? { kind: 'FACILITATOR' }
+      : p.kind === 'PARTICIPANT'
+        ? { kind: 'PARTICIPANT', participantId: p.participantId ?? '' }
+        : null;
 
   const requireFacilitatorPrincipal = (p: Principal, operation: string) => {
     if (p.kind !== 'FACILITATOR')
@@ -855,6 +879,135 @@ export function createApplication(deps: Dependencies) {
             filename: `beer-game-${input.gameId}.json`,
             body: JSON.stringify(built.json, null, 2),
           };
+    },
+
+    // ---- 共有の API の契約（/api/v1）の読み取り。形は contract-views.ts ----
+
+    /** ゲームの状態。呼び出した人ごとの投影（進行役は参加コードと最終週、参加者は自分の ID と役割） */
+    getGameState(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return gameStateView(
+          game,
+          viewerOf(principal),
+          versionsOf(game, session),
+        );
+      });
+    },
+
+    /**
+     * セッションの状態。参加者には自分の役割の状況だけ（他の役割と将来の需要は返さない）、進行役には全役割と確定した週の結果。
+     * 参加者が自分と違う役割（`role`）を求めたら、値を返さずに拒否する（AC2.1.2）。観察者には開かない。
+     */
+    getSessionState(input: { token: string; gameId: string; role?: Role }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const viewer = viewerOf(principal);
+        if (!viewer) throw new ForbiddenError('観察者には開けません');
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        if (!session) throw new NotActiveError();
+        if (viewer.kind === 'PARTICIPANT') {
+          const own = ROLES.find((r) =>
+            session.holders[r].includes(viewer.participantId),
+          );
+          if (!own || (input.role !== undefined && input.role !== own))
+            throw new ForbiddenError('自分の役割の状態だけ開けます');
+        }
+        const view = sessionStateView(
+          session,
+          viewer,
+          await repos.games.participantNames(input.gameId),
+          versionsOf(game, session),
+        );
+        if (!view) throw new ForbiddenError('役割が割り当てられていません');
+        return view;
+      });
+    },
+
+    /** ロビー（進行役だけ）。参加者・招待・観察者の一覧。招待コードの値は含まない */
+    getLobby(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, 'ロビーの表示');
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return lobbyView(
+          game,
+          await repos.observers.listInvitations(input.gameId),
+          await repos.observers.listObservers(input.gameId),
+          versionsOf(game, session),
+        );
+      });
+    },
+
+    /** 観察（観察者と進行役だけ）。参加者には開かせない（自分の値から、合計を使って相手の値を逆算できるため） */
+    getObservation(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'PARTICIPANT')
+          throw new ForbiddenError(
+            '観察の画面は、観察者と進行役だけが開けます',
+          );
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return observationView(game, session, versionsOf(game, session));
+      });
+    },
+
+    /** 振り返り。ゲームが終了してから、そのゲームの進行役・参加者・観察者に開示する（終了前は値を一切返さない） */
+    async getReview(input: { token: string; gameId: string }) {
+      const { game, session } = await uow.run(async (repos) => {
+        await authenticate(repos, input.token, input.gameId);
+        return {
+          game: await loadGame(repos, input.gameId),
+          session: await repos.sessions.findByGame(input.gameId),
+        };
+      });
+      if (!canDisclose(session?.status ?? null)) throw new NotEndedError();
+      const source = await reviews.read(input.gameId);
+      return reviewView(game, source.rows, versionsOf(game, session));
+    },
+
+    /** 出力（CSV・JSON）。進行役だけが、終了後だけ。全体を組み立ててから返し、欠けがあれば失敗する */
+    async getExport(input: {
+      token: string;
+      gameId: string;
+      format: 'csv' | 'json';
+    }) {
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
+      requireFacilitatorPrincipal(principal, '出力');
+      const { sessionStatus, source } = await exports.read(input.gameId);
+      if (!canDisclose(sessionStatus) || !source) throw new NotEndedError();
+      const built = buildContractExport(source);
+      return {
+        schemaVersion: CONTRACT_EXPORT_SCHEMA_VERSION,
+        contentType:
+          input.format === 'csv'
+            ? 'text/csv; charset=utf-8'
+            : 'application/json; charset=utf-8',
+        filename: `beer-game-${input.gameId}.${input.format}`,
+        body:
+          input.format === 'csv'
+            ? built.csv
+            : JSON.stringify(built.json, null, 2),
+      };
+    },
+
+    /** 保持状態（進行役だけ）。保持日数・削除予定日・削除の進行 */
+    getRetention(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, '保持状態の表示');
+        const policy = await repos.retention.policyOf(input.gameId);
+        const progress = await repos.retention.progressOf(input.gameId);
+        if (!policy || !progress) throw new NotFoundError();
+        return retentionStateView(policy, progress);
+      });
     },
 
     /** 進行役のコンソール。入力の有無だけを見せる */

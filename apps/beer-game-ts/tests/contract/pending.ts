@@ -7,14 +7,9 @@
  */
 export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
   'createGame',
-  'getLobby',
-  'getObservation',
   'inviteObserver',
   'revokeObserverInvitation',
   'joinAsObserver',
-  'getReview',
-  'getExport',
-  'getRetention',
   'assignRole',
   'joinGame',
   'startGame',
@@ -27,6 +22,4 @@ export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
   'revokeCredential',
   'reissueCredential',
   'recoverParticipation',
-  'getSessionState',
-  'getGameState',
 ]);

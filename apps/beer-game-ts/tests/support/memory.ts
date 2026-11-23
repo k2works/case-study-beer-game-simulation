@@ -40,6 +40,7 @@ interface StoredInvitation {
   id: string;
   gameId: string;
   validity: Validity;
+  createdAt?: Date;
 }
 
 interface Store {
@@ -50,9 +51,23 @@ interface Store {
   invitations: Map<string, StoredInvitation>;
   observers: Map<
     string,
-    { gameId: string; invitationId: string; displayName: string }
+    {
+      gameId: string;
+      invitationId: string;
+      displayName: string;
+      joinedAt?: Date;
+    }
   >;
-  retention: Map<string, { days: number; deleteAfter: Date; attempts: number }>;
+  retention: Map<
+    string,
+    {
+      days: number;
+      deleteAfter: Date;
+      attempts: number;
+      startsAt?: Date;
+      lastFailedAt?: Date;
+    }
+  >;
   receipts: {
     reference: string;
     outcome: string;
@@ -111,7 +126,17 @@ function reposOver(
       findByGame: async (gameId) => store.sessions.get(gameId) ?? null,
       save: async (session, expected) => {
         checkVersion(store.sessions.get(session.gameId), expected);
-        store.sessions.set(session.gameId, session);
+        // PostgreSQL の永続化と同じく、新しく保存された入力（時刻が無い）に、保存の時刻を付ける
+        const savedAt = new Date();
+        store.sessions.set(session.gameId, {
+          ...session,
+          decisions: Object.fromEntries(
+            Object.entries(session.decisions).map(([role, d]) => [
+              role,
+              { ...d, savedAt: d.savedAt ?? savedAt },
+            ]),
+          ),
+        });
       },
     },
     credentials: {
@@ -151,7 +176,7 @@ function reposOver(
     },
     observers: {
       saveInvitation: async (digest, inv) =>
-        void store.invitations.set(digest, inv),
+        void store.invitations.set(digest, { ...inv, createdAt: new Date() }),
       findInvitation: async (digests, at) => {
         for (const d of digests) {
           const inv = store.invitations.get(d);
@@ -188,16 +213,48 @@ function reposOver(
           gameId: o.gameId,
           invitationId: o.invitationId,
           displayName: o.displayName,
+          joinedAt: new Date(),
         }),
       countObservers: async (gameId) =>
         [...store.observers.values()].filter((o) => o.gameId === gameId).length,
+      listInvitations: async (gameId) =>
+        [...store.invitations.values()]
+          .filter((inv) => inv.gameId === gameId)
+          .map((inv) => ({
+            id: inv.id,
+            createdAt: inv.createdAt ?? inv.validity.expiresAt,
+            expiresAt: inv.validity.expiresAt,
+            revokedAt: inv.validity.revokedAt ?? null,
+          })),
+      listObservers: async (gameId) =>
+        [...store.observers.entries()]
+          .filter(([, o]) => o.gameId === gameId)
+          .map(([id, o]) => ({
+            id,
+            displayName: o.displayName,
+            joinedAt: o.joinedAt ?? new Date(0),
+          })),
     },
     retention: {
       schedule: async (gameId, policy) =>
-        void store.retention.set(gameId, { ...policy, attempts: 0 }),
+        void store.retention.set(gameId, {
+          ...policy,
+          attempts: 0,
+          startsAt: new Date(),
+        }),
       policyOf: async (gameId) => {
         const r = store.retention.get(gameId);
         return r ? { days: r.days, deleteAfter: r.deleteAfter } : null;
+      },
+      progressOf: async (gameId) => {
+        const r = store.retention.get(gameId);
+        return r
+          ? {
+              startsAt: r.startsAt ?? new Date(0),
+              attempts: r.attempts,
+              lastFailedAt: r.lastFailedAt ?? null,
+            }
+          : null;
       },
       due: async (at, maxAttempts, limit) =>
         [...store.retention.entries()]
@@ -224,9 +281,10 @@ function reposOver(
         store.events = store.events.filter((e) => e.gameId !== gameId);
         return true;
       },
-      recordFailure: async (gameId) => {
+      recordFailure: async (gameId, at) => {
         const r = store.retention.get(gameId)!;
         r.attempts += 1;
+        r.lastFailedAt = at;
         return r.attempts;
       },
       saveReceipt: async (receipt) => {

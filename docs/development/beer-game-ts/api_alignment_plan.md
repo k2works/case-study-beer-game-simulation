@@ -84,7 +84,19 @@ TS にだけあって契約に無いもの（共有 UI は使わない。削除�
 | :-: | :--- | :--- |
 | 0 | 完了（2026-11-24） | 契約テストの土台（35 件）は通過。依存の版は 2026-11-24 に公式レジストリで確認（ajv 8.20.0、ajv-formats 3.0.1、yaml 2.9.1。いずれも exact 指定） |
 | 1 | 完了（2026-11-24） | `getHealth`・`getReady` を `/api/v1` に実装（未実装は 25 → 23 件）。problem+json（`code`・`type`・`errors[]`・`Retry-After`）、Origin（`ALLOWED_ORIGINS`）、`Idempotency-Key` の検査、本文 64 KB、404 を契約の形で。**旧い経路（`/api/*`）は従来の形のまま**（段階 4 まで。URL の接頭辞で切り替える）。537 件通過 |
-| 2〜7 | 未着手 | |
+| 2 | 完了（2026-11-24） | 読み取りの 7 操作（`getGameState`・`getSessionState`・`getLobby`・`getObservation`・`getReview`・`getExport`・`getRetention`）を `/api/v1` に実装（未実装は 23 → 16 件）。応答は契約のスキーマに適合し、開示・認可の規則（参加者は自分の役割だけ、観察者に役割別の値を見せない、終了前は 409 `game.not_ended`、無資格・別ゲーム・存在しないゲームは同じ 403）を契約テスト 26 件で検査。564 件通過。**ゲート 1 で、マイグレーション 007（`role_decisions.saved_at`）を承認**（2026-11-24、ユーザー）。`versions.game`・`versions.session` は、既存の `games.version`・`sessions.version` から返せる（スキーマ変更なし） |
+| 3〜7 | 未着手 | |
+
+### 段階 2 で、後の段階へ持ち越したもの・分かったこと
+
+| 項目 | 持ち越し先 | 内容 |
+| :--- | :-: | :--- |
+| **カスタム条件の形の差（ドメインの変更）** | 3（開始前にゲート） | 契約の `CustomConditions` は、役割ごとの初期在庫（`initialInventory: {役割: 数}`）と初期の流れ（`initialFlow`）を持つ。TS は、全役割に共通の 1 つの初期在庫しか持たず、初期の流れは固定（4）。共有 UI の `custom-conditions-ui`（「小売店の初期在庫を 20」）は、役割ごとの値を使う。**ドメインの条件（`Conditions`）の変更と、`games.initial_inventory`（整数）の保存形式の変更（スキーマ変更）が要る**ので、段階 3 の `createGame` の前に、案を示して確認する |
+| 公開範囲の呼び名 | 3 | 契約は `TEAM_TOTAL`・`NONE`、TS の内部は `TEAM_TOTAL`・`PROGRESS_ONLY`。読み取りは `disclosureNameOf` で写す。作成の入力は、段階 3 で `NONE` → `PROGRESS_ONLY` に写す（保存済みの値は変えない） |
+| 出力の形の版 | 4 | 契約の出力は `beer-game-kotlin.export.v1`（Kotlin・Rust と同じ形式なので同じ値）。旧い出力（`beer-game2.export.v1`）は、旧い経路と一緒に、段階 4 で撤去する（前に「`beer-game2.export.v1` は変えない」としたのは、旧い経路の出力のこと） |
+| `RoleStatus.decisionSavedAt` | — | 完了。永続化が、新しく保存された入力に `now()` を付け、既存の入力の時刻は引き継ぐ（別の役割の保存で変わらないことを、PostgreSQL の統合テストで検査） |
+| 保持の `nextAttemptAt`・`lastFailureCode` | — | `nextAttemptAt` は、再試行を定期のタスクの次の実行で行い、指数の待ちを持たないので null。`lastFailureCode` は記録していないので null。契約の型は両方とも null を許す。`IN_PROGRESS` は、状態の記録が無いので現れない |
+| 開始後の役割の入れ替え（H4）の `replaced` | 3 | 読み取りは `replaced` を省略（false）。H4 の実装は、段階 3 の前にスキーマ変更の案を確認する（2026-11-24、実装することは承認済み） |
 
 ### 段階 1 で、後の段階へ持ち越したもの
 
@@ -104,3 +116,4 @@ TS にだけあって契約に無いもの（共有 UI は使わない。削除�
 | :--- | :--- | :--- |
 | 2026-11-24 | 初版作成（段階 0。差分表と段階・ゲート） | claude-code |
 | 2026-11-24 | 段階 1 の完了を反映（横断の仕組み、`getHealth`・`getReady`、持ち越しの一覧） | claude-code |
+| 2026-11-24 | 段階 2 の完了を反映（読み取り 7 操作、マイグレーション 007 の承認、段階 3 へ持ち越す差） | claude-code |

@@ -22,6 +22,7 @@ import {
   commitWeek,
   saveDecision,
   startSession,
+  type Session,
 } from '../../src/domain/session.js';
 import { randomUUID } from 'node:crypto';
 
@@ -41,6 +42,17 @@ beforeEach(async () => {
 });
 
 const uid = () => randomUUID();
+
+/** 保存の時刻（永続化が付ける）を除いた、セッションの値 */
+const withoutSavedAt = (session: Session): Session => ({
+  ...session,
+  decisions: Object.fromEntries(
+    Object.entries(session.decisions).map(([role, d]) => [
+      role,
+      { quantity: d.quantity, version: d.version, savedBy: d.savedBy },
+    ]),
+  ),
+});
 
 function readyGame(id = uid()) {
   let g = createGame({ id, joinCode: `J-${id.slice(0, 8)}`, weeks: 3 }).game;
@@ -131,7 +143,12 @@ describe('Session の永続化', () => {
       await uow.run((r) => r.sessions.save(next.session, s.version));
       s = next.session;
     }
-    expect(await uow.run((r) => r.sessions.findByGame(s.gameId))).toEqual(s);
+    const stored = await uow.run((r) => r.sessions.findByGame(s.gameId));
+    // 保存の時刻は、永続化が付ける。それ以外は、保存したとおりに読み戻せる
+    for (const role of ROLES) {
+      expect(stored?.decisions[role]?.savedAt).toBeInstanceOf(Date);
+    }
+    expect(withoutSavedAt(stored!)).toEqual(s);
     const committed = commitWeek(s, FACILITATOR, {
       week: 1,
       version: s.version,
@@ -146,6 +163,41 @@ describe('Session の永続化', () => {
     expect(rows.find((x) => x.role === 'RETAILER')).toMatchObject({
       ordered: 7,
     });
+  });
+
+  it('[US2.4/AC2.4.4] 入力の保存の時刻は、保存のたびに付き、別の役割の保存で、既存の入力の時刻は変わらない', async () => {
+    const { session: s0, ids } = await started();
+    const load = async () =>
+      (await uow.run((r) => r.sessions.findByGame(s0.gameId)))!;
+    // ユースケースと同じく、保存済みのセッションを読み込んでから、入力を保存する（読み込んだ入力は、保存の時刻を持つ）
+    const save = async (i: number, quantity: number) => {
+      const from = await load();
+      const next = saveDecision(
+        from,
+        { kind: 'PARTICIPANT', participantId: ids[i]! },
+        ROLES[i]!,
+        quantity,
+        from.decisions[ROLES[i]!]?.version ?? 0,
+      ).session;
+      await uow.run((r) => r.sessions.save(next, from.version));
+    };
+    await save(0, 3);
+    const first = (await load()).decisions[ROLES[0]!]!.savedAt!;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await save(1, 5);
+    const afterOther = await load();
+    // 別の役割の保存は、最初の役割の保存の時刻を変えない
+    expect(afterOther.decisions[ROLES[0]!]!.savedAt).toEqual(first);
+    expect(afterOther.decisions[ROLES[1]!]!.savedAt!.getTime()).toBeGreaterThan(
+      first.getTime(),
+    );
+    // 同じ役割の再保存は、保存の時刻を新しくする
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await save(0, 6);
+    const resaved = await load();
+    expect(resaved.decisions[ROLES[0]!]!.savedAt!.getTime()).toBeGreaterThan(
+      first.getTime(),
+    );
   });
 
   it('[US2.3/AC2.3.2] 同じ週の二重の確定は、主キーで防がれる', async () => {

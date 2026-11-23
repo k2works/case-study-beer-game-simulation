@@ -87,6 +87,19 @@ export interface ObserverRepository {
     displayName: string;
   }): Promise<void>;
   countObservers(gameId: string): Promise<number>;
+  /** このゲームの招待の一覧（失効・期限切れを含む。作成の順。招待コードは含まない） */
+  listInvitations(gameId: string): Promise<
+    {
+      id: string;
+      createdAt: Date;
+      expiresAt: Date;
+      revokedAt: Date | null;
+    }[]
+  >;
+  /** このゲームの観察者の一覧（参加の順） */
+  listObservers(
+    gameId: string,
+  ): Promise<{ id: string; displayName: string; joinedAt: Date }[]>;
 }
 
 /**
@@ -99,6 +112,12 @@ export interface RetentionRepository {
     policy: { days: number; deleteAfter: Date },
   ): Promise<void>;
   policyOf(gameId: string): Promise<{ days: number; deleteAfter: Date } | null>;
+  /** 保持の進行。保持の開始（作成時）、削除の試行の回数、直前の失敗の時刻 */
+  progressOf(gameId: string): Promise<{
+    startsAt: Date;
+    attempts: number;
+    lastFailedAt: Date | null;
+  } | null>;
   /** 時刻 `at` で期限に達し、失敗が `maxAttempts` 回未満のゲーム */
   due(
     at: Date,

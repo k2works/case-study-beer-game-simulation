@@ -186,7 +186,7 @@ class PgSessions implements SessionRepository {
     if (!row) return null;
     const decisionRows = (
       await this.db.query(
-        'SELECT role, quantity, version, saved_by FROM role_decisions WHERE session_id = $1',
+        'SELECT role, quantity, version, saved_by, saved_at FROM role_decisions WHERE session_id = $1',
         [row.session_id],
       )
     ).rows;
@@ -196,6 +196,7 @@ class PgSessions implements SessionRepository {
         quantity: d.quantity,
         version: d.version,
         savedBy: d.saved_by,
+        savedAt: d.saved_at,
       };
     }
     const resultRows = (
@@ -292,9 +293,18 @@ class PgSessions implements SessionRepository {
         const d = session.decisions[role];
         if (!d) continue;
         await this.db.query(
-          `INSERT INTO role_decisions (session_id, week, role, quantity, version, saved_by)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [session.id, session.week, role, d.quantity, d.version, d.savedBy],
+          // 保存の時刻は、読み込んだ入力ならそのまま引き継ぎ、新しく保存された入力（時刻が無い）なら now()
+          `INSERT INTO role_decisions (session_id, week, role, quantity, version, saved_by, saved_at)
+           VALUES ($1,$2,$3,$4,$5,$6, COALESCE($7, now()))`,
+          [
+            session.id,
+            session.week,
+            role,
+            d.quantity,
+            d.version,
+            d.savedBy,
+            d.savedAt ?? null,
+          ],
         );
       }
       const known = new Set(
@@ -514,6 +524,33 @@ class PgObservers implements ObserverRepository {
     );
   }
 
+  async listInvitations(gameId: string) {
+    const { rows } = await this.db.query(
+      `SELECT invitation_id, created_at, expires_at, revoked_at
+         FROM observer_invitations WHERE game_id = $1 ORDER BY created_at, invitation_id`,
+      [gameId],
+    );
+    return rows.map((r) => ({
+      id: r.invitation_id as string,
+      createdAt: r.created_at as Date,
+      expiresAt: r.expires_at as Date,
+      revokedAt: (r.revoked_at as Date | null) ?? null,
+    }));
+  }
+
+  async listObservers(gameId: string) {
+    const { rows } = await this.db.query(
+      `SELECT observer_id, display_name, joined_at
+         FROM observers WHERE game_id = $1 ORDER BY joined_at, observer_id`,
+      [gameId],
+    );
+    return rows.map((r) => ({
+      id: r.observer_id as string,
+      displayName: r.display_name as string,
+      joinedAt: r.joined_at as Date,
+    }));
+  }
+
   async countObservers(gameId: string) {
     const { rows } = await this.db.query(
       'SELECT count(*)::int AS n FROM observers WHERE game_id = $1',
@@ -542,6 +579,21 @@ class PgRetention implements RetentionRepository {
       ? {
           days: rows[0].retention_days as number,
           deleteAfter: rows[0].delete_after as Date,
+        }
+      : null;
+  }
+
+  async progressOf(gameId: string) {
+    const { rows } = await this.db.query(
+      `SELECT created_at, deletion_attempts, deletion_failed_at
+         FROM games WHERE game_id = $1`,
+      [gameId],
+    );
+    return rows[0]
+      ? {
+          startsAt: rows[0].created_at as Date,
+          attempts: rows[0].deletion_attempts as number,
+          lastFailedAt: (rows[0].deletion_failed_at as Date | null) ?? null,
         }
       : null;
   }

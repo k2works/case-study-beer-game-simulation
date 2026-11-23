@@ -118,6 +118,14 @@ export const retryExhaustedProblem = () =>
     1,
   );
 
+/** ゲームが終了していない（振り返り・出力は、終了後だけ。AC4.2.2） */
+export const gameNotEndedProblem = () =>
+  new ApiProblem(409, 'game.not_ended', 'ゲームが終了してから、開けます。');
+
+/** セッションが無い（ゲームが開始されていない） */
+export const sessionNotActiveProblem = () =>
+  new ApiProblem(409, 'session.not_active', 'ゲームはまだ開始されていません。');
+
 export const internalProblem = () =>
   new ApiProblem(
     500,

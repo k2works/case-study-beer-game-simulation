@@ -12,6 +12,8 @@ import type { Application } from '../../application/index.js';
 import {
   DecisionConflict,
   ForbiddenError,
+  NotActiveError,
+  NotEndedError,
   NotFoundError,
   UnauthorizedError,
 } from '../../application/errors.js';
@@ -35,6 +37,7 @@ import {
   API_V1,
   ApiProblem,
   badRequestProblem,
+  gameNotEndedProblem,
   internalProblem,
   isApiV1,
   notFoundProblem,
@@ -42,9 +45,11 @@ import {
   payloadTooLargeProblem,
   retryExhaustedProblem,
   sendApiProblem,
+  sessionNotActiveProblem,
   unauthorizedProblem,
   validationProblem,
 } from './problems.js';
+import { registerApiV1Reads } from './routes-v1-reads.js';
 
 export interface HttpConfig {
   /** 変更系の要求を受ける送信元（Origin）。画面の配信元。開発・E2E では別のポートも許す */
@@ -283,6 +288,8 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     ) {
       return unauthorizedProblem();
     }
+    if (error instanceof NotEndedError) return gameNotEndedProblem();
+    if (error instanceof NotActiveError) return sessionNotActiveProblem();
     if (error instanceof NotFoundError) return notFoundProblem();
     if (error instanceof ConflictError) return retryExhaustedProblem();
     if (error instanceof DomainError && !(error instanceof StaleError)) {
@@ -447,6 +454,8 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
         .code(ok ? 200 : 503)
         .send({ status: ok ? 'ready' : 'unavailable' });
     });
+
+  registerApiV1Reads(server, app);
 
   server.post('/api/games', async (request, reply) => {
     const body = createBody.parse(request.body);
