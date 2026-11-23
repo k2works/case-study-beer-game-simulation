@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-23
+* **Update**: [bolt_14_report](/development/beer-game-rust/bolt_14_report.md) を更新（承認の記録: B14 のゲート。claude-code/claude-sonnet-5-5）
 * **Update**: [test-strategy（Rust）](/design/beer-game-rust/test-strategy.md)・[test-strategy（Kotlin）](/design/beer-game-kotlin/test-strategy.md)・[development_strategy](/development/beer-game-kotlin/development_strategy.md)・[ADR-012](/adr/beer-game-kotlin/012-gherkin-and-cucumber.md) を更新（フィーチャーの配置を `apps/beer-game-features/` へ移動。claude-code/claude-sonnet-5-5）
 * **Update**: [bolt_16_report](/development/beer-game-rust/bolt_16_report.md) を更新（承認の記録: B16 の報告。claude-code/claude-sonnet-5-5）
 * **Creation**: [bolt_16_report](/development/beer-game-rust/bolt_16_report.md)・[nfr_results](/development/beer-game-rust/nfr_results.md)・[release_readiness](/development/beer-game-rust/release_readiness.md) を作成（claude-code/claude-sonnet-5-5）
