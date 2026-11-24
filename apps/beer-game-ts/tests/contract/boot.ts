@@ -39,6 +39,9 @@ export async function bootApp(
     ready?: () => Promise<boolean>;
     notifierReady?: () => boolean;
     allowedOrigins?: readonly string[];
+    secureCookies?: boolean;
+    /** 参加・復帰の専用のレート制限（窓あたりの上限）。既定は、超えない値 */
+    rateLimit?: number;
   } = {},
 ): Promise<Booted> {
   const mem = memoryUnitOfWork();
@@ -55,10 +58,11 @@ export async function bootApp(
     ready: options.ready ?? (async () => true),
     ...(options.notifierReady ? { notifierReady: options.notifierReady } : {}),
     notifier: { subscribe: () => () => {} },
-    rateLimiter: memoryRateLimiter(1000, 60_000),
+    rateLimiter: memoryRateLimiter(options.rateLimit ?? 1000, 60_000),
     config: {
       allowedOrigins: options.allowedOrigins ?? [ORIGIN],
       logLevel: 'silent',
+      secureCookies: options.secureCookies ?? false,
     },
     logStream: new Writable({
       write(_chunk, _enc, cb) {

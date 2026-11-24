@@ -11,7 +11,12 @@ import {
   type Game,
 } from '../../src/domain/game.js';
 import { ROLES } from '../../src/domain/role.js';
-import { DomainError, PermissionError } from '../../src/domain/values.js';
+import {
+  DomainError,
+  NotPreparingError,
+  ParticipantNotFoundError,
+  PermissionError,
+} from '../../src/domain/values.js';
 
 const newGame = (weeks = 10): Game =>
   createGame({ id: 'g1', joinCode: 'JOIN-0001', weeks }).game;
@@ -149,6 +154,7 @@ describe('createGame', () => {
     } catch (e) {
       expect((e as DomainError).issues).toEqual([
         {
+          field: 'demand',
           week: 2,
           problem: '0〜1000 の整数ではありません',
           fix: '0〜1000 の整数にしてください',
@@ -212,12 +218,35 @@ describe('assignRole', () => {
     ).toThrow(PermissionError);
   });
 
-  it('[US1.2/AC1.2.5] 1 人に複数の役割は割り当てられない。現在の役割を示す', () => {
+  it('[US1.2/AC1.2.5] 1 人に同時に複数の役割は持たせない。別の役割にいる人は、付け替え（D9）になる', () => {
     const g = assignRole(withP(), FACILITATOR, 'p1', 'RETAILER').game;
-    expect(() => assignRole(g, FACILITATOR, 'p1', 'FACTORY')).toThrow(
-      /RETAILER/,
-    );
-    expect(g.assignments).toEqual({ RETAILER: ['p1'] });
+    const out = assignRole(g, FACILITATOR, 'p1', 'FACTORY');
+    expect(out.game.assignments).toEqual({ FACTORY: ['p1'] });
+    // 移動元の RoleUnassigned と、移動先の RoleAssigned
+    expect(out.events).toEqual([
+      { type: 'RoleUnassigned', gameId: 'g1', participantId: 'p1' },
+      {
+        type: 'RoleAssigned',
+        gameId: 'g1',
+        participantId: 'p1',
+        role: 'FACTORY',
+      },
+    ]);
+    expect(out.game.version).toBe(g.version + 1);
+  });
+
+  it('[US1.2/AC1.2.5] 付け替えで、共同担当の残りは、元の役割に残る', () => {
+    let g = joinGame(withP(), { participantId: 'p2', displayName: 'b' }).game;
+    g = assignRole(g, FACILITATOR, 'p1', 'RETAILER').game;
+    g = assignRole(g, FACILITATOR, 'p2', 'RETAILER').game;
+    const moved = assignRole(g, FACILITATOR, 'p1', 'FACTORY').game;
+    expect(moved.assignments).toEqual({ RETAILER: ['p2'], FACTORY: ['p1'] });
+  });
+
+  it('[US1.2/AC1.2.5] 参加していない人には、割り当てられない（ParticipantNotFoundError）', () => {
+    expect(() =>
+      assignRole(withP(), FACILITATOR, 'nobody', 'RETAILER'),
+    ).toThrow(ParticipantNotFoundError);
   });
 
   it('[US1.2] 割り当てを解除すると、別の役割に割り当て直せる', () => {
@@ -253,10 +282,25 @@ describe('assignRole', () => {
     expect(missingRoles(g)).toContain('RETAILER');
   });
 
-  it('[US1.2/AC1.2.5] 同じ役割に二重には割り当てない', () => {
+  it('[US1.2/AC1.2.5] 同じ役割への割り当て直しは、何も変わらず、イベントも版も足さない', () => {
     const g = assignRole(withP(), FACILITATOR, 'p1', 'RETAILER').game;
-    expect(() => assignRole(g, FACILITATOR, 'p1', 'RETAILER')).toThrow(
-      /RETAILER/,
+    const out = assignRole(g, FACILITATOR, 'p1', 'RETAILER');
+    expect(out.events).toEqual([]);
+    expect(out.game).toBe(g);
+    expect(out.game.assignments).toEqual({ RETAILER: ['p1'] });
+  });
+
+  it('開始後の割り当ては、準備中ではないので拒否する（NotPreparingError）', () => {
+    let g = withP();
+    g = assignRole(g, FACILITATOR, 'p1', 'RETAILER').game;
+    for (const [i, role] of ROLES.entries()) {
+      if (role === 'RETAILER') continue;
+      g = joinGame(g, { participantId: `q${i}`, displayName: `Q${i}` }).game;
+      g = assignRole(g, FACILITATOR, `q${i}`, role).game;
+    }
+    const started = startGame(g, FACILITATOR).game;
+    expect(() => assignRole(started, FACILITATOR, 'p1', 'FACTORY')).toThrow(
+      NotPreparingError,
     );
   });
 

@@ -197,7 +197,7 @@ describe('作成・参加・割り当て・開始', () => {
     expect(mem.snapshot().sessions.get(t.gameId)?.status).toBe('ACTIVE');
   });
 
-  it('[US1.2/AC1.2.5] 1 人に複数の役割は割り当てられず、解除すれば割り当て直せる', async () => {
+  it('[US1.2/AC1.2.5] 1 人に同時に複数の役割は持たせず、別の役割へは付け替えになる。解除しても割り当て直せる', async () => {
     const c = await app.createGame({ weeks: 3 });
     const j = await app.joinGame({ joinCode: c.joinCode, displayName: '花子' });
     const base = {
@@ -206,9 +206,12 @@ describe('作成・参加・割り当て・開始', () => {
       participantId: j.participantId,
     };
     await app.assignRole({ ...base, role: 'RETAILER' });
-    await expect(app.assignRole({ ...base, role: 'FACTORY' })).rejects.toThrow(
-      /RETAILER/,
-    );
+    // 付け替え（D9）。同時に 2 つの役割にはならない
+    await app.assignRole({ ...base, role: 'WHOLESALER' });
+    expect(
+      (await app.lobby({ token: c.facilitatorToken, gameId: c.gameId }))
+        .assignments,
+    ).toEqual({ WHOLESALER: [j.participantId] });
     await app.unassignRole(base);
     await app.assignRole({ ...base, role: 'FACTORY' });
     const lobby = await app.lobby({

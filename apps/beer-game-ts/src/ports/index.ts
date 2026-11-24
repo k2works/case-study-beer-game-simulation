@@ -137,7 +137,23 @@ export interface RetentionRepository {
 }
 
 /** 冪等記録の範囲（操作の種類）。同じキーでも、範囲が違えば別の記録 */
-export type IdempotencyScope = 'create' | 'commit';
+export type IdempotencyScope =
+  | 'create'
+  | 'join'
+  | 'recover'
+  | 'start'
+  | 'assign'
+  | 'save'
+  | 'commit'
+  | 'pause'
+  | 'resume'
+  | 'mode'
+  | 'proxy'
+  | 'invite'
+  | 'revoke-invitation'
+  | 'join-observer'
+  | 'revoke-credential'
+  | 'reissue-credential';
 
 export interface IdempotencyRecord {
   gameId: string;

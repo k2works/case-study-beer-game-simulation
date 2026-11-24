@@ -9,11 +9,16 @@ import {
 } from './conditions.js';
 import { ROLES, type Role } from './role.js';
 import {
+  AlreadyStartedError,
   DemandSeries,
   DisplayName,
   DomainError,
+  type Issue,
   Money,
+  NotPreparingError,
+  ParticipantNotFoundError,
   PermissionError,
+  StartConditionError,
   QUANTITY_MAX,
   Quantity,
   Version,
@@ -95,12 +100,34 @@ export function createGame(input: {
   /** キット準拠値から変える条件（指定の無い項目はキットの値。初期在庫は、省略した役割がキットの値） */
   conditions?: ConditionsInput;
 }): Outcome {
-  const finalWeek = Week.of(input.weeks);
-  const kit = kitDemand(finalWeek);
-  const demand = input.demand
-    ? DemandSeries.create(input.demand, finalWeek)
-    : kit;
-  const conditions = conditionsOf(input.conditions ?? {});
+  // 入力の誤りは、最初の 1 つで止めず、すべて集めて示す（AC1.1.2。最終週・需要系列・条件）
+  const issues: Issue[] = [];
+  const collect = <T>(validate: () => T): T | undefined => {
+    try {
+      return validate();
+    } catch (e) {
+      if (!(e instanceof DomainError)) throw e;
+      issues.push(...e.issues);
+      return undefined;
+    }
+  };
+  const finalWeek = collect(() => weekOf(input.weeks));
+  const kit = finalWeek === undefined ? undefined : kitDemand(finalWeek);
+  const demand =
+    finalWeek === undefined
+      ? undefined
+      : collect(() =>
+          input.demand ? DemandSeries.create(input.demand, finalWeek) : kit!,
+        );
+  const conditions = collect(() => conditionsOf(input.conditions ?? {}));
+  if (
+    issues.length > 0 ||
+    finalWeek === undefined ||
+    kit === undefined ||
+    demand === undefined ||
+    conditions === undefined
+  )
+    throw new DomainError('入力に誤りがあります', issues);
   const { kind, changes } = kitPreset(
     conditions,
     demand.some((v, i) => v !== kit[i]),
@@ -130,9 +157,25 @@ export function createGame(input: {
   };
 }
 
+/** 最終週（1〜50 の整数）。範囲外は、対象の項目（`finalWeek`）つきで拒否する */
+function weekOf(value: number): Week {
+  try {
+    return Week.of(value);
+  } catch (e) {
+    if (e instanceof DomainError && e.issues.length === 0)
+      throw new DomainError(e.message, [
+        {
+          field: 'finalWeek',
+          problem: e.message,
+          fix: '最終週を 1〜50 の整数にしてください',
+        },
+      ]);
+    throw e;
+  }
+}
+
 function requirePreparing(game: Game): void {
-  if (game.status !== 'PREPARING')
-    throw new DomainError('このゲームは参加の受付を終了しています');
+  if (game.status !== 'PREPARING') throw new NotPreparingError();
 }
 
 function requireFacilitator(actor: Actor): void {
@@ -184,28 +227,47 @@ export function assignRole(
   requireFacilitator(actor);
   requirePreparing(game);
   if (!game.participants.some((p) => p.id === participantId)) {
-    throw new DomainError('参加していない人は、役割を割り当てられません');
-  }
-  const current = roleOf(game, participantId);
-  if (current !== undefined) {
-    throw new DomainError(
-      `この参加者はすでに ${current} です。1 人に複数の役割は割り当てられません`,
-      [
-        {
-          problem: `${current} に割り当て済みです`,
-          fix: '先に割り当てを解除してください',
-        },
-      ],
+    throw new ParticipantNotFoundError(
+      '参加していない人は、役割を割り当てられません',
     );
   }
+  const current = roleOf(game, participantId);
+  // 同じ役割への割り当て直しは、何も変わらない（イベントも版も足さない）
+  if (current === role) return { game, events: [] };
+  // 1 人に同時に複数の役割は持たせない（AC1.2.5）。別の役割にいる人は、付け替え（D9）として、
+  // 移動元の RoleUnassigned と移動先の RoleAssigned にする
+  const moved: Readonly<Partial<Record<Role, readonly string[]>>> =
+    current === undefined
+      ? game.assignments
+      : (() => {
+          const rest = (game.assignments[current] ?? []).filter(
+            (id) => id !== participantId,
+          );
+          // 元の役割から外す（共同担当の残りがいれば、元の役割に残す。最後の 1 人なら、役割の項目ごと外す）
+          const others = Object.fromEntries(
+            Object.entries(game.assignments).filter(([r]) => r !== current),
+          );
+          return rest.length > 0 ? { ...others, [current]: rest } : others;
+        })();
   return {
     game: bump(game, {
       assignments: {
-        ...game.assignments,
-        [role]: [...(game.assignments[role] ?? []), participantId],
+        ...moved,
+        [role]: [...(moved[role] ?? []), participantId],
       },
     }),
-    events: [{ type: 'RoleAssigned', gameId: game.id, participantId, role }],
+    events: [
+      ...(current === undefined
+        ? []
+        : [
+            {
+              type: 'RoleUnassigned' as const,
+              gameId: game.id,
+              participantId,
+            },
+          ]),
+      { type: 'RoleAssigned', gameId: game.id, participantId, role },
+    ],
   };
 }
 
@@ -239,12 +301,12 @@ export function missingRoles(game: Game): Role[] {
 
 export function startGame(game: Game, actor: Actor): Outcome {
   requireFacilitator(actor);
-  if (game.status !== 'PREPARING')
-    throw new DomainError('このゲームはすでに開始されています');
+  if (game.status !== 'PREPARING') throw new AlreadyStartedError();
   const missing = missingRoles(game);
   if (missing.length > 0) {
-    throw new DomainError(
+    throw new StartConditionError(
       '開始できません。役割が足りません',
+      missing,
       missing.map((r) => ({
         problem: `${r} に参加者がいません`,
         fix: `${r} に参加者を割り当ててください`,

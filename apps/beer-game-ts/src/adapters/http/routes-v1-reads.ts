@@ -1,26 +1,16 @@
 import { createHash } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Application } from '../../application/index.js';
 import { ROLES } from '../../domain/role.js';
-import { API_V1, notFoundProblem } from './problems.js';
-import { sessionCookieName, tabIdOf } from './session-cookies.js';
+import { API_V1 } from './problems.js';
+import { idParam, tokenOf } from './v1-support.js';
 
 /**
  * 共有の API の契約（/api/v1）の、読み取りの経路。ルールは持たず、ユースケースを呼ぶだけ。
  * 資格は、Cookie `bg_session`（`X-Tab-Id` があれば `bg_session_<X-Tab-Id>`）。無い・無効・別のゲーム・存在しないゲームは、
  * すべて同じ 403（`app.unauthorized`）。経路の ID が UUID でなければ 404。
  */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function idParam(request: FastifyRequest, name: string): string {
-  const value = (request.params as Record<string, string>)[name];
-  if (typeof value !== 'string' || !UUID.test(value)) throw notFoundProblem();
-  return value;
-}
-
-const tokenOf = (request: FastifyRequest): string =>
-  request.cookies[sessionCookieName(tabIdOf(request))] ?? '';
 
 const stateQuery = z.object({ role: z.enum(ROLES).optional() });
 const exportQuery = z.object({ format: z.enum(['csv', 'json']) });

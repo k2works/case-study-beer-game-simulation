@@ -21,6 +21,7 @@ import {
   DisplayName,
   DomainError,
   PermissionError,
+  type Issue,
 } from '../domain/values.js';
 import {
   PROXY_OPERATOR,
@@ -35,7 +36,6 @@ import {
   type SessionOutcome,
 } from '../domain/session.js';
 import {
-  DuplicateError,
   type Clock,
   type ReviewReader,
   type CredentialPolicy,
@@ -51,11 +51,17 @@ import {
   DecisionConflict,
   ForbiddenError,
   IdempotencyKeyReusedError,
+  InvalidInvitationError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
   UnauthorizedError,
 } from './errors.js';
+import {
+  fingerprintOf,
+  idempotently,
+  retryOnDuplicate,
+} from './idempotency.js';
 import {
   gameStateView,
   lobbyView,
@@ -64,6 +70,7 @@ import {
   reviewView,
   sessionStateView,
   versionsOf,
+  type StreamVersions,
   type Viewer,
 } from './contract-views.js';
 import {
@@ -121,25 +128,8 @@ export interface CreatedGame {
   joinCode: string;
   facilitatorToken: string;
   recoveryCode: string;
-}
-
-/**
- * 要求の指紋。項目の順序に左右されない、正規化した JSON。同じキーの要求が「同じ内容」かを比べる。
- * （値は、ゲームの設定だけで、資格・表示名を含まない）
- */
-function fingerprintOf(value: unknown): string {
-  const canonical = (v: unknown): unknown =>
-    Array.isArray(v)
-      ? v.map(canonical)
-      : v !== null && typeof v === 'object'
-        ? Object.fromEntries(
-            Object.entries(v as Record<string, unknown>)
-              .filter(([, x]) => x !== undefined)
-              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-              .map(([k, x]) => [k, canonical(x)]),
-          )
-        : v;
-  return JSON.stringify(canonical(value));
+  /** 追記後のストリームごとの版（共有の契約の `versions`） */
+  versions: StreamVersions;
 }
 
 export interface CommitResult {
@@ -324,6 +314,7 @@ export function createApplication(deps: Dependencies) {
     }) {
       const { idempotencyKey, ...request } = input;
       const fingerprint = fingerprintOf(request);
+      // 作成は、ゲームの存在前の要求なので、キーだけで探す（`findCreate`）。それ以外の操作は `idempotently`
       const attempt = () =>
         uow.run(async (repos) => {
           if (idempotencyKey !== undefined) {
@@ -348,57 +339,102 @@ export function createApplication(deps: Dependencies) {
         });
       const createOnce = async (repos: Repositories): Promise<CreatedGame> => {
         const gameId = ids.uuid();
-        const retention = retentionPolicyOf(clock.now(), input.retentionDays);
+        // 保持期間の誤りも、ゲームの設定の誤りと一緒に、すべて集めて示す
+        let retention: ReturnType<typeof retentionPolicyOf> | undefined;
+        let retentionIssues: Issue[] = [];
+        try {
+          retention = retentionPolicyOf(clock.now(), input.retentionDays);
+        } catch (e) {
+          if (!(e instanceof DomainError)) throw e;
+          retentionIssues = e.issues;
+        }
         const joinCode = ids.joinCode();
-        const { game, events } = createGameRule({
-          id: gameId,
-          joinCode,
-          weeks: input.weeks,
-          ...(input.demand ? { demand: input.demand } : {}),
-          ...(input.commitMode ? { commitMode: input.commitMode } : {}),
-          ...(input.conditions ? { conditions: input.conditions } : {}),
-        });
+        let created: ReturnType<typeof createGameRule>;
+        try {
+          created = createGameRule({
+            id: gameId,
+            joinCode,
+            weeks: input.weeks,
+            ...(input.demand ? { demand: input.demand } : {}),
+            ...(input.commitMode ? { commitMode: input.commitMode } : {}),
+            ...(input.conditions ? { conditions: input.conditions } : {}),
+          });
+        } catch (e) {
+          if (e instanceof DomainError && retentionIssues.length > 0)
+            throw new DomainError(e.message, [...e.issues, ...retentionIssues]);
+          throw e;
+        }
+        if (retention === undefined)
+          throw new DomainError('入力に誤りがあります', retentionIssues);
+        const { game, events } = created;
         await repos.games.save(game, null);
         await repos.retention.schedule(gameId, retention);
         const principal: Principal = { gameId, kind: 'FACILITATOR' };
         const facilitatorToken = await issue(repos, principal, 'SESSION');
         const recoveryCode = await issue(repos, principal, 'RECOVERY');
         await repos.events.append(gameId, events);
-        return { gameId, joinCode, facilitatorToken, recoveryCode };
+        return {
+          gameId,
+          joinCode,
+          facilitatorToken,
+          recoveryCode,
+          versions: versionsOf(game, null),
+        };
       };
-      // 同時の重複（同じキーの要求が、ほぼ同時に 2 つ届く）: 後から保存した側は一意制約に違反して失敗する。
-      // その場合は 1 回だけやり直し、先に保存された応答を返す（500 にも 503 にもしない）
-      return (async () => {
-        try {
-          return await attempt();
-        } catch (e) {
-          if (idempotencyKey !== undefined && e instanceof DuplicateError)
-            return attempt();
-          throw e;
-        }
-      })();
+      // 同時の重複は、1 回だけやり直して、先に保存された応答を返す
+      return retryOnDuplicate(idempotencyKey, attempt);
     },
 
-    joinGame(input: { joinCode: string; displayName: string }) {
-      return uow.run(async (repos) => {
-        const game = await repos.games.findByJoinCode(input.joinCode);
-        if (!game) throw new NotFoundError('参加コードが見つかりません');
-        const participantId = ids.uuid();
-        const { game: next, events } = joinGameRule(game, {
-          participantId,
-          displayName: input.displayName,
-        });
-        await repos.games.save(next, game.version);
-        const principal: Principal = {
-          gameId: game.id,
-          kind: 'PARTICIPANT',
-          participantId,
-        };
-        const token = await issue(repos, principal, 'SESSION');
-        const recoveryCode = await issue(repos, principal, 'RECOVERY');
-        await repos.events.append(game.id, events);
-        return { gameId: game.id, participantId, token, recoveryCode };
-      });
+    /**
+     * 参加コードで参加する。同じ冪等キー・同じ内容の再送は、保存した応答（同じ参加者・資格）を返す。
+     * 不明・形式不正の参加コードは `InvalidInvitationError`（区別しない。列挙の防止。AC1.2.2）。
+     */
+    joinGame(input: {
+      joinCode: string;
+      displayName: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const game = await repos.games.findByJoinCode(input.joinCode);
+          if (!game) throw new InvalidInvitationError();
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'join',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                joinCode: input.joinCode,
+                displayName: input.displayName,
+              }),
+            },
+            async () => {
+              const participantId = ids.uuid();
+              const { game: next, events } = joinGameRule(game, {
+                participantId,
+                displayName: input.displayName,
+              });
+              await repos.games.save(next, game.version);
+              const principal: Principal = {
+                gameId: game.id,
+                kind: 'PARTICIPANT',
+                participantId,
+              };
+              const token = await issue(repos, principal, 'SESSION');
+              const recoveryCode = await issue(repos, principal, 'RECOVERY');
+              await repos.events.append(game.id, events);
+              return {
+                gameId: game.id,
+                participantId,
+                token,
+                recoveryCode,
+                versions: versionsOf(next, null),
+              };
+            },
+          );
+        }),
+      );
     },
 
     /**
@@ -463,24 +499,54 @@ export function createApplication(deps: Dependencies) {
       });
     },
 
+    /**
+     * 役割を割り当てる（進行役だけ）。別の役割にいる人は付け替え（D9）、同じ役割への割り当て直しは何も変えない
+     * （イベントも版も足さない）。応答は、追記後の版。
+     */
     assignRole(input: {
       token: string;
       gameId: string;
       participantId: string;
       role: Role;
+      idempotencyKey?: string;
     }) {
-      return uow.run(async (repos) => {
-        const principal = await authenticate(repos, input.token, input.gameId);
-        const game = await loadGame(repos, input.gameId);
-        const { game: next, events } = assignRoleRule(
-          game,
-          actorOf(principal),
-          input.participantId,
-          input.role,
-        );
-        await repos.games.save(next, game.version);
-        await repos.events.append(game.id, events);
-      });
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          const game = await loadGame(repos, input.gameId);
+          const session = await repos.sessions.findByGame(input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: input.gameId,
+              scope: 'assign',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                role: input.role,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const { game: next, events } = assignRoleRule(
+                game,
+                actorOf(principal),
+                input.participantId,
+                input.role,
+              );
+              if (events.length > 0) {
+                await repos.games.save(next, game.version);
+                await repos.events.append(game.id, events);
+              }
+              return { versions: versionsOf(next, session) };
+            },
+          );
+        }),
+      );
     },
 
     unassignRole(input: {
@@ -501,22 +567,45 @@ export function createApplication(deps: Dependencies) {
       });
     },
 
-    startGame(input: { token: string; gameId: string }) {
-      return uow.run(async (repos) => {
-        const principal = await authenticate(repos, input.token, input.gameId);
-        const game = await loadGame(repos, input.gameId);
-        const { game: started, events } = startGameRule(
-          game,
-          actorOf(principal),
-        );
-        const { session, events: sessionEvents } = startSession(
-          started,
-          ids.uuid(),
-        );
-        await repos.games.save(started, game.version);
-        await repos.sessions.save(session, null);
-        await repos.events.append(game.id, [...events, ...sessionEvents]);
-      });
+    /** ゲームを開始する（進行役だけ）。応答は、追記後の版（セッションが作られる） */
+    startGame(input: {
+      token: string;
+      gameId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: input.gameId,
+              scope: 'start',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({ operator: principal }),
+            },
+            async () => {
+              const { game: started, events } = startGameRule(
+                game,
+                actorOf(principal),
+              );
+              const { session, events: sessionEvents } = startSession(
+                started,
+                ids.uuid(),
+              );
+              await repos.games.save(started, game.version);
+              await repos.sessions.save(session, null);
+              await repos.events.append(game.id, [...events, ...sessionEvents]);
+              return { versions: versionsOf(started, session) };
+            },
+          );
+        }),
+      );
     },
 
     saveDecision(input: {

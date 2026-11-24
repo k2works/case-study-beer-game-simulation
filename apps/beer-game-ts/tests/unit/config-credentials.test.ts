@@ -57,6 +57,21 @@ describe('loadConfig', () => {
     expect(() => loadConfig(env)).toThrow(new RegExp(name));
   });
 
+  it('資格の Cookie の Secure は、本番では true、開発では false が既定。COOKIE_SECURE で上書きできる', () => {
+    expect(loadConfig(prod).secureCookies).toBe(true);
+    expect(loadConfig({ NODE_ENV: 'development' }).secureCookies).toBe(false);
+    expect(
+      loadConfig({ NODE_ENV: 'development', COOKIE_SECURE: 'true' })
+        .secureCookies,
+    ).toBe(true);
+    expect(loadConfig({ ...prod, COOKIE_SECURE: 'false' }).secureCookies).toBe(
+      false,
+    );
+    expect(() =>
+      loadConfig({ NODE_ENV: 'development', COOKIE_SECURE: 'yes' }),
+    ).toThrow(/COOKIE_SECURE/);
+  });
+
   it('本番で鍵が短ければ失敗する', () => {
     expect(() => loadConfig({ ...prod, CREDENTIAL_HMAC_KEY: 'abcd' })).toThrow(
       /CREDENTIAL_HMAC_KEY/,

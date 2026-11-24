@@ -6,13 +6,9 @@
  * 一覧が空になれば、契約の全操作を実装したことになる。
  */
 export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
-  'createGame',
   'inviteObserver',
   'revokeObserverInvitation',
   'joinAsObserver',
-  'assignRole',
-  'joinGame',
-  'startGame',
   'saveDecision',
   'commitWeek',
   'pauseSession',

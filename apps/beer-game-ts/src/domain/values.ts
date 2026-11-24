@@ -25,6 +25,45 @@ export class PermissionError extends DomainError {
   }
 }
 
+/**
+ * 準備中でないゲームへの、準備中だけの操作（参加・割り当てなど）。
+ * 共有の API の契約では 409 `game.not_preparing`。旧い経路では、ほかのドメインの誤りと同じく 422 のまま。
+ */
+export class NotPreparingError extends DomainError {
+  constructor(message = 'このゲームは参加の受付を終了しています') {
+    super(message);
+    this.name = 'NotPreparingError';
+  }
+}
+
+/** すでに開始されたゲームの、開始。共有の API の契約では 409 `session.already_started` */
+export class AlreadyStartedError extends DomainError {
+  constructor(message = 'このゲームはすでに開始されています') {
+    super(message);
+    this.name = 'AlreadyStartedError';
+  }
+}
+
+/** 開始の条件を満たさない（役割が足りない）。共有の API の契約では 409 `game.start_condition_not_met`＋`missingRoles` */
+export class StartConditionError extends DomainError {
+  constructor(
+    message: string,
+    readonly missingRoles: readonly string[],
+    issues: Issue[] = [],
+  ) {
+    super(message, issues);
+    this.name = 'StartConditionError';
+  }
+}
+
+/** このゲームの参加者ではない。共有の API の契約では 404 `game.participant_not_found` */
+export class ParticipantNotFoundError extends DomainError {
+  constructor(message = 'このゲームの参加者ではありません') {
+    super(message);
+    this.name = 'ParticipantNotFoundError';
+  }
+}
+
 /** 版・週が古いなど、並行する操作との競合。呼び出し側は 409 として扱う */
 export class StaleError extends DomainError {
   constructor(message: string) {
@@ -111,7 +150,13 @@ export const DisplayName = {
     const trimmed = value.trim();
     const length = [...trimmed].length;
     if (length < 1 || length > DISPLAY_NAME_MAX) {
-      throw new DomainError(`表示名は 1〜${DISPLAY_NAME_MAX} 文字です`);
+      throw new DomainError(`表示名は 1〜${DISPLAY_NAME_MAX} 文字です`, [
+        {
+          field: 'displayName',
+          problem: `表示名は 1〜${DISPLAY_NAME_MAX} 文字です`,
+          fix: `表示名を 1〜${DISPLAY_NAME_MAX} 文字にしてください`,
+        },
+      ]);
     }
     return trimmed as DisplayName;
   },
@@ -131,18 +176,21 @@ export const DemandSeries = {
       const v = values[week - 1];
       if (week > weeks) {
         issues.push({
+          field: 'demand',
           week,
           problem: '週数を超える需要です',
           fix: `${week} 週目以降の需要を削除するか、週数を増やしてください`,
         });
       } else if (v === undefined) {
         issues.push({
+          field: 'demand',
           week,
           problem: '需要が指定されていません',
           fix: `${week} 週目の需要を追加してください`,
         });
       } else if (!Number.isInteger(v) || v < 0 || v > max) {
         issues.push({
+          field: 'demand',
           week,
           problem: `${range}ではありません`,
           fix: `${range}にしてください`,

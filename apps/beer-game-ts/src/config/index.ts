@@ -10,6 +10,11 @@ export interface Config {
   idempotencyKey: Buffer;
   /** メトリクスの次元の環境名（staging、production など） */
   metricsEnvironment: string;
+  /**
+   * 資格の Cookie に `Secure` を付けるか（共有の契約の /api/v1。環境変数 COOKIE_SECURE）。
+   * HTTPS の環境（本番）では true。http://localhost の開発・E2E では、WebKit が Secure の Cookie を受けないので false
+   */
+  secureCookies: boolean;
   /** 参加・復帰の専用のレート制限（送信元ごと、1 分あたりの回数）。研修会場は送信元の IP を共有しやすいため、余裕を持たせる */
   authRateLimitPerMinute: number;
 }
@@ -86,6 +91,14 @@ function required(
   return fallback;
 }
 
+function booleanOf(env: Env, name: string, fallback: boolean): boolean {
+  const raw = env[name];
+  if (raw === undefined || raw === '') return fallback;
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  throw new Error(`${name} は true か false です`);
+}
+
 /** カンマ区切りの送信元の一覧。前後の空白と空の要素を除く */
 function originList(raw: string): string[] {
   return raw
@@ -127,5 +140,6 @@ export function loadConfig(env: Env): Config {
     idempotencyKey: key(env, 'IDEMPOTENCY_KEY', production, '22'.repeat(32)),
     authRateLimitPerMinute: positiveInt(env, 'AUTH_RATE_LIMIT_PER_MINUTE', 60),
     metricsEnvironment: env.APP_ENV || environment,
+    secureCookies: booleanOf(env, 'COOKIE_SECURE', production),
   };
 }

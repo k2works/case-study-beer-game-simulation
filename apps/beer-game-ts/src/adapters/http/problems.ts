@@ -118,6 +118,48 @@ export const retryExhaustedProblem = () =>
     1,
   );
 
+/** 不明・形式不正の参加コード。区別しない（列挙の防止。AC1.2.2） */
+export const invalidInvitationProblem = () =>
+  new ApiProblem(
+    403,
+    'game.invitation_invalid',
+    '参加コードが正しくありません。進行役に確認してください。',
+  );
+
+/** 準備中でないゲームへの、準備中だけの操作（参加の受付の終了など） */
+export const notPreparingProblem = () =>
+  new ApiProblem(
+    409,
+    'game.not_preparing',
+    'このゲームは、準備中ではありません（参加の受付を終了しています）。',
+  );
+
+/** すでに開始されたゲームの開始 */
+export const alreadyStartedProblem = () =>
+  new ApiProblem(
+    409,
+    'session.already_started',
+    'このゲームは、すでに開始されています。',
+  );
+
+/** 開始の条件を満たさない（役割が足りない）。不足する役割を示す */
+export const startConditionProblem = (missingRoles: readonly string[]) =>
+  new ApiProblem(
+    409,
+    'game.start_condition_not_met',
+    '開始できません。4 つの役割に、参加者がそろっていません。',
+    undefined,
+    { missingRoles },
+  );
+
+/** このゲームの参加者ではない */
+export const participantNotFoundProblem = () =>
+  new ApiProblem(
+    404,
+    'game.participant_not_found',
+    'このゲームの参加者が見つかりません。',
+  );
+
 /** 同じ冪等キーで、内容の違う要求（ADR-004） */
 export const idempotencyKeyReusedProblem = () =>
   new ApiProblem(

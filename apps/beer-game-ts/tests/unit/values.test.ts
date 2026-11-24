@@ -88,16 +88,19 @@ describe('DemandSeries', () => {
       expect(err).toBeInstanceOf(DomainError);
       expect(err.issues).toEqual([
         {
+          field: 'demand',
           week: 2,
           problem: '0〜1000 の整数ではありません',
           fix: '0〜1000 の整数にしてください',
         },
         {
+          field: 'demand',
           week: 4,
           problem: '0〜1000 の整数ではありません',
           fix: '0〜1000 の整数にしてください',
         },
         {
+          field: 'demand',
           week: 5,
           problem: '需要が指定されていません',
           fix: '5 週目の需要を追加してください',

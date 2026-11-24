@@ -34,6 +34,7 @@ export function retentionPolicyOf(
   )
     throw new DomainError('保持期間が無効です', [
       {
+        field: 'retentionDays',
         problem: `保持期間は ${RETENTION.minDays}〜${RETENTION.maxDays} 日の整数です`,
         fix: `保持期間を ${RETENTION.minDays}〜${RETENTION.maxDays} 日にしてください`,
       },

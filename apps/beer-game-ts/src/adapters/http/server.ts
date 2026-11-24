@@ -13,6 +13,7 @@ import {
   DecisionConflict,
   ForbiddenError,
   IdempotencyKeyReusedError,
+  InvalidInvitationError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
@@ -24,9 +25,13 @@ import {
 } from '../../domain/conditions.js';
 import { ROLES } from '../../domain/role.js';
 import {
+  AlreadyStartedError,
   DomainError,
+  NotPreparingError,
+  ParticipantNotFoundError,
   PermissionError,
   StaleError,
+  StartConditionError,
 } from '../../domain/values.js';
 import {
   ConflictError,
@@ -40,14 +45,19 @@ import { idempotencyKeyOf } from './idempotency-key.js';
 import {
   API_V1,
   ApiProblem,
+  alreadyStartedProblem,
   badRequestProblem,
   gameNotEndedProblem,
   idempotencyKeyReusedProblem,
   internalProblem,
+  invalidInvitationProblem,
   isApiV1,
   notFoundProblem,
+  notPreparingProblem,
   notReadyProblem,
+  participantNotFoundProblem,
   payloadTooLargeProblem,
+  startConditionProblem,
   retryExhaustedProblem,
   sendApiProblem,
   sessionNotActiveProblem,
@@ -55,11 +65,14 @@ import {
   validationProblem,
 } from './problems.js';
 import { registerApiV1Reads } from './routes-v1-reads.js';
+import { rateLimited, registerApiV1Commands } from './routes-v1-commands.js';
 
 export interface HttpConfig {
   /** 変更系の要求を受ける送信元（Origin）。画面の配信元。開発・E2E では別のポートも許す */
   allowedOrigins: readonly string[];
   logLevel: string;
+  /** 共有の契約（/api/v1）の資格の Cookie に `Secure` を付けるか。省略時は付ける（HTTPS が前提） */
+  secureCookies?: boolean;
 }
 
 export interface ServerDependencies {
@@ -318,13 +331,23 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       return idempotencyKeyReusedProblem();
     if (error instanceof NotEndedError) return gameNotEndedProblem();
     if (error instanceof NotActiveError) return sessionNotActiveProblem();
+    // 不明・形式不正の参加コード（NotFoundError の一種なので、先に判定する）。区別しない（列挙の防止）
+    if (error instanceof InvalidInvitationError)
+      return invalidInvitationProblem();
     if (error instanceof NotFoundError) return notFoundProblem();
+    // ドメインの失敗のうち、契約が固有の code を定めるもの（一般のドメインの失敗の写しより先に判定する）
+    if (error instanceof NotPreparingError) return notPreparingProblem();
+    if (error instanceof AlreadyStartedError) return alreadyStartedProblem();
+    if (error instanceof StartConditionError)
+      return startConditionProblem(error.missingRoles);
+    if (error instanceof ParticipantNotFoundError)
+      return participantNotFoundProblem();
     if (error instanceof ConflictError) return retryExhaustedProblem();
     if (error instanceof DomainError && !(error instanceof StaleError)) {
       return validationProblem(
         error.issues.length > 0
           ? error.issues.map((i) => ({
-              field: 'body',
+              field: i.field ?? 'body',
               message: i.fix,
               ...(i.week !== undefined ? { week: i.week } : {}),
             }))
@@ -484,6 +507,21 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     });
 
   registerApiV1Reads(server, app);
+  registerApiV1Commands(server, {
+    app,
+    // 共有の契約: 超えたら 429（`app.rate_limited`）＋ `Retry-After`（窓の長さ）
+    limit: async (request, bucket) => {
+      const ok = await deps.rateLimiter.hit(
+        `${bucket}:${request.ip}`,
+        new Date(),
+      );
+      if (!ok) {
+        request.log.warn({ ip: request.ip, bucket }, 'レート制限を超えました');
+        throw rateLimited();
+      }
+    },
+    secureCookies: config.secureCookies ?? true,
+  });
 
   server.post('/api/games', async (request, reply) => {
     const { conditions, ...rest } = createBody.parse(request.body);

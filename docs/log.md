@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-24
+* **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3c-1 準備中のコマンド 4 操作の完了。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3b `createGame` の冪等の完了。マイグレーション 009。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3a カスタム条件の完了。マイグレーション 008。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 3 の前の確認事項 3 案の承認の記録。マイグレーション 008・009・010。claude-code/claude-sonnet-5-5）

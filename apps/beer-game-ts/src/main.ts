@@ -24,7 +24,11 @@ const server = buildServer({
     limit: config.authRateLimitPerMinute,
     windowMs: 60_000,
   }),
-  config: { allowedOrigins: config.allowedOrigins, logLevel: config.logLevel },
+  config: {
+    allowedOrigins: config.allowedOrigins,
+    logLevel: config.logLevel,
+    secureCookies: config.secureCookies,
+  },
 });
 
 async function shutdown() {

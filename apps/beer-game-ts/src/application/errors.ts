@@ -6,6 +6,16 @@ export class NotFoundError extends Error {
     this.name = 'NotFoundError';
   }
 }
+/**
+ * 不明・形式不正の参加コード（区別しない。列挙の防止。AC1.2.2）。共有の契約では 403 `game.invitation_invalid`。
+ * 旧い経路では、これまでどおり「見つからない」（404）として扱えるように、`NotFoundError` の一種にする。
+ */
+export class InvalidInvitationError extends NotFoundError {
+  constructor(message = '参加コードが見つかりません') {
+    super(message);
+    this.name = 'InvalidInvitationError';
+  }
+}
 /** 資格が無い、または無効 */
 export class UnauthorizedError extends Error {
   constructor(message = '参加または復帰が必要です') {
