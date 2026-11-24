@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 
 本書は、beer-game-kotlin を本番で運用するための要件を、運用フロー、監視、バックアップ、障害対応、変更管理の順に定義します。**`docs/` を正本**とします。
 
-運用要件は [beer-game2 の運用要件](../beer-game2/operation.md) を正本として引き継ぎ、落としません。変えるのは、次の 4 点だけです。
+運用要件は [beer-game2 の運用要件](../beer-game-ts/operation.md) を正本として引き継ぎ、落としません。変えるのは、次の 4 点だけです。
 
 - バックエンドが Kotlin（JVM）になったことによる、監視と起動の扱い（[技術スタック](./tech-stack.md)）。
 - **状態の正本が `events` 表**になったことによる、バックアップ・復旧の考え方（投影は、イベントから作り直せる）。
@@ -233,8 +233,8 @@ stop
 | Web の静的ファイル | S3 のバージョニング、ビルド成果物（版つきで不変） | バージョンごと | 引継 | 引継 |
 | イメージ | レジストリの不変の版（ダイジェスト固定）。**イベントの形を変えたリリースの旧イメージは、戻せる期間を記録する**（変更管理） | 直近の複数世代 | ダイジェストで戻す | 変更 |
 | インフラの定義 | Git（Terraform） | 無期限 | 引継 | 引継 |
-| Terraform の状態 | 暗号化した S3 のリモートの保管と排他ロック。環境ごとに分離（[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)） | 版つき | 引継 | 引継 |
-| 秘密情報 | Secrets Manager。資格の鍵は**複数の版を同時に保持**（[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)） | — | 引継 | 引継 |
+| Terraform の状態 | 暗号化した S3 のリモートの保管と排他ロック。環境ごとに分離（[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)） | 版つき | 引継 | 引継 |
+| 秘密情報 | Secrets Manager。資格の鍵は**複数の版を同時に保持**（[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)） | — | 引継 | 引継 |
 | エクスポートの成果物 | **保存しない**。要求時に、`week_role_results` と設定から純粋関数 `buildExport` で作る（`checksum`、`schema_version` も要求時に算出）。表 `export_packages` は無い | — | 投影（`week_role_results`）の復旧に従う。個別のバックアップは不要 | 変更 |
 
 ### RPO と RTO
@@ -417,7 +417,7 @@ stop
 
 | 項目 | 要件 | Kotlin 版 |
 | :--- | :--- | :--: |
-| 保持と削除 | 保持期間（既定 90 日、1〜3650 日）の後に削除。期限到達の 99% を 24 時間以内に完了。**`game_roots` のカスケード削除で、`events` を含めて漏れなく消える**（[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)） | 変更 |
+| 保持と削除 | 保持期間（既定 90 日、1〜3650 日）の後に削除。期限到達の 99% を 24 時間以内に完了。**`game_roots` のカスケード削除で、`events` を含めて漏れなく消える**（[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)） | 変更 |
 | 削除の運用 | 失敗した削除を、運営側が状況を確認し、再試行できる（保持状態の画面と API） | 引継 |
 | 削除の証跡 | ゲームを特定できない形の受領記録を 1 年残し、期限後に削除する | 引継 |
 | 復元後の扱い | 復元後に、保持の定期タスクを実行して、期限切れのゲームを再び削除する。整合性の検査と投影の整合の検査を行う | 変更 |
@@ -490,12 +490,12 @@ beer-game2 が、beer-game（v1）の差分（11 件）に対して決めた対�
 | :--- | :--- | :--- |
 | 1 | ログ、メトリクス、ダッシュボードが無い | 構造化ログ、エラーの記録、メトリクス、ダッシュボードを最初から実装する（NF-O1〜NF-O5）。ログとメトリクスは合成で足す（[ガイド §7.7](../../reference/関数型プログラミングガイド_Kotlin編.md)） |
 | 2 | `/health` がデータベースを確認しない | `GET /ready`（`SELECT 1`）を ALB のヘルスチェックにする（NF-O10） |
-| 3 | デプロイが未実装。レジストリが GHCR と ECR で不一致 | ECR に統一。ステージング自動、本番は承認 + ブルー/グリーン（[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)） |
+| 3 | デプロイが未実装。レジストリが GHCR と ECR で不一致 | ECR に統一。ステージング自動、本番は承認 + ブルー/グリーン（[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)） |
 | 4 | 通知先と体制が未定義 | **未決**（組織の判断）。下記の未決事項 |
 | 5 | 復元の訓練が無い。バックアップ（7 日）と保持削除の関係が未整理 | 訓練を四半期とリリース前に行う。バックアップの保持を保持方針に明記する |
 | 6 | Terraform の状態の保管先が未定義。ネットワーク・ECR・WAF が定義の外 | リモートの状態とネットワークのモジュール（ADR-012） |
 | 7 | マイグレーションが手動で、履歴が無い | 履歴管理し、デプロイ時に自動で適用する。ツールは技術スタックで決める |
-| 8 | 資格の失効と鍵のローテーションの手段が無い | 資格の失効・再発行と、鍵の版管理を実装する（[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)） |
+| 8 | 資格の失効と鍵のローテーションの手段が無い | 資格の失効・再発行と、鍵の版管理を実装する（[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)） |
 | 9 | 運用手順書がすべて未作成 | Bolt の進行に合わせて作成する（優先度「高」から） |
 | 10 | 研修の実施日時を運用側へ伝える仕組みが無い | **未決**。運営者が日時を連絡する手順と、運用の予定表を決める |
 | 11 | 削除の運用のアラートが、インフラに定義されていない | 監視項目の表のとおり、アラームを定義する（期限超過の経過時間と失敗の件数が中心） |
@@ -522,7 +522,7 @@ beer-game2 が、beer-game（v1）の差分（11 件）に対して決めた対�
 ## 出典
 
 - [非機能要件定義](./non-functional.md)、[インフラストラクチャアーキテクチャ](./architecture-infrastructure.md)、[技術スタック](./tech-stack.md)、[データモデル設計（Kotlin 版）](./data-model.md)、[ドメインモデル設計（Kotlin 版）](./domain-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md)
-- [beer-game2 運用要件定義](../beer-game2/operation.md)
+- [beer-game2 運用要件定義](../beer-game-ts/operation.md)
 - [運用要件定義ガイド](../../reference/運用要件定義ガイド.md)
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（§7.3 イベントソーシング、§7.5 CQRS、§7.6 永続化とトランザクション境界、§7.7 監視は合成で足す）、第 9 章（静的解析）
-- [ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)
+- [ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)

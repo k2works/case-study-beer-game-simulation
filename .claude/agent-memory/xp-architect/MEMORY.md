@@ -1,0 +1,1 @@
+- [beer-game-kotlin 設計レビュー](project_beer_game_kotlin_design.md) — Kotlin ES/CQRS 版設計書（draft）の初回レビューで指摘した構造リスク

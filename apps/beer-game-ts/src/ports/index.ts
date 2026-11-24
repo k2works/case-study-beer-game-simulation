@@ -1,0 +1,271 @@
+import type { CredentialValidity } from '../domain/credential.js';
+import type { ExportSource } from '../domain/export.js';
+import type { Game } from '../domain/game.js';
+import type { ReviewRow } from '../domain/review.js';
+import type { Session } from '../domain/session.js';
+
+/** 版が古い、または既に存在する。呼び出し側は競合として扱う */
+export class ConflictError extends Error {
+  constructor(message = '他の操作で更新されています') {
+    super(message);
+    this.name = 'ConflictError';
+  }
+}
+
+/** 一意制約の違反（週の二重の確定など）。競合として扱うが、不変条件の違反の候補として数える */
+export class DuplicateError extends ConflictError {
+  constructor() {
+    super();
+    this.name = 'DuplicateError';
+  }
+}
+
+export interface GameRepository {
+  find(id: string): Promise<Game | null>;
+  findByJoinCode(joinCode: string): Promise<Game | null>;
+  /** expectedVersion が null なら新規。版が合わなければ ConflictError */
+  save(game: Game, expectedVersion: number | null): Promise<void>;
+  /** 参加者 ID → 表示名。読み取り専用で、ロックを取らない（状況の表示に使う） */
+  participantNames(gameId: string): Promise<Record<string, string>>;
+}
+
+export interface SessionRepository {
+  findByGame(gameId: string): Promise<Session | null>;
+  save(session: Session, expectedVersion: number | null): Promise<void>;
+}
+
+/** 資格に対応する主体。生の資格は保存せず、ダイジェストだけを持つ */
+export interface Principal {
+  gameId: string;
+  kind: 'FACILITATOR' | 'PARTICIPANT' | 'OBSERVER';
+  participantId?: string;
+  observerId?: string;
+}
+
+/** 資格の種類。ブラウザセッション（Cookie の値）と、復帰コード（Cookie を失ったときに戻るため） */
+export type CredentialPurpose = 'SESSION' | 'RECOVERY';
+
+export interface CredentialRepository {
+  /** 保存する。復帰コードは主体ごとに 1 つで、保存すると前の復帰コードは使えなくなる */
+  save(
+    digest: string,
+    principal: Principal,
+    purpose: CredentialPurpose,
+    validity: CredentialValidity,
+  ): Promise<void>;
+  /** 候補のダイジェスト（鍵の版ごと）のうち、時刻 `at` で有効（失効・期限切れでない）なものの主体 */
+  find(
+    digests: readonly string[],
+    purpose: CredentialPurpose,
+    at: Date,
+  ): Promise<Principal | null>;
+  /** 主体のブラウザセッションと復帰コードを、すべて失効させる */
+  revokeAll(principal: Principal, at: Date): Promise<void>;
+  /**
+   * 主体の復帰資格が、失効させられた状態か（`revokeAll` の後、新しい復帰コードを保存するまで true）。
+   * 期限切れだけで失効していなければ false（契約: 期限切れの資格は、先に失効させてから再発行する）。
+   */
+  isRecoveryRevoked(principal: Principal): Promise<boolean>;
+}
+
+/** 観察用の招待と観察者。招待コードは保存せず、ダイジェストだけを持つ */
+export interface ObserverRepository {
+  saveInvitation(
+    digest: string,
+    invitation: { id: string; gameId: string; validity: CredentialValidity },
+  ): Promise<void>;
+  /** 候補のダイジェストのうち、時刻 `at` で有効な招待 */
+  findInvitation(
+    digests: readonly string[],
+    at: Date,
+  ): Promise<{ id: string; gameId: string } | null>;
+  /** 失効させる。このゲームの招待でなければ false */
+  revokeInvitation(gameId: string, id: string, at: Date): Promise<boolean>;
+  activeInvitations(
+    gameId: string,
+    at: Date,
+  ): Promise<{ id: string; expiresAt: Date }[]>;
+  addObserver(observer: {
+    id: string;
+    gameId: string;
+    invitationId: string;
+    displayName: string;
+  }): Promise<void>;
+  countObservers(gameId: string): Promise<number>;
+  /** このゲームの招待の一覧（失効・期限切れを含む。作成の順。招待コードは含まない） */
+  listInvitations(gameId: string): Promise<
+    {
+      id: string;
+      createdAt: Date;
+      expiresAt: Date;
+      revokedAt: Date | null;
+    }[]
+  >;
+  /** このゲームの観察者の一覧（参加の順） */
+  listObservers(
+    gameId: string,
+  ): Promise<{ id: string; displayName: string; joinedAt: Date }[]>;
+}
+
+/**
+ * 保持と削除。削除は `games` からの連鎖削除で、ゲームの ID を持つ行をすべて消す。
+ * 受領記録は、ゲームを特定できない参照（鍵つきのダイジェスト）だけを持つ。
+ */
+export interface RetentionRepository {
+  schedule(
+    gameId: string,
+    policy: { days: number; deleteAfter: Date },
+  ): Promise<void>;
+  policyOf(gameId: string): Promise<{ days: number; deleteAfter: Date } | null>;
+  /** 保持の進行。保持の開始（作成時）、削除の試行の回数、直前の失敗の時刻 */
+  progressOf(gameId: string): Promise<{
+    startsAt: Date;
+    attempts: number;
+    lastFailedAt: Date | null;
+  } | null>;
+  /** 時刻 `at` で期限に達し、失敗が `maxAttempts` 回未満のゲーム */
+  due(
+    at: Date,
+    maxAttempts: number,
+    limit: number,
+  ): Promise<{ gameId: string }[]>;
+  /** 削除する。既に無ければ false（別のタスクが先に削除した） */
+  deleteGame(gameId: string): Promise<boolean>;
+  /** 失敗を記録し、記録後の試行回数を返す */
+  recordFailure(gameId: string, at: Date): Promise<number>;
+  saveReceipt(receipt: {
+    reference: string;
+    outcome: 'DELETED';
+    recordedAt: Date;
+    expiresAt: Date;
+  }): Promise<void>;
+}
+
+/** 冪等記録の範囲（操作の種類）。同じキーでも、範囲が違えば別の記録 */
+export type IdempotencyScope =
+  | 'create'
+  | 'join'
+  | 'recover'
+  | 'start'
+  | 'assign'
+  | 'save'
+  | 'commit'
+  | 'pause'
+  | 'resume'
+  | 'mode'
+  | 'proxy'
+  | 'invite'
+  | 'revoke-invitation'
+  | 'join-observer'
+  | 'revoke-credential'
+  | 'reissue-credential';
+
+export interface IdempotencyRecord {
+  gameId: string;
+  scope: IdempotencyScope;
+  key: string;
+  /** 要求の指紋。同じキーで内容が違えば競合 */
+  fingerprint: string;
+  response: unknown;
+}
+export interface IdempotencyRepository {
+  find(
+    gameId: string,
+    scope: IdempotencyScope,
+    key: string,
+  ): Promise<IdempotencyRecord | null>;
+  /**
+   * 作成（`create`）の記録を、キーだけで探す（ゲームの存在前の要求なので、ゲームの ID を知らない）。
+   * 期限切れの記録は見つからない。
+   */
+  findCreate(key: string): Promise<IdempotencyRecord | null>;
+  /**
+   * 保存する。同じ範囲・キーの記録が既にあれば `DuplicateError`（同時の重複）。
+   * 作成の記録は、期限切れの同じキーの記録があれば、置き換える。
+   */
+  save(record: IdempotencyRecord): Promise<void>;
+}
+
+export interface EventLog {
+  append(gameId: string, events: readonly object[]): Promise<void>;
+}
+
+export interface Repositories {
+  games: GameRepository;
+  sessions: SessionRepository;
+  credentials: CredentialRepository;
+  observers: ObserverRepository;
+  retention: RetentionRepository;
+  idempotency: IdempotencyRepository;
+  events: EventLog;
+}
+
+/** 1 回の操作のトランザクション境界。失敗したら、何も残さない
+ *
+ * @landmark トランザクション境界の契約。成功したら全部、失敗したら何も残らない。メモリ版と PostgreSQL 版の 2 つの実装が、同じ契約でテストされている。
+ */
+export interface UnitOfWork {
+  run<T>(work: (repos: Repositories) => Promise<T>): Promise<T>;
+}
+
+export interface Clock {
+  now(): Date;
+}
+
+export interface IdGenerator {
+  uuid(): string;
+  joinCode(): string;
+}
+
+export interface CredentialPolicy {
+  /** 256 ビットの資格と、保存用のダイジェスト（最新の鍵の版） */
+  issue(): { token: string; digest: string };
+  /** 検証用の、すべての鍵の版のダイジェスト */
+  digestsOf(token: string): string[];
+}
+
+/** 状態の変化の通知（内容は含めず、変化があったことだけを伝える） */
+export interface ChangeNotifier {
+  subscribe(gameId: string, listener: () => void): () => void;
+}
+
+/** 振り返りの元データ。ゲームの状態と、確定した週の役割別の行 */
+export interface ReviewSource {
+  /** セッションが無い（未開始）なら null */
+  sessionStatus: 'ACTIVE' | 'PAUSED' | 'ENDED' | null;
+  rows: ReviewRow[];
+}
+
+/**
+ * 読み取り専用の経路（集約を経由せず、ロックを取らない）。
+ * 開示してよいかの判定はここでは行わない（ドメインの `canDisclose`）。
+ */
+export interface ReviewReader {
+  read(gameId: string): Promise<ReviewSource>;
+}
+
+/** 出力の元データの読み取り専用の経路。開示してよいかの判定はここでは行わない */
+export interface ExportReader {
+  read(gameId: string): Promise<{
+    sessionStatus: 'ACTIVE' | 'PAUSED' | 'ENDED' | null;
+    source: ExportSource | null;
+  }>;
+}
+
+/**
+ * 総当たりの対策のレート制限。状態はプロセスの外に持ち、タスク数で実効の上限が増えないようにする。
+ */
+export interface RateLimiter {
+  /** `bucket` の、時刻 `at` を含む窓の回数を 1 増やし、上限以内なら true */
+  hit(bucket: string, at: Date): Promise<boolean>;
+}
+
+/** メトリクス（CloudWatch の EMF など）。次元にゲームや参加者の ID を入れない */
+export interface Metric {
+  name: string;
+  value: number;
+  unit: 'Milliseconds' | 'Count' | 'None';
+}
+export interface Metrics {
+  emit(metrics: readonly Metric[], dimensions?: Record<string, string>): void;
+}

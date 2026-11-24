@@ -1,0 +1,6 @@
+# ルート（domain 以外のクレートの既定）。テストコードでは、失敗を即座に示すために unwrap などを許す。
+# 層ごとに許す範囲が違うため、domain は crates/domain/clippy.toml で厳格にする（ガイド 9.5）。
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true

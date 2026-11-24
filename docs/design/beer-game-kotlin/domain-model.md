@@ -11,13 +11,13 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T22:04:25Z }
 
 ## 概要
 
-本書は、beer-game-kotlin のドメインモデルを定義します。機能と振る舞いは [beer-game2 のドメインモデル](../beer-game2/domain-model.md) を正本として引き継ぎ、次の 3 点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
+本書は、beer-game-kotlin のドメインモデルを定義します。機能と振る舞いは [beer-game2 のドメインモデル](../beer-game-ts/domain-model.md) を正本として引き継ぎ、次の 3 点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
 
 - 状態はイベントの列です。集約は `decide(state, command): Either<DomainError, List<Event>>` と `evolve(state, event): State` の 2 つの純粋関数で表します（[ガイド §7.3](../../reference/関数型プログラミングガイド_Kotlin編.md)、[§7.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - ADT（State・Command・Event・DomainError）は `sealed interface` と `data class` / `value class` で表し、失敗は例外でなく `Either` と `Raise` で返します（[ガイド §3.5](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - 読み取りは、イベントを畳み込む純粋関数（投影）に分けます（CQRS、[ガイド §7.5](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 
-入力は [要件定義](../../requirements/beer-game2/requirements_definition.md)（BR-01〜BR-17、FR-01〜FR-18、NFR-01〜NFR-12）、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md) です。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。本書の Kotlin のコードは、型と関数の形を示す設計上のスケッチです。
+入力は [要件定義](../../requirements/beer-game-ts/requirements_definition.md)（BR-01〜BR-17、FR-01〜FR-18、NFR-01〜NFR-12）、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) です。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。本書の Kotlin のコードは、型と関数の形を示す設計上のスケッチです。
 
 ### 設計の前提と原則
 
@@ -78,7 +78,7 @@ RT ..> GAME : 期限到達の検出（保持方針の投影）\nと game_roots �
 
 ## ユビキタス言語
 
-beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game2/domain-model.md) を参照）。ES で加わった用語と、コード上の名称を示します。**B5 以降に書くコードの用語は、型の注釈 `@Term` から生成した [用語集](./generated/glossary.md) が正本**です（手で複製しません。変更の表 40）。
+beer-game2 の用語を引き継ぎます（定義は [beer-game2](../beer-game-ts/domain-model.md) を参照）。ES で加わった用語と、コード上の名称を示します。**B5 以降に書くコードの用語は、型の注釈 `@Term` から生成した [用語集](./generated/glossary.md) が正本**です（手で複製しません。変更の表 40）。
 
 | 用語 | コード上の名称 | 定義 |
 | :--- | :--- | :--- |
@@ -1030,6 +1030,6 @@ fun Projection.replay(events: List<EventEnvelope<DomainEvent>>): List<RowChange>
 ## 出典
 
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 3 章（型で表すエラー）、第 6 章（代数構造）、第 7 章（アーキテクチャ）
-- [beer-game2 ドメインモデル設計](../beer-game2/domain-model.md)、[データモデル設計](./data-model.md)
-- [要件定義](../../requirements/beer-game2/requirements_definition.md)、[システムユースケース](../../requirements/beer-game2/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game2/user_story.md)
-- [ADR-004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)、[ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)
+- [beer-game2 ドメインモデル設計](../beer-game-ts/domain-model.md)、[データモデル設計](./data-model.md)
+- [要件定義](../../requirements/beer-game-ts/requirements_definition.md)、[システムユースケース](../../requirements/beer-game-ts/system_usecase.md)、[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)
+- [ADR-004](../../adr/beer-game-ts/004-separate-game-and-session-aggregates.md)、[ADR-005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)

@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /*
  * 共同担当・共同入力の HTTP の統合テスト（B6 Step 6.1）。実物の永続化（H2）と全経路を通し、応答の形（保存者・保存の時刻・共同担当）、
  * 競合の 409（最新値・保存者）、冪等キーの再送、失効した資格の再送を確かめる。表示名は、同じ役割の共同担当と進行役にだけ出る。
- * 受入（features/weekly-play/co-input.feature）は、同じ振る舞いを日本語のシナリオで確かめる。
+ * 受入（apps/beer-game-features/weekly-play/co-input.feature）は、同じ振る舞いを日本語のシナリオで確かめる。
  */
 
 private const val DEMAND = "[4,999,998]"

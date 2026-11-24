@@ -1,0 +1,31 @@
+[package]
+name = "beergame-acceptance"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# 受け入れテストのクレート。共有する features/（日本語 Gherkin）を cucumber-rs で実行する。
+# cucumber・tokio は、このクレートだけが持つ（domain の依存には含めない。DS-4）。
+[dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
+beergame-adapter-http = { path = "../adapter-http" }
+beergame-adapter-persistence = { path = "../adapter-persistence" }
+beergame-app = { path = "../app" }
+beergame-application = { path = "../application" }
+beergame-domain = { path = "../domain" }
+cucumber = { version = "0.23.0", features = ["output-junit"] }
+http-body-util = "0.1.5"
+serde_json = "1.0.154"
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "postgres", "uuid"] }
+testcontainers = "0.28.0"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time"] }
+tower = { version = "0.5.3", features = ["util"] }
+
+[[test]]
+name = "acceptance"
+path = "tests/acceptance/main.rs"
+harness = false
+
+[lints]
+workspace = true

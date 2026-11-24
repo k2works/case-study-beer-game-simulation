@@ -22,7 +22,8 @@ name: beer-game-kotlin-deploy-staging
 on:
   workflow_dispatch:
   # main への merge の CI（beer-game-kotlin。テスト・静的検査・コンテナのスモーク）が成功したら、ステージングへ自動でデプロイする。
-  # CI が apps/beer-game-kotlin/** の変更だけで起動するので、無関係の変更ではデプロイされない
+  # CI は、このアプリ・共有の画面/契約/受け入れ条件・このアプリの設計書（docs/design/beer-game-kotlin/**）の変更で起動する。
+  # 設計書・文書だけの変更では、jobs.changes が判定して、デプロイしない
   workflow_run:
     workflows: [beer-game-kotlin]
     types: [completed]
@@ -37,11 +38,40 @@ permissions:
   contents: read
 
 jobs:
+  # 自動起動のとき、デプロイに関わる変更があったかを判定する。
+  # CI は設計書（docs/design/**）の変更でも起動する（生成物の検査のため）ので、設計書・文書だけの変更では、デプロイしない。
+  # 判定は、CI が成功したコミットの、最初の親との差（PR の merge・squash の変更の全体）。手動起動（workflow_dispatch）は判定しない。
+  changes:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      deploy: ${{ steps.diff.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+      - id: diff
+        run: |
+          files="$(git diff --name-only HEAD^1 HEAD)"
+          echo "$files"
+          # デプロイの入力: このアプリ、共有の画面・契約・受け入れ条件、このデプロイのワークフロー
+          if echo "$files" | grep -qE '^(apps/beer-game-kotlin/|apps/beer-game-(web|contracts|features)/|\.github/workflows/beer-game-kotlin)'; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "デプロイに関わる変更が無い（設計書・文書だけ）ので、デプロイしない"
+          fi
+
   deploy:
-    # 手動か、main の CI が成功し、かつ自動デプロイが有効（リポジトリの変数）のときだけ
+    needs: changes
+    # 手動か、main の CI が成功し、デプロイに関わる変更があり、かつ自動デプロイが有効（リポジトリの変数）のときだけ。
+    # 手動のときは changes が飛ばされるので、`!cancelled()` で、飛ばされた needs を許す
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && vars.BEER_GAME_KOTLIN_AUTO_DEPLOY == 'true')
+      ${{ !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && needs.changes.outputs.deploy == 'true' && vars.BEER_GAME_KOTLIN_AUTO_DEPLOY == 'true')) }}
     runs-on: ubuntu-24.04
     # イメージのビルド（初回は約 6 分）、migrate、ローリング更新、スモークテストを見込む。実測は未確認（AWS で未実行）
     timeout-minutes: 45
@@ -74,7 +104,7 @@ jobs:
         with:
           node-version: '26'
           cache: npm
-          cache-dependency-path: apps/beer-game-kotlin/web/package-lock.json
+          cache-dependency-path: apps/beer-game-web/package-lock.json
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -110,7 +140,7 @@ jobs:
           if aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" >/dev/null 2>&1; then
             echo "同じコミットのイメージが既にあるため、再利用する"
           else
-            docker build -t "$REGISTRY/$REPOSITORY:$RELEASE_ID" .
+            docker build --build-context web=../beer-game-web -t "$REGISTRY/$REPOSITORY:$RELEASE_ID" .
             docker push "$REGISTRY/$REPOSITORY:$RELEASE_ID"
           fi
           DIGEST="$(aws ecr describe-images --repository-name "$REPOSITORY" --image-ids "imageTag=$RELEASE_ID" \
@@ -178,7 +208,7 @@ jobs:
       # 静的ファイル（web/dist）を releases/<SHA>/ に置き、current に反映する
       - name: 静的ファイルの公開
         id: web
-        working-directory: apps/beer-game-kotlin/web
+        working-directory: apps/beer-game-web
         run: |
           echo "published=true" >> "$GITHUB_OUTPUT"
           npm ci

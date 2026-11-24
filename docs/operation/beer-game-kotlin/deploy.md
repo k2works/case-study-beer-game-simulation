@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T00:00:00Z }
 - Terraform の適用（`apps/beer-game-kotlin/infra/`）。適用前に人が確認する項目と適用の順序は、[Bolt 3 計画](../../development/beer-game-kotlin/bolt_3_plan.md) の「Step 2 の結果」にある「AWS への適用の前に、人が確認すべき項目」と「設計書との食い違い・未決・未確認」（特に、初回のイメージの扱い）を参照する。**本書では創作しない。**
 - アカウント、OIDC プロバイダー、状態用の S3、ドメインの準備。同じく上記と、[インフラストラクチャ](../../design/beer-game-kotlin/architecture-infrastructure.md) を参照する。
 - GitHub の Environment（`staging`、`production`）の作成と、変数の設定（次節）。**`production` には、必須のレビュアー（保護ルール）を設定する。**
-- beer-game2 の同種の手順書は書式の参考: [AWS ステージング環境セットアップ手順書](../beer-game2/aws_staging_setup.md)、[AWS プロダクション環境セットアップ・運用](../beer-game2/aws_production_setup.md)。Kotlin 版で変わる点は、JVM のコンテナ（ポート 8080、`/api/v1/ready`）、migrate モード、必要な秘密が 5 つ（DB の資格、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`）であること。
+- beer-game2 の同種の手順書は書式の参考: [AWS ステージング環境セットアップ手順書](../beer-game-ts/aws_staging_setup.md)、[AWS プロダクション環境セットアップ・運用](../beer-game-ts/aws_production_setup.md)。Kotlin 版で変わる点は、JVM のコンテナ（ポート 8080、`/api/v1/ready`）、migrate モード、必要な秘密が 5 つ（DB の資格、`CREDENTIAL_KEY`・`IDEMPOTENCY_KEY`・`RESPONSE_KEY`）であること。
 
 ## ワークフロー
 
@@ -101,7 +101,7 @@ OIDC の信頼の条件は「このリポジトリの、この GitHub Environmen
 
 ## Bolt 14 での変更（本番の定義）
 
-- **ステージングの自動デプロイ**（AC6.2.1）: main の CI（`beer-game-kotlin`）が成功すると、`workflow_run` でステージングのデプロイが起動する。**リポジトリの変数 `BEER_GAME_KOTLIN_AUTO_DEPLOY` が `'true'` のときだけ**（未設定の間はジョブを飛ばす）。手動で 1 回成功させてから設定する。
+- **ステージングの自動デプロイ**（AC6.2.1）: main の CI（`beer-game-kotlin`）が成功すると、`workflow_run` でステージングのデプロイが起動する。**リポジトリの変数 `BEER_GAME_KOTLIN_AUTO_DEPLOY` が `'true'` のときだけ**（未設定の間はジョブを飛ばす）。さらに、CI が成功したコミットの変更（最初の親との差）に、このアプリ・共有の画面/契約/受け入れ条件・このデプロイのワークフローが含まれないとき（設計書・文書だけの変更）は、デプロイしない（`changes` ジョブ。手動起動は判定しない）。手動で 1 回成功させてから設定する。
 - **本番はブルー/グリーン**（ECS の組み込み）。ステージングはローリング。詳細は [本番の運用手順書](./production.md)。
 - 追加の変数: `RETENTION_TASK_FAMILY`・`VERIFY_TASK_FAMILY`（両環境）、`RDS_INSTANCE`（本番。デプロイ前のスナップショット用）。いずれも `terraform output`。**未設定**（人が行う）。
 - 定期のタスク（`retention`・`verify-projections`）のタスク定義も、同じダイジェストの新しい版を登録する。

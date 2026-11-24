@@ -100,7 +100,7 @@ Step 1 は、単体テストとスモークテストを先に書いた（Red を
 
 ### Step 2: Terraform の定義（🔵）
 
-- [x] 2.1 beer-game2 の `apps/beer-game2/infra`（定義）を読み、**JVM に合わせた変更点**（ポート、ヘルスチェックのパス `/api/v1/ready`、環境変数 `DB_KIND=postgres`・`APP_ENV`、秘密情報の注入、CPU・メモリの初期案、起動猶予）を洗い出す
+- [x] 2.1 beer-game2 の `apps/beer-game-ts/infra`（定義）を読み、**JVM に合わせた変更点**（ポート、ヘルスチェックのパス `/api/v1/ready`、環境変数 `DB_KIND=postgres`・`APP_ENV`、秘密情報の注入、CPU・メモリの初期案、起動猶予）を洗い出す
 - [x] 2.2 `apps/beer-game-kotlin/infra/` に、最小構成（ネットワーク、RDS for PostgreSQL 18、ECR、ECS Fargate、ALB、CloudFront、S3、Secrets Manager、IAM、環境ごとの分離）の**定義**を作る。**リソースを作らない**。秘密の値を含めない。リモートの状態（S3 とロック）は設計書のとおり
 - [x] 2.3 検証: `terraform fmt -check`、`terraform validate`（作業用の新しい Terraform。設計の `required_version` を満たす版を、公式の配布から作業用ディレクトリに取得して使う。**システムの Terraform は入れ替えない**）。**`terraform plan` は、認証情報が無いため未実行（未確認）**と記録
 

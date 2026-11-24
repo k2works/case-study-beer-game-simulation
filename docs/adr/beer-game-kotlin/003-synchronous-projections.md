@@ -21,7 +21,7 @@ ES + CQRS の採用（[ADR-002](./002-event-sourcing-and-cqrs.md)）の帰結と
 
 ## コンテキスト
 
-- 週確定後の画面反映は 2 秒以内（NFR-03）。SSE は版の通知だけを送り、クライアントは通知を受けてスナップショットを取得する（beer-game2 の [ADR-006](../beer-game2/006-sse-version-only.md)）。取得した状態が通知の版以上であることが必要になる。
+- 週確定後の画面反映は 2 秒以内（NFR-03）。SSE は版の通知だけを送り、クライアントは通知を受けてスナップショットを取得する（beer-game2 の [ADR-006](../beer-game-ts/006-sse-version-only.md)）。取得した状態が通知の版以上であることが必要になる。
 - 状態の復元は、ストリームの再生（`fold(evolve)`）である。ストリームの長さは、`session` が 50 週 ×（4 役割 × 数回の保存 + 確定 1 + 例外の操作）で**千件前後**、`game` が数十〜百件程度と**見積もっている**（実測ではない）。規模は同時 15 チーム（NFR-04）で、1 コマンドが読むのは 1 ゲームのストリームだけである。
 - 出力（CSV・JSON）は Should、最終週の確定は Must である。beer-game2 は `export_packages` を保存し、状態は `PENDING`・`COMPLETE`・`FAILED` を持った。設計書レビュー H3 は、Should の出力の失敗が Must の最終週の確定を妨げうると指摘した。
 
@@ -80,5 +80,5 @@ ES + CQRS の採用（[ADR-002](./002-event-sourcing-and-cqrs.md)）の帰結と
 ## 備考
 
 - 著者: claude-code
-- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-006](./006-event-schema-evolution.md)。beer-game2 の [ADR-005](../beer-game2/005-role-results-and-sql-read-models.md)、[ADR-006](../beer-game2/006-sse-version-only.md)
+- 関連 ADR: [ADR-002](./002-event-sourcing-and-cqrs.md)、[ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-006](./006-event-schema-evolution.md)。beer-game2 の [ADR-005](../beer-game-ts/005-role-results-and-sql-read-models.md)、[ADR-006](../beer-game-ts/006-sse-version-only.md)
 - 参照: [データモデル](../../design/beer-game-kotlin/data-model.md)（投影、スナップショット、出力は投影にしない）、[ドメインモデル](../../design/beer-game-kotlin/domain-model.md) D11、[バックエンド](../../design/beer-game-kotlin/architecture-backend.md) BD6・BD10、[設計書レビュー](../../review/beer-game-kotlin/design_review_20261114.md) H3

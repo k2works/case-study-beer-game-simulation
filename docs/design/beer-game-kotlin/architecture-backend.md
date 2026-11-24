@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T07:43:36Z }
 
 本書は、beer-game-kotlin のバックエンドのアーキテクチャを、パターン選択の根拠とあわせて定義します。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。本書の Kotlin のコードは、型と関数の形を示す設計上のスケッチです。
 
-[beer-game2 のバックエンドアーキテクチャ](../beer-game2/architecture-backend.md) の機能・API の振る舞い・セキュリティ・運用要件を正本として引き継ぎ、次の点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
+[beer-game2 のバックエンドアーキテクチャ](../beer-game-ts/architecture-backend.md) の機能・API の振る舞い・セキュリティ・運用要件を正本として引き継ぎ、次の点を **Kotlin・関数型・イベントソーシング（ES）+ CQRS** で設計し直します。
 
 - 書き込みは、`decide` / `evolve`（[ドメインモデル](./domain-model.md)）を呼ぶ**薄いコマンド処理**に集約します。ロック（`SELECT ... FOR UPDATE`）と版つき更新は、追記の一意制約と自動再試行に置き換えます（再構築との同時実行の制御にだけ、ポート `ProjectionLock` を使います。PostgreSQL 版の実体はアドバイザリロックです）（[データモデル](./data-model.md)）。
 - 読み取りは、同期投影の表を SQL で読む**問い合わせ側**です。
@@ -480,7 +480,7 @@ beer-game2 の `POST /sessions/:id/start` は、`session` を対象にしてい�
 
 ### 入力の検証とエラーの写像
 
-- ルートは、DTO（`kotlinx.serialization`）を、スマートコンストラクタで `Command` に変換します。誤りは**すべて集め**（`zipOrAccumulate`。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）、`422` で、項目ごとの誤りを返します（[ユーザーストーリー](../../requirements/beer-game2/user_story.md) AC1.1.2、AC1.1.4）。本文の構文エラーは `400`。
+- ルートは、DTO（`kotlinx.serialization`）を、スマートコンストラクタで `Command` に変換します。誤りは**すべて集め**（`zipOrAccumulate`。[ガイド §3.4](../../reference/関数型プログラミングガイド_Kotlin編.md)）、`422` で、項目ごとの誤りを返します（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) AC1.1.2、AC1.1.4）。本文の構文エラーは `400`。
 - ドメインのエラーは、分類で HTTP の状態へ写します。**写像は 1 か所（`adapter-http`）の純粋関数**で、`when` の網羅で漏れをなくします。
 
 | 分類（[ドメインモデル](./domain-model.md)） | HTTP | 備考 |
@@ -672,7 +672,7 @@ apps/beer-game-kotlin/
 ├── adapter-persistence/              （JDBC、EventStore、投影の SQL、EventCodec、ProjectionLock・ChangeNotifier の PostgreSQL 版と H2 版、マイグレーション）
 │   └── src/main/resources/db/migration/  （Flyway の番号つきの SQL。**B1 で確定: `common/V001〜V005`、`postgres/V102`。B5 Step 5.5 で、`common/V007`・`V008` を足し、`postgres/` は 101＝冪等記録の索引、102＝DB ロールと GRANT に付け替えた**。006（保持）は B11 の予約。h2/ は作らない）
 ├── app/                              （main、AppConfig、ワイヤリング、起動のモード）
-├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源）
+├── contracts/openapi.yaml            （API の契約。手書きの正本。フロントエンドの型の源。2026-11-23 に ../beer-game-contracts/ へ移動）
 ├── ui/                               （フロントエンド。別のパッケージとして扱う。**B1 の実装の場所は `web/`**）
 ├── features/                         （日本語 Gherkin。B1 で追加。両処理系が参照する）
 └── infra/                            （Terraform）
@@ -761,7 +761,7 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 
 ## 設計判断
 
-[ADR](../../adr/beer-game2/) の判断のうち、ES + CQRS と Kotlin に関わるものは再評価して、ここに記録します。新しい ADR にする場合は、この節を元にします。
+[ADR](../../adr/beer-game-ts/) の判断のうち、ES + CQRS と Kotlin に関わるものは再評価して、ここに記録します。新しい ADR にする場合は、この節を元にします。
 
 ### BD1: 層の依存の守り方
 
@@ -908,8 +908,8 @@ B1 の実装のパッケージは、設計のサブパッケージ（`{shared,ga
 ## 出典
 
 - [ドメインモデル設計（Kotlin 版）](./domain-model.md)、[データモデル設計（Kotlin 版）](./data-model.md)、[非機能要件](./non-functional.md)、[運用要件](./operation.md)
-- [beer-game2 のバックエンドアーキテクチャ](../beer-game2/architecture-backend.md)
+- [beer-game2 のバックエンドアーキテクチャ](../beer-game-ts/architecture-backend.md)
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 3 章（型で表すエラー）、第 4 章（副作用の管理）、第 7 章（アーキテクチャ）、第 8 章（テスト戦略）、第 9 章（静的解析）
 - [アーキテクチャ設計ガイド](../../reference/アーキテクチャ設計ガイド.md)
 - [ADR-014 ローカル開発に H2（PostgreSQL モード）を使う](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、[H2 公式ドキュメント（features）](https://h2database.com/html/features.html)（2026-11-14 確認）
-- [ADR-003](../../adr/beer-game2/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game2/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game2/006-sse-version-only.md)、[007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game2/009-credential-key-versions.md)
+- [ADR-003](../../adr/beer-game-ts/003-ports-and-adapters-with-lint.md)、[004](../../adr/beer-game-ts/004-separate-game-and-session-aggregates.md)、[005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[006](../../adr/beer-game-ts/006-sse-version-only.md)、[007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[009](../../adr/beer-game-ts/009-credential-key-versions.md)

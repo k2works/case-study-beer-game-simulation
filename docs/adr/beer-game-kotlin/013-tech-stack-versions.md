@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T08:30:39Z }
 
 ## ステータス
 
-提案中（レビュー待ち）。beer-game2 の [ADR-013](../beer-game2/013-tech-stack-versions.md) を、Kotlin 版では本 ADR で**置換**する（Node 中心の決定は、フロントエンドのビルドとテストにだけ残る）。
+提案中（レビュー待ち）。beer-game2 の [ADR-013](../beer-game-ts/013-tech-stack-versions.md) を、Kotlin 版では本 ADR で**置換**する（Node 中心の決定は、フロントエンドのビルドとテストにだけ残る）。
 
 ## コンテキスト
 
@@ -95,5 +95,5 @@ beer-game2 の ADR-013 は Node 26 LTS、PostgreSQL 18、TypeScript 6.0 を定�
 
 - 著者: claude-code
 - **B1 の実装の結果（2026-11-14）**: Kotlin 2.4.21 と Gradle 9.9.1、Kotest 6.2.7、Testcontainers 2.0.5、HikariCP 7.1.0、Flyway 13.12.2、H2 2.5.252 は、JDK 25.0.2 のビルドと実行で動作した。**detekt 1.23.8 は JDK 25 で動かない**（JDK 21 で動く。[ADR-011](./011-strict-static-analysis.md)）。Node は 24.11.0 で実行した（Node 26 は未導入）。依存の追加（`junit-bom`・`junit-platform-suite`・`junit-platform-launcher`・`slf4j-api` 2.0.19 ほか）は、[技術スタック](../../design/beer-game-kotlin/tech-stack.md) の変更表 19〜27 に記録。PMD と契約テストの道具は B2。
-- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-014](./014-h2-for-local-development.md)（ローカル開発の H2）。置換: beer-game2 の [ADR-013](../beer-game2/013-tech-stack-versions.md)
+- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-011](./011-strict-static-analysis.md)、[ADR-012](./012-gherkin-and-cucumber.md)、[ADR-014](./014-h2-for-local-development.md)（ローカル開発の H2）。置換: beer-game2 の [ADR-013](../beer-game-ts/013-tech-stack-versions.md)
 - 参照: [技術スタック（確認した重要な事項、設計判断）](../../design/beer-game-kotlin/tech-stack.md)、[インフラストラクチャ](../../design/beer-game-kotlin/architecture-infrastructure.md)、[設計レビュー（M17）](../../review/beer-game-kotlin/design_review_20261114.md)、[リリース計画（B1〜B3）](../../development/beer-game-kotlin/release_plan.md)

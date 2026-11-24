@@ -15,9 +15,9 @@ verified:
 
 本書は、beer-game-kotlin（beer-game2 の Kotlin 版）のリリース計画を、AI-DLC の Intent → Unit → Bolt の階層で定義します。**AI が計画を提案し、人が承認ゲートで検証・承認します。本書は 2026-11-14 に、ユーザーが承認しました。**
 
-- 機能・振る舞いは beer-game2 を引き継ぎます。要件・ユースケース・ストーリー・Unit の定義・ADR は、新規に作らず beer-game2 のものを参照します（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)、[Unit 定義](../../requirements/beer-game2/unit_definition.md)）。
+- 機能・振る舞いは beer-game2 を引き継ぎます。要件・ユースケース・ストーリー・Unit の定義・ADR は、新規に作らず beer-game2 のものを参照します（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)、[Unit 定義](../../requirements/beer-game-ts/unit_definition.md)）。
 - 設計は [beer-game-kotlin の設計](../../design/beer-game-kotlin/index.md)（イベントソーシング + CQRS、Ktor + Arrow）です。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。
-- 計画の根拠: [リリース・イテレーション計画ガイド（AI-DLC 版）](../../reference/リリース・イテレーション計画ガイド_AI-DLC版.md)、[beer-game2 のリリース計画](../beer-game2/release_plan.md) と [リリース完了報告書 0.2](../beer-game2/release_report-0_2_0.md)。
+- 計画の根拠: [リリース・イテレーション計画ガイド（AI-DLC 版）](../../reference/リリース・イテレーション計画ガイド_AI-DLC版.md)、[beer-game2 のリリース計画](../beer-game-ts/release_plan.md) と [リリース完了報告書 0.2](../beer-game-ts/release_report-0_2_0.md)。
 - 開発の進め方は [開発戦略](./development_strategy.md) に従います。受入条件・デモ項目は日本語 Gherkin と Cucumber（Cucumber-JVM の `@api`、Cucumber-JS + Playwright の `@ui`）で表し、静的解析は [関数型プログラミングガイド（Kotlin 編）第 9 章](../../reference/関数型プログラミングガイド_Kotlin編.md) を厳格に適用します（違反 0 件、ベースラインなし、`@Suppress` なし。detekt が中心、PMD の XPath ルール 14 個が補完、ktlint は `.editorconfig` で調整）。
 - **日付と所要は、仮定にもとづく初期の見積もりです。** ウォーキングスケルトン（B1）の実績で再調整します。
 
@@ -30,7 +30,7 @@ verified:
 | 対象ユーザー | 進行役、参加者（共同担当を含む）、観察者、運用担当 |
 | 開発体制 | モブ（人 1 名 + AI）。人は承認ゲートで計画・設計・コードを検証し、判断する |
 | 実装の場所 | `apps/beer-game-kotlin/`（バックエンド Kotlin。フロントエンドは React/TypeScript で、配置は B1 で決める） |
-| 参照のみ | `apps/beer-game2/`（フロントエンドの再利用元）。beer-game2 は修正しない |
+| 参照のみ | `apps/beer-game-ts/`（フロントエンドの再利用元）。beer-game2 は修正しない |
 
 ---
 
@@ -51,7 +51,7 @@ beer-game2 と同じ範囲（Unit U1〜U6、Release 0.1 / 0.2 / 1.0）です。K
 
 ### ビジネス価値と測定基準
 
-[Unit 定義](../../requirements/beer-game2/unit_definition.md) の「測定基準」を参照してください。最優先の価値は、**役割別の振り返り**（ブルウィップ効果の確認）です。Kotlin 版に固有の測定基準は、次の 3 つです。
+[Unit 定義](../../requirements/beer-game-ts/unit_definition.md) の「測定基準」を参照してください。最優先の価値は、**役割別の振り返り**（ブルウィップ効果の確認）です。Kotlin 版に固有の測定基準は、次の 3 つです。
 
 | 指標 | 目標 | 確認する Bolt |
 | :--- | :--- | :--- |
@@ -72,7 +72,7 @@ beer-game2 と同じ範囲（Unit U1〜U6、Release 0.1 / 0.2 / 1.0）です。K
 | Release 0.2 | 2026-12-09（B5〜B8、18 稼働日） |
 | Release 1.0 | 計画上 2026-12-30（B9〜B15、33 稼働日）。バッファ込みで **2027-01-06 を目安**（38 稼働日） |
 
-**所要の見積もりの根拠**: beer-game2 の実績は、計画 13 日に対し 2 日でした。ただし、これは AI が承認ゲートを連続して通過し、承認を Unit の終わりにまとめて受けたためで、**人の検証時間を含みません**（[リリース完了報告書 0.2](../beer-game2/release_report-0_2_0.md)）。そのため、実績の短さを Kotlin 版の見積もりには反映せず、beer-game2 の計画値（人の検証を含む稼働日）を基準にしました。Kotlin 版で増える作業は、基盤（B1 を 2 日 → 4 日）、規約検査と CI の基盤（B2、3 日）、投影の再構築と整合検査・スキーマ進化（B12、2 日）で、計 +7 日です（beer-game2 の 26 日 → 33 日）。
+**所要の見積もりの根拠**: beer-game2 の実績は、計画 13 日に対し 2 日でした。ただし、これは AI が承認ゲートを連続して通過し、承認を Unit の終わりにまとめて受けたためで、**人の検証時間を含みません**（[リリース完了報告書 0.2](../beer-game-ts/release_report-0_2_0.md)）。そのため、実績の短さを Kotlin 版の見積もりには反映せず、beer-game2 の計画値（人の検証を含む稼働日）を基準にしました。Kotlin 版で増える作業は、基盤（B1 を 2 日 → 4 日）、規約検査と CI の基盤（B2、3 日）、投影の再構築と整合検査・スキーマ進化（B12、2 日）で、計 +7 日です（beer-game2 の 26 日 → 33 日）。
 
 **B1 を 3 日から 4 日に、B2 を 2 日から 3 日に変えた理由**（開発戦略の決定: Gherkin と Cucumber の導入、静的解析の厳格な適用）:
 

@@ -7,9 +7,7 @@
 local.properties
 .env
 .env.*
-# Gradle のビルドに要らないもの。web は、デモ用の画面のビルド段階（Dockerfile の webbuild）が使うので文脈に入れる（成果物と依存は除く）
-web/dist/
-web/node_modules/
+# Gradle のビルドに要らないもの。画面（apps/beer-game-web）は、名前付きのビルドコンテキスト「web」で渡す（その除外は apps/beer-game-web/.dockerignore）
 infra/
 scripts/
 Dockerfile

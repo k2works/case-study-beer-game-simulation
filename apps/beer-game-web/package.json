@@ -1,0 +1,56 @@
+{
+  "name": "@beer-game/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ビールゲーム（Kotlin 版）の画面（React + Vite）と、受け入れ（Cucumber-JS + Playwright。@ui のシナリオ）。",
+  "engines": {
+    "node": "^24 || >=26"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "api:lint": "redocly lint ../beer-game-contracts/openapi.yaml --config ../beer-game-contracts/redocly.yaml",
+    "api:generate": "openapi-typescript ../beer-game-contracts/openapi.yaml -o src/api/generated/schema.d.ts && prettier --write src/api/generated/schema.d.ts",
+    "api:check": "node scripts/check-generated.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "acceptance": "cucumber-js",
+    "acceptance:dry-run": "cucumber-js --dry-run"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.5.1"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "13.3.0",
+    "@redocly/cli": "2.78.0",
+    "@eslint/js": "10.0.1",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "eslint": "10.14.0",
+    "jsdom": "31.0.0",
+    "openapi-typescript": "7.13.0",
+    "playwright": "1.65.1",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vite": "8.3.6",
+    "vitest": "5.1.0"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  }
+}

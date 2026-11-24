@@ -21,7 +21,7 @@ ES + CQRS の採用は、ユーザーの決定である。ストリームの単�
 
 ## コンテキスト
 
-beer-game2 は、集約ごとの現在の状態を表に持ち、`version` で版つきに更新し、監査と通知のためにイベントを別に残した（[ADR-008](../beer-game2/008-auto-commit-and-event-audit.md)）。この形は、状態の表とイベントの二重管理になり、復元と監査の根拠が別々になる。
+beer-game2 は、集約ごとの現在の状態を表に持ち、`version` で版つきに更新し、監査と通知のためにイベントを別に残した（[ADR-008](../beer-game-ts/008-auto-commit-and-event-audit.md)）。この形は、状態の表とイベントの二重管理になり、復元と監査の根拠が別々になる。
 
 Kotlin 版は、次の事情がある。
 
@@ -84,5 +84,5 @@ Kotlin 版は、次の事情がある。
 ## 備考
 
 - 著者: claude-code
-- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-006](./006-event-schema-evolution.md)、[ADR-010](./010-retention-deletion-with-append-only.md)。beer-game2 の [ADR-004](../beer-game2/004-separate-game-and-session-aggregates.md)、[ADR-008](../beer-game2/008-auto-commit-and-event-audit.md)
+- 関連 ADR: [ADR-001](./001-kotlin-version-of-beer-game2.md)、[ADR-003](./003-synchronous-projections.md)、[ADR-004](./004-idempotency-after-authorization.md)、[ADR-005](./005-optimistic-concurrency-and-advisory-lock.md)、[ADR-006](./006-event-schema-evolution.md)、[ADR-010](./010-retention-deletion-with-append-only.md)。beer-game2 の [ADR-004](../beer-game-ts/004-separate-game-and-session-aggregates.md)、[ADR-008](../beer-game-ts/008-auto-commit-and-event-audit.md)
 - 参照: [ドメインモデル](../../design/beer-game-kotlin/domain-model.md)（D1〜D7）、[データモデル](../../design/beer-game-kotlin/data-model.md)、[バックエンド](../../design/beer-game-kotlin/architecture-backend.md)、[設計書レビュー](../../review/beer-game-kotlin/design_review_20261114.md)

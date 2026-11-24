@@ -1,0 +1,16 @@
+# Terraform の作業ディレクトリと状態（状態は S3 に置く。ローカルに残さない）
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# カナリアの zip（apply 時に作る。コミットしない）
+.canary.zip
+
+# 実際の値を入れたファイル（コミットしない）。例は *.example
+backend.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# .terraform.lock.hcl はコミットする（プロバイダーの版とハッシュの固定）

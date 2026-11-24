@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T06:24:34Z }
 
 本書は、beer-game-kotlin のデータモデルを、概念データモデルから論理データモデルへ段階的に定義します。**`docs/` を設計の正本**とします。
 
-[beer-game2 のデータモデル](../beer-game2/data-model.md) は、集約ごとの現在の状態を表に持ち、版つきで更新していました。本書は、[ドメインモデル（Kotlin 版）](./domain-model.md) の**イベントソーシング + CQRS**に合わせ、次のように作り直します。
+[beer-game2 のデータモデル](../beer-game-ts/data-model.md) は、集約ごとの現在の状態を表に持ち、版つきで更新していました。本書は、[ドメインモデル（Kotlin 版）](./domain-model.md) の**イベントソーシング + CQRS**に合わせ、次のように作り直します。
 
 - **書き込み側の正本は、追記専用の `events` 表**です。状態は、イベントの再生（`fold(evolve)`）で導きます。
 - **読み取り側は、投影テーブル**です。イベントの追記と同じトランザクションで更新し、いつでもイベントから作り直せます。
@@ -973,5 +973,5 @@ db/migration/
 - [ドメインモデル設計（Kotlin 版）](./domain-model.md)
 - [ADR-014 ローカル開発に H2（PostgreSQL モード）を使う](../../adr/beer-game-kotlin/014-h2-for-local-development.md)、[H2 公式ドキュメント（features）](https://h2database.com/html/features.html)（2026-11-14 確認）
 - [ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（イベントソーシング、CQRS、永続化とトランザクション境界）
-- [beer-game2 データモデル設計](../beer-game2/data-model.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)
-- [ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)
+- [beer-game2 データモデル設計](../beer-game-ts/data-model.md)、[要件定義](../../requirements/beer-game-ts/requirements_definition.md)
+- [ADR-005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)

@@ -1,6 +1,6 @@
 # beer-game-kotlin — 設計
 
-beer-game-kotlin（[beer-game2](../beer-game2/index.md) の Kotlin 版）の設計ドキュメントです。機能・API の振る舞い・画面は beer-game2 を引き継ぎ、バックエンドを **Kotlin（Ktor + Arrow + kotlinx.coroutines）、イベントソーシング + CQRS** で再設計します。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。フロントエンドは React/TypeScript を踏襲します。要件と ADR は beer-game2 のものを参照します（本プロジェクトでは新規に作りません）。
+beer-game-kotlin（[beer-game2](../beer-game-ts/index.md) の Kotlin 版）の設計ドキュメントです。機能・API の振る舞い・画面は beer-game2 を引き継ぎ、バックエンドを **Kotlin（Ktor + Arrow + kotlinx.coroutines）、イベントソーシング + CQRS** で再設計します。コーディングは [関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) に準拠します。フロントエンドは React/TypeScript を踏襲します。要件と ADR は beer-game2 のものを参照します（本プロジェクトでは新規に作りません）。
 
 ## ドキュメント一覧
 
@@ -41,9 +41,7 @@ beer-game-kotlin（[beer-game2](../beer-game2/index.md) の Kotlin 版）の設�
 
 ### コードの案内（Living Documentation）
 
-サイトシーイング・マップとガイドツアーは、コードの注釈から自動生成する成果物です。**実装後に生成します**（現時点では作りません）。
-
-用語集とイベント一覧は、B5 Step 8.4 から、コードの注釈（`@Term`・`@EventSpec`）から生成しています（手で編集しません。再生成は `./gradlew :domain:generateLivingDocs`。方式は [ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案）。
+用語集・イベント一覧・コアのハイライト・サイトシーイング・マップ・ガイドツアーは、コードの注釈（`@Term`・`@EventSpec`・`@CoreConcept`・`@KeyLandmark`・`@GuidedTour`）から生成しています（手で編集しません。再生成は `./gradlew :domain:generateLivingDocs`。方式は [ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、承認済み）。`LivingDocumentationSpec`・`GuidedTourSpec` が、コードとの差と設計書との不一致を検出します。入口は [README](../../../apps/beer-game-kotlin/README.md) の「コードの案内」です。
 
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |

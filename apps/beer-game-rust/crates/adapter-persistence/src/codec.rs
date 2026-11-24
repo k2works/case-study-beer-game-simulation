@@ -1,0 +1,603 @@
+//! ドメインのイベントと JSON の変換（`EventCodec`）。`event_type` を判別子にし、スキーマ版は 1。
+//! 個人情報・秘密（表示名・資格の値）はイベントに含まれない（D7）。不明な `event_type`・不正な値は、失敗にする。
+
+use std::collections::BTreeSet;
+
+use beergame_domain::{
+    CommitKind, CommitMode, ConditionsInput, DecisionVersion, DisclosurePolicy, Editor, EndReason,
+    GameEvent, GameId, GameSettings, Instant, InvitationId, JoinCode, Money, ObserverId,
+    ParticipantId, Pipeline, Quantity, RetentionDays, Role, RoleMap, RoleState, RoleWeekResult,
+    SessionEvent, Units, Week,
+};
+use serde_json::{Value, json};
+use uuid::Uuid;
+
+use crate::store::EventCodec;
+use crate::upcast::{CURRENT_SCHEMA_VERSION as SCHEMA_VERSION, upcast};
+
+type R<T> = Result<T, String>;
+
+fn uuid_of(n: u128) -> String {
+    Uuid::from_u128(n).to_string()
+}
+
+fn field<'a>(v: &'a Value, name: &str) -> R<&'a Value> {
+    v.get(name).ok_or_else(|| format!("項目が無い: {name}"))
+}
+
+fn int(v: &Value, name: &str) -> R<i64> {
+    field(v, name)?
+        .as_i64()
+        .ok_or_else(|| format!("整数ではない: {name}"))
+}
+
+fn text<'a>(v: &'a Value, name: &str) -> R<&'a str> {
+    field(v, name)?
+        .as_str()
+        .ok_or_else(|| format!("文字列ではない: {name}"))
+}
+
+fn id(v: &Value, name: &str) -> R<u128> {
+    Uuid::parse_str(text(v, name)?)
+        .map(|u| u.as_u128())
+        .map_err(|e| format!("{name}: {e}"))
+}
+
+fn e<T: std::fmt::Debug>(x: T) -> String {
+    format!("{x:?}")
+}
+
+fn role_name(role: Role) -> &'static str {
+    match role {
+        Role::Factory => "FACTORY",
+        Role::Distributor => "DISTRIBUTOR",
+        Role::Wholesaler => "WHOLESALER",
+        Role::Retailer => "RETAILER",
+    }
+}
+
+fn role_of(name: &str) -> R<Role> {
+    Role::ALL
+        .into_iter()
+        .find(|r| role_name(*r) == name)
+        .ok_or_else(|| format!("不明な役割: {name}"))
+}
+
+fn role_field(v: &Value, name: &str) -> R<Role> {
+    role_of(text(v, name)?)
+}
+
+fn per_role<A>(m: &RoleMap<A>, f: impl Fn(&A) -> Value) -> Value {
+    json!({
+        "FACTORY": f(&m.factory),
+        "DISTRIBUTOR": f(&m.distributor),
+        "WHOLESALER": f(&m.wholesaler),
+        "RETAILER": f(&m.retailer),
+    })
+}
+
+fn read_per_role<A>(v: &Value, f: impl Fn(&Value) -> R<A>) -> R<RoleMap<A>> {
+    Ok(RoleMap {
+        factory: f(field(v, "FACTORY")?)?,
+        distributor: f(field(v, "DISTRIBUTOR")?)?,
+        wholesaler: f(field(v, "WHOLESALER")?)?,
+        retailer: f(field(v, "RETAILER")?)?,
+    })
+}
+
+fn units(v: &Value) -> R<Units> {
+    Units::of(v.as_i64().ok_or("整数ではない")?).map_err(e)
+}
+
+fn quantity(v: &Value) -> R<Quantity> {
+    Quantity::of(v.as_i64().ok_or("整数ではない")?).map_err(e)
+}
+
+fn week_of(n: i64) -> R<Week> {
+    Week::of(n).map_err(e)
+}
+
+fn pipeline(p: &Pipeline) -> Value {
+    Value::Array(p.0.iter().map(|u| json!(u.get())).collect())
+}
+
+fn read_pipeline(v: &Value) -> R<Pipeline> {
+    let items = v.as_array().ok_or("配列ではない")?;
+    Ok(Pipeline(items.iter().map(units).collect::<R<Vec<_>>>()?))
+}
+
+fn role_state(s: &RoleState) -> Value {
+    json!({
+        "inventory": s.inventory.get(),
+        "backlog": s.backlog.get(),
+        "orderPipeline": pipeline(&s.order_pipeline),
+        "deliveryPipeline": pipeline(&s.delivery_pipeline),
+        "cumulativeCost": s.cumulative_cost.minor(),
+        "arrivals": s.arrivals.get(),
+        "orders": s.orders.get(),
+    })
+}
+
+fn read_role_state(v: &Value) -> R<RoleState> {
+    Ok(RoleState {
+        inventory: units(field(v, "inventory")?)?,
+        backlog: units(field(v, "backlog")?)?,
+        order_pipeline: read_pipeline(field(v, "orderPipeline")?)?,
+        delivery_pipeline: read_pipeline(field(v, "deliveryPipeline")?)?,
+        cumulative_cost: Money::of(int(v, "cumulativeCost")?).map_err(e)?,
+        arrivals: units(field(v, "arrivals")?)?,
+        orders: units(field(v, "orders")?)?,
+    })
+}
+
+fn role_result(r: &RoleWeekResult) -> Value {
+    json!({
+        "orders": r.orders.get(),
+        "shipped": r.shipped.get(),
+        "ordered": r.ordered.get(),
+        "endingInventory": r.ending_inventory.get(),
+        "endingBacklog": r.ending_backlog.get(),
+        "weeklyCost": r.weekly_cost.minor(),
+        "cumulativeCost": r.cumulative_cost.minor(),
+    })
+}
+
+fn read_role_result(v: &Value) -> R<RoleWeekResult> {
+    Ok(RoleWeekResult {
+        orders: units(field(v, "orders")?)?,
+        shipped: units(field(v, "shipped")?)?,
+        ordered: quantity(field(v, "ordered")?)?,
+        ending_inventory: units(field(v, "endingInventory")?)?,
+        ending_backlog: units(field(v, "endingBacklog")?)?,
+        weekly_cost: Money::of(int(v, "weeklyCost")?).map_err(e)?,
+        cumulative_cost: Money::of(int(v, "cumulativeCost")?).map_err(e)?,
+    })
+}
+
+fn commit_mode_name(m: CommitMode) -> &'static str {
+    match m {
+        CommitMode::Manual => "MANUAL",
+        CommitMode::Auto => "AUTO",
+    }
+}
+
+fn read_commit_mode(name: &str) -> R<CommitMode> {
+    match name {
+        "MANUAL" => Ok(CommitMode::Manual),
+        "AUTO" => Ok(CommitMode::Auto),
+        other => Err(format!("不明な確定方式: {other}")),
+    }
+}
+
+fn settings(s: &GameSettings) -> Value {
+    json!({
+        "finalWeek": s.final_week.get(),
+        "demand": s.demand.to_ints(),
+        "holdingCost": s.cost_policy.holding.minor(),
+        "backlogCost": s.cost_policy.backlog.minor(),
+        "commitMode": commit_mode_name(s.commit_mode),
+        "conditions": {
+            "initialInventory": per_role(&s.conditions.initial_inventory, |u| json!(u.get())),
+            "initialFlow": s.conditions.initial_flow.get(),
+            "orderDelayWeeks": s.conditions.order_delay,
+            "shipmentDelayWeeks": s.conditions.shipment_delay,
+            "productionDelayWeeks": s.conditions.production_delay,
+            "disclosurePolicy": disclosure_name(s.conditions.disclosure),
+        },
+    })
+}
+
+fn disclosure_name(policy: DisclosurePolicy) -> &'static str {
+    match policy {
+        DisclosurePolicy::TeamTotal => "TEAM_TOTAL",
+        DisclosurePolicy::None => "NONE",
+    }
+}
+
+/// 設定を読む。`conditions` が無いイベント（B7 まで）は、キットの値として読む（後方互換）。
+fn read_settings(v: &Value) -> R<GameSettings> {
+    let demand: Vec<i64> = field(v, "demand")?
+        .as_array()
+        .ok_or("配列ではない: demand")?
+        .iter()
+        .map(|n| n.as_i64().ok_or_else(|| "整数ではない: demand".to_owned()))
+        .collect::<R<_>>()?;
+    let final_week = week_of(int(v, "finalWeek")?)?;
+    let mut input = ConditionsInput {
+        holding_cost_minor: Some(int(v, "holdingCost")?),
+        backlog_cost_minor: Some(int(v, "backlogCost")?),
+        ..ConditionsInput::default()
+    };
+    if let Some(c) = v.get("conditions") {
+        let inventory = read_per_role(field(c, "initialInventory")?, |n| {
+            n.as_i64()
+                .ok_or_else(|| "整数ではない: initialInventory".to_owned())
+        })?;
+        input.initial_inventory = Role::ALL
+            .into_iter()
+            .map(|role| (role, *inventory.get(role)))
+            .collect();
+        input.initial_flow = Some(int(c, "initialFlow")?);
+        input.order_delay_weeks = Some(int(c, "orderDelayWeeks")?);
+        input.shipment_delay_weeks = Some(int(c, "shipmentDelayWeeks")?);
+        input.production_delay_weeks = Some(int(c, "productionDelayWeeks")?);
+        input.disclosure_policy = Some(text(c, "disclosurePolicy")?.to_owned());
+    }
+    GameSettings::custom(
+        i64::from(final_week.get()),
+        &demand,
+        read_commit_mode(text(v, "commitMode")?)?,
+        &input,
+    )
+    .map_err(e)
+}
+
+fn assignments(a: &RoleMap<BTreeSet<ParticipantId>>) -> Value {
+    per_role(a, |set| {
+        Value::Array(set.iter().map(|p| json!(uuid_of(p.get()))).collect())
+    })
+}
+
+fn read_assignments(v: &Value) -> R<RoleMap<BTreeSet<ParticipantId>>> {
+    read_per_role(v, |set| {
+        set.as_array()
+            .ok_or("配列ではない")?
+            .iter()
+            .map(|p| {
+                let s = p.as_str().ok_or("文字列ではない")?;
+                Uuid::parse_str(s)
+                    .map(|u| ParticipantId::new(u.as_u128()))
+                    .map_err(e)
+            })
+            .collect::<R<BTreeSet<_>>>()
+    })
+}
+
+fn editor(ed: &Editor) -> Value {
+    match ed {
+        Editor::ByParticipant(p) => json!({"kind": "PARTICIPANT", "id": uuid_of(p.get())}),
+        Editor::ByFacilitator(g) => json!({"kind": "FACILITATOR", "id": uuid_of(g.get())}),
+    }
+}
+
+fn read_editor(v: &Value) -> R<Editor> {
+    let who = id(v, "id")?;
+    match text(v, "kind")? {
+        "PARTICIPANT" => Ok(Editor::ByParticipant(ParticipantId::new(who))),
+        "FACILITATOR" => Ok(Editor::ByFacilitator(GameId::new(who))),
+        other => Err(format!("不明な入力者: {other}")),
+    }
+}
+
+/// `game` ストリームのイベントの変換。
+pub struct GameCodec;
+
+impl EventCodec<GameEvent> for GameCodec {
+    fn projection(&self, game_id: Uuid, event: &GameEvent) -> Vec<crate::projection::Statement> {
+        crate::projection::game_statements(game_id, event)
+    }
+
+    fn encode(&self, event: &GameEvent) -> R<(String, i32, Value)> {
+        let (name, payload) = match event {
+            GameEvent::GameCreated {
+                game_id,
+                join_code,
+                settings: s,
+                retention_days,
+                facilitator_credential_expires_at,
+            } => (
+                "GameCreated",
+                json!({
+                    "gameId": uuid_of(game_id.get()),
+                    "joinCode": join_code.as_str(),
+                    "settings": settings(s),
+                    "retentionDays": retention_days.get(),
+                    "facilitatorCredentialExpiresAt": facilitator_credential_expires_at.epoch_millis(),
+                }),
+            ),
+            GameEvent::ParticipantJoined {
+                participant_id,
+                credential_expires_at,
+            } => (
+                "ParticipantJoined",
+                json!({"participantId": uuid_of(participant_id.get()), "credentialExpiresAt": credential_expires_at.epoch_millis()}),
+            ),
+            GameEvent::RoleAssigned {
+                participant_id,
+                role,
+            } => (
+                "RoleAssigned",
+                json!({"participantId": uuid_of(participant_id.get()), "role": role_name(*role)}),
+            ),
+            GameEvent::RoleUnassigned {
+                participant_id,
+                role,
+            } => (
+                "RoleUnassigned",
+                json!({"participantId": uuid_of(participant_id.get()), "role": role_name(*role)}),
+            ),
+            GameEvent::ParticipantReplaced {
+                participant_id,
+                role,
+                replaced,
+            } => (
+                "ParticipantReplaced",
+                json!({
+                    "participantId": uuid_of(participant_id.get()), "role": role_name(*role),
+                    "replaced": replaced.iter().map(|r| uuid_of(r.get())).collect::<Vec<_>>(),
+                }),
+            ),
+            GameEvent::ObserverInvited {
+                invitation_id,
+                expires_at,
+            } => (
+                "ObserverInvited",
+                json!({"invitationId": uuid_of(invitation_id.get()), "expiresAt": expires_at.epoch_millis()}),
+            ),
+            GameEvent::ObserverInvitationRevoked { invitation_id } => (
+                "ObserverInvitationRevoked",
+                json!({"invitationId": uuid_of(invitation_id.get())}),
+            ),
+            GameEvent::ObserverJoined {
+                observer_id,
+                invitation_id,
+            } => (
+                "ObserverJoined",
+                json!({"observerId": uuid_of(observer_id.get()), "invitationId": uuid_of(invitation_id.get())}),
+            ),
+            GameEvent::CredentialRevoked { participant_id } => (
+                "CredentialRevoked",
+                json!({"participantId": uuid_of(participant_id.get())}),
+            ),
+            GameEvent::CredentialReissued {
+                participant_id,
+                credential_expires_at,
+            } => (
+                "CredentialReissued",
+                json!({"participantId": uuid_of(participant_id.get()), "credentialExpiresAt": credential_expires_at.epoch_millis()}),
+            ),
+            GameEvent::GameStarted { game_id } => {
+                ("GameStarted", json!({"gameId": uuid_of(game_id.get())}))
+            }
+        };
+        Ok((name.to_owned(), SCHEMA_VERSION, payload))
+    }
+
+    fn decode(&self, event_type: &str, schema_version: i32, p: Value) -> R<GameEvent> {
+        let p = upcast(event_type, schema_version, p)?;
+        match event_type {
+            "GameCreated" => Ok(GameEvent::GameCreated {
+                game_id: GameId::new(id(&p, "gameId")?),
+                join_code: JoinCode::of(text(&p, "joinCode")?).map_err(e)?,
+                settings: read_settings(field(&p, "settings")?)?,
+                retention_days: RetentionDays::of(int(&p, "retentionDays")?).map_err(e)?,
+                facilitator_credential_expires_at: Instant::from_epoch_millis(int(
+                    &p,
+                    "facilitatorCredentialExpiresAt",
+                )?),
+            }),
+            "ParticipantJoined" => Ok(GameEvent::ParticipantJoined {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                credential_expires_at: Instant::from_epoch_millis(int(&p, "credentialExpiresAt")?),
+            }),
+            "RoleAssigned" => Ok(GameEvent::RoleAssigned {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                role: role_field(&p, "role")?,
+            }),
+            "RoleUnassigned" => Ok(GameEvent::RoleUnassigned {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                role: role_field(&p, "role")?,
+            }),
+            "ParticipantReplaced" => Ok(GameEvent::ParticipantReplaced {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                role: role_field(&p, "role")?,
+                replaced: field(&p, "replaced")?
+                    .as_array()
+                    .ok_or("replaced が配列でない")?
+                    .iter()
+                    .map(|v| {
+                        v.as_str()
+                            .and_then(|t| Uuid::parse_str(t).ok())
+                            .map(|u| ParticipantId::new(u.as_u128()))
+                            .ok_or_else(|| "replaced の要素が UUID でない".to_owned())
+                    })
+                    .collect::<R<Vec<_>>>()?,
+            }),
+            "ObserverInvited" => Ok(GameEvent::ObserverInvited {
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
+                expires_at: Instant::from_epoch_millis(int(&p, "expiresAt")?),
+            }),
+            "ObserverInvitationRevoked" => Ok(GameEvent::ObserverInvitationRevoked {
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
+            }),
+            "ObserverJoined" => Ok(GameEvent::ObserverJoined {
+                observer_id: ObserverId::new(id(&p, "observerId")?),
+                invitation_id: InvitationId::new(id(&p, "invitationId")?),
+            }),
+            "CredentialRevoked" => Ok(GameEvent::CredentialRevoked {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+            }),
+            "CredentialReissued" => Ok(GameEvent::CredentialReissued {
+                participant_id: ParticipantId::new(id(&p, "participantId")?),
+                credential_expires_at: Instant::from_epoch_millis(int(&p, "credentialExpiresAt")?),
+            }),
+            "GameStarted" => Ok(GameEvent::GameStarted {
+                game_id: GameId::new(id(&p, "gameId")?),
+            }),
+            other => Err(format!("不明なイベント: {other}")),
+        }
+    }
+}
+
+/// `session` ストリームのイベントの変換。
+pub struct SessionCodec;
+
+impl EventCodec<SessionEvent> for SessionCodec {
+    fn actor(&self, event: &SessionEvent) -> (&'static str, Option<Uuid>) {
+        match event {
+            SessionEvent::DecisionSaved { editor, .. } => match editor {
+                Editor::ByParticipant(p) => ("PARTICIPANT", Some(Uuid::from_u128(p.get()))),
+                Editor::ByFacilitator(g) => ("FACILITATOR", Some(Uuid::from_u128(g.get()))),
+            },
+            SessionEvent::ProxyDecisionSubmitted { operator, .. } => {
+                ("FACILITATOR", Some(Uuid::from_u128(operator.get())))
+            }
+            SessionEvent::SessionStarted { .. }
+            | SessionEvent::WeekCommitted { .. }
+            | SessionEvent::SessionEnded { .. }
+            | SessionEvent::SessionPaused
+            | SessionEvent::RoleReplaced { .. }
+            | SessionEvent::CommitModeChanged { .. }
+            | SessionEvent::SessionResumed => ("ANONYMOUS", None),
+        }
+    }
+
+    fn projection(&self, game_id: Uuid, event: &SessionEvent) -> Vec<crate::projection::Statement> {
+        crate::projection::session_statements(game_id, event)
+    }
+
+    fn encode(&self, event: &SessionEvent) -> R<(String, i32, Value)> {
+        let (name, payload) = match event {
+            SessionEvent::SessionStarted {
+                game_id,
+                settings: s,
+                assignments: a,
+                initial_states,
+                commit_mode,
+            } => (
+                "SessionStarted",
+                json!({
+                    "gameId": uuid_of(game_id.get()),
+                    "settings": settings(s),
+                    "assignments": assignments(a),
+                    "initialStates": per_role(initial_states, role_state),
+                    "commitMode": commit_mode_name(*commit_mode),
+                }),
+            ),
+            SessionEvent::DecisionSaved {
+                week,
+                role,
+                quantity: q,
+                decision_version,
+                editor: ed,
+                submitted_role_count,
+            } => (
+                "DecisionSaved",
+                json!({
+                    "week": week.get(), "role": role_name(*role), "quantity": q.get(),
+                    "decisionVersion": decision_version.get(), "editor": editor(ed),
+                    "submittedRoleCount": submitted_role_count,
+                }),
+            ),
+            SessionEvent::WeekCommitted {
+                week,
+                commit_kind,
+                decisions,
+                results,
+                next_states,
+                contributors,
+            } => (
+                "WeekCommitted",
+                json!({
+                    "week": week.get(),
+                    "commitKind": match commit_kind { CommitKind::Manual => "MANUAL", CommitKind::Auto => "AUTO" },
+                    "decisions": per_role(decisions, |q| json!(q.get())),
+                    "results": per_role(results, role_result),
+                    "nextStates": per_role(next_states, role_state),
+                    "contributors": contributors,
+                }),
+            ),
+            SessionEvent::RoleReplaced { role, new_holder } => (
+                "RoleReplaced",
+                json!({"role": role_name(*role), "newHolder": uuid_of(new_holder.get())}),
+            ),
+            SessionEvent::CommitModeChanged { mode } => (
+                "CommitModeChanged",
+                json!({"commitMode": commit_mode_name(*mode)}),
+            ),
+            SessionEvent::SessionPaused => ("SessionPaused", json!({})),
+            SessionEvent::SessionResumed => ("SessionResumed", json!({})),
+            SessionEvent::ProxyDecisionSubmitted {
+                week,
+                role,
+                quantity: q,
+                decision_version,
+                operator,
+                submitted_role_count,
+            } => (
+                "ProxyDecisionSubmitted",
+                json!({
+                    "week": week.get(), "role": role_name(*role), "quantity": q.get(),
+                    "decisionVersion": decision_version.get(), "operator": uuid_of(operator.get()),
+                    "submittedRoleCount": submitted_role_count,
+                }),
+            ),
+            SessionEvent::SessionEnded { reason } => (
+                "SessionEnded",
+                json!({"reason": match reason { EndReason::FinalWeek => "FINAL_WEEK" }}),
+            ),
+        };
+        Ok((name.to_owned(), SCHEMA_VERSION, payload))
+    }
+
+    fn decode(&self, event_type: &str, schema_version: i32, p: Value) -> R<SessionEvent> {
+        let p = upcast(event_type, schema_version, p)?;
+        match event_type {
+            "SessionStarted" => Ok(SessionEvent::SessionStarted {
+                game_id: GameId::new(id(&p, "gameId")?),
+                settings: read_settings(field(&p, "settings")?)?,
+                assignments: read_assignments(field(&p, "assignments")?)?,
+                initial_states: read_per_role(field(&p, "initialStates")?, read_role_state)?,
+                commit_mode: read_commit_mode(text(&p, "commitMode")?)?,
+            }),
+            "DecisionSaved" => Ok(SessionEvent::DecisionSaved {
+                week: week_of(int(&p, "week")?)?,
+                role: role_field(&p, "role")?,
+                quantity: quantity(field(&p, "quantity")?)?,
+                decision_version: DecisionVersion::new(
+                    u32::try_from(int(&p, "decisionVersion")?).map_err(e)?,
+                ),
+                editor: read_editor(field(&p, "editor")?)?,
+                submitted_role_count: usize::try_from(int(&p, "submittedRoleCount")?).map_err(e)?,
+            }),
+            "WeekCommitted" => Ok(SessionEvent::WeekCommitted {
+                week: week_of(int(&p, "week")?)?,
+                commit_kind: match text(&p, "commitKind")? {
+                    "MANUAL" => CommitKind::Manual,
+                    "AUTO" => CommitKind::Auto,
+                    other => return Err(format!("不明な確定の種類: {other}")),
+                },
+                decisions: read_per_role(field(&p, "decisions")?, quantity)?,
+                results: read_per_role(field(&p, "results")?, read_role_result)?,
+                next_states: read_per_role(field(&p, "nextStates")?, read_role_state)?,
+                contributors: usize::try_from(int(&p, "contributors")?).map_err(e)?,
+            }),
+            "RoleReplaced" => Ok(SessionEvent::RoleReplaced {
+                role: role_field(&p, "role")?,
+                new_holder: ParticipantId::new(id(&p, "newHolder")?),
+            }),
+            "CommitModeChanged" => Ok(SessionEvent::CommitModeChanged {
+                mode: read_commit_mode(text(&p, "commitMode")?)?,
+            }),
+            "SessionPaused" => Ok(SessionEvent::SessionPaused),
+            "SessionResumed" => Ok(SessionEvent::SessionResumed),
+            "ProxyDecisionSubmitted" => Ok(SessionEvent::ProxyDecisionSubmitted {
+                week: week_of(int(&p, "week")?)?,
+                role: role_field(&p, "role")?,
+                quantity: quantity(field(&p, "quantity")?)?,
+                decision_version: DecisionVersion::new(
+                    u32::try_from(int(&p, "decisionVersion")?).map_err(e)?,
+                ),
+                operator: GameId::new(id(&p, "operator")?),
+                submitted_role_count: usize::try_from(int(&p, "submittedRoleCount")?).map_err(e)?,
+            }),
+            "SessionEnded" => match text(&p, "reason")? {
+                "FINAL_WEEK" => Ok(SessionEvent::SessionEnded {
+                    reason: EndReason::FinalWeek,
+                }),
+                other => Err(format!("不明な終了の理由: {other}")),
+            },
+            other => Err(format!("不明なイベント: {other}")),
+        }
+    }
+}

@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 本書は、beer-game-kotlin のテスト戦略を定義します。**`docs/` を設計の正本**とします。実装コードはまだ存在しません。
 
-[beer-game2 のテスト戦略](../beer-game2/test-strategy.md) を出発点に、次の 3 点を Kotlin・関数型・イベントソーシング（ES）+ CQRS に合わせて作り直します。
+[beer-game2 のテスト戦略](../beer-game-ts/test-strategy.md) を出発点に、次の 3 点を Kotlin・関数型・イベントソーシング（ES）+ CQRS に合わせて作り直します。
 
 - **ドメインが純粋関数**（`decideGame` / `evolveGame` / `decideSession` / `evolveSession` / `startGame` / `simulateWeek`）になるため、テストの大半が「入力を与えて出力を確かめる」だけになる。ES では、テストの形が **Given（過去のイベント）/ When（コマンド）/ Then（新しいイベント、またはエラー）** にそのまま対応する（[ガイド 第 8 章](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
 - 状態が**イベントの列**になるため、「再生しても同じ状態になる」「投影を作り直しても同じ行になる」という**性質**を、プロパティベーステストで保証する（[ガイド §8.3](../../reference/関数型プログラミングガイド_Kotlin編.md)）。
@@ -21,7 +21,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-15T09:21:42Z }
 
 - **ローカル開発は H2 の PostgreSQL モード、検証は PostgreSQL 18**（2026-11-14 のユーザーの決定。[技術スタック](./tech-stack.md) 設計判断 T7）。H2 は開発機での起動・動作確認だけに使い、統合テスト・受け入れ・CI・ステージング・本番は PostgreSQL 18 のままにする。PostgreSQL 固有の機能（アドバイザリロック、`LISTEN` / `NOTIFY`）はポートの裏に隠し、**ポートの契約テストを両実装で実行**する（下の「ローカル開発の H2 とテストの分担」）。
 
-機能と振る舞いの受入条件は beer-game2 の [ユーザーストーリー](../../requirements/beer-game2/user_story.md) を正本として引き継ぎます。変えるのは、**検証の手段**だけです。
+機能と振る舞いの受入条件は beer-game2 の [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) を正本として引き継ぎます。変えるのは、**検証の手段**だけです。
 
 ### 基準にする値
 
@@ -136,10 +136,10 @@ UI -[hidden]down-> UNIT
 | 項目 | 方針 |
 | :--- | :--- |
 | 言語・語彙 | 日本語 Gherkin。ファイルの先頭に `# language: ja`（`機能`・`背景`・`シナリオ`・`前提`・`もし`・`ならば`・`かつ`）。語彙は [ドメインモデル](./domain-model.md) のユビキタス言語に合わせ、**イベント名・テーブル名などの実装の言葉を持ち込まない**。言語を混在させない |
-| 整理 | 機能領域ごとにフォルダを切る。領域は [ユーザーストーリー](../../requirements/beer-game2/user_story.md) の Epic（ゲーム準備と参加、1 週の意思決定、継続と復旧、観察と振り返り、保持、運用と観測性）に合わせる。1 ファイルに 3〜15 シナリオを目安にする |
+| 整理 | 機能領域ごとにフォルダを切る。領域は [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) の Epic（ゲーム準備と参加、1 週の意思決定、継続と復旧、観察と振り返り、保持、運用と観測性）に合わせる。1 ファイルに 3〜15 シナリオを目安にする |
 | タグ | ストーリーと受入条件の ID（`@US2.4`、`@AC2.4.1`）、層（`@api`、`@ui`）、重要度（`@acceptance-criteria`、`@happy-path`、`@negative`、`@core`）。`@wip` は作業中の一時的なもので、完了時に削除する。**タグの一覧と意味を、フィーチャーファイルと同じ場所のテキストファイルに文書化する** |
 | 層の分担 | `@api`: Cucumber-JVM（Gradle のソースセット `acceptanceTest` を想定）。Ktor のテスト用アプリケーションと実 PostgreSQL（Testcontainers）を通す。`@ui`: Cucumber-JS（`@cucumber/cucumber`、プロジェクトの依存として導入し、依存ツリーに複数の版を混在させない）と Playwright。実 Ktor サーバーを通す。画面を通す必要のある業務（振り返りの表示など）だけを `@ui` にし、ほかは `@api` にする |
-| 配置（**B1 で確定。2026-11-14**） | フィーチャーファイルは `apps/beer-game-kotlin/features/<機能領域>/` に 1 か所にまとめ、両処理系から参照する（**仮説 4 は成立した**: Cucumber-JVM は `@SelectDirectories("../features")`（JUnit Platform Suite）、Cucumber-JS は `web/cucumber.mjs` の `paths: ['../features/**/*.feature']`。日本語 Gherkin は両方で解釈でき、タグで処理系ごとに実行を分ける。JVM は `junit-platform.properties` の `cucumber.filter.tags=@api`、JS は `tags: '@ui'`）。**領域のフォルダ名は ASCII**（`game-setup`、`weekly-play`、`operations`。Epic 3〜5 は B1 の範囲外）。ステップ定義は、Cucumber-JVM は **`app/src/acceptanceTest/kotlin/beergame/acceptance/`**（`app` のソースセット `acceptanceTest`。`RunningApp`＝シナリオごとに Ktor を本番と同じ組み立てで起動、`GamePlayApi`＝HTTP を呼ぶだけの窓口、`ScenarioContext`、`*Steps.kt`）、Cucumber-JS は `web/steps/`・`web/support/`。**`acceptanceTest` は `test` のクラスパスを継承しない**（Cucumber-JVM 8.0.4 が JUnit 6.1.3 を要求し、Kotest 6.2.7 は JUnit 5.13.4 を引くため、混ぜない）。タスクは 2 つ: `acceptanceTest`（PostgreSQL。受け入れの正）と `acceptanceTestH2`（H2）。DB はシステムプロパティ `acceptance.db`。テストのレベルは、Gradle のソースセットで分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合、`acceptanceTest` = Cucumber-JVM）。コンポーネントと E2E は、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない |
+| 配置（**B1 で確定。2026-11-14**） | フィーチャーファイルは `apps/beer-game-features/<機能領域>/` に 1 か所にまとめ、両処理系（と Rust 版）から参照する（2026-11-23 に `apps/beer-game-kotlin/features/` から移動。**仮説 4 は成立した**: Cucumber-JVM は `@SelectDirectories("../../beer-game-features")`（JUnit Platform Suite）、Cucumber-JS は `web/cucumber.mjs` の `paths: ['../../beer-game-features/**/*.feature']`。日本語 Gherkin は両方で解釈でき、タグで処理系ごとに実行を分ける。JVM は `junit-platform.properties` の `cucumber.filter.tags=@api`、JS は `tags: '@ui'`）。**領域のフォルダ名は ASCII**（`game-setup`、`weekly-play`、`operations`。Epic 3〜5 は B1 の範囲外）。ステップ定義は、Cucumber-JVM は **`app/src/acceptanceTest/kotlin/beergame/acceptance/`**（`app` のソースセット `acceptanceTest`。`RunningApp`＝シナリオごとに Ktor を本番と同じ組み立てで起動、`GamePlayApi`＝HTTP を呼ぶだけの窓口、`ScenarioContext`、`*Steps.kt`）、Cucumber-JS は `web/steps/`・`web/support/`。**`acceptanceTest` は `test` のクラスパスを継承しない**（Cucumber-JVM 8.0.4 が JUnit 6.1.3 を要求し、Kotest 6.2.7 は JUnit 5.13.4 を引くため、混ぜない）。タスクは 2 つ: `acceptanceTest`（PostgreSQL。受け入れの正）と `acceptanceTestH2`（H2）。DB はシステムプロパティ `acceptance.db`。テストのレベルは、Gradle のソースセットで分ける（`test` = ユニットと性質、`integrationTest` = DB と HTTP の統合、`acceptanceTest` = Cucumber-JVM）。コンポーネントと E2E は、フロントエンドのディレクトリに置く。beer-game2 の `u1`〜`u5` のような、デリバリー単位の名前は使わない |
 | 実行 | `@api` は Gradle のタスク、`@ui` は `npx cucumber-js`。CI の毎回の工程に含める。**Undefined・Pending のステップがあれば失敗** |
 
 ### ステップ定義の責務
@@ -852,10 +852,10 @@ stop
 
 - **Gherkin のシナリオ**: タグ `@US<番号>`・`@AC<番号>`（例: `@US2.4 @AC2.4.1`）と、層のタグ（`@api`、`@ui`）、重要度のタグから抽出する。Cucumber の実行結果（メッセージ形式や JUnit XML など。形式は B1 で選ぶ）と突き合わせ、**受入条件ごとに、実行したシナリオの数と結果**を出す。
 - **Kotest のテスト**: テスト名の ID（`[US2.4/AC2.4.1]`）を、テスト結果の XML から抽出する。
-- **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game2/user_story.md)）に存在しない ID を持つタグ・テスト、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。生成の道具は実装開始時に決める。
+- **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)）に存在しない ID を持つタグ・テスト、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。生成の道具は実装開始時に決める。
 - **生きたドキュメントとの連携**: タグから、機能領域・ストーリー別のシナリオのダイジェストを生成する（開発戦略の終盤の重点）。
 
-下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です。**受入条件の代表例は、すべてのストーリーで Cucumber のシナリオ（`@api`、画面を通す業務は `@ui`）に持たせ**、下表の「主なレベル」は、それを補う Kotest などのテストを示します。ストーリーの内容は beer-game2 の [ユーザーストーリー](../../requirements/beer-game2/user_story.md) を参照します。
+下表は、各ストーリーの受入条件を、どのレベルのテストで保証するかの**計画**です。**受入条件の代表例は、すべてのストーリーで Cucumber のシナリオ（`@api`、画面を通す業務は `@ui`）に持たせ**、下表の「主なレベル」は、それを補う Kotest などのテストを示します。ストーリーの内容は beer-game2 の [ユーザーストーリー](../../requirements/beer-game-ts/user_story.md) を参照します。
 
 | ストーリー | 受入条件 | 主なレベル | 備考 |
 | :--- | :--- | :--- | :--- |
@@ -991,6 +991,6 @@ stop
 
 - [テスト戦略ガイド](../../reference/テスト戦略ガイド.md)、[ガイド 関数型プログラミング（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（イベントソーシング、CQRS、永続化）、第 8 章（テスト戦略）、第 9 章（静的解析）
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[技術スタック（Kotlin 版）](./tech-stack.md)、[非機能要件（Kotlin 版）](./non-functional.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[運用要件](./operation.md)
-- [beer-game2 のテスト戦略](../beer-game2/test-strategy.md)、[ユーザーストーリー（beer-game2）](../../requirements/beer-game2/user_story.md)
+- [beer-game2 のテスト戦略](../beer-game-ts/test-strategy.md)、[ユーザーストーリー（beer-game2）](../../requirements/beer-game-ts/user_story.md)
 - [開発戦略（Kotlin 版）](../../development/beer-game-kotlin/development_strategy.md)、[BDD 導入ガイド](../../reference/BDD導入ガイド.md)
-- [ADR-005](../../adr/beer-game2/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)
+- [ADR-005](../../adr/beer-game-ts/005-role-results-and-sql-read-models.md)、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)

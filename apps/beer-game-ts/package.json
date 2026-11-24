@@ -1,0 +1,57 @@
+{
+  "name": "@beer-game-ts/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d --wait",
+    "migrate": "node-pg-migrate -m migrations --migrations-table pgmigrations up",
+    "dev:server": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "acceptance": "tsx scripts/acceptance-matrix.ts",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run acceptance > /dev/null && npm run docs:tour:check && npm run docs:living:check",
+    "migrate:local": "DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2 npm run migrate",
+    "dev": "npm run db:up && npm run migrate:local && npm start",
+    "smoke": "tsx scripts/smoke.ts",
+    "dev:bots": "tsx scripts/dev-bots.ts",
+    "container:check": "bash scripts/container-check.sh",
+    "build": "tsc -p tsconfig.build.json",
+    "start:prod": "node dist/main.js",
+    "retention": "tsx src/retention.ts",
+    "docs:tour": "tsx scripts/guided-tour.ts",
+    "docs:tour:check": "tsx scripts/guided-tour.ts --check",
+    "docs:living": "tsx scripts/living-docs.ts",
+    "docs:living:check": "tsx scripts/living-docs.ts --check"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@vitest/coverage-v8": "5.1.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "eslint": "10.14.0",
+    "fast-check": "4.10.2",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.1.0",
+    "yaml": "2.9.1"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.5",
+    "fastify": "5.12.8",
+    "node-pg-migrate": "9.0.0",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  }
+}

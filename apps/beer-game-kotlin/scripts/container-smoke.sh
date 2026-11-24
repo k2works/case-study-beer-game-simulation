@@ -95,7 +95,7 @@ expect_log() { # 説明 文字列
 
 echo "== イメージ =="
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
-  docker build -t "$IMAGE" .
+  docker build --build-context web=../beer-game-web -t "$IMAGE" .
 fi
 docker image inspect "$IMAGE" >/dev/null
 

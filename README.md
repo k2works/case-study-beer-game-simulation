@@ -2,7 +2,8 @@
 
 [![beer-game-kotlin](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-kotlin.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-kotlin.yml)
 [![beer-game3](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game3.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game3.yml)
-[![beer-game2](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game2.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game2.yml)
+[![beer-game-ts](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-ts.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-ts.yml)
+[![beer-game-rust](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-rust.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/beer-game-rust.yml)
 [![Deploy MkDocs (develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/mkdocs-develop.yml/badge.svg?branch=develop)](https://github.com/k2works/case-study-beer-game-simulation/actions/workflows/mkdocs-develop.yml)
 [![デモ環境（Heroku）](https://img.shields.io/badge/demo-Heroku-430098?logo=heroku&logoColor=white)](https://beer-game-kotlin-demo-bc58641c42c0.herokuapp.com)
 
@@ -10,11 +11,30 @@
 
 ### 目的
 
+サプライチェーンの需給の揺れ（ブルウィップ効果）を体験するビールゲームを題材に、同じ仕様を複数の言語・方法論で実装し、設計と開発の進め方を比べるケーススタディです。設計・計画・報告書は `docs/` に置き、MkDocs で公開しています。
+
+### アプリケーション
+
+3 つの実装（Kotlin・Rust・TypeScript）は、同じ API 契約・同じ画面・同じ受け入れの仕様を共有します。
+
+| ディレクトリ                                       | 内容                                                                                              |
+| :------------------------------------------------- | :------------------------------------------------------------------------------------------------ |
+| [`apps/beer-game-kotlin`](apps/beer-game-kotlin)   | Kotlin 版のバックエンド                                                                           |
+| [`apps/beer-game-rust`](apps/beer-game-rust)       | Rust 版のバックエンド                                                                             |
+| [`apps/beer-game-ts`](apps/beer-game-ts)           | TypeScript 版のバックエンド（Fastify + PostgreSQL。独自の画面は持たず、共有の画面と契約を使う）  |
+| [`apps/beer-game-web`](apps/beer-game-web)         | 共有の画面（React + Vite）と、画面の受け入れ（Cucumber-JS + Playwright。`@ui`）                  |
+| [`apps/beer-game-contracts`](apps/beer-game-contracts) | 共有の API 契約（OpenAPI。`/api/v1`）                                                         |
+| [`apps/beer-game-features`](apps/beer-game-features) | 共有の受け入れの仕様（Gherkin）                                                                 |
+| `apps/beer-game`、`apps/beer-game3`                | 旧い版・別の試み（参照用）                                                                        |
+
+TS 版のバックエンドで共有の画面を動かす手順は、[`apps/beer-game-ts/README.md`](apps/beer-game-ts/README.md) を参照してください。
+
 ### 前提
 
-| ソフトウェア | バージョン | 備考 |
-| :----------- | :--------- | :--- |
-| nodejs       | 22.x       |      |
+| ソフトウェア | バージョン | 備考                                                       |
+| :----------- | :--------- | :--------------------------------------------------------- |
+| nodejs       | 22.x 以上  | ドキュメントの生成。TS 版・共有の画面は 26 以上            |
+| Docker       | 最近の版   | MkDocs・PostgreSQL（TS 版。ポート 5433）の実行             |
 
 ## 構成
 

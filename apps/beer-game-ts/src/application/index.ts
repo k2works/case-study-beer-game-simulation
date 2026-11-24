@@ -1,0 +1,1772 @@
+import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
+import type { ConditionsInput } from '../domain/conditions.js';
+import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
+import { OBSERVER_LIMIT, observe } from '../domain/observation.js';
+import { buildExport } from '../domain/export.js';
+import { RETENTION, retentionPolicyOf } from '../domain/retention.js';
+import {
+  assignRole as assignRoleRule,
+  unassignRole as unassignRoleRule,
+  createGame as createGameRule,
+  joinGame as joinGameRule,
+  missingRoles,
+  type CommitMode,
+  type Game,
+  type GameSettings,
+  startGame as startGameRule,
+} from '../domain/game.js';
+import { ROLES, type Role } from '../domain/role.js';
+import { buildReview, canDisclose } from '../domain/review.js';
+import {
+  DecisionConflictError,
+  DecisionsChangedError,
+  DisplayName,
+  DomainError,
+  ParticipantNotFoundError,
+  PermissionError,
+  SessionEndedError,
+  type Issue,
+} from '../domain/values.js';
+import {
+  PROXY_OPERATOR,
+  changeCommitMode as changeCommitModeRule,
+  commitWeek as commitWeekRule,
+  commitWeekWithBasis as commitWeekWithBasisRule,
+  pauseSession as pauseSessionRule,
+  proxyDecision as proxyDecisionRule,
+  replaceHolders,
+  resumeSession as resumeSessionRule,
+  saveDecision as saveDecisionRule,
+  startSession,
+  type Session,
+  type SessionOutcome,
+} from '../domain/session.js';
+import {
+  type Clock,
+  type ReviewReader,
+  type CredentialPolicy,
+  type CredentialPurpose,
+  type ExportReader,
+  type IdempotencyScope,
+  type Metrics,
+  type IdGenerator,
+  type Principal,
+  type Repositories,
+  type UnitOfWork,
+} from '../ports/index.js';
+import {
+  CredentialAlreadyRevokedError,
+  CredentialNotRevokedError,
+  DecisionConflict,
+  DecisionConflictedError,
+  DecisionsChangedViewError,
+  ForbiddenError,
+  IdempotencyKeyReusedError,
+  InvalidInvitationError,
+  InvalidObserverInvitationError,
+  InvitationNotFoundError,
+  NotActiveError,
+  NotEndedError,
+  NotFoundError,
+  UnauthorizedError,
+} from './errors.js';
+import {
+  fingerprintOf,
+  idempotently,
+  retryOnDuplicate,
+} from './idempotency.js';
+import {
+  decisionEntryView,
+  gameStateView,
+  lobbyView,
+  observationView,
+  retentionStateView,
+  reviewView,
+  sessionStateView,
+  versionsOf,
+  withLiveCommitMode,
+  type StreamVersions,
+  type Viewer,
+} from './contract-views.js';
+import {
+  buildContractExport,
+  CONTRACT_EXPORT_SCHEMA_VERSION,
+} from '../domain/contract-export.js';
+
+export interface Dependencies {
+  uow: UnitOfWork;
+  clock: Clock;
+  ids: IdGenerator;
+  credentials: CredentialPolicy;
+  /** 読み取り専用の経路（振り返り） */
+  reviews: ReviewReader;
+  /** 読み取り専用の経路（出力） */
+  exports: ExportReader;
+  /** メトリクス（省略時は出さない） */
+  metrics?: Metrics;
+  /** 資格の有効期間（省略時は仮の既定値） */
+  ttl?: { sessionMs: number; recoveryMs: number; observerInvitationMs: number };
+}
+
+/** 進行役のコンソールの、1 役割の状況 */
+export interface ConsoleRole {
+  holders: string[];
+  decision: { quantity: number; version: number; savedBy: string } | null;
+  inventory: number;
+  backlog: number;
+  incomingGoods: number[];
+  cumulativeCostMinor: number;
+  history: {
+    week: number;
+    order: number;
+    demand: number;
+    received: number;
+    shipped: number;
+    endingInventory: number;
+    endingBacklog: number;
+    weeklyCostMinor: number;
+    cumulativeCostMinor: number;
+  }[];
+}
+
+/** 再発行の対象。進行役自身か、このゲームの参加者 1 人 */
+export type CredentialTarget =
+  { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };
+
+/** 無効な復帰コード。復帰せず、進行役への確認方法を示す */
+const INVALID_RECOVERY =
+  '復帰コードが無効です（失効・期限切れ、またはゲームが削除済み）。進行役に、新しい復帰コードの発行を依頼してください';
+
+/** 作成したゲームと、進行役の資格（生の値。保存はダイジェストだけ。冪等記録には、暗号化して保存する） */
+export interface CreatedGame {
+  gameId: string;
+  joinCode: string;
+  facilitatorToken: string;
+  recoveryCode: string;
+  /** 追記後のストリームごとの版（共有の契約の `versions`） */
+  versions: StreamVersions;
+}
+
+export interface CommitResult {
+  committedWeek: number;
+  nextWeek: number;
+  status: Session['status'];
+}
+
+/**
+ * ユースケース。読み込み → 集約の呼び出し → 保存だけを行い、ルールは持たない。
+ * 1 回の操作は 1 つのトランザクション（UnitOfWork）で行う。
+ *
+ * @guidedTour walking-skeleton 40 ユースケース。1 回の操作を `UnitOfWork`（1 つのトランザクション）の中で行い、資格を確認し、集約を呼び、保存する。**ルールはここに書かない**（層の依存は lint で守られる）。次は、集約のルール。
+ *
+ * @landmark ユースケース層の入口。1 回の操作は 1 つのトランザクション。ルールを持たず、認証 → 集約の呼び出し → 保存の順に進めるだけ。
+ */
+export function createApplication(deps: Dependencies) {
+  const { uow, ids, credentials, reviews, exports, clock } = deps;
+  const ttl = deps.ttl ?? CREDENTIAL_TTL;
+
+  /** 資格を発行して保存し、生の値を返す（生の値は保存しない） */
+  async function issueWithExpiry(
+    repos: Repositories,
+    principal: Principal,
+    purpose: CredentialPurpose,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const cred = credentials.issue();
+    const validity = CredentialValidity.issue(
+      clock.now(),
+      purpose === 'SESSION' ? ttl.sessionMs : ttl.recoveryMs,
+    );
+    await repos.credentials.save(cred.digest, principal, purpose, validity);
+    return { token: cred.token, expiresAt: validity.expiresAt };
+  }
+  async function issue(
+    repos: Repositories,
+    principal: Principal,
+    purpose: CredentialPurpose,
+  ): Promise<string> {
+    return (await issueWithExpiry(repos, principal, purpose)).token;
+  }
+
+  const findPrincipal = (
+    repos: Repositories,
+    token: string,
+    purpose: CredentialPurpose,
+  ) =>
+    token
+      ? repos.credentials.find(
+          credentials.digestsOf(token),
+          purpose,
+          clock.now(),
+        )
+      : Promise.resolve(null);
+
+  async function authenticate(
+    repos: Repositories,
+    token: string,
+    gameId: string,
+  ): Promise<Principal> {
+    const principal = await findPrincipal(repos, token, 'SESSION');
+    if (!principal) throw new UnauthorizedError();
+    if (principal.gameId !== gameId) throw new ForbiddenError();
+    return principal;
+  }
+
+  const actorOf = (p: Principal): Actor =>
+    p.kind === 'FACILITATOR'
+      ? FACILITATOR
+      : p.kind === 'OBSERVER'
+        ? { kind: 'OBSERVER', observerId: p.observerId ?? '' }
+        : participant(p.participantId ?? '');
+
+  /** このゲームの参加者の主体。参加者でなければ `ParticipantNotFoundError` */
+  const participantPrincipal = (
+    game: Game,
+    participantId: string,
+  ): Principal => {
+    if (!game.participants.some((p) => p.id === participantId))
+      throw new ParticipantNotFoundError();
+    return { gameId: game.id, kind: 'PARTICIPANT', participantId };
+  };
+
+  /** 資格から、投影の「見る人」を作る。観察者は、役割も参加コードも見ないので null */
+  const viewerOf = (p: Principal): Viewer | null =>
+    p.kind === 'FACILITATOR'
+      ? { kind: 'FACILITATOR' }
+      : p.kind === 'PARTICIPANT'
+        ? { kind: 'PARTICIPANT', participantId: p.participantId ?? '' }
+        : null;
+
+  const requireFacilitatorPrincipal = (p: Principal, operation: string) => {
+    if (p.kind !== 'FACILITATOR')
+      throw new PermissionError(`${operation}は進行役だけができます`);
+  };
+
+  async function loadGame(repos: Repositories, gameId: string) {
+    const game = await repos.games.find(gameId);
+    if (!game) throw new NotFoundError('ゲームが見つかりません');
+    return game;
+  }
+
+  /** 画面に出す設定（準拠かカスタムか、変更項目、条件の値） */
+  const settingsView = (s: GameSettings) => ({
+    kind: s.kind,
+    changes: s.changes,
+    // 旧い経路（/api/*）と旧い UI は、初期在庫を 1 つの数で扱う。役割ごとの値は /api/v1 が返す。小売店の値を示す（段階 4 で撤去）
+    initialInventory: s.initialInventory.RETAILER,
+    orderDelayWeeks: s.orderDelayWeeks,
+    shipmentDelayWeeks: s.shipmentDelayWeeks,
+    productionDelayWeeks: s.productionDelayWeeks,
+    holdingCostMinor: s.holdingCostMinor,
+    backlogCostMinor: s.backlogCostMinor,
+    disclosure: s.disclosure,
+  });
+
+  /** 役割の週ごとの結果（参加者の画面と、進行役のコンソールで共通） */
+  const historyOf = (session: Session, role: Role) =>
+    session.history.map((h) => {
+      const r = h.roles[role];
+      return {
+        week: h.week,
+        order: r.order,
+        demand: r.demand,
+        received: r.received,
+        shipped: r.shipped,
+        endingInventory: r.endingInventory,
+        endingBacklog: r.endingBacklog,
+        weeklyCostMinor: r.weeklyCostMinor,
+        cumulativeCostMinor: r.cumulativeCostMinor,
+      };
+    });
+
+  /** 保持方針（進行役に示す）。削除予定日と、削除後もバックアップに残る日数 */
+  async function retentionView(repos: Repositories, gameId: string) {
+    const policy = await repos.retention.policyOf(gameId);
+    return policy
+      ? {
+          days: policy.days,
+          deleteAfter: policy.deleteAfter.toISOString(),
+          backupDays: RETENTION.backupDays,
+        }
+      : null;
+  }
+
+  /** 保存者の表示名。代理入力は「進行役」 */
+  const nameOf = (names: Record<string, string>, savedBy: string) =>
+    savedBy === PROXY_OPERATOR ? '進行役' : (names[savedBy] ?? '');
+
+  async function loadSession(repos: Repositories, gameId: string) {
+    const session = await repos.sessions.findByGame(gameId);
+    if (!session) throw new NotFoundError('ゲームはまだ開始されていません');
+    return session;
+  }
+
+  /** 認証 → セッションの読み込み → 集約の操作 → 保存（停止・再開・代理入力で共通） */
+  function changeSession(
+    input: { token: string; gameId: string },
+    operate: (session: Session, actor: Actor) => SessionOutcome,
+  ): Promise<Session> {
+    return uow.run(async (repos) => {
+      const principal = await authenticate(repos, input.token, input.gameId);
+      const session = await loadSession(repos, input.gameId);
+      const { session: next, events } = operate(session, actorOf(principal));
+      await repos.sessions.save(next, session.version);
+      await repos.events.append(input.gameId, events);
+      return next;
+    });
+  }
+
+  /**
+   * 共有の契約の、進行中のコマンド（session ストリーム）。認証 → 認可（進行役だけの操作は、冪等の照合より前）→ セッションの読み込み →
+   * 冪等な実行（集約の操作 → 保存）。応答は、追記後の版（game ストリームは追記しないので null）。
+   * 開始前（セッションが無い）は `NotActiveError`。
+   */
+  function sessionCommand(
+    input: { token: string; gameId: string; idempotencyKey?: string },
+    spec: {
+      scope: IdempotencyScope;
+      /** 進行役だけの操作なら、その名前（認可の失敗の文言） */
+      facilitatorOnly?: string;
+      /** 指紋に加える、要求の内容 */
+      content?: unknown;
+      /** 操作者（資格）から、操作の前に決める値（役割など）。認可の失敗は、ここで投げる */
+      prepare?: (principal: Principal, session: Session) => void;
+    },
+    operate: (
+      session: Session,
+      actor: Actor,
+      repos: Repositories,
+      principal: Principal,
+    ) => SessionOutcome | Promise<SessionOutcome>,
+  ): Promise<{ versions: StreamVersions }> {
+    return retryOnDuplicate(input.idempotencyKey, () =>
+      uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (spec.facilitatorOnly)
+          requireFacilitatorPrincipal(principal, spec.facilitatorOnly);
+        const session = await repos.sessions.findByGame(input.gameId);
+        if (!session) throw new NotActiveError();
+        spec.prepare?.(principal, session);
+        return idempotently(
+          repos,
+          {
+            gameId: input.gameId,
+            scope: spec.scope,
+            key: input.idempotencyKey,
+            fingerprint: fingerprintOf({
+              operator: principal,
+              ...(spec.content === undefined ? {} : { content: spec.content }),
+            }),
+          },
+          async () => {
+            const { session: next, events } = await operate(
+              session,
+              actorOf(principal),
+              repos,
+              principal,
+            );
+            await repos.sessions.save(next, session.version);
+            await repos.events.append(input.gameId, events);
+            // 週の確定を、確定の方式（手動・自動）ごとに数える（保存と同じ操作の中の自動確定も含む）
+            for (const e of events)
+              if (e.type === 'WeekCommitted')
+                deps.metrics?.emit(
+                  [{ name: 'WeekCommitted', value: 1, unit: 'Count' }],
+                  { CommitKind: e.record.commitKind },
+                );
+            return { versions: versionsOf(null, next) };
+          },
+        );
+      }),
+    );
+  }
+
+  /** 参加者の、このセッションでの役割。役割が無い（進行役・観察者・役割の無い参加者）なら、権限なし（403） */
+  function roleOfPrincipal(principal: Principal, session: Session): Role {
+    const role =
+      principal.kind === 'PARTICIPANT'
+        ? ROLES.find((r) =>
+            session.holders[r].includes(principal.participantId ?? ''),
+          )
+        : undefined;
+    if (!role) throw new PermissionError('入力する役割がありません');
+    return role;
+  }
+
+  return {
+    createGame(input: {
+      weeks: number;
+      demand?: readonly number[];
+      commitMode?: CommitMode;
+      conditions?: ConditionsInput;
+      /** 保持期間（日）。省略時は 90 日 */
+      retentionDays?: number;
+      /**
+       * 冪等キー（共有の契約の `Idempotency-Key`）。同じキー・同じ内容の再送は、保存した応答（同じゲーム・資格・復帰コード）を返す。
+       * 同じキーで内容が違えば `IdempotencyKeyReusedError`。省略（旧い経路）なら冪等にしない。
+       */
+      idempotencyKey?: string;
+    }) {
+      const { idempotencyKey, ...request } = input;
+      const fingerprint = fingerprintOf(request);
+      // 作成は、ゲームの存在前の要求なので、キーだけで探す（`findCreate`）。それ以外の操作は `idempotently`
+      const attempt = () =>
+        uow.run(async (repos) => {
+          if (idempotencyKey !== undefined) {
+            const prior = await repos.idempotency.findCreate(idempotencyKey);
+            if (prior) {
+              if (prior.fingerprint !== fingerprint)
+                throw new IdempotencyKeyReusedError();
+              return prior.response as CreatedGame;
+            }
+          }
+          const created = await createOnce(repos);
+          if (idempotencyKey !== undefined) {
+            await repos.idempotency.save({
+              gameId: created.gameId,
+              scope: 'create',
+              key: idempotencyKey,
+              fingerprint,
+              response: created,
+            });
+          }
+          return created;
+        });
+      const createOnce = async (repos: Repositories): Promise<CreatedGame> => {
+        const gameId = ids.uuid();
+        // 保持期間の誤りも、ゲームの設定の誤りと一緒に、すべて集めて示す
+        let retention: ReturnType<typeof retentionPolicyOf> | undefined;
+        let retentionIssues: Issue[] = [];
+        try {
+          retention = retentionPolicyOf(clock.now(), input.retentionDays);
+        } catch (e) {
+          if (!(e instanceof DomainError)) throw e;
+          retentionIssues = e.issues;
+        }
+        const joinCode = ids.joinCode();
+        let created: ReturnType<typeof createGameRule>;
+        try {
+          created = createGameRule({
+            id: gameId,
+            joinCode,
+            weeks: input.weeks,
+            ...(input.demand ? { demand: input.demand } : {}),
+            ...(input.commitMode ? { commitMode: input.commitMode } : {}),
+            ...(input.conditions ? { conditions: input.conditions } : {}),
+          });
+        } catch (e) {
+          if (e instanceof DomainError && retentionIssues.length > 0)
+            throw new DomainError(e.message, [...e.issues, ...retentionIssues]);
+          throw e;
+        }
+        if (retention === undefined)
+          throw new DomainError('入力に誤りがあります', retentionIssues);
+        const { game, events } = created;
+        await repos.games.save(game, null);
+        await repos.retention.schedule(gameId, retention);
+        const principal: Principal = { gameId, kind: 'FACILITATOR' };
+        const facilitatorToken = await issue(repos, principal, 'SESSION');
+        const recoveryCode = await issue(repos, principal, 'RECOVERY');
+        await repos.events.append(gameId, events);
+        return {
+          gameId,
+          joinCode,
+          facilitatorToken,
+          recoveryCode,
+          versions: versionsOf(game, null),
+        };
+      };
+      // 同時の重複は、1 回だけやり直して、先に保存された応答を返す
+      return retryOnDuplicate(idempotencyKey, attempt);
+    },
+
+    /**
+     * 参加コードで参加する。同じ冪等キー・同じ内容の再送は、保存した応答（同じ参加者・資格）を返す。
+     * 不明・形式不正の参加コードは `InvalidInvitationError`（区別しない。列挙の防止。AC1.2.2）。
+     */
+    joinGame(input: {
+      joinCode: string;
+      displayName: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const game = await repos.games.findByJoinCode(input.joinCode);
+          if (!game) throw new InvalidInvitationError();
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'join',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                joinCode: input.joinCode,
+                displayName: input.displayName,
+              }),
+            },
+            async () => {
+              const participantId = ids.uuid();
+              const { game: next, events } = joinGameRule(game, {
+                participantId,
+                displayName: input.displayName,
+              });
+              await repos.games.save(next, game.version);
+              const principal: Principal = {
+                gameId: game.id,
+                kind: 'PARTICIPANT',
+                participantId,
+              };
+              const token = await issue(repos, principal, 'SESSION');
+              const recoveryCode = await issue(repos, principal, 'RECOVERY');
+              await repos.events.append(game.id, events);
+              return {
+                gameId: game.id,
+                participantId,
+                token,
+                recoveryCode,
+                versions: versionsOf(next, null),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 復帰コードで戻る。新しいブラウザセッションを発行する（復帰コード自体は、期限まで再利用できる）。
+     * 無効なら、復帰せず、進行役への確認方法を示す。
+     */
+    recover(input: {
+      code: string;
+      /** 共有の契約: 復帰するゲーム。復帰コードが別のゲームのものなら、区別せず拒否する */
+      gameId?: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await findPrincipal(repos, input.code, 'RECOVERY');
+          const game = principal
+            ? await repos.games.find(principal.gameId)
+            : null;
+          if (!principal || !game)
+            throw new UnauthorizedError(INVALID_RECOVERY);
+          if (input.gameId !== undefined && input.gameId !== game.id)
+            throw new UnauthorizedError(INVALID_RECOVERY);
+          // 復帰資格の有効性が認可。有効と確かめてから、冪等の応答を探す（失効した資格の再送に、保存した応答を返さない）
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'recover',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                gameId: input.gameId,
+                code: input.code,
+              }),
+            },
+            async () => {
+              const token = await issue(repos, principal, 'SESSION');
+              await repos.events.append(game.id, [
+                { type: 'ParticipationRecovered', ...principal },
+              ]);
+              const session = await repos.sessions.findByGame(game.id);
+              const role =
+                principal.kind === 'PARTICIPANT'
+                  ? ROLES.find((r) =>
+                      game.assignments[r]?.includes(
+                        principal.participantId ?? '',
+                      ),
+                    )
+                  : undefined;
+              return {
+                ...principal,
+                token,
+                gameStatus: game.status,
+                versions: versionsOf(game, session),
+                ...(role ? { role } : {}),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 参加者の資格の失効（進行役。契約の `revokeCredential`）。復帰資格と、発行済みのブラウザセッションを、ともに使えなくする。
+     * すでに失効していれば `CredentialAlreadyRevokedError`。
+     */
+    revokeParticipantCredential(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '資格の失効');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'revoke-credential',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const target = participantPrincipal(game, input.participantId);
+              if (await repos.credentials.isRecoveryRevoked(target))
+                throw new CredentialAlreadyRevokedError();
+              await repos.credentials.revokeAll(target, clock.now());
+              await repos.events.append(game.id, [
+                { type: 'CredentialRevoked', ...target },
+              ]);
+              return {
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 参加者の資格の再発行（進行役。契約の `reissueCredential`）。新しい復帰コードを、この応答で一度だけ示す。
+     * 失効していない資格の再発行は拒否する（有効な資格は置き換えない。期限切れの資格は、先に失効させる）。
+     */
+    reissueParticipantCredential(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '資格の再発行');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'reissue-credential',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const target = participantPrincipal(game, input.participantId);
+              if (!(await repos.credentials.isRecoveryRevoked(target)))
+                throw new CredentialNotRevokedError();
+              const recovery = await issueWithExpiry(repos, target, 'RECOVERY');
+              await repos.events.append(game.id, [
+                { type: 'CredentialReissued', ...target },
+              ]);
+              return {
+                recoveryCode: recovery.token,
+                expiresAt: recovery.expiresAt.toISOString(),
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 進行役が、漏れた資格を失効させて再発行する。対象のブラウザセッションと復帰コードをすべて失効させ、
+     * 新しい復帰コードを返す。進行役自身が対象なら、新しいブラウザセッションも返す。
+     */
+    reissueCredential(input: {
+      token: string;
+      gameId: string;
+      target: CredentialTarget;
+    }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, '資格の再発行');
+        const game = await loadGame(repos, input.gameId);
+        const target: Principal =
+          input.target.kind === 'FACILITATOR'
+            ? { gameId: game.id, kind: 'FACILITATOR' }
+            : {
+                gameId: game.id,
+                kind: 'PARTICIPANT',
+                participantId: input.target.participantId,
+              };
+        if (
+          target.kind === 'PARTICIPANT' &&
+          !game.participants.some((p) => p.id === target.participantId)
+        )
+          throw new NotFoundError('このゲームの参加者ではありません');
+        await repos.credentials.revokeAll(target, clock.now());
+        const recoveryCode = await issue(repos, target, 'RECOVERY');
+        const facilitatorToken =
+          target.kind === 'FACILITATOR'
+            ? await issue(repos, target, 'SESSION')
+            : undefined;
+        await repos.events.append(game.id, [
+          { type: 'CredentialRevoked', ...target },
+          { type: 'CredentialReissued', ...target },
+        ]);
+        return {
+          recoveryCode,
+          ...(facilitatorToken ? { facilitatorToken } : {}),
+        };
+      });
+    },
+
+    /**
+     * 役割を割り当てる（進行役だけ）。別の役割にいる人は付け替え（D9）、同じ役割への割り当て直しは何も変えない
+     * （イベントも版も足さない）。応答は、追記後の版。
+     */
+    assignRole(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+      role: Role;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          // 進行役だけの操作。冪等の照合より前に認可する（ADR-004）
+          requireFacilitatorPrincipal(principal, '役割の割り当て');
+          const game = await loadGame(repos, input.gameId);
+          const session = await repos.sessions.findByGame(input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: input.gameId,
+              scope: 'assign',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                role: input.role,
+                operator: principal,
+              }),
+            },
+            async () => {
+              // 開始後の入れ替え（H4）。終了後は受け付けず、資格がすでに失効している参加者（以前に外された旧担当者を含む）は割り当てない
+              if (game.status === 'STARTED') {
+                if (session?.status === 'ENDED') throw new SessionEndedError();
+                const target = game.participants.find(
+                  (p) => p.id === input.participantId,
+                );
+                if (
+                  target &&
+                  (target.replaced ||
+                    (await repos.credentials.isRecoveryRevoked(
+                      participantPrincipal(game, target.id),
+                    )))
+                )
+                  throw new CredentialAlreadyRevokedError();
+              }
+              const { game: next, events } = assignRoleRule(
+                game,
+                actorOf(principal),
+                input.participantId,
+                input.role,
+              );
+              if (events.length === 0)
+                return { versions: versionsOf(next, session) };
+              await repos.games.save(next, game.version);
+              const replaced = events.flatMap((e) =>
+                e.type === 'RoleReplaced' ? [e] : [],
+              );
+              let nextSession = session;
+              const revoked: object[] = [];
+              for (const e of replaced) {
+                // 旧担当者の資格（復帰資格とブラウザセッション）を、同じ操作で失効させ、担当者を差し替える
+                for (const id of e.replacedParticipantIds) {
+                  const old = participantPrincipal(game, id);
+                  await repos.credentials.revokeAll(old, clock.now());
+                  revoked.push({ type: 'CredentialRevoked', ...old });
+                }
+                if (nextSession) {
+                  const swapped = replaceHolders(
+                    nextSession,
+                    e.role,
+                    e.participantId,
+                  );
+                  await repos.sessions.save(swapped, nextSession.version);
+                  nextSession = swapped;
+                }
+              }
+              await repos.events.append(game.id, [...events, ...revoked]);
+              return { versions: versionsOf(next, nextSession) };
+            },
+          );
+        }),
+      );
+    },
+
+    unassignRole(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+    }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const game = await loadGame(repos, input.gameId);
+        const { game: next, events } = unassignRoleRule(
+          game,
+          actorOf(principal),
+          input.participantId,
+        );
+        await repos.games.save(next, game.version);
+        await repos.events.append(game.id, events);
+      });
+    },
+
+    /** ゲームを開始する（進行役だけ）。応答は、追記後の版（セッションが作られる） */
+    startGame(input: {
+      token: string;
+      gameId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: input.gameId,
+              scope: 'start',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({ operator: principal }),
+            },
+            async () => {
+              const { game: started, events } = startGameRule(
+                game,
+                actorOf(principal),
+              );
+              const { session, events: sessionEvents } = startSession(
+                started,
+                ids.uuid(),
+              );
+              await repos.games.save(started, game.version);
+              await repos.sessions.save(session, null);
+              await repos.events.append(game.id, [...events, ...sessionEvents]);
+              return { versions: versionsOf(started, session) };
+            },
+          );
+        }),
+      );
+    },
+
+    saveDecision(input: {
+      token: string;
+      gameId: string;
+      role: Role;
+      quantity: number;
+      expectedVersion: number;
+    }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const session = await loadSession(repos, input.gameId);
+        let outcome;
+        try {
+          outcome = saveDecisionRule(
+            session,
+            actorOf(principal),
+            input.role,
+            input.quantity,
+            input.expectedVersion,
+          );
+        } catch (e) {
+          // 共同入力の競合: 最新の値と保存者の表示名を、同じ応答で返す
+          if (!(e instanceof DecisionConflictError)) throw e;
+          const names = await repos.games.participantNames(input.gameId);
+          throw new DecisionConflict(
+            e.message,
+            e.latest && {
+              quantity: e.latest.quantity,
+              version: e.latest.version,
+              savedBy: nameOf(names, e.latest.savedBy),
+            },
+          );
+        }
+        const { session: next, events } = outcome;
+        await repos.sessions.save(next, session.version);
+        await repos.events.append(input.gameId, events);
+        // 自動確定された場合は、その結果も返す
+        const committedEvent = events.find((e) => e.type === 'WeekCommitted');
+        const committed: CommitResult | undefined = committedEvent
+          ? {
+              committedWeek: session.week,
+              nextWeek: next.week,
+              status: next.status,
+            }
+          : undefined;
+        return {
+          version: next.decisions[input.role]?.version ?? 0,
+          sessionVersion: next.version,
+          ...(committed ? { committed } : {}),
+        };
+      });
+    },
+
+    commitWeek(input: {
+      token: string;
+      gameId: string;
+      week: number;
+      version: number;
+      idempotencyKey: string;
+    }): Promise<CommitResult> {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const fingerprint = `${input.week}:${input.version}`;
+        const prior = await repos.idempotency.find(
+          input.gameId,
+          'commit',
+          input.idempotencyKey,
+        );
+        if (prior) {
+          if (prior.fingerprint !== fingerprint) {
+            throw new IdempotencyKeyReusedError();
+          }
+          return prior.response as CommitResult;
+        }
+        const session = await loadSession(repos, input.gameId);
+        const { session: next, events } = commitWeekRule(
+          session,
+          actorOf(principal),
+          {
+            week: input.week,
+            version: input.version,
+          },
+        );
+        const result: CommitResult = {
+          committedWeek: input.week,
+          nextWeek: next.week,
+          status: next.status,
+        };
+        await repos.sessions.save(next, session.version);
+        await repos.events.append(input.gameId, events);
+        await repos.idempotency.save({
+          gameId: input.gameId,
+          scope: 'commit',
+          key: input.idempotencyKey,
+          fingerprint,
+          response: result,
+        });
+        return result;
+      });
+    },
+
+    pauseSession(input: { token: string; gameId: string }) {
+      return changeSession(input, (session, actor) =>
+        pauseSessionRule(session, actor),
+      );
+    },
+
+    resumeSession(input: { token: string; gameId: string }) {
+      return changeSession(input, (session, actor) =>
+        resumeSessionRule(session, actor),
+      );
+    },
+
+    /** 進行役が確定方式を変える（いつでも）。自動へ切り替えて、そろっていれば確定する */
+    changeCommitMode(input: {
+      token: string;
+      gameId: string;
+      commitMode: CommitMode;
+    }) {
+      return changeSession(input, (session, actor) =>
+        changeCommitModeRule(session, actor, input.commitMode),
+      );
+    },
+
+    /** 進行役の代理入力。時刻は注入された時計から取り、イベントに残す */
+    async proxyDecision(input: {
+      token: string;
+      gameId: string;
+      role: Role;
+      quantity: number;
+      expectedVersion: number;
+    }) {
+      const next = await changeSession(input, (session, actor) =>
+        proxyDecisionRule(
+          session,
+          actor,
+          input.role,
+          input.quantity,
+          input.expectedVersion,
+          clock.now(),
+        ),
+      );
+      return {
+        version: next.decisions[input.role]?.version ?? 0,
+        sessionVersion: next.version,
+      };
+    },
+
+    /**
+     * 共有の契約の入力の保存。役割は、資格から決まる。週の判定が先（版が違っても `WeekAdvancedError`）。
+     * 版の競合は、最新の入力（保存者・時刻つき）を持つ `DecisionConflictedError`。
+     */
+    saveOwnDecision(input: {
+      token: string;
+      gameId: string;
+      week: number;
+      quantity: number;
+      expectedVersion: number;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'save',
+          content: {
+            week: input.week,
+            quantity: input.quantity,
+            expectedVersion: input.expectedVersion,
+          },
+          prepare: roleOfPrincipal,
+        },
+        async (session, actor, repos, principal) => {
+          const role = roleOfPrincipal(principal, session);
+          try {
+            return saveDecisionRule(
+              session,
+              actor,
+              role,
+              input.quantity,
+              input.expectedVersion,
+              input.week,
+            );
+          } catch (e) {
+            if (!(e instanceof DecisionConflictError)) throw e;
+            const names = await repos.games.participantNames(input.gameId);
+            const latest = session.decisions[role];
+            throw new DecisionConflictedError(
+              e.message,
+              role,
+              latest
+                ? decisionEntryView(
+                    latest,
+                    viewerOf(principal) ?? { kind: 'FACILITATOR' },
+                    names,
+                    clock.now(),
+                  )
+                : null,
+            );
+          }
+        },
+      );
+    },
+
+    /**
+     * 共有の契約の週の確定（進行役）。確定の根拠は、役割ごとの入力の版（`basis`）。
+     * 根拠が変わっていれば、現在の入力（保存者・時刻つき）を持つ `DecisionsChangedViewError`。
+     */
+    commitWeekWithBasis(input: {
+      token: string;
+      gameId: string;
+      requestedWeek: number;
+      basis: Readonly<Record<Role, number>>;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'commit',
+          facilitatorOnly: '週の確定',
+          content: { week: input.requestedWeek, basis: input.basis },
+        },
+        async (session, actor, repos) => {
+          try {
+            return commitWeekWithBasisRule(session, actor, {
+              requestedWeek: input.requestedWeek,
+              basis: input.basis,
+            });
+          } catch (e) {
+            if (!(e instanceof DecisionsChangedError)) throw e;
+            const names = await repos.games.participantNames(input.gameId);
+            const now = clock.now();
+            throw new DecisionsChangedViewError(
+              e.message,
+              e.week,
+              Object.fromEntries(
+                ROLES.flatMap((r) => {
+                  const d = session.decisions[r];
+                  return d
+                    ? [
+                        [
+                          r,
+                          decisionEntryView(
+                            d,
+                            { kind: 'FACILITATOR' },
+                            names,
+                            now,
+                          ),
+                        ],
+                      ]
+                    : [];
+                }),
+              ),
+            );
+          }
+        },
+      );
+    },
+
+    pause(input: { token: string; gameId: string; idempotencyKey?: string }) {
+      return sessionCommand(
+        input,
+        { scope: 'pause', facilitatorOnly: '停止' },
+        (session, actor) => pauseSessionRule(session, actor),
+      );
+    },
+
+    resume(input: { token: string; gameId: string; idempotencyKey?: string }) {
+      return sessionCommand(
+        input,
+        { scope: 'resume', facilitatorOnly: '再開' },
+        (session, actor) => resumeSessionRule(session, actor),
+      );
+    },
+
+    setCommitMode(input: {
+      token: string;
+      gameId: string;
+      commitMode: CommitMode;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'mode',
+          facilitatorOnly: '確定方式の変更',
+          content: { commitMode: input.commitMode },
+        },
+        (session, actor) =>
+          changeCommitModeRule(session, actor, input.commitMode),
+      );
+    },
+
+    /** 共有の契約の代理入力（進行役）。版は要求せず、現在の版に重ねる。週は `requestedWeek` で確かめる */
+    submitProxyDecision(input: {
+      token: string;
+      gameId: string;
+      role: Role;
+      requestedWeek: number;
+      quantity: number;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'proxy',
+          facilitatorOnly: '代理入力',
+          content: {
+            role: input.role,
+            week: input.requestedWeek,
+            quantity: input.quantity,
+          },
+        },
+        (session, actor) =>
+          proxyDecisionRule(
+            session,
+            actor,
+            input.role,
+            input.quantity,
+            session.decisions[input.role]?.version ?? 0,
+            clock.now(),
+            input.requestedWeek,
+          ),
+      );
+    },
+
+    /** 観察用の招待の発行（進行役）。招待コードは、この応答で一度だけ返す */
+    issueObserverInvitation(input: {
+      token: string;
+      gameId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '観察用の招待の発行');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'invite',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({ operator: principal }),
+            },
+            async () => {
+              const invitationId = ids.uuid();
+              const cred = credentials.issue();
+              const validity = CredentialValidity.issue(
+                clock.now(),
+                ttl.observerInvitationMs,
+              );
+              await repos.observers.saveInvitation(cred.digest, {
+                id: invitationId,
+                gameId: game.id,
+                validity,
+              });
+              await repos.events.append(game.id, [
+                { type: 'ObserverInvited', gameId: game.id, invitationId },
+              ]);
+              return {
+                invitationId,
+                code: cred.token,
+                expiresAt: validity.expiresAt.toISOString(),
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 観察用の招待の失効（進行役）。新しい参加だけを止め、参加済みの観察者は観察を続けられる。
+     * このゲームに無い招待は `InvitationNotFoundError`、すでに失効していれば `CredentialAlreadyRevokedError`。
+     */
+    revokeObserverInvitation(input: {
+      token: string;
+      gameId: string;
+      invitationId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '観察用の招待の失効');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'revoke-invitation',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                invitationId: input.invitationId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const invitation = (
+                await repos.observers.listInvitations(input.gameId)
+              ).find((i) => i.id === input.invitationId);
+              if (!invitation) throw new InvitationNotFoundError();
+              if (invitation.revokedAt !== null)
+                throw new CredentialAlreadyRevokedError();
+              await repos.observers.revokeInvitation(
+                input.gameId,
+                input.invitationId,
+                clock.now(),
+              );
+              await repos.events.append(input.gameId, [
+                {
+                  type: 'ObserverInvitationRevoked',
+                  gameId: input.gameId,
+                  invitationId: input.invitationId,
+                },
+              ]);
+              return {
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 観察用の招待で、観察者として参加する。役割を持たず、読み取りだけ。
+     * 不明・失効・期限切れ・形式不正の招待コードは、区別せず `InvalidObserverInvitationError`。
+     */
+    joinAsObserver(input: {
+      code: string;
+      displayName?: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const invitation = input.code
+            ? await repos.observers.findInvitation(
+                credentials.digestsOf(input.code),
+                clock.now(),
+              )
+            : null;
+          if (!invitation) throw new InvalidObserverInvitationError();
+          return idempotently(
+            repos,
+            {
+              gameId: invitation.gameId,
+              scope: 'join-observer',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                code: input.code,
+                displayName: input.displayName,
+              }),
+            },
+            async () => {
+              if (
+                (await repos.observers.countObservers(invitation.gameId)) >=
+                OBSERVER_LIMIT
+              )
+                throw new DomainError(
+                  `観察者は 1 ゲーム ${OBSERVER_LIMIT} 人までです`,
+                );
+              const name = input.displayName?.trim();
+              const observerId = ids.uuid();
+              await repos.observers.addObserver({
+                id: observerId,
+                gameId: invitation.gameId,
+                invitationId: invitation.id,
+                displayName: name ? DisplayName.of(name) : '観察者',
+              });
+              const token = await issue(
+                repos,
+                { gameId: invitation.gameId, kind: 'OBSERVER', observerId },
+                'SESSION',
+              );
+              await repos.events.append(invitation.gameId, [
+                {
+                  type: 'ObserverJoined',
+                  gameId: invitation.gameId,
+                  observerId,
+                },
+              ]);
+              const game = await loadGame(repos, invitation.gameId);
+              return {
+                gameId: invitation.gameId,
+                observerId,
+                token,
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 観察（観察者と進行役だけ）。参加者には開かせない（自分の値から、合計を使って相手の値を逆算できるため）。
+     */
+    observation(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'PARTICIPANT')
+          throw new ForbiddenError(
+            '観察の画面は、観察者と進行役だけが開けます',
+          );
+        return observe(await loadSession(repos, input.gameId));
+      });
+    },
+
+    /**
+     * 保持期限に達したゲームを削除する（定期のタスクから呼ぶ）。1 ゲームずつ、削除と受領記録を 1 つのトランザクションで行う。
+     * 失敗したら何も消えず、試行回数を記録して次の実行で再試行する。上限に達したら、恒久的な失敗として数える。
+     */
+    async runRetention(limit = 100) {
+      const at = clock.now();
+      const due = await uow.run((repos) =>
+        repos.retention.due(at, RETENTION.maxAttempts, limit),
+      );
+      const result = { deleted: 0, failed: 0, permanentFailures: 0 };
+      for (const { gameId } of due) {
+        try {
+          const deleted = await uow.run(async (repos) => {
+            // 別のタスクが先に削除していれば、受領記録を書かない（一度だけ）
+            if (!(await repos.retention.deleteGame(gameId))) return false;
+            await repos.retention.saveReceipt({
+              reference: credentials.digestsOf(gameId)[0]!,
+              outcome: 'DELETED',
+              recordedAt: at,
+              expiresAt: new Date(at.getTime() + RETENTION.receiptMs),
+            });
+            return true;
+          });
+          if (deleted) result.deleted += 1;
+        } catch {
+          result.failed += 1;
+          const attempts = await uow.run((repos) =>
+            repos.retention.recordFailure(gameId, at),
+          );
+          if (attempts >= RETENTION.maxAttempts) result.permanentFailures += 1;
+        }
+      }
+      deps.metrics?.emit([
+        { name: 'RetentionDeleted', value: result.deleted, unit: 'Count' },
+        { name: 'RetentionFailed', value: result.failed, unit: 'Count' },
+        {
+          name: 'RetentionPermanentFailures',
+          value: result.permanentFailures,
+          unit: 'Count',
+        },
+      ]);
+      return result;
+    },
+
+    /** 変化の通知（SSE）の購読の認可。このゲームの進行役・参加者・観察者に通す */
+    async authorizeStream(input: { token: string; gameId: string }) {
+      await uow.run((repos) => authenticate(repos, input.token, input.gameId));
+    },
+
+    lobby(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'OBSERVER')
+          throw new ForbiddenError('観察者は、ロビーを開けません');
+        const game = await loadGame(repos, input.gameId);
+        return {
+          gameId: game.id,
+          viewer:
+            principal.kind === 'FACILITATOR'
+              ? { kind: 'FACILITATOR' as const }
+              : {
+                  kind: 'PARTICIPANT' as const,
+                  participantId: principal.participantId ?? '',
+                },
+          status: game.status,
+          finalWeek: game.settings.finalWeek,
+          commitMode: game.settings.commitMode,
+          settings: settingsView(game.settings),
+          ...(principal.kind === 'FACILITATOR'
+            ? {
+                joinCode: game.joinCode,
+                retention: await retentionView(repos, game.id),
+                observerInvitations: (
+                  await repos.observers.activeInvitations(game.id, clock.now())
+                ).map((i) => ({
+                  id: i.id,
+                  expiresAt: i.expiresAt.toISOString(),
+                })),
+              }
+            : {}),
+          observerCount: await repos.observers.countObservers(game.id),
+          participants: game.participants.map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+          })),
+          assignments: game.assignments,
+          missingRoles: missingRoles(game),
+        };
+      });
+    },
+
+    /** 参加者の役割別の状況。自分の役割の情報だけで、他の役割と将来の需要は含まない */
+    roleState(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind !== 'PARTICIPANT')
+          throw new ForbiddenError('参加者の画面です');
+        const session = await loadSession(repos, input.gameId);
+        const role = ROLES.find((r) =>
+          session.holders[r].includes(principal.participantId ?? ''),
+        );
+        if (!role) throw new ForbiddenError('役割が割り当てられていません');
+        const names = await repos.games.participantNames(input.gameId);
+        const state = session.states[role];
+        const decision = session.decisions[role];
+        return {
+          role,
+          status: session.status,
+          week: session.week,
+          sessionVersion: session.version,
+          commitMode: session.settings.commitMode,
+          inventory: state.inventory,
+          backlog: state.backlog,
+          incomingGoods: [...state.incomingGoods],
+          ...(role === 'RETAILER' && session.status === 'ACTIVE'
+            ? { customerDemand: session.settings.demand[session.week - 1] }
+            : {}),
+          /** 同じ役割の担当（共同担当を含む）の表示名 */
+          coHolders: session.holders[role].map((id) => names[id] ?? ''),
+          decision: decision
+            ? {
+                quantity: decision.quantity,
+                version: decision.version,
+                savedBy: nameOf(names, decision.savedBy),
+              }
+            : null,
+          history: historyOf(session, role),
+        };
+      });
+    },
+
+    /**
+     * 振り返り（役割別の時系列）。ゲームが終了してから、そのゲームの進行役・参加者に開示する。
+     * 開示の判定はドメインの `canDisclose` に集め、終了前は値を一切返さない。
+     */
+    async review(input: { token: string; gameId: string }) {
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
+      const source = await reviews.read(input.gameId);
+      if (!canDisclose(source.sessionStatus)) {
+        throw new PermissionError('振り返りは、ゲームが終了してから見られます');
+      }
+      return {
+        ...buildReview(source.rows),
+        /** 出力（CSV・JSON）は進行役だけ */
+        canExport: principal.kind === 'FACILITATOR',
+      };
+    },
+
+    /**
+     * 出力（CSV・JSON）。進行役だけが、終了後だけ。全体を組み立ててから返し、欠けがあれば失敗する（部分的な結果を返さない）。
+     */
+    async exportGame(input: {
+      token: string;
+      gameId: string;
+      format: 'csv' | 'json';
+    }) {
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
+      requireFacilitatorPrincipal(principal, '出力');
+      const { sessionStatus, source } = await exports.read(input.gameId);
+      if (!canDisclose(sessionStatus) || !source)
+        throw new PermissionError('出力は、ゲームが終了してからできます');
+      const built = buildExport(source);
+      return input.format === 'csv'
+        ? {
+            contentType: 'text/csv; charset=utf-8',
+            filename: `beer-game-${input.gameId}.csv`,
+            body: built.csv,
+          }
+        : {
+            contentType: 'application/json; charset=utf-8',
+            filename: `beer-game-${input.gameId}.json`,
+            body: JSON.stringify(built.json, null, 2),
+          };
+    },
+
+    // ---- 共有の API の契約（/api/v1）の読み取り。形は contract-views.ts ----
+
+    /** ゲームの状態。呼び出した人ごとの投影（進行役は参加コードと最終週、参加者は自分の ID と役割） */
+    getGameState(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return gameStateView(
+          withLiveCommitMode(game, session),
+          viewerOf(principal),
+          versionsOf(game, session),
+        );
+      });
+    },
+
+    /**
+     * セッションの状態。参加者には自分の役割の状況だけ（他の役割と将来の需要は返さない）、進行役には全役割と確定した週の結果。
+     * 参加者が自分と違う役割（`role`）を求めたら、値を返さずに拒否する（AC2.1.2）。観察者には開かない。
+     */
+    getSessionState(input: { token: string; gameId: string; role?: Role }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        const viewer = viewerOf(principal);
+        if (!viewer) throw new ForbiddenError('観察者には開けません');
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        if (!session) throw new NotActiveError();
+        if (viewer.kind === 'PARTICIPANT') {
+          const own = ROLES.find((r) =>
+            session.holders[r].includes(viewer.participantId),
+          );
+          if (!own || (input.role !== undefined && input.role !== own))
+            throw new ForbiddenError('自分の役割の状態だけ開けます');
+        }
+        const view = sessionStateView(
+          session,
+          viewer,
+          await repos.games.participantNames(input.gameId),
+          versionsOf(game, session),
+        );
+        if (!view) throw new ForbiddenError('役割が割り当てられていません');
+        return view;
+      });
+    },
+
+    /** ロビー（進行役だけ）。参加者・招待・観察者の一覧。招待コードの値は含まない */
+    getLobby(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, 'ロビーの表示');
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return lobbyView(
+          withLiveCommitMode(game, session),
+          await repos.observers.listInvitations(input.gameId),
+          await repos.observers.listObservers(input.gameId),
+          versionsOf(game, session),
+        );
+      });
+    },
+
+    /** 観察（観察者と進行役だけ）。参加者には開かせない（自分の値から、合計を使って相手の値を逆算できるため） */
+    getObservation(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind === 'PARTICIPANT')
+          throw new ForbiddenError(
+            '観察の画面は、観察者と進行役だけが開けます',
+          );
+        const game = await loadGame(repos, input.gameId);
+        const session = await repos.sessions.findByGame(input.gameId);
+        return observationView(game, session, versionsOf(game, session));
+      });
+    },
+
+    /** 振り返り。ゲームが終了してから、そのゲームの進行役・参加者・観察者に開示する（終了前は値を一切返さない） */
+    async getReview(input: { token: string; gameId: string }) {
+      const { game, session } = await uow.run(async (repos) => {
+        await authenticate(repos, input.token, input.gameId);
+        return {
+          game: await loadGame(repos, input.gameId),
+          session: await repos.sessions.findByGame(input.gameId),
+        };
+      });
+      if (!canDisclose(session?.status ?? null)) throw new NotEndedError();
+      const source = await reviews.read(input.gameId);
+      return reviewView(game, source.rows, versionsOf(game, session));
+    },
+
+    /** 出力（CSV・JSON）。進行役だけが、終了後だけ。全体を組み立ててから返し、欠けがあれば失敗する */
+    async getExport(input: {
+      token: string;
+      gameId: string;
+      format: 'csv' | 'json';
+    }) {
+      const principal = await uow.run((repos) =>
+        authenticate(repos, input.token, input.gameId),
+      );
+      requireFacilitatorPrincipal(principal, '出力');
+      const { sessionStatus, source } = await exports.read(input.gameId);
+      if (!canDisclose(sessionStatus) || !source) throw new NotEndedError();
+      const built = buildContractExport(source);
+      return {
+        schemaVersion: CONTRACT_EXPORT_SCHEMA_VERSION,
+        contentType:
+          input.format === 'csv'
+            ? 'text/csv; charset=utf-8'
+            : 'application/json; charset=utf-8',
+        filename: `beer-game-${input.gameId}.${input.format}`,
+        body:
+          input.format === 'csv'
+            ? built.csv
+            : JSON.stringify(built.json, null, 2),
+      };
+    },
+
+    /** 保持状態（進行役だけ）。保持日数・削除予定日・削除の進行 */
+    getRetention(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        requireFacilitatorPrincipal(principal, '保持状態の表示');
+        const policy = await repos.retention.policyOf(input.gameId);
+        const progress = await repos.retention.progressOf(input.gameId);
+        if (!policy || !progress) throw new NotFoundError();
+        return retentionStateView(policy, progress);
+      });
+    },
+
+    /** 進行役のコンソール。入力の有無だけを見せる */
+    console(input: { token: string; gameId: string }) {
+      return uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (principal.kind !== 'FACILITATOR')
+          throw new ForbiddenError('進行役の画面です');
+        const session = await loadSession(repos, input.gameId);
+        const names = await repos.games.participantNames(input.gameId);
+        return {
+          status: session.status,
+          week: session.week,
+          sessionVersion: session.version,
+          commitMode: session.settings.commitMode,
+          settings: settingsView(session.settings),
+          retention: await retentionView(repos, input.gameId),
+          submitted: Object.fromEntries(
+            ROLES.map((r) => [r, session.decisions[r] !== undefined]),
+          ) as Record<Role, boolean>,
+          /** 役割ごとの入力の版（代理入力の楽観的排他に使う） */
+          versions: Object.fromEntries(
+            ROLES.map((r) => [r, session.decisions[r]?.version ?? 0]),
+          ) as Record<Role, number>,
+          /** 役割ごとの状況（進行役だけが見られる。UI 設計 S06） */
+          roles: Object.fromEntries(
+            ROLES.map((r) => {
+              const state = session.states[r];
+              const d = session.decisions[r];
+              return [
+                r,
+                {
+                  holders: session.holders[r].map((id) => names[id] ?? ''),
+                  decision: d
+                    ? {
+                        quantity: d.quantity,
+                        version: d.version,
+                        savedBy: nameOf(names, d.savedBy),
+                      }
+                    : null,
+                  inventory: state.inventory,
+                  backlog: state.backlog,
+                  incomingGoods: [...state.incomingGoods],
+                  cumulativeCostMinor: state.cumulativeCostMinor,
+                  history: historyOf(session, r),
+                },
+              ];
+            }),
+          ) as Record<Role, ConsoleRole>,
+        };
+      });
+    },
+  };
+}
+
+export type Application = ReturnType<typeof createApplication>;

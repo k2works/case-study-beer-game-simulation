@@ -13,10 +13,10 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-14T07:25:54Z }
 
 本書は、beer-game-kotlin の非機能要件を、**測定できる形**で定義します。**`docs/` を正本**とします。実装コードはまだ存在せず、**実測値はありません**。
 
-[beer-game2 の非機能要件](../beer-game2/non-functional.md) を正本として引き継ぎ、**イベントソーシング（ES）+ CQRS と JVM で変わるものだけ**を見直しました。
+[beer-game2 の非機能要件](../beer-game-ts/non-functional.md) を正本として引き継ぎ、**イベントソーシング（ES）+ CQRS と JVM で変わるものだけ**を見直しました。
 
 - **すべての ID を維持**しました。内容が変わる要件には「変更」、新しい要件には「新」を付け、変更の理由を [beer-game2 からの変更](#beer-game2-からの変更) に表で示します。
-- 要件定義の NFR-01〜NFR-12 は変えません（[要件定義](../../requirements/beer-game2/requirements_definition.md)）。
+- 要件定義の NFR-01〜NFR-12 は変えません（[要件定義](../../requirements/beer-game-ts/requirements_definition.md)）。
 - 数値目標は、運営者と合意する前提の**提案**です。**Kotlin 版で新しく追加した数値は、実装後の実測で見直す**前提の暫定値です（根拠のない値は「実測で決める」と書いています）。
 
 ### 要件の件数について
@@ -152,20 +152,20 @@ NF-P3 と NF-P15 の「最大の長さ」は、**最悪ケースで `SESSION` �
 | :--- | :--- | :--- | :--- | :---: |
 | NF-S1 | 進行役の資格と復帰資格は、128 ビット以上の暗号論的乱数（JVM の `SecureRandom` など）とし、生の値は発行時に一度だけ返す | 乱数長と一意性のテスト | U1 NFR3.1、NFR-06 | 継続 |
 | NF-S2 | 資格は、`HttpOnly`、`Secure`、`SameSite=Strict` の Cookie でだけ送り、URL、ログ、監査（イベント）、出力に含めない | ヘッダーのテスト | U1 NFR3.2、U5 NFR3.12 | 継続 |
-| NF-S3 | 資格は、鍵付きダイジェスト（HMAC）と**鍵の版**だけを保存し、定数時間で比較する。鍵は複数の版を同時に保持し、ローテーション後も旧版の資格を期限まで検証できる。**本番では鍵の設定を必須とし、未設定なら起動に失敗する** | 保存内容の検査、起動のテスト | U1 NFR3.3、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md) | 継続 |
-| NF-S4 | すべての資格（進行役、復帰、観察用の招待、ブラウザセッション）に、有効期限と失効を持たせる。進行役は、資格を失効・再発行できる。有効期間の既定値は、運営者と合意して決める（ブラウザセッション 24 時間、復帰資格 30 日、進行役の資格はゲームの保持期間内 など）。**有効期限と失効は、イベント（`CredentialRevoked` など）と周辺ストア（`credentials`）に同じトランザクションで記録する** | 信頼できる時計での境界テスト | U1 NFR3.4、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md) | 変更 |
+| NF-S3 | 資格は、鍵付きダイジェスト（HMAC）と**鍵の版**だけを保存し、定数時間で比較する。鍵は複数の版を同時に保持し、ローテーション後も旧版の資格を期限まで検証できる。**本番では鍵の設定を必須とし、未設定なら起動に失敗する** | 保存内容の検査、起動のテスト | U1 NFR3.3、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md) | 継続 |
+| NF-S4 | すべての資格（進行役、復帰、観察用の招待、ブラウザセッション）に、有効期限と失効を持たせる。進行役は、資格を失効・再発行できる。有効期間の既定値は、運営者と合意して決める（ブラウザセッション 24 時間、復帰資格 30 日、進行役の資格はゲームの保持期間内 など）。**有効期限と失効は、イベント（`CredentialRevoked` など）と周辺ストア（`credentials`）に同じトランザクションで記録する** | 信頼できる時計での境界テスト | U1 NFR3.4、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md) | 変更 |
 | NF-S5 | すべての読み取り・書き込み・SSE の購読で、ゲーム、セッション、役割、操作の認可を、サーバー側で検査する（**認証はアダプターが行い、結果の `Actor` をコマンドに載せ、認可の規則は `decide` が持つ**） | 認可の行列テスト | NFR-06、U1 NFR3.5 | 変更 |
 | NF-S6 | 参加者への応答とイベント（SSE）は、自分の役割の状態だけを含み、他の役割、将来の需要、資格を、直列化の前に除く（**読み取りは役割別の投影から行い、投影の型で漏れを防ぐ**） | 否定のテスト | U1 NFR3.6、U5 NFR3.14 | 変更 |
 | NF-S7 | 参加コードは参加先の発見にだけ使い、進行役の操作や状態参照の資格として扱わない | 認可のテスト | U1 NFR3.7 | 継続 |
 | NF-S8 | 変更系のリクエストは、Origin（または Referer）を検査して外部のオリジンを拒否し、版と冪等キーを要求する | CSRF の否定テスト | U5 NFR3.15、3.16 | 継続 |
-| NF-S9 | セキュリティヘッダー（CSP、HSTS、`nosniff`、制限的な Referrer-Policy）を、CloudFront と API の両方で設定する | ヘッダーの検査 | U3 NFR3.5、U5 NFR3.16、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md) | 継続 |
+| NF-S9 | セキュリティヘッダー（CSP、HSTS、`nosniff`、制限的な Referrer-Policy）を、CloudFront と API の両方で設定する | ヘッダーの検査 | U3 NFR3.5、U5 NFR3.16、[ADR-011](../../adr/beer-game-ts/011-cloudfront-domain-tls-headers.md) | 継続 |
 | NF-S10 | 入力はスキーマ（**スマートコンストラクタと `zipOrAccumulate` による検証**）で検証し、数量、ペイロード、リクエストの大きさに上限を設ける | 境界値と悪意のある入力のテスト | U1 NFR3.9 | 変更 |
 | NF-S11 | 参加、復帰、観察用の招待での参加のエンドポイントに、専用のレート制限を設け、連続の失敗を記録する。実効の上限が、タスク数で増えないようにする | 総当たりのテスト | U2 NFR11.6 | 継続 |
 | NF-S12 | 復帰の失敗は、資格の存在・期限・削除の状態を区別しない応答とする | 応答のテスト | U2 NFR11.5 | 継続 |
 | NF-S13 | CI で依存関係（**Gradle の依存関係の検査**）、秘密情報、静的解析（detekt を含む）を検査し、Critical と High はリリースを止める | CI の記録 | U1 NFR3.11 | 変更 |
 | NF-S14 | 収集する個人情報は表示名だけとし、**イベント**、ログ、テレメトリ、出力に、表示名と資格を含めない。**表示名と資格のダイジェストは周辺ストア（`display_profiles`、`credentials`）にだけ置く** | スキーマとデータフローのレビュー、ログの走査 | NFR-07、U1 NFR4.1、4.2、ドメインモデル D7 | 変更 |
 | NF-S15 | 保存時と通信時に暗号化する（データベースは KMS、通信は HTTPS）。TLS は 1.2 以上とする（独自ドメインと ACM の証明書） | 設定の検査 | U3 NFR3.5、U4 NFR3.4 | 継続 |
-| NF-S16 | 保持期間は運営者が設定でき（1〜3650 日、既定 90 日）、期限後に削除する。**削除は、`game_roots` の連鎖削除で、削除後に、`game_id` 列を持つすべての表（`events`、投影、周辺ストア、冪等記録を含む）に行が残らない。** 削除の受領記録は、ゲームを特定できない形（ダイジェストだけ）で 1 年残す。バックアップに残る期間（7 日）を、保持方針に明記する。**保持の起点は作成時**（暫定。終了済みを終了時から数える案は未決）とし、削除予定日と「バックアップには削除後も最大 7 日残る」を、作成後、ロビー、保持状態の画面に示す（[UI 設計](./ui-design.md)） | 保持のテスト、`information_schema` を使った網羅の検査 | NFR-07、U4 NFR4.1、[ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md) | 変更 |
+| NF-S16 | 保持期間は運営者が設定でき（1〜3650 日、既定 90 日）、期限後に削除する。**削除は、`game_roots` の連鎖削除で、削除後に、`game_id` 列を持つすべての表（`events`、投影、周辺ストア、冪等記録を含む）に行が残らない。** 削除の受領記録は、ゲームを特定できない形（ダイジェストだけ）で 1 年残す。バックアップに残る期間（7 日）を、保持方針に明記する。**保持の起点は作成時**（暫定。終了済みを終了時から数える案は未決）とし、削除予定日と「バックアップには削除後も最大 7 日残る」を、作成後、ロビー、保持状態の画面に示す（[UI 設計](./ui-design.md)） | 保持のテスト、`information_schema` を使った網羅の検査 | NFR-07、U4 NFR4.1、[ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md) | 変更 |
 | NF-S17 | エクスポートの取得は、進行役だけで、毎回認可し、取得用の参照は 15 分で失効する | 認可の行列テスト | U3 NFR3.4 | 継続 |
 | NF-S18 | 観察者は、読み取り専用で、役割別の在庫・受注残・意思決定値と将来の需要を取得できない。観察用の招待は、参加コードと別の値で、有効期間と失効を持つ。**観察者の問い合わせが読めるのは、`game_overview`（参加コードなし）、`session_overview`（`submitted_role_count` を含む）、`week_team_totals` の 3 表だけ**で、参加コードの表 `game_join_codes`（進行役と参加の問い合わせだけが読む）と、役割別の投影には、DB の権限でも到達できない（観察者が参加コードを得て参加者として加われない。BR-17） | 認可の行列テスト、DB の権限のテスト（3 表だけに SELECT があり、`game_join_codes` を含む他の表に無いこと） | FR-17、BR-17 | 変更 |
 | NF-S19 | 観察用の招待・参加コード・復帰資格の総当たりを、専用のレート制限と監視で検知する | 総当たりのテスト、アラート | NFR-06 | 継続 |
@@ -181,12 +181,12 @@ NF-P3 と NF-P15 の「最大の長さ」は、**最悪ケースで `SESSION` �
 | NF-O3 | API の応答時間、エラー率、**ストリームの追記の競合と自動再試行の回数**、ロールバック、**同期投影の更新時間**、**再構築の排他ロックの待ち**、SSE の遅延、接続数、**DB の接続プールの使用率**を、操作と結果の別に計測する | メトリクスの契約テスト | U1 NFR7.4 | 変更 |
 | NF-O4 | 次のアラートを設ける。API の p95 が 1 秒超（5 分）、状態反映の p95 が 2 秒超（5 分）、重複した週結果または不変条件の違反（**同じ週の `WeekCommitted` が複数、または `projected_version` と `MAX(stream_version)` の不一致**）、**追記の競合の再試行が上限を超えた件数の増加**、削除の恒久的な失敗（5 分以内に通知） | 合成のアラート試験 | U1 NFR7.6〜7.9、U4 NFR7.2 | 変更 |
 | NF-O5 | ダッシュボードに、リクエストの量・応答時間・エラー、ゲームと SSE の数、確定の成功と競合、**追記の競合と再試行**、**投影の更新時間**、**JVM のヒープと GC**、SLO の消費を表示する | 目視 | U1 NFR7 | 変更 |
-| NF-O6 | 設定、役割変更、代理入力（入力値を含む）、週確定（手動・自動の別）、停止、再開、終了、資格の失効の履歴を、**イベントとして追跡できる**（専用の監査テーブルは作らない）。**`events` が状態の正本であり、監査を兼ねる** | イベントのスキーマのテスト | NFR-09、U1 NFR7.1、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md) | 変更 |
+| NF-O6 | 設定、役割変更、代理入力（入力値を含む）、週確定（手動・自動の別）、停止、再開、終了、資格の失効の履歴を、**イベントとして追跡できる**（専用の監査テーブルは作らない）。**`events` が状態の正本であり、監査を兼ねる** | イベントのスキーマのテスト | NFR-09、U1 NFR7.1、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md) | 変更 |
 | NF-O7 | テストのカバレッジは、**行 85% 以上、分岐 75% 以上**（CI のゲート。Kover）。関数・文は対象外 | カバレッジの計測 | U1 | 変更 |
 | NF-O8 | 静的解析（detekt、警告 0）、整形（ktlint）、コンパイラの警告のエラー化を、CI で必須とする | CI の結果 | — | 変更 |
 | NF-O9 | 設計文書はコードと同期し、設計の正本は `docs/` とする | レビュー | — | 継続 |
 | NF-O10 | 準備のヘルスチェック（`GET /ready`）が、データベースへの接続を確認し、接続できないタスクを、負荷分散の対象から外す | ヘルスチェックのテスト | NFR-11 | 継続 |
-| NF-O11 | 本番へ自動でデプロイでき、直前の版へ戻せる。スキーマの変更は履歴（Flyway）で管理する。**イベントは書き換えず、形の変更は `schema_version` とアップキャストで吸収する。ロールバック時に、旧版のアプリが新しい版のアプリが書いたイベントを読めるよう、新しい `schema_version` を書き始めるのは、読める版が全タスクに展開された後のリリースとする**。復元の訓練で、RPO 0・RTO 15 分を実測する | パイプラインとロールバックの試験、復元の訓練 | NFR-12、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md) | 変更 |
+| NF-O11 | 本番へ自動でデプロイでき、直前の版へ戻せる。スキーマの変更は履歴（Flyway）で管理する。**イベントは書き換えず、形の変更は `schema_version` とアップキャストで吸収する。ロールバック時に、旧版のアプリが新しい版のアプリが書いたイベントを読めるよう、新しい `schema_version` を書き始めるのは、読める版が全タスクに展開された後のリリースとする**。復元の訓練で、RPO 0・RTO 15 分を実測する | パイプラインとロールバックの試験、復元の訓練 | NFR-12、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md) | 変更 |
 | NF-O12 | **JVM の観測**: ヒープの使用量、GC の回数と一時停止、スレッド数、コルーチンのディスパッチャーの待ち（`Dispatchers.IO` の飽和）を、メトリクスに出す | メトリクスの契約テスト | NF-P17 | 新 |
 | NF-O13 | **イベント量の観測**: `SESSION` と `GAME` のストリームの長さ（最大、p99）、`events` の保存量、1 ゲームあたりの保存量を計測し、**`SESSION` のストリームが最大の長さ（2000 件。「ストリームの最大の長さ」）を超えたゲームがあればアラートを出す**（提案） | メトリクス、アラートの試験 | NF-C8 | 新 |
 
@@ -372,8 +372,8 @@ NF-P3 と NF-P15 の「最大の長さ」は、**最悪ケースで `SESSION` �
 
 ## 出典
 
-- [beer-game2 の非機能要件](../beer-game2/non-functional.md)、[要件定義](../../requirements/beer-game2/requirements_definition.md)（NFR-01〜NFR-12）
+- [beer-game2 の非機能要件](../beer-game-ts/non-functional.md)、[要件定義](../../requirements/beer-game-ts/requirements_definition.md)（NFR-01〜NFR-12）
 - [非機能要件定義ガイド](../../reference/非機能要件定義ガイド.md)、[ガイド 関数型プログラミングガイド（Kotlin 編）](../../reference/関数型プログラミングガイド_Kotlin編.md) 第 7 章（ES、CQRS、永続化、監視）
 - [ドメインモデル（Kotlin 版）](./domain-model.md)、[データモデル（Kotlin 版）](./data-model.md)、[技術スタック（Kotlin 版）](./tech-stack.md)、[テスト戦略（Kotlin 版）](./test-strategy.md)、[バックエンドアーキテクチャ](./architecture-backend.md)、[運用要件](./operation.md)
 - `aidlc/spaces/default/intents/261027-beer-game-development/construction/` 配下の各 Unit の NFR 要件（U1〜U5。出典 ID は beer-game2 の記載を引き継ぐ）
-- [ADR-007](../../adr/beer-game2/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game2/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game2/009-credential-key-versions.md)、[ADR-011](../../adr/beer-game2/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game2/012-delivery-pipeline-and-terraform.md)
+- [ADR-007](../../adr/beer-game-ts/007-cascade-deletion-without-queues.md)、[ADR-008](../../adr/beer-game-ts/008-auto-commit-and-event-audit.md)、[ADR-009](../../adr/beer-game-ts/009-credential-key-versions.md)、[ADR-011](../../adr/beer-game-ts/011-cloudfront-domain-tls-headers.md)、[ADR-012](../../adr/beer-game-ts/012-delivery-pipeline-and-terraform.md)
