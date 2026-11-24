@@ -41,7 +41,7 @@ beer-game-rust プロジェクトの設計ドキュメントです。
 
 ### コードの案内（Living Documentation）
 
-コードの doc コメントの注釈（`/// @event`・`@term`・`@core`・`@tour`・`@landmark`）から生成した文書です（手で編集しません。再生成は `just livingdoc`。方式は [ADR-002](../../adr/beer-game-rust/002-living-documentation-doc-comments.md)、**提案**で承認待ち）。`cargo test` が、コードの注釈との差と、イベントの ID・名前の設計書（beer-game-kotlin の表）との不一致を検出します。
+コードの doc コメントの注釈（`/// @event`・`@term`・`@core`・`@tour`・`@landmark`）から生成した文書です（手で編集しません。再生成は `just livingdoc`。方式は [ADR-002](../../adr/beer-game-rust/002-living-documentation-doc-comments.md)、承認済み）。`cargo test` が、コードの注釈との差と、イベントの ID・名前の設計書（beer-game-kotlin の表）との不一致を検出します。
 
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |

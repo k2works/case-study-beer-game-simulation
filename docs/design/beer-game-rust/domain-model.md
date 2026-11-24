@@ -370,7 +370,7 @@ Kotlin 版の D8 のとおり、ES にせず、状態の行を持つプロセス
 
 イベントの一覧（EV-G01〜G12、EV-S01〜S10）、発生条件、ペイロードは、[Kotlin 版のドメインイベント](../beer-game-kotlin/domain-model.md) を正本として**引き継ぎます**（名称も変えません。イベントは永続化され、投影と契約の一部になるため）。
 
-- **コードから生成した一覧**: [イベント一覧（生成）](./generated/events.md)（ID・イベント・ストリーム・条件・ペイロードの項目・書き込む投影のテーブル）。ID と名前が Kotlin 版の表と一致しないと、`cargo test`（`beergame-livingdoc`）が失敗する（[ADR-002](../../adr/beer-game-rust/002-living-documentation-doc-comments.md)、提案）。
+- **コードから生成した一覧**: [イベント一覧（生成）](./generated/events.md)（ID・イベント・ストリーム・条件・ペイロードの項目・書き込む投影のテーブル）。ID と名前が Kotlin 版の表と一致しないと、`cargo test`（`beergame-livingdoc`）が失敗する（[ADR-002](../../adr/beer-game-rust/002-living-documentation-doc-comments.md)）。
 - **名称の差（1 件）**: 実装の `SessionEvent::RoleReplaced`（EV-S09）は、Kotlin 版の表では `RoleHolderReplaced` である。`event_type` として永続化済みで、改名は保存済みのイベントの読み出し（アップキャスト）を要するため、コードは変えず、差を注釈で明示している。表を Rust 版の名前に直すかは人の判断。未実装は EV-G10 `ParticipationRecovered`・EV-S07 `AutoCommitChanged`（生成物の末尾に載る）。
 - ペイロードの JSON は、**adapter（`adapter-persistence` の `EventCodec`）の DTO** を、serde の `#[serde(tag = "event_type")]` のような**内部タグ付きの列挙型**で表すことを第一候補とします（**ドメインのイベントの型には serde の属性を付けない**。BD5）（Kotlin 版の「`event_type` を判別子にした多相」に対応。**書式は未確認**で、B1 で確かめる）。
 - 表示名と資格の値は、ペイロードに含めません（D7）。型の上でも、`GameEvent` のフィールドに `DisplayName` と資格のダイジェストの型を**持たせません**。
