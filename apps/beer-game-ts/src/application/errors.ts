@@ -52,6 +52,45 @@ export class IdempotencyKeyReusedError extends ConflictError {
   }
 }
 
+/**
+ * 不明・失効・期限切れ・形式不正の観察用の招待コード（区別しない。列挙の防止。AC1.3.4）。
+ * 共有の契約では 403 `game.invitation_invalid`。旧い経路では、これまでどおり 401 として扱えるように、`UnauthorizedError` の一種にする。
+ */
+export class InvalidObserverInvitationError extends UnauthorizedError {
+  constructor(
+    message = '招待が無効です（失効または期限切れ）。進行役に確認してください',
+  ) {
+    super(message);
+    this.name = 'InvalidObserverInvitationError';
+  }
+}
+
+/** このゲームに無い観察用の招待。共有の契約では 404 `game.invitation_not_found` */
+export class InvitationNotFoundError extends NotFoundError {
+  constructor(message = '招待が見つかりません') {
+    super(message);
+    this.name = 'InvitationNotFoundError';
+  }
+}
+
+/** すでに失効している資格・招待の失効。共有の契約では 409 `game.credential_already_revoked` */
+export class CredentialAlreadyRevokedError extends Error {
+  constructor(message = 'すでに失効しています') {
+    super(message);
+    this.name = 'CredentialAlreadyRevokedError';
+  }
+}
+
+/** 失効していない資格の再発行（有効な資格は置き換えない）。共有の契約では 409 `game.credential_not_revoked` */
+export class CredentialNotRevokedError extends Error {
+  constructor(
+    message = '資格は失効していません。先に失効させてから、再発行してください',
+  ) {
+    super(message);
+    this.name = 'CredentialNotRevokedError';
+  }
+}
+
 /** ゲームが終了していない（振り返りと出力は、終了してから） */
 export class NotEndedError extends Error {
   constructor(message = 'ゲームが終了してから、開けます') {

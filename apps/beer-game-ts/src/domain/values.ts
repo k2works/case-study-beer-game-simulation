@@ -95,7 +95,8 @@ export class DecisionConflictError extends StaleError {
 
 export const QUANTITY_MAX = 1000;
 export const WEEK_MAX = 50;
-export const DISPLAY_NAME_MAX = 20;
+/** 表示名の上限（コードポイントの数）。共有の API の契約（`JoinGameRequest.displayName`）と同じ 80 */
+export const DISPLAY_NAME_MAX = 80;
 
 export type Quantity = number & { readonly __brand: 'Quantity' };
 export const Quantity = {

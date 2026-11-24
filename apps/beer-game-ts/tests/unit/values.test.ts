@@ -68,10 +68,13 @@ describe('Version', () => {
 });
 
 describe('DisplayName', () => {
-  it('前後の空白を除き、1〜20 文字', () => {
+  it('前後の空白を除き、1〜80 文字（共有の契約と同じ。コードポイントの数）', () => {
     expect(DisplayName.of('  花子 ')).toBe('花子');
     expect(() => DisplayName.of('   ')).toThrow(DomainError);
-    expect(() => DisplayName.of('あ'.repeat(21))).toThrow(DomainError);
+    expect(DisplayName.of('あ'.repeat(80))).toHaveLength(80);
+    expect(() => DisplayName.of('あ'.repeat(81))).toThrow(DomainError);
+    // サロゲートペアの文字も、1 文字と数える
+    expect([...DisplayName.of('😀'.repeat(80))]).toHaveLength(80);
   });
 });
 

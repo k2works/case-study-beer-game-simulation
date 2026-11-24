@@ -475,6 +475,21 @@ class PgCredentials implements CredentialRepository {
       );
     }
   }
+
+  async isRecoveryRevoked(principal: Principal) {
+    const { rows } =
+      principal.kind === 'FACILITATOR'
+        ? await this.db.query(
+            'SELECT facilitator_revoked_at AS revoked_at FROM games WHERE game_id = $1',
+            [principal.gameId],
+          )
+        : await this.db.query(
+            `SELECT recovery_revoked_at AS revoked_at FROM participants
+              WHERE game_id = $1 AND participant_id = $2`,
+            [principal.gameId, principal.participantId ?? null],
+          );
+    return rows[0]?.revoked_at != null;
+  }
 }
 
 class PgObservers implements ObserverRepository {

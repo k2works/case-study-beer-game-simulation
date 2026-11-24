@@ -10,10 +10,14 @@ import Fastify, {
 import { z, ZodError } from 'zod';
 import type { Application } from '../../application/index.js';
 import {
+  CredentialAlreadyRevokedError,
+  CredentialNotRevokedError,
   DecisionConflict,
   ForbiddenError,
   IdempotencyKeyReusedError,
   InvalidInvitationError,
+  InvalidObserverInvitationError,
+  InvitationNotFoundError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
@@ -47,10 +51,13 @@ import {
   ApiProblem,
   alreadyStartedProblem,
   badRequestProblem,
+  credentialAlreadyRevokedProblem,
+  credentialNotRevokedProblem,
   gameNotEndedProblem,
   idempotencyKeyReusedProblem,
   internalProblem,
   invalidInvitationProblem,
+  invitationNotFoundProblem,
   isApiV1,
   notFoundProblem,
   notPreparingProblem,
@@ -319,6 +326,9 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
         })),
       );
     }
+    // 観察用の招待コードの失敗（UnauthorizedError の一種なので、資格の失敗より先に判定する）。区別しない
+    if (error instanceof InvalidObserverInvitationError)
+      return invalidInvitationProblem();
     if (
       error instanceof UnauthorizedError ||
       error instanceof ForbiddenError ||
@@ -334,6 +344,12 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     // 不明・形式不正の参加コード（NotFoundError の一種なので、先に判定する）。区別しない（列挙の防止）
     if (error instanceof InvalidInvitationError)
       return invalidInvitationProblem();
+    if (error instanceof InvitationNotFoundError)
+      return invitationNotFoundProblem();
+    if (error instanceof CredentialAlreadyRevokedError)
+      return credentialAlreadyRevokedProblem();
+    if (error instanceof CredentialNotRevokedError)
+      return credentialNotRevokedProblem();
     if (error instanceof NotFoundError) return notFoundProblem();
     // ドメインの失敗のうち、契約が固有の code を定めるもの（一般のドメインの失敗の写しより先に判定する）
     if (error instanceof NotPreparingError) return notPreparingProblem();

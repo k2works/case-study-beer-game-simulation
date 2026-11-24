@@ -126,6 +126,30 @@ export const invalidInvitationProblem = () =>
     '参加コードが正しくありません。進行役に確認してください。',
   );
 
+/** このゲームに無い観察用の招待 */
+export const invitationNotFoundProblem = () =>
+  new ApiProblem(
+    404,
+    'game.invitation_not_found',
+    'このゲームに、その招待はありません。',
+  );
+
+/** すでに失効している資格・招待の失効 */
+export const credentialAlreadyRevokedProblem = () =>
+  new ApiProblem(
+    409,
+    'game.credential_already_revoked',
+    'すでに失効しています。',
+  );
+
+/** 失効していない資格の再発行（有効な資格は置き換えない） */
+export const credentialNotRevokedProblem = () =>
+  new ApiProblem(
+    409,
+    'game.credential_not_revoked',
+    '資格は失効していません。先に失効させてから、再発行してください。',
+  );
+
 /** 準備中でないゲームへの、準備中だけの操作（参加の受付の終了など） */
 export const notPreparingProblem = () =>
   new ApiProblem(

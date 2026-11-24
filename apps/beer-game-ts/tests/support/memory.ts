@@ -174,6 +174,14 @@ function reposOver(
           });
         }
       },
+      // 復帰コードは主体ごとに 1 つ（保存すると、前のものは消える）。それが失効していれば、失効の状態
+      isRecoveryRevoked: async (principal) =>
+        [...store.credentials.values()].some(
+          (c) =>
+            c.purpose === 'RECOVERY' &&
+            samePrincipal(c.principal, principal) &&
+            c.validity.revokedAt !== undefined,
+        ),
     },
     observers: {
       saveInvitation: async (digest, inv) =>

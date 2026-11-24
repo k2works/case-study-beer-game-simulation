@@ -236,8 +236,6 @@ describe('createGame（POST /games）', () => {
 describe('joinGame（POST /participations/join）', () => {
   it('200 で、versions と gameId を返し、参加者の資格を Cookie で発行する（復帰資格つき）', async () => {
     await boot();
-    const t = await preparedTable(app);
-    // 準備済みのテーブルとは別の、これから参加する人のゲーム
     const created = await app.createGame({ weeks: 2, demand: [4, 4] });
     const res = await send('POST', '/api/v1/participations/join', {
       joinCode: created.joinCode,
@@ -262,7 +260,6 @@ describe('joinGame（POST /participations/join）', () => {
     ).json();
     expect(state.participantId).toBeTruthy();
     expect(state.joinCode).toBeUndefined();
-    void t;
   });
 
   it('不明・形式不正の参加コードは、区別せず 403（game.invitation_invalid）', async () => {
@@ -293,7 +290,7 @@ describe('joinGame（POST /participations/join）', () => {
   it('表示名が空・長すぎるときは 422（field は displayName）', async () => {
     await boot();
     const created = await app.createGame({ weeks: 2, demand: [4, 4] });
-    for (const displayName of ['', '  ', 'あ'.repeat(21)]) {
+    for (const displayName of ['', '  ', 'あ'.repeat(81)]) {
       const res = await send('POST', '/api/v1/participations/join', {
         joinCode: created.joinCode,
         displayName,

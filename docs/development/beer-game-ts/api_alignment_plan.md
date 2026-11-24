@@ -178,7 +178,8 @@ DROP INDEX uq_idempotency_create;
 | 3a | 完了（2026-11-24） | カスタム条件: マイグレーション 008（役割ごとの初期在庫 4 列＋`initial_flow`。`sessions.settings` も変換。Up・Down を専用 DB で検査）。`Conditions.initialInventory: Record<Role, number>`・`initialFlow`、範囲を契約に合わせた（初期在庫・初期の流れ 0〜1000、遅延 1〜8 週、費用 0〜100000）。検証の誤りに `field`（`conditions.<項目>`）を付ける。旧い経路は、初期在庫を数 1 つで受け・返す暫定の写しを置いた（段階 4 で撤去）。573 件通過 |
 | 3b | 完了（2026-11-24） | `createGame` の冪等: **マイグレーション 009**（`uq_idempotency_create`。案 3 の番号 010 を、適用の順に合わせて 009 とした。H4 は 010 になる。node-pg-migrate は、既適用より前の番号の追加を拒否するため）。冪等記録を範囲（`create`・`commit`）つきにし、作成は、キーだけで探して保存済みの応答（同じゲーム・資格・復帰コード）を返す。同じキーで内容が違えば `IdempotencyKeyReusedError`（409 `app.idempotency_key_reused`）。同時の重複は、一意違反を 1 回だけやり直して解決（6 並行で、ゲーム 1 つ）。期限切れの記録は、新しい作成が置き換える。587 件通過 |
 | 3c-1 | 完了（2026-11-24） | 準備中のコマンド 4 操作（`createGame`・`joinGame`・`startGame`・`assignRole`）を `/api/v1` に実装（未実装は 16 → 12 件）。冪等の共通の部品（`idempotently`・`retryOnDuplicate`・指紋は SHA-256）、資格の Cookie の発行（`bg_session`・`bg_recovery`・`X-Tab-Id`・`Secure` は `COOKIE_SECURE`）、レート制限の 429＋`Retry-After`。ドメインの型つきのエラー（`NotPreparingError`・`AlreadyStartedError`・`StartConditionError`・`ParticipantNotFoundError`）を契約の `code` に写した。**付け替え（D9）**: 別の役割にいる人は付け替え、同じ役割は変化なし（イベントも版も足さない）。作成の検証の誤りを、最終週・需要・条件・保持期間まで、すべて集めて返す（`field`・対象の週つき）。614 件通過 |
-| 3c-2〜3e・4〜7 | 未着手 | `recoverParticipation`・観察者 3 操作・`revokeCredential`・`reissueCredential`、進行中のコマンド、H4 |
+| 3c-2 | 完了（2026-11-24） | `recoverParticipation`・観察者 3 操作（`inviteObserver`・`revokeObserverInvitation`・`joinAsObserver`）・`revokeCredential`・`reissueCredential` を `/api/v1` に実装（未実装は 12 → 6 件）。復帰は、本文の復帰コードか Cookie `bg_recovery`。**契約の失効と再発行を別の操作に分けた**（`revokeParticipantCredential`・`reissueParticipantCredential`。失効の判定は `isRecoveryRevoked`。既存のスキーマで足りる）。失効済みの再失効・未失効の再発行は 409。観察者は、ブラウザセッションだけを発行し、復帰資格は発行しない。表示名の上限を契約に合わせて 20 → 80 文字（コードポイント）。630 件通過 |
+| 3d〜3e・4〜7 | 未着手 | 進行中のコマンド（`saveDecision`・`commitWeek`・`pause`・`resume`・`setCommitMode`・`submitProxyDecision`）と業務の失敗の `code`、H4 |
 
 ### 段階 2 で、後の段階へ持ち越したもの・分かったこと
 
@@ -213,3 +214,4 @@ DROP INDEX uq_idempotency_create;
 | 2026-11-24 | 段階 3 の前の確認事項 3 案の承認、小段階 3a（カスタム条件）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3b（`createGame` の冪等。マイグレーション 009）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3c-1（準備中のコマンド 4 操作）の完了を反映 | claude-code |
+| 2026-11-24 | 小段階 3c-2（復帰・観察者・資格の失効と再発行）の完了を反映 | claude-code |

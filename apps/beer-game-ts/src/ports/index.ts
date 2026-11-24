@@ -61,6 +61,11 @@ export interface CredentialRepository {
   ): Promise<Principal | null>;
   /** 主体のブラウザセッションと復帰コードを、すべて失効させる */
   revokeAll(principal: Principal, at: Date): Promise<void>;
+  /**
+   * 主体の復帰資格が、失効させられた状態か（`revokeAll` の後、新しい復帰コードを保存するまで true）。
+   * 期限切れだけで失効していなければ false（契約: 期限切れの資格は、先に失効させてから再発行する）。
+   */
+  isRecoveryRevoked(principal: Principal): Promise<boolean>;
 }
 
 /** 観察用の招待と観察者。招待コードは保存せず、ダイジェストだけを持つ */

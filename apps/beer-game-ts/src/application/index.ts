@@ -11,6 +11,7 @@ import {
   joinGame as joinGameRule,
   missingRoles,
   type CommitMode,
+  type Game,
   type GameSettings,
   startGame as startGameRule,
 } from '../domain/game.js';
@@ -20,6 +21,7 @@ import {
   DecisionConflictError,
   DisplayName,
   DomainError,
+  ParticipantNotFoundError,
   PermissionError,
   type Issue,
 } from '../domain/values.js';
@@ -48,10 +50,14 @@ import {
   type UnitOfWork,
 } from '../ports/index.js';
 import {
+  CredentialAlreadyRevokedError,
+  CredentialNotRevokedError,
   DecisionConflict,
   ForbiddenError,
   IdempotencyKeyReusedError,
   InvalidInvitationError,
+  InvalidObserverInvitationError,
+  InvitationNotFoundError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
@@ -151,22 +157,25 @@ export function createApplication(deps: Dependencies) {
   const ttl = deps.ttl ?? CREDENTIAL_TTL;
 
   /** 資格を発行して保存し、生の値を返す（生の値は保存しない） */
+  async function issueWithExpiry(
+    repos: Repositories,
+    principal: Principal,
+    purpose: CredentialPurpose,
+  ): Promise<{ token: string; expiresAt: Date }> {
+    const cred = credentials.issue();
+    const validity = CredentialValidity.issue(
+      clock.now(),
+      purpose === 'SESSION' ? ttl.sessionMs : ttl.recoveryMs,
+    );
+    await repos.credentials.save(cred.digest, principal, purpose, validity);
+    return { token: cred.token, expiresAt: validity.expiresAt };
+  }
   async function issue(
     repos: Repositories,
     principal: Principal,
     purpose: CredentialPurpose,
   ): Promise<string> {
-    const cred = credentials.issue();
-    await repos.credentials.save(
-      cred.digest,
-      principal,
-      purpose,
-      CredentialValidity.issue(
-        clock.now(),
-        purpose === 'SESSION' ? ttl.sessionMs : ttl.recoveryMs,
-      ),
-    );
-    return cred.token;
+    return (await issueWithExpiry(repos, principal, purpose)).token;
   }
 
   const findPrincipal = (
@@ -199,6 +208,16 @@ export function createApplication(deps: Dependencies) {
       : p.kind === 'OBSERVER'
         ? { kind: 'OBSERVER', observerId: p.observerId ?? '' }
         : participant(p.participantId ?? '');
+
+  /** このゲームの参加者の主体。参加者でなければ `ParticipantNotFoundError` */
+  const participantPrincipal = (
+    game: Game,
+    participantId: string,
+  ): Principal => {
+    if (!game.participants.some((p) => p.id === participantId))
+      throw new ParticipantNotFoundError();
+    return { gameId: game.id, kind: 'PARTICIPANT', participantId };
+  };
 
   /** 資格から、投影の「見る人」を作る。観察者は、役割も参加コードも見ないので null */
   const viewerOf = (p: Principal): Viewer | null =>
@@ -441,19 +460,161 @@ export function createApplication(deps: Dependencies) {
      * 復帰コードで戻る。新しいブラウザセッションを発行する（復帰コード自体は、期限まで再利用できる）。
      * 無効なら、復帰せず、進行役への確認方法を示す。
      */
-    recover(input: { code: string }) {
-      return uow.run(async (repos) => {
-        const principal = await findPrincipal(repos, input.code, 'RECOVERY');
-        const game = principal
-          ? await repos.games.find(principal.gameId)
-          : null;
-        if (!principal || !game) throw new UnauthorizedError(INVALID_RECOVERY);
-        const token = await issue(repos, principal, 'SESSION');
-        await repos.events.append(game.id, [
-          { type: 'ParticipationRecovered', ...principal },
-        ]);
-        return { ...principal, token, gameStatus: game.status };
-      });
+    recover(input: {
+      code: string;
+      /** 共有の契約: 復帰するゲーム。復帰コードが別のゲームのものなら、区別せず拒否する */
+      gameId?: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await findPrincipal(repos, input.code, 'RECOVERY');
+          const game = principal
+            ? await repos.games.find(principal.gameId)
+            : null;
+          if (!principal || !game)
+            throw new UnauthorizedError(INVALID_RECOVERY);
+          if (input.gameId !== undefined && input.gameId !== game.id)
+            throw new UnauthorizedError(INVALID_RECOVERY);
+          // 復帰資格の有効性が認可。有効と確かめてから、冪等の応答を探す（失効した資格の再送に、保存した応答を返さない）
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'recover',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                gameId: input.gameId,
+                code: input.code,
+              }),
+            },
+            async () => {
+              const token = await issue(repos, principal, 'SESSION');
+              await repos.events.append(game.id, [
+                { type: 'ParticipationRecovered', ...principal },
+              ]);
+              const session = await repos.sessions.findByGame(game.id);
+              const role =
+                principal.kind === 'PARTICIPANT'
+                  ? ROLES.find((r) =>
+                      game.assignments[r]?.includes(
+                        principal.participantId ?? '',
+                      ),
+                    )
+                  : undefined;
+              return {
+                ...principal,
+                token,
+                gameStatus: game.status,
+                versions: versionsOf(game, session),
+                ...(role ? { role } : {}),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 参加者の資格の失効（進行役。契約の `revokeCredential`）。復帰資格と、発行済みのブラウザセッションを、ともに使えなくする。
+     * すでに失効していれば `CredentialAlreadyRevokedError`。
+     */
+    revokeParticipantCredential(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '資格の失効');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'revoke-credential',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const target = participantPrincipal(game, input.participantId);
+              if (await repos.credentials.isRecoveryRevoked(target))
+                throw new CredentialAlreadyRevokedError();
+              await repos.credentials.revokeAll(target, clock.now());
+              await repos.events.append(game.id, [
+                { type: 'CredentialRevoked', ...target },
+              ]);
+              return {
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
+    },
+
+    /**
+     * 参加者の資格の再発行（進行役。契約の `reissueCredential`）。新しい復帰コードを、この応答で一度だけ示す。
+     * 失効していない資格の再発行は拒否する（有効な資格は置き換えない。期限切れの資格は、先に失効させる）。
+     */
+    reissueParticipantCredential(input: {
+      token: string;
+      gameId: string;
+      participantId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '資格の再発行');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'reissue-credential',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                participantId: input.participantId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const target = participantPrincipal(game, input.participantId);
+              if (!(await repos.credentials.isRecoveryRevoked(target)))
+                throw new CredentialNotRevokedError();
+              const recovery = await issueWithExpiry(repos, target, 'RECOVERY');
+              await repos.events.append(game.id, [
+                { type: 'CredentialReissued', ...target },
+              ]);
+              return {
+                recoveryCode: recovery.token,
+                expiresAt: recovery.expiresAt.toISOString(),
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
     },
 
     /**
@@ -756,96 +917,190 @@ export function createApplication(deps: Dependencies) {
     },
 
     /** 観察用の招待の発行（進行役）。招待コードは、この応答で一度だけ返す */
-    issueObserverInvitation(input: { token: string; gameId: string }) {
-      return uow.run(async (repos) => {
-        const principal = await authenticate(repos, input.token, input.gameId);
-        requireFacilitatorPrincipal(principal, '観察用の招待の発行');
-        const game = await loadGame(repos, input.gameId);
-        const invitationId = ids.uuid();
-        const cred = credentials.issue();
-        const validity = CredentialValidity.issue(
-          clock.now(),
-          ttl.observerInvitationMs,
-        );
-        await repos.observers.saveInvitation(cred.digest, {
-          id: invitationId,
-          gameId: game.id,
-          validity,
-        });
-        await repos.events.append(game.id, [
-          { type: 'ObserverInvited', gameId: game.id, invitationId },
-        ]);
-        return {
-          invitationId,
-          code: cred.token,
-          expiresAt: validity.expiresAt.toISOString(),
-        };
-      });
+    issueObserverInvitation(input: {
+      token: string;
+      gameId: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '観察用の招待の発行');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'invite',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({ operator: principal }),
+            },
+            async () => {
+              const invitationId = ids.uuid();
+              const cred = credentials.issue();
+              const validity = CredentialValidity.issue(
+                clock.now(),
+                ttl.observerInvitationMs,
+              );
+              await repos.observers.saveInvitation(cred.digest, {
+                id: invitationId,
+                gameId: game.id,
+                validity,
+              });
+              await repos.events.append(game.id, [
+                { type: 'ObserverInvited', gameId: game.id, invitationId },
+              ]);
+              return {
+                invitationId,
+                code: cred.token,
+                expiresAt: validity.expiresAt.toISOString(),
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
     },
 
-    /** 観察用の招待の失効（進行役）。新しい参加だけを止め、参加済みの観察者は観察を続けられる */
+    /**
+     * 観察用の招待の失効（進行役）。新しい参加だけを止め、参加済みの観察者は観察を続けられる。
+     * このゲームに無い招待は `InvitationNotFoundError`、すでに失効していれば `CredentialAlreadyRevokedError`。
+     */
     revokeObserverInvitation(input: {
       token: string;
       gameId: string;
       invitationId: string;
+      idempotencyKey?: string;
     }) {
-      return uow.run(async (repos) => {
-        const principal = await authenticate(repos, input.token, input.gameId);
-        requireFacilitatorPrincipal(principal, '観察用の招待の失効');
-        const revoked = await repos.observers.revokeInvitation(
-          input.gameId,
-          input.invitationId,
-          clock.now(),
-        );
-        if (!revoked) throw new NotFoundError('招待が見つかりません');
-        await repos.events.append(input.gameId, [
-          {
-            type: 'ObserverInvitationRevoked',
-            gameId: input.gameId,
-            invitationId: input.invitationId,
-          },
-        ]);
-      });
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const principal = await authenticate(
+            repos,
+            input.token,
+            input.gameId,
+          );
+          requireFacilitatorPrincipal(principal, '観察用の招待の失効');
+          const game = await loadGame(repos, input.gameId);
+          return idempotently(
+            repos,
+            {
+              gameId: game.id,
+              scope: 'revoke-invitation',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                invitationId: input.invitationId,
+                operator: principal,
+              }),
+            },
+            async () => {
+              const invitation = (
+                await repos.observers.listInvitations(input.gameId)
+              ).find((i) => i.id === input.invitationId);
+              if (!invitation) throw new InvitationNotFoundError();
+              if (invitation.revokedAt !== null)
+                throw new CredentialAlreadyRevokedError();
+              await repos.observers.revokeInvitation(
+                input.gameId,
+                input.invitationId,
+                clock.now(),
+              );
+              await repos.events.append(input.gameId, [
+                {
+                  type: 'ObserverInvitationRevoked',
+                  gameId: input.gameId,
+                  invitationId: input.invitationId,
+                },
+              ]);
+              return {
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
+          );
+        }),
+      );
     },
 
-    /** 観察用の招待で、観察者として参加する。役割を持たず、読み取りだけ */
-    joinAsObserver(input: { code: string; displayName?: string }) {
-      return uow.run(async (repos) => {
-        const invitation = input.code
-          ? await repos.observers.findInvitation(
-              credentials.digestsOf(input.code),
-              clock.now(),
-            )
-          : null;
-        if (!invitation)
-          throw new UnauthorizedError(
-            '招待が無効です（失効または期限切れ）。進行役に確認してください',
+    /**
+     * 観察用の招待で、観察者として参加する。役割を持たず、読み取りだけ。
+     * 不明・失効・期限切れ・形式不正の招待コードは、区別せず `InvalidObserverInvitationError`。
+     */
+    joinAsObserver(input: {
+      code: string;
+      displayName?: string;
+      idempotencyKey?: string;
+    }) {
+      return retryOnDuplicate(input.idempotencyKey, () =>
+        uow.run(async (repos) => {
+          const invitation = input.code
+            ? await repos.observers.findInvitation(
+                credentials.digestsOf(input.code),
+                clock.now(),
+              )
+            : null;
+          if (!invitation) throw new InvalidObserverInvitationError();
+          return idempotently(
+            repos,
+            {
+              gameId: invitation.gameId,
+              scope: 'join-observer',
+              key: input.idempotencyKey,
+              fingerprint: fingerprintOf({
+                code: input.code,
+                displayName: input.displayName,
+              }),
+            },
+            async () => {
+              if (
+                (await repos.observers.countObservers(invitation.gameId)) >=
+                OBSERVER_LIMIT
+              )
+                throw new DomainError(
+                  `観察者は 1 ゲーム ${OBSERVER_LIMIT} 人までです`,
+                );
+              const name = input.displayName?.trim();
+              const observerId = ids.uuid();
+              await repos.observers.addObserver({
+                id: observerId,
+                gameId: invitation.gameId,
+                invitationId: invitation.id,
+                displayName: name ? DisplayName.of(name) : '観察者',
+              });
+              const token = await issue(
+                repos,
+                { gameId: invitation.gameId, kind: 'OBSERVER', observerId },
+                'SESSION',
+              );
+              await repos.events.append(invitation.gameId, [
+                {
+                  type: 'ObserverJoined',
+                  gameId: invitation.gameId,
+                  observerId,
+                },
+              ]);
+              const game = await loadGame(repos, invitation.gameId);
+              return {
+                gameId: invitation.gameId,
+                observerId,
+                token,
+                versions: versionsOf(
+                  game,
+                  await repos.sessions.findByGame(game.id),
+                ),
+              };
+            },
           );
-        if (
-          (await repos.observers.countObservers(invitation.gameId)) >=
-          OBSERVER_LIMIT
-        )
-          throw new DomainError(
-            `観察者は 1 ゲーム ${OBSERVER_LIMIT} 人までです`,
-          );
-        const name = input.displayName?.trim();
-        const observerId = ids.uuid();
-        await repos.observers.addObserver({
-          id: observerId,
-          gameId: invitation.gameId,
-          invitationId: invitation.id,
-          displayName: name ? DisplayName.of(name) : '観察者',
-        });
-        const token = await issue(
-          repos,
-          { gameId: invitation.gameId, kind: 'OBSERVER', observerId },
-          'SESSION',
-        );
-        await repos.events.append(invitation.gameId, [
-          { type: 'ObserverJoined', gameId: invitation.gameId, observerId },
-        ]);
-        return { gameId: invitation.gameId, observerId, token };
-      });
+        }),
+      );
     },
 
     /**

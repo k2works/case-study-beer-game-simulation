@@ -5,7 +5,12 @@ import type { ConditionsInput } from '../../domain/conditions.js';
 import { ROLES } from '../../domain/role.js';
 import { idempotencyKeyOf } from './idempotency-key.js';
 import { API_V1, rateLimitedProblem, validationProblem } from './problems.js';
-import { idParam, issueCookies, tokenOf } from './v1-support.js';
+import {
+  idParam,
+  issueCookies,
+  recoveryTokenOf,
+  tokenOf,
+} from './v1-support.js';
 
 /**
  * 共有の API の契約（/api/v1）の、変更系（コマンド）の経路。ルールは持たず、ユースケースを呼ぶだけ。
@@ -89,6 +94,17 @@ const joinSchema = z.object({
   displayName: z.string(),
 });
 const assignSchema = z.object({ role: roleSchema });
+const recoverSchema = z.object({
+  gameId: z.uuid(),
+  recoveryCode: z.string().optional(),
+});
+const joinObserverSchema = z.object({
+  invitationCode: z.string(),
+  displayName: z.string(),
+});
+const credentialSubjectSchema = z.object({
+  subject: z.object({ kind: z.literal('PARTICIPANT'), id: z.uuid() }),
+});
 
 export function registerApiV1Commands(
   server: FastifyInstance,
@@ -147,6 +163,100 @@ export function registerApiV1Commands(
     );
     return { versions: joined.versions, gameId: joined.gameId };
   });
+
+  // 復帰資格（本文の復帰コード、または Cookie `bg_recovery`）で、同じゲームと役割へ戻る。新しいブラウザセッションを発行する
+  server.post(`${API_V1}/participations/recover`, async (request, reply) => {
+    await ctx.limit(request, 'recover');
+    const body = recoverSchema.parse(request.body);
+    const code = body.recoveryCode ?? recoveryTokenOf(request) ?? '';
+    const back = await app.recover({
+      code,
+      gameId: body.gameId,
+      idempotencyKey: idempotencyKeyOf(request),
+    });
+    issueCookies(
+      request,
+      reply,
+      { session: back.token, recovery: code },
+      ctx.secureCookies,
+    );
+    return {
+      versions: back.versions,
+      gameId: back.gameId,
+      kind: back.kind,
+      ...(back.role ? { role: back.role } : {}),
+    };
+  });
+
+  // 観察用の招待（進行役）。招待コードは、この応答で一度だけ示す
+  server.post(
+    `${API_V1}/games/:gameId/observer-invitations`,
+    async (request) => {
+      const issued = await app.issueObserverInvitation({
+        token: tokenOf(request),
+        gameId: idParam(request, 'gameId'),
+        idempotencyKey: idempotencyKeyOf(request),
+      });
+      return {
+        versions: issued.versions,
+        invitationId: issued.invitationId,
+        invitationCode: issued.code,
+        expiresAt: issued.expiresAt,
+      };
+    },
+  );
+
+  server.post(
+    `${API_V1}/games/:gameId/observer-invitations/:invitationId/revoke`,
+    async (request) =>
+      app.revokeObserverInvitation({
+        token: tokenOf(request),
+        gameId: idParam(request, 'gameId'),
+        invitationId: idParam(request, 'invitationId'),
+        idempotencyKey: idempotencyKeyOf(request),
+      }),
+  );
+
+  // 観察者の参加（認可は招待コード）。ブラウザセッションだけを発行する（復帰資格は発行しない）
+  server.post(`${API_V1}/participations/observe`, async (request, reply) => {
+    await ctx.limit(request, 'observe');
+    const body = joinObserverSchema.parse(request.body);
+    const joined = await app.joinAsObserver({
+      code: body.invitationCode,
+      displayName: body.displayName,
+      idempotencyKey: idempotencyKeyOf(request),
+    });
+    issueCookies(request, reply, { session: joined.token }, ctx.secureCookies);
+    return {
+      versions: joined.versions,
+      gameId: joined.gameId,
+      kind: 'OBSERVER' as const,
+    };
+  });
+
+  // 参加者の資格の失効と再発行（進行役）。再発行の応答で、新しい復帰コードを一度だけ示す
+  server.post(`${API_V1}/games/:gameId/credentials/revoke`, async (request) => {
+    const body = credentialSubjectSchema.parse(request.body);
+    return app.revokeParticipantCredential({
+      token: tokenOf(request),
+      gameId: idParam(request, 'gameId'),
+      participantId: body.subject.id,
+      idempotencyKey: idempotencyKeyOf(request),
+    });
+  });
+
+  server.post(
+    `${API_V1}/games/:gameId/credentials/reissue`,
+    async (request) => {
+      const body = credentialSubjectSchema.parse(request.body);
+      return app.reissueParticipantCredential({
+        token: tokenOf(request),
+        gameId: idParam(request, 'gameId'),
+        participantId: body.subject.id,
+        idempotencyKey: idempotencyKeyOf(request),
+      });
+    },
+  );
 
   server.post(`${API_V1}/games/:gameId/start`, async (request) =>
     app.startGame({

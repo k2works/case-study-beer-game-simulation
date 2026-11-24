@@ -6,16 +6,10 @@
  * 一覧が空になれば、契約の全操作を実装したことになる。
  */
 export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
-  'inviteObserver',
-  'revokeObserverInvitation',
-  'joinAsObserver',
   'saveDecision',
   'commitWeek',
   'pauseSession',
   'setCommitMode',
   'resumeSession',
   'submitProxyDecision',
-  'revokeCredential',
-  'reissueCredential',
-  'recoverParticipation',
 ]);
