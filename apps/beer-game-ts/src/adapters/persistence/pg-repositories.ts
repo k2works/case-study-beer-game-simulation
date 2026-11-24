@@ -24,6 +24,7 @@ import {
   type GameRepository,
   type IdempotencyRecord,
   type IdempotencyRepository,
+  type IdempotencyScope,
   type ObserverRepository,
   type RetentionRepository,
   type Principal,
@@ -676,7 +677,6 @@ export function decrypt(key: Buffer, data: Buffer): unknown {
   return JSON.parse(text.toString('utf8'));
 }
 
-const SCOPE = 'commit';
 const digestOfKey = (key: string) =>
   createHash('sha256').update(key).digest('hex');
 
@@ -685,16 +685,39 @@ class PgIdempotency implements IdempotencyRepository {
     private readonly db: Db,
     private readonly key: Buffer,
   ) {}
-  async find(gameId: string, key: string): Promise<IdempotencyRecord | null> {
+  async find(
+    gameId: string,
+    scope: IdempotencyScope,
+    key: string,
+  ): Promise<IdempotencyRecord | null> {
     const { rows } = await this.db.query(
       `SELECT fingerprint, response FROM idempotency_records
        WHERE game_id = $1 AND scope = $2 AND key_digest = $3 AND expires_at > now()`,
-      [gameId, SCOPE, digestOfKey(key)],
+      [gameId, scope, digestOfKey(key)],
     );
     const r = rows[0];
     return r
       ? {
           gameId,
+          scope,
+          key,
+          fingerprint: r.fingerprint,
+          response: decrypt(this.key, r.response),
+        }
+      : null;
+  }
+  async findCreate(key: string): Promise<IdempotencyRecord | null> {
+    // 部分一意索引（uq_idempotency_create）で、キーだけで探せる
+    const { rows } = await this.db.query(
+      `SELECT game_id, fingerprint, response FROM idempotency_records
+       WHERE scope = 'create' AND key_digest = $1 AND expires_at > now()`,
+      [digestOfKey(key)],
+    );
+    const r = rows[0];
+    return r
+      ? {
+          gameId: r.game_id as string,
+          scope: 'create',
           key,
           fingerprint: r.fingerprint,
           response: decrypt(this.key, r.response),
@@ -702,13 +725,21 @@ class PgIdempotency implements IdempotencyRepository {
       : null;
   }
   async save(record: IdempotencyRecord) {
+    if (record.scope === 'create') {
+      // 期限切れの記録が、同じキーの新しい作成を妨げない（一意索引は、期限切れの行も含むため）
+      await this.db.query(
+        `DELETE FROM idempotency_records
+          WHERE scope = 'create' AND key_digest = $1 AND expires_at <= now()`,
+        [digestOfKey(record.key)],
+      );
+    }
     await guarded(() =>
       this.db.query(
         `INSERT INTO idempotency_records (game_id, scope, key_digest, fingerprint, response)
          VALUES ($1,$2,$3,$4,$5)`,
         [
           record.gameId,
-          SCOPE,
+          record.scope,
           digestOfKey(record.key),
           record.fingerprint,
           encrypt(this.key, record.response),

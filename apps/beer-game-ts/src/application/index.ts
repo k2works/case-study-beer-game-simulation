@@ -35,7 +35,7 @@ import {
   type SessionOutcome,
 } from '../domain/session.js';
 import {
-  ConflictError,
+  DuplicateError,
   type Clock,
   type ReviewReader,
   type CredentialPolicy,
@@ -50,6 +50,7 @@ import {
 import {
   DecisionConflict,
   ForbiddenError,
+  IdempotencyKeyReusedError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
@@ -113,6 +114,33 @@ export type CredentialTarget =
 /** 無効な復帰コード。復帰せず、進行役への確認方法を示す */
 const INVALID_RECOVERY =
   '復帰コードが無効です（失効・期限切れ、またはゲームが削除済み）。進行役に、新しい復帰コードの発行を依頼してください';
+
+/** 作成したゲームと、進行役の資格（生の値。保存はダイジェストだけ。冪等記録には、暗号化して保存する） */
+export interface CreatedGame {
+  gameId: string;
+  joinCode: string;
+  facilitatorToken: string;
+  recoveryCode: string;
+}
+
+/**
+ * 要求の指紋。項目の順序に左右されない、正規化した JSON。同じキーの要求が「同じ内容」かを比べる。
+ * （値は、ゲームの設定だけで、資格・表示名を含まない）
+ */
+function fingerprintOf(value: unknown): string {
+  const canonical = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(canonical)
+      : v !== null && typeof v === 'object'
+        ? Object.fromEntries(
+            Object.entries(v as Record<string, unknown>)
+              .filter(([, x]) => x !== undefined)
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([k, x]) => [k, canonical(x)]),
+          )
+        : v;
+  return JSON.stringify(canonical(value));
+}
 
 export interface CommitResult {
   committedWeek: number;
@@ -288,8 +316,37 @@ export function createApplication(deps: Dependencies) {
       conditions?: ConditionsInput;
       /** 保持期間（日）。省略時は 90 日 */
       retentionDays?: number;
+      /**
+       * 冪等キー（共有の契約の `Idempotency-Key`）。同じキー・同じ内容の再送は、保存した応答（同じゲーム・資格・復帰コード）を返す。
+       * 同じキーで内容が違えば `IdempotencyKeyReusedError`。省略（旧い経路）なら冪等にしない。
+       */
+      idempotencyKey?: string;
     }) {
-      return uow.run(async (repos) => {
+      const { idempotencyKey, ...request } = input;
+      const fingerprint = fingerprintOf(request);
+      const attempt = () =>
+        uow.run(async (repos) => {
+          if (idempotencyKey !== undefined) {
+            const prior = await repos.idempotency.findCreate(idempotencyKey);
+            if (prior) {
+              if (prior.fingerprint !== fingerprint)
+                throw new IdempotencyKeyReusedError();
+              return prior.response as CreatedGame;
+            }
+          }
+          const created = await createOnce(repos);
+          if (idempotencyKey !== undefined) {
+            await repos.idempotency.save({
+              gameId: created.gameId,
+              scope: 'create',
+              key: idempotencyKey,
+              fingerprint,
+              response: created,
+            });
+          }
+          return created;
+        });
+      const createOnce = async (repos: Repositories): Promise<CreatedGame> => {
         const gameId = ids.uuid();
         const retention = retentionPolicyOf(clock.now(), input.retentionDays);
         const joinCode = ids.joinCode();
@@ -308,7 +365,18 @@ export function createApplication(deps: Dependencies) {
         const recoveryCode = await issue(repos, principal, 'RECOVERY');
         await repos.events.append(gameId, events);
         return { gameId, joinCode, facilitatorToken, recoveryCode };
-      });
+      };
+      // 同時の重複（同じキーの要求が、ほぼ同時に 2 つ届く）: 後から保存した側は一意制約に違反して失敗する。
+      // その場合は 1 回だけやり直し、先に保存された応答を返す（500 にも 503 にもしない）
+      return (async () => {
+        try {
+          return await attempt();
+        } catch (e) {
+          if (idempotencyKey !== undefined && e instanceof DuplicateError)
+            return attempt();
+          throw e;
+        }
+      })();
     },
 
     joinGame(input: { joinCode: string; displayName: string }) {
@@ -515,11 +583,12 @@ export function createApplication(deps: Dependencies) {
         const fingerprint = `${input.week}:${input.version}`;
         const prior = await repos.idempotency.find(
           input.gameId,
+          'commit',
           input.idempotencyKey,
         );
         if (prior) {
           if (prior.fingerprint !== fingerprint) {
-            throw new ConflictError('同じ冪等キーで、内容の違う要求です');
+            throw new IdempotencyKeyReusedError();
           }
           return prior.response as CommitResult;
         }
@@ -541,6 +610,7 @@ export function createApplication(deps: Dependencies) {
         await repos.events.append(input.gameId, events);
         await repos.idempotency.save({
           gameId: input.gameId,
+          scope: 'commit',
           key: input.idempotencyKey,
           fingerprint,
           response: result,

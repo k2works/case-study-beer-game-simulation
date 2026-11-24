@@ -12,6 +12,7 @@ import type { Application } from '../../application/index.js';
 import {
   DecisionConflict,
   ForbiddenError,
+  IdempotencyKeyReusedError,
   NotActiveError,
   NotEndedError,
   NotFoundError,
@@ -41,6 +42,7 @@ import {
   ApiProblem,
   badRequestProblem,
   gameNotEndedProblem,
+  idempotencyKeyReusedProblem,
   internalProblem,
   isApiV1,
   notFoundProblem,
@@ -311,6 +313,9 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     ) {
       return unauthorizedProblem();
     }
+    // 競合（ConflictError）の一種なので、競合の写しより先に判定する
+    if (error instanceof IdempotencyKeyReusedError)
+      return idempotencyKeyReusedProblem();
     if (error instanceof NotEndedError) return gameNotEndedProblem();
     if (error instanceof NotActiveError) return sessionNotActiveProblem();
     if (error instanceof NotFoundError) return notFoundProblem();

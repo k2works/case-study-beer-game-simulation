@@ -176,7 +176,8 @@ DROP INDEX uq_idempotency_create;
 | 1 | 完了（2026-11-24） | `getHealth`・`getReady` を `/api/v1` に実装（未実装は 25 → 23 件）。problem+json（`code`・`type`・`errors[]`・`Retry-After`）、Origin（`ALLOWED_ORIGINS`）、`Idempotency-Key` の検査、本文 64 KB、404 を契約の形で。**旧い経路（`/api/*`）は従来の形のまま**（段階 4 まで。URL の接頭辞で切り替える）。537 件通過 |
 | 2 | 完了（2026-11-24） | 読み取りの 7 操作（`getGameState`・`getSessionState`・`getLobby`・`getObservation`・`getReview`・`getExport`・`getRetention`）を `/api/v1` に実装（未実装は 23 → 16 件）。応答は契約のスキーマに適合し、開示・認可の規則（参加者は自分の役割だけ、観察者に役割別の値を見せない、終了前は 409 `game.not_ended`、無資格・別ゲーム・存在しないゲームは同じ 403）を契約テスト 26 件で検査。564 件通過。**ゲート 1 で、マイグレーション 007（`role_decisions.saved_at`）を承認**（2026-11-24、ユーザー）。`versions.game`・`versions.session` は、既存の `games.version`・`sessions.version` から返せる（スキーマ変更なし） |
 | 3a | 完了（2026-11-24） | カスタム条件: マイグレーション 008（役割ごとの初期在庫 4 列＋`initial_flow`。`sessions.settings` も変換。Up・Down を専用 DB で検査）。`Conditions.initialInventory: Record<Role, number>`・`initialFlow`、範囲を契約に合わせた（初期在庫・初期の流れ 0〜1000、遅延 1〜8 週、費用 0〜100000）。検証の誤りに `field`（`conditions.<項目>`）を付ける。旧い経路は、初期在庫を数 1 つで受け・返す暫定の写しを置いた（段階 4 で撤去）。573 件通過 |
-| 3b〜3e・4〜7 | 未着手 | |
+| 3b | 完了（2026-11-24） | `createGame` の冪等: **マイグレーション 009**（`uq_idempotency_create`。案 3 の番号 010 を、適用の順に合わせて 009 とした。H4 は 010 になる。node-pg-migrate は、既適用より前の番号の追加を拒否するため）。冪等記録を範囲（`create`・`commit`）つきにし、作成は、キーだけで探して保存済みの応答（同じゲーム・資格・復帰コード）を返す。同じキーで内容が違えば `IdempotencyKeyReusedError`（409 `app.idempotency_key_reused`）。同時の重複は、一意違反を 1 回だけやり直して解決（6 並行で、ゲーム 1 つ）。期限切れの記録は、新しい作成が置き換える。587 件通過 |
+| 3c〜3e・4〜7 | 未着手 | |
 
 ### 段階 2 で、後の段階へ持ち越したもの・分かったこと
 
@@ -209,3 +210,4 @@ DROP INDEX uq_idempotency_create;
 | 2026-11-24 | 段階 1 の完了を反映（横断の仕組み、`getHealth`・`getReady`、持ち越しの一覧） | claude-code |
 | 2026-11-24 | 段階 2 の完了を反映（読み取り 7 操作、マイグレーション 007 の承認、段階 3 へ持ち越す差） | claude-code |
 | 2026-11-24 | 段階 3 の前の確認事項 3 案の承認、小段階 3a（カスタム条件）の完了を反映 | claude-code |
+| 2026-11-24 | 小段階 3b（`createGame` の冪等。マイグレーション 009）の完了を反映 | claude-code |

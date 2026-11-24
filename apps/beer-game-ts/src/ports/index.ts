@@ -136,15 +136,32 @@ export interface RetentionRepository {
   }): Promise<void>;
 }
 
+/** 冪等記録の範囲（操作の種類）。同じキーでも、範囲が違えば別の記録 */
+export type IdempotencyScope = 'create' | 'commit';
+
 export interface IdempotencyRecord {
   gameId: string;
+  scope: IdempotencyScope;
   key: string;
   /** 要求の指紋。同じキーで内容が違えば競合 */
   fingerprint: string;
   response: unknown;
 }
 export interface IdempotencyRepository {
-  find(gameId: string, key: string): Promise<IdempotencyRecord | null>;
+  find(
+    gameId: string,
+    scope: IdempotencyScope,
+    key: string,
+  ): Promise<IdempotencyRecord | null>;
+  /**
+   * 作成（`create`）の記録を、キーだけで探す（ゲームの存在前の要求なので、ゲームの ID を知らない）。
+   * 期限切れの記録は見つからない。
+   */
+  findCreate(key: string): Promise<IdempotencyRecord | null>;
+  /**
+   * 保存する。同じ範囲・キーの記録が既にあれば `DuplicateError`（同時の重複）。
+   * 作成の記録は、期限切れの同じキーの記録があれば、置き換える。
+   */
   save(record: IdempotencyRecord): Promise<void>;
 }
 

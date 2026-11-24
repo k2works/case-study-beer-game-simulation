@@ -1,3 +1,5 @@
+import { ConflictError } from '../ports/index.js';
+
 export class NotFoundError extends Error {
   constructor(message = '見つかりません') {
     super(message);
@@ -26,6 +28,17 @@ export class DecisionConflict extends Error {
   ) {
     super(message);
     this.name = 'DecisionConflict';
+  }
+}
+
+/**
+ * 同じ冪等キーで、内容の違う要求（409。`app.idempotency_key_reused`）。
+ * 旧い経路が、これまでどおり 409 の競合として扱えるように、競合（`ConflictError`）の一種にする。
+ */
+export class IdempotencyKeyReusedError extends ConflictError {
+  constructor(message = '同じ冪等キーで、内容の違う要求です') {
+    super(message);
+    this.name = 'IdempotencyKeyReusedError';
   }
 }
 

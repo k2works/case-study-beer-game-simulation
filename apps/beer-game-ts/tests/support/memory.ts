@@ -12,6 +12,7 @@ import type { ReviewRow } from '../../src/domain/review.js';
 import type { Session } from '../../src/domain/session.js';
 import {
   ConflictError,
+  DuplicateError,
   type CredentialPolicy,
   type CredentialPurpose,
   type ExportReader,
@@ -293,9 +294,23 @@ function reposOver(
       },
     },
     idempotency: {
-      find: async (gameId, key) =>
-        store.idempotency.get(`${gameId}:${key}`) ?? null,
-      save: async (r) => void store.idempotency.set(`${r.gameId}:${r.key}`, r),
+      find: async (gameId, scope, key) =>
+        store.idempotency.get(`${gameId}:${scope}:${key}`) ?? null,
+      findCreate: async (key) =>
+        [...store.idempotency.values()].find(
+          (r) => r.scope === 'create' && r.key === key,
+        ) ?? null,
+      save: async (r) => {
+        // PostgreSQL の一意制約と同じく、同じ範囲・キーの重複は拒否する（作成は、ゲームをまたいでキーだけで重複とみなす）
+        const duplicate =
+          r.scope === 'create'
+            ? [...store.idempotency.values()].some(
+                (x) => x.scope === 'create' && x.key === r.key,
+              )
+            : store.idempotency.has(`${r.gameId}:${r.scope}:${r.key}`);
+        if (duplicate) throw new DuplicateError();
+        store.idempotency.set(`${r.gameId}:${r.scope}:${r.key}`, r);
+      },
     },
     events: {
       append: async (gameId, events) => {

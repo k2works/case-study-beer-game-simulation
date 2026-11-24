@@ -241,6 +241,7 @@ describe('冪等記録', () => {
     await uow.run((r) =>
       r.idempotency.save({
         gameId: game.id,
+        scope: 'commit',
         key: 'k1',
         fingerprint: '1:3',
         response,
@@ -251,14 +252,21 @@ describe('冪等記録', () => {
     );
     expect(rows[0].key_digest).not.toContain('k1');
     expect(rows[0].response.toString('utf8')).not.toContain('committedWeek');
-    expect(await uow.run((r) => r.idempotency.find(game.id, 'k1'))).toEqual({
+    expect(
+      await uow.run((r) => r.idempotency.find(game.id, 'commit', 'k1')),
+    ).toEqual({
       gameId: game.id,
+      scope: 'commit',
       key: 'k1',
       fingerprint: '1:3',
       response,
     });
     expect(
-      await uow.run((r) => r.idempotency.find(game.id, 'other')),
+      await uow.run((r) => r.idempotency.find(game.id, 'commit', 'other')),
+    ).toBeNull();
+    // 範囲が違えば、別の記録
+    expect(
+      await uow.run((r) => r.idempotency.find(game.id, 'create', 'k1')),
     ).toBeNull();
   });
 });
@@ -502,7 +510,8 @@ describe('ユースケースを実 PostgreSQL で通す', () => {
           work({
             ...repos,
             idempotency: {
-              find: (g, k) => repos.idempotency.find(g, k),
+              find: (g, s, k) => repos.idempotency.find(g, s, k),
+              findCreate: (k) => repos.idempotency.findCreate(k),
               save: async () => {
                 throw new Error('injected failure');
               },

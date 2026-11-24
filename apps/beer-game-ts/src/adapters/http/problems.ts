@@ -118,6 +118,14 @@ export const retryExhaustedProblem = () =>
     1,
   );
 
+/** 同じ冪等キーで、内容の違う要求（ADR-004） */
+export const idempotencyKeyReusedProblem = () =>
+  new ApiProblem(
+    409,
+    'app.idempotency_key_reused',
+    '同じ冪等キーで、内容の違う要求です。新しいキーで送ってください。',
+  );
+
 /** ゲームが終了していない（振り返り・出力は、終了後だけ。AC4.2.2） */
 export const gameNotEndedProblem = () =>
   new ApiProblem(409, 'game.not_ended', 'ゲームが終了してから、開けます。');
