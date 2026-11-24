@@ -13562,7 +13562,7 @@
 </tbody>
 </table>
 <h2 id="_3">自動デプロイを有効にする（人が行う）<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p>自動の起動は、<strong>リポジトリの変数 <code>BEER_GAME_RUST_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ</strong>動く（未設定の間は、起動してもジョブを飛ばす）。次の順で行う:</p>
+<p>自動の起動は、<strong>リポジトリの変数 <code>BEER_GAME_RUST_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ</strong>動く（未設定の間は、起動してもジョブを飛ばす）。さらに、CI が成功したコミットの変更（最初の親との差）に、このアプリ・共有の画面/契約/受け入れ条件・このデプロイのワークフローが含まれないとき（設計書・文書だけの変更）は、デプロイしない（<code>changes</code> ジョブ。手動起動は判定しない）。次の順で行う:</p>
 <ol>
 <li>AWS の準備（Terraform の適用、OIDC、環境の変数）を終える（<a href="../production/">本番の適用前の確認</a>）。</li>
 <li><code>beer-game-rust-deploy-staging</code> を、手動で 1 回成功させる。</li>

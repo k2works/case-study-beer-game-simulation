@@ -13791,7 +13791,7 @@
 <p>自動ロールバックそのものが失敗した場合は、手動のロールバック（<a href="../rollback/">ロールバック手順書</a>）を使う。</p>
 <h2 id="bolt-14">Bolt 14 での変更（本番の定義）<a class="headerlink" href="#bolt-14" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>ステージングの自動デプロイ</strong>（AC6.2.1）: main の CI（<code>beer-game-kotlin</code>）が成功すると、<code>workflow_run</code> でステージングのデプロイが起動する。<strong>リポジトリの変数 <code>BEER_GAME_KOTLIN_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ</strong>（未設定の間はジョブを飛ばす）。手動で 1 回成功させてから設定する。</li>
+<li><strong>ステージングの自動デプロイ</strong>（AC6.2.1）: main の CI（<code>beer-game-kotlin</code>）が成功すると、<code>workflow_run</code> でステージングのデプロイが起動する。<strong>リポジトリの変数 <code>BEER_GAME_KOTLIN_AUTO_DEPLOY</code> が <code>'true'</code> のときだけ</strong>（未設定の間はジョブを飛ばす）。さらに、CI が成功したコミットの変更（最初の親との差）に、このアプリ・共有の画面/契約/受け入れ条件・このデプロイのワークフローが含まれないとき（設計書・文書だけの変更）は、デプロイしない（<code>changes</code> ジョブ。手動起動は判定しない）。手動で 1 回成功させてから設定する。</li>
 <li><strong>本番はブルー/グリーン</strong>（ECS の組み込み）。ステージングはローリング。詳細は <a href="../production/">本番の運用手順書</a>。</li>
 <li>追加の変数: <code>RETENTION_TASK_FAMILY</code>・<code>VERIFY_TASK_FAMILY</code>（両環境）、<code>RDS_INSTANCE</code>（本番。デプロイ前のスナップショット用）。いずれも <code>terraform output</code>。<strong>未設定</strong>（人が行う）。</li>
 <li>定期のタスク（<code>retention</code>・<code>verify-projections</code>）のタスク定義も、同じダイジェストの新しい版を登録する。</li>
