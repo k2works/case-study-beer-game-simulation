@@ -4,13 +4,8 @@ title: "ガイドツアー: ウォーキングスケルトン（発注の保存�
 description: "ウォーキングスケルトンの縦の流れ（画面 → API → ユースケース → 集約 → 計算 → 永続化 → 通知）を、順にたどるガイドツアー。コードのタグから自動生成する。"
 tags: [design, living-documentation]
 status: draft
-generated:
-  {
-    by: "script:apps/beer-game-ts/scripts/guided-tour.ts (walking-skeleton)",
-    at: 2026-11-24T02:54:42.206Z,
-  }
+generated: { by: "script:apps/beer-game-ts/scripts/guided-tour.ts (walking-skeleton)", at: 2026-11-24T02:58:59.244Z }
 ---
-
 # ガイドツアー: ウォーキングスケルトン（発注の保存から、1 週が確定するまで）
 
 > **自動生成**: このファイルは `npm run docs:tour` で、コードの `@guidedTour` から生成しています。直接編集せず、コードのタグを直してください（CI が、コードとの一致を検査します）。
