@@ -140,6 +140,11 @@ internal object LivingDocumentation {
 
     internal fun cell(text: String): String = text.replace("|", "\\|").replace("\n", " ")
 
+    /** ソースの場所へのリンク（`develop` ブランチ。行番号は含めない。行が動いても壊れない）。`file` はリポジトリからの相対パス。 */
+    internal fun sourceLink(file: String): String = "[`$file`]($REPO_BLOB_BASE/$file)"
+
+    private const val REPO_BLOB_BASE = "https://github.com/k2works/case-study-beer-game-simulation/blob/develop"
+
     fun eventsMarkdown(
         events: List<EventRow>,
         designOnly: Map<String, String>,

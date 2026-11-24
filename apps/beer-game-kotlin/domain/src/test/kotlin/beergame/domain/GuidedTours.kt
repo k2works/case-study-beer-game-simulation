@@ -157,5 +157,5 @@ internal object GuidedTours {
             "",
             LivingDocumentation.cell(step.description),
             "",
-        ) + operations?.lines(step).orEmpty() + listOf("場所: `${step.file}`", "")
+        ) + operations?.lines(step).orEmpty() + listOf("場所: ${LivingDocumentation.sourceLink(step.file)}", "")
 }

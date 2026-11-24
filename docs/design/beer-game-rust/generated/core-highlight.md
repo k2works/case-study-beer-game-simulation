@@ -20,16 +20,16 @@ generated: { by: beergame-livingdoc }
 
 | 種別 | 名前 | 場所 | なぜ核心か |
 | :--- | :--- | :--- | :--- |
-| 型 | `Pipeline` | `apps/beer-game-rust/crates/domain/src/simulate.rs` | 遅延の表現。注文と出荷が遅れて届くことが、変動の増幅（ブルウィップ効果）の原因で、教材が見せたい現象そのもの。長さは遅延 - 1 |
-| 関数 | `simulate_week` | `apps/beer-game-rust/crates/domain/src/simulate.rs` | 1 週の計算の入口。JSD 改訂版キットの 12 ステップと遅延を忠実に再現する。副作用が無く、同じ入力から同じ結果を返すので、既知の系列の golden テストと性質テストで守る |
+| 型 | `Pipeline` | [`apps/beer-game-rust/crates/domain/src/simulate.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/simulate.rs) | 遅延の表現。注文と出荷が遅れて届くことが、変動の増幅（ブルウィップ効果）の原因で、教材が見せたい現象そのもの。長さは遅延 - 1 |
+| 関数 | `simulate_week` | [`apps/beer-game-rust/crates/domain/src/simulate.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/simulate.rs) | 1 週の計算の入口。JSD 改訂版キットの 12 ステップと遅延を忠実に再現する。副作用が無く、同じ入力から同じ結果を返すので、既知の系列の golden テストと性質テストで守る |
 
 ## 進行
 
 | 種別 | 名前 | 場所 | なぜ核心か |
 | :--- | :--- | :--- | :--- |
-| 型 | `SessionState` | `apps/beer-game-rust/crates/domain/src/session.rs` | 進行の状態（未開始・進行中・終了）。session ストリームのイベントを畳み込んだ結果で、4 役割の入力を揃えて週を一度だけ確定する整合性の土台 |
-| 関数 | `decide_session` | `apps/beer-game-rust/crates/domain/src/session.rs` | 進行の規則のすべてが集まる場所。入力の保存・代理入力・停止と再開・手動と自動の確定の可否を決め、事実（イベント）だけを返す。共同入力と自動確定の整合性もここで守る |
-| 関数 | `evolve_session` | `apps/beer-game-rust/crates/domain/src/session.rs` | 事実（イベント）を状態へ畳み込む。規則を持たず、確定済みの結果を採用するだけなので、あとから再生しても同じ状態に戻る（イベントソーシングの土台） |
+| 型 | `SessionState` | [`apps/beer-game-rust/crates/domain/src/session.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs) | 進行の状態（未開始・進行中・終了）。session ストリームのイベントを畳み込んだ結果で、4 役割の入力を揃えて週を一度だけ確定する整合性の土台 |
+| 関数 | `decide_session` | [`apps/beer-game-rust/crates/domain/src/session.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs) | 進行の規則のすべてが集まる場所。入力の保存・代理入力・停止と再開・手動と自動の確定の可否を決め、事実（イベント）だけを返す。共同入力と自動確定の整合性もここで守る |
+| 関数 | `evolve_session` | [`apps/beer-game-rust/crates/domain/src/session.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs) | 事実（イベント）を状態へ畳み込む。規則を持たず、確定済みの結果を採用するだけなので、あとから再生しても同じ状態に戻る（イベントソーシングの土台） |
 
 コアが事実として残すイベント（[イベント一覧](./events.md)）:
 

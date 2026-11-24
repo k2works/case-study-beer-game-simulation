@@ -51,7 +51,7 @@ API: `POST /games`（操作 `createGame`）
 
 発行するイベント: EV-G01 `GameCreated`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 #### 2. `Ports.joinGame`（関数）
 
@@ -61,7 +61,7 @@ API: `POST /participations/join`（操作 `joinGame`）
 
 発行するイベント: EV-G02 `ParticipantJoined`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 #### 3. `Ports.assignRole`（関数）
 
@@ -71,7 +71,7 @@ API: `PUT /games/{gameId}/participants/{participantId}/role`（操作 `assignRol
 
 発行するイベント: EV-G03 `RoleAssigned`、EV-G04 `RoleUnassigned`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 #### 4. `Ports.startGame`（関数）
 
@@ -81,7 +81,7 @@ API: `POST /games/{gameId}/start`（操作 `startGame`）
 
 発行するイベント: EV-G11 `GameStarted`、EV-S01 `SessionStarted`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 ### プレイ
 
@@ -93,7 +93,7 @@ API: `PUT /sessions/{sessionId}/decisions`（操作 `saveDecision`）
 
 発行するイベント: EV-S05 `DecisionSaved`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 #### 6. `Ports.commitWeek`（関数）
 
@@ -103,7 +103,7 @@ API: `POST /sessions/{sessionId}/weeks/{week}/commit`（操作 `commitWeek`）
 
 発行するイベント: EV-S08 `WeekCommitted`
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Commands.kt)
 
 #### 7. `Ports.snapshot`（関数）
 
@@ -113,4 +113,4 @@ API: `GET /sessions/{sessionId}/state`（操作 `getSessionState`）
 
 発行するイベント: なし（問い合わせ）
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt)

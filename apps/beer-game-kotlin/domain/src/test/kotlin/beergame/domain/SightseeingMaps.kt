@@ -187,7 +187,7 @@ internal object SightseeingMaps {
             "",
             LivingDocumentation.cell(landmark.description),
             "",
-            "場所: `${landmark.file}`",
+            "場所: ${LivingDocumentation.sourceLink(landmark.file)}",
             "",
         )
 }

@@ -57,19 +57,19 @@ package "副作用" {
 
 開示の規則。投影から読んだ行に、呼び出した人ごとの規則を掛ける純粋関数で、他の役割の値は読み取りの型に持たせない
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Disclosure.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Disclosure.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Disclosure.kt)
 
 #### `decideSession`（関数）
 
 進行の規則のすべてを、状態とコマンドから事実を決める 1 つの純粋関数に集める。入出力は値だけで、規則を変えても外側の層は変わらない
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt)
 
 #### `simulateWeek`（関数）
 
 週次計算の純粋関数。時計・乱数・永続化を知らず、同じ入力から同じ結果を返す。アーキテクチャの中心で、外側のどの層からも呼ばれる
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt)
 
 ### 境界
 
@@ -79,7 +79,7 @@ package "副作用" {
 
 副作用を関数の束に閉じ込める境界。時計・乱数・永続化・通知を、application は型として知るだけで、実装を知らない
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/AppPorts.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/AppPorts.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/AppPorts.kt)
 
 ### 組み立て
 
@@ -89,7 +89,7 @@ package "副作用" {
 
 本物の実装を束ねて、application の境界（Ports）を満たす唯一の場所。他の層は、ここを知らない
 
-場所: `apps/beer-game-kotlin/app/src/main/kotlin/beergame/app/Wiring.kt`
+場所: [`apps/beer-game-kotlin/app/src/main/kotlin/beergame/app/Wiring.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/app/src/main/kotlin/beergame/app/Wiring.kt)
 
 ### 副作用
 
@@ -99,10 +99,10 @@ HTTP・データベースなどの外界との接点。薄く保ち、規則は�
 
 永続化の入口。application が定めた EventStore の約束を、データベースで満たす。規則は持たず、追記と読み出しだけを担う
 
-場所: `apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt`
+場所: [`apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt)
 
 #### `Route.commandRoutes`（関数）
 
 HTTP の入口。要求を値のコマンドに変えるだけの薄い層で、規則は持たず、結果を応答に写す
 
-場所: `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt`
+場所: [`apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt)

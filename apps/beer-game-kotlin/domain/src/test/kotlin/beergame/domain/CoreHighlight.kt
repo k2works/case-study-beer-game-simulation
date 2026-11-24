@@ -127,7 +127,8 @@ internal object CoreHighlight {
     ): List<String> {
         val rows =
             elements.map {
-                "| ${it.kind} | `${it.name}` | `${it.file}` | ${LivingDocumentation.cell(it.description)} |"
+                val place = LivingDocumentation.sourceLink(it.file)
+                "| ${it.kind} | `${it.name}` | $place | ${LivingDocumentation.cell(it.description)} |"
             }
         val sessionEvents =
             if (context.name.startsWith("進行")) {

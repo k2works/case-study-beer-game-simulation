@@ -52,7 +52,7 @@ API: `POST /api/v1/games`
 
 発行するイベント: EV-G01 `GameCreated`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 #### 2. `join_game`（関数）
 
@@ -62,7 +62,7 @@ API: `POST /api/v1/participations/join`
 
 発行するイベント: EV-G02 `ParticipantJoined`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 #### 3. `assign_or_replace_role`（関数）
 
@@ -72,7 +72,7 @@ API: `PUT /api/v1/games/{game_id}/participants/{participant_id}/role`
 
 発行するイベント: EV-G03 `RoleAssigned`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 #### 4. `start_game`（関数）
 
@@ -82,7 +82,7 @@ API: `POST /api/v1/games/{game_id}/start`
 
 発行するイベント: EV-G11 `GameStarted`、EV-S01 `SessionStarted`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 ### プレイ
 
@@ -94,7 +94,7 @@ API: `PUT /api/v1/sessions/{session_id}/decisions`
 
 発行するイベント: EV-S05 `DecisionSaved`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 #### 6. `commit_week`（関数）
 
@@ -104,7 +104,7 @@ API: `POST /api/v1/sessions/{session_id}/weeks/{week}/commit`
 
 発行するイベント: EV-S08 `WeekCommitted`
 
-場所: `apps/beer-game-rust/crates/application/src/commands.rs`
+場所: [`apps/beer-game-rust/crates/application/src/commands.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs)
 
 #### 7. `session_state`（関数）
 
@@ -112,4 +112,4 @@ API: `POST /api/v1/sessions/{session_id}/weeks/{week}/commit`
 
 API: `GET /api/v1/sessions/{session_id}/state`
 
-場所: `apps/beer-game-rust/crates/adapter-http/src/api.rs`
+場所: [`apps/beer-game-rust/crates/adapter-http/src/api.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-http/src/api.rs)

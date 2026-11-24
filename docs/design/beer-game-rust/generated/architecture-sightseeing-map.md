@@ -56,13 +56,13 @@ package "副作用" {
 
 進行の規則の全部。入出力も時計も持たない純粋関数なので、規則を表にして網羅的に試せる
 
-場所: `apps/beer-game-rust/crates/domain/src/session.rs`
+場所: [`apps/beer-game-rust/crates/domain/src/session.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs)
 
 #### `simulate_week`（関数）
 
 副作用の無い計算。テストが速く、同じ入力は同じ結果になる
 
-場所: `apps/beer-game-rust/crates/domain/src/simulate.rs`
+場所: [`apps/beer-game-rust/crates/domain/src/simulate.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/simulate.rs)
 
 ### 境界
 
@@ -72,13 +72,13 @@ package "副作用" {
 
 核と永続化のつなぎ目。トレイトで外側の実装を隠すので、核とコマンドの手順は、データベースなしで試せる
 
-場所: `apps/beer-game-rust/crates/application/src/lib.rs`
+場所: [`apps/beer-game-rust/crates/application/src/lib.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/lib.rs)
 
 #### `execute_decision`（関数）
 
 コマンドの実行手順。読む → 決める（ドメイン）→ 追記する → 確定する、を 1 つのトランザクションで行い、競合は読み直して再試行する。業務の規則は持たない
 
-場所: `apps/beer-game-rust/crates/application/src/lib.rs`
+場所: [`apps/beer-game-rust/crates/application/src/lib.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/lib.rs)
 
 ### 副作用
 
@@ -88,16 +88,16 @@ package "副作用" {
 
 HTTP の入口。ハンドラーは薄く、入力の形の検証・認証の結果の受け渡し・応答の組み立てだけを行い、業務の規則はドメインに任せる
 
-場所: `apps/beer-game-rust/crates/adapter-http/src/api.rs`
+場所: [`apps/beer-game-rust/crates/adapter-http/src/api.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-http/src/api.rs)
 
 #### `session_statements`（関数）
 
 読み取りモデルの更新。イベントから、投影の表への書き込み（SQL と束縛値）を純粋に導き、追記と同じトランザクションで実行する（CQRS の読み取り側）
 
-場所: `apps/beer-game-rust/crates/adapter-persistence/src/projection.rs`
+場所: [`apps/beer-game-rust/crates/adapter-persistence/src/projection.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-persistence/src/projection.rs)
 
 #### `PgEventStore`（型）
 
 イベントストアの実装。追記専用で、同じ版への同時の追記は一意制約の違反で検出して一方だけを成功させる（楽観的並行制御）
 
-場所: `apps/beer-game-rust/crates/adapter-persistence/src/store.rs`
+場所: [`apps/beer-game-rust/crates/adapter-persistence/src/store.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-persistence/src/store.rs)
