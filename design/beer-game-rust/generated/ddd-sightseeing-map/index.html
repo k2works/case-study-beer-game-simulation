@@ -13420,30 +13420,30 @@
 <p>業務の言葉をそろえ、力を注ぐ場所（中核）を決める。何を作り込み、何を割り切るかの判断</p>
 <h4 id="run_retention"><code>run_retention</code>（関数）<a class="headerlink" href="#run_retention" title="Permanent link">&para;</a></h4>
 <p>一般のコンテキスト（保持と削除）。中核ではないので、作り込まずに、期限の検出と連鎖削除を最小の手順で実装し、失敗したら何も消さずに再試行する</p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/retention.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/retention.rs"><code>apps/beer-game-rust/crates/application/src/retention.rs</code></a></p>
 <h4 id="role"><code>Role</code>（型）<a class="headerlink" href="#role" title="Permanent link">&para;</a></h4>
 <p>ユビキタス言語の核。4 つの持ち場と、上流・下流の関係を型にする。コード・設計書・画面が同じ言葉で話す</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/role.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/role.rs"><code>apps/beer-game-rust/crates/domain/src/role.rs</code></a></p>
 <h4 id="simulate_week"><code>simulate_week</code>（関数）<a class="headerlink" href="#simulate_week" title="Permanent link">&para;</a></h4>
 <p>中核の計算。力を注ぐ場所で、時計・乱数・永続化に依存しない純粋関数にして、入力だけで結果が決まるようにする</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/simulate.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/simulate.rs"><code>apps/beer-game-rust/crates/domain/src/simulate.rs</code></a></p>
 <h3 id="_3">戦術的設計<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
 <p>モデルの部品。集約が規則を持ち、事実（イベント）だけを返し、状態は事実を畳み込んで得る</p>
 <h4 id="evolution"><code>Evolution</code>（型）<a class="headerlink" href="#evolution" title="Permanent link">&para;</a></h4>
 <p>畳み込みの全域性。<code>decide</code> が作らない列は <code>Ignored</code> で返して状態を守り、再生側が検知する（fail closed）<code>decide</code> が作らない列（例: 未開始への入力の保存）は <code>Ignored</code> で返し、状態は変わらない。</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/foundation.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/foundation.rs"><code>apps/beer-game-rust/crates/domain/src/foundation.rs</code></a></p>
 <h4 id="decide_game"><code>decide_game</code>（関数）<a class="headerlink" href="#decide_game" title="Permanent link">&para;</a></h4>
 <p>準備の集約の規則。進行と同じ形（状態とコマンドから、事実か誤りを返す）で、コンテキストごとに規則の置き場が 1 つに決まる</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/game.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/game.rs"><code>apps/beer-game-rust/crates/domain/src/game.rs</code></a></p>
 <h4 id="assignorreplace"><code>AssignOrReplace</code>（型）<a class="headerlink" href="#assignorreplace" title="Permanent link">&para;</a></h4>
 <p>2 つの集約にまたがる規則。開始後の入れ替えは game と session の 2 本のストリームに同時に事実を残すので、単独の集約ではなく、ここで束ねる</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/replace_role.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/replace_role.rs"><code>apps/beer-game-rust/crates/domain/src/replace_role.rs</code></a></p>
 <h4 id="decide_session"><code>decide_session</code>（関数）<a class="headerlink" href="#decide_session" title="Permanent link">&para;</a></h4>
 <p>集約の規則。状態とコマンドから、事実（イベント）か誤りを返す。状態は書き換えない</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/session.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs"><code>apps/beer-game-rust/crates/domain/src/session.rs</code></a></p>
 <h4 id="quantity"><code>Quantity</code>（型）<a class="headerlink" href="#quantity" title="Permanent link">&para;</a></h4>
 <p>値オブジェクト。範囲を検証するスマートコンストラクタで作り、フィールドを公開しない。不正な値は、型として作れない</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/values.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/values.rs"><code>apps/beer-game-rust/crates/domain/src/values.rs</code></a></p>
 
 
 

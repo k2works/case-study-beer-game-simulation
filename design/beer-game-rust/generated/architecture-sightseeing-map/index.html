@@ -13429,29 +13429,29 @@
 <p>副作用を持たない純粋な規則。入力から結果を決める。テストが速く、同じ入力は同じ結果になる</p>
 <h4 id="decide_session"><code>decide_session</code>（関数）<a class="headerlink" href="#decide_session" title="Permanent link">&para;</a></h4>
 <p>進行の規則の全部。入出力も時計も持たない純粋関数なので、規則を表にして網羅的に試せる</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/session.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/session.rs"><code>apps/beer-game-rust/crates/domain/src/session.rs</code></a></p>
 <h4 id="simulate_week"><code>simulate_week</code>（関数）<a class="headerlink" href="#simulate_week" title="Permanent link">&para;</a></h4>
 <p>副作用の無い計算。テストが速く、同じ入力は同じ結果になる</p>
-<p>場所: <code>apps/beer-game-rust/crates/domain/src/simulate.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/domain/src/simulate.rs"><code>apps/beer-game-rust/crates/domain/src/simulate.rs</code></a></p>
 <h3 id="_5">境界<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>核と外側のつなぎ目。ポート（トレイト）で外側の実装を隠し、コマンドの実行手順を持つ</p>
 <h4 id="eventstore"><code>EventStore</code>（トレイト）<a class="headerlink" href="#eventstore" title="Permanent link">&para;</a></h4>
 <p>核と永続化のつなぎ目。トレイトで外側の実装を隠すので、核とコマンドの手順は、データベースなしで試せる</p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/lib.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/lib.rs"><code>apps/beer-game-rust/crates/application/src/lib.rs</code></a></p>
 <h4 id="execute_decision"><code>execute_decision</code>（関数）<a class="headerlink" href="#execute_decision" title="Permanent link">&para;</a></h4>
 <p>コマンドの実行手順。読む → 決める（ドメイン）→ 追記する → 確定する、を 1 つのトランザクションで行い、競合は読み直して再試行する。業務の規則は持たない</p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/lib.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/lib.rs"><code>apps/beer-game-rust/crates/application/src/lib.rs</code></a></p>
 <h3 id="_6">副作用<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <p>データベースと HTTP。ポートを実装し、核が決めた結果を永続化・送受信する</p>
 <h4 id="router"><code>router</code>（関数）<a class="headerlink" href="#router" title="Permanent link">&para;</a></h4>
 <p>HTTP の入口。ハンドラーは薄く、入力の形の検証・認証の結果の受け渡し・応答の組み立てだけを行い、業務の規則はドメインに任せる</p>
-<p>場所: <code>apps/beer-game-rust/crates/adapter-http/src/api.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-http/src/api.rs"><code>apps/beer-game-rust/crates/adapter-http/src/api.rs</code></a></p>
 <h4 id="session_statements"><code>session_statements</code>（関数）<a class="headerlink" href="#session_statements" title="Permanent link">&para;</a></h4>
 <p>読み取りモデルの更新。イベントから、投影の表への書き込み（SQL と束縛値）を純粋に導き、追記と同じトランザクションで実行する（CQRS の読み取り側）</p>
-<p>場所: <code>apps/beer-game-rust/crates/adapter-persistence/src/projection.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-persistence/src/projection.rs"><code>apps/beer-game-rust/crates/adapter-persistence/src/projection.rs</code></a></p>
 <h4 id="pgeventstore"><code>PgEventStore</code>（型）<a class="headerlink" href="#pgeventstore" title="Permanent link">&para;</a></h4>
 <p>イベントストアの実装。追記専用で、同じ版への同時の追記は一意制約の違反で検出して一方だけを成功させる（楽観的並行制御）</p>
-<p>場所: <code>apps/beer-game-rust/crates/adapter-persistence/src/store.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-persistence/src/store.rs"><code>apps/beer-game-rust/crates/adapter-persistence/src/store.rs</code></a></p>
 
 
 
