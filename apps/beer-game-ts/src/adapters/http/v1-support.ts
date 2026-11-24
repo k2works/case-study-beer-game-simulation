@@ -35,13 +35,24 @@ export function ifMatchVersionOf(request: FastifyRequest): number {
   return Number(match[1]);
 }
 
-/** 資格（ブラウザセッションの Cookie）。`X-Tab-Id` があれば、タブ別の名前。無ければ空（認可の失敗として扱われる） */
-export const tokenOf = (request: FastifyRequest): string =>
-  request.cookies[sessionCookieName(tabIdOf(request))] ?? '';
+/**
+ * 資格の Cookie を読む。タブ別の名前（`X-Tab-Id` があるとき）を優先し、無ければ従来の名前を使う
+ * （識別子を付ける前に発行した資格、識別子を付けない呼び出し元が発行した資格の移行。Kotlin 版と同じ。ADR-020）。
+ * タブ自身は従来の名前を発行しないので、タブ間の分離は保たれる。
+ */
+const cookieValueOf = (
+  request: FastifyRequest,
+  nameOf: (tabId: string | null) => string,
+): string | undefined =>
+  request.cookies[nameOf(tabIdOf(request))] ?? request.cookies[nameOf(null)];
 
-/** 復帰資格の Cookie の値（`bg_recovery`。`X-Tab-Id` があれば、タブ別の名前） */
+/** 資格（ブラウザセッションの Cookie）。無ければ空（認可の失敗として扱われる） */
+export const tokenOf = (request: FastifyRequest): string =>
+  cookieValueOf(request, sessionCookieName) ?? '';
+
+/** 復帰資格の Cookie の値（`bg_recovery`） */
 export const recoveryTokenOf = (request: FastifyRequest): string | undefined =>
-  request.cookies[recoveryCookieName(tabIdOf(request))] ?? undefined;
+  cookieValueOf(request, recoveryCookieName);
 
 /**
  * 資格の Cookie を発行する。ブラウザセッション（`bg_session`。24 時間）と、復帰資格（`bg_recovery`。30 日。復帰の経路だけ）。

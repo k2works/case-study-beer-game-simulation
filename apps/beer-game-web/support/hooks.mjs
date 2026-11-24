@@ -42,7 +42,11 @@ BeforeAll(async function () {
                 'cd apps/beer-game-kotlin && APP_ENV=local DB_KIND=h2 PORT=' +
                 process.env.API_PORT +
                 ` ALLOWED_ORIGINS=${uiUrl} ./gradlew :app:run` +
-                '（画面の Origin を許可するため、ALLOWED_ORIGINS が要る）',
+                '（画面の Origin を許可するため、ALLOWED_ORIGINS が要る）。' +
+                'TS 版は、cd apps/beer-game-ts && npm run db:up && npm run migrate:local && PORT=' +
+                process.env.API_PORT +
+                ` ALLOWED_ORIGINS=${uiUrl} COOKIE_SECURE=false AUTH_RATE_LIMIT_PER_MINUTE=10000` +
+                ' DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2 npm run start',
             { cause },
         );
     });

@@ -2,9 +2,20 @@ name: beer-game-ts
 
 on:
   push:
-    paths: ['apps/beer-game-ts/**', '.github/workflows/beer-game-ts*.yml']
+    paths:
+      - 'apps/beer-game-ts/**'
+      # 画面・受け入れの仕様・API の契約は、Kotlin 版・Rust 版と共有する（e2e ジョブが、TS 版のバックエンドで実行する）
+      - 'apps/beer-game-web/**'
+      - 'apps/beer-game-features/**'
+      - 'apps/beer-game-contracts/**'
+      - '.github/workflows/beer-game-ts*.yml'
   pull_request:
-    paths: ['apps/beer-game-ts/**', '.github/workflows/beer-game-ts*.yml']
+    paths:
+      - 'apps/beer-game-ts/**'
+      - 'apps/beer-game-web/**'
+      - 'apps/beer-game-features/**'
+      - 'apps/beer-game-contracts/**'
+      - '.github/workflows/beer-game-ts*.yml'
 
 concurrency:
   group: beer-game-ts-ci-${{ github.ref }}
@@ -51,11 +62,10 @@ jobs:
       # 本番に入る依存の脆弱性（開発依存は対象外）
       - run: npm audit --omit=dev --audit-level=high
 
+  # 共有の画面（apps/beer-game-web）の受け入れ @ui（Cucumber-JS + Playwright。27 シナリオ）を、TS 版のバックエンドで実行する
   e2e:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/beer-game-ts
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:18-alpine
@@ -75,17 +85,37 @@ jobs:
           cache: npm
           cache-dependency-path: apps/beer-game-ts/package-lock.json
       - run: npm ci
+        working-directory: apps/beer-game-ts
       - run: npm run migrate
-      - run: npx playwright install --with-deps chromium
-      - run: npm run e2e
+        working-directory: apps/beer-game-ts
+      # バックエンドを、専用のポート 3100 で起動する（画面の Origin を許可する。web/support/hooks.mjs の案内と同じ）。
+      # 受け入れはすべて同じ送信元から参加するので、参加・復帰の上限を緩める。http の Cookie を受けるため Secure は付けない
+      - name: バックエンドの起動
+        working-directory: apps/beer-game-ts
         env:
-          CI: 'true'
-      - uses: actions/upload-artifact@v5
+          PORT: '3100'
+          ALLOWED_ORIGINS: http://localhost:5273
+          COOKIE_SECURE: 'false'
+          AUTH_RATE_LIMIT_PER_MINUTE: '10000'
+          LOG_LEVEL: warn
+        run: nohup npm run start > ../app.log 2>&1 &
+      - name: バックエンドの準備の待機
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3100/api/v1/ready > /dev/null; then echo "起動を確認（${i} 回目）"; exit 0; fi
+            sleep 1
+          done
+          echo "::error::バックエンドが起動しませんでした"; cat apps/app.log; exit 1
+      - run: npm ci
+        working-directory: apps/beer-game-web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/beer-game-web
+      # Undefined・Pending のステップがあれば、Cucumber-JS が失敗にする（strict が既定）
+      - run: npm run acceptance
+        working-directory: apps/beer-game-web
+      - name: バックエンドのログ（失敗したとき）
         if: failure()
-        with:
-          name: playwright-traces
-          path: apps/beer-game-ts/test-results
-          retention-days: 7
+        run: cat apps/app.log || true
 
   container:
     runs-on: ubuntu-latest

@@ -84,6 +84,7 @@ import {
   reviewView,
   sessionStateView,
   versionsOf,
+  withLiveCommitMode,
   type StreamVersions,
   type Viewer,
 } from './contract-views.js';
@@ -1599,7 +1600,7 @@ export function createApplication(deps: Dependencies) {
         const game = await loadGame(repos, input.gameId);
         const session = await repos.sessions.findByGame(input.gameId);
         return gameStateView(
-          game,
+          withLiveCommitMode(game, session),
           viewerOf(principal),
           versionsOf(game, session),
         );
@@ -1644,7 +1645,7 @@ export function createApplication(deps: Dependencies) {
         const game = await loadGame(repos, input.gameId);
         const session = await repos.sessions.findByGame(input.gameId);
         return lobbyView(
-          game,
+          withLiveCommitMode(game, session),
           await repos.observers.listInvitations(input.gameId),
           await repos.observers.listObservers(input.gameId),
           versionsOf(game, session),

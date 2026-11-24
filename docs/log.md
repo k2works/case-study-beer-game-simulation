@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-24
+* **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 5 を先行: 共有 UI の `@ui` 27/27 を TS バックエンドで通した。CI の e2e ジョブとデプロイの静的ファイルを共有の画面へ。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3e H4 開始後の役割の入れ替えの完了。マイグレーション 010。段階 3 の完了。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3d 進行中のコマンド 6 操作と業務の失敗の `code` の完了。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（小段階 3c-2 復帰・観察者・資格の失効と再発行の完了。claude-code/claude-sonnet-5-5）

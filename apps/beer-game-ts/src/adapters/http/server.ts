@@ -256,6 +256,28 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   server.register(cookie);
 
+  // 本文の無い要求（開始・停止・再開など、契約が本文を定めない操作）に、`Content-Type: application/json` が付くことがある
+  // （共有 UI と受け入れの準備がそうする）。Fastify の既定は空の本文を 400 にするので、空は「本文なし」として通し、
+  // 本文が要る経路は、入力の検証（zod）が 422 にする。形の壊れた JSON は、従来どおり 400
+  server.removeContentTypeParser('application/json');
+  server.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_request, body, done) => {
+      if (body === '') return done(null, undefined);
+      try {
+        done(null, JSON.parse(body as string));
+      } catch {
+        done(
+          Object.assign(new Error('JSON を解釈できません'), {
+            statusCode: 400,
+          }),
+          undefined,
+        );
+      }
+    },
+  );
+
   // セキュリティヘッダー（NF-S9）。API は JSON と SSE だけを返すので、CSP はすべて拒否でよい
   const SECURITY_HEADERS = {
     'strict-transport-security': 'max-age=31536000; includeSubDomains',

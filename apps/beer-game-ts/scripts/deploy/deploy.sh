@@ -5,7 +5,7 @@
 #   AWS_REGION ECS_CLUSTER ECS_SERVICE API_TASK_FAMILY MIGRATE_TASK_FAMILY
 #   WEB_BUCKET DISTRIBUTION_ID TASK_SUBNETS（カンマ区切り） TASK_SG
 #   IMAGE（<ECR の URL>@sha256:...）  RELEASE_ID（コミット SHA）
-# 任意: WEB_DIR（既定 dist/ui）
+# 任意: WEB_DIR（既定 ../beer-game-web/dist。共有の画面 apps/beer-game-web のビルド成果物。apps/beer-game-ts から実行する）
 #
 # 順序: タスク定義の登録 → マイグレーション（失敗したら中止）→ ローリング更新 → 静的ファイルの公開 → 履歴の記録
 # 注意: AWS に接続するため、パイプライン（OIDC）から実行する。まだ AWS で検証していない。
@@ -13,7 +13,7 @@ set -euo pipefail
 
 : "${AWS_REGION:?}" "${ECS_CLUSTER:?}" "${ECS_SERVICE:?}" "${API_TASK_FAMILY:?}" "${MIGRATE_TASK_FAMILY:?}"
 : "${WEB_BUCKET:?}" "${DISTRIBUTION_ID:?}" "${TASK_SUBNETS:?}" "${TASK_SG:?}" "${IMAGE:?}" "${RELEASE_ID:?}"
-WEB_DIR="${WEB_DIR:-dist/ui}"
+WEB_DIR="${WEB_DIR:-../beer-game-web/dist}"
 
 log() { echo "==> $*"; }
 

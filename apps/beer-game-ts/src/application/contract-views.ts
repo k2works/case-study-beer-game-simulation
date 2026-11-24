@@ -34,6 +34,21 @@ export const versionsOf = (
   session: session?.version ?? null,
 });
 
+/**
+ * 開始後の確定方式は、session が持つ（`setCommitMode` が変えるのは session）。game の写しは開始時の値のままなので、
+ * 画面に見せる ゲームの設定には、session の現在の確定方式を重ねる。
+ */
+export const withLiveCommitMode = (
+  game: Game,
+  session: Session | null,
+): Game =>
+  session && session.settings.commitMode !== game.settings.commitMode
+    ? {
+        ...game,
+        settings: { ...game.settings, commitMode: session.settings.commitMode },
+      }
+    : game;
+
 /** 呼び出した人（見せる値を決める側が、資格から作る） */
 export type Viewer =
   { kind: 'FACILITATOR' } | { kind: 'PARTICIPANT'; participantId: string };

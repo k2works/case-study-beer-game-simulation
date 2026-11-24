@@ -156,13 +156,23 @@ describe('getGameState（GET /games/{gameId}/state）', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    // タブ名なしの Cookie は、タブ ID つきの要求では読まない（別のタブの資格と混ざらない）
+    // タブ名の Cookie を優先し、無ければ従来の名前の Cookie を使う（Kotlin 版と同じ。ADR-020 の移行）
     const plain = await server.inject({
       method: 'GET',
       url: `/api/v1/games/${t.gameId}/state`,
       headers: { cookie: `bg_session=${t.facilitator}`, 'x-tab-id': tab },
     });
-    expect(plain.statusCode).toBe(403);
+    expect(plain.statusCode).toBe(200);
+    // タブ名の Cookie があれば、従来の名前の Cookie より優先する（別のタブの資格と混ざらない）
+    const other = await server.inject({
+      method: 'GET',
+      url: `/api/v1/games/${t.gameId}/state`,
+      headers: {
+        cookie: `bg_session_${tab}=unknown; bg_session=${t.facilitator}`,
+        'x-tab-id': tab,
+      },
+    });
+    expect(other.statusCode).toBe(403);
   });
 });
 

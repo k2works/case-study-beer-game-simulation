@@ -441,6 +441,20 @@ describe('setCommitMode（PUT /sessions/{sessionId}/commit-mode）', () => {
     expect(state.json().week).toBe(2);
   });
 
+  it('変えた確定方式は、ゲームの状態とロビーに反映される（開始後の値は session が持つ）', async () => {
+    await boot();
+    const table = await startedTable(app);
+    expect((await setMode(table, 'AUTO')).statusCode).toBe(200);
+    for (const path of ['state', 'lobby']) {
+      const res = await server.inject({
+        method: 'GET',
+        url: `/api/v1/games/${table.gameId}/${path}`,
+        headers: { cookie: `bg_session=${table.facilitator}` },
+      });
+      expect(res.json().commitMode).toBe('AUTO');
+    }
+  });
+
   it('停止中も変えられる。未知の方式は 422（field は commitMode）。進行役でなければ 403', async () => {
     await boot();
     const table = await startedTable(app);

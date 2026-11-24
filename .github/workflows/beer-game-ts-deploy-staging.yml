@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   # push:
   #   branches: [main]
-  #   paths: ['apps/beer-game-ts/**']
+  #   paths: ['apps/beer-game-ts/**', 'apps/beer-game-web/**', 'apps/beer-game-contracts/**']
 
 concurrency:
   group: beer-game-ts-deploy-staging
@@ -69,7 +69,12 @@ jobs:
           echo "image=$REGISTRY/$REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
 
       - run: npm ci
-      - run: npm run build:ui
+      # 画面は、Kotlin 版・Rust 版と共有の apps/beer-game-web（成果物は apps/beer-game-web/dist。deploy.sh の WEB_DIR の既定）
+      - name: 画面のビルド（共有の apps/beer-game-web）
+        working-directory: apps/beer-game-web
+        run: |
+          npm ci
+          npm run build
 
       - name: デプロイ（マイグレーション → ローリング更新 → 静的ファイル）
         env:

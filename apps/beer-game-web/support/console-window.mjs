@@ -14,9 +14,13 @@ const ROLE_LABELS = {
 };
 const WAIT_MS = 10_000;
 
+// 画面の配信元。準備の API の呼び出しにも、ブラウザと同じ Origin を付ける（Origin を必須とするバックエンド（TS 版）でも、
+// Origin を検査しない・許可リストで許すバックエンド（Rust 版・Kotlin 版）でも、同じように通る）。
+const UI_ORIGIN = `http://localhost:${process.env.UI_PORT ?? '5273'}`;
+
 /** 前提の準備に使う API の呼び出し。失敗は握りつぶさず、本文つきで投げる。 */
 async function call(context, method, path, body, extraHeaders = {}) {
-    const headers = { 'Content-Type': 'application/json', ...extraHeaders };
+    const headers = { 'Content-Type': 'application/json', Origin: UI_ORIGIN, ...extraHeaders };
     if (method !== 'GET') headers['Idempotency-Key'] = randomUUID();
     const response = await context.fetch(`/api/v1${path}`, {
         method,
@@ -243,9 +247,10 @@ export class ConsoleWindow {
             .click({ timeout: WAIT_MS });
         const issued = this.page.getByRole('status').filter({ hasText: '招待コード:' });
         await issued.waitFor({ timeout: WAIT_MS });
-        const match = /v\d+\.[A-Za-z0-9_-]+/.exec(await issued.innerText());
+        // 招待コードの形は、契約が定めない（バックエンドごとに違ってよい）。「招待コード:」の直後の語を控える
+        const match = /招待コード:\s*(\S+)/.exec(await issued.innerText());
         assert.ok(match, '招待コードが表示されていない');
-        this.invitationCode = match[0];
+        this.invitationCode = match[1];
     }
 
     /** ロビーで、控えた招待を失効させる（確認のダイアログで「失効させる」を選ぶ）。 */
