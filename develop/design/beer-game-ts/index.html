@@ -13651,8 +13651,24 @@
 <td style="text-align: left;">発注の保存から 1 週が確定するまでを、画面 → API → ユースケース → 集約 → 計算 → 永続化の順にたどる。<strong>コードの <code>@guidedTour</code> から自動生成</strong></td>
 <td style="text-align: left;">生成物（Draft）</td>
 </tr>
+<tr>
+<td style="text-align: left;"><a href="generated/core-highlight/">コアのハイライト（生成）</a></td>
+<td style="text-align: left;">中核（シミュレーション計算と進行）の主要な宣言。新しく参加する人の読む入口。<strong>コードの <code>@core</code> から自動生成</strong>。中核の区分は設計書が正本で、補完・一般の宣言の混入と上限（10 個）は検査が検出する</td>
+<td style="text-align: left;">生成物（Draft）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/events/">イベント一覧（生成）</a></td>
+<td style="text-align: left;">実装済みのドメインイベントの名前・集約・ペイロードの項目。<strong>コードの共用体型から自動生成</strong>。設計書の表に無いイベントは検査が失敗し、設計書だけにあるイベントは未実装として載る</td>
+<td style="text-align: left;">生成物（Draft）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/glossary/">用語集（生成）</a></td>
+<td style="text-align: left;">注釈 <code>@term</code> を付けた宣言の用語・定義・出典。用語が設計書の「ユビキタス言語」の表に無いと検査が失敗する</td>
+<td style="text-align: left;">生成物（Draft）</td>
+</tr>
 </tbody>
 </table>
+<p>再生成は <code>npm run docs:living</code>、検査は <code>npm run docs:living:check</code>（CI と <code>npm run verify</code> に含まれます）。</p>
 <h3 id="_4">品質・運用<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
