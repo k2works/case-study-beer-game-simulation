@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="B5 の H1（Living Documentation の中盤の重点）の提案。domain に標準ライブラリだけの注釈（Term・EventSpec）を置き、domain の試験が用語集とイベント一覧を生成して、コミット済みの生成物・設計書の ID との不一致を失敗にする。人の承認待ち。">
+        <meta name="description" content="B5 の H1（Living Documentation の中盤の重点）。domain に標準ライブラリだけの注釈（Term・EventSpec）を置き、domain の試験が用語集とイベント一覧を生成して、コミット済みの生成物・設計書の ID との不一致を失敗にする。承認済み（2026-11-15）。">
       
       
         <meta name="author" content="k2works">
@@ -27,7 +27,7 @@
     
     
       
-        <title>ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する（提案） - ビールゲームのケーススタディ</title>
+        <title>ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する - ビールゲームのケーススタディ</title>
       
     
     
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する（提案）
+              ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する
             
           </span>
         </div>
@@ -10209,7 +10209,7 @@
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        決定（提案）
+        決定
       
     </span>
   </a>
@@ -13580,8 +13580,8 @@
   
 
 
-<h1 id="adr-018">ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する（提案）<a class="headerlink" href="#adr-018" title="Permanent link">&para;</a></h1>
-<p>開発戦略が「B1〜B2 で決める」とした未決（注釈の語彙と生成の仕組み）の、最小の案。本書は、<strong>AI の提案であって、決定ではない</strong>。B5 Step 8.4 で実装した。</p>
+<h1 id="adr-018">ADR-018: 用語集とイベント一覧を、型の注釈とソースから生成する<a class="headerlink" href="#adr-018" title="Permanent link">&para;</a></h1>
+<p>開発戦略が「B1〜B2 で決める」とした未決（注釈の語彙と生成の仕組み）の、最小の案。本書は、AI が提案し、2026-11-15 にユーザーが承認した（下の「ステータス」）。B5 Step 8.4 で実装した。</p>
 <p>日付: 2026-11-15</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>承認済み（2026-11-15、ユーザー。B5 ゲート 8。注釈は domain 内、生成は domain のテスト、手書きの EV 表は残す方式）。</p>
@@ -13591,7 +13591,7 @@
 <li>注釈の語彙・生成方式（コンパイラ連携か、ソースの走査か）は、B1〜B3 で決まらないまま残っていた。domain は Kotlin 標準と Arrow だけに依存する規約。</li>
 <li>ドメインイベントは、設計書の表（EV-G<em>、EV-S</em>）、コード（sealed な部分型）、<code>EventCodec</code> の golden に重複して表れる。B5 で 8 種類が増え、手で一致を保つ限界が近い。</li>
 </ul>
-<h2 id="_3">決定（提案）<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<h2 id="_3">決定<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>注釈</strong>: domain に標準ライブラリだけの 2 つ（<code>Term</code>: 用語・定義・出典。<code>EventSpec</code>: 設計書の ID・発生する条件）を置く。実行時まで残るだけで、業務の振る舞いに関わらない。付ける対象は、これから書くコードと B5 で足した概念から（既存コードへの一括適用はしない）。</li>
 <li><strong>生成</strong>: domain の試験 <code>LivingDocumentationSpec</code>（追加の依存なし）。イベントは、sealed の部分型（<code>permittedSubclasses</code>）を全件（ストリームは親から、ペイロードの項目は型のフィールドから）、購読する投影は <code>Projection.kt</code> の走査から導く。用語は、クラスパスのクラスから <code>Term</code> を集める。</li>

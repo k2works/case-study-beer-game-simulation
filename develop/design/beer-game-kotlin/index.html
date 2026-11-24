@@ -13676,8 +13676,7 @@
 </tbody>
 </table>
 <h3 id="living-documentation">コードの案内（Living Documentation）<a class="headerlink" href="#living-documentation" title="Permanent link">&para;</a></h3>
-<p>サイトシーイング・マップとガイドツアーは、コードの注釈から自動生成する成果物です。<strong>実装後に生成します</strong>（現時点では作りません）。</p>
-<p>用語集とイベント一覧は、B5 Step 8.4 から、コードの注釈（<code>@Term</code>・<code>@EventSpec</code>）から生成しています（手で編集しません。再生成は <code>./gradlew :domain:generateLivingDocs</code>。方式は <a href="../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>、提案）。</p>
+<p>用語集・イベント一覧・コアのハイライト・サイトシーイング・マップ・ガイドツアーは、コードの注釈（<code>@Term</code>・<code>@EventSpec</code>・<code>@CoreConcept</code>・<code>@KeyLandmark</code>・<code>@GuidedTour</code>）から生成しています（手で編集しません。再生成は <code>./gradlew :domain:generateLivingDocs</code>。方式は <a href="../../adr/beer-game-kotlin/018-living-documentation-annotations/">ADR-018</a>、承認済み）。<code>LivingDocumentationSpec</code>・<code>GuidedTourSpec</code> が、コードとの差と設計書との不一致を検出します。入口は <a href="../../../apps/beer-game-kotlin/README.md">README</a> の「コードの案内」です。</p>
 <table>
 <thead>
 <tr>
