@@ -13925,9 +13925,14 @@
 <td style="text-align: left;"><code>recoverParticipation</code>・観察者 3 操作（<code>inviteObserver</code>・<code>revokeObserverInvitation</code>・<code>joinAsObserver</code>）・<code>revokeCredential</code>・<code>reissueCredential</code> を <code>/api/v1</code> に実装（未実装は 12 → 6 件）。復帰は、本文の復帰コードか Cookie <code>bg_recovery</code>。<strong>契約の失効と再発行を別の操作に分けた</strong>（<code>revokeParticipantCredential</code>・<code>reissueParticipantCredential</code>。失効の判定は <code>isRecoveryRevoked</code>。既存のスキーマで足りる）。失効済みの再失効・未失効の再発行は 409。観察者は、ブラウザセッションだけを発行し、復帰資格は発行しない。表示名の上限を契約に合わせて 20 → 80 文字（コードポイント）。630 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">3d〜3e・4〜7</td>
+<td style="text-align: center;">3d</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;">進行中の 6 操作（<code>saveDecision</code>・<code>commitWeek</code>・<code>pauseSession</code>・<code>resumeSession</code>・<code>setCommitMode</code>・<code>submitProxyDecision</code>）を <code>/api/v1</code> に実装（未実装は 6 → 0 件のうち H4 を除く操作がすべて実装済み。<code>pending.ts</code> は空）。役割は資格から決まる。週の判定が先（<code>session.week_advanced</code>）。版の競合は 409 <code>session.decision_conflict</code>（<code>role</code>・最新の入力＝保存者・時刻つき）。確定の根拠は、役割ごとの入力の版（<code>basis</code>）で、変わっていれば 409 <code>session.decisions_changed</code>（<code>current</code>）。保存回数の上限 9（代理入力を含む。版が回数）。停止・終了・停止中でない再開・開始前に型のある失敗（<code>session.paused</code>・<code>already_ended</code>・<code>not_paused</code>・<code>not_active</code>）。進行役だけの操作は、冪等の照合より前に認可する。<code>If-Match</code> は引用符可・無ければ 0・整数でなければ 422。658 件通過</td>
+</tr>
+<tr>
+<td style="text-align: center;">3e・4〜7</td>
 <td style="text-align: left;">未着手</td>
-<td style="text-align: left;">進行中のコマンド（<code>saveDecision</code>・<code>commitWeek</code>・<code>pause</code>・<code>resume</code>・<code>setCommitMode</code>・<code>submitProxyDecision</code>）と業務の失敗の <code>code</code>、H4</td>
+<td style="text-align: left;">H4（開始後の役割の入れ替え。マイグレーション 010）、旧 API の撤去 ほか</td>
 </tr>
 </tbody>
 </table>
@@ -14063,6 +14068,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">小段階 3c-2（復帰・観察者・資格の失効と再発行）の完了を反映</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">小段階 3d（進行中のコマンド 6 操作と業務の失敗の <code>code</code>）の完了を反映</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
