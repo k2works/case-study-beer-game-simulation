@@ -29,7 +29,10 @@ npm run db:up          # PostgreSQL 18 を起動
 export DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2
 npm run migrate        # スキーマを適用
 npm start              # API: http://localhost:3000
-npm run dev:client     # UI: http://localhost:5173（別の端末）
+# 画面は、Kotlin 版・Rust 版と共有の apps/beer-game-web（別の端末）。/api を 3000 へ転送する
+#   cd ../beer-game-web && npm ci && npm run dev    # UI: http://localhost:5173
+# API は、画面の Origin を許可し、http の Cookie を受ける設定で起動する:
+#   ALLOWED_ORIGINS=http://localhost:5173 COOKIE_SECURE=false npm start
 ```
 
 開発では、鍵などの環境変数は既定値で起動します。**`NODE_ENV=production` では、次が無いと起動に失敗します**。
@@ -52,7 +55,7 @@ npm run dev:client     # UI: http://localhost:5173（別の端末）
 ## ローカルで動かして確認する
 
 ```bash
-npm run dev      # DB 起動 → マイグレーション → API と UI を起動（UI: http://localhost:5173）
+npm run dev      # DB 起動 → マイグレーション → API を起動（画面は上の手順で別に起動する）
 npm run smoke    # 別の端末で。作成 → 参加 → 割り当て → 開始 → 入力 → 確定 を API で通す
 ```
 
@@ -65,19 +68,20 @@ npm run smoke    # 別の端末で。作成 → 参加 → 割り当て → 開�
 進行役の資格と参加者の資格は別の Cookie なので、**同じブラウザで進行役が参加者（1 役割）を兼ねられます**。残りの 3 役割は、開発用ボットが担当します。
 
 ```bash
-npm run dev                         # 端末 1: DB・API・UI を起動
+ALLOWED_ORIGINS=http://localhost:5173 COOKIE_SECURE=false npm run dev   # 端末 1: DB・API を起動
+# （端末 3: cd ../beer-game-web && npm run dev で、画面を起動する）
 # ブラウザで http://localhost:5173 を開き「ゲームを作る」→ 参加コードが表示される
 npm run dev:bots -- <参加コード>    # 端末 2: ボット 3 体が参加し、割り当て後は毎週 4 を発注する
 ```
 
 1. 同じブラウザで「参加する」を開き、自分も参加する（進行役のまま）。
 2. ロビーで、自分とボット 3 体に役割を割り当て、「開始する」。
-3. 自分の画面で発注を保存する。「全員が保存したら自動で次の週に進む」（作成時の既定）なら、ボットの発注がそろった時点で自動で次の週に進む。これを最終週まで繰り返す。
+3. 自分の画面で発注を保存する。作成時に「全員が保存したら自動で次の週に進む」を有効にしていれば（既定は無効）、ボットの発注がそろった時点で自動で次の週に進む。これを最終週まで繰り返す。
    作成時にこのチェックを外した場合は、メニューの「進行役コンソール」で「週を確定する」を押す。
 
 振り返りの確認には、増幅が現れる発注方式のボットを使う: `BOT_STRATEGY=reactive npm run dev:bots -- <参加コード>`（受注・受注残・在庫の差で発注する。上流ほど注文が大きく揺れる）。ゲームを終えると、メニューの「振り返り」で、役割別の推移を見られる。
 
-起動できないとき: ポート 3000 / 5173 が他のプロセスに使われていると、UI は起動に失敗します（API の許可 Origin が 5173 固定のため、別ポートで動かさない）。`lsof -nP -iTCP:5173 -sTCP:LISTEN` で確認して止めてください。
+起動できないとき: ポート 3000 / 5173 が他のプロセスに使われていると、UI は起動に失敗します（別のポートで動かすときは、API の `ALLOWED_ORIGINS` に、その画面の Origin を足す）。`lsof -nP -iTCP:5173 -sTCP:LISTEN` で確認して止めてください。
 
 ## 検証
 

@@ -307,6 +307,7 @@ nav:
           - ADR-011 ドメイン・TLS・ヘッダー: adr/beer-game-ts/011-cloudfront-domain-tls-headers.md
           - ADR-012 デリバリーと Terraform: adr/beer-game-ts/012-delivery-pipeline-and-terraform.md
           - ADR-013 技術スタックの版: adr/beer-game-ts/013-tech-stack-versions.md
+          - ADR-014 共有の API 契約と画面: adr/beer-game-ts/014-shared-api-contract-and-web.md
       - beer-game-kotlin:
           - 概要: adr/beer-game-kotlin/index.md
           - ADR-001: adr/beer-game-kotlin/001-kotlin-version-of-beer-game2.md

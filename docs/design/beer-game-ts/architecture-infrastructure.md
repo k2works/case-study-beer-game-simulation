@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:22Z }
 
 # インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: 静的ファイルは共有の画面 `apps/beer-game-web/dist` を S3 へ置く。合成監視は `/api/v1/ready`。SSE と Playwright の E2E は無い（CI の `e2e` ジョブは共有の `@ui` を TS 版のバックエンドで実行）。ローカルの `npm run dev` は DB・マイグレーション・API だけを起動し、画面は `apps/beer-game-web` を別に起動する。環境変数は `ALLOWED_ORIGINS`（複数可）・`COOKIE_SECURE`。
+
 ## 概要
 
 本書は、beer-game2（v2）の実行環境と配信の構成を定義します。**`docs/` を設計の正本**とします。

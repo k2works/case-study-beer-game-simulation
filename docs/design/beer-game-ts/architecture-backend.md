@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:21Z }
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: HTTP の API は、共有の契約 `apps/beer-game-contracts/openapi.yaml`（`/api/v1`。25 操作）に従う。旧い `/api/*` と SSE（`/games/:id/events`）は**撤去**した。資格は Cookie `bg_session`（24 時間）と `bg_recovery`（30 日。復帰の経路だけ）で、`X-Tab-Id` があればタブ別の名前になる。失敗は problem+json（`type=/problems/{code}`・`code` 29 種・`errors[]`・`correlationId`）、全コマンドで `Idempotency-Key` が必須、版は game・session の 2 本（`versions`）、週の確定の根拠は役割ごとの入力の版（`basis`）。経路は `src/adapters/http/routes-v1-*.ts`、失敗の写しは `server.ts` の `toApiProblem`。以下の SSE・経路の記述は、撤去前の設計。
+
 ## 概要
 
 本書は、beer-game2（v2）のバックエンドのアーキテクチャを、パターン選択の根拠とあわせて定義します。**`docs/` を設計の正本**とします。

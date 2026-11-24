@@ -19,6 +19,7 @@ beer-game2 プロジェクトの ADR ドキュメントです。
 | [ADR-011](./011-cloudfront-domain-tls-headers.md) | 独自ドメイン、TLS 1.2 以上、セキュリティヘッダーを含む CloudFront の単一オリジンにする | 提案中 |
 | [ADR-012](./012-delivery-pipeline-and-terraform.md) | ECR、OIDC、ステージング自動・本番承認・ブルー/グリーンのパイプラインと、リモートの Terraform を採用する | 提案中 |
 | [ADR-013](./013-tech-stack-versions.md) | 技術スタックの版を、確認済みの値で固定する（Node 26 LTS、PostgreSQL 18、TypeScript 6.0） | 提案中 |
+| [ADR-014](./014-shared-api-contract-and-web.md) | TS 版は共有の API 契約（/api/v1）と共有の画面を使う（ADR-006・ADR-010 を置き換える） | 提案中 |
 
 ## 補足
 

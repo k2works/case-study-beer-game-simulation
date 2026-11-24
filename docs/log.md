@@ -1,6 +1,11 @@
 # Docs Update Log
 
 ## 2026-11-24
+* **Creation**: [ADR-014](/adr/beer-game-ts/014-shared-api-contract-and-web.md) を作成（TS 版は共有の API 契約と共有の画面を使う。claude-code/claude-sonnet-5-5）
+* **Update**: [ADR-006](/adr/beer-game-ts/006-sse-version-only.md)・[ADR-010](/adr/beer-game-ts/010-url-router-and-features.md) を更新（ADR-014 で置き換えた旨）、[ADR 索引](/adr/beer-game-ts/index.md) を更新（claude-code/claude-sonnet-5-5）
+* **Update**: [architecture-frontend](/design/beer-game-ts/architecture-frontend.md)・[architecture-backend](/design/beer-game-ts/architecture-backend.md)・[test-strategy](/design/beer-game-ts/test-strategy.md)・[tech-stack](/design/beer-game-ts/tech-stack.md)・[non-functional](/design/beer-game-ts/non-functional.md)・[operation](/design/beer-game-ts/operation.md)・[architecture-infrastructure](/design/beer-game-ts/architecture-infrastructure.md)・[ui-design](/design/beer-game-ts/ui-design.md) を更新（現状の注記。verified は未変更。claude-code/claude-sonnet-5-5）
+* **Update**: [application_dev_setup](/operation/beer-game-ts/application_dev_setup.md)・[aws_staging_setup](/operation/beer-game-ts/aws_staging_setup.md) を更新（共有の画面の起動、`/api/v1`。claude-code/claude-sonnet-5-5）
+* **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 7 ドキュメントの完了。全段階の完了。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 6 `apps/beer-game-ts/ui` の削除と整理の完了。ガイドツアーの第 10 ステップを `src/` へ。claude-code/claude-sonnet-5-5）
 * **Update**: [guided-tour-walking-skeleton](/design/beer-game-ts/guided-tour-walking-skeleton.md) を再生成（第 1 ステップを HTTP の発注の保存の入口へ。claude-code/claude-sonnet-5-5）
 * **Update**: [api_alignment_plan](/development/beer-game-ts/api_alignment_plan.md) を更新（段階 4 旧 API の撤去とテストの付け替えの完了。claude-code/claude-sonnet-5-5）

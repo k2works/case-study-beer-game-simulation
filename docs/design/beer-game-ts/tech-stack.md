@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:23Z }
 
 # 技術スタック選定 - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: フロントエンド（React・react-router・Vite）と、その開発依存（Testing Library・jsdom・Playwright・axe・wait-on・concurrently）は、TS 版の `package.json` から**外した**（画面は共有の `apps/beer-game-web`）。契約テストのため、開発依存に `ajv` 8.20.0・`ajv-formats` 3.0.1・`yaml` 2.9.1 を足した。SSE（EventSource）は使わない。以下の表のうち、これらの行は削除前の選定。
+
 ## 概要
 
 本書は、beer-game2（v2）の技術スタックを、バージョンとサポート期限とあわせて一覧にします。**`docs/` を設計の正本**とします。

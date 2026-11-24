@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 # UI 設計 - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: TS 版の独自の画面は削除し、共有の画面 `apps/beer-game-web` を使う。画面の設計は共有側（[Kotlin 版の UI 設計](../beer-game-kotlin/ui-design.md)）を正とする。通信断の表示は、SSE ではなく取得の失敗に対するもの。本書は、削除前の TS 版の画面の設計の記録。
+
 ## 概要
 
 本書は、beer-game2（v2）の UI を、画面一覧、画面遷移、画面イメージ、インタラクションの順に定義します。**`docs/` を設計の正本**とします。

@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:22Z }
 
 # フロントエンドアーキテクチャ - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: TS 版は独自の画面（`apps/beer-game-ts/ui`）を**削除**し、Kotlin 版・Rust 版と共有の画面 `apps/beer-game-web`（React + Vite）を使う。画面は共有の API 契約 `apps/beer-game-contracts/openapi.yaml`（`/api/v1`）だけを話し、SSE は使わない（コマンドの応答の `versions` に追いつくまで状態を取得し直す）。以下の `ui/src/` の構成・SSE の記述は、削除前の設計で、画面の現状は [共有の画面の設計](../beer-game-kotlin/architecture-frontend.md) を参照。
+
 ## 概要
 
 本書は、beer-game2（v2）のフロントエンドのアーキテクチャを定義します。**`docs/` を設計の正本**とします。

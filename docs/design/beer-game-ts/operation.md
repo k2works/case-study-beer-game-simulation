@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 # 運用要件定義 - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: SSE を撤去したため、SSE の切断率・遅延・接続数の指標とスモークテストの SSE の確認は、**対象外**（読み替え）。合成監視は `/api/v1/ready` を叩く（旧い `/api/v1/ready` は撤去。Terraform の `ready_url` を更新済み）。デプロイの静的ファイルは、共有の画面 `apps/beer-game-web` のビルド（`apps/beer-game-web/dist`）。
+
 ## 概要
 
 本書は、beer-game2（v2）を本番で運用するための要件を、運用フロー、監視、バックアップ、障害対応、変更管理の順に定義します。**`docs/` を正本**とします。
@@ -85,13 +87,13 @@ beer-game（v1）の [運用要件](../beer-game/operation.md)（11 件の差分
 
 | 監視項目                 | アラーム                              | メトリクス                                                                      | 条件                                         |
 | :----------------------- | :------------------------------------ | :------------------------------------------------------------------------------ | :------------------------------------------- |
-| 研修中の主要な操作の成功 | `<name>-ready-canary`                 | `CloudWatchSynthetics` の `SuccessPercent`（合成監視、1 分ごとに `/api/ready`） | 1 回（1 分）でも 100% 未満。データ無しも発報 |
+| 研修中の主要な操作の成功 | `<name>-ready-canary`                 | `CloudWatchSynthetics` の `SuccessPercent`（合成監視、1 分ごとに `/api/v1/ready`） | 1 回（1 分）でも 100% 未満。データ無しも発報 |
 | 5xx                      | `<name>-server-errors`                | `ServerErrors`                                                                  | 5 分で 5 件以上                              |
 | API の応答（p95）        | `<name>-api-latency-p95`              | `Latency`                                                                       | p95 が 1 秒超（5 分）                        |
 | 不変条件の違反           | `<name>-invariant-violations`         | `InvariantViolations`（500、または DB の一意制約の違反）                        | 1 件で発報                                   |
 | 削除の恒久的な失敗       | `<name>-retention-permanent-failures` | `RetentionPermanentFailures`                                                    | 1 件で発報                                   |
 
-合成監視は `/ready` ではなく `/api/ready` を叩きます（CloudFront は `/api/*` だけを API へ中継するため）。Warning の通知と、DB・容量・セキュリティの項目は、まだ定義していません。
+合成監視は `/ready` ではなく `/api/v1/ready` を叩きます（CloudFront は `/api/*` だけを API へ中継するため）。Warning の通知と、DB・容量・セキュリティの項目は、まだ定義していません。
 
 ### ヘルスチェック
 

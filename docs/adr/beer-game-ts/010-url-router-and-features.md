@@ -15,7 +15,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:01:20Z }
 
 ## ステータス
 
-提案中（レビュー待ち）
+提案中（レビュー待ち）。**2026-11-24: [ADR-014](./014-shared-api-contract-and-web.md) で置き換えた**（TS 版の独自の画面は削除し、共有の `apps/beer-game-web` を使う）。
 
 ## コンテキスト
 

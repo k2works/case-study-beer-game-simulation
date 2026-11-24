@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 # テスト戦略 - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: 独自の画面を削除したため、**UI コンポーネントのテスト（`tests/component`）と Playwright の E2E（`tests/e2e`）は無い**。現状のテストは、単体（`tests/unit`）・契約（`tests/contract`。Ajv で `/api/v1` の応答を契約のスキーマで検査し、全 25 操作の実装を `operations.test.ts` が確かめる）・統合（`tests/integration`。実 PostgreSQL）。画面の振る舞い・アクセシビリティは、共有の受け入れ `apps/beer-game-features` の `@ui`（27 シナリオ。Cucumber-JS + Playwright）を、CI の `e2e` ジョブが TS 版のバックエンドで実行して確かめる。以下の UI コンポーネント・E2E・SSE の記述は、削除前の設計。
+
 ## 概要
 
 本書は、beer-game2（v2）のテスト戦略を定義します。**`docs/` を設計の正本**とします。

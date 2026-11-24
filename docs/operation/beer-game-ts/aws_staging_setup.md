@@ -134,7 +134,7 @@ Environment `staging` を作り、次の**変数**（Variables。秘密ではな
 1. Actions の `beer-game-ts-deploy-staging` を手動で起動する。イメージのビルド → ECR → マイグレーション（失敗したら中止）→ ローリング更新（失敗したら自動で戻る）→ 静的ファイル → スモークテスト、の順に進む。
 2. 動作を確認できたら、ワークフローの `push` トリガー（main へのマージ）を有効にする。
 3. 戻すときは `beer-game-ts-rollback-staging` を起動する（戻す先のコミット SHA を指定できる）。マイグレーションは戻さない。
-4. **初回の確認項目**: SSE が CloudFront と ALB を通って届くか（スモークテストの SSE）、Cookie（`Secure`、`SameSite=Strict`）と Origin の検査が正しく働くか、壊した版をデプロイして戻せるか。
+4. **初回の確認項目**: `/api/v1` が CloudFront と ALB を通って届くか（スモークテスト。`X-Tab-Id` などのヘッダーの転送を含む）、Cookie（`Secure`、`SameSite=Strict`）と Origin の検査が正しく働くか、壊した版をデプロイして戻せるか。
 
 ## 既知の制約と未確認事項
 

@@ -9,6 +9,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-09T09:35:19Z }
 
 # 非機能要件定義 - ビールゲームシミュレーション（v2）
 
+> **現状の注記（2026-11-24。[ADR-014](../../adr/beer-game-ts/014-shared-api-contract-and-web.md)）**: SSE を撤去したため、SSE を前提とする項目（NF-P4・P7・R10・C1・C3・C5 の SSE の接続・遅延、NF-O2 の SSE への相関 ID の伝達）は、**SSE の部分を読み替える**（画面は応答の `versions` に追いつくまで取得し直す）。目標値の見直しは、人の判断（保留中の NF-P18・NF-P1 保存 p95 と同じ扱い）。
+
 ## 概要
 
 本書は、beer-game2（v2）の非機能要件を、**測定できる形**で定義します。**`docs/` を正本**とします。
