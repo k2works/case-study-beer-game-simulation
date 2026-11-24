@@ -60,6 +60,8 @@ jobs:
       - run: npm run acceptance > /dev/null
       # ガイドツアーが、コードのタグと一致している（Living Documentation）
       - run: npm run docs:tour:check
+      # イベント一覧・用語集・コアのハイライトが、コードと一致し、設計書の表と矛盾しない（Living Documentation）
+      - run: npm run docs:living:check
       # 本番に入る依存の脆弱性（開発依存は対象外）
       - run: npm audit --omit=dev --audit-level=high
 

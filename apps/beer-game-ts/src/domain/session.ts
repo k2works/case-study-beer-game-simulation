@@ -54,6 +54,10 @@ export interface WeekRecord {
 
 /** Session 集約（進行）。不変。操作は新しい Session とイベントを返す。
  *
+ * @term セッション | ゲームの進行状態（週・状態・版・役割の状態・意思決定）を持つ実行単位 | ドメインモデル ユビキタス言語
+ *
+ * @core 進行（プレイ） | 4 役割の意思決定を揃えて週を一度だけ確定する整合性の土台。週・役割別の状態・発注・履歴を持ち、共同入力と自動確定の不変条件を守る
+ *
  * @landmark 進行の集約。週・役割別の状態・発注・履歴を持ち、確定と自動確定の不変条件を守る。Game とは別の集約にして、更新の競合を小さくしている。
  */
 export interface Session {
@@ -217,6 +221,8 @@ export function changeCommitMode(
 }
 
 /**
+ * @core 進行（プレイ） | 入力の保存の規則。担当の役割・進行中・範囲・版の一致を確かめ、古い画面からの上書きを拒否する。自動確定のときは、最後の保存と同じ操作で週を確定する
+ *
  * @guidedTour walking-skeleton 50 ルールの本体その 1。担当の役割だけが、進行中に、範囲内の数量を、版が一致するときだけ保存できる。自動確定のゲームでは、最後の保存で、同じ操作の中で週を確定する。
  */
 export function saveDecision(
@@ -262,6 +268,8 @@ export function saveDecision(
 
 /**
  * 進行役の代理入力。進行中・停止中のどちらでもでき、操作者・役割・時刻・値をイベント（監査の記録）に残す。
+ *
+ * @term 代理入力 | 進行役が参加者に代わって入力する意思決定。入力値を履歴に残す | ドメインモデル ユビキタス言語
  */
 export function proxyDecision(
   session: Session,
@@ -353,6 +361,10 @@ const allDecided = (session: Session) =>
   ROLES.every((r) => session.decisions[r] !== undefined);
 
 /**
+ * @term 週確定 | 4 役割の意思決定から次週の状態を計算して確定する操作。一度だけ成立する | ドメインモデル ユビキタス言語
+ *
+ * @core 進行（プレイ） | 週を一度だけ確定する規則。4 役割がそろい、週と版が一致するときだけ確定し、計算は simulateWeek に任せて、役割別の週結果を履歴に積む
+ *
  * @guidedTour walking-skeleton 60 ルールの本体その 2。進行役だけが、4 役割の発注がそろい、週と版が一致するときだけ確定できる（確認した後に入力が変わったら拒否）。計算は `simulateWeek` に任せ、役割別の週結果を履歴に積む。
  */
 export function commitWeek(

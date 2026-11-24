@@ -17,7 +17,7 @@
     "dev:server": "tsx watch src/main.ts",
     "start": "tsx src/main.ts",
     "acceptance": "tsx scripts/acceptance-matrix.ts",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run acceptance > /dev/null && npm run docs:tour:check",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run acceptance > /dev/null && npm run docs:tour:check && npm run docs:living:check",
     "migrate:local": "DATABASE_URL=postgres://beer_game2:local-only@localhost:5433/beer_game2 npm run migrate",
     "dev": "npm run db:up && npm run migrate:local && npm start",
     "smoke": "tsx scripts/smoke.ts",
@@ -27,7 +27,9 @@
     "start:prod": "node dist/main.js",
     "retention": "tsx src/retention.ts",
     "docs:tour": "tsx scripts/guided-tour.ts",
-    "docs:tour:check": "tsx scripts/guided-tour.ts --check"
+    "docs:tour:check": "tsx scripts/guided-tour.ts --check",
+    "docs:living": "tsx scripts/living-docs.ts",
+    "docs:living:check": "tsx scripts/living-docs.ts --check"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

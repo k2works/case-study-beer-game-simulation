@@ -8,7 +8,7 @@
 
 ## コードの案内
 
-初めて読むときは、まず [サイトシーイング・マップ](../../docs/design/beer-game-ts/sightseeing-map.md)（見どころ 7 か所）で全体をつかみ、次に [ガイドツアー: ウォーキングスケルトン](../../docs/design/beer-game-ts/guided-tour-walking-skeleton.md) から。発注の保存から 1 週が確定するまでを、7 ステップでたどれます。地図は JSDoc の `@landmark <説明>`、ツアーは `@guidedTour <ツアー名> <順序> <説明>` から生成します（`npm run docs:tour`。コードとの一致は CI が検査します）。
+初めて読むときは、まず [サイトシーイング・マップ](../../docs/design/beer-game-ts/sightseeing-map.md)（見どころ 7 か所）で全体をつかみ、次に [ガイドツアー: ウォーキングスケルトン](../../docs/design/beer-game-ts/guided-tour-walking-skeleton.md) から。発注の保存から 1 週が確定するまでを、7 ステップでたどれます。地図は JSDoc の `@landmark <説明>`、ツアーは `@guidedTour <ツアー名> <順序> <説明>` から生成します（`npm run docs:tour`。コードとの一致は CI が検査します）。核心は [コアのハイライト](../../docs/design/beer-game-ts/generated/core-highlight.md)、言葉とイベントは [用語集](../../docs/design/beer-game-ts/generated/glossary.md)・[イベント一覧](../../docs/design/beer-game-ts/generated/events.md) にあります（`@core`・`@term` と共用体型から生成。`npm run docs:living`。設計書の表との不一致は CI が検査します）。
 
 ## 構成
 

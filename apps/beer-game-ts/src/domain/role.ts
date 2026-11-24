@@ -5,6 +5,9 @@ export const ROLES = [
   'WHOLESALER',
   'RETAILER',
 ] as const;
+/**
+ * @term 役割 | サプライチェーン上の位置。工場・一次卸・二次卸・小売店の 4 つで、上流から下流の順に並ぶ | ドメインモデル ユビキタス言語
+ */
 export type Role = (typeof ROLES)[number];
 
 /** 役割の表示名（利用者に示す文言用） */

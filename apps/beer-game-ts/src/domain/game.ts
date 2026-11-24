@@ -25,6 +25,9 @@ import {
   Week,
 } from './values.js';
 
+/**
+ * @term 自動確定 | 進行役が有効にした場合、4 役割の入力がそろった時点でシステムが週確定を行う方式（手動 MANUAL の対） | ドメインモデル ユビキタス言語
+ */
 export type CommitMode = 'MANUAL' | 'AUTO';
 
 /** ゲームの設定。条件（初期在庫・遅延・費用単価・公開範囲）を含む */
@@ -50,6 +53,8 @@ export interface Participant {
 export type GameStatus = 'PREPARING' | 'STARTED' | 'ENDED';
 
 /** Game 集約（準備）。不変。操作は新しい Game とイベントを返す。
+ *
+ * @term ゲーム | 1 回のシミュレーション実施単位。設定、参加者、役割の割り当てを持つ | ドメインモデル ユビキタス言語
  *
  * @landmark 準備の集約。設定・参加者・役割の割り当てと、開始の条件（4 役割がそろう）を持つ。不変で、操作は新しい Game とイベントを返す。
  */

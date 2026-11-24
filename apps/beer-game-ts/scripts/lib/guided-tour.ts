@@ -41,7 +41,7 @@ function declarationAfter(source: string, index: number): string | null {
   return null;
 }
 
-interface Tagged {
+export interface Tagged {
   /** タグの行（`@guidedTour` や `@landmark` を除いた残り） */
   head: string;
   /** 次の `@` タグまでの続きの行 */
@@ -51,7 +51,7 @@ interface Tagged {
 }
 
 /** JSDoc から、指定したタグ（例: `@guidedTour`）の付いたものを集める（出現順） */
-function findTagged(source: string, tag: string): Tagged[] {
+export function findTagged(source: string, tag: string): Tagged[] {
   const out: Tagged[] = [];
   for (const match of source.matchAll(COMMENT)) {
     const lines = match[1]!
@@ -68,7 +68,7 @@ function findTagged(source: string, tag: string): Tagged[] {
   return out;
 }
 
-const joinDescription = (head: string, rest: string[]) =>
+export const joinDescription = (head: string, rest: string[]) =>
   [head, ...rest].filter((l) => l.length > 0).join(' ');
 
 /** ソースから、`@guidedTour` の付いた宣言を取り出す（出現順） */

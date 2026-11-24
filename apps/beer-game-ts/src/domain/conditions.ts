@@ -3,6 +3,9 @@ import { DomainError, type Issue } from './values.js';
 
 /** 公開範囲（観察者にプレイ中に見せる範囲。観察は Bolt 8） */
 export const DISCLOSURE_POLICIES = ['TEAM_TOTAL', 'PROGRESS_ONLY'] as const;
+/**
+ * @term 公開範囲 | プレイ中に観察者へ見せる情報の範囲。既定はチーム合計（寄与者が 2 未満なら非表示） | ドメインモデル ユビキタス言語
+ */
 export type DisclosurePolicy = (typeof DISCLOSURE_POLICIES)[number];
 
 /** ゲームの条件（キット準拠値から変えられる項目） */

@@ -327,6 +327,7 @@ R --> [*]
 | GameCreated | Game | ゲーム作成（設定の種別: キット準拠 / カスタム、確定方式） |
 | ParticipantJoined | Game | 参加 |
 | RoleAssigned、RoleUnassigned | Game | 役割の割り当て・解除（参加者、役割） |
+| RoleReplaced | Game | 開始後の役割の入れ替え（新しい担当者、役割、外された旧担当者）。コードに実装済みで、生成した[イベント一覧](./generated/events.md)との突き合わせで、この表への追記漏れが見つかった |
 | ObserverInvited、ObserverInvitationRevoked | Game | 観察用の招待の発行・失効 |
 | CredentialRevoked、CredentialReissued | Game | 資格の失効・再発行（進行役、参加者） |
 | GameStarted | Game | 開始 |
