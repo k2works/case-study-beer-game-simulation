@@ -13748,7 +13748,7 @@
 <h2 id="_10">ドメインイベント<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p>イベントの一覧（EV-G01〜G12、EV-S01〜S10）、発生条件、ペイロードは、<a href="../../beer-game-kotlin/domain-model/">Kotlin 版のドメインイベント</a> を正本として<strong>引き継ぎます</strong>（名称も変えません。イベントは永続化され、投影と契約の一部になるため）。</p>
 <ul>
-<li><strong>コードから生成した一覧</strong>: <a href="../generated/events/">イベント一覧（生成）</a>（ID・イベント・ストリーム・条件・ペイロードの項目・書き込む投影のテーブル）。ID と名前が Kotlin 版の表と一致しないと、<code>cargo test</code>（<code>beergame-livingdoc</code>）が失敗する（<a href="../../../adr/beer-game-rust/002-living-documentation-doc-comments/">ADR-002</a>、提案）。</li>
+<li><strong>コードから生成した一覧</strong>: <a href="../generated/events/">イベント一覧（生成）</a>（ID・イベント・ストリーム・条件・ペイロードの項目・書き込む投影のテーブル）。ID と名前が Kotlin 版の表と一致しないと、<code>cargo test</code>（<code>beergame-livingdoc</code>）が失敗する（<a href="../../../adr/beer-game-rust/002-living-documentation-doc-comments/">ADR-002</a>）。</li>
 <li><strong>名称の差（1 件）</strong>: 実装の <code>SessionEvent::RoleReplaced</code>（EV-S09）は、Kotlin 版の表では <code>RoleHolderReplaced</code> である。<code>event_type</code> として永続化済みで、改名は保存済みのイベントの読み出し（アップキャスト）を要するため、コードは変えず、差を注釈で明示している。表を Rust 版の名前に直すかは人の判断。未実装は EV-G10 <code>ParticipationRecovered</code>・EV-S07 <code>AutoCommitChanged</code>（生成物の末尾に載る）。</li>
 <li>ペイロードの JSON は、<strong>adapter（<code>adapter-persistence</code> の <code>EventCodec</code>）の DTO</strong> を、serde の <code>#[serde(tag = "event_type")]</code> のような<strong>内部タグ付きの列挙型</strong>で表すことを第一候補とします（<strong>ドメインのイベントの型には serde の属性を付けない</strong>。BD5）（Kotlin 版の「<code>event_type</code> を判別子にした多相」に対応。<strong>書式は未確認</strong>で、B1 で確かめる）。</li>
 <li>表示名と資格の値は、ペイロードに含めません（D7）。型の上でも、<code>GameEvent</code> のフィールドに <code>DisplayName</code> と資格のダイジェストの型を<strong>持たせません</strong>。</li>
