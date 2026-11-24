@@ -9507,6 +9507,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13543,7 +13578,10 @@ npm<span class="w"> </span>run<span class="w"> </span>db:up<span class="w">     
 <span class="nb">export</span><span class="w"> </span><span class="nv">DATABASE_URL</span><span class="o">=</span>postgres://beer_game2:local-only@localhost:5433/beer_game2
 npm<span class="w"> </span>run<span class="w"> </span>migrate<span class="w">        </span><span class="c1"># スキーマを適用</span>
 npm<span class="w"> </span>start<span class="w">              </span><span class="c1"># API: http://localhost:3000</span>
-npm<span class="w"> </span>run<span class="w"> </span>dev:client<span class="w">     </span><span class="c1"># UI: http://localhost:5173（別の端末）</span>
+<span class="c1"># 画面は、Kotlin 版・Rust 版と共有の apps/beer-game-web（別の端末）。/api を 3000 へ転送する</span>
+<span class="c1">#   cd ../beer-game-web &amp;&amp; npm ci &amp;&amp; npm run dev    # UI: http://localhost:5173</span>
+<span class="c1"># API は、画面の Origin を許可し、http の Cookie を受ける設定で起動する:</span>
+<span class="c1">#   ALLOWED_ORIGINS=http://localhost:5173 COOKIE_SECURE=false npm start</span>
 </code></pre></div>
 <p>開発では、鍵などの環境変数は既定値で起動します。<strong><code>NODE_ENV=production</code> では、次が無いと起動に失敗します</strong>。</p>
 <table>
@@ -13596,25 +13634,26 @@ npm<span class="w"> </span>run<span class="w"> </span>dev:client<span class="w">
 </tbody>
 </table>
 <h2 id="_3">ローカルで動かして確認する<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">      </span><span class="c1"># DB 起動 → マイグレーション → API と UI を起動（UI: http://localhost:5173）</span>
+<div class="highlight"><pre><span></span><code>npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">      </span><span class="c1"># DB 起動 → マイグレーション → API を起動（画面は上の手順で別に起動する）</span>
 npm<span class="w"> </span>run<span class="w"> </span>smoke<span class="w">    </span><span class="c1"># 別の端末で。作成 → 参加 → 割り当て → 開始 → 入力 → 確定 を API で通す</span>
 </code></pre></div>
 <p>保持期限に達したゲームの削除（本番では EventBridge Scheduler から 5 分ごとに起動する定期タスク）は、<code>npm run retention</code> で手元でも実行できます。</p>
 <p><code>smoke</code> は、<code>/health</code>・<code>/ready</code>、顧客需要が小売店だけに開示されること、確定後に 2 週目へ進み役割別の結果が残ることを確認します。接続先は <code>API_URL</code>、<code>ORIGIN</code> で変えられます。</p>
 <h2 id="1-1">1 人で 1 ゲーム遊ぶ（ローカル）<a class="headerlink" href="#1-1" title="Permanent link">&para;</a></h2>
 <p>進行役の資格と参加者の資格は別の Cookie なので、<strong>同じブラウザで進行役が参加者（1 役割）を兼ねられます</strong>。残りの 3 役割は、開発用ボットが担当します。</p>
-<div class="highlight"><pre><span></span><code>npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">                         </span><span class="c1"># 端末 1: DB・API・UI を起動</span>
+<div class="highlight"><pre><span></span><code><span class="nv">ALLOWED_ORIGINS</span><span class="o">=</span>http://localhost:5173<span class="w"> </span><span class="nv">COOKIE_SECURE</span><span class="o">=</span><span class="nb">false</span><span class="w"> </span>npm<span class="w"> </span>run<span class="w"> </span>dev<span class="w">   </span><span class="c1"># 端末 1: DB・API を起動</span>
+<span class="c1"># （端末 3: cd ../beer-game-web &amp;&amp; npm run dev で、画面を起動する）</span>
 <span class="c1"># ブラウザで http://localhost:5173 を開き「ゲームを作る」→ 参加コードが表示される</span>
 npm<span class="w"> </span>run<span class="w"> </span>dev:bots<span class="w"> </span>--<span class="w"> </span>&lt;参加コード&gt;<span class="w">    </span><span class="c1"># 端末 2: ボット 3 体が参加し、割り当て後は毎週 4 を発注する</span>
 </code></pre></div>
 <ol>
 <li>同じブラウザで「参加する」を開き、自分も参加する（進行役のまま）。</li>
 <li>ロビーで、自分とボット 3 体に役割を割り当て、「開始する」。</li>
-<li>自分の画面で発注を保存する。「全員が保存したら自動で次の週に進む」（作成時の既定）なら、ボットの発注がそろった時点で自動で次の週に進む。これを最終週まで繰り返す。
+<li>自分の画面で発注を保存する。作成時に「全員が保存したら自動で次の週に進む」を有効にしていれば（既定は無効）、ボットの発注がそろった時点で自動で次の週に進む。これを最終週まで繰り返す。
    作成時にこのチェックを外した場合は、メニューの「進行役コンソール」で「週を確定する」を押す。</li>
 </ol>
 <p>振り返りの確認には、増幅が現れる発注方式のボットを使う: <code>BOT_STRATEGY=reactive npm run dev:bots -- &lt;参加コード&gt;</code>（受注・受注残・在庫の差で発注する。上流ほど注文が大きく揺れる）。ゲームを終えると、メニューの「振り返り」で、役割別の推移を見られる。</p>
-<p>起動できないとき: ポート 3000 / 5173 が他のプロセスに使われていると、UI は起動に失敗します（API の許可 Origin が 5173 固定のため、別ポートで動かさない）。<code>lsof -nP -iTCP:5173 -sTCP:LISTEN</code> で確認して止めてください。</p>
+<p>起動できないとき: ポート 3000 / 5173 が他のプロセスに使われていると、UI は起動に失敗します（別のポートで動かすときは、API の <code>ALLOWED_ORIGINS</code> に、その画面の Origin を足す）。<code>lsof -nP -iTCP:5173 -sTCP:LISTEN</code> で確認して止めてください。</p>
 <h2 id="_4">検証<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>npm<span class="w"> </span>run<span class="w"> </span>verify<span class="w">         </span><span class="c1"># format → lint → typecheck → テスト+カバレッジ → 受入条件の対応 → E2E</span>
 npx<span class="w"> </span>playwright<span class="w"> </span>install<span class="w"> </span>chromium<span class="w">   </span><span class="c1"># 初回のみ</span>

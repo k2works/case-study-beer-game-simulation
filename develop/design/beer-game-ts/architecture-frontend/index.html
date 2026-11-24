@@ -9601,6 +9601,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13601,6 +13636,9 @@
 
 
 <h1 id="-v2">フロントエンドアーキテクチャ - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: TS 版は独自の画面（<code>apps/beer-game-ts/ui</code>）を<strong>削除</strong>し、Kotlin 版・Rust 版と共有の画面 <code>apps/beer-game-web</code>（React + Vite）を使う。画面は共有の API 契約 <code>apps/beer-game-contracts/openapi.yaml</code>（<code>/api/v1</code>）だけを話し、SSE は使わない（コマンドの応答の <code>versions</code> に追いつくまで状態を取得し直す）。以下の <code>ui/src/</code> の構成・SSE の記述は、削除前の設計で、画面の現状は <a href="../../beer-game-kotlin/architecture-frontend/">共有の画面の設計</a> を参照。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）のフロントエンドのアーキテクチャを定義します。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/architecture-frontend/">フロントエンドアーキテクチャ</a> を出発点に、v2 の範囲（共同担当、観察者、自動確定、カスタム条件）と、v1 の差分（再読み込みで進行役が戻れない、英語の列挙値の表示、<code>CreateJoinLobby.tsx</code> の肥大など）を反映して<strong>改訂</strong>しました。</p>

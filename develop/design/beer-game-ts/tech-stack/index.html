@@ -9595,6 +9595,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13595,6 +13630,9 @@
 
 
 <h1 id="-v2">技術スタック選定 - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: フロントエンド（React・react-router・Vite）と、その開発依存（Testing Library・jsdom・Playwright・axe・wait-on・concurrently）は、TS 版の <code>package.json</code> から<strong>外した</strong>（画面は共有の <code>apps/beer-game-web</code>）。契約テストのため、開発依存に <code>ajv</code> 8.20.0・<code>ajv-formats</code> 3.0.1・<code>yaml</code> 2.9.1 を足した。SSE（EventSource）は使わない。以下の表のうち、これらの行は削除前の選定。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）の技術スタックを、バージョンとサポート期限とあわせて一覧にします。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/tech-stack/">技術スタック</a> を出発点に、「踏襲し、版だけ更新する」方針（<a href="../../../adr/beer-game-ts/001-rebuild-as-beer-game2/">ADR-001</a>）で改訂しました。</p>

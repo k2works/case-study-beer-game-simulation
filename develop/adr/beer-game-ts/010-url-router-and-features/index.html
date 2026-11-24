@@ -9552,6 +9552,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13555,7 +13590,7 @@
 <p>フロントエンドに URL ルーターを導入し、ゲームを URL で表す。資格は Cookie のままとする。構成は機能単位（<code>features/</code>）にする。</p>
 <p>日付: 2026-11-09</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>提案中（レビュー待ち）</p>
+<p>提案中（レビュー待ち）。<strong>2026-11-24: <a href="../014-shared-api-contract-and-web/">ADR-014</a> で置き換えた</strong>（TS 版の独自の画面は削除し、共有の <code>apps/beer-game-web</code> を使う）。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>v1 は、URL ルーターを使わず、<code>useState</code> で画面を切り替えていた。このため、再読み込みでゲーム ID とセッション ID を失い、特に<strong>進行役が、ブラウザを閉じると、コンソールへ戻れなかった</strong>。また、<code>CreateJoinLobby.tsx</code>（約 415 行）に、作成・参加・ロビーが同居していた。</p>
 <h2 id="_3">決定<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>

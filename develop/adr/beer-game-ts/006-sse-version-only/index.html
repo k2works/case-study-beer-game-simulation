@@ -9552,6 +9552,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13555,7 +13590,7 @@
 <p>SSE は、集約の種別と版の通知だけを送り、再接続時の取りこぼしの再送は行わない。クライアントは、接続のたびにスナップショットを取得して追いつく。</p>
 <p>日付: 2026-11-09</p>
 <h2 id="_1">ステータス<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<p>提案中（レビュー待ち）</p>
+<p>提案中（レビュー待ち）。<strong>2026-11-24: <a href="../014-shared-api-contract-and-web/">ADR-014</a> で置き換えた</strong>（SSE は撤去。共有の契約には SSE が無く、画面は応答の <code>versions</code> に追いつくまで取得し直す）。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>v1 の SSE は、版の通知に加えて、<code>Last-Event-ID</code> によるイベントの再生と、カーソルの照合を実装していた。しかし、クライアントは、通知を受けるたびに、スナップショットを再取得しており、再生した内容は使われていなかった。再生の実装（<code>eventsSince</code>、カーソルの確認）は、複雑さだけを増やしていた。</p>
 <h2 id="_3">決定<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>

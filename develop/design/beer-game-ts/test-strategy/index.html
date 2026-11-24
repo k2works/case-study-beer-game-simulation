@@ -9674,6 +9674,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13674,6 +13709,9 @@
 
 
 <h1 id="-v2">テスト戦略 - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: 独自の画面を削除したため、<strong>UI コンポーネントのテスト（<code>tests/component</code>）と Playwright の E2E（<code>tests/e2e</code>）は無い</strong>。現状のテストは、単体（<code>tests/unit</code>）・契約（<code>tests/contract</code>。Ajv で <code>/api/v1</code> の応答を契約のスキーマで検査し、全 25 操作の実装を <code>operations.test.ts</code> が確かめる）・統合（<code>tests/integration</code>。実 PostgreSQL）。画面の振る舞い・アクセシビリティは、共有の受け入れ <code>apps/beer-game-features</code> の <code>@ui</code>（27 シナリオ。Cucumber-JS + Playwright）を、CI の <code>e2e</code> ジョブが TS 版のバックエンドで実行して確かめる。以下の UI コンポーネント・E2E・SSE の記述は、削除前の設計。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）のテスト戦略を定義します。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/test-strategy/">テスト戦略</a>（実測: 199 件、カバレッジ 90.5%、10 件の差分）を出発点に、v2 の設計（集約の分離、共同入力、自動確定、役割別の週結果、カスケード削除）と、v1 の差分の解消を反映して<strong>改訂</strong>しました。</p>

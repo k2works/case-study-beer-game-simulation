@@ -9618,6 +9618,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13618,6 +13653,9 @@
 
 
 <h1 id="-v2">非機能要件定義 - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: SSE を撤去したため、SSE を前提とする項目（NF-P4・P7・R10・C1・C3・C5 の SSE の接続・遅延、NF-O2 の SSE への相関 ID の伝達）は、<strong>SSE の部分を読み替える</strong>（画面は応答の <code>versions</code> に追いつくまで取得し直す）。目標値の見直しは、人の判断（保留中の NF-P18・NF-P1 保存 p95 と同じ扱い）。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）の非機能要件を、<strong>測定できる形</strong>で定義します。<strong><code>docs/</code> を正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/non-functional/">非機能要件</a>（61 件、実装の状況と 12 件の差分）を出発点に、v2 の設計と範囲を反映して<strong>改訂</strong>しました。表の「v1 の状態」は、v1 の実装の状況です。<strong>△・✗・未測定は、v2 で満たす対象</strong>です。</p>

@@ -9668,6 +9668,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13668,6 +13703,9 @@
 
 
 <h1 id="-v2">バックエンドアーキテクチャ - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: HTTP の API は、共有の契約 <code>apps/beer-game-contracts/openapi.yaml</code>（<code>/api/v1</code>。25 操作）に従う。旧い <code>/api/*</code> と SSE（<code>/games/:id/events</code>）は<strong>撤去</strong>した。資格は Cookie <code>bg_session</code>（24 時間）と <code>bg_recovery</code>（30 日。復帰の経路だけ）で、<code>X-Tab-Id</code> があればタブ別の名前になる。失敗は problem+json（<code>type=/problems/{code}</code>・<code>code</code> 29 種・<code>errors[]</code>・<code>correlationId</code>）、全コマンドで <code>Idempotency-Key</code> が必須、版は game・session の 2 本（<code>versions</code>）、週の確定の根拠は役割ごとの入力の版（<code>basis</code>）。経路は <code>src/adapters/http/routes-v1-*.ts</code>、失敗の写しは <code>server.ts</code> の <code>toApiProblem</code>。以下の SSE・経路の記述は、撤去前の設計。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）のバックエンドのアーキテクチャを、パターン選択の根拠とあわせて定義します。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/architecture-backend/">バックエンドアーキテクチャ</a> を出発点に、<a href="../domain-model/">ドメインモデル（v2）</a> と <a href="../data-model/">データモデル（v2）</a> に合わせて<strong>改訂</strong>しました。v1 の差分（ルールの <code>GameService</code> への集中、<code>api/app.ts</code> への機能の同居、ログとメトリクスの欠如、<code>/health</code> の浅さ）の解消が中心です。</p>

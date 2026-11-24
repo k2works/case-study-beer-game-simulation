@@ -9579,6 +9579,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13579,6 +13614,9 @@
 
 
 <h1 id="-v2">インフラストラクチャアーキテクチャ - ビールゲームシミュレーション（v2）<a class="headerlink" href="#-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: 静的ファイルは共有の画面 <code>apps/beer-game-web/dist</code> を S3 へ置く。合成監視は <code>/api/v1/ready</code>。SSE と Playwright の E2E は無い（CI の <code>e2e</code> ジョブは共有の <code>@ui</code> を TS 版のバックエンドで実行）。ローカルの <code>npm run dev</code> は DB・マイグレーション・API だけを起動し、画面は <code>apps/beer-game-web</code> を別に起動する。環境変数は <code>ALLOWED_ORIGINS</code>（複数可）・<code>COOKIE_SECURE</code>。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）の実行環境と配信の構成を定義します。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/architecture-infrastructure/">インフラストラクチャアーキテクチャ</a> を出発点に、v1 の差分（デプロイ未実装、観測性の欠如、ネットワークと状態管理が定義の外、セキュリティヘッダーと TLS）の解消と、v2 の設計の単純化（保持削除のキューの廃止）を反映して<strong>改訂</strong>しました。</p>

@@ -9557,6 +9557,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13781,7 +13816,7 @@ terraform<span class="w"> </span>apply<span class="w"> </span>tfplan
 <li>Actions の <code>beer-game-ts-deploy-staging</code> を手動で起動する。イメージのビルド → ECR → マイグレーション（失敗したら中止）→ ローリング更新（失敗したら自動で戻る）→ 静的ファイル → スモークテスト、の順に進む。</li>
 <li>動作を確認できたら、ワークフローの <code>push</code> トリガー（main へのマージ）を有効にする。</li>
 <li>戻すときは <code>beer-game-ts-rollback-staging</code> を起動する（戻す先のコミット SHA を指定できる）。マイグレーションは戻さない。</li>
-<li><strong>初回の確認項目</strong>: SSE が CloudFront と ALB を通って届くか（スモークテストの SSE）、Cookie（<code>Secure</code>、<code>SameSite=Strict</code>）と Origin の検査が正しく働くか、壊した版をデプロイして戻せるか。</li>
+<li><strong>初回の確認項目</strong>: <code>/api/v1</code> が CloudFront と ALB を通って届くか（スモークテスト。<code>X-Tab-Id</code> などのヘッダーの転送を含む）、Cookie（<code>Secure</code>、<code>SameSite=Strict</code>）と Origin の検査が正しく働くか、壊した版をデプロイして戻せるか。</li>
 </ol>
 <h2 id="_5">既知の制約と未確認事項<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <ul>

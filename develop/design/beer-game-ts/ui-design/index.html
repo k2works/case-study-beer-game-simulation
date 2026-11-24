@@ -9745,6 +9745,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR-014 共有の API 契約と画面
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -13745,6 +13780,9 @@
 
 
 <h1 id="ui-v2">UI 設計 - ビールゲームシミュレーション（v2）<a class="headerlink" href="#ui-v2" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>現状の注記（2026-11-24。<a href="../../../adr/beer-game-ts/014-shared-api-contract-and-web/">ADR-014</a>）</strong>: TS 版の独自の画面は削除し、共有の画面 <code>apps/beer-game-web</code> を使う。画面の設計は共有側（<a href="../../beer-game-kotlin/ui-design/">Kotlin 版の UI 設計</a>）を正とする。通信断の表示は、SSE ではなく取得の失敗に対するもの。本書は、削除前の TS 版の画面の設計の記録。</p>
+</blockquote>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game2（v2）の UI を、画面一覧、画面遷移、画面イメージ、インタラクションの順に定義します。<strong><code>docs/</code> を設計の正本</strong>とします。</p>
 <p>beer-game（v1）の <a href="../../beer-game/ui-design/">UI 設計</a>（14 件の差分を記録）を出発点に、v2 の範囲（共同担当、カスタム条件、観察者、自動確定）と、v1 の差分の解消を反映して<strong>改訂</strong>しました。入力は次のとおりです。</p>
