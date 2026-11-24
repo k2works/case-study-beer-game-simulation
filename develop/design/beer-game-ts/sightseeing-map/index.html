@@ -13448,42 +13448,42 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><code>buildServer</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/server.ts"><code>src/adapters/http/server.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/server.ts"><code>apps/beer-game-ts/src/adapters/http/server.ts</code></a></td>
 <td style="text-align: left;">HTTP の入口。Origin の検査、資格の選択、入力の検証、エラーの変換を、ここでまとめて行う。ルールは持たない。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>createApplication</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/application/index.ts"><code>src/application/index.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/application/index.ts"><code>apps/beer-game-ts/src/application/index.ts</code></a></td>
 <td style="text-align: left;">ユースケース層の入口。1 回の操作は 1 つのトランザクション。ルールを持たず、認証 → 集約の呼び出し → 保存の順に進めるだけ。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Game</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>src/domain/game.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>apps/beer-game-ts/src/domain/game.ts</code></a></td>
 <td style="text-align: left;">準備の集約。設定・参加者・役割の割り当てと、開始の条件（4 役割がそろう）を持つ。不変で、操作は新しい Game とイベントを返す。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>observe</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/observation.ts"><code>src/domain/observation.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/observation.ts"><code>apps/beer-game-ts/src/domain/observation.ts</code></a></td>
 <td style="text-align: left;">観察者への開示の判定。役割別の値と需要を出さず、合計は寄与者が 2 役割以上のときだけ出す。参加者には開かせない（自分の値から相手の値を逆算できるため）。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>canDisclose</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/review.ts"><code>src/domain/review.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/review.ts"><code>apps/beer-game-ts/src/domain/review.ts</code></a></td>
 <td style="text-align: left;">情報の制約の要。振り返りを開示してよいかの判定が、この 1 か所に集まっている（終了後だけ）。他の経路から漏れないよう、判定を散らさない。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Session</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></td>
 <td style="text-align: left;">進行の集約。週・役割別の状態・発注・履歴を持ち、確定と自動確定の不変条件を守る。Game とは別の集約にして、更新の競合を小さくしている。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>simulateWeek</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>src/domain/simulate-week.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>apps/beer-game-ts/src/domain/simulate-week.ts</code></a></td>
 <td style="text-align: left;">ゲームのルールの核。週次の計算（入荷 → 受注 → 出荷 → 在庫・受注残 → 発注 → 遅延の前進 → 費用）が、純粋関数 1 つに閉じている。ここが分かれば、画面の数字の意味が分かる。</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>UnitOfWork</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/ports/index.ts"><code>src/ports/index.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/ports/index.ts"><code>apps/beer-game-ts/src/ports/index.ts</code></a></td>
 <td style="text-align: left;">トランザクション境界の契約。成功したら全部、失敗したら何も残らない。メモリ版と PostgreSQL 版の 2 つの実装が、同じ契約でテストされている。</td>
 </tr>
 </tbody>

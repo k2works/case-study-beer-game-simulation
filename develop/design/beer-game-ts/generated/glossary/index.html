@@ -13425,43 +13425,43 @@
 <tbody>
 <tr>
 <td style="text-align: left;">ゲーム</td>
-<td style="text-align: left;"><code>Game</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>src/domain/game.ts</code></a>）</td>
+<td style="text-align: left;"><code>Game</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>apps/beer-game-ts/src/domain/game.ts</code></a>）</td>
 <td style="text-align: left;">1 回のシミュレーション実施単位。設定、参加者、役割の割り当てを持つ</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">セッション</td>
-<td style="text-align: left;"><code>Session</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a>）</td>
+<td style="text-align: left;"><code>Session</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a>）</td>
 <td style="text-align: left;">ゲームの進行状態（週・状態・版・役割の状態・意思決定）を持つ実行単位</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">公開範囲</td>
-<td style="text-align: left;"><code>DisclosurePolicy</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/conditions.ts"><code>src/domain/conditions.ts</code></a>）</td>
+<td style="text-align: left;"><code>DisclosurePolicy</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/conditions.ts"><code>apps/beer-game-ts/src/domain/conditions.ts</code></a>）</td>
 <td style="text-align: left;">プレイ中に観察者へ見せる情報の範囲。既定はチーム合計（寄与者が 2 未満なら非表示）</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">自動確定</td>
-<td style="text-align: left;"><code>CommitMode</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>src/domain/game.ts</code></a>）</td>
+<td style="text-align: left;"><code>CommitMode</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts"><code>apps/beer-game-ts/src/domain/game.ts</code></a>）</td>
 <td style="text-align: left;">進行役が有効にした場合、4 役割の入力がそろった時点でシステムが週確定を行う方式（手動 MANUAL の対）</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">週確定</td>
-<td style="text-align: left;"><code>commitWeek</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a>）</td>
+<td style="text-align: left;"><code>commitWeek</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a>）</td>
 <td style="text-align: left;">4 役割の意思決定から次週の状態を計算して確定する操作。一度だけ成立する</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">代理入力</td>
-<td style="text-align: left;"><code>proxyDecision</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a>）</td>
+<td style="text-align: left;"><code>proxyDecision</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a>）</td>
 <td style="text-align: left;">進行役が参加者に代わって入力する意思決定。入力値を履歴に残す</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>
 <tr>
 <td style="text-align: left;">役割</td>
-<td style="text-align: left;"><code>Role</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/role.ts"><code>src/domain/role.ts</code></a>）</td>
+<td style="text-align: left;"><code>Role</code>（<a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/role.ts"><code>apps/beer-game-ts/src/domain/role.ts</code></a>）</td>
 <td style="text-align: left;">サプライチェーン上の位置。工場・一次卸・二次卸・小売店の 4 つで、上流から下流の順に並ぶ</td>
 <td style="text-align: left;">ドメインモデル ユビキタス言語</td>
 </tr>

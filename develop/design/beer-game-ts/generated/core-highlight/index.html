@@ -13426,7 +13426,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><code>simulateWeek</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>src/domain/simulate-week.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>apps/beer-game-ts/src/domain/simulate-week.ts</code></a></td>
 <td style="text-align: left;">週次の計算の入口。JSD 改訂版キットの 12 ステップと遅延を忠実に再現する、時刻・DB・認可に依存しない純粋関数で、golden とプロパティテストで守られている</td>
 </tr>
 </tbody>
@@ -13443,17 +13443,17 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><code>Session</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></td>
 <td style="text-align: left;">4 役割の意思決定を揃えて週を一度だけ確定する整合性の土台。週・役割別の状態・発注・履歴を持ち、共同入力と自動確定の不変条件を守る</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>saveDecision</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></td>
 <td style="text-align: left;">入力の保存の規則。担当の役割・進行中・範囲・版の一致を確かめ、古い画面からの上書きを拒否する。自動確定のときは、最後の保存と同じ操作で週を確定する</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>commitWeek</code></td>
-<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></td>
+<td style="text-align: left;"><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></td>
 <td style="text-align: left;">週を一度だけ確定する規則。4 役割がそろい、週と版が一致するときだけ確定し、計算は simulateWeek に任せて、役割別の週結果を履歴に積む</td>
 </tr>
 </tbody>

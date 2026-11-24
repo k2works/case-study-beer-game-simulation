@@ -13561,25 +13561,25 @@
 初めてコードを読む人は、ここから始めて、各ステップのファイルを開いてください。</p>
 <p>全体の構造は <a href="../architecture-backend/">バックエンドのアーキテクチャ</a>、層の依存の理由は <a href="../../../adr/beer-game-ts/003-ports-and-adapters-with-lint/">ADR-003</a> を参照してください。</p>
 <h2 id="1-registerapiv1commands">1. registerApiV1Commands<a class="headerlink" href="#1-registerapiv1commands" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/routes-v1-commands.ts"><code>src/adapters/http/routes-v1-commands.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/routes-v1-commands.ts"><code>apps/beer-game-ts/src/adapters/http/routes-v1-commands.ts</code></a></p>
 <p>入口。参加者が発注を保存する要求（<code>PUT /api/v1/sessions/{sessionId}/decisions</code>）。入力する役割は資格から決まり、意思決定の版は <code>If-Match</code> で送る（他の操作で更新されていたら、黙って上書きしないため）。画面は Kotlin 版・Rust 版と共通の <code>apps/beer-game-web</code> で、HTTP の契約（<code>apps/beer-game-contracts/openapi.yaml</code>）だけを話す。次は、サーバー側の入口。</p>
 <h2 id="2-buildserver">2. buildServer<a class="headerlink" href="#2-buildserver" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/server.ts"><code>src/adapters/http/server.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/server.ts"><code>apps/beer-game-ts/src/adapters/http/server.ts</code></a></p>
 <p>HTTP の入口。Origin の検査、Cookie から資格の選択、zod による入力の検証、エラーの Problem JSON への変換を行う。<strong>ルールは持たず</strong>、ユースケースを呼ぶだけ。次は、ユースケース。</p>
 <h2 id="3-createapplication">3. createApplication<a class="headerlink" href="#3-createapplication" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/application/index.ts"><code>src/application/index.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/application/index.ts"><code>apps/beer-game-ts/src/application/index.ts</code></a></p>
 <p>ユースケース。1 回の操作を <code>UnitOfWork</code>（1 つのトランザクション）の中で行い、資格を確認し、集約を呼び、保存する。<strong>ルールはここに書かない</strong>（層の依存は lint で守られる）。次は、集約のルール。</p>
 <h2 id="4-savedecision">4. saveDecision<a class="headerlink" href="#4-savedecision" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></p>
 <p>ルールの本体その 1。担当の役割だけが、進行中に、範囲内の数量を、版が一致するときだけ保存できる。自動確定のゲームでは、最後の保存で、同じ操作の中で週を確定する。</p>
 <h2 id="5-commitweek">5. commitWeek<a class="headerlink" href="#5-commitweek" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>src/domain/session.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts"><code>apps/beer-game-ts/src/domain/session.ts</code></a></p>
 <p>ルールの本体その 2。進行役だけが、4 役割の発注がそろい、週と版が一致するときだけ確定できる（確認した後に入力が変わったら拒否）。計算は <code>simulateWeek</code> に任せ、役割別の週結果を履歴に積む。</p>
 <h2 id="6-simulateweek">6. simulateWeek<a class="headerlink" href="#6-simulateweek" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>src/domain/simulate-week.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/simulate-week.ts"><code>apps/beer-game-ts/src/domain/simulate-week.ts</code></a></p>
 <p>週次の計算（純粋関数）。入荷 → 受注 → 出荷 → 在庫・受注残 → 発注 → 遅延の前進 → 費用の順。時刻・DB・認可に依存しない。golden とプロパティテストで守られている。次は、結果の保存。</p>
 <h2 id="7-pgunitofwork">7. PgUnitOfWork<a class="headerlink" href="#7-pgunitofwork" title="Permanent link">&para;</a></h2>
-<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/persistence/pg-unit-of-work.ts"><code>src/adapters/persistence/pg-unit-of-work.ts</code></a></p>
+<p><a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/persistence/pg-unit-of-work.ts"><code>apps/beer-game-ts/src/adapters/persistence/pg-unit-of-work.ts</code></a></p>
 <p>トランザクションの境界。1 回の操作の保存（集約、役割別の週結果、イベント、冪等記録）は、すべて成功するか、何も残らない。版つきの更新で、同時の更新も検出する。保存のたびに <code>pg_notify</code> され（<code>PgNotifier</code>。受信が生きているかは <code>/api/v1/ready</code> の <code>notifier</code> で確かめる）、画面は応答の <code>versions</code> に追いつくまで状態を取得し直して更新される。動く様子は、共有の画面の受け入れ（<code>apps/beer-game-web</code> の <code>@ui</code>。TS 版のバックエンドで CI が実行する）で確認できる。</p>
 
 
