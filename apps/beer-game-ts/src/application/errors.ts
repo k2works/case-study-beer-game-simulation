@@ -1,4 +1,5 @@
 import { ConflictError } from '../ports/index.js';
+import type { DecisionEntryView } from './contract-views.js';
 
 export class NotFoundError extends Error {
   constructor(message = '見つかりません') {
@@ -38,6 +39,32 @@ export class DecisionConflict extends Error {
   ) {
     super(message);
     this.name = 'DecisionConflict';
+  }
+}
+
+/**
+ * 共有の契約の、意思決定の版の競合（409 `session.decision_conflict`）。競合した役割と、最新の入力（無ければ null）を持つ。
+ */
+export class DecisionConflictedError extends Error {
+  constructor(
+    message: string,
+    readonly role: string,
+    readonly latest: DecisionEntryView | null,
+  ) {
+    super(message);
+    this.name = 'DecisionConflictedError';
+  }
+}
+
+/** 共有の契約の、確定の根拠の変化（409 `session.decisions_changed`）。確定の対象の週と、役割ごとの現在の入力を持つ */
+export class DecisionsChangedViewError extends Error {
+  constructor(
+    message: string,
+    readonly week: number,
+    readonly current: Readonly<Record<string, DecisionEntryView>>,
+  ) {
+    super(message);
+    this.name = 'DecisionsChangedViewError';
   }
 }
 

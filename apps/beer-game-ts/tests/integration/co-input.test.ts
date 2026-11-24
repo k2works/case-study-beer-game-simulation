@@ -12,6 +12,7 @@ import { DecisionConflict } from '../../src/application/errors.js';
 import { FACILITATOR } from '../../src/domain/actor.js';
 import { assignRole, createGame, joinGame } from '../../src/domain/game.js';
 import { ROLES } from '../../src/domain/role.js';
+import { SAVE_LIMIT } from '../../src/domain/values.js';
 import type { UnitOfWork } from '../../src/ports/index.js';
 import { prepareTestDatabase, resetData } from '../support/db.js';
 import { fakeCredentials, sequentialIds } from '../support/memory.js';
@@ -143,28 +144,31 @@ describe('共同入力の並行性（実 PostgreSQL）', () => {
     }
   });
 
-  it('[US2.2/AC2.2.4] 受理された保存は、続けて版を進める保存でだけ上書きされる（100 回の並行の試行で版と値が一致）', async () => {
-    const { gameId, retailers } = await coTable(2);
-    let version = 0;
-    for (let round = 0; round < 50; round++) {
-      const results = await Promise.allSettled(
-        retailers.map((token, i) =>
-          app.saveDecision({
-            token,
-            gameId,
-            role: 'RETAILER',
-            quantity: round * 10 + i,
-            expectedVersion: version,
-          }),
-        ),
-      );
-      const ok = results.flatMap((r) =>
-        r.status === 'fulfilled' ? [r.value] : [],
-      );
-      expect(ok).toHaveLength(1);
-      version = ok[0]!.version;
+  it('[US2.2/AC2.2.4] 受理された保存は、続けて版を進める保存でだけ上書きされる（上限の 9 回まで、並行の試行で版と値が一致）', async () => {
+    // 1 役割・1 週あたりの保存回数の上限（NF-C8）が 9 回なので、ゲームを替えて繰り返す
+    for (let table = 0; table < 5; table++) {
+      const { gameId, retailers } = await coTable(2);
+      let version = 0;
+      for (let round = 0; round < SAVE_LIMIT; round++) {
+        const results = await Promise.allSettled(
+          retailers.map((token, i) =>
+            app.saveDecision({
+              token,
+              gameId,
+              role: 'RETAILER',
+              quantity: round * 10 + i,
+              expectedVersion: version,
+            }),
+          ),
+        );
+        const ok = results.flatMap((r) =>
+          r.status === 'fulfilled' ? [r.value] : [],
+        );
+        expect(ok).toHaveLength(1);
+        version = ok[0]!.version;
+      }
+      const state = await app.roleState({ token: retailers[1]!, gameId });
+      expect(state.decision?.version).toBe(SAVE_LIMIT);
     }
-    const state = await app.roleState({ token: retailers[1]!, gameId });
-    expect(state.decision?.version).toBe(50);
   });
 });

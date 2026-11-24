@@ -7,6 +7,7 @@ import { idempotencyKeyOf } from './idempotency-key.js';
 import { API_V1, rateLimitedProblem, validationProblem } from './problems.js';
 import {
   idParam,
+  ifMatchVersionOf,
   issueCookies,
   recoveryTokenOf,
   tokenOf,
@@ -101,6 +102,25 @@ const recoverSchema = z.object({
 const joinObserverSchema = z.object({
   invitationCode: z.string(),
   displayName: z.string(),
+});
+const weekSchema = z.number().int().min(1).max(50);
+const versionSchema = z.number().int().min(0);
+const saveDecisionSchema = z.object({ week: weekSchema, quantity: z.number() });
+const commitWeekSchema = z.object({
+  requestedWeek: weekSchema,
+  basis: z.strictObject({
+    FACTORY: versionSchema,
+    DISTRIBUTOR: versionSchema,
+    WHOLESALER: versionSchema,
+    RETAILER: versionSchema,
+  }),
+});
+const setCommitModeSchema = z.object({
+  commitMode: z.enum(['MANUAL', 'AUTO']),
+});
+const proxyDecisionSchema = z.object({
+  requestedWeek: weekSchema,
+  quantity: z.number(),
 });
 const credentialSubjectSchema = z.object({
   subject: z.object({ kind: z.literal('PARTICIPANT'), id: z.uuid() }),
@@ -279,4 +299,98 @@ export function registerApiV1Commands(
       });
     },
   );
+
+  // 進行中のコマンド（sessionId は gameId と同じ）。入力の保存の役割は資格から決まり、版は `If-Match`
+  server.put(`${API_V1}/sessions/:sessionId/decisions`, async (request) => {
+    const body = saveDecisionSchema.parse(request.body);
+    return app.saveOwnDecision({
+      token: tokenOf(request),
+      gameId: idParam(request, 'sessionId'),
+      week: body.week,
+      quantity: body.quantity,
+      expectedVersion: ifMatchVersionOf(request),
+      idempotencyKey: idempotencyKeyOf(request),
+    });
+  });
+
+  server.post(
+    `${API_V1}/sessions/:sessionId/weeks/:week/commit`,
+    async (request) => {
+      const body = commitWeekSchema.parse(request.body);
+      const week = pathWeekOf(request);
+      if (week !== body.requestedWeek)
+        throw validationProblem([
+          {
+            field: 'requestedWeek',
+            message: '経路の週と、本文の requestedWeek を同じにしてください',
+          },
+        ]);
+      return app.commitWeekWithBasis({
+        token: tokenOf(request),
+        gameId: idParam(request, 'sessionId'),
+        requestedWeek: body.requestedWeek,
+        basis: body.basis,
+        idempotencyKey: idempotencyKeyOf(request),
+      });
+    },
+  );
+
+  server.post(`${API_V1}/sessions/:sessionId/pause`, async (request) =>
+    app.pause({
+      token: tokenOf(request),
+      gameId: idParam(request, 'sessionId'),
+      idempotencyKey: idempotencyKeyOf(request),
+    }),
+  );
+
+  server.post(`${API_V1}/sessions/:sessionId/resume`, async (request) =>
+    app.resume({
+      token: tokenOf(request),
+      gameId: idParam(request, 'sessionId'),
+      idempotencyKey: idempotencyKeyOf(request),
+    }),
+  );
+
+  server.put(`${API_V1}/sessions/:sessionId/commit-mode`, async (request) => {
+    const body = setCommitModeSchema.parse(request.body);
+    return app.setCommitMode({
+      token: tokenOf(request),
+      gameId: idParam(request, 'sessionId'),
+      commitMode: body.commitMode,
+      idempotencyKey: idempotencyKeyOf(request),
+    });
+  });
+
+  server.put(
+    `${API_V1}/sessions/:sessionId/proxy-decisions/:role`,
+    async (request) => {
+      const body = proxyDecisionSchema.parse(request.body);
+      const role = roleSchema.safeParse(
+        (request.params as { role: string }).role,
+      );
+      if (!role.success)
+        throw validationProblem([
+          { field: 'role', message: '役割を指定してください' },
+        ]);
+      return app.submitProxyDecision({
+        token: tokenOf(request),
+        gameId: idParam(request, 'sessionId'),
+        role: role.data,
+        requestedWeek: body.requestedWeek,
+        quantity: body.quantity,
+        idempotencyKey: idempotencyKeyOf(request),
+      });
+    },
+  );
+}
+
+/** 経路の週（1〜50 の整数）。そうでなければ 422（field は week） */
+function pathWeekOf(request: FastifyRequest): number {
+  const raw = (request.params as { week: string }).week;
+  const week = /^\d{1,3}$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isInteger(week) || week < 1 || week > 50)
+    throw validationProblem([
+      { field: 'week', message: '週は 1〜50 の整数にしてください' },
+    ]);
+  return week;
 }

@@ -179,7 +179,8 @@ DROP INDEX uq_idempotency_create;
 | 3b | 完了（2026-11-24） | `createGame` の冪等: **マイグレーション 009**（`uq_idempotency_create`。案 3 の番号 010 を、適用の順に合わせて 009 とした。H4 は 010 になる。node-pg-migrate は、既適用より前の番号の追加を拒否するため）。冪等記録を範囲（`create`・`commit`）つきにし、作成は、キーだけで探して保存済みの応答（同じゲーム・資格・復帰コード）を返す。同じキーで内容が違えば `IdempotencyKeyReusedError`（409 `app.idempotency_key_reused`）。同時の重複は、一意違反を 1 回だけやり直して解決（6 並行で、ゲーム 1 つ）。期限切れの記録は、新しい作成が置き換える。587 件通過 |
 | 3c-1 | 完了（2026-11-24） | 準備中のコマンド 4 操作（`createGame`・`joinGame`・`startGame`・`assignRole`）を `/api/v1` に実装（未実装は 16 → 12 件）。冪等の共通の部品（`idempotently`・`retryOnDuplicate`・指紋は SHA-256）、資格の Cookie の発行（`bg_session`・`bg_recovery`・`X-Tab-Id`・`Secure` は `COOKIE_SECURE`）、レート制限の 429＋`Retry-After`。ドメインの型つきのエラー（`NotPreparingError`・`AlreadyStartedError`・`StartConditionError`・`ParticipantNotFoundError`）を契約の `code` に写した。**付け替え（D9）**: 別の役割にいる人は付け替え、同じ役割は変化なし（イベントも版も足さない）。作成の検証の誤りを、最終週・需要・条件・保持期間まで、すべて集めて返す（`field`・対象の週つき）。614 件通過 |
 | 3c-2 | 完了（2026-11-24） | `recoverParticipation`・観察者 3 操作（`inviteObserver`・`revokeObserverInvitation`・`joinAsObserver`）・`revokeCredential`・`reissueCredential` を `/api/v1` に実装（未実装は 12 → 6 件）。復帰は、本文の復帰コードか Cookie `bg_recovery`。**契約の失効と再発行を別の操作に分けた**（`revokeParticipantCredential`・`reissueParticipantCredential`。失効の判定は `isRecoveryRevoked`。既存のスキーマで足りる）。失効済みの再失効・未失効の再発行は 409。観察者は、ブラウザセッションだけを発行し、復帰資格は発行しない。表示名の上限を契約に合わせて 20 → 80 文字（コードポイント）。630 件通過 |
-| 3d〜3e・4〜7 | 未着手 | 進行中のコマンド（`saveDecision`・`commitWeek`・`pause`・`resume`・`setCommitMode`・`submitProxyDecision`）と業務の失敗の `code`、H4 |
+| 3d | 完了（2026-11-24） | 進行中の 6 操作（`saveDecision`・`commitWeek`・`pauseSession`・`resumeSession`・`setCommitMode`・`submitProxyDecision`）を `/api/v1` に実装（未実装は 6 → 0 件のうち H4 を除く操作がすべて実装済み。`pending.ts` は空）。役割は資格から決まる。週の判定が先（`session.week_advanced`）。版の競合は 409 `session.decision_conflict`（`role`・最新の入力＝保存者・時刻つき）。確定の根拠は、役割ごとの入力の版（`basis`）で、変わっていれば 409 `session.decisions_changed`（`current`）。保存回数の上限 9（代理入力を含む。版が回数）。停止・終了・停止中でない再開・開始前に型のある失敗（`session.paused`・`already_ended`・`not_paused`・`not_active`）。進行役だけの操作は、冪等の照合より前に認可する。`If-Match` は引用符可・無ければ 0・整数でなければ 422。658 件通過 |
+| 3e・4〜7 | 未着手 | H4（開始後の役割の入れ替え。マイグレーション 010）、旧 API の撤去 ほか |
 
 ### 段階 2 で、後の段階へ持ち越したもの・分かったこと
 
@@ -215,3 +216,4 @@ DROP INDEX uq_idempotency_create;
 | 2026-11-24 | 小段階 3b（`createGame` の冪等。マイグレーション 009）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3c-1（準備中のコマンド 4 操作）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3c-2（復帰・観察者・資格の失効と再発行）の完了を反映 | claude-code |
+| 2026-11-24 | 小段階 3d（進行中のコマンド 6 操作と業務の失敗の `code`）の完了を反映 | claude-code |

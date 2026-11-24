@@ -64,11 +64,98 @@ export class ParticipantNotFoundError extends DomainError {
   }
 }
 
+/** 停止中のセッションへの、進行中だけの操作。共有の契約では 409 `session.paused` */
+export class SessionPausedError extends DomainError {
+  constructor(
+    message = '停止中です。進行役の再開を待ってください（保存済みの入力は残っています）',
+  ) {
+    super(message);
+    this.name = 'SessionPausedError';
+  }
+}
+
+/** 終了したセッションへの操作。共有の契約では 409 `session.already_ended` */
+export class SessionEndedError extends DomainError {
+  constructor(message = 'このゲームは終了しています') {
+    super(message);
+    this.name = 'SessionEndedError';
+  }
+}
+
+/** 停止中でないセッションの再開。共有の契約では 409 `session.not_paused` */
+export class NotPausedError extends DomainError {
+  constructor(message = '停止中ではないため、再開できません') {
+    super(message);
+    this.name = 'NotPausedError';
+  }
+}
+
+/**
+ * 1 役割・1 週あたりの保存回数（代理入力を含む）の上限に達した（NF-C8）。共有の契約では 409 `session.save_limit_reached`。
+ * 競合で拒否された保存は、数えない（版は、受理された保存だけが進める）。
+ */
+export const SAVE_LIMIT = 9;
+export class SaveLimitReachedError extends DomainError {
+  constructor(
+    message = `この週の、この役割の保存回数の上限（${SAVE_LIMIT} 回）に達しています`,
+  ) {
+    super(message);
+    this.name = 'SaveLimitReachedError';
+  }
+}
+
+/** 4 役割の入力がそろっていない週の確定。共有の契約では 422 `session.incomplete_decisions`＋`missingRoles` */
+export class IncompleteDecisionsError extends DomainError {
+  constructor(
+    message: string,
+    readonly missingRoles: readonly string[],
+    issues: Issue[] = [],
+  ) {
+    super(message, issues);
+    this.name = 'IncompleteDecisionsError';
+  }
+}
+
 /** 版・週が古いなど、並行する操作との競合。呼び出し側は 409 として扱う */
 export class StaleError extends DomainError {
   constructor(message: string) {
     super(message);
     this.name = 'StaleError';
+  }
+}
+
+/**
+ * 要求した週が、現在の週と違う（週がすでに進んでいる）。共有の契約では 409 `session.week_advanced`＋`requestedWeek`・`currentWeek`。
+ * 版が違っても、週の判定が先。
+ */
+export class WeekAdvancedError extends StaleError {
+  constructor(
+    readonly requestedWeek: number,
+    readonly currentWeek: number,
+  ) {
+    super(`現在の週は ${currentWeek} 週目です。要求の週が一致しません`);
+    this.name = 'WeekAdvancedError';
+  }
+}
+
+/**
+ * 確認した後に、役割ごとの入力が変わった（確定の根拠が変わった）。共有の契約では 409 `session.decisions_changed`＋`week`・`current`。
+ * `current` は、役割ごとの現在の入力（保存者・保存の時刻つき）。
+ */
+export class DecisionsChangedError extends StaleError {
+  constructor(
+    readonly week: number,
+    readonly current: Readonly<
+      Partial<
+        Record<
+          string,
+          { quantity: number; version: number; savedBy: string; savedAt?: Date }
+        >
+      >
+    >,
+  ) {
+    super('確認した後に入力が変更されました。再読み込みしてください');
+    this.name = 'DecisionsChangedError';
   }
 }
 
@@ -102,7 +189,13 @@ export type Quantity = number & { readonly __brand: 'Quantity' };
 export const Quantity = {
   of(value: number, max: number = QUANTITY_MAX): Quantity {
     if (!Number.isInteger(value) || value < 0 || value > max) {
-      throw new DomainError(`数量は 0〜${max} の整数です`);
+      throw new DomainError(`数量は 0〜${max} の整数です`, [
+        {
+          field: 'quantity',
+          problem: `数量は 0〜${max} の整数です`,
+          fix: `数量を 0〜${max} の整数にしてください`,
+        },
+      ]);
     }
     return value as Quantity;
   },

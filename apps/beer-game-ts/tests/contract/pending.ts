@@ -5,11 +5,4 @@
  * 操作を `/api/v1` に実装したら、この一覧から**消す**（消し忘れると、operations.test.ts が失敗して教える）。
  * 一覧が空になれば、契約の全操作を実装したことになる。
  */
-export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
-  'saveDecision',
-  'commitWeek',
-  'pauseSession',
-  'setCommitMode',
-  'resumeSession',
-  'submitProxyDecision',
-]);
+export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([]);

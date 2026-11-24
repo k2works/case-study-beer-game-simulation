@@ -11,6 +11,7 @@ import { ROLES } from '../../src/domain/role.js';
 import {
   changeCommitMode,
   commitWeek,
+  commitWeekWithBasis,
   pauseSession,
   proxyDecision,
   resumeSession,
@@ -20,9 +21,16 @@ import {
 } from '../../src/domain/session.js';
 import {
   DecisionConflictError,
+  DecisionsChangedError,
   DomainError,
+  IncompleteDecisionsError,
+  NotPausedError,
   PermissionError,
+  SaveLimitReachedError,
+  SessionEndedError,
+  SessionPausedError,
   StaleError,
+  WeekAdvancedError,
 } from '../../src/domain/values.js';
 
 function startedGame(weeks = 3): Game {
@@ -695,6 +703,113 @@ describe('共同担当と共同入力', () => {
   it('共同担当でない参加者は、その役割に保存できない', () => {
     expect(() =>
       saveDecision(coSession(), participant('p0'), 'RETAILER', 1, 0),
+    ).toThrow(PermissionError);
+  });
+});
+
+describe('共有の契約の判定（週・保存回数・確定の根拠）', () => {
+  const basisOf = (s: Session) =>
+    Object.fromEntries(
+      ROLES.map((r) => [r, s.decisions[r]?.version ?? 0]),
+    ) as Record<(typeof ROLES)[number], number>;
+
+  it('要求した週が現在の週と違えば、版が違っても WeekAdvancedError（週が先）', () => {
+    const s = newSession();
+    try {
+      saveDecision(s, holder('RETAILER'), 'RETAILER', 4, 99, 2);
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(WeekAdvancedError);
+      expect(e).toMatchObject({ requestedWeek: 2, currentWeek: 1 });
+    }
+    expect(() =>
+      proxyDecision(s, FACILITATOR, 'FACTORY', 4, 0, new Date(), 3),
+    ).toThrow(WeekAdvancedError);
+  });
+
+  it('保存は 9 回まで。10 回目は SaveLimitReachedError（拒否した保存は版を進めない）', () => {
+    let s = newSession();
+    for (let i = 0; i < 9; i++)
+      s = saveDecision(s, holder('RETAILER'), 'RETAILER', i, i).session;
+    expect(s.decisions.RETAILER?.version).toBe(9);
+    expect(() => saveDecision(s, holder('RETAILER'), 'RETAILER', 1, 9)).toThrow(
+      SaveLimitReachedError,
+    );
+    // 版の競合は、上限より先に判定する
+    expect(() => saveDecision(s, holder('RETAILER'), 'RETAILER', 1, 3)).toThrow(
+      DecisionConflictError,
+    );
+  });
+
+  it('停止中・終了後・停止中でない再開は、それぞれ型のある失敗', () => {
+    const s = newSession(1);
+    expect(() => resumeSession(s, FACILITATOR)).toThrow(NotPausedError);
+    const paused = pauseSession(s, FACILITATOR).session;
+    expect(() =>
+      saveDecision(paused, holder('RETAILER'), 'RETAILER', 1, 0),
+    ).toThrow(SessionPausedError);
+    const ended = commitWeek(fillAll(s), FACILITATOR, {
+      week: 1,
+      version: fillAll(s).version,
+    }).session;
+    expect(() => pauseSession(ended, FACILITATOR)).toThrow(SessionEndedError);
+  });
+
+  it('commitWeekWithBasis: 週 → 根拠 → 不足の順に判定し、そろっていれば確定する', () => {
+    const s = newSession();
+    expect(() =>
+      commitWeekWithBasis(s, FACILITATOR, {
+        requestedWeek: 2,
+        basis: basisOf(s),
+      }),
+    ).toThrow(WeekAdvancedError);
+
+    const partial = saveDecision(
+      s,
+      holder('RETAILER'),
+      'RETAILER',
+      4,
+      0,
+    ).session;
+    // 根拠（確認の時点では未入力）が、現在と違う
+    try {
+      commitWeekWithBasis(partial, FACILITATOR, {
+        requestedWeek: 1,
+        basis: basisOf(s),
+      });
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(DecisionsChangedError);
+      expect((e as DecisionsChangedError).week).toBe(1);
+      expect((e as DecisionsChangedError).current.RETAILER?.quantity).toBe(4);
+    }
+    // 根拠は同じでも、入力が足りない
+    try {
+      commitWeekWithBasis(partial, FACILITATOR, {
+        requestedWeek: 1,
+        basis: basisOf(partial),
+      });
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(IncompleteDecisionsError);
+      expect((e as IncompleteDecisionsError).missingRoles).toEqual([
+        'FACTORY',
+        'DISTRIBUTOR',
+        'WHOLESALER',
+      ]);
+    }
+    const full = fillAll(s);
+    const { session, events } = commitWeekWithBasis(full, FACILITATOR, {
+      requestedWeek: 1,
+      basis: basisOf(full),
+    });
+    expect(session.week).toBe(2);
+    expect(events[0]?.type).toBe('WeekCommitted');
+    expect(() =>
+      commitWeekWithBasis(full, holder('RETAILER'), {
+        requestedWeek: 1,
+        basis: basisOf(full),
+      }),
     ).toThrow(PermissionError);
   });
 });

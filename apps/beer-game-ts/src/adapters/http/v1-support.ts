@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { notFoundProblem } from './problems.js';
+import { notFoundProblem, validationProblem } from './problems.js';
 import {
   cookieOptions,
   recoveryCookieName,
@@ -15,6 +15,24 @@ export function idParam(request: FastifyRequest, name: string): string {
   const value = (request.params as Record<string, string>)[name];
   if (typeof value !== 'string' || !UUID.test(value)) throw notFoundProblem();
   return value;
+}
+
+/**
+ * `If-Match`（意思決定の版）。整数。`"3"` のように引用符で囲んでもよい。無ければ 0（初回の保存）。
+ * 整数でなければ 422（field は `If-Match`）。
+ */
+export function ifMatchVersionOf(request: FastifyRequest): number {
+  const raw = request.headers['if-match'];
+  if (raw === undefined) return 0;
+  const match = /^"?(\d{1,9})"?$/.exec(raw.trim());
+  if (!match)
+    throw validationProblem([
+      {
+        field: 'If-Match',
+        message: 'If-Match は、意思決定の版（0 以上の整数）にしてください',
+      },
+    ]);
+  return Number(match[1]);
 }
 
 /** 資格（ブラウザセッションの Cookie）。`X-Tab-Id` があれば、タブ別の名前。無ければ空（認可の失敗として扱われる） */

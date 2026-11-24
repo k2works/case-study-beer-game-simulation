@@ -9,10 +9,18 @@ import {
 } from './simulate-week.js';
 import {
   DecisionConflictError,
+  DecisionsChangedError,
   DomainError,
+  IncompleteDecisionsError,
+  NotPausedError,
   PermissionError,
   Quantity,
+  SAVE_LIMIT,
+  SaveLimitReachedError,
+  SessionEndedError,
+  SessionPausedError,
   StaleError,
+  WeekAdvancedError,
 } from './values.js';
 
 export type SessionStatus = 'ACTIVE' | 'PAUSED' | 'ENDED';
@@ -125,16 +133,18 @@ export function startSession(game: Game, sessionId: string): SessionOutcome {
 }
 
 function requireNotEnded(session: Session): void {
-  if (session.status === 'ENDED')
-    throw new DomainError('このゲームは終了しています');
+  if (session.status === 'ENDED') throw new SessionEndedError();
 }
 
 function requireActive(session: Session): void {
   requireNotEnded(session);
-  if (session.status === 'PAUSED')
-    throw new DomainError(
-      '停止中です。進行役の再開を待ってください（保存済みの入力は残っています）',
-    );
+  if (session.status === 'PAUSED') throw new SessionPausedError();
+}
+
+/** 要求した週が現在の週と違えば、拒否する（版が違っても、週の判定が先） */
+function requireCurrentWeek(session: Session, requestedWeek?: number): void {
+  if (requestedWeek !== undefined && requestedWeek !== session.week)
+    throw new WeekAdvancedError(requestedWeek, session.week);
 }
 
 function requireFacilitator(actor: Actor, operation: string): void {
@@ -159,8 +169,7 @@ export function pauseSession(session: Session, actor: Actor): SessionOutcome {
 export function resumeSession(session: Session, actor: Actor): SessionOutcome {
   requireFacilitator(actor, '再開');
   requireNotEnded(session);
-  if (session.status !== 'PAUSED')
-    throw new DomainError('停止中ではないため、再開できません');
+  if (session.status !== 'PAUSED') throw new NotPausedError();
   return withAutoCommit(
     { ...session, status: 'ACTIVE', version: session.version + 1 },
     [{ type: 'SessionResumed', sessionId: session.id }],
@@ -198,6 +207,8 @@ export function saveDecision(
   role: Role,
   quantity: number,
   expectedVersion: number,
+  /** 保存する週（画面が見ている週）。現在の週と違えば `WeekAdvancedError`。省略時は確かめない */
+  requestedWeek?: number,
 ): SessionOutcome {
   requireActive(session);
   if (actor.kind !== 'PARTICIPANT') {
@@ -210,6 +221,7 @@ export function saveDecision(
       `${role} の担当ではないため、発注を保存できません`,
     );
   }
+  requireCurrentWeek(session, requestedWeek);
   const { saved, decision } = storeDecision(
     session,
     role,
@@ -240,9 +252,12 @@ export function proxyDecision(
   quantity: number,
   expectedVersion: number,
   at: Date,
+  /** 代理入力する週（画面が見ている週）。現在の週と違えば `WeekAdvancedError`。省略時は確かめない */
+  requestedWeek?: number,
 ): SessionOutcome {
   requireFacilitator(actor, '代理入力');
   requireNotEnded(session);
+  requireCurrentWeek(session, requestedWeek);
   const { saved, decision } = storeDecision(
     session,
     role,
@@ -280,6 +295,8 @@ function storeDecision(
       current ? { ...current } : null,
     );
   }
+  // 保存回数の上限（NF-C8。1 役割・1 週あたり。代理入力を含む）。版は受理された保存だけが進めるので、版が回数になる
+  if ((current?.version ?? 0) >= SAVE_LIMIT) throw new SaveLimitReachedError();
   const decision: Decision = {
     quantity: value,
     version: expectedVersion + 1,
@@ -327,27 +344,50 @@ export function commitWeek(
 ): SessionOutcome {
   requireFacilitator(actor, '週の確定');
   requireActive(session);
-  if (request.week !== session.week) {
-    throw new StaleError(
-      `現在の週は ${session.week} 週目です。要求の週が一致しません`,
-    );
-  }
+  requireCurrentWeek(session, request.week);
   if (request.version !== session.version) {
     throw new StaleError(
       '確認した後に入力が変更されました（版が一致しません）。再読み込みしてください',
     );
   }
+  requireAllDecided(session);
+  return applyCommit(session, 'MANUAL');
+}
+
+/**
+ * 共有の契約の確定。確認の時点で見ていた、役割ごとの入力の版（`basis`）が、現在と同じときだけ確定できる。
+ * 判定の順は「週が違う → `WeekAdvancedError`」「週が同じで `basis` が現在と違う → `DecisionsChangedError`」「入力が揃っていない →
+ * `IncompleteDecisionsError`」。
+ */
+export function commitWeekWithBasis(
+  session: Session,
+  actor: Actor,
+  request: { requestedWeek: number; basis: Readonly<Record<Role, number>> },
+): SessionOutcome {
+  requireFacilitator(actor, '週の確定');
+  requireActive(session);
+  requireCurrentWeek(session, request.requestedWeek);
+  if (
+    ROLES.some((r) => (session.decisions[r]?.version ?? 0) !== request.basis[r])
+  )
+    throw new DecisionsChangedError(session.week, session.decisions);
+  requireAllDecided(session);
+  return applyCommit(session, 'MANUAL');
+}
+
+/** 4 役割の発注がそろっていなければ、不足する役割を示して拒否する */
+function requireAllDecided(session: Session): void {
   const missing = ROLES.filter((r) => session.decisions[r] === undefined);
   if (missing.length > 0) {
-    throw new DomainError(
+    throw new IncompleteDecisionsError(
       '4 役割の発注がそろっていないため、確定できません',
+      missing,
       missing.map((r) => ({
         problem: `${r} の発注がありません`,
         fix: `${r} の発注を入力してください`,
       })),
     );
   }
-  return applyCommit(session, 'MANUAL');
 }
 
 /** 4 役割の発注がそろっている前提で、週を確定する（手動・自動で共通） */

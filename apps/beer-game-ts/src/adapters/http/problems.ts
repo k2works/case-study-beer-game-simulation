@@ -200,6 +200,77 @@ export const gameNotEndedProblem = () =>
 export const sessionNotActiveProblem = () =>
   new ApiProblem(409, 'session.not_active', 'ゲームはまだ開始されていません。');
 
+/** 停止中のセッションへの、進行中だけの操作 */
+export const sessionPausedProblem = () =>
+  new ApiProblem(
+    409,
+    'session.paused',
+    '停止中です。進行役の再開を待ってください（保存済みの入力は残っています）。',
+  );
+
+/** 終了したセッションへの操作 */
+export const sessionEndedProblem = () =>
+  new ApiProblem(409, 'session.already_ended', 'このゲームは終了しています。');
+
+/** 停止中でないセッションの再開 */
+export const notPausedProblem = () =>
+  new ApiProblem(
+    409,
+    'session.not_paused',
+    '停止中ではないため、再開できません。',
+  );
+
+/** 1 役割・1 週あたりの保存回数の上限に達した */
+export const saveLimitReachedProblem = () =>
+  new ApiProblem(
+    409,
+    'session.save_limit_reached',
+    'この週の、この役割の保存回数の上限に達しています。',
+  );
+
+/** 4 役割の入力がそろっていない週の確定。不足する役割を示す */
+export const incompleteDecisionsProblem = (missingRoles: readonly string[]) =>
+  new ApiProblem(
+    422,
+    'session.incomplete_decisions',
+    '4 役割の入力がそろっていないため、確定できません。',
+    undefined,
+    { missingRoles },
+  );
+
+/** 要求した週が、現在の週と違う（週がすでに進んでいる） */
+export const weekAdvancedProblem = (
+  requestedWeek: number,
+  currentWeek: number,
+) =>
+  new ApiProblem(
+    409,
+    'session.week_advanced',
+    `現在の週は ${currentWeek} 週目です。画面を更新してください。`,
+    undefined,
+    { requestedWeek, currentWeek },
+  );
+
+/** 意思決定の版の競合。競合した役割と、最新の入力（無ければ項目ごと付けない） */
+export const decisionConflictProblem = (role: string, latest: unknown) =>
+  new ApiProblem(
+    409,
+    'session.decision_conflict',
+    '他の担当者が先に保存しています。最新の入力を確認してください。',
+    undefined,
+    { role, ...(latest ? { latest } : {}) },
+  );
+
+/** 確認した後に、役割ごとの入力が変わった。確定の対象の週と、現在の入力 */
+export const decisionsChangedProblem = (week: number, current: unknown) =>
+  new ApiProblem(
+    409,
+    'session.decisions_changed',
+    '確認した後に入力が変更されました。再確認してください。',
+    undefined,
+    { week, current },
+  );
+
 export const internalProblem = () =>
   new ApiProblem(
     500,

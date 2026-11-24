@@ -13,6 +13,8 @@ import {
   CredentialAlreadyRevokedError,
   CredentialNotRevokedError,
   DecisionConflict,
+  DecisionConflictedError,
+  DecisionsChangedViewError,
   ForbiddenError,
   IdempotencyKeyReusedError,
   InvalidInvitationError,
@@ -31,11 +33,17 @@ import { ROLES } from '../../domain/role.js';
 import {
   AlreadyStartedError,
   DomainError,
+  IncompleteDecisionsError,
+  NotPausedError,
   NotPreparingError,
   ParticipantNotFoundError,
   PermissionError,
+  SaveLimitReachedError,
+  SessionEndedError,
+  SessionPausedError,
   StaleError,
   StartConditionError,
+  WeekAdvancedError,
 } from '../../domain/values.js';
 import {
   ConflictError,
@@ -53,23 +61,31 @@ import {
   badRequestProblem,
   credentialAlreadyRevokedProblem,
   credentialNotRevokedProblem,
+  decisionConflictProblem,
+  decisionsChangedProblem,
   gameNotEndedProblem,
   idempotencyKeyReusedProblem,
+  incompleteDecisionsProblem,
   internalProblem,
   invalidInvitationProblem,
   invitationNotFoundProblem,
   isApiV1,
   notFoundProblem,
+  notPausedProblem,
   notPreparingProblem,
   notReadyProblem,
   participantNotFoundProblem,
   payloadTooLargeProblem,
+  saveLimitReachedProblem,
   startConditionProblem,
   retryExhaustedProblem,
   sendApiProblem,
+  sessionEndedProblem,
   sessionNotActiveProblem,
+  sessionPausedProblem,
   unauthorizedProblem,
   validationProblem,
+  weekAdvancedProblem,
 } from './problems.js';
 import { registerApiV1Reads } from './routes-v1-reads.js';
 import { rateLimited, registerApiV1Commands } from './routes-v1-commands.js';
@@ -358,6 +374,19 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       return startConditionProblem(error.missingRoles);
     if (error instanceof ParticipantNotFoundError)
       return participantNotFoundProblem();
+    if (error instanceof SessionPausedError) return sessionPausedProblem();
+    if (error instanceof SessionEndedError) return sessionEndedProblem();
+    if (error instanceof NotPausedError) return notPausedProblem();
+    if (error instanceof SaveLimitReachedError)
+      return saveLimitReachedProblem();
+    if (error instanceof IncompleteDecisionsError)
+      return incompleteDecisionsProblem(error.missingRoles);
+    if (error instanceof WeekAdvancedError)
+      return weekAdvancedProblem(error.requestedWeek, error.currentWeek);
+    if (error instanceof DecisionConflictedError)
+      return decisionConflictProblem(error.role, error.latest);
+    if (error instanceof DecisionsChangedViewError)
+      return decisionsChangedProblem(error.week, error.current);
     if (error instanceof ConflictError) return retryExhaustedProblem();
     if (error instanceof DomainError && !(error instanceof StaleError)) {
       return validationProblem(

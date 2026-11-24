@@ -137,6 +137,22 @@ function editorView(
       };
 }
 
+/** 契約の `DecisionEntry`。保存済みの入力（数量・版・最後の保存者・保存の時刻）。保存の時刻が無い（未永続）なら `fallbackAt` */
+export function decisionEntryView(
+  d: Decision,
+  viewer: Viewer,
+  names: Readonly<Record<string, string>>,
+  fallbackAt: Date,
+) {
+  return {
+    quantity: d.quantity,
+    version: d.version,
+    editor: editorView(d, viewer, names),
+    savedAt: (d.savedAt ?? fallbackAt).toISOString(),
+  };
+}
+export type DecisionEntryView = ReturnType<typeof decisionEntryView>;
+
 /** 役割別の状況。当週の入荷・受注・入力。将来の週の需要は、どの役割にも含めない */
 export function roleStatusView(
   session: Session,

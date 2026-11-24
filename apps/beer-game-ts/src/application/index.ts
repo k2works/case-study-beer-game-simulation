@@ -19,6 +19,7 @@ import { ROLES, type Role } from '../domain/role.js';
 import { buildReview, canDisclose } from '../domain/review.js';
 import {
   DecisionConflictError,
+  DecisionsChangedError,
   DisplayName,
   DomainError,
   ParticipantNotFoundError,
@@ -29,6 +30,7 @@ import {
   PROXY_OPERATOR,
   changeCommitMode as changeCommitModeRule,
   commitWeek as commitWeekRule,
+  commitWeekWithBasis as commitWeekWithBasisRule,
   pauseSession as pauseSessionRule,
   proxyDecision as proxyDecisionRule,
   resumeSession as resumeSessionRule,
@@ -43,6 +45,7 @@ import {
   type CredentialPolicy,
   type CredentialPurpose,
   type ExportReader,
+  type IdempotencyScope,
   type Metrics,
   type IdGenerator,
   type Principal,
@@ -53,6 +56,8 @@ import {
   CredentialAlreadyRevokedError,
   CredentialNotRevokedError,
   DecisionConflict,
+  DecisionConflictedError,
+  DecisionsChangedViewError,
   ForbiddenError,
   IdempotencyKeyReusedError,
   InvalidInvitationError,
@@ -69,6 +74,7 @@ import {
   retryOnDuplicate,
 } from './idempotency.js';
 import {
+  decisionEntryView,
   gameStateView,
   lobbyView,
   observationView,
@@ -304,6 +310,76 @@ export function createApplication(deps: Dependencies) {
       await repos.events.append(input.gameId, events);
       return next;
     });
+  }
+
+  /**
+   * 共有の契約の、進行中のコマンド（session ストリーム）。認証 → 認可（進行役だけの操作は、冪等の照合より前）→ セッションの読み込み →
+   * 冪等な実行（集約の操作 → 保存）。応答は、追記後の版（game ストリームは追記しないので null）。
+   * 開始前（セッションが無い）は `NotActiveError`。
+   */
+  function sessionCommand(
+    input: { token: string; gameId: string; idempotencyKey?: string },
+    spec: {
+      scope: IdempotencyScope;
+      /** 進行役だけの操作なら、その名前（認可の失敗の文言） */
+      facilitatorOnly?: string;
+      /** 指紋に加える、要求の内容 */
+      content?: unknown;
+      /** 操作者（資格）から、操作の前に決める値（役割など）。認可の失敗は、ここで投げる */
+      prepare?: (principal: Principal, session: Session) => void;
+    },
+    operate: (
+      session: Session,
+      actor: Actor,
+      repos: Repositories,
+      principal: Principal,
+    ) => SessionOutcome | Promise<SessionOutcome>,
+  ): Promise<{ versions: StreamVersions }> {
+    return retryOnDuplicate(input.idempotencyKey, () =>
+      uow.run(async (repos) => {
+        const principal = await authenticate(repos, input.token, input.gameId);
+        if (spec.facilitatorOnly)
+          requireFacilitatorPrincipal(principal, spec.facilitatorOnly);
+        const session = await repos.sessions.findByGame(input.gameId);
+        if (!session) throw new NotActiveError();
+        spec.prepare?.(principal, session);
+        return idempotently(
+          repos,
+          {
+            gameId: input.gameId,
+            scope: spec.scope,
+            key: input.idempotencyKey,
+            fingerprint: fingerprintOf({
+              operator: principal,
+              ...(spec.content === undefined ? {} : { content: spec.content }),
+            }),
+          },
+          async () => {
+            const { session: next, events } = await operate(
+              session,
+              actorOf(principal),
+              repos,
+              principal,
+            );
+            await repos.sessions.save(next, session.version);
+            await repos.events.append(input.gameId, events);
+            return { versions: versionsOf(null, next) };
+          },
+        );
+      }),
+    );
+  }
+
+  /** 参加者の、このセッションでの役割。役割が無い（進行役・観察者・役割の無い参加者）なら、権限なし（403） */
+  function roleOfPrincipal(principal: Principal, session: Session): Role {
+    const role =
+      principal.kind === 'PARTICIPANT'
+        ? ROLES.find((r) =>
+            session.holders[r].includes(principal.participantId ?? ''),
+          )
+        : undefined;
+    if (!role) throw new PermissionError('入力する役割がありません');
+    return role;
   }
 
   return {
@@ -914,6 +990,183 @@ export function createApplication(deps: Dependencies) {
         version: next.decisions[input.role]?.version ?? 0,
         sessionVersion: next.version,
       };
+    },
+
+    /**
+     * 共有の契約の入力の保存。役割は、資格から決まる。週の判定が先（版が違っても `WeekAdvancedError`）。
+     * 版の競合は、最新の入力（保存者・時刻つき）を持つ `DecisionConflictedError`。
+     */
+    saveOwnDecision(input: {
+      token: string;
+      gameId: string;
+      week: number;
+      quantity: number;
+      expectedVersion: number;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'save',
+          content: {
+            week: input.week,
+            quantity: input.quantity,
+            expectedVersion: input.expectedVersion,
+          },
+          prepare: roleOfPrincipal,
+        },
+        async (session, actor, repos, principal) => {
+          const role = roleOfPrincipal(principal, session);
+          try {
+            return saveDecisionRule(
+              session,
+              actor,
+              role,
+              input.quantity,
+              input.expectedVersion,
+              input.week,
+            );
+          } catch (e) {
+            if (!(e instanceof DecisionConflictError)) throw e;
+            const names = await repos.games.participantNames(input.gameId);
+            const latest = session.decisions[role];
+            throw new DecisionConflictedError(
+              e.message,
+              role,
+              latest
+                ? decisionEntryView(
+                    latest,
+                    viewerOf(principal) ?? { kind: 'FACILITATOR' },
+                    names,
+                    clock.now(),
+                  )
+                : null,
+            );
+          }
+        },
+      );
+    },
+
+    /**
+     * 共有の契約の週の確定（進行役）。確定の根拠は、役割ごとの入力の版（`basis`）。
+     * 根拠が変わっていれば、現在の入力（保存者・時刻つき）を持つ `DecisionsChangedViewError`。
+     */
+    commitWeekWithBasis(input: {
+      token: string;
+      gameId: string;
+      requestedWeek: number;
+      basis: Readonly<Record<Role, number>>;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'commit',
+          facilitatorOnly: '週の確定',
+          content: { week: input.requestedWeek, basis: input.basis },
+        },
+        async (session, actor, repos) => {
+          try {
+            return commitWeekWithBasisRule(session, actor, {
+              requestedWeek: input.requestedWeek,
+              basis: input.basis,
+            });
+          } catch (e) {
+            if (!(e instanceof DecisionsChangedError)) throw e;
+            const names = await repos.games.participantNames(input.gameId);
+            const now = clock.now();
+            throw new DecisionsChangedViewError(
+              e.message,
+              e.week,
+              Object.fromEntries(
+                ROLES.flatMap((r) => {
+                  const d = session.decisions[r];
+                  return d
+                    ? [
+                        [
+                          r,
+                          decisionEntryView(
+                            d,
+                            { kind: 'FACILITATOR' },
+                            names,
+                            now,
+                          ),
+                        ],
+                      ]
+                    : [];
+                }),
+              ),
+            );
+          }
+        },
+      );
+    },
+
+    pause(input: { token: string; gameId: string; idempotencyKey?: string }) {
+      return sessionCommand(
+        input,
+        { scope: 'pause', facilitatorOnly: '停止' },
+        (session, actor) => pauseSessionRule(session, actor),
+      );
+    },
+
+    resume(input: { token: string; gameId: string; idempotencyKey?: string }) {
+      return sessionCommand(
+        input,
+        { scope: 'resume', facilitatorOnly: '再開' },
+        (session, actor) => resumeSessionRule(session, actor),
+      );
+    },
+
+    setCommitMode(input: {
+      token: string;
+      gameId: string;
+      commitMode: CommitMode;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'mode',
+          facilitatorOnly: '確定方式の変更',
+          content: { commitMode: input.commitMode },
+        },
+        (session, actor) =>
+          changeCommitModeRule(session, actor, input.commitMode),
+      );
+    },
+
+    /** 共有の契約の代理入力（進行役）。版は要求せず、現在の版に重ねる。週は `requestedWeek` で確かめる */
+    submitProxyDecision(input: {
+      token: string;
+      gameId: string;
+      role: Role;
+      requestedWeek: number;
+      quantity: number;
+      idempotencyKey?: string;
+    }) {
+      return sessionCommand(
+        input,
+        {
+          scope: 'proxy',
+          facilitatorOnly: '代理入力',
+          content: {
+            role: input.role,
+            week: input.requestedWeek,
+            quantity: input.quantity,
+          },
+        },
+        (session, actor) =>
+          proxyDecisionRule(
+            session,
+            actor,
+            input.role,
+            input.quantity,
+            session.decisions[input.role]?.version ?? 0,
+            clock.now(),
+            input.requestedWeek,
+          ),
+      );
     },
 
     /** 観察用の招待の発行（進行役）。招待コードは、この応答で一度だけ返す */
