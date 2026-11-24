@@ -13856,14 +13856,12 @@
 <span class="c1">-- Down</span>
 <span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">participants</span><span class="w"> </span><span class="k">DROP</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">replaced_at</span><span class="p">;</span>
 </code></pre></div>
-<p><strong>ドメイン・アプリの変更</strong>（契約の <code>assignRole</code> の規則どおり）:</p>
-<ul>
-<li>準備中: <strong>別の役割にいる人を選ぶと「付け替え」</strong>（いまの TS は「すでに ○○ です」と拒否する。契約は <code>RoleUnassigned</code> と <code>RoleAssigned</code> で付け替える）。同じ役割への割り当て直しは、何も変えず 200（イベントも版も足さない）。</li>
-<li>開始後: 担当者のいる役割へ、<strong>役割を持たない参加者</strong>を割り当てると、その役割の<strong>現在の担当者全員</strong>が入れ替わる（共同担当も全員）。旧担当者の復帰資格を失効（<code>recovery_revoked_at</code>）し、ブラウザセッション（<code>browser_sessions</code>）の行を、同じトランザクションで削除する。<code>session.holders</code>（開始時点の写し）を新担当者に更新し、game・session の両方の版を進める。新しいイベント（<code>RoleReplaced</code>）を、履歴に足す。</li>
-<li>拒否: 別の役割にいる人の開始後の付け替えは <code>game.not_preparing</code>（409）、終了後は <code>session.already_ended</code>（409）、資格が失効済みの参加者は <code>game.credential_already_revoked</code>（409）、存在しない参加者は <code>game.participant_not_found</code>（404）。</li>
-<li><code>Participant</code> に <code>replaced</code>（入れ替えられたか）を足し、ロビーの <code>replaced</code> に出す。ロビーと <code>getGameState</code>（<code>role</code>）は、入れ替えられた人を、役割の担当として数えない。</li>
-<li><strong>資格の失効・再発行</strong>（<code>revokeCredential</code>・<code>reissueCredential</code>）は、既存の列（<code>participants.recovery_revoked_at</code>・<code>browser_sessions</code>）で足りる（<strong>スキーマ変更なし</strong>）。契約は、失効と再発行を別の操作に分け、失効済みでない資格の再発行を <code>game.credential_not_revoked</code>（409）、失効済みの再失効を <code>game.credential_already_revoked</code>（409）で拒否する。いまの TS の <code>reissueCredential</code>（失効＋再発行を 1 つで行う）は、契約の形に分ける。</li>
-</ul>
+<p><strong>ドメイン・アプリの変更</strong>（契約の <code>assignRole</code> の規則どおり）:
+- 準備中: <strong>別の役割にいる人を選ぶと「付け替え」</strong>（いまの TS は「すでに ○○ です」と拒否する。契約は <code>RoleUnassigned</code> と <code>RoleAssigned</code> で付け替える）。同じ役割への割り当て直しは、何も変えず 200（イベントも版も足さない）。
+- 開始後: 担当者のいる役割へ、<strong>役割を持たない参加者</strong>を割り当てると、その役割の<strong>現在の担当者全員</strong>が入れ替わる（共同担当も全員）。旧担当者の復帰資格を失効（<code>recovery_revoked_at</code>）し、ブラウザセッション（<code>browser_sessions</code>）の行を、同じトランザクションで削除する。<code>session.holders</code>（開始時点の写し）を新担当者に更新し、game・session の両方の版を進める。新しいイベント（<code>RoleReplaced</code>）を、履歴に足す。
+- 拒否: 別の役割にいる人の開始後の付け替えは <code>game.not_preparing</code>（409）、終了後は <code>session.already_ended</code>（409）、資格が失効済みの参加者は <code>game.credential_already_revoked</code>（409）、存在しない参加者は <code>game.participant_not_found</code>（404）。
+- <code>Participant</code> に <code>replaced</code>（入れ替えられたか）を足し、ロビーの <code>replaced</code> に出す。ロビーと <code>getGameState</code>（<code>role</code>）は、入れ替えられた人を、役割の担当として数えない。
+- <strong>資格の失効・再発行</strong>（<code>revokeCredential</code>・<code>reissueCredential</code>）は、既存の列（<code>participants.recovery_revoked_at</code>・<code>browser_sessions</code>）で足りる（<strong>スキーマ変更なし</strong>）。契約は、失効と再発行を別の操作に分け、失効済みでない資格の再発行を <code>game.credential_not_revoked</code>（409）、失効済みの再失効を <code>game.credential_already_revoked</code>（409）で拒否する。いまの TS の <code>reissueCredential</code>（失効＋再発行を 1 つで行う）は、契約の形に分ける。</p>
 <p><strong>却下した案</strong>: <code>participants</code> の行を消す（入力者のラベルと、<code>role_decisions</code> の参照が失われる）／<code>participants.role</code> に履歴を持たせる（担当の判定が複雑になる）。</p>
 <h3 id="3-creategame-idempotency-key-010">案 3: <code>createGame</code> の冪等（<code>Idempotency-Key</code>）— マイグレーション 010<a class="headerlink" href="#3-creategame-idempotency-key-010" title="Permanent link">&para;</a></h3>
 <p><strong>なぜ要るか</strong>: 契約は、変更系すべてに <code>Idempotency-Key</code> を必須とし、同じキーの再送は保存した応答を返す。共有 UI は、結果が不明な失敗（切断・<code>type</code> の無い 5xx）で、同じキーで最大 2 回再送する。TS の冪等記録（<code>idempotency_records</code>）は、<code>game_id</code> が <code>games</code> への外部キーなので、<strong>ゲームの存在前の <code>createGame</code> は載せられなかった</strong>。</p>
@@ -13938,18 +13936,23 @@
 </tr>
 <tr>
 <td style="text-align: center;">5（先行）</td>
-<td style="text-align: left;">ローカルで完了（2026-11-24。CI は確認待ち）</td>
+<td style="text-align: left;">完了（2026-11-24。CI の <code>e2e</code> ジョブも成功）</td>
 <td style="text-align: left;"><strong>段階 4 より先に、共有 UI の <code>@ui</code> を TS バックエンドで実行した（27/27 通過）</strong>。実装の側で直した 4 点: ①本文なしで <code>Content-Type: application/json</code> が付く要求（開始・停止・再開など）を、空の本文として通す（Fastify の既定は 400）②資格の Cookie は、タブ別の名前（<code>X-Tab-Id</code>）を優先し、無ければ従来の名前を読む（Kotlin 版と同じ。ADR-020 の移行）③<code>GET /games/{id}/state</code>・<code>/lobby</code> の <code>commitMode</code> に、session の現在の確定方式を重ねる（開始後は session が持つ）④<code>assignRole</code> の認可を冪等の照合より前に。共有の受け入れの支援（<code>apps/beer-game-web/support</code>）の 2 点: 準備の API 呼び出しにも画面と同じ <code>Origin</code> を付ける（TS 版は Origin を必須にする。Kotlin 版は許可リスト、Rust 版は検査なしなので、どれも通る。<strong>TS 版の Origin の検査は緩めない</strong>）、招待コードの形（Kotlin 版の <code>v1.…</code>）を前提にしない（契約が定めない）。CI の <code>e2e</code> ジョブを共有 UI の <code>@ui</code> に置き換え、デプロイ 2 本と <code>deploy.sh</code> の静的ファイルを <code>apps/beer-game-web/dist</code> に変更。旧 UI（<code>ui/</code>）は、まだ残している</td>
 </tr>
 <tr>
 <td style="text-align: center;">4</td>
 <td style="text-align: left;">完了（2026-11-24）</td>
-<td style="text-align: left;">旧 API（<code>/api/*</code>。<code>me</code>・<code>console</code>・<code>stream</code>（SSE）・<code>unassign</code>・<code>/api/ready</code>）を撤去。<code>server.ts</code> は <code>/health</code>・<code>/ready</code>（コンテナ・ALB の確認）と <code>/api/v1</code> だけを持ち、<strong>API の外の経路も、契約の problem+json</strong>（<code>code</code> つき）で返す。<code>http.test.ts</code>（74 件）を <code>/api/v1</code> に付け替え（56 件。受入条件のタグは維持。ほかの契約テストと重なる重複は統合）。契約テストの前提（<code>fixtures.ts</code>）は新しいユースケース（<code>saveOwnDecision</code>・<code>commitWeekWithBasis</code>）で用意する。<code>scripts/smoke.ts</code>・<code>dev-bots.ts</code> を <code>/api/v1</code> に。<code>ALLOWED_ORIGIN</code>（単数）を撤去し <code>ALLOWED_ORIGINS</code> に統一（config・Terraform・container-check・手順書）。相関 ID は、要求の <code>x-correlation-id</code> が UUID のときだけ使う（契約）。失敗の記録（復帰・観察者の参加）と週の確定のメトリクス（<code>WeekCommitted</code>。手動・自動）を、<code>/api/v1</code> の経路で維持した。SSE の撤去に伴い <code>notify.test.ts</code> の SSE のテストを削除（<code>PgNotifier</code> は <code>/api/v1/ready</code> の <code>notifier</code> の確認のため残す）。<code>container-check.sh</code> の Postgres の待ちを TCP にした（CI の起動直後の接続拒否の対策）。<strong>持ち越し</strong>: アプリケーション層の旧い読み取り・操作（<code>console</code>・<code>roleState</code>・<code>lobby</code>・<code>saveDecision</code> など）は、<code>use-cases.test.ts</code> などの単体・統合テストが使っており、HTTP からは呼ばれない。テストごと新しいユースケースへ寄せる整理は、別の作業にする</td>
+<td style="text-align: left;">旧 API（<code>/api/*</code>。<code>me</code>・<code>console</code>・<code>stream</code>（SSE）・<code>unassign</code>・<code>/api/ready</code>）を撤去。<code>server.ts</code> は <code>/health</code>・<code>/ready</code>（コンテナ・ALB の確認）と <code>/api/v1</code> だけを持ち、<strong>API の外の経路も、契約の problem+json</strong>（<code>code</code> つき）で返す。<code>http.test.ts</code>（74 件）を <code>/api/v1</code> に付け替えた（受入条件のタグは維持。ほかの契約テストと重なる重複は統合）。契約テストの前提（<code>fixtures.ts</code>）は新しいユースケース（<code>saveOwnDecision</code>・<code>commitWeekWithBasis</code>）で用意する。<code>scripts/smoke.ts</code>・<code>dev-bots.ts</code> を <code>/api/v1</code> に。<code>ALLOWED_ORIGIN</code>（単数）を撤去し <code>ALLOWED_ORIGINS</code> に統一（config・Terraform・container-check・手順書）。相関 ID は、要求の <code>x-correlation-id</code> が UUID のときだけ使う（契約）。失敗の記録（復帰・観察者の参加）と週の確定のメトリクス（<code>WeekCommitted</code>。手動・自動）を、<code>/api/v1</code> の経路で維持した。SSE の撤去に伴い <code>notify.test.ts</code> の SSE のテストを削除（<code>PgNotifier</code> は <code>/api/v1/ready</code> の <code>notifier</code> の確認のため残す）。<code>container-check.sh</code> の Postgres の待ちを TCP にした（CI の起動直後の接続拒否の対策）。<strong>持ち越し</strong>: アプリケーション層の旧い読み取り・操作（<code>console</code>・<code>roleState</code>・<code>lobby</code>・<code>saveDecision</code> など）は、<code>use-cases.test.ts</code> などの単体・統合テストが使っており、HTTP からは呼ばれない。テストごと新しいユースケースへ寄せる整理は、別の作業にする</td>
 </tr>
 <tr>
-<td style="text-align: center;">6・7</td>
+<td style="text-align: center;">6</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;"><strong><code>ui/</code>（19 ファイル）と、UI 専用のテスト・設定を削除</strong>: <code>tests/component</code>（91 件）、<code>tests/e2e</code>（3 本）、<code>playwright.config.ts</code>、<code>vite.config.ts</code>、<code>tests/support/setup.ts</code>。<code>package.json</code> から UI 専用の依存（react・react-dom・react-router・vite・<code>@vitejs/plugin-react</code>・testing-library 3 つ・jsdom・<code>@axe-core/playwright</code>・<code>@playwright/test</code>・wait-on・concurrently・<code>@types/react*</code>）と scripts（<code>dev:client</code>・<code>build:ui</code>・<code>e2e</code>）を外し、<code>tsconfig.json</code>・<code>vitest.config.ts</code>・<code>guided-tour.ts</code> の <code>SCAN_DIRS</code> を整理した。<strong>ガイドツアーの第 10 ステップは、<code>@guidedTour</code> を <code>src/</code>（<code>registerApiV1Commands</code>＝発注の保存の入口）へ移した</strong>（人の確認が要る点の既定を選んだ。生成物は再生成済み）。<strong>受入条件の対応表</strong>: 画面のテストにしか無かった AC1.1.6（自動確定は既定で無効）と AC3.2.3（他のタブで確定された後の保存は古い週として拒否）は、API のテスト（<code>http.test.ts</code>）に足した（画面の側の古い応答の抑止は、共有の <code>apps/beer-game-web</code> が持つ）。単体・契約・統合 584 件通過。画面の振る舞い・アクセシビリティは、共有の features の <code>@ui</code>（27 シナリオ）と <code>accessibility-ui</code> が引き継ぐ。インフラ: 合成監視の URL を <code>/api/v1/ready</code> に、不要になった SSE の注記を整理</td>
+</tr>
+<tr>
+<td style="text-align: center;">7</td>
 <td style="text-align: left;">未着手</td>
-<td style="text-align: left;">ui の削除、ドキュメント</td>
+<td style="text-align: left;">ドキュメント（設計書・手順書・ADR）</td>
 </tr>
 </tbody>
 </table>
