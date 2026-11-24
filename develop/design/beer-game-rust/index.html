@@ -3235,6 +3235,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#living-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        コードの案内（Living Documentation）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -13722,6 +13733,49 @@
 <td style="text-align: left;"><a href="tech-stack/">技術スタック選定</a></td>
 <td style="text-align: left;">技術スタック一覧とバージョン管理方針を整理</td>
 <td style="text-align: left;">検証済み（2026-11-21）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="living-documentation">コードの案内（Living Documentation）<a class="headerlink" href="#living-documentation" title="Permanent link">&para;</a></h3>
+<p>コードの doc コメントの注釈（<code>/// @event</code>・<code>@term</code>・<code>@core</code>・<code>@tour</code>・<code>@landmark</code>）から生成した文書です（手で編集しません。再生成は <code>just livingdoc</code>。方式は <a href="../../adr/beer-game-rust/002-living-documentation-doc-comments/">ADR-002</a>、<strong>提案</strong>で承認待ち）。<code>cargo test</code> が、コードの注釈との差と、イベントの ID・名前の設計書（beer-game-kotlin の表）との不一致を検出します。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ドキュメント</th>
+<th style="text-align: left;">概要</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><a href="generated/core-highlight/">コアのハイライト（生成）</a></td>
+<td style="text-align: left;">中核（シミュレーション計算と進行）の主要な概念 5 つ。新しく参加する人の読む入口</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/walking-skeleton-tour/">ガイドツアー: ウォーキングスケルトン（生成）</a></td>
+<td style="text-align: left;">作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示を 7 ステップで案内。API の経路と発行するイベントを添える</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/architecture-sightseeing-map/">サイトシーイング・マップ: アーキテクチャ（生成）</a></td>
+<td style="text-align: left;">核・境界・副作用の見どころ 7 つ。層の依存の向きは <code>Cargo.toml</code> から導く</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/ddd-sightseeing-map/">サイトシーイング・マップ: DDD（生成）</a></td>
+<td style="text-align: left;">戦略的設計と戦術的設計の見どころ 8 つ</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/events/">イベント一覧（生成）</a></td>
+<td style="text-align: left;">実装済みのドメインイベントの ID・ストリーム・発生条件・ペイロードの項目・書き込む投影のテーブル。設計書にあって未実装のイベントも載せる</td>
+<td style="text-align: left;">生成物</td>
+</tr>
+<tr>
+<td style="text-align: left;"><a href="generated/glossary/">用語集（生成）</a></td>
+<td style="text-align: left;">注釈 <code>@term</code> を付けた要素の用語・定義・出典</td>
+<td style="text-align: left;">生成物</td>
 </tr>
 </tbody>
 </table>
