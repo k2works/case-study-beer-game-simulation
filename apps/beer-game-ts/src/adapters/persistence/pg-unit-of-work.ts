@@ -9,7 +9,7 @@ export interface PgOptions {
 
 /** 1 回の操作を 1 つのトランザクションで行う。失敗したら、何も残さない
  *
- * @guidedTour walking-skeleton 80 トランザクションの境界。1 回の操作の保存（集約、役割別の週結果、イベント、冪等記録）は、すべて成功するか、何も残らない。版つきの更新で、同時の更新も検出する。保存のたびに `pg_notify` され（`PgNotifier`）、SSE で全員の画面へ「変化があった」とだけ伝わり、画面が再取得して更新される。動く様子は、E2E（`tests/e2e/game.spec.ts`）で確認できる。
+ * @guidedTour walking-skeleton 80 トランザクションの境界。1 回の操作の保存（集約、役割別の週結果、イベント、冪等記録）は、すべて成功するか、何も残らない。版つきの更新で、同時の更新も検出する。保存のたびに `pg_notify` され（`PgNotifier`。受信が生きているかは `/api/v1/ready` の `notifier` で確かめる）、画面は応答の `versions` に追いつくまで状態を取得し直して更新される。動く様子は、共有の画面の受け入れ（`apps/beer-game-web` の `@ui`。TS 版のバックエンドで CI が実行する）で確認できる。
  */
 export class PgUnitOfWork implements UnitOfWork {
   constructor(

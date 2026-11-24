@@ -99,7 +99,7 @@ module "ecs" {
 module "observability" {
   source      = "../../modules/observability"
   name        = local.name
-  ready_url   = "https://${module.web.public_domain}/api/ready"
+  ready_url   = "https://${module.web.public_domain}/api/v1/ready"
   alert_email = var.alert_email
 }
 

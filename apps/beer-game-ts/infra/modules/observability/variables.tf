@@ -4,7 +4,7 @@ variable "name" {
 }
 
 variable "ready_url" {
-  description = "合成監視が叩く URL（CloudFront 経由の /api/../ready ではなく、公開の準備の確認先）"
+  description = "合成監視が叩く URL（CloudFront 経由の /api/v1/ready。公開の準備の確認先）"
   type        = string
 }
 

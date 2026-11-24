@@ -30,7 +30,7 @@ import {
 
 const REPO_BASE =
   'https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts';
-const SCAN_DIRS = ['src', 'ui/src', 'tests/e2e'];
+const SCAN_DIRS = ['src'];
 
 interface TourConfig extends TourMeta {
   output: string;

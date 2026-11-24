@@ -99,7 +99,7 @@ resource "aws_cloudfront_distribution" "this" {
       https_port             = 443
       origin_protocol_policy = "http-only"
       origin_ssl_protocols   = ["TLSv1.2"]
-      # SSE の接続を維持する（アプリは 15 秒ごとにコメントを送る）。既定の上限は 60 秒
+      # オリジンの応答の待ちの上限（既定は 30 秒）。長い要求（出力など）に余裕を持たせる
       origin_read_timeout      = 60
       origin_keepalive_timeout = 60
     }

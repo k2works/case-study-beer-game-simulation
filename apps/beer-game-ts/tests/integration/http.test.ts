@@ -185,6 +185,24 @@ describe('自動確定', () => {
     ).toBe('AUTO');
   });
 
+  it('[US1.1/AC1.1.6] 自動確定は、既定で無効（手動）。有効にして作ると、自動確定のゲームになる', async () => {
+    await boot();
+    const byDefault = await post('/api/v1/games', created());
+    expect(byDefault.statusCode).toBe(201);
+    const defaultId = String(byDefault.headers.location).split('/')[4]!;
+    expect(
+      (
+        await get(`/api/v1/games/${defaultId}/state`, cookieOf(byDefault))
+      ).json().commitMode,
+    ).toBe('MANUAL');
+    const auto = await post('/api/v1/games', created({ commitMode: 'AUTO' }));
+    const autoId = String(auto.headers.location).split('/')[4]!;
+    expect(
+      (await get(`/api/v1/games/${autoId}/state`, cookieOf(auto))).json()
+        .commitMode,
+    ).toBe('AUTO');
+  });
+
   it('commitMode が不正なら 422', async () => {
     await boot();
     expect(
@@ -716,6 +734,30 @@ describe('共同入力の競合（HTTP）', () => {
     });
     // 表示名は応答にだけ含め、ログには残さない
     expect(logs.join('')).not.toContain('参加者-');
+  });
+
+  it('[US3.2/AC3.2.3] 他のタブで週が確定された後の保存は、古い週として拒否され、新しい状態を黙って上書きしない', async () => {
+    await boot();
+    const t = await startedTable(app);
+    await saveAll(app, t);
+    expect((await commit(t, 1)).statusCode).toBe(200);
+    // 確定前の画面（第 1 週）からの保存
+    const stale = await save(t, 'RETAILER', 99);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({
+      code: 'session.week_advanced',
+      requestedWeek: 1,
+      currentWeek: 2,
+    });
+    const own = (
+      await get(`/api/v1/sessions/${t.gameId}/state`, t.players.RETAILER.token)
+    ).json();
+    expect(own).toMatchObject({ week: 2 });
+    expect(own.roleStatus.decision).toBeNull();
+    // 確定前の画面からの、確定の再送（別のキー）も、二重には確定しない
+    const again = await commit(t, 1);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().code).toBe('session.week_advanced');
   });
 
   it('[US2.2/AC2.2.3] 役割の無い資格には、競合ではなく権限エラーを返し、値を含めない', async () => {

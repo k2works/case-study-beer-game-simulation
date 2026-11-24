@@ -4,8 +4,13 @@ title: "ガイドツアー: ウォーキングスケルトン（発注の保存�
 description: "ウォーキングスケルトンの縦の流れ（画面 → API → ユースケース → 集約 → 計算 → 永続化 → 通知）を、順にたどるガイドツアー。コードのタグから自動生成する。"
 tags: [design, living-documentation]
 status: draft
-generated: { by: "script:apps/beer-game-ts/scripts/guided-tour.ts (walking-skeleton)", at: 2026-11-10T06:38:08.109Z }
+generated:
+  {
+    by: "script:apps/beer-game-ts/scripts/guided-tour.ts (walking-skeleton)",
+    at: 2026-11-24T02:54:42.206Z,
+  }
 ---
+
 # ガイドツアー: ウォーキングスケルトン（発注の保存から、1 週が確定するまで）
 
 > **自動生成**: このファイルは `npm run docs:tour` で、コードの `@guidedTour` から生成しています。直接編集せず、コードのタグを直してください（CI が、コードとの一致を検査します）。
@@ -16,11 +21,11 @@ generated: { by: "script:apps/beer-game-ts/scripts/guided-tour.ts (walking-skele
 
 全体の構造は [バックエンドのアーキテクチャ](./architecture-backend.md)、層の依存の理由は [ADR-003](../../adr/beer-game-ts/003-ports-and-adapters-with-lint.md) を参照してください。
 
-## 1. PlayScreen
+## 1. registerApiV1Commands
 
-[`ui/src/features/play.tsx`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/ui/src/features/play.tsx)
+[`src/adapters/http/routes-v1-commands.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/http/routes-v1-commands.ts)
 
-入口。参加者が発注を保存する画面。`api.saveDecision` を、画面が持つ「版」とともに呼ぶ（他の操作で更新されていたら、黙って上書きしないため）。画面は HTTP を知らず、`ApiClient`（実装は `ui/src/api/http-client.ts`、テストでは偽物）だけに依存する。次は、サーバー側の入口。
+入口。参加者が発注を保存する要求（`PUT /api/v1/sessions/{sessionId}/decisions`）。入力する役割は資格から決まり、意思決定の版は `If-Match` で送る（他の操作で更新されていたら、黙って上書きしないため）。画面は Kotlin 版・Rust 版と共通の `apps/beer-game-web` で、HTTP の契約（`apps/beer-game-contracts/openapi.yaml`）だけを話す。次は、サーバー側の入口。
 
 ## 2. buildServer
 
@@ -56,4 +61,4 @@ HTTP の入口。Origin の検査、Cookie から資格の選択、zod による
 
 [`src/adapters/persistence/pg-unit-of-work.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/adapters/persistence/pg-unit-of-work.ts)
 
-トランザクションの境界。1 回の操作の保存（集約、役割別の週結果、イベント、冪等記録）は、すべて成功するか、何も残らない。版つきの更新で、同時の更新も検出する。保存のたびに `pg_notify` され（`PgNotifier`）、SSE で全員の画面へ「変化があった」とだけ伝わり、画面が再取得して更新される。動く様子は、E2E（`tests/e2e/game.spec.ts`）で確認できる。
+トランザクションの境界。1 回の操作の保存（集約、役割別の週結果、イベント、冪等記録）は、すべて成功するか、何も残らない。版つきの更新で、同時の更新も検出する。保存のたびに `pg_notify` され（`PgNotifier`。受信が生きているかは `/api/v1/ready` の `notifier` で確かめる）、画面は応答の `versions` に追いつくまで状態を取得し直して更新される。動く様子は、共有の画面の受け入れ（`apps/beer-game-web` の `@ui`。TS 版のバックエンドで CI が実行する）で確認できる。

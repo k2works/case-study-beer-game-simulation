@@ -5,19 +5,10 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
     "types": ["node", "vitest/globals"]
   },
-  "include": [
-    "src",
-    "tests",
-    "ui",
-    "scripts",
-    "vitest.config.ts",
-    "vite.config.ts",
-    "eslint.config.js"
-  ]
+  "include": ["src", "tests", "scripts", "vitest.config.ts", "eslint.config.js"]
 }

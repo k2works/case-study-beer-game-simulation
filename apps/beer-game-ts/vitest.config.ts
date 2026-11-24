@@ -3,9 +3,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['tests/{unit,component,integration,contract}/**/*.test.{ts,tsx}'],
+    include: ['tests/{unit,integration,contract}/**/*.test.ts'],
     passWithNoTests: true,
-    setupFiles: ['tests/support/setup.ts'],
     // 統合テストは同じテスト DB を使うため、ファイルを直列に実行する
     fileParallelism: false,
     coverage: {

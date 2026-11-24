@@ -126,6 +126,9 @@ const credentialSubjectSchema = z.object({
   subject: z.object({ kind: z.literal('PARTICIPANT'), id: z.uuid() }),
 });
 
+/**
+ * @guidedTour walking-skeleton 10 入口。参加者が発注を保存する要求（`PUT /api/v1/sessions/{sessionId}/decisions`）。入力する役割は資格から決まり、意思決定の版は `If-Match` で送る（他の操作で更新されていたら、黙って上書きしないため）。画面は Kotlin 版・Rust 版と共通の `apps/beer-game-web` で、HTTP の契約（`apps/beer-game-contracts/openapi.yaml`）だけを話す。次は、サーバー側の入口。
+ */
 export function registerApiV1Commands(
   server: FastifyInstance,
   ctx: CommandRoutesContext,
