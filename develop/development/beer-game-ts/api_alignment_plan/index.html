@@ -13910,7 +13910,12 @@
 <td style="text-align: left;">カスタム条件: マイグレーション 008（役割ごとの初期在庫 4 列＋<code>initial_flow</code>。<code>sessions.settings</code> も変換。Up・Down を専用 DB で検査）。<code>Conditions.initialInventory: Record&lt;Role, number&gt;</code>・<code>initialFlow</code>、範囲を契約に合わせた（初期在庫・初期の流れ 0〜1000、遅延 1〜8 週、費用 0〜100000）。検証の誤りに <code>field</code>（<code>conditions.&lt;項目&gt;</code>）を付ける。旧い経路は、初期在庫を数 1 つで受け・返す暫定の写しを置いた（段階 4 で撤去）。573 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">3b〜3e・4〜7</td>
+<td style="text-align: center;">3b</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;"><code>createGame</code> の冪等: <strong>マイグレーション 009</strong>（<code>uq_idempotency_create</code>。案 3 の番号 010 を、適用の順に合わせて 009 とした。H4 は 010 になる。node-pg-migrate は、既適用より前の番号の追加を拒否するため）。冪等記録を範囲（<code>create</code>・<code>commit</code>）つきにし、作成は、キーだけで探して保存済みの応答（同じゲーム・資格・復帰コード）を返す。同じキーで内容が違えば <code>IdempotencyKeyReusedError</code>（409 <code>app.idempotency_key_reused</code>）。同時の重複は、一意違反を 1 回だけやり直して解決（6 並行で、ゲーム 1 つ）。期限切れの記録は、新しい作成が置き換える。587 件通過</td>
+</tr>
+<tr>
+<td style="text-align: center;">3c〜3e・4〜7</td>
 <td style="text-align: left;">未着手</td>
 <td style="text-align: left;"></td>
 </tr>
@@ -14033,6 +14038,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">段階 3 の前の確認事項 3 案の承認、小段階 3a（カスタム条件）の完了を反映</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">小段階 3b（<code>createGame</code> の冪等。マイグレーション 009）の完了を反映</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
