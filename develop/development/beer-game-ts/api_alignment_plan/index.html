@@ -13930,9 +13930,14 @@
 <td style="text-align: left;">進行中の 6 操作（<code>saveDecision</code>・<code>commitWeek</code>・<code>pauseSession</code>・<code>resumeSession</code>・<code>setCommitMode</code>・<code>submitProxyDecision</code>）を <code>/api/v1</code> に実装（未実装は 6 → 0 件のうち H4 を除く操作がすべて実装済み。<code>pending.ts</code> は空）。役割は資格から決まる。週の判定が先（<code>session.week_advanced</code>）。版の競合は 409 <code>session.decision_conflict</code>（<code>role</code>・最新の入力＝保存者・時刻つき）。確定の根拠は、役割ごとの入力の版（<code>basis</code>）で、変わっていれば 409 <code>session.decisions_changed</code>（<code>current</code>）。保存回数の上限 9（代理入力を含む。版が回数）。停止・終了・停止中でない再開・開始前に型のある失敗（<code>session.paused</code>・<code>already_ended</code>・<code>not_paused</code>・<code>not_active</code>）。進行役だけの操作は、冪等の照合より前に認可する。<code>If-Match</code> は引用符可・無ければ 0・整数でなければ 422。658 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">3e・4〜7</td>
+<td style="text-align: center;">3e</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;">H4（開始後の役割の入れ替え。マイグレーション 010 <code>participants.replaced_at</code>）。担当のいる役割へ、参加済み・未割り当ての参加者を割り当てると、現在の担当者全員が外れ（<code>Participant.replaced</code>）、<code>session.holders</code> を差し替え、game・session の版を進め、<code>RoleReplaced</code>・<code>CredentialRevoked</code> を履歴に足し、旧担当者の復帰資格とブラウザセッションを同じトランザクションで失効する。同じ役割への割り当て直しは変化なし。拒否: 別の役割にいる人 <code>game.not_preparing</code>、終了後 <code>session.already_ended</code>、失効済み（外された旧担当者・手動失効）<code>game.credential_already_revoked</code>、存在しない参加者 <code>game.participant_not_found</code>、進行役以外 403。ロビーの <code>replaced</code>。<code>assignRole</code> の認可を冪等の照合より前に置いた（ADR-004）。<strong>契約の全 25 操作が実装済み（<code>pending.ts</code> が空）</strong>。673 件通過</td>
+</tr>
+<tr>
+<td style="text-align: center;">4〜7</td>
 <td style="text-align: left;">未着手</td>
-<td style="text-align: left;">H4（開始後の役割の入れ替え。マイグレーション 010）、旧 API の撤去 ほか</td>
+<td style="text-align: left;">旧 API の撤去とテストの付け替え、共有 UI の <code>@ui</code>、ui の削除、ドキュメント</td>
 </tr>
 </tbody>
 </table>
@@ -14073,6 +14078,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">小段階 3d（進行中のコマンド 6 操作と業務の失敗の <code>code</code>）の完了を反映</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">小段階 3e（H4。開始後の役割の入れ替え）の完了を反映。段階 3 の完了</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
