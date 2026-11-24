@@ -13421,37 +13421,37 @@
 <p>進行役がゲームを作成する。設定を検証し、参加コードと進行役の資格を発行する。ここから、参加と割り当てを受け付ける準備中が始まる</p>
 <p>API: <code>POST /api/v1/games</code></p>
 <p>発行するイベント: EV-G01 <code>GameCreated</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h4 id="2-join_game">2. <code>join_game</code>（関数）<a class="headerlink" href="#2-join_game" title="Permanent link">&para;</a></h4>
 <p>参加者が、参加コードと表示名で参加する。アカウントは作らず、復帰資格を発行する</p>
 <p>API: <code>POST /api/v1/participations/join</code></p>
 <p>発行するイベント: EV-G02 <code>ParticipantJoined</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h4 id="3-assign_or_replace_role">3. <code>assign_or_replace_role</code>（関数）<a class="headerlink" href="#3-assign_or_replace_role" title="Permanent link">&para;</a></h4>
 <p>進行役が、参加者に役割を割り当てる。準備中は割り当て・付け替え、開始後は入れ替えになり、規則はドメインが決める</p>
 <p>API: <code>PUT /api/v1/games/{game_id}/participants/{participant_id}/role</code></p>
 <p>発行するイベント: EV-G03 <code>RoleAssigned</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h4 id="4-start_game">4. <code>start_game</code>（関数）<a class="headerlink" href="#4-start_game" title="Permanent link">&para;</a></h4>
 <p>進行役がゲームを開始する。各役割に 1 人以上いることを確かめ、game と session の 2 本のストリームへ同じトランザクションで追記する。ここから、入力を受け付けるプレイが始まる</p>
 <p>API: <code>POST /api/v1/games/{game_id}/start</code></p>
 <p>発行するイベント: EV-G11 <code>GameStarted</code>、EV-S01 <code>SessionStarted</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h3 id="_4">プレイ<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
 <h4 id="5-save_decision">5. <code>save_decision</code>（関数）<a class="headerlink" href="#5-save_decision" title="Permanent link">&para;</a></h4>
 <p>参加者が、自分の役割の発注量を保存する。意思決定の版が一致しなければ拒否し、保存のたびに版が 1 増える。4 役割がそろうまで、週は進まない</p>
 <p>API: <code>PUT /api/v1/sessions/{session_id}/decisions</code></p>
 <p>発行するイベント: EV-S05 <code>DecisionSaved</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h4 id="6-commit_week">6. <code>commit_week</code>（関数）<a class="headerlink" href="#6-commit_week" title="Permanent link">&para;</a></h4>
 <p>進行役が週を確定する。4 役割の入力がそろい、根拠にした版が現在と一致するとき、週次計算を呼んで、次の週の状態を事実として残す</p>
 <p>API: <code>POST /api/v1/sessions/{session_id}/weeks/{week}/commit</code></p>
 <p>発行するイベント: EV-S08 <code>WeekCommitted</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/application/src/commands.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/application/src/commands.rs"><code>apps/beer-game-rust/crates/application/src/commands.rs</code></a></p>
 <h4 id="7-session_state">7. <code>session_state</code>（関数）<a class="headerlink" href="#7-session_state" title="Permanent link">&para;</a></h4>
 <p>画面が、いまの週・自分の役割の状態・入力の状況を読む。投影の行から、呼び出した人ごとの規則で見せる範囲を絞り、他の役割の値は返さない（問い合わせ側。書き込みの後続ではない）</p>
 <p>API: <code>GET /api/v1/sessions/{session_id}/state</code></p>
-<p>場所: <code>apps/beer-game-rust/crates/adapter-http/src/api.rs</code></p>
+<p>場所: <a href="https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-rust/crates/adapter-http/src/api.rs"><code>apps/beer-game-rust/crates/adapter-http/src/api.rs</code></a></p>
 
 
 
