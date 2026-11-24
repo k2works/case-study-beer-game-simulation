@@ -41,9 +41,7 @@ beer-game-kotlin（[beer-game2](../beer-game-ts/index.md) の Kotlin 版）の�
 
 ### コードの案内（Living Documentation）
 
-サイトシーイング・マップとガイドツアーは、コードの注釈から自動生成する成果物です。**実装後に生成します**（現時点では作りません）。
-
-用語集とイベント一覧は、B5 Step 8.4 から、コードの注釈（`@Term`・`@EventSpec`）から生成しています（手で編集しません。再生成は `./gradlew :domain:generateLivingDocs`。方式は [ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、提案）。
+用語集・イベント一覧・コアのハイライト・サイトシーイング・マップ・ガイドツアーは、コードの注釈（`@Term`・`@EventSpec`・`@CoreConcept`・`@KeyLandmark`・`@GuidedTour`）から生成しています（手で編集しません。再生成は `./gradlew :domain:generateLivingDocs`。方式は [ADR-018](../../adr/beer-game-kotlin/018-living-documentation-annotations.md)、承認済み）。`LivingDocumentationSpec`・`GuidedTourSpec` が、コードとの差と設計書との不一致を検出します。入口は [README](../../../apps/beer-game-kotlin/README.md) の「コードの案内」です。
 
 | ドキュメント | 概要 | 状況 |
 | :--- | :--- | :--- |
