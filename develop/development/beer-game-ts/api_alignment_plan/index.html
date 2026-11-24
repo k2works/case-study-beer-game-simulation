@@ -13915,9 +13915,14 @@
 <td style="text-align: left;"><code>createGame</code> の冪等: <strong>マイグレーション 009</strong>（<code>uq_idempotency_create</code>。案 3 の番号 010 を、適用の順に合わせて 009 とした。H4 は 010 になる。node-pg-migrate は、既適用より前の番号の追加を拒否するため）。冪等記録を範囲（<code>create</code>・<code>commit</code>）つきにし、作成は、キーだけで探して保存済みの応答（同じゲーム・資格・復帰コード）を返す。同じキーで内容が違えば <code>IdempotencyKeyReusedError</code>（409 <code>app.idempotency_key_reused</code>）。同時の重複は、一意違反を 1 回だけやり直して解決（6 並行で、ゲーム 1 つ）。期限切れの記録は、新しい作成が置き換える。587 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">3c〜3e・4〜7</td>
+<td style="text-align: center;">3c-1</td>
+<td style="text-align: left;">完了（2026-11-24）</td>
+<td style="text-align: left;">準備中のコマンド 4 操作（<code>createGame</code>・<code>joinGame</code>・<code>startGame</code>・<code>assignRole</code>）を <code>/api/v1</code> に実装（未実装は 16 → 12 件）。冪等の共通の部品（<code>idempotently</code>・<code>retryOnDuplicate</code>・指紋は SHA-256）、資格の Cookie の発行（<code>bg_session</code>・<code>bg_recovery</code>・<code>X-Tab-Id</code>・<code>Secure</code> は <code>COOKIE_SECURE</code>）、レート制限の 429＋<code>Retry-After</code>。ドメインの型つきのエラー（<code>NotPreparingError</code>・<code>AlreadyStartedError</code>・<code>StartConditionError</code>・<code>ParticipantNotFoundError</code>）を契約の <code>code</code> に写した。<strong>付け替え（D9）</strong>: 別の役割にいる人は付け替え、同じ役割は変化なし（イベントも版も足さない）。作成の検証の誤りを、最終週・需要・条件・保持期間まで、すべて集めて返す（<code>field</code>・対象の週つき）。614 件通過</td>
+</tr>
+<tr>
+<td style="text-align: center;">3c-2〜3e・4〜7</td>
 <td style="text-align: left;">未着手</td>
-<td style="text-align: left;"></td>
+<td style="text-align: left;"><code>recoverParticipation</code>・観察者 3 操作・<code>revokeCredential</code>・<code>reissueCredential</code>、進行中のコマンド、H4</td>
 </tr>
 </tbody>
 </table>
@@ -14043,6 +14048,11 @@
 <tr>
 <td style="text-align: left;">2026-11-24</td>
 <td style="text-align: left;">小段階 3b（<code>createGame</code> の冪等。マイグレーション 009）の完了を反映</td>
+<td style="text-align: left;">claude-code</td>
+</tr>
+<tr>
+<td style="text-align: left;">2026-11-24</td>
+<td style="text-align: left;">小段階 3c-1（準備中のコマンド 4 操作）の完了を反映</td>
 <td style="text-align: left;">claude-code</td>
 </tr>
 </tbody>
