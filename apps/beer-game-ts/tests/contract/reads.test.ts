@@ -74,6 +74,42 @@ describe('getGameState（GET /games/{gameId}/state）', () => {
     expect(typeof body.versions.game).toBe('number');
   });
 
+  it('カスタム条件は、設定の種別 CUSTOM と、変えた項目（契約の呼び名）で示す。需要系列だけの変更は、設定の変更に含めない', async () => {
+    const custom = await app.createGame({
+      weeks: 2,
+      demand: [4, 4],
+      conditions: {
+        initialInventory: { RETAILER: 20 },
+        initialFlow: 5,
+        shipmentDelayWeeks: 3,
+        disclosure: 'PROGRESS_ONLY',
+      },
+    });
+    const res = await get(
+      `/api/v1/games/${custom.gameId}/state`,
+      custom.facilitatorToken,
+    );
+    const body = res.json();
+    expectConforms('GameState', body);
+    expect(body.settingsKind).toBe('CUSTOM');
+    expect(body.changedSettings).toEqual([
+      'INITIAL_INVENTORY',
+      'INITIAL_FLOW',
+      'SHIPMENT_DELAY',
+      'DISCLOSURE',
+    ]);
+
+    const demandOnly = await app.createGame({ weeks: 2, demand: [9, 9] });
+    const only = (
+      await get(
+        `/api/v1/games/${demandOnly.gameId}/state`,
+        demandOnly.facilitatorToken,
+      )
+    ).json();
+    expectConforms('GameState', only);
+    expect(only).toMatchObject({ settingsKind: 'KIT', changedSettings: [] });
+  });
+
   it('参加者には、自分の ID と役割を返す（参加コードと最終週は返さない）。開始後は sessionId が gameId', async () => {
     const t = await startedTable(app);
     const res = await get(

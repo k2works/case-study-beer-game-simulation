@@ -5,6 +5,7 @@ import {
   kitPreset,
   type ConditionItem,
   type Conditions,
+  type ConditionsInput,
 } from './conditions.js';
 import { ROLES, type Role } from './role.js';
 import {
@@ -91,8 +92,8 @@ export function createGame(input: {
   weeks: number;
   demand?: readonly number[];
   commitMode?: CommitMode;
-  /** キット準拠値から変える条件（指定の無い項目はキットの値） */
-  conditions?: Partial<Conditions>;
+  /** キット準拠値から変える条件（指定の無い項目はキットの値。初期在庫は、省略した役割がキットの値） */
+  conditions?: ConditionsInput;
 }): Outcome {
   const finalWeek = Week.of(input.weeks);
   const kit = kitDemand(finalWeek);

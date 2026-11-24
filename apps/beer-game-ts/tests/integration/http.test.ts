@@ -697,7 +697,7 @@ describe('カスタム条件（HTTP）', () => {
   it('[US1.1/AC1.1.4] 範囲外の条件は 422 で、項目ごとに修正内容を返す', async () => {
     const res = await post('/api/games', {
       weeks: 3,
-      conditions: { shipmentDelayWeeks: 7, backlogCostMinor: 5000 },
+      conditions: { shipmentDelayWeeks: 9, backlogCostMinor: 100_001 },
     });
     expect(res.statusCode).toBe(422);
     expect(res.json().issues).toHaveLength(2);

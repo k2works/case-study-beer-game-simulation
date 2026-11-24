@@ -241,10 +241,37 @@ describe('initialRoleStates: 条件（初期在庫・遅延）', () => {
     });
   });
 
+  it('[US1.1/AC1.1.4] 初期在庫は役割ごと、待ち行列の各段には初期の流れが入る', () => {
+    const s = initialRoleStates({
+      ...KIT_CONDITIONS,
+      initialInventory: {
+        FACTORY: 0,
+        DISTRIBUTOR: 5,
+        WHOLESALER: 12,
+        RETAILER: 20,
+      },
+      initialFlow: 7,
+    });
+    expect(ROLES.map((r) => s[r].inventory)).toEqual([0, 5, 12, 20]);
+    expect(s.RETAILER).toMatchObject({
+      incomingGoods: [7, 7],
+      outgoingOrders: [7, 7],
+    });
+    expect(s.FACTORY).toMatchObject({
+      incomingGoods: [7, 7],
+      outgoingOrders: [],
+    });
+  });
+
   it('[US1.1/AC1.1.4] 遅延の週数だけの段を作る。工場の入荷の段は生産の遅延', () => {
     const s = initialRoleStates({
       ...KIT_CONDITIONS,
-      initialInventory: 20,
+      initialInventory: {
+        FACTORY: 20,
+        DISTRIBUTOR: 20,
+        WHOLESALER: 20,
+        RETAILER: 20,
+      },
       orderDelayWeeks: 1,
       shipmentDelayWeeks: 3,
       productionDelayWeeks: 4,
@@ -266,7 +293,13 @@ describe('simulateWeek: 可変の遅延の性質（fast-check）', () => {
   const qty = fc.integer({ min: 0, max: 1000 });
   const delay = fc.integer({ min: 1, max: 4 });
   const conditions = fc.record({
-    initialInventory: fc.integer({ min: 0, max: 100 }),
+    initialInventory: fc.record({
+      FACTORY: fc.integer({ min: 0, max: 100 }),
+      DISTRIBUTOR: fc.integer({ min: 0, max: 100 }),
+      WHOLESALER: fc.integer({ min: 0, max: 100 }),
+      RETAILER: fc.integer({ min: 0, max: 100 }),
+    }),
+    initialFlow: fc.integer({ min: 0, max: 20 }),
     orderDelayWeeks: delay,
     shipmentDelayWeeks: delay,
     productionDelayWeeks: delay,

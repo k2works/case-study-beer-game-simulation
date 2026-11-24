@@ -17,7 +17,10 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../application/errors.js';
-import { DISCLOSURE_POLICIES } from '../../domain/conditions.js';
+import {
+  DISCLOSURE_POLICIES,
+  type ConditionsInput,
+} from '../../domain/conditions.js';
 import { ROLES } from '../../domain/role.js';
 import {
   DomainError,
@@ -111,6 +114,26 @@ const createBody = z.object({
     .partial()
     .optional(),
 });
+/**
+ * 旧い経路（/api/*）は、初期在庫を 1 つの数で受ける。全役割に同じ値として、ドメインの条件（役割ごと）へ写す。
+ * 役割ごとの値は、共有の契約の経路（/api/v1）で受ける。この写しは、旧い経路と一緒に、段階 4 で撤去する。
+ */
+function legacyConditions(
+  input: NonNullable<z.infer<typeof createBody>['conditions']>,
+): ConditionsInput {
+  const { initialInventory, ...others } = input;
+  return initialInventory === undefined
+    ? others
+    : {
+        ...others,
+        initialInventory: {
+          FACTORY: initialInventory,
+          DISTRIBUTOR: initialInventory,
+          WHOLESALER: initialInventory,
+          RETAILER: initialInventory,
+        },
+      };
+}
 const joinBody = z.object({
   joinCode: z.string().min(1),
   displayName: z.string(),
@@ -458,8 +481,11 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   registerApiV1Reads(server, app);
 
   server.post('/api/games', async (request, reply) => {
-    const body = createBody.parse(request.body);
-    const created = await app.createGame(body);
+    const { conditions, ...rest } = createBody.parse(request.body);
+    const created = await app.createGame({
+      ...rest,
+      ...(conditions ? { conditions: legacyConditions(conditions) } : {}),
+    });
     setSession(reply, 'facilitator', created.facilitatorToken);
     // 復帰コードは、この応答で一度だけ返す（保存はダイジェストだけ）
     return reply.code(201).send({

@@ -1,6 +1,8 @@
 export interface Issue {
   /** 対象の週（週に紐づかない場合は省略） */
   week?: number;
+  /** 対象の入力項目（共有の契約の `errors[].field`。例: `conditions.initialFlow`）。特定の項目に紐づかない場合は省略 */
+  field?: string;
   problem: string;
   fix: string;
 }

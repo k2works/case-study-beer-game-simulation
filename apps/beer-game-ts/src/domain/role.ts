@@ -7,6 +7,14 @@ export const ROLES = [
 ] as const;
 export type Role = (typeof ROLES)[number];
 
+/** 役割の表示名（利用者に示す文言用） */
+export const ROLE_LABELS: Readonly<Record<Role, string>> = {
+  FACTORY: '工場',
+  DISTRIBUTOR: '一次卸',
+  WHOLESALER: '二次卸',
+  RETAILER: '小売店',
+};
+
 export function isRole(value: unknown): value is Role {
   return (
     typeof value === 'string' && (ROLES as readonly string[]).includes(value)

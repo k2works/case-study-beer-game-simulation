@@ -1,5 +1,5 @@
 import { FACILITATOR, participant, type Actor } from '../domain/actor.js';
-import type { Conditions } from '../domain/conditions.js';
+import type { ConditionsInput } from '../domain/conditions.js';
 import { CREDENTIAL_TTL, CredentialValidity } from '../domain/credential.js';
 import { OBSERVER_LIMIT, observe } from '../domain/observation.js';
 import { buildExport } from '../domain/export.js';
@@ -205,7 +205,8 @@ export function createApplication(deps: Dependencies) {
   const settingsView = (s: GameSettings) => ({
     kind: s.kind,
     changes: s.changes,
-    initialInventory: s.initialInventory,
+    // 旧い経路（/api/*）と旧い UI は、初期在庫を 1 つの数で扱う。役割ごとの値は /api/v1 が返す。小売店の値を示す（段階 4 で撤去）
+    initialInventory: s.initialInventory.RETAILER,
     orderDelayWeeks: s.orderDelayWeeks,
     shipmentDelayWeeks: s.shipmentDelayWeeks,
     productionDelayWeeks: s.productionDelayWeeks,
@@ -284,7 +285,7 @@ export function createApplication(deps: Dependencies) {
       weeks: number;
       demand?: readonly number[];
       commitMode?: CommitMode;
-      conditions?: Partial<Conditions>;
+      conditions?: ConditionsInput;
       /** 保持期間（日）。省略時は 90 日 */
       retentionDays?: number;
     }) {

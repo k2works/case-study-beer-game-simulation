@@ -85,7 +85,14 @@ describe('Game の永続化', () => {
       weeks: 3,
       demand: [5, 5, 5],
       conditions: {
-        initialInventory: 30,
+        // 役割ごとに違う初期在庫と、初期の流れも、保存して読み戻せる
+        initialInventory: {
+          FACTORY: 0,
+          DISTRIBUTOR: 30,
+          WHOLESALER: 12,
+          RETAILER: 999,
+        },
+        initialFlow: 7,
         orderDelayWeeks: 1,
         shipmentDelayWeeks: 3,
         productionDelayWeeks: 4,

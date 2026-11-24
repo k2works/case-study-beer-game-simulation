@@ -19,6 +19,7 @@ export type SettingsField = (typeof SETTINGS_FIELDS)[number];
 /** 条件の項目 → 契約の項目。需要系列（`demand`）は、契約では設定の変更に含めない */
 const FIELD_OF: Record<Exclude<ConditionItem, 'demand'>, SettingsField> = {
   initialInventory: 'INITIAL_INVENTORY',
+  initialFlow: 'INITIAL_FLOW',
   orderDelayWeeks: 'ORDER_DELAY',
   shipmentDelayWeeks: 'SHIPMENT_DELAY',
   productionDelayWeeks: 'PRODUCTION_DELAY',

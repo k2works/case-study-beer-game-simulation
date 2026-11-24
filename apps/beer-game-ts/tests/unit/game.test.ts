@@ -57,12 +57,17 @@ describe('createGame', () => {
       id: 'g1',
       joinCode: 'J',
       weeks: 10,
-      conditions: { initialInventory: 20, orderDelayWeeks: 1 },
+      conditions: { initialInventory: { RETAILER: 20 }, orderDelayWeeks: 1 },
     });
     expect(game.settings).toMatchObject({
       kind: 'CUSTOM',
       changes: ['initialInventory', 'orderDelayWeeks'],
-      initialInventory: 20,
+      initialInventory: {
+        FACTORY: 12,
+        DISTRIBUTOR: 12,
+        WHOLESALER: 12,
+        RETAILER: 20,
+      },
       orderDelayWeeks: 1,
       shipmentDelayWeeks: 2,
     });
@@ -102,7 +107,7 @@ describe('createGame', () => {
       });
       expect.unreachable();
     } catch (e) {
-      expect((e as DomainError).issues[0]!.fix).toMatch(/配送の遅延を 1〜4/);
+      expect((e as DomainError).issues[0]!.fix).toMatch(/配送の遅延を 1〜8/);
     }
   });
 

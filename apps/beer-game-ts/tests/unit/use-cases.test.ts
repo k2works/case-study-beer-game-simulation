@@ -1016,7 +1016,15 @@ describe('カスタム条件', () => {
   it('[US1.1/AC1.1.3] カスタム条件で作ると、ロビーと進行役のコンソールに「カスタム」と変更項目、条件の値が出る', async () => {
     const created = await app.createGame({
       weeks: 3,
-      conditions: { initialInventory: 20, holdingCostMinor: 25 },
+      conditions: {
+        initialInventory: {
+          FACTORY: 20,
+          DISTRIBUTOR: 20,
+          WHOLESALER: 20,
+          RETAILER: 20,
+        },
+        holdingCostMinor: 25,
+      },
     });
     const lobby = await app.lobby({
       token: created.facilitatorToken,
@@ -1052,7 +1060,14 @@ describe('カスタム条件', () => {
   it('[US1.1/AC1.1.4] 条件の初期在庫で始まり、進行役のコンソールにも種別が出る', async () => {
     const created = await app.createGame({
       weeks: 3,
-      conditions: { initialInventory: 40 },
+      conditions: {
+        initialInventory: {
+          FACTORY: 40,
+          DISTRIBUTOR: 40,
+          WHOLESALER: 40,
+          RETAILER: 40,
+        },
+      },
     });
     const ids: string[] = [];
     for (const role of ROLES) {

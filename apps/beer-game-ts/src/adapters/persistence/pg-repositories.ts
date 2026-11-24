@@ -65,7 +65,13 @@ class PgGames implements GameRepository {
       quantityMax: row.quantity_max as number,
       commitMode: row.commit_mode as GameSettings['commitMode'],
       changes: row.settings_changes as GameSettings['changes'],
-      initialInventory: row.initial_inventory as number,
+      initialInventory: {
+        FACTORY: row.initial_inventory_factory as number,
+        DISTRIBUTOR: row.initial_inventory_distributor as number,
+        WHOLESALER: row.initial_inventory_wholesaler as number,
+        RETAILER: row.initial_inventory_retailer as number,
+      },
+      initialFlow: row.initial_flow as number,
       orderDelayWeeks: row.order_delay_weeks as number,
       shipmentDelayWeeks: row.shipment_delay_weeks as number,
       productionDelayWeeks: row.production_delay_weeks as number,
@@ -119,9 +125,10 @@ class PgGames implements GameRepository {
         await this.db.query(
           `INSERT INTO games (game_id, join_code, status, version, settings_kind, final_week,
              demand, holding_cost_minor, backlog_cost_minor, quantity_max, commit_mode,
-             settings_changes, initial_inventory, order_delay_weeks, shipment_delay_weeks,
-             production_delay_weeks, disclosure_policy)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+             settings_changes, initial_inventory_factory, initial_inventory_distributor,
+             initial_inventory_wholesaler, initial_inventory_retailer, initial_flow,
+             order_delay_weeks, shipment_delay_weeks, production_delay_weeks, disclosure_policy)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
           [
             game.id,
             game.joinCode,
@@ -135,7 +142,11 @@ class PgGames implements GameRepository {
             s.quantityMax,
             s.commitMode,
             JSON.stringify(s.changes),
-            s.initialInventory,
+            s.initialInventory.FACTORY,
+            s.initialInventory.DISTRIBUTOR,
+            s.initialInventory.WHOLESALER,
+            s.initialInventory.RETAILER,
+            s.initialFlow,
             s.orderDelayWeeks,
             s.shipmentDelayWeeks,
             s.productionDelayWeeks,

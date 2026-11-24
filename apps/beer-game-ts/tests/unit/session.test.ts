@@ -85,7 +85,15 @@ describe('startSession（条件）', () => {
       id: 'g1',
       joinCode: 'J',
       weeks: 3,
-      conditions: { initialInventory: 30, shipmentDelayWeeks: 1 },
+      conditions: {
+        initialInventory: {
+          FACTORY: 30,
+          DISTRIBUTOR: 30,
+          WHOLESALER: 30,
+          RETAILER: 30,
+        },
+        shipmentDelayWeeks: 1,
+      },
     }).game;
     ROLES.forEach((role, i) => {
       g = joinGame(g, { participantId: `p${i}`, displayName: `P${i}` }).game;

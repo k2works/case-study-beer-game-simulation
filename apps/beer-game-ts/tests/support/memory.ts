@@ -381,6 +381,7 @@ export function memoryExportReader(mem: {
             kind: s.kind,
             changes: s.changes,
             initialInventory: s.initialInventory,
+            initialFlow: s.initialFlow,
             orderDelayWeeks: s.orderDelayWeeks,
             shipmentDelayWeeks: s.shipmentDelayWeeks,
             productionDelayWeeks: s.productionDelayWeeks,

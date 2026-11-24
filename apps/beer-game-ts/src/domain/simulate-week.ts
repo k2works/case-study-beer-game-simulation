@@ -35,17 +35,17 @@ export interface RoleWeekResult {
 }
 export type WeekResults = Readonly<Record<Role, RoleWeekResult>>;
 
-/** 待ち行列の各段の初期値（キットと同じ。遅延を変えても、段の数が変わるだけ） */
-export const INITIAL_PIPELINE = 4;
-
-/** 条件（初期在庫・遅延）から、開始時の 4 役割の状態を作る。工場の入荷の段は、生産の遅延 */
+/**
+ * 条件（役割ごとの初期在庫・初期の流れ・遅延）から、開始時の 4 役割の状態を作る。工場の入荷の段は、生産の遅延。
+ * 待ち行列の各段には、初期の流れ（キットは 4）が入る。遅延を変えても、段の数が変わるだけ。
+ */
 export function initialRoleStates(
   conditions: Conditions = KIT_CONDITIONS,
 ): RoleStates {
   const pipeline = (weeks: number) =>
-    Array.from({ length: weeks }, () => INITIAL_PIPELINE);
+    Array.from({ length: weeks }, () => conditions.initialFlow);
   const make = (role: Role): RoleState => ({
-    inventory: conditions.initialInventory,
+    inventory: conditions.initialInventory[role],
     backlog: 0,
     incomingGoods: pipeline(
       role === 'FACTORY'

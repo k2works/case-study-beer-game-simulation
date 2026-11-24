@@ -17,7 +17,7 @@ function source(weeks = 2, extra: Partial<ExportSource> = {}): ExportSource {
       ...KIT_CONDITIONS,
       kind: 'CUSTOM',
       changes: ['initialInventory'],
-      initialInventory: 20,
+      initialInventory: { ...KIT_CONDITIONS.initialInventory, RETAILER: 20 },
     },
     demand: Array.from({ length: weeks }, () => 4),
     weeks: Array.from({ length: weeks }, (_, i) => ({
@@ -82,7 +82,7 @@ describe('buildExport', () => {
       settings: {
         kind: 'CUSTOM',
         changes: ['initialInventory'],
-        initialInventory: 20,
+        initialInventory: { ...KIT_CONDITIONS.initialInventory, RETAILER: 20 },
       },
       demand: [4, 4],
     });
