@@ -43,13 +43,13 @@ package "戦術的設計" {
 
 中核の識別。設計書の境界付けられたコンテキストの分類で「中核」とされたものだけに付け、力を注ぐ場所を絞る
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt)
 
 #### `Term`（型）
 
 ユビキタス言語。業務の言葉と定義・出典を、型に付けて残す。用語集はここから生成され、コードと会話の言葉がずれない
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Documentation.kt)
 
 ### 戦術的設計
 
@@ -59,28 +59,28 @@ package "戦術的設計" {
 
 値オブジェクト。0〜1000 の整数という不変条件を、生成の時点で守る。範囲外の値は、型として存在できない
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Quantities.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Quantities.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Quantities.kt)
 
 #### `RetentionSaga`（型）
 
 プロセスマネージャー。保持期間の削除という、複数の段階にまたがる手続きの進み方（再試行・間隔）を、状態を持たず決める
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/RetentionSaga.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/RetentionSaga.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/RetentionSaga.kt)
 
 #### `SessionEvent`（型）
 
 ドメインイベント。進行で起きた事実を、過去形で表す。状態はここから取り戻し、投影の元にもなる
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt)
 
 #### `SessionState`（型）
 
 集約（進行）。イベントの畳み込みで復元し、4 役割の入力を揃えて週を一度だけ確定する整合性の境界
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt)
 
 #### `simulateWeek`（関数）
 
 ドメインサービス。1 つの集約や値に収まらない週の計算を、状態を持たない純粋な関数として表す。副作用が無い
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/SimulateWeek.kt)

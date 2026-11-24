@@ -53,19 +53,19 @@ S8 --> S9
 
 コマンドの入口。HTTP の要求を、入力を検証したコマンドに変える。状態は返さず、版だけを返す。次に、認証と冪等を含む共通の流れへ渡す
 
-場所: `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt`
+場所: [`apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/CommandRoutes.kt)
 
 #### 2. `Ports.runCommand`（関数）
 
 コマンドの共通の流れ。認証・冪等記録・競合の再試行を担い、読み込み・decide・追記・投影を順に呼ぶ。競合したときは、認可を含めて最初から評価し直す
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Execute.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Execute.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Execute.kt)
 
 #### 3. `decideSession`（関数）
 
 進行の規則を判断し、事実（イベント）の列を返す純粋関数。状態を変えず、副作用も無い。返した事実が、次に追記される
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Session.kt)
 
 ### イベントと投影
 
@@ -73,19 +73,19 @@ S8 --> S9
 
 事実を events に追記する。ストリームごとの版の一意制約で、同時の更新のうち片方だけを通す。追記した事実が、投影の元になる
 
-場所: `apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt`
+場所: [`apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcEventStore.kt)
 
 #### 5. `Projections`（型）
 
 事実から、読み取りモデルの行の変更を導く純粋関数の集まり。問い合わせの形に合わせて、役割別の値と合計を別の投影に分ける
 
-場所: `apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Projection.kt`
+場所: [`apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Projection.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/domain/src/main/kotlin/beergame/domain/Projection.kt)
 
 #### 6. `JdbcProjectionWriter`（型）
 
 導いた行の変更を、追記と同じトランザクションで書く（同期投影）。書いた版を projection_checkpoints に残し、問い合わせ側が古い表示を捨てられるようにする
 
-場所: `apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionWriter.kt`
+場所: [`apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionWriter.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionWriter.kt)
 
 ### 問い合わせ側
 
@@ -93,16 +93,16 @@ S8 --> S9
 
 問い合わせの入口。コマンドとは別の経路で、イベントストアを経由せずに、投影を読む
 
-場所: `apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/QueryRoutes.kt`
+場所: [`apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/QueryRoutes.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-http/src/main/kotlin/beergame/http/QueryRoutes.kt)
 
 #### 8. `Ports.snapshot`（関数）
 
 認証して投影を読み、呼び出した人ごとの開示の規則を掛けて返す。他の役割の値は、返さない
 
-場所: `apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt`
+場所: [`apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/application/src/main/kotlin/beergame/application/Query.kt)
 
 #### 9. `JdbcProjectionReader`（型）
 
 投影の表を、読み取り専用のトランザクションで読む。行と同じ時点の版を返し、イベントを再生しない
 
-場所: `apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionReader.kt`
+場所: [`apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionReader.kt`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-kotlin/adapter-persistence/src/main/kotlin/beergame/persistence/JdbcProjectionReader.kt)
