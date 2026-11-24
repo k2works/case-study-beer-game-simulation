@@ -9,6 +9,8 @@ on:
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベント・用語・中核の表との突き合わせ。docs:living:check）
+      - 'docs/design/beer-game-ts/**'
       - '.github/workflows/beer-game-ts*.yml'
   pull_request:
     paths:
@@ -16,6 +18,8 @@ on:
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベント・用語・中核の表との突き合わせ。docs:living:check）
+      - 'docs/design/beer-game-ts/**'
       - '.github/workflows/beer-game-ts*.yml'
 
 concurrency:

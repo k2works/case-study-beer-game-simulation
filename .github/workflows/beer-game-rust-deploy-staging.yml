@@ -23,7 +23,8 @@ name: beer-game-rust-deploy-staging
 on:
   workflow_dispatch:
   # main への merge の CI（beer-game-rust。テスト・静的検査・コンテナのスモーク）が成功したら、ステージングへ自動でデプロイする。
-  # CI が apps/beer-game-rust/** の変更だけで起動するので、無関係の変更ではデプロイされない
+  # CI は、このアプリ・共有の画面/契約/受け入れ条件・このアプリの設計書（docs/design/beer-game-rust/**）の変更で起動する。
+  # 無関係の変更ではデプロイされないが、設計書だけの変更でも、CI が成功すれば同じ内容の再デプロイになる
   workflow_run:
     workflows: [beer-game-rust]
     types: [completed]

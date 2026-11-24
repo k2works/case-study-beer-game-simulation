@@ -14,6 +14,9 @@ on:
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベントの表との突き合わせ。ADR-002。表の正本は Kotlin 版）
+      - 'docs/design/beer-game-rust/**'
+      - 'docs/design/beer-game-kotlin/domain-model.md'
       - '.github/workflows/beer-game-rust.yml'
   push:
     branches: [develop, main]
@@ -22,6 +25,9 @@ on:
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベントの表との突き合わせ。ADR-002。表の正本は Kotlin 版）
+      - 'docs/design/beer-game-rust/**'
+      - 'docs/design/beer-game-kotlin/domain-model.md'
       - '.github/workflows/beer-game-rust.yml'
   workflow_dispatch:
 

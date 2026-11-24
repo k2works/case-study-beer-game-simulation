@@ -27,6 +27,8 @@ on:
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベントの表との突き合わせ。LivingDocumentationSpec）
+      - 'docs/design/beer-game-kotlin/**'
       - '.github/workflows/beer-game-kotlin.yml'
   push:
     branches: [develop, main]
@@ -35,6 +37,8 @@ on:
       - 'apps/beer-game-features/**'
       - 'apps/beer-game-web/**'
       - 'apps/beer-game-contracts/**'
+      # 設計書（生成物と、イベントの表との突き合わせ。LivingDocumentationSpec）
+      - 'docs/design/beer-game-kotlin/**'
       - '.github/workflows/beer-game-kotlin.yml'
   workflow_dispatch:
 
