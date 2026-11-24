@@ -101,7 +101,7 @@ OIDC の信頼の条件は「このリポジトリの、この GitHub Environmen
 
 ## Bolt 14 での変更（本番の定義）
 
-- **ステージングの自動デプロイ**（AC6.2.1）: main の CI（`beer-game-kotlin`）が成功すると、`workflow_run` でステージングのデプロイが起動する。**リポジトリの変数 `BEER_GAME_KOTLIN_AUTO_DEPLOY` が `'true'` のときだけ**（未設定の間はジョブを飛ばす）。手動で 1 回成功させてから設定する。
+- **ステージングの自動デプロイ**（AC6.2.1）: main の CI（`beer-game-kotlin`）が成功すると、`workflow_run` でステージングのデプロイが起動する。**リポジトリの変数 `BEER_GAME_KOTLIN_AUTO_DEPLOY` が `'true'` のときだけ**（未設定の間はジョブを飛ばす）。さらに、CI が成功したコミットの変更（最初の親との差）に、このアプリ・共有の画面/契約/受け入れ条件・このデプロイのワークフローが含まれないとき（設計書・文書だけの変更）は、デプロイしない（`changes` ジョブ。手動起動は判定しない）。手動で 1 回成功させてから設定する。
 - **本番はブルー/グリーン**（ECS の組み込み）。ステージングはローリング。詳細は [本番の運用手順書](./production.md)。
 - 追加の変数: `RETENTION_TASK_FAMILY`・`VERIFY_TASK_FAMILY`（両環境）、`RDS_INSTANCE`（本番。デプロイ前のスナップショット用）。いずれも `terraform output`。**未設定**（人が行う）。
 - 定期のタスク（`retention`・`verify-projections`）のタスク定義も、同じダイジェストの新しい版を登録する。
