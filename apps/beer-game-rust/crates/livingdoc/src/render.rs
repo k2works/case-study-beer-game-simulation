@@ -166,6 +166,16 @@ fn table_cell(text: &str) -> String {
     text.replace('|', "\\|")
 }
 
+/// ソースの場所へのリンクの基点（`develop` ブランチ）。
+pub const REPO_BLOB_BASE: &str =
+    "https://github.com/k2works/case-study-beer-game-simulation/blob/develop";
+
+/// ソースの場所へのリンク。行番号は含めない（行が動いても壊れない）。`file` は、リポジトリの根からの相対パス。
+#[must_use]
+pub fn source_link(file: &str) -> String {
+    format!("[`{file}`]({REPO_BLOB_BASE}/{file})")
+}
+
 // ---------------------------------------------------------------- イベント
 
 #[derive(Clone, Debug)]
@@ -588,10 +598,10 @@ fn render_core(scan: &Scan, inputs: &Inputs, events: &[EventRow]) -> Result<Stri
         for tag in group {
             emitln!(
                 out,
-                "| {} | `{}` | `{}` | {} |",
+                "| {} | `{}` | {} | {} |",
                 tag.item.kind.label(),
                 tag.item.qualified(),
-                tag.file,
+                source_link(&tag.file),
                 table_cell(tag.field(1)),
             );
         }
@@ -722,7 +732,7 @@ fn render_tour(scan: &Scan, tour: &TourDef, events: &[EventRow]) -> Result<Strin
             for extra in tag.fields.iter().skip(2) {
                 emit!(out, "{extra}\n\n");
             }
-            emitln!(out, "場所: `{}`", tag.file);
+            emitln!(out, "場所: {}", source_link(&tag.file));
         }
     }
     Ok(out)
@@ -810,11 +820,11 @@ fn render_map(scan: &Scan, map: &MapDef, inputs: &Inputs) -> Result<String, Erro
         for tag in in_section {
             emit!(
                 out,
-                "\n#### `{}`（{}）\n\n{}\n\n場所: `{}`\n",
+                "\n#### `{}`（{}）\n\n{}\n\n場所: {}\n",
                 tag.item.qualified(),
                 tag.item.kind.label(),
                 tag.field(1),
-                tag.file
+                source_link(&tag.file)
             );
         }
     }

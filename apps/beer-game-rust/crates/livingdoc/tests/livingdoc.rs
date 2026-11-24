@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use beergame_livingdoc::render::{Inputs, render_all};
+use beergame_livingdoc::render::{Inputs, render_all, source_link};
 use beergame_livingdoc::scan::{ItemKind, scan_source};
 use beergame_livingdoc::{Error, Generated, generate, stale_documents};
 
@@ -294,6 +294,29 @@ fn adr_002__tours_and_unknown_tags_are_validated() {
     assert!(rendered_error(&missing_event).contains("EV-G99"));
     let unknown_tag = format!("{BASE}/// @nonsense 何か\npub fn e() {{}}\n");
     assert!(rendered_error(&unknown_tag).contains("未知の注釈"));
+}
+
+/// LD-16: 「場所」は、develop ブランチのファイルへのリンク（行番号なし）。コア・ツアー・マップのすべてで同じ形にする。
+#[test]
+fn adr_002__locations_are_links_to_the_source() {
+    let link =
+        "[`x.rs`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/x.rs)";
+    assert_eq!(source_link("x.rs"), link);
+    let source = format!("{BASE}/// @core 計算 | 核心\npub fn c() {{}}\n");
+    let documents = render(&source).expect("生成できる");
+    for name in [
+        "core-highlight.md",
+        "walking-skeleton-tour.md",
+        "ddd-sightseeing-map.md",
+        "architecture-sightseeing-map.md",
+    ] {
+        let document = documents
+            .iter()
+            .find(|d| d.path.ends_with(name))
+            .expect("文書がある");
+        assert!(document.content.contains(link), "{name}: {link}");
+        assert!(!document.content.contains("場所: `"), "{name}");
+    }
 }
 
 /// LD-14: 同じ入力からは、同じ文書ができる（生成は決定的）。
