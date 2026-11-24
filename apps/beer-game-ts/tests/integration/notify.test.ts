@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { AddressInfo } from 'node:net';
 import pg from 'pg';
 import {
   afterAll,
@@ -14,14 +13,9 @@ import { PgExportReader } from '../../src/adapters/persistence/pg-export-reader.
 import { PgReviewReader } from '../../src/adapters/persistence/pg-review-reader.js';
 import { PgNotifier } from '../../src/adapters/persistence/pg-notifier.js';
 import { PgUnitOfWork } from '../../src/adapters/persistence/pg-unit-of-work.js';
-import { buildServer } from '../../src/adapters/http/server.js';
 import { createApplication } from '../../src/application/index.js';
 import { ROLES } from '../../src/domain/role.js';
-import {
-  fakeCredentials,
-  memoryRateLimiter,
-  sequentialIds,
-} from '../support/memory.js';
+import { fakeCredentials, sequentialIds } from '../support/memory.js';
 import { prepareTestDatabase, resetData, TEST_URL } from '../support/db.js';
 
 let pool: pg.Pool;
@@ -39,6 +33,7 @@ describe('PgNotifier（LISTEN / NOTIFY）', () => {
   it('[US2.1] セッションが更新されると、そのゲームの購読者だけに、内容なしで通知される', async () => {
     const notifier = new PgNotifier(TEST_URL);
     await notifier.start();
+    expect(notifier.isListening()).toBe(true);
     const app = createApplication({
       uow: new PgUnitOfWork(pool, { idempotencyKey: Buffer.alloc(32, 1) }),
       clock: { now: () => new Date() },
@@ -92,68 +87,5 @@ describe('PgNotifier の再接続', () => {
       { timeout: 3000, interval: 100 },
     );
     await notifier.stop();
-  });
-});
-
-describe('SSE', () => {
-  it('[US2.1] 通知は「変化があった」ことだけを伝え、状態の内容を含まない。認証が要る。[US6.1/AC6.1.3] 接続数と通知の数をメトリクスに出す', async () => {
-    let fire: () => void = () => {};
-    const emitted: { name: string; value: number }[] = [];
-    const app = createApplication({
-      uow: new PgUnitOfWork(pool, { idempotencyKey: Buffer.alloc(32, 1) }),
-      clock: { now: () => new Date() },
-      ids: { uuid: () => randomUUID(), joinCode: sequentialIds().joinCode },
-      credentials: fakeCredentials(),
-      reviews: new PgReviewReader(pool),
-      exports: new PgExportReader(pool, new PgReviewReader(pool)),
-    });
-    const server = buildServer({
-      app,
-      ready: async () => true,
-      notifier: {
-        subscribe: (_id, l) => {
-          fire = l;
-          return () => {};
-        },
-      },
-      rateLimiter: memoryRateLimiter(1000, 60_000),
-      metrics: { emit: (ms) => emitted.push(...ms) },
-      config: { allowedOrigins: ['https://x.test'], logLevel: 'silent' },
-    });
-    await server.listen({ port: 0, host: '127.0.0.1' });
-    const base = `http://127.0.0.1:${(server.server.address() as AddressInfo).port}`;
-    try {
-      const c = await app.createGame({ weeks: 2 });
-      expect((await fetch(`${base}/api/games/${c.gameId}/stream`)).status).toBe(
-        401,
-      );
-
-      const ctrl = new AbortController();
-      const res = await fetch(`${base}/api/games/${c.gameId}/stream`, {
-        headers: { cookie: `bg_facilitator=${c.facilitatorToken}` },
-        signal: ctrl.signal,
-      });
-      expect(res.headers.get('content-type')).toBe('text/event-stream');
-      expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-      expect(res.headers.get('strict-transport-security')).toMatch(/max-age/);
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-      let text = decoder.decode((await reader.read()).value);
-      expect(text).toContain(': connected');
-      fire();
-      text += decoder.decode((await reader.read()).value);
-      expect(text).toContain('event: changed\ndata: {}');
-      expect(emitted).toContainEqual({
-        name: 'SseConnections',
-        value: 1,
-        unit: 'Count',
-      });
-      expect(emitted.filter((m) => m.name === 'SseNotifications')).toHaveLength(
-        1,
-      );
-      ctrl.abort();
-    } finally {
-      await server.close();
-    }
   });
 });

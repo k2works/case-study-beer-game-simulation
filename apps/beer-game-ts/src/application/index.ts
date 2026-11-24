@@ -366,6 +366,13 @@ export function createApplication(deps: Dependencies) {
             );
             await repos.sessions.save(next, session.version);
             await repos.events.append(input.gameId, events);
+            // 週の確定を、確定の方式（手動・自動）ごとに数える（保存と同じ操作の中の自動確定も含む）
+            for (const e of events)
+              if (e.type === 'WeekCommitted')
+                deps.metrics?.emit(
+                  [{ name: 'WeekCommitted', value: 1, unit: 'Count' }],
+                  { CommitKind: e.record.commitKind },
+                );
             return { versions: versionsOf(null, next) };
           },
         );
@@ -386,17 +393,6 @@ export function createApplication(deps: Dependencies) {
   }
 
   return {
-    /** 候補の資格のうち、このゲームのものを返す。無ければ先頭（認可の失敗として扱われる） */
-    identify(input: { tokens: string[]; gameId: string }): Promise<string> {
-      return uow.run(async (repos) => {
-        for (const token of input.tokens) {
-          const principal = await findPrincipal(repos, token, 'SESSION');
-          if (principal?.gameId === input.gameId) return token;
-        }
-        return input.tokens[0] ?? '';
-      });
-    },
-
     createGame(input: {
       weeks: number;
       demand?: readonly number[];

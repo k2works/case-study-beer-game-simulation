@@ -209,24 +209,19 @@ describe('assignRole（開始後の入れ替え）', () => {
   it('終了後は 409 session.already_ended', async () => {
     const table = await startedWithSpare(1);
     for (const role of ROLES) {
-      await app.saveDecision({
+      await app.saveOwnDecision({
         token: table.players[role].token,
         gameId: table.gameId,
-        role,
+        week: 1,
         quantity: 4,
         expectedVersion: 0,
       });
     }
-    const { sessionVersion } = await app.console({
+    await app.commitWeekWithBasis({
       token: table.facilitator,
       gameId: table.gameId,
-    });
-    await app.commitWeek({
-      token: table.facilitator,
-      gameId: table.gameId,
-      week: 1,
-      version: sessionVersion,
-      idempotencyKey: 'week-1',
+      requestedWeek: 1,
+      basis: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 1, RETAILER: 1 },
     });
     const res = await assign(table, table.spare.id, 'RETAILER');
     expect(res.statusCode).toBe(409);
@@ -235,7 +230,7 @@ describe('assignRole（開始後の入れ替え）', () => {
 
   it('停止中も受け付ける', async () => {
     const table = await startedWithSpare();
-    await app.pauseSession({ token: table.facilitator, gameId: table.gameId });
+    await app.pause({ token: table.facilitator, gameId: table.gameId });
     const res = await assign(table, table.spare.id, 'WHOLESALER');
     expect(res.statusCode).toBe(200);
   });

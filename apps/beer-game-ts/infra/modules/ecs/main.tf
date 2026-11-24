@@ -89,7 +89,7 @@ resource "aws_ecs_task_definition" "api" {
       # メトリクスの次元 Environment（観測のアラームと同じ値）
       { name = "APP_ENV", value = var.name },
       { name = "PORT", value = tostring(var.container_port) },
-      { name = "ALLOWED_ORIGIN", value = var.allowed_origin },
+      { name = "ALLOWED_ORIGINS", value = var.allowed_origin },
     ]
     secrets = local.api_secrets
     logConfiguration = {

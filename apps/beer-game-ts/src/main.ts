@@ -17,7 +17,6 @@ const server = buildServer({
     await pool.query('SELECT 1');
     return true;
   },
-  notifier,
   notifierReady: () => notifier.isListening(),
   metrics: createMetrics(config),
   rateLimiter: new PgRateLimiter(pool, {

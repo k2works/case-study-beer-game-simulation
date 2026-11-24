@@ -82,16 +82,43 @@ describe('problem+json（共有の契約の Problem）', () => {
     expect(res.headers['x-correlation-id']).toBe(UUID);
   });
 
-  it('旧い経路（/api/*）の problem は、段階 4 まで従来の形のまま', async () => {
+  it('相関 ID は、要求の x-correlation-id が UUID ならそれを使い、そうでなければ作る', async () => {
     server = await bootServer();
-    const res = await server.inject({
+    const given = await server.inject({
+      method: 'GET',
+      url: '/api/v1/health',
+      headers: { 'x-correlation-id': UUID },
+    });
+    expect(given.headers['x-correlation-id']).toBe(UUID);
+    for (const bad of ['corr-123', '', 'x'.repeat(200)]) {
+      const res = await server.inject({
+        method: 'GET',
+        url: '/api/v1/no-such-route',
+        headers: { 'x-correlation-id': bad },
+      });
+      const id = res.headers['x-correlation-id'];
+      expect(id).not.toBe(bad);
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(res.json().correlationId).toBe(id);
+    }
+  });
+
+  it('API の外の経路（旧い /api/*・その他）も、契約の problem+json で、同じ code を返す', async () => {
+    server = await bootServer();
+    const missing = await server.inject({ method: 'GET', url: '/api/games' });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toMatchObject({
+      type: '/problems/request.not_found',
+      code: 'request.not_found',
+    });
+    const forbidden = await server.inject({
       method: 'POST',
       url: '/api/games',
       payload: { weeks: 2 },
       headers: { origin: 'https://evil.example.test' },
     });
-    expect(res.statusCode).toBe(403);
-    expect(res.json().type).toBe('about:blank');
+    expect(forbidden.statusCode).toBe(403);
+    expect(forbidden.json().code).toBe('app.unauthorized');
   });
 });
 

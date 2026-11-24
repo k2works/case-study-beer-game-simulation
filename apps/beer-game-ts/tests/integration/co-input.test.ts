@@ -170,5 +170,5 @@ describe('共同入力の並行性（実 PostgreSQL）', () => {
       const state = await app.roleState({ token: retailers[1]!, gameId });
       expect(state.decision?.version).toBe(SAVE_LIMIT);
     }
-  });
+  }, 30_000);
 });

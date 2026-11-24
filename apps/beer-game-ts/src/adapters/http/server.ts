@@ -1,18 +1,16 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { Writable } from 'node:stream';
 import cookie from '@fastify/cookie';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
-  type FastifyReply,
   type FastifyRequest,
 } from 'fastify';
-import { z, ZodError } from 'zod';
+import { ZodError } from 'zod';
 import type { Application } from '../../application/index.js';
 import {
   CredentialAlreadyRevokedError,
   CredentialNotRevokedError,
-  DecisionConflict,
   DecisionConflictedError,
   DecisionsChangedViewError,
   ForbiddenError,
@@ -25,11 +23,6 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../../application/errors.js';
-import {
-  DISCLOSURE_POLICIES,
-  type ConditionsInput,
-} from '../../domain/conditions.js';
-import { ROLES } from '../../domain/role.js';
 import {
   AlreadyStartedError,
   DomainError,
@@ -48,7 +41,6 @@ import {
 import {
   ConflictError,
   DuplicateError,
-  type ChangeNotifier,
   type Metrics,
   type RateLimiter,
 } from '../../ports/index.js';
@@ -90,11 +82,13 @@ import {
 import { registerApiV1Reads } from './routes-v1-reads.js';
 import { rateLimited, registerApiV1Commands } from './routes-v1-commands.js';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export interface HttpConfig {
   /** 変更系の要求を受ける送信元（Origin）。画面の配信元。開発・E2E では別のポートも許す */
   allowedOrigins: readonly string[];
   logLevel: string;
-  /** 共有の契約（/api/v1）の資格の Cookie に `Secure` を付けるか。省略時は付ける（HTTPS が前提） */
+  /** 資格の Cookie に `Secure` を付けるか。省略時は付ける（HTTPS が前提） */
   secureCookies?: boolean;
 }
 
@@ -103,7 +97,6 @@ export interface ServerDependencies {
   ready: () => Promise<boolean>;
   /** 通知の受信が生きているか（`/api/v1/ready` の確認。省略時は生きているとみなす） */
   notifierReady?: () => boolean;
-  notifier: ChangeNotifier;
   /** 参加・復帰の専用のレート制限（総当たりの対策） */
   rateLimiter: RateLimiter;
   /** メトリクス（省略時は出さない） */
@@ -111,121 +104,6 @@ export interface ServerDependencies {
   config: HttpConfig;
   /** ログの出力先（テスト用。省略時は標準出力） */
   logStream?: Writable;
-}
-
-/** 進行役と参加者の資格は別の Cookie。同じブラウザで、進行役が参加者を兼ねられる */
-export const COOKIE = {
-  facilitator: 'bg_facilitator',
-  participant: 'bg_participant',
-  observer: 'bg_observer',
-} as const;
-type Kind = keyof typeof COOKIE;
-
-class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly title = 'Bad Request',
-  ) {
-    super(message);
-  }
-}
-
-const roleSchema = z.enum(ROLES);
-const createBody = z.object({
-  weeks: z.number().int(),
-  demand: z.array(z.number()).optional(),
-  commitMode: z.enum(['MANUAL', 'AUTO']).optional(),
-  // 保持期間（日）。範囲の検査はドメイン
-  retentionDays: z.number().optional(),
-  // 範囲の検査はドメイン（項目ごとの修正内容を返す）。ここでは形と、未知の項目だけを拒否する
-  conditions: z
-    .strictObject({
-      initialInventory: z.number(),
-      orderDelayWeeks: z.number(),
-      shipmentDelayWeeks: z.number(),
-      productionDelayWeeks: z.number(),
-      holdingCostMinor: z.number(),
-      backlogCostMinor: z.number(),
-      disclosure: z.enum(DISCLOSURE_POLICIES),
-    })
-    .partial()
-    .optional(),
-});
-/**
- * 旧い経路（/api/*）は、初期在庫を 1 つの数で受ける。全役割に同じ値として、ドメインの条件（役割ごと）へ写す。
- * 役割ごとの値は、共有の契約の経路（/api/v1）で受ける。この写しは、旧い経路と一緒に、段階 4 で撤去する。
- */
-function legacyConditions(
-  input: NonNullable<z.infer<typeof createBody>['conditions']>,
-): ConditionsInput {
-  const { initialInventory, ...others } = input;
-  return initialInventory === undefined
-    ? others
-    : {
-        ...others,
-        initialInventory: {
-          FACTORY: initialInventory,
-          DISTRIBUTOR: initialInventory,
-          WHOLESALER: initialInventory,
-          RETAILER: initialInventory,
-        },
-      };
-}
-const joinBody = z.object({
-  joinCode: z.string().min(1),
-  displayName: z.string(),
-});
-const assignBody = z.object({
-  participantId: z.string().min(1),
-  role: roleSchema,
-});
-const decisionBody = z.object({ role: roleSchema, quantity: z.number() });
-const recoverBody = z.object({ code: z.string().max(200) });
-const observeBody = z.object({
-  code: z.string().max(200),
-  displayName: z.string().optional(),
-});
-const reissueBody = z.discriminatedUnion('target', [
-  z.object({ target: z.literal('FACILITATOR') }),
-  z.object({
-    target: z.literal('PARTICIPANT'),
-    participantId: z.string().min(1),
-  }),
-]);
-const commitBody = z.object({ week: z.number().int() });
-const commitModeBody = z.object({ commitMode: z.enum(['MANUAL', 'AUTO']) });
-const exportQuery = z.object({ format: z.enum(['csv', 'json']) });
-
-function ifMatch(request: FastifyRequest): number {
-  const raw = request.headers['if-match'];
-  const n =
-    typeof raw === 'string' ? Number(raw.replace(/"/g, '')) : Number.NaN;
-  if (!Number.isInteger(n) || n < 0)
-    throw new HttpError(400, 'If-Match ヘッダーに版が必要です');
-  return n;
-}
-
-function problem(
-  reply: FastifyReply,
-  status: number,
-  title: string,
-  detail: string,
-  issues?: unknown,
-  extensions: Record<string, unknown> = {},
-) {
-  return reply
-    .code(status)
-    .type('application/problem+json')
-    .send({
-      type: 'about:blank',
-      title,
-      status,
-      detail,
-      ...(issues ? { issues } : {}),
-      ...extensions,
-      correlationId: reply.request.id,
-    });
 }
 
 /**
@@ -248,8 +126,14 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       },
       ...(deps.logStream ? { stream: deps.logStream } : {}),
     },
-    requestIdHeader: 'x-correlation-id',
-    genReqId: () => randomUUID(),
+    // 相関 ID: 要求の `x-correlation-id` が UUID ならそれを使い、そうでなければ作る（共有の契約）
+    requestIdHeader: false,
+    genReqId: (request) => {
+      const given = request.headers['x-correlation-id'];
+      return typeof given === 'string' && UUID.test(given)
+        ? given
+        : randomUUID();
+    },
     // 本文の上限は 64 KB（NF-P12）。超えたら 413
     bodyLimit: 65_536,
   });
@@ -258,7 +142,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
 
   // 本文の無い要求（開始・停止・再開など、契約が本文を定めない操作）に、`Content-Type: application/json` が付くことがある
   // （共有 UI と受け入れの準備がそうする）。Fastify の既定は空の本文を 400 にするので、空は「本文なし」として通し、
-  // 本文が要る経路は、入力の検証（zod）が 422 にする。形の壊れた JSON は、従来どおり 400
+  // 本文が要る経路は、入力の検証（zod）が 422 にする。形の壊れた JSON は 400
   server.removeContentTypeParser('application/json');
   server.addContentTypeParser(
     'application/json',
@@ -278,7 +162,7 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     },
   );
 
-  // セキュリティヘッダー（NF-S9）。API は JSON と SSE だけを返すので、CSP はすべて拒否でよい
+  // セキュリティヘッダー（NF-S9）。API は JSON だけを返すので、CSP はすべて拒否でよい
   const SECURITY_HEADERS = {
     'strict-transport-security': 'max-age=31536000; includeSubDomains',
     'x-content-type-options': 'nosniff',
@@ -317,43 +201,24 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       },
     );
   });
-  // SSE の接続数（このタスクの現在の値。タスクの合計はダッシュボードで足し合わせる）
-  let sseConnections = 0;
-  const emitConnections = () =>
-    metrics.emit([
-      { name: 'SseConnections', value: sseConnections, unit: 'Count' },
-    ]);
-  const committed = (kind: 'MANUAL' | 'AUTO') =>
-    metrics.emit([{ name: 'WeekCommitted', value: 1, unit: 'Count' }], {
-      CommitKind: kind,
-    });
 
+  // 変更系: 送信元（Origin）の検査のあと、`Idempotency-Key` が必須（共有の契約）
   server.addHook('onRequest', async (request, reply) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return;
     const origin = request.headers.origin;
     const allowed =
       origin !== undefined && config.allowedOrigins.includes(origin);
-    if (isApiV1(request.url)) {
-      // 共有の契約（/api/v1）: 送信元の検査のあと、変更系は Idempotency-Key が必須
-      if (!allowed) return sendApiProblem(reply, unauthorizedProblem());
-      try {
-        idempotencyKeyOf(request);
-      } catch (error) {
-        if (error instanceof ApiProblem) return sendApiProblem(reply, error);
-        throw error;
-      }
-      return;
-    }
-    if (!allowed) {
-      return problem(reply, 403, 'Forbidden', '許可されていない送信元です');
+    if (!allowed) return sendApiProblem(reply, unauthorizedProblem());
+    if (!isApiV1(request.url)) return;
+    try {
+      idempotencyKeyOf(request);
+    } catch (error) {
+      if (error instanceof ApiProblem) return sendApiProblem(reply, error);
+      throw error;
     }
   });
 
-  /**
-   * 共有の契約（/api/v1）の失敗を、`code` を持つ problem+json にする。
-   * 業務の失敗の code（session.paused など）は、操作を /api/v1 に実装するときに、ここへ写しを足す
-   * （docs/development/beer-game-ts/api_alignment_plan.md の段階 3）。写しが無い StaleError は、いまは app.internal になる。
-   */
+  /** 失敗を、共有の契約の `code` を持つ problem+json にする */
   const toApiProblem = (error: FastifyError | Error): ApiProblem => {
     if (error instanceof ApiProblem) return error;
     if (error instanceof ZodError) {
@@ -431,121 +296,44 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
   };
 
   server.setErrorHandler((error: FastifyError | Error, request, reply) => {
-    if (isApiV1(request.url)) {
-      if (error instanceof DuplicateError) invariantViolations.add(request);
-      const mapped = toApiProblem(error);
-      if (mapped.code === 'app.internal') {
-        request.log.error({ err: error }, '予期しないエラー');
-      }
-      return sendApiProblem(reply, mapped);
-    }
-    if (error instanceof ZodError) {
-      return problem(
-        reply,
-        400,
-        'Bad Request',
-        '入力の形式が正しくありません',
-        error.issues.map((i) => ({
-          problem: i.message,
-          fix: `${i.path.join('.') || '本文'} を確認してください`,
-        })),
-      );
-    }
-    if (error instanceof HttpError)
-      return problem(reply, error.status, error.title, error.message);
-    if (error instanceof UnauthorizedError) {
-      // 復帰の失敗は、総当たりの検知のために記録する（コードは記録しない）
-      if (request.routeOptions.url === '/api/recover')
-        request.log.warn({ ip: request.ip }, '復帰に失敗しました');
-      if (request.routeOptions.url === '/api/observe')
-        request.log.warn({ ip: request.ip }, '観察者の参加に失敗しました');
-      return problem(reply, 401, 'Unauthorized', error.message);
-    }
-    if (error instanceof ForbiddenError)
-      return problem(reply, 403, 'Forbidden', error.message);
-    if (error instanceof NotFoundError)
-      return problem(reply, 404, 'Not Found', error.message);
-    // 共同入力の競合: 最新の値・版・保存者を同じ応答で返す（同じ役割の担当にだけ起きる）
-    if (error instanceof DecisionConflict) {
-      return problem(reply, 409, 'Conflict', error.message, undefined, {
-        latest: error.latest,
-      });
-    }
     if (error instanceof DuplicateError) invariantViolations.add(request);
-    if (error instanceof ConflictError || error instanceof StaleError) {
-      return problem(reply, 409, 'Conflict', error.message);
+    // 復帰・観察者の参加の失敗は、総当たりの検知のために記録する（コードは記録しない）
+    if (
+      error instanceof UnauthorizedError &&
+      request.routeOptions.url === `${API_V1}/participations/recover`
+    )
+      request.log.warn({ ip: request.ip }, '復帰に失敗しました');
+    if (
+      error instanceof InvalidObserverInvitationError &&
+      request.routeOptions.url === `${API_V1}/participations/observe`
+    )
+      request.log.warn({ ip: request.ip }, '観察者の参加に失敗しました');
+    const mapped = toApiProblem(error);
+    if (mapped.code === 'app.internal') {
+      request.log.error({ err: error }, '予期しないエラー');
     }
-    if (error instanceof PermissionError) {
-      return problem(reply, 403, 'Forbidden', error.message);
-    }
-    if (error instanceof DomainError) {
-      return problem(
-        reply,
-        422,
-        'Unprocessable Content',
-        error.message,
-        error.issues,
-      );
-    }
-    const status = (error as FastifyError).statusCode;
-    if (status && status >= 400 && status < 500) {
-      return problem(reply, status, 'Bad Request', '要求を処理できません');
-    }
-    request.log.error({ err: error }, '予期しないエラー');
-    return problem(
-      reply,
-      500,
-      'Internal Server Error',
-      '予期しないエラーが発生しました。相関 ID を添えて連絡してください',
-    );
+    return sendApiProblem(reply, mapped);
   });
 
-  // 経路が無い。/api/v1 は、code を持つ problem+json。それ以外は従来の形（Fastify の既定）
-  server.setNotFoundHandler((request, reply) => {
-    if (isApiV1(request.url)) return sendApiProblem(reply, notFoundProblem());
-    return reply.code(404).send({
-      message: `Route ${request.method}:${request.url} not found`,
-      error: 'Not Found',
-      statusCode: 404,
-    });
-  });
+  // 経路が無い。code を持つ problem+json
+  server.setNotFoundHandler((_request, reply) =>
+    sendApiProblem(reply, notFoundProblem()),
+  );
 
-  /** 候補の資格のうち、このゲームのものを選ぶ（別のゲームの古い資格は使わない） */
-  const tokenOf = (request: FastifyRequest, ...kinds: Kind[]) => {
-    const tokens = kinds
-      .map((k) => request.cookies[COOKIE[k]])
-      .filter((t): t is string => Boolean(t));
-    return app.identify({ tokens, gameId: gameParam(request) });
-  };
-  const setSession = (reply: FastifyReply, kind: Kind, value: string) =>
-    reply.setCookie(COOKIE[kind], value, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 24 * 60 * 60,
-    });
-  const gameParam = (request: FastifyRequest) =>
-    (request.params as { id: string }).id;
-
-  /** 参加・復帰の専用のレート制限。送信元ごと、エンドポイントごとに数える */
-  const limit = async (request: FastifyRequest, name: string) => {
-    const ok = await deps.rateLimiter.hit(`${name}:${request.ip}`, new Date());
-    if (!ok) {
-      request.log.warn(
-        { ip: request.ip, bucket: name },
-        'レート制限を超えました',
-      );
-      throw new HttpError(
-        429,
-        '試行が多すぎます。時間をおいてから、もう一度試してください',
-        'Too Many Requests',
-      );
-    }
-  };
-
+  // /health はコンテナのヘルスチェック、/ready は ALB のヘルスチェック（DB の確認）。
+  // 共有の契約の getHealth・getReady は、/api/v1 の下（CloudFront 経由の合成監視もこちら）
   server.get('/health', async () => ({ status: 'ok' }));
-  // 共有の契約（getHealth・getReady）。認可なし。負荷分散には /ready を使う
+  server.get('/ready', async (_request, reply) => {
+    let ok: boolean;
+    try {
+      ok = await deps.ready();
+    } catch {
+      ok = false;
+    }
+    return reply
+      .code(ok ? 200 : 503)
+      .send({ status: ok ? 'ready' : 'unavailable' });
+  });
   server.get(`${API_V1}/health`, async () => ({ status: 'ok' }));
   server.get(`${API_V1}/ready`, async (_request, reply) => {
     let database: boolean;
@@ -559,24 +347,11 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
     // 503 は必ず type を持つ problem+json（共有 UI が、負荷分散の外側の 503 と区別する）
     return sendApiProblem(reply, notReadyProblem({ database, notifier }));
   });
-  // /ready は ALB のヘルスチェック、/api/ready は CloudFront 経由の合成監視（/api/* だけが API へ届く）
-  for (const path of ['/ready', '/api/ready'])
-    server.get(path, async (_request, reply) => {
-      let ok: boolean;
-      try {
-        ok = await deps.ready();
-      } catch {
-        ok = false;
-      }
-      return reply
-        .code(ok ? 200 : 503)
-        .send({ status: ok ? 'ready' : 'unavailable' });
-    });
 
   registerApiV1Reads(server, app);
   registerApiV1Commands(server, {
     app,
-    // 共有の契約: 超えたら 429（`app.rate_limited`）＋ `Retry-After`（窓の長さ）
+    // 超えたら 429（`app.rate_limited`）＋ `Retry-After`（窓の長さ）
     limit: async (request, bucket) => {
       const ok = await deps.rateLimiter.hit(
         `${bucket}:${request.ip}`,
@@ -588,281 +363,6 @@ export function buildServer(deps: ServerDependencies): FastifyInstance {
       }
     },
     secureCookies: config.secureCookies ?? true,
-  });
-
-  server.post('/api/games', async (request, reply) => {
-    const { conditions, ...rest } = createBody.parse(request.body);
-    const created = await app.createGame({
-      ...rest,
-      ...(conditions ? { conditions: legacyConditions(conditions) } : {}),
-    });
-    setSession(reply, 'facilitator', created.facilitatorToken);
-    // 復帰コードは、この応答で一度だけ返す（保存はダイジェストだけ）
-    return reply.code(201).send({
-      gameId: created.gameId,
-      joinCode: created.joinCode,
-      recoveryCode: created.recoveryCode,
-    });
-  });
-
-  server.post('/api/join', async (request, reply) => {
-    await limit(request, 'join');
-    const body = joinBody.parse(request.body);
-    const joined = await app.joinGame(body);
-    setSession(reply, 'participant', joined.token);
-    return reply.code(201).send({
-      gameId: joined.gameId,
-      participantId: joined.participantId,
-      recoveryCode: joined.recoveryCode,
-    });
-  });
-
-  // 復帰コードで戻る。新しいブラウザセッションの Cookie を設定する
-  server.post('/api/recover', async (request, reply) => {
-    await limit(request, 'recover');
-    const body = recoverBody.parse(request.body);
-    const back = await app.recover(body);
-    setSession(
-      reply,
-      back.kind === 'FACILITATOR' ? 'facilitator' : 'participant',
-      back.token,
-    );
-    return {
-      gameId: back.gameId,
-      kind: back.kind,
-      gameStatus: back.gameStatus,
-      ...(back.participantId ? { participantId: back.participantId } : {}),
-    };
-  });
-
-  // 観察用の招待（進行役）。招待コードは、この応答で一度だけ返す
-  server.post('/api/games/:id/observer-invitations', async (request, reply) => {
-    const issued = await app.issueObserverInvitation({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-    });
-    return reply.code(201).send(issued);
-  });
-
-  server.delete(
-    '/api/games/:id/observer-invitations/:invitationId',
-    async (request, reply) => {
-      const { invitationId } = request.params as { invitationId: string };
-      await app.revokeObserverInvitation({
-        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-        gameId: gameParam(request),
-        invitationId,
-      });
-      return reply.code(204).send();
-    },
-  );
-
-  // 観察者の参加。参加コードとは別の招待コードで、専用のレート制限を受ける
-  server.post('/api/observe', async (request, reply) => {
-    await limit(request, 'observe');
-    const body = observeBody.parse(request.body);
-    const joined = await app.joinAsObserver(body);
-    setSession(reply, 'observer', joined.token);
-    return reply.code(201).send({ gameId: joined.gameId });
-  });
-
-  // 観察（観察者と進行役）。逆算できない集計だけを返す
-  server.get('/api/games/:id/observation', async (request) =>
-    app.observation({
-      token: await tokenOf(request, 'observer', 'facilitator', 'participant'),
-      gameId: gameParam(request),
-    }),
-  );
-
-  // 漏れた資格の失効と再発行（進行役）。進行役自身なら、新しい Cookie も設定する
-  server.post('/api/games/:id/credentials/reissue', async (request, reply) => {
-    const body = reissueBody.parse(request.body);
-    const reissued = await app.reissueCredential({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      target:
-        body.target === 'FACILITATOR'
-          ? { kind: 'FACILITATOR' }
-          : { kind: 'PARTICIPANT', participantId: body.participantId },
-    });
-    if (reissued.facilitatorToken)
-      setSession(reply, 'facilitator', reissued.facilitatorToken);
-    return { recoveryCode: reissued.recoveryCode };
-  });
-
-  server.get('/api/games/:id/lobby', async (request) =>
-    app.lobby({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-    }),
-  );
-
-  server.post('/api/games/:id/assignments', async (request, reply) => {
-    const body = assignBody.parse(request.body);
-    await app.assignRole({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      ...body,
-    });
-    return reply.code(204).send();
-  });
-
-  server.delete(
-    '/api/games/:id/assignments/:participantId',
-    async (request, reply) => {
-      const { participantId } = request.params as { participantId: string };
-      await app.unassignRole({
-        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-        gameId: gameParam(request),
-        participantId,
-      });
-      return reply.code(204).send();
-    },
-  );
-
-  server.post('/api/games/:id/start', async (request, reply) => {
-    await app.startGame({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-    });
-    return reply.code(204).send();
-  });
-
-  server.get('/api/games/:id/me', async (request) =>
-    app.roleState({
-      token: await tokenOf(request, 'participant', 'facilitator', 'observer'),
-      gameId: gameParam(request),
-    }),
-  );
-
-  // 振り返り（役割別の時系列）。ゲームが終了してから、進行役・参加者に開示する
-  server.get('/api/games/:id/review', async (request) =>
-    app.review({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-    }),
-  );
-
-  // 出力（進行役・終了後）。全体を組み立ててから送る。本文の SHA-256 をヘッダーで返す
-  server.get('/api/games/:id/export', async (request, reply) => {
-    const { format } = exportQuery.parse(request.query);
-    const out = await app.exportGame({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      format,
-    });
-    return reply
-      .type(out.contentType)
-      .header('content-disposition', `attachment; filename="${out.filename}"`)
-      .header('cache-control', 'no-store')
-      .header(
-        'x-checksum-sha256',
-        createHash('sha256').update(out.body).digest('hex'),
-      )
-      .send(out.body);
-  });
-
-  server.get('/api/games/:id/console', async (request) =>
-    app.console({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-    }),
-  );
-
-  server.put('/api/games/:id/decision', async (request) => {
-    const body = decisionBody.parse(request.body);
-    const saved = await app.saveDecision({
-      token: await tokenOf(request, 'participant', 'facilitator', 'observer'),
-      gameId: gameParam(request),
-      role: body.role,
-      quantity: body.quantity,
-      expectedVersion: ifMatch(request),
-    });
-    if (saved.committed) committed('AUTO');
-    return saved;
-  });
-
-  for (const action of ['pause', 'resume'] as const) {
-    server.post(`/api/games/:id/${action}`, async (request, reply) => {
-      const input = {
-        token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-        gameId: gameParam(request),
-      };
-      await (action === 'pause'
-        ? app.pauseSession(input)
-        : app.resumeSession(input));
-      return reply.code(204).send();
-    });
-  }
-
-  server.put('/api/games/:id/commit-mode', async (request, reply) => {
-    const body = commitModeBody.parse(request.body);
-    await app.changeCommitMode({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      commitMode: body.commitMode,
-    });
-    return reply.code(204).send();
-  });
-
-  server.put('/api/games/:id/proxy-decision', async (request) => {
-    const body = decisionBody.parse(request.body);
-    return app.proxyDecision({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      role: body.role,
-      quantity: body.quantity,
-      expectedVersion: ifMatch(request),
-    });
-  });
-
-  server.post('/api/games/:id/commit', async (request) => {
-    const body = commitBody.parse(request.body);
-    const key = request.headers['idempotency-key'];
-    if (typeof key !== 'string' || key.length === 0) {
-      throw new HttpError(400, 'Idempotency-Key ヘッダーが必要です');
-    }
-    const result = await app.commitWeek({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId: gameParam(request),
-      week: body.week,
-      version: ifMatch(request),
-      idempotencyKey: key,
-    });
-    committed('MANUAL');
-    return result;
-  });
-
-  // 状態の変化の通知（SSE）。内容は含めず、変化があったことだけを伝える
-  server.get('/api/games/:id/stream', async (request, reply) => {
-    const gameId = gameParam(request);
-    await app.authorizeStream({
-      token: await tokenOf(request, 'facilitator', 'participant', 'observer'),
-      gameId,
-    }); // 認証・認可の確認（観察者にはロビーを見せないため、専用の確認）
-    reply.hijack();
-    const res = reply.raw;
-    res.writeHead(200, {
-      ...SECURITY_HEADERS,
-      'content-type': 'text/event-stream',
-      'cache-control': 'no-cache',
-      connection: 'keep-alive',
-      'x-correlation-id': request.id,
-    });
-    res.write(': connected\n\n');
-    sseConnections += 1;
-    emitConnections();
-    const unsubscribe = deps.notifier.subscribe(gameId, () => {
-      res.write('event: changed\ndata: {}\n\n');
-      metrics.emit([{ name: 'SseNotifications', value: 1, unit: 'Count' }]);
-    });
-    const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15_000);
-    request.raw.on('close', () => {
-      clearInterval(heartbeat);
-      unsubscribe();
-      sseConnections -= 1;
-      emitConnections();
-    });
   });
 
   return server;

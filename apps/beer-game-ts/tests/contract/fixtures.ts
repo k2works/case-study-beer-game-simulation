@@ -1,7 +1,7 @@
 import type { Application } from '../../src/application/index.js';
 import { ROLES, type Role } from '../../src/domain/role.js';
 
-/** 契約テストの前提のゲーム。HTTP を通さずに、アプリケーションで用意する（契約テストは、読み取りの応答を検証する） */
+/** 契約テストの前提のゲーム。HTTP を通さずに、アプリケーションで用意する（契約テストは、HTTP の応答を検証する） */
 export interface Table {
   gameId: string;
   joinCode: string;
@@ -13,12 +13,17 @@ export interface Table {
 /** 4 人が参加し、4 役割にそろって割り当てられている（開始前） */
 export async function preparedTable(
   app: Application,
-  options: { weeks?: number; demand?: number[] } = {},
+  options: {
+    weeks?: number;
+    demand?: number[];
+    commitMode?: 'MANUAL' | 'AUTO';
+  } = {},
 ): Promise<Table> {
   const weeks = options.weeks ?? 2;
   const created = await app.createGame({
     weeks,
     demand: options.demand ?? Array.from({ length: weeks }, () => 4),
+    ...(options.commitMode ? { commitMode: options.commitMode } : {}),
   });
   const players = {} as Table['players'];
   for (const role of ROLES) {
@@ -47,48 +52,48 @@ export async function preparedTable(
 
 export async function startedTable(
   app: Application,
-  options: { weeks?: number; demand?: number[] } = {},
+  options: {
+    weeks?: number;
+    demand?: number[];
+    commitMode?: 'MANUAL' | 'AUTO';
+  } = {},
 ): Promise<Table> {
   const table = await preparedTable(app, options);
   await app.startGame({ token: table.facilitator, gameId: table.gameId });
   return table;
 }
 
-/** 4 役割が当週の発注を保存する */
+/** 4 役割が、指定の週の発注を保存する（その週の最初の保存。版は 0 から） */
 export async function saveAll(
   app: Application,
   table: Table,
   quantity = 4,
+  week = 1,
 ): Promise<void> {
   for (const role of ROLES) {
-    await app.saveDecision({
+    await app.saveOwnDecision({
       token: table.players[role].token,
       gameId: table.gameId,
-      role,
+      week,
       quantity,
       expectedVersion: 0,
     });
   }
 }
 
-/** 当週を、全役割が保存してから、進行役が確定する */
+/** 当週を、全役割が保存してから、進行役が確定する（確定の根拠は、各役割の版 1） */
 export async function playWeek(
   app: Application,
   table: Table,
   week: number,
   quantity = 4,
 ): Promise<void> {
-  await saveAll(app, table, quantity);
-  const { sessionVersion } = await app.console({
+  await saveAll(app, table, quantity, week);
+  await app.commitWeekWithBasis({
     token: table.facilitator,
     gameId: table.gameId,
-  });
-  await app.commitWeek({
-    token: table.facilitator,
-    gameId: table.gameId,
-    week,
-    version: sessionVersion,
-    idempotencyKey: `week-${week}`,
+    requestedWeek: week,
+    basis: { FACTORY: 1, DISTRIBUTOR: 1, WHOLESALER: 1, RETAILER: 1 },
   });
 }
 

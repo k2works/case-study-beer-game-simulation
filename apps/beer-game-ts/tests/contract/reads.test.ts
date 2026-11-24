@@ -259,10 +259,10 @@ describe('getSessionState（GET /sessions/{sessionId}/state）', () => {
 
   it('入力を保存すると、保存者・保存の時刻・版を示す。確定後は結果に反映される', async () => {
     const t = await startedTable(app);
-    await app.saveDecision({
+    await app.saveOwnDecision({
       token: t.players.RETAILER.token,
       gameId: t.gameId,
-      role: 'RETAILER',
+      week: 1,
       quantity: 9,
       expectedVersion: 0,
     });
@@ -282,12 +282,12 @@ describe('getSessionState（GET /sessions/{sessionId}/state）', () => {
     expect(own.submittedRoleCount).toBe(1);
 
     // 進行役の代理入力は、表示名を持たない
-    await app.proxyDecision({
+    await app.submitProxyDecision({
       token: t.facilitator,
       gameId: t.gameId,
       role: 'FACTORY',
+      requestedWeek: 1,
       quantity: 3,
-      expectedVersion: 0,
     });
     const fac = (
       await get(`/api/v1/sessions/${t.gameId}/state`, t.facilitator)
@@ -345,7 +345,7 @@ describe('getObservation（GET /games/{gameId}/observation）', () => {
   it('観察者と進行役に、現在週・入力済みの役割数・チーム合計だけを返す', async () => {
     const t = await startedTable(app, { weeks: 2 });
     await playWeek(app, t, 1);
-    await saveAll(app, t);
+    await saveAll(app, t, 4, 2);
     const observer = await observerOf(app, t);
     for (const token of [observer, t.facilitator]) {
       const res = await get(`/api/v1/games/${t.gameId}/observation`, token);

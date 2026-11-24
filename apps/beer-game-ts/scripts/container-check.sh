@@ -35,7 +35,8 @@ docker run -d --name "$DB" --network "$NET" \
   -e POSTGRES_DB=beer_game2 -e POSTGRES_USER=beer_game2 -e POSTGRES_PASSWORD=local-only \
   postgres:18-alpine >/dev/null
 for _ in $(seq 1 40); do
-  docker exec "$DB" pg_isready -U beer_game2 >/dev/null 2>&1 && break
+  # TCP で確かめる（初期化中の一時的なサーバーは、ソケットだけで待ち受けるので、ソケットの確認は早く通ってしまう）
+  docker exec "$DB" pg_isready -h 127.0.0.1 -U beer_game2 >/dev/null 2>&1 && break
   sleep 1
 done
 
@@ -44,7 +45,7 @@ docker run --rm --network "$NET" -e DATABASE_URL="$DB_URL" "$IMAGE" \
   && ok "マイグレーションを 1 回限りのタスクとして適用" || fail "マイグレーションに失敗"
 
 docker run -d --name "$API" --network "$NET" -p "${PORT}:3000" \
-  -e NODE_ENV=production -e DATABASE_URL="$DB_URL" -e ALLOWED_ORIGIN="https://staging.example.test" \
+  -e NODE_ENV=production -e DATABASE_URL="$DB_URL" -e ALLOWED_ORIGINS="https://staging.example.test" \
   -e CREDENTIAL_HMAC_KEY="$(printf 'ab%.0s' $(seq 1 32))" -e IDEMPOTENCY_KEY="$(printf 'cd%.0s' $(seq 1 32))" \
   "$IMAGE" >/dev/null
 

@@ -6,7 +6,7 @@ const KEY_HEX = 'ab'.repeat(32);
 const prod = {
   NODE_ENV: 'production',
   DATABASE_URL: 'postgres://u:p@h:5432/d',
-  ALLOWED_ORIGIN: 'https://beer.example.test',
+  ALLOWED_ORIGINS: 'https://beer.example.test',
   CREDENTIAL_HMAC_KEY: KEY_HEX,
   CREDENTIAL_KEY_VERSION: 'v1',
   IDEMPOTENCY_KEY: 'cd'.repeat(32),
@@ -50,7 +50,7 @@ describe('loadConfig', () => {
     'CREDENTIAL_HMAC_KEY',
     'IDEMPOTENCY_KEY',
     'DATABASE_URL',
-    'ALLOWED_ORIGIN',
+    'ALLOWED_ORIGINS',
   ])('[US6.1] 本番で %s が無ければ、起動に失敗する', (name) => {
     const env: Record<string, string | undefined> = { ...prod };
     delete env[name];
@@ -112,12 +112,14 @@ describe('loadConfig', () => {
     ).toEqual(['https://a.example.test', 'http://localhost:5273']);
   });
 
-  it('旧い名前 ALLOWED_ORIGIN（単数）も受ける。両方あれば ALLOWED_ORIGINS が優先', () => {
-    expect(loadConfig(prod).allowedOrigins).toEqual([prod.ALLOWED_ORIGIN]);
-    expect(
-      loadConfig({ ...prod, ALLOWED_ORIGINS: 'https://new.example.test' })
-        .allowedOrigins,
-    ).toEqual(['https://new.example.test']);
+  it('許可する送信元が 1 つなら、そのまま 1 要素になる。旧い名前 ALLOWED_ORIGIN（単数）は読まない', () => {
+    expect(loadConfig(prod).allowedOrigins).toEqual([prod.ALLOWED_ORIGINS]);
+    const env: Record<string, string | undefined> = {
+      ...prod,
+      ALLOWED_ORIGIN: 'https://old.example.test',
+    };
+    delete env.ALLOWED_ORIGINS;
+    expect(() => loadConfig(env)).toThrow(/ALLOWED_ORIGINS/);
   });
 });
 

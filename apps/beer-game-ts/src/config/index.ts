@@ -127,13 +127,7 @@ export function loadConfig(env: Env): Config {
       'postgres://beer_game2:local-only@localhost:5433/beer_game2',
     ),
     allowedOrigins: originList(
-      required(
-        // 旧い名前 ALLOWED_ORIGIN（単数）も、段階 4 の旧 API の撤去まで受ける
-        { ...env, ALLOWED_ORIGINS: env.ALLOWED_ORIGINS ?? env.ALLOWED_ORIGIN },
-        'ALLOWED_ORIGINS',
-        production,
-        'http://localhost:5173',
-      ),
+      required(env, 'ALLOWED_ORIGINS', production, 'http://localhost:5173'),
     ),
     logLevel: env.LOG_LEVEL ?? 'info',
     credentialKeys: credentialKeys(env, production),
