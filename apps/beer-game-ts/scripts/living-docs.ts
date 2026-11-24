@@ -34,8 +34,10 @@ import {
   validateTerms,
 } from './lib/living-docs.js';
 
+/** リンクの基点（develop ブランチ）。表示とリンク先のパスは、リポジトリ基点（Kotlin 版・Rust 版と同じ） */
 const REPO_BASE =
-  'https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts';
+  'https://github.com/k2works/case-study-beer-game-simulation/blob/develop';
+const APP_DIR = 'apps/beer-game-ts';
 const DESIGN = '../../docs/design/beer-game-ts';
 const OUTPUT = `${DESIGN}/generated`;
 
@@ -51,9 +53,13 @@ function walk(dir: string): string[] {
 const sources = walk('src')
   .filter((f) => /\.(ts|tsx)$/.test(f))
   .sort()
-  .map((file) => ({ file, text: readFileSync(file, 'utf8') }));
+  .map((file) => ({
+    file: `${APP_DIR}/${file}`,
+    text: readFileSync(file, 'utf8'),
+  }));
+/** `src/...`（アプリ基点）で探す。見つかったものの `file` は、リポジトリ基点 */
 const sourceOf = (file: string) => {
-  const found = sources.find((s) => s.file === file);
+  const found = sources.find((s) => s.file === `${APP_DIR}/${file}`);
   if (!found) throw new Error(`${file} が見つかりません`);
   return found;
 };
@@ -63,13 +69,13 @@ const design = readFileSync(`${DESIGN}/domain-model.md`, 'utf8');
 const events = [
   ...extractUnionEvents(
     sourceOf('src/domain/game.ts').text,
-    'src/domain/game.ts',
+    `${APP_DIR}/src/domain/game.ts`,
     'GameEvent',
     'Game',
   ),
   ...extractUnionEvents(
     sourceOf('src/domain/session.ts').text,
-    'src/domain/session.ts',
+    `${APP_DIR}/src/domain/session.ts`,
     'SessionEvent',
     'Session',
   ),

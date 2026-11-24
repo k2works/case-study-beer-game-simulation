@@ -28,8 +28,10 @@ import {
   type TourMeta,
 } from './lib/guided-tour.js';
 
+/** リンクの基点（develop ブランチ）。表示とリンク先のパスは、リポジトリ基点（Kotlin 版・Rust 版と同じ） */
 const REPO_BASE =
-  'https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts';
+  'https://github.com/k2works/case-study-beer-game-simulation/blob/develop';
+const APP_DIR = 'apps/beer-game-ts';
 const SCAN_DIRS = ['src'];
 
 interface TourConfig extends TourMeta {
@@ -69,7 +71,10 @@ function sources(): { file: string; text: string }[] {
   return SCAN_DIRS.flatMap(walk)
     .filter((f) => /\.(ts|tsx)$/.test(f))
     .sort()
-    .map((file) => ({ file, text: readFileSync(file, 'utf8') }));
+    .map((file) => ({
+      file: `${APP_DIR}/${file}`,
+      text: readFileSync(file, 'utf8'),
+    }));
 }
 
 const MAP: TourConfig = {

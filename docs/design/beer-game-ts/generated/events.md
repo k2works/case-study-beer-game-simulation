@@ -4,7 +4,7 @@ title: "イベント一覧（生成）"
 description: "ドメインイベントの一覧。コードの共用体型から生成した。手で編集しない。"
 tags: [design, living-documentation, generated]
 status: draft
-generated: { by: "script:apps/beer-game-ts/scripts/living-docs.ts", at: 2026-11-24T06:28:25.088Z }
+generated: { by: "script:apps/beer-game-ts/scripts/living-docs.ts", at: 2026-11-24T10:11:45.634Z }
 ---
 # イベント一覧（生成）
 
@@ -14,20 +14,20 @@ generated: { by: "script:apps/beer-game-ts/scripts/living-docs.ts", at: 2026-11-
 
 | イベント | 集約 | ペイロードの項目 | 場所 |
 | :--- | :--- | :--- | :--- |
-| `GameCreated` | Game | `gameId`、`kind`、`changes` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `ParticipantJoined` | Game | `gameId`、`participantId` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `RoleAssigned` | Game | `gameId`、`participantId`、`role` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `RoleUnassigned` | Game | `gameId`、`participantId` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `RoleReplaced` | Game | `gameId`、`participantId`、`role`、`replacedParticipantIds` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `GameStarted` | Game | `gameId` | [`src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
-| `SessionStarted` | Session | `gameId`、`sessionId` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `DecisionSaved` | Session | `sessionId`、`week`、`role`、`quantity`、`savedBy`、`version` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `ProxyDecisionSubmitted` | Session | `sessionId`、`week`、`role`、`quantity`、`version`、`operator`、`at` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `WeekCommitted` | Session | `sessionId`、`record` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `AutoCommitChanged` | Session | `sessionId`、`commitMode` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `SessionPaused` | Session | `sessionId` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `SessionResumed` | Session | `sessionId` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
-| `SessionEnded` | Session | `sessionId` | [`src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `GameCreated` | Game | `gameId`、`kind`、`changes` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `ParticipantJoined` | Game | `gameId`、`participantId` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `RoleAssigned` | Game | `gameId`、`participantId`、`role` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `RoleUnassigned` | Game | `gameId`、`participantId` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `RoleReplaced` | Game | `gameId`、`participantId`、`role`、`replacedParticipantIds` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `GameStarted` | Game | `gameId` | [`apps/beer-game-ts/src/domain/game.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/game.ts) |
+| `SessionStarted` | Session | `gameId`、`sessionId` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `DecisionSaved` | Session | `sessionId`、`week`、`role`、`quantity`、`savedBy`、`version` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `ProxyDecisionSubmitted` | Session | `sessionId`、`week`、`role`、`quantity`、`version`、`operator`、`at` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `WeekCommitted` | Session | `sessionId`、`record` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `AutoCommitChanged` | Session | `sessionId`、`commitMode` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `SessionPaused` | Session | `sessionId` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `SessionResumed` | Session | `sessionId` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
+| `SessionEnded` | Session | `sessionId` | [`apps/beer-game-ts/src/domain/session.ts`](https://github.com/k2works/case-study-beer-game-simulation/blob/develop/apps/beer-game-ts/src/domain/session.ts) |
 
 ## 設計書にあり、まだ実装が無いイベント
 
