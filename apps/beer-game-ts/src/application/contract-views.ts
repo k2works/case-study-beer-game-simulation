@@ -101,6 +101,7 @@ export function lobbyView(
       participantId: p.id,
       displayName: p.displayName,
       role: roleOfParticipant(game, p.id),
+      ...(p.replaced ? { replaced: true } : {}),
     })),
     invitations: invitations.map((i) => ({
       invitationId: i.id,

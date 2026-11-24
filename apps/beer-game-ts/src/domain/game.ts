@@ -43,6 +43,8 @@ export interface GameSettings extends Conditions {
 export interface Participant {
   id: string;
   displayName: string;
+  /** 開始後の役割の入れ替えで外された旧担当者。行は、履歴と入力者のラベルのために残る */
+  replaced?: true;
 }
 
 export type GameStatus = 'PREPARING' | 'STARTED' | 'ENDED';
@@ -73,6 +75,14 @@ export type GameEvent =
   | { type: 'ParticipantJoined'; gameId: string; participantId: string }
   | { type: 'RoleAssigned'; gameId: string; participantId: string; role: Role }
   | { type: 'RoleUnassigned'; gameId: string; participantId: string }
+  | {
+      type: 'RoleReplaced';
+      gameId: string;
+      participantId: string;
+      role: Role;
+      /** 外された旧担当者（その役割の、入れ替え前の担当者全員） */
+      replacedParticipantIds: readonly string[];
+    }
   | { type: 'GameStarted'; gameId: string };
 
 export interface Outcome {
@@ -225,6 +235,7 @@ export function assignRole(
   role: Role,
 ): Outcome {
   requireFacilitator(actor);
+  if (game.status === 'STARTED') return replaceRole(game, participantId, role);
   requirePreparing(game);
   if (!game.participants.some((p) => p.id === participantId)) {
     throw new ParticipantNotFoundError(
@@ -267,6 +278,42 @@ export function assignRole(
             },
           ]),
       { type: 'RoleAssigned', gameId: game.id, participantId, role },
+    ],
+  };
+}
+
+/**
+ * 開始後の役割の入れ替え（H4）。担当のいる役割へ、参加済み・未割り当ての参加者を割り当てると、
+ * その役割の現在の担当者全員が外れ（`replaced`）、新しい参加者が唯一の担当者になる。
+ * すでにその役割の担当なら、何も変わらない（イベントも版も足さない）。別の役割にいる人は、開始後は付け替えられない
+ * （`NotPreparingError`）。外された旧担当者の資格の失効は、呼び出す側（ユースケース）が同じ操作で行う。
+ */
+function replaceRole(game: Game, participantId: string, role: Role): Outcome {
+  if (!game.participants.some((p) => p.id === participantId))
+    throw new ParticipantNotFoundError(
+      '参加していない人は、役割を割り当てられません',
+    );
+  const current = roleOf(game, participantId);
+  if (current === role) return { game, events: [] };
+  if (current !== undefined) throw new NotPreparingError();
+  const replacedParticipantIds = game.assignments[role] ?? [];
+  return {
+    game: bump(game, {
+      assignments: { ...game.assignments, [role]: [participantId] },
+      participants: game.participants.map((p) =>
+        replacedParticipantIds.includes(p.id)
+          ? { ...p, replaced: true as const }
+          : p,
+      ),
+    }),
+    events: [
+      {
+        type: 'RoleReplaced',
+        gameId: game.id,
+        participantId,
+        role,
+        replacedParticipantIds,
+      },
     ],
   };
 }

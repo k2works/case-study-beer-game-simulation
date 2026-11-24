@@ -14,6 +14,7 @@ import {
   commitWeekWithBasis,
   pauseSession,
   proxyDecision,
+  replaceHolders,
   resumeSession,
   saveDecision,
   startSession,
@@ -704,6 +705,34 @@ describe('共同担当と共同入力', () => {
     expect(() =>
       saveDecision(coSession(), participant('p0'), 'RETAILER', 1, 0),
     ).toThrow(PermissionError);
+  });
+});
+
+describe('replaceHolders（役割の入れ替え。H4）', () => {
+  it('その役割の担当者を差し替えて版を進める。旧担当者が保存した入力は、入力者のラベルとして残る', () => {
+    const s = saveDecision(
+      newSession(),
+      holder('RETAILER'),
+      'RETAILER',
+      5,
+      0,
+    ).session;
+    const next = replaceHolders(s, 'RETAILER', 'spare');
+    expect(next.holders.RETAILER).toEqual(['spare']);
+    expect(next.holders.FACTORY).toEqual(s.holders.FACTORY);
+    expect(next.version).toBe(s.version + 1);
+    expect(next.decisions.RETAILER?.savedBy).toBe('p3');
+  });
+
+  it('終了後は SessionEndedError', () => {
+    const s = fillAll(newSession(1));
+    const ended = commitWeek(s, FACILITATOR, {
+      week: 1,
+      version: s.version,
+    }).session;
+    expect(() => replaceHolders(ended, 'RETAILER', 'spare')).toThrow(
+      SessionEndedError,
+    );
   });
 });
 

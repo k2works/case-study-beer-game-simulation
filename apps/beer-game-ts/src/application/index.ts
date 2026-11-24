@@ -24,6 +24,7 @@ import {
   DomainError,
   ParticipantNotFoundError,
   PermissionError,
+  SessionEndedError,
   type Issue,
 } from '../domain/values.js';
 import {
@@ -33,6 +34,7 @@ import {
   commitWeekWithBasis as commitWeekWithBasisRule,
   pauseSession as pauseSessionRule,
   proxyDecision as proxyDecisionRule,
+  replaceHolders,
   resumeSession as resumeSessionRule,
   saveDecision as saveDecisionRule,
   startSession,
@@ -754,6 +756,8 @@ export function createApplication(deps: Dependencies) {
             input.token,
             input.gameId,
           );
+          // 進行役だけの操作。冪等の照合より前に認可する（ADR-004）
+          requireFacilitatorPrincipal(principal, '役割の割り当て');
           const game = await loadGame(repos, input.gameId);
           const session = await repos.sessions.findByGame(input.gameId);
           return idempotently(
@@ -769,17 +773,54 @@ export function createApplication(deps: Dependencies) {
               }),
             },
             async () => {
+              // 開始後の入れ替え（H4）。終了後は受け付けず、資格がすでに失効している参加者（以前に外された旧担当者を含む）は割り当てない
+              if (game.status === 'STARTED') {
+                if (session?.status === 'ENDED') throw new SessionEndedError();
+                const target = game.participants.find(
+                  (p) => p.id === input.participantId,
+                );
+                if (
+                  target &&
+                  (target.replaced ||
+                    (await repos.credentials.isRecoveryRevoked(
+                      participantPrincipal(game, target.id),
+                    )))
+                )
+                  throw new CredentialAlreadyRevokedError();
+              }
               const { game: next, events } = assignRoleRule(
                 game,
                 actorOf(principal),
                 input.participantId,
                 input.role,
               );
-              if (events.length > 0) {
-                await repos.games.save(next, game.version);
-                await repos.events.append(game.id, events);
+              if (events.length === 0)
+                return { versions: versionsOf(next, session) };
+              await repos.games.save(next, game.version);
+              const replaced = events.flatMap((e) =>
+                e.type === 'RoleReplaced' ? [e] : [],
+              );
+              let nextSession = session;
+              const revoked: object[] = [];
+              for (const e of replaced) {
+                // 旧担当者の資格（復帰資格とブラウザセッション）を、同じ操作で失効させ、担当者を差し替える
+                for (const id of e.replacedParticipantIds) {
+                  const old = participantPrincipal(game, id);
+                  await repos.credentials.revokeAll(old, clock.now());
+                  revoked.push({ type: 'CredentialRevoked', ...old });
+                }
+                if (nextSession) {
+                  const swapped = replaceHolders(
+                    nextSession,
+                    e.role,
+                    e.participantId,
+                  );
+                  await repos.sessions.save(swapped, nextSession.version);
+                  nextSession = swapped;
+                }
               }
-              return { versions: versionsOf(next, session) };
+              await repos.events.append(game.id, [...events, ...revoked]);
+              return { versions: versionsOf(next, nextSession) };
             },
           );
         }),

@@ -311,6 +311,81 @@ describe('assignRole', () => {
   });
 });
 
+describe('assignRole（開始後の入れ替え。H4）', () => {
+  const startedWithSpare = (): Game =>
+    startGame(
+      joinGame(readyGame(), { participantId: 'spare', displayName: '交代' })
+        .game,
+      FACILITATOR,
+    ).game;
+
+  it('担当のいる役割へ未割り当ての参加者を割り当てると、現在の担当者全員が外れ、版が進む', () => {
+    const started = startedWithSpare();
+    const { game, events } = assignRole(
+      started,
+      FACILITATOR,
+      'spare',
+      'RETAILER',
+    );
+    expect(game.assignments.RETAILER).toEqual(['spare']);
+    expect(game.participants.find((p) => p.id === 'p3')?.replaced).toBe(true);
+    expect(game.participants.find((p) => p.id === 'p0')?.replaced).toBe(
+      undefined,
+    );
+    expect(game.version).toBe(started.version + 1);
+    expect(events).toEqual([
+      {
+        type: 'RoleReplaced',
+        gameId: 'g1',
+        participantId: 'spare',
+        role: 'RETAILER',
+        replacedParticipantIds: ['p3'],
+      },
+    ]);
+  });
+
+  it('共同担当がいれば、担当者全員が入れ替わる', () => {
+    let started = readyGame();
+    started = joinGame(started, {
+      participantId: 'co',
+      displayName: '共同',
+    }).game;
+    started = assignRole(started, FACILITATOR, 'co', 'RETAILER').game;
+    started = joinGame(started, {
+      participantId: 'spare',
+      displayName: '交代',
+    }).game;
+    const { game, events } = assignRole(
+      startGame(started, FACILITATOR).game,
+      FACILITATOR,
+      'spare',
+      'RETAILER',
+    );
+    expect(game.assignments.RETAILER).toEqual(['spare']);
+    expect(events[0]).toMatchObject({ replacedParticipantIds: ['p3', 'co'] });
+  });
+
+  it('その役割の担当への割り当て直しは、何も変わらない', () => {
+    const started = startedWithSpare();
+    const out = assignRole(started, FACILITATOR, 'p3', 'RETAILER');
+    expect(out.game).toBe(started);
+    expect(out.events).toEqual([]);
+  });
+
+  it('別の役割にいる人の付け替えは、開始後は NotPreparingError。未参加は ParticipantNotFoundError、進行役以外は PermissionError', () => {
+    const started = startedWithSpare();
+    expect(() => assignRole(started, FACILITATOR, 'p0', 'RETAILER')).toThrow(
+      NotPreparingError,
+    );
+    expect(() => assignRole(started, FACILITATOR, 'zzz', 'RETAILER')).toThrow(
+      ParticipantNotFoundError,
+    );
+    expect(() =>
+      assignRole(started, participant('p0'), 'spare', 'RETAILER'),
+    ).toThrow(PermissionError);
+  });
+});
+
 describe('startGame', () => {
   it('[US1.2/AC1.2.3] 4 役割がそろっていれば開始でき、設定が固定される', () => {
     const { game, events } = startGame(readyGame(), FACILITATOR);

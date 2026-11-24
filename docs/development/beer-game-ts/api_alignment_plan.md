@@ -180,7 +180,8 @@ DROP INDEX uq_idempotency_create;
 | 3c-1 | 完了（2026-11-24） | 準備中のコマンド 4 操作（`createGame`・`joinGame`・`startGame`・`assignRole`）を `/api/v1` に実装（未実装は 16 → 12 件）。冪等の共通の部品（`idempotently`・`retryOnDuplicate`・指紋は SHA-256）、資格の Cookie の発行（`bg_session`・`bg_recovery`・`X-Tab-Id`・`Secure` は `COOKIE_SECURE`）、レート制限の 429＋`Retry-After`。ドメインの型つきのエラー（`NotPreparingError`・`AlreadyStartedError`・`StartConditionError`・`ParticipantNotFoundError`）を契約の `code` に写した。**付け替え（D9）**: 別の役割にいる人は付け替え、同じ役割は変化なし（イベントも版も足さない）。作成の検証の誤りを、最終週・需要・条件・保持期間まで、すべて集めて返す（`field`・対象の週つき）。614 件通過 |
 | 3c-2 | 完了（2026-11-24） | `recoverParticipation`・観察者 3 操作（`inviteObserver`・`revokeObserverInvitation`・`joinAsObserver`）・`revokeCredential`・`reissueCredential` を `/api/v1` に実装（未実装は 12 → 6 件）。復帰は、本文の復帰コードか Cookie `bg_recovery`。**契約の失効と再発行を別の操作に分けた**（`revokeParticipantCredential`・`reissueParticipantCredential`。失効の判定は `isRecoveryRevoked`。既存のスキーマで足りる）。失効済みの再失効・未失効の再発行は 409。観察者は、ブラウザセッションだけを発行し、復帰資格は発行しない。表示名の上限を契約に合わせて 20 → 80 文字（コードポイント）。630 件通過 |
 | 3d | 完了（2026-11-24） | 進行中の 6 操作（`saveDecision`・`commitWeek`・`pauseSession`・`resumeSession`・`setCommitMode`・`submitProxyDecision`）を `/api/v1` に実装（未実装は 6 → 0 件のうち H4 を除く操作がすべて実装済み。`pending.ts` は空）。役割は資格から決まる。週の判定が先（`session.week_advanced`）。版の競合は 409 `session.decision_conflict`（`role`・最新の入力＝保存者・時刻つき）。確定の根拠は、役割ごとの入力の版（`basis`）で、変わっていれば 409 `session.decisions_changed`（`current`）。保存回数の上限 9（代理入力を含む。版が回数）。停止・終了・停止中でない再開・開始前に型のある失敗（`session.paused`・`already_ended`・`not_paused`・`not_active`）。進行役だけの操作は、冪等の照合より前に認可する。`If-Match` は引用符可・無ければ 0・整数でなければ 422。658 件通過 |
-| 3e・4〜7 | 未着手 | H4（開始後の役割の入れ替え。マイグレーション 010）、旧 API の撤去 ほか |
+| 3e | 完了（2026-11-24） | H4（開始後の役割の入れ替え。マイグレーション 010 `participants.replaced_at`）。担当のいる役割へ、参加済み・未割り当ての参加者を割り当てると、現在の担当者全員が外れ（`Participant.replaced`）、`session.holders` を差し替え、game・session の版を進め、`RoleReplaced`・`CredentialRevoked` を履歴に足し、旧担当者の復帰資格とブラウザセッションを同じトランザクションで失効する。同じ役割への割り当て直しは変化なし。拒否: 別の役割にいる人 `game.not_preparing`、終了後 `session.already_ended`、失効済み（外された旧担当者・手動失効）`game.credential_already_revoked`、存在しない参加者 `game.participant_not_found`、進行役以外 403。ロビーの `replaced`。`assignRole` の認可を冪等の照合より前に置いた（ADR-004）。**契約の全 25 操作が実装済み（`pending.ts` が空）**。673 件通過 |
+| 4〜7 | 未着手 | 旧 API の撤去とテストの付け替え、共有 UI の `@ui`、ui の削除、ドキュメント |
 
 ### 段階 2 で、後の段階へ持ち越したもの・分かったこと
 
@@ -217,3 +218,4 @@ DROP INDEX uq_idempotency_create;
 | 2026-11-24 | 小段階 3c-1（準備中のコマンド 4 操作）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3c-2（復帰・観察者・資格の失効と再発行）の完了を反映 | claude-code |
 | 2026-11-24 | 小段階 3d（進行中のコマンド 6 操作と業務の失敗の `code`）の完了を反映 | claude-code |
+| 2026-11-24 | 小段階 3e（H4。開始後の役割の入れ替え）の完了を反映。段階 3 の完了 | claude-code |

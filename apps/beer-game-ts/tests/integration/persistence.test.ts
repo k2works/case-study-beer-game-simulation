@@ -77,6 +77,39 @@ describe('Game の永続化', () => {
     );
   });
 
+  it('[US1.2/H4] 入れ替えで外された旧担当者の行は、`replaced` を付けて残り、入れ替えの時刻は書き換わらない', async () => {
+    const { game, ids } = readyGame();
+    const extra = uid();
+    const prepared = joinGame(game, {
+      participantId: extra,
+      displayName: '交代要員',
+    }).game;
+    const started = startGame(prepared, FACILITATOR).game;
+    await uow.run((r) => r.games.save(started, null));
+    const replaced = assignRole(started, FACILITATOR, extra, 'RETAILER').game;
+    await uow.run((r) => r.games.save(replaced, started.version));
+    const loaded = await uow.run((r) => r.games.find(game.id));
+    expect(loaded).toEqual(replaced);
+    const retailer = ids[ROLES.indexOf('RETAILER')]!;
+    expect(loaded?.participants.find((p) => p.id === retailer)?.replaced).toBe(
+      true,
+    );
+    expect(loaded?.assignments.RETAILER).toEqual([extra]);
+
+    const at = async () =>
+      (
+        await pool.query(
+          'SELECT replaced_at FROM participants WHERE participant_id = $1',
+          [retailer],
+        )
+      ).rows[0].replaced_at as Date;
+    const first = await at();
+    expect(first).toBeInstanceOf(Date);
+    // 以後の保存（ここでは同じ内容の保存）で、時刻は変わらない
+    await uow.run((r) => r.games.save(loaded!, replaced.version));
+    expect(await at()).toEqual(first);
+  });
+
   it('[US1.1/AC1.1.3] カスタム条件（種別・変更項目・初期在庫・遅延・費用・公開範囲）を保存し、読み戻せる', async () => {
     const id = uid();
     const g = createGame({

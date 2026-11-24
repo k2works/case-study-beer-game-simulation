@@ -50,7 +50,7 @@ class PgGames implements GameRepository {
 
   private async hydrate(row: Record<string, unknown>): Promise<Game> {
     const { rows } = await this.db.query(
-      'SELECT participant_id, display_name, role FROM participants WHERE game_id = $1 ORDER BY seq',
+      'SELECT participant_id, display_name, role, replaced_at FROM participants WHERE game_id = $1 ORDER BY seq',
       [row.game_id],
     );
     // 参加の順（seq）に、役割ごとの担当の一覧を作る（共同担当）
@@ -87,6 +87,7 @@ class PgGames implements GameRepository {
       participants: rows.map((p) => ({
         id: p.participant_id,
         displayName: p.display_name,
+        ...(p.replaced_at ? { replaced: true as const } : {}),
       })),
       assignments,
     };
@@ -164,10 +165,12 @@ class PgGames implements GameRepository {
       for (const p of game.participants) {
         const role = roleOf(game, p.id) ?? null;
         await this.db.query(
-          `INSERT INTO participants (participant_id, game_id, display_name, role)
-           VALUES ($1,$2,$3,$4)
-           ON CONFLICT (participant_id) DO UPDATE SET role = EXCLUDED.role`,
-          [p.id, game.id, p.displayName, role],
+          // 入れ替えの時刻は、初めて外された保存の時刻のまま（以後の保存で書き換えない）
+          `INSERT INTO participants (participant_id, game_id, display_name, role, replaced_at)
+           VALUES ($1,$2,$3,$4, CASE WHEN $5::boolean THEN now() END)
+           ON CONFLICT (participant_id) DO UPDATE SET role = EXCLUDED.role,
+             replaced_at = COALESCE(participants.replaced_at, EXCLUDED.replaced_at)`,
+          [p.id, game.id, p.displayName, role, p.replaced === true],
         );
       }
     });

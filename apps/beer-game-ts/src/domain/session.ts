@@ -132,6 +132,24 @@ export function startSession(game: Game, sessionId: string): SessionOutcome {
   };
 }
 
+/**
+ * 役割の入れ替え（H4）に合わせて、その役割の担当者を差し替える。版を進める。
+ * 入れ替えの記録（`RoleReplaced`）は Game 側のイベントが持つので、ここはイベントを足さない。
+ * 旧担当者が保存した入力（`decisions[role].savedBy`）は、入力者のラベルのために、そのまま残す。
+ */
+export function replaceHolders(
+  session: Session,
+  role: Role,
+  participantId: string,
+): Session {
+  requireNotEnded(session);
+  return {
+    ...session,
+    version: session.version + 1,
+    holders: { ...session.holders, [role]: [participantId] },
+  };
+}
+
 function requireNotEnded(session: Session): void {
   if (session.status === 'ENDED') throw new SessionEndedError();
 }
