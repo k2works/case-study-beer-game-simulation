@@ -29,7 +29,8 @@ impl Actor {
     }
 }
 
-/// `evolve` の結果。`decide` が作らない列（例: 未開始への入力の保存）は `Ignored` で返し、状態は変わらない。
+/// `evolve` の結果。
+/// @landmark ddd 戦術的設計 | 畳み込みの全域性。`decide` が作らない列は `Ignored` で返して状態を守り、再生側が検知する（fail closed）`decide` が作らない列（例: 未開始への入力の保存）は `Ignored` で返し、状態は変わらない。
 /// 再生側が検知し、**コマンドの経路では失敗として扱う**（fail closed。設計判断 RD2）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Evolution<S> {

@@ -170,6 +170,7 @@ pub struct Decision<E> {
 }
 
 /// イベントストアのポート。`Tx` は `begin` / `commit` / `rollback` で表す。
+/// @landmark architecture 境界 | 核と永続化のつなぎ目。トレイトで外側の実装を隠すので、核とコマンドの手順は、データベースなしで試せる
 /// 失敗の経路では `rollback` を明示し、`Tx` の drop は panic・ランタイムの終了のときの保険にする（RB2）。
 pub trait EventStore<E>: Sync {
     type Tx: Send;
@@ -326,6 +327,7 @@ where
 }
 
 /// コマンドを実行する（周辺ストアへの書き込みを伴う）。追記の競合は、上限まで再試行する（試行のたびに rollback し、新しい `Tx` で読み直す）。
+/// @landmark architecture 境界 | コマンドの実行手順。読む → 決める（ドメイン）→ 追記する → 確定する、を 1 つのトランザクションで行い、競合は読み直して再試行する。業務の規則は持たない
 ///
 /// # Errors
 /// 業務上の失敗、永続化の失敗、再試行の上限（`RetryExhausted`）。

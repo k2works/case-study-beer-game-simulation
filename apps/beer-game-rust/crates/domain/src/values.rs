@@ -3,6 +3,8 @@
 use crate::error::ValidationError;
 
 /// 発注数・生産要請数。0〜1000 の整数（BR-10）。
+/// @term 発注量 | 各週に、役割が上流へ注文する数量。0〜1000 の整数 | BR-10
+/// @landmark ddd 戦術的設計 | 値オブジェクト。範囲を検証するスマートコンストラクタで作り、フィールドを公開しない。不正な値は、型として作れない
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Quantity(u32);
 
@@ -73,6 +75,7 @@ impl Units {
 }
 
 /// 週。1〜50（AC1.1.5）。
+/// @term 週 | ゲームの進行の単位。1〜50 の整数。週ごとに、4 役割の発注量を確定して在庫・受注残・費用を更新する | AC1.1.5
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Week(u8);
 
@@ -232,6 +235,7 @@ impl RetentionDays {
 }
 
 /// 意思決定の版。役割ごと・週ごとに 0 から始まり、保存のたびに 1 増える（ストリームの版とは別）。
+/// @term 意思決定の版 | 役割ごと・週ごとの入力の版。保存のたびに 1 増え、古い画面からの保存や確定を拒否する根拠になる（ストリームの版とは別） | ドメインモデル D10
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DecisionVersion(u32);
 

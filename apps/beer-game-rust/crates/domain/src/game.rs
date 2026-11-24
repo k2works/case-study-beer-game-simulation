@@ -16,6 +16,7 @@ use crate::values::{
 };
 
 /// 確定方式。手動（進行役が確定する）か、自動（4 役割の入力がそろったら、同じ追記で確定する。B8）。
+/// @term 確定方式 | 週を確定する方法。手動（進行役が確定する）か、自動（4 役割の入力がそろったら、同じ追記で確定する）。進行中・一時停止中に変えられる | ドメインモデル ユビキタス言語
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CommitMode {
     #[default]
@@ -255,7 +256,7 @@ pub enum GameCommand {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GameEvent {
-    /// EV-G01 CreateGame。ストリームが空。
+    /// @event EV-G01 | CreateGame。ストリームが空
     GameCreated {
         game_id: GameId,
         join_code: JoinCode,
@@ -263,45 +264,49 @@ pub enum GameEvent {
         retention_days: RetentionDays,
         facilitator_credential_expires_at: Instant,
     },
-    /// EV-G02 JoinGame。準備中。
+    /// @event EV-G02 | JoinGame。準備中
     ParticipantJoined {
         participant_id: ParticipantId,
         credential_expires_at: Instant,
     },
-    /// EV-G03 AssignRole。進行役、役割が変わる。
+    /// @event EV-G03 | AssignRole。進行役、役割が変わる（準備中。開始後は入れ替えの新担当者）
     RoleAssigned {
         participant_id: ParticipantId,
         role: Role,
     },
-    /// EV-G04 AssignRole による付け替え（解除の側）。単独の UnassignRole は未実装。
+    /// @event EV-G04 | AssignRole による付け替え（解除の側）。単独の UnassignRole は未実装
     RoleUnassigned {
         participant_id: ParticipantId,
         role: Role,
     },
-    /// EV-G11 StartGame。進行役、準備中、各役割に 1 人以上。
+    /// @event EV-G11 | StartGame。進行役、準備中、各役割に 1 人以上
     GameStarted { game_id: GameId },
-    /// 開始後の役割の入れ替え（EV-G12）。役割の担当者全員が外れ（資格は失効）、新しい担当者が引き継ぐ。
+    /// 開始後の役割の入れ替え。役割の担当者全員が外れ（資格は失効）、新しい担当者が引き継ぐ。
+    /// @event EV-G12 | AssignRole（開始後の入れ替え）。進行役、旧担当者ごとに 1 件
+    /// @term 役割の入れ替え | 開始後に、進行役が役割の担当者を別の参加者に替えること。旧担当者の資格は同じ追記で失効し、入力済みの値と週は変わらない | ドメインモデル 役割の入れ替え、ADR-015
     ParticipantReplaced {
         participant_id: ParticipantId,
         role: Role,
         /// 外れた旧担当者（昇順）。
         replaced: Vec<ParticipantId>,
     },
-    /// 観察用の招待の発行（EV-G13）。
+    /// @event EV-G05 | InviteObserver。進行役。準備中と開始後
+    /// @term 観察用の招待 | 進行役が発行する、観察者を招くためのコード。参加コードとは別の値で、失効または期限切れの招待では新しく参加できない | AC1.3.1〜1.3.4、BR-17
     ObserverInvited {
         invitation_id: InvitationId,
         expires_at: Instant,
     },
-    /// 観察用の招待の失効。
+    /// @event EV-G06 | RevokeObserverInvitation。進行役、失効していない招待（期限切れでも可）
     ObserverInvitationRevoked { invitation_id: InvitationId },
-    /// 観察者の参加。
+    /// @event EV-G07 | JoinAsObserver。有効で期限内の招待（準備中と開始後）
     ObserverJoined {
         observer_id: ObserverId,
         invitation_id: InvitationId,
     },
-    /// 参加者の資格の失効。
+    /// @event EV-G08 | RevokeCredential。進行役、失効していない参加者の資格（期限切れでも可）
+    /// @term 資格の失効 | 進行役が、漏れた参加者の資格を使えなくすること。失効した資格での要求は、以前に成功したものの再送でも拒否する | AC3.2.5、ADR-004
     CredentialRevoked { participant_id: ParticipantId },
-    /// 参加者の資格の再発行。
+    /// @event EV-G09 | ReissueCredential。進行役、失効した参加者の資格
     CredentialReissued {
         participant_id: ParticipantId,
         credential_expires_at: Instant,
@@ -485,6 +490,7 @@ fn observer_join_events(
 }
 
 /// 作成・参加・役割の割り当ての規則は、すべてここに集まる（`evolve` は事実を採用するだけで、規則を持たない）。
+/// @landmark ddd 戦術的設計 | 準備の集約の規則。進行と同じ形（状態とコマンドから、事実か誤りを返す）で、コンテキストごとに規則の置き場が 1 つに決まる
 ///
 /// # Errors
 /// 規則に反するとき、`GameError`。

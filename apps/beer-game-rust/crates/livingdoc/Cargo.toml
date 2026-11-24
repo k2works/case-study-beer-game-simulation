@@ -1,0 +1,12 @@
+[package]
+name = "beergame-livingdoc"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# Living Documentation の生成。標準ライブラリだけに依存する（ADR-002）。
+# 実行: cargo run -q -p beergame-livingdoc -- generate（just livingdoc）
+
+[lints]
+workspace = true

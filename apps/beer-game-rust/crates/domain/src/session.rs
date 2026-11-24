@@ -111,6 +111,7 @@ impl SessionData {
 }
 
 /// 状態は版を持たない（ストリームの版は永続化の層が持つ。設計判断 RD2）。
+/// @core 進行 | 進行の状態（未開始・進行中・終了）。session ストリームのイベントを畳み込んだ結果で、4 役割の入力を揃えて週を一度だけ確定する整合性の土台
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionState {
     NotStarted,
@@ -157,6 +158,7 @@ pub enum SessionCommand {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionEvent {
+    /// @event EV-S01 | StartGame（game ストリームの GameStarted と同一トランザクション）
     SessionStarted {
         game_id: GameId,
         settings: GameSettings,
@@ -164,6 +166,7 @@ pub enum SessionEvent {
         initial_states: RoleMap<RoleState>,
         commit_mode: CommitMode,
     },
+    /// @event EV-S05 | SaveDecision。進行中、その役割の参加者、意思決定の版が一致
     DecisionSaved {
         week: Week,
         role: Role,
@@ -172,6 +175,7 @@ pub enum SessionEvent {
         editor: Editor,
         submitted_role_count: usize,
     },
+    /// @event EV-S08 | CommitWeek（進行役、進行中、4 役割が揃う、週と意思決定の版が一致）。自動確定は、最後の入力・再開・方式の変更と同じ追記
     WeekCommitted {
         week: Week,
         commit_kind: CommitKind,
@@ -180,21 +184,25 @@ pub enum SessionEvent {
         next_states: RoleMap<RoleState>,
         contributors: usize,
     },
-    SessionEnded {
-        reason: EndReason,
-    },
+    /// @event EV-S04 | 最終週の WeekCommitted と同じ decide。手動の EndSession は未実装
+    SessionEnded { reason: EndReason },
+    /// @event EV-S02 | PauseSession。進行役、進行中
+    /// @term 一時停止 | 進行役が進行を止めた状態。参加者は入力の保存も週の確定もできず、入力済みの値は失われない。再開すると最後の確定済みの週から続ける | AC3.1.1、AC3.1.3
     SessionPaused,
+    /// @event EV-S03 | ResumeSession。進行役、一時停止中
     SessionResumed,
     /// 確定方式の変更。
-    CommitModeChanged {
-        mode: CommitMode,
-    },
+    /// @event EV-S10 | SetCommitMode。進行役、進行中または一時停止中
+    CommitModeChanged { mode: CommitMode },
     /// 開始後の役割の入れ替え。役割の担当者が、新しい担当者だけになる。
+    /// @event EV-S09 | AssignRole（開始後の入れ替え）。game ストリームの ParticipantReplaced と同一トランザクション。進行中または一時停止中 | RoleHolderReplaced
     RoleReplaced {
         role: Role,
         new_holder: ParticipantId,
     },
     /// 進行役の代理入力（監査のため、`DecisionSaved` とは別の事実として残す）。
+    /// @event EV-S06 | SubmitProxyDecision。進行役、進行中または一時停止中、requestedWeek が現在の週と一致
+    /// @term 代理入力 | 不在の参加者に代わって、進行役が役割の発注量を入力すること。値・操作者・役割・時刻を履歴に残し、一時停止中も受け付ける（確定はしない） | AC3.1.2、FR-15
     ProxyDecisionSubmitted {
         week: Week,
         role: Role,
@@ -534,6 +542,9 @@ fn commit_week_events(
 }
 
 /// 進行の規則のすべてがここに集まる（`evolve` は事実を採用するだけ）。
+/// @core 進行 | 進行の規則のすべてが集まる場所。入力の保存・代理入力・停止と再開・手動と自動の確定の可否を決め、事実（イベント）だけを返す。共同入力と自動確定の整合性もここで守る
+/// @landmark ddd 戦術的設計 | 集約の規則。状態とコマンドから、事実（イベント）か誤りを返す。状態は書き換えない
+/// @landmark architecture 核 | 進行の規則の全部。入出力も時計も持たない純粋関数なので、規則を表にして網羅的に試せる
 ///
 /// # Errors
 /// 規則に反するとき、`SessionError`。
@@ -596,6 +607,7 @@ fn update_active(
 }
 
 /// イベントを状態へ畳み込む。全域。`WeekCommitted` の `next_states` はそのまま採用し、`simulate_week` を呼ばない（D5）。
+/// @core 進行 | 事実（イベント）を状態へ畳み込む。規則を持たず、確定済みの結果を採用するだけなので、あとから再生しても同じ状態に戻る（イベントソーシングの土台）
 /// decide が作らない列は、状態を変えずに `Ignored` で返す。
 #[must_use]
 pub fn evolve_session(state: SessionState, event: &SessionEvent) -> Evolution<SessionState> {

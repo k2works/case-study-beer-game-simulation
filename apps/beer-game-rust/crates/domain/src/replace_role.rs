@@ -9,6 +9,7 @@ use crate::start_game::{StartDecision, StartError};
 use crate::values::{Instant, ParticipantId};
 
 /// 割り当ての入力。
+/// @landmark ddd 戦術的設計 | 2 つの集約にまたがる規則。開始後の入れ替えは game と session の 2 本のストリームに同時に事実を残すので、単独の集約ではなく、ここで束ねる
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AssignOrReplace {
     pub actor: Actor,

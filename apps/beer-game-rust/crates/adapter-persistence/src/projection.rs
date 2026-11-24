@@ -281,6 +281,7 @@ fn decision_statements(
 /// `session` ストリームのイベントが書く投影（`session_overview`・`role_current_states`・`current_decisions`・`week_commits`・`week_role_results`）。
 /// `week_team_totals`（観察者向けのチーム合計）は B9 まで書かない。
 #[must_use]
+/// @landmark architecture 副作用 | 読み取りモデルの更新。イベントから、投影の表への書き込み（SQL と束縛値）を純粋に導き、追記と同じトランザクションで実行する（CQRS の読み取り側）
 pub fn session_statements(game: Uuid, event: &SessionEvent) -> Vec<Statement> {
     match event {
         SessionEvent::SessionStarted { initial_states, .. } => {

@@ -108,6 +108,7 @@ fn after(now: Instant, millis: i64) -> Instant {
 ///
 /// # Errors
 /// 期限の検出・受領記録の掃除の失敗（個々の削除の失敗は、記録して続ける）。
+/// @landmark ddd 戦略的設計 | 一般のコンテキスト（保持と削除）。中核ではないので、作り込まずに、期限の検出と連鎖削除を最小の手順で実装し、失敗したら何も消さずに再試行する
 pub async fn run_retention(
     store: &impl RetentionStore,
     env: &impl Env,

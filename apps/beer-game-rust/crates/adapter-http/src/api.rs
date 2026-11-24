@@ -123,6 +123,7 @@ const RECOVER_PATH: &str = "/api/v1/participations/recover";
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
 /// ルーターを作る。
+/// @landmark architecture 副作用 | HTTP の入口。ハンドラーは薄く、入力の形の検証・認証の結果の受け渡し・応答の組み立てだけを行い、業務の規則はドメインに任せる
 pub fn router<B: Backend>(backend: Arc<B>) -> Router {
     Router::new()
         .route("/api/v1/health", get(health::<B>))
@@ -1335,6 +1336,7 @@ async fn game_state<B: Backend>(
         .unwrap_or_else(|problem: Box<Problem>| problem_response(&problem, &correlation))
 }
 
+/// @tour walking-skeleton 70 プレイ | 画面が、いまの週・自分の役割の状態・入力の状況を読む。投影の行から、呼び出した人ごとの規則で見せる範囲を絞り、他の役割の値は返さない（問い合わせ側。書き込みの後続ではない） | API: `GET /api/v1/sessions/{session_id}/state`
 async fn session_state<B: Backend>(
     State(backend): State<Arc<B>>,
     Path(session): Path<String>,

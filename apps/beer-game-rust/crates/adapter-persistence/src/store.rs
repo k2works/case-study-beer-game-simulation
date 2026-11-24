@@ -85,6 +85,7 @@ async fn run_on(conn: &mut sqlx::PgConnection, statement: &Statement) -> Result<
 pub struct PgTx(Transaction<'static, Postgres>);
 
 /// 1 本のストリーム `(game_id, stream_type)` のイベントストア。
+/// @landmark architecture 副作用 | イベントストアの実装。追記専用で、同じ版への同時の追記は一意制約の違反で検出して一方だけを成功させる（楽観的並行制御）
 pub struct PgEventStore<E, C> {
     pool: PgPool,
     game_id: Uuid,

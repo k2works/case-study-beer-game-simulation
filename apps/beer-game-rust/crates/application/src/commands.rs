@@ -165,6 +165,7 @@ fn after(now: Instant, millis: i64) -> Instant {
     Instant::from_epoch_millis(now.epoch_millis().saturating_add(millis))
 }
 
+/// @tour walking-skeleton 10 準備 | 進行役がゲームを作成する。設定を検証し、参加コードと進行役の資格を発行する。ここから、参加と割り当てを受け付ける準備中が始まる | API: `POST /api/v1/games` | 発行するイベント: EV-G01 `GameCreated`
 /// ゲームの作成（US1.1。匿名）。`game_id` は境界が決める（ストアはゲームごとに作るため）。入力の誤りは、項目ごとにすべて集めて返す（AC1.1.2）。
 ///
 /// # Errors
@@ -242,6 +243,8 @@ pub async fn create_game<St: EventStore<GameEvent>>(
 
 /// 参加（US1.2。匿名）。参加コードからゲームを引くのは境界（問い合わせ）が行い、ここには `game_id` が渡る。
 /// 表示名はイベントに入れず、周辺ストアへ書く（NF-S14）。
+///
+/// @tour walking-skeleton 20 準備 | 参加者が、参加コードと表示名で参加する。アカウントは作らず、復帰資格を発行する | API: `POST /api/v1/participations/join` | 発行するイベント: EV-G02 `ParticipantJoined`
 ///
 /// # Errors
 /// 入力の誤り（`Invalid`）、受付の終了（`Domain(NotPreparing)`）、永続化の失敗。
@@ -507,6 +510,7 @@ async fn run_session<St: EventStore<SessionEvent>>(
     .await
 }
 
+/// @tour walking-skeleton 50 プレイ | 参加者が、自分の役割の発注量を保存する。意思決定の版が一致しなければ拒否し、保存のたびに版が 1 増える。4 役割がそろうまで、週は進まない | API: `PUT /api/v1/sessions/{session_id}/decisions` | 発行するイベント: EV-S05 `DecisionSaved`
 /// 意思決定の保存（US2.2。その役割の参加者だけ）。
 ///
 /// # Errors
@@ -539,6 +543,7 @@ pub async fn save_decision<St: EventStore<SessionEvent>>(
     .await
 }
 
+/// @tour walking-skeleton 60 プレイ | 進行役が週を確定する。4 役割の入力がそろい、根拠にした版が現在と一致するとき、週次計算を呼んで、次の週の状態を事実として残す | API: `POST /api/v1/sessions/{session_id}/weeks/{week}/commit` | 発行するイベント: EV-S08 `WeekCommitted`
 /// 週の確定（US2.3。進行役だけ。手動）。
 ///
 /// # Errors
@@ -785,6 +790,7 @@ pub async fn submit_proxy_decision<St: EventStore<SessionEvent>>(
     .await
 }
 
+/// @tour walking-skeleton 40 準備 | 進行役がゲームを開始する。各役割に 1 人以上いることを確かめ、game と session の 2 本のストリームへ同じトランザクションで追記する。ここから、入力を受け付けるプレイが始まる | API: `POST /api/v1/games/{game_id}/start` | 発行するイベント: EV-G11 `GameStarted`、EV-S01 `SessionStarted`
 /// ゲームの開始（US1.2。進行役だけ）。`game` と `session` の 2 本へ 1 つのトランザクションで追記する。
 ///
 /// # Errors
@@ -813,6 +819,7 @@ where
 
 /// 役割の割り当て（準備中）と入れ替え（開始後）。開始後の入れ替えは、`game` と `session` の両方へ追記し、外れた旧担当者の
 /// 資格（復帰資格とブラウザセッション）を同じトランザクションで失効させる。進行役だけ。
+/// @tour walking-skeleton 30 準備 | 進行役が、参加者に役割を割り当てる。準備中は割り当て・付け替え、開始後は入れ替えになり、規則はドメインが決める | API: `PUT /api/v1/games/{game_id}/participants/{participant_id}/role` | 発行するイベント: EV-G03 `RoleAssigned`
 ///
 /// # Errors
 /// 権限・対象・資格の失効・準備中でない・終了後の誤り、永続化の失敗。
