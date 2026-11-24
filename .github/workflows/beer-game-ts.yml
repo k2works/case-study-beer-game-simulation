@@ -1,6 +1,7 @@
 name: beer-game-ts
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'apps/beer-game-ts/**'
