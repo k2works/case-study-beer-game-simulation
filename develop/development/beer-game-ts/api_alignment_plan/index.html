@@ -13935,9 +13935,14 @@
 <td style="text-align: left;">H4（開始後の役割の入れ替え。マイグレーション 010 <code>participants.replaced_at</code>）。担当のいる役割へ、参加済み・未割り当ての参加者を割り当てると、現在の担当者全員が外れ（<code>Participant.replaced</code>）、<code>session.holders</code> を差し替え、game・session の版を進め、<code>RoleReplaced</code>・<code>CredentialRevoked</code> を履歴に足し、旧担当者の復帰資格とブラウザセッションを同じトランザクションで失効する。同じ役割への割り当て直しは変化なし。拒否: 別の役割にいる人 <code>game.not_preparing</code>、終了後 <code>session.already_ended</code>、失効済み（外された旧担当者・手動失効）<code>game.credential_already_revoked</code>、存在しない参加者 <code>game.participant_not_found</code>、進行役以外 403。ロビーの <code>replaced</code>。<code>assignRole</code> の認可を冪等の照合より前に置いた（ADR-004）。<strong>契約の全 25 操作が実装済み（<code>pending.ts</code> が空）</strong>。673 件通過</td>
 </tr>
 <tr>
-<td style="text-align: center;">4〜7</td>
+<td style="text-align: center;">5（先行）</td>
+<td style="text-align: left;">ローカルで完了（2026-11-24。CI は確認待ち）</td>
+<td style="text-align: left;"><strong>段階 4 より先に、共有 UI の <code>@ui</code> を TS バックエンドで実行した（27/27 通過）</strong>。実装の側で直した 4 点: ①本文なしで <code>Content-Type: application/json</code> が付く要求（開始・停止・再開など）を、空の本文として通す（Fastify の既定は 400）②資格の Cookie は、タブ別の名前（<code>X-Tab-Id</code>）を優先し、無ければ従来の名前を読む（Kotlin 版と同じ。ADR-020 の移行）③<code>GET /games/{id}/state</code>・<code>/lobby</code> の <code>commitMode</code> に、session の現在の確定方式を重ねる（開始後は session が持つ）④<code>assignRole</code> の認可を冪等の照合より前に。共有の受け入れの支援（<code>apps/beer-game-web/support</code>）の 2 点: 準備の API 呼び出しにも画面と同じ <code>Origin</code> を付ける（TS 版は Origin を必須にする。Kotlin 版は許可リスト、Rust 版は検査なしなので、どれも通る。<strong>TS 版の Origin の検査は緩めない</strong>）、招待コードの形（Kotlin 版の <code>v1.…</code>）を前提にしない（契約が定めない）。CI の <code>e2e</code> ジョブを共有 UI の <code>@ui</code> に置き換え、デプロイ 2 本と <code>deploy.sh</code> の静的ファイルを <code>apps/beer-game-web/dist</code> に変更。旧 UI（<code>ui/</code>）は、まだ残している</td>
+</tr>
+<tr>
+<td style="text-align: center;">4・6・7</td>
 <td style="text-align: left;">未着手</td>
-<td style="text-align: left;">旧 API の撤去とテストの付け替え、共有 UI の <code>@ui</code>、ui の削除、ドキュメント</td>
+<td style="text-align: left;">旧 API の撤去とテストの付け替え、ui の削除、ドキュメント</td>
 </tr>
 </tbody>
 </table>
