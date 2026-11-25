@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Scala 版の非機能要件。beer-game-kotlin の 84 件の ID をすべて維持し（Scala も JVM のため JVM 由来の要件は継続）、ツール依存の 6 件を Scala に合わせて変更し、キャンセル安全性・Left の ROLLBACK・純粋性と依存の制限・代数構造の法則を NF-SC1〜NF-SC4 として新設して 88 件とした正本。変更表つき。">
+        <meta name="description" content="Scala 版の非機能要件。beer-game-kotlin の 84 件の ID をすべて維持し（Scala も JVM のため JVM 由来の要件は継続）、ツール依存の 6 件を Scala に合わせて変更し、NF-P2・NF-P4・NF-O4 を現行の画面の実態（3 秒間隔のポーリング）に合わせて変更し、キャンセル安全性・Left の ROLLBACK・純粋性と依存の制限・代数構造の法則を NF-SC1〜NF-SC4 として新設して 88 件とした正本。変更表つき。">
       
       
         <meta name="author" content="k2works">
@@ -3848,6 +3848,17 @@
     <span class="md-ellipsis">
       
         beer-game-kotlin からの変更
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        変更の記録（レビュー対応。2026-11-25）
       
     </span>
   </a>
@@ -14537,14 +14548,16 @@
 <li><strong>確認したこと</strong>（2026-11-25。リポジトリの外の使い捨てのプロジェクト。sbt 1.13.1、Scala 3.7.4、doobie 1.0.0-RC12、ローカルの Docker の <code>postgres:18.6</code>）:</li>
 <li><strong>NF-SC2 の前提</strong>: doobie の <code>transact</code> は、<code>ConnectionIO</code> が例外なく完了すれば、値が <code>Left</code> でも COMMIT する。<code>FC.rollback</code> を挟むと残らない（<a href="../data-model/">データモデル</a> の検証）。トランザクションの境界（commit・rollback の呼び出し）は、スタブの <code>Connection</code> を渡した <code>Transactor.fromConnection</code> で、DB なしに記録できる（<a href="../test-strategy/">テスト戦略</a> の確認した事項 8）。</li>
 <li><strong>NF-SC4 の道具</strong>: cats-laws + discipline-munit で <code>MonoidTests</code> が走り、<code>empty</code> を壊した実装は 4 件の法則で落ちる（確認した事項 3）。</li>
-<li><strong>NF-O7 の道具</strong>: sbt-scoverage 2.4.4 が文と分岐の率を出し、しきい値を割ると <code>coverageReport</code> が失敗する。行の独立した指標は無い（確認した事項 4）。</li>
+<li><strong>NF-O7 の道具</strong>: sbt-scoverage 2.4.4 が文と分岐の率を出し、しきい値を割ると <code>coverageReport</code> が失敗する。行の独立した指標は無い（確認した事項 4）。<strong>行率を XML の文の行番号から算出できるかは未確認</strong>（B1）。</li>
 <li><strong>NF-O8 の道具</strong>: scalac のオプション、WartRemover 3.6.3、sbt-scalafix 0.14.10 が Scala 3.7.4 で動く（確認した事項 9〜11）。</li>
 <li><strong>NF-S20（追記専用）・NF-S16（連鎖削除）</strong>: Rust 版が PostgreSQL 18.6 で SQL として実測した結果を引用します。<strong>Scala 版の接続・権限のないロールからは未確認</strong>です。</li>
 <li><strong>それ以外の要件は、すべて未検証</strong>です。</li>
+<li><strong>確認状況の唯一の一覧</strong>は <a href="../tech-stack/#確認状況の一覧">技術スタック</a> です。食い違うときは、<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」を正とします。</li>
+<li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3（<code>Ignored</code> で止める設計を維持）、H6（カバレッジは行率を算出する案 C を第一）、H7（範囲は U1〜U3 を約束）、H9（NF-P2 は p95 4 秒）の 4 件です。<strong>H1・H2・H4・H5・H8・H10 の直し方は AI の案で、承認を得ていません</strong>。</li>
 <li>Kotlin 版の実装の経緯（B3・B6・B15 の実測の注記）は引き継ぎません（Scala 版の値ではないため）。</li>
 </ul>
 <h2 id="slo">品質特性の優先順位と SLO の要約<a class="headerlink" href="#slo" title="Permanent link">&para;</a></h2>
-<p><strong>Kotlin 版と同じです。</strong> 優先順位は、1 機能の正確性・信頼性（整合性）、2 セキュリティ、3 性能効率性・使用性、4 保守性・観測性、5 可用性（SLO）、6 拡張性・移植性。SLO は、月間可用性 99.5%、完全停止の検知 1 分以内、RPO 0（確定済み週）、RTO 15 分、入力確定（サーバー側）p95 1 秒以内、週確定から全画面への反映 p95 2 秒以内、保持期限後の削除（期限到達の 99% を 24 時間以内）。</p>
+<p><strong>Kotlin 版と同じです。</strong> 優先順位は、1 機能の正確性・信頼性（整合性）、2 セキュリティ、3 性能効率性・使用性、4 保守性・観測性、5 可用性（SLO）、6 拡張性・移植性。SLO は、月間可用性 99.5%、完全停止の検知 1 分以内、RPO 0（確定済み週）、RTO 15 分、入力確定（サーバー側）p95 1 秒以内、週確定から全画面への反映 <strong>p95 4 秒以内（Scala 版は NF-P2 を再定義した。ユーザーの決定、2026-11-25。Kotlin 版は 2 秒）</strong>、保持期限後の削除（期限到達の 99% を 24 時間以内）。</p>
 <h2 id="es-cqrs-scala">ES + CQRS と Scala で変わる点<a class="headerlink" href="#es-cqrs-scala" title="Permanent link">&para;</a></h2>
 <p>ES + CQRS による変化（再生による書き込み時間、ストリームの版の一意制約と自動再試行、同期投影、投影の再構築、追記専用、個人情報の分離、イベントの互換）と、JVM による変化（起動、ウォームアップ、ヒープ）は <strong>Kotlin 版と同じ</strong>で、要件もそのまま引き継ぎます。<strong>Scala の言語・ツールで変わる点</strong>は次のとおりです。</p>
 <table>
@@ -14566,7 +14579,7 @@
 <tr>
 <td style="text-align: left;">トランザクションの終わり</td>
 <td style="text-align: left;">ブロックが <code>Left</code> を返したら ROLLBACK</td>
-<td style="text-align: left;"><strong>doobie は <code>Left</code> でも COMMIT する</strong>。<code>Tx.rollbackOnLeft</code> で ROLLBACK を明示（SBD2）</td>
+<td style="text-align: left;"><strong>doobie は <code>Left</code> でも COMMIT する</strong>。公開の入口を <code>Tx.run</code> だけにして ROLLBACK を明示（SBD2）。<strong>案（H4）: <code>.transact(</code> の直接呼び出しを Scalafix で禁止</strong>（旧案の合成子 <code>Tx.rollbackOnLeft</code> は公開しない）</td>
 <td style="text-align: left;"><strong>NF-SC2（新）</strong>、NF-R5</td>
 </tr>
 <tr>
@@ -14620,8 +14633,9 @@
 </tbody>
 </table>
 <h2 id="_3">性能要件<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p>JVM のウォームアップ・ヒープ・起動に関する NF-P1・NF-P15〜NF-P18 は、<strong>Kotlin 版のまま継続</strong>します（Scala も JVM のため）。<strong>Kotlin 版の数値は Kotlin の実装についての提案値で、Scala の実装の実測で見直します</strong>（SN2）。計測の方法（JMH か自前か）は実装開始時に決めます（<strong>JMH を Scala から使う場合の道具は未確認</strong>）。</p>
+<p>JVM のウォームアップ・ヒープ・起動に関する NF-P1・NF-P15〜NF-P18 は、<strong>Kotlin 版のまま継続</strong>します（Scala も JVM のため）。<strong>Kotlin 版の数値は Kotlin の実装についての提案値で、Scala の実装の実測で見直します</strong>（SN2）。<strong>ただし NF-P2・NF-P4 は、画面の実態に合わせて Scala 版で再定義した</strong>（下の表）。計測の方法（JMH か自前か）は実装開始時に決めます（<strong>JMH を Scala から使う場合の道具は未確認</strong>）。</p>
 <h3 id="kotlin">継続する要件（要約。正本は <a href="../../beer-game-kotlin/non-functional/">Kotlin 版</a>）<a class="headerlink" href="#kotlin" title="Permanent link">&para;</a></h3>
+<p><strong>NF-P2・NF-P4 は、Scala 版で内容を変えた</strong>（下の表に全文を書く。変更の理由は「beer-game-kotlin からの変更」）。他は継続です。</p>
 <table>
 <thead>
 <tr>
@@ -14636,7 +14650,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-P2</td>
-<td style="text-align: left;">週確定から全ブラウザの表示まで <strong>p95 2 秒以下（p99 5 秒以下）</strong>。同一の時計（確定した側のブラウザの時刻を基準）で測る。同期投影のため、通知の版以上の状態が取れる。<strong>Rust 版は 2026-11-23 に、現行の画面が 3 秒間隔のポーリングであることを理由に 4 秒へ再定義した。Scala 版は画面を共有するため、同じ扱いにするかは未決</strong>（未決事項 2）</td>
+<td style="text-align: left;">週確定から全ブラウザの表示まで <strong>p95 4 秒以下</strong>。同一の時計（確定した側のブラウザの時刻を基準）で測る。同期投影のため、通知の版以上の状態が取れる。<strong>目標の再定義（2026-11-25 にユーザーが決定。旧: p95 2 秒以下・p99 5 秒以下）</strong>: 現行の画面は SSE を使わず、3 秒間隔のポーリング（<code>PlayPage</code>・<code>LobbyPage</code>・<code>ObservationPage</code> が各 <code>*_POLL_MS = 3000</code>。console にはポーリングがない）で、Scala 版は画面を変えない（SU2・SF1）。2 秒は 3 秒間隔のポーリングでは満たせないため、ポーリングの間隔（3 秒）＋取得の所要に収まる 4 秒に定めた（Rust 版が 2026-11-23 に同じ再定義をした先例と揃える）。<strong>根拠の数値は Rust 版の推定</strong>（GET の実測 + 3 秒間隔からの計算で p95 約 2.86 秒。画面を介した実測ではない。<a href="../../../development/beer-game-rust/nfr_results/">Rust 版の NFR の検証結果</a>）で、<strong>Scala 版の値は実測していない</strong>。<strong>SSE で 2 秒を保つことは、全実装共通の画面の改善として別に扱う</strong>（画面を変えない前提と両立しない。<a href="../ui-design/">UI 設計</a> の #12、<a href="../architecture-frontend/">フロントエンド</a>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P3</td>
@@ -14644,7 +14658,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-P4</td>
-<td style="text-align: left;">SSE が使えない場合、1 秒間隔のポーリングに移り、確定から 4 秒以内に最新の版を表示する</td>
+<td style="text-align: left;">SSE が使えない場合（現行の画面は常にこの状態）、<strong>3 秒間隔のポーリング</strong>（現行の画面の実態）で、確定から 4 秒以内に最新の版を表示する。<strong>Rust 版の推定では最大約 3.0 秒</strong>（画面を介した実測ではない）。Scala 版の値は未測定</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P5</td>
@@ -14747,14 +14761,14 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-SC1</td>
-<td style="text-align: left;"><strong>キャンセル安全性</strong>: クライアントの切断（ルートの <code>Fiber</code> の取消）、切り離した処理の想定外の失敗、プロセスへの SIGTERM、COMMIT の前の失敗のいずれでも、(1) <strong>トランザクションが部分更新を残さない</strong>（COMMIT されるか、全体が ROLLBACK される。これは PostgreSQL が保証する）、(2) <strong>失敗の経路では ROLLBACK を明示し、ロックと接続が一定時間（初期値は B1 で測って決める）以内に解放され、プールに返った接続はトランザクション外の状態である</strong>、(3) コマンドの処理（<code>execute</code>）は、<strong>切断されても最後まで実行され</strong>（COMMIT の途中で止まらない）、結果が返らなかった要求は、同じ <code>Idempotency-Key</code> の再送で保存済みの応答を得る（<strong>元の処理が実行中の再送は、完了を待って同じ応答を返す</strong>）、(4) SIGTERM では、新しい要求を止め、SSE を閉じ、<strong>追跡している <code>Fiber</code> の完了を、<code>stopTimeout</code> より短い上限で待ってから</strong>終了コード 0 で終わる</td>
+<td style="text-align: left;"><strong>キャンセル安全性</strong>: クライアントの切断（ルートの <code>Fiber</code> の取消）、切り離した処理の想定外の失敗、プロセスへの SIGTERM、COMMIT の前の失敗のいずれでも、(1) <strong>トランザクションが部分更新を残さない</strong>（COMMIT されるか、全体が ROLLBACK される。これは PostgreSQL が保証する）、(2) <strong>失敗の経路では ROLLBACK を明示し、ロックと接続が一定時間以内に解放され（</strong>「一定時間」の決め方（案）: <code>lock_timeout</code> より短く、かつ B1 で測った解放時間の p99 に余裕を足した値。数値は B1 で測って決める<strong>）、プールに返った接続はトランザクション外の状態である</strong>、(3) コマンドの処理（<code>execute</code>）は、<strong>切断されても最後まで実行され</strong>（COMMIT の途中で止まらない）、結果が返らなかった要求は、同じ <code>Idempotency-Key</code> の再送で保存済みの応答を得る（<strong>元の処理が実行中の再送は、完了を待って同じ応答を返す</strong>）、(4) SIGTERM では、新しい要求を止め、SSE を閉じ、<strong>追跡している <code>Fiber</code> の完了を、<code>stopTimeout</code> より短い上限で待ってから</strong>終わる（<strong>終了コードは未決</strong>。0 か 143 かは <code>IOApp</code> の挙動を B1 で実測して人が決める。<a href="../architecture-infrastructure/">インフラ</a> の SI3）</td>
 <td style="text-align: left;">DB の統合テスト（失敗の経路の明示の ROLLBACK とロック・接続の解放時間、<code>Fiber</code> の取消、<code>Supervisor</code> による隔離、タイムアウト後の COMMIT と再送、実行中の再送、想定外の失敗、シャットダウン、安全網の設定。<a href="../test-strategy/">テスト戦略</a> の STT4）</td>
 <td style="text-align: center;">新</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-SC2</td>
-<td style="text-align: left;"><strong><code>Left</code> の ROLLBACK</strong>: 書き込みを伴うトランザクションは、<code>Left</code>（業務の失敗・追記の競合・再試行の上限）を返す経路で、<strong>書き込み（追記・投影・周辺ストア・冪等記録）を一切残さない</strong>。doobie は <code>Left</code> でも COMMIT するため、すべての書き込みのトランザクションが <code>Tx.rollbackOnLeft</code> を通る</td>
-<td style="text-align: left;"><code>execute</code> の性質（成功は COMMIT だけ、競合の再試行、上限で <code>RetryExhausted</code>、業務の失敗は ROLLBACK して追記しない）のテストと、実 DB で <code>Left</code> の行が残らないこと。<code>.transact</code> の直接の呼び出しの禁止の検査（方式は未決）</td>
+<td style="text-align: left;"><strong><code>Left</code> の ROLLBACK</strong>: 書き込みを伴うトランザクションは、<code>Left</code>（業務の失敗・追記の競合・再試行の上限）を返す経路で、<strong>書き込み（追記・投影・周辺ストア・冪等記録）を一切残さない</strong>。doobie は <code>Left</code> でも COMMIT するため、すべての書き込みのトランザクションが、<strong><code>Tx.run</code>（案。公開の入口をこれだけにし、コマンドの <code>ConnectionIO</code> 全体を 1 回で包む）</strong>を通る</td>
+<td style="text-align: left;"><code>execute</code> の性質（成功は COMMIT だけ、競合の再試行、上限で <code>RetryExhausted</code>、業務の失敗は ROLLBACK して追記しない）のテストと、実 DB で <code>Left</code> の行が残らないこと。<strong><code>.transact(</code> の直接の呼び出しを Scalafix の <code>DisableSyntax.regex</code> で禁止し（<code>Tx</code> のファイルだけ除外）、「<code>Tx</code> を通さない <code>.transact</code> を置くと CI が落ちる」を最初のビルドの受入条件にする</strong>（H4 の案。AI の案で承認を得ていない。<a href="../test-strategy/">テスト戦略</a>）</td>
 <td style="text-align: center;">新</td>
 </tr>
 <tr>
@@ -14974,8 +14988,8 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-O7</td>
-<td style="text-align: left;">テストのカバレッジは、<strong>文 85% 以上、分岐 75% 以上</strong>（CI のゲート。sbt-scoverage。技術スタックの ST4 の暫定値）。<code>domain</code> は文 97% 以上を暫定の下限とする。<strong>team の規約の行 80% の floor との関係（scoverage は文と分岐を計測し、行の独立した指標を持たない）は、人が決める</strong>（STT2）</td>
-<td style="text-align: left;">カバレッジの計測</td>
+<td style="text-align: left;">テストのカバレッジは、<strong>行 80% 以上</strong>（team の規約の floor。CI のゲート）。scoverage は行の指標を持たないため、<strong>XML の各文のソースの行番号と実行回数から行率を算出する</strong>（案 C。ユーザーの決定、2026-11-25。<strong>出せるかは B1 で確かめる</strong>）。<strong>文 85% 以上・分岐 75% 以上（技術スタックの ST4 の暫定値）と、<code>domain</code> の文 97% 以上は、暫定の追加のゲート</strong>とする。<strong>文の率は行の率の代わりにならない</strong>（9 文の行 1 行だけ実行で文 90%・行 50% になりうる）ため、<strong>行 80% の充足は実測まで主張しない</strong>。行を出せなければ、文の率での代替が行 80% とみなせるかを人が再度決める（STT2）</td>
+<td style="text-align: left;">カバレッジの計測（行率の算出を含む）</td>
 <td style="text-align: center;">変更</td>
 </tr>
 <tr>
@@ -15015,7 +15029,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-O4</td>
-<td style="text-align: left;">アラート（API p95 1 秒超、反映 p95 2 秒超、重複した週結果・不変条件の違反、再試行の上限超過の増加、削除の恒久的な失敗）</td>
+<td style="text-align: left;">アラート（API p95 1 秒超、反映 p95 4 秒超（NF-P2 の再定義に合わせた。Kotlin 版は 2 秒）、重複した週結果・不変条件の違反、再試行の上限超過の増加、削除の恒久的な失敗）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-O5</td>
@@ -15134,8 +15148,8 @@
 <tr>
 <td style="text-align: left;">性能（NF-P）</td>
 <td style="text-align: right;">20</td>
-<td style="text-align: right;">20</td>
-<td style="text-align: right;">0</td>
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">2（NF-P2・NF-P4）</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">20</td>
 </tr>
@@ -15158,8 +15172,8 @@
 <tr>
 <td style="text-align: left;">保守・観測（NF-O）</td>
 <td style="text-align: right;">13</td>
-<td style="text-align: right;">10</td>
-<td style="text-align: right;">3</td>
+<td style="text-align: right;">9</td>
+<td style="text-align: right;">4（NF-O4・NF-O7・NF-O8・NF-O12）</td>
 <td style="text-align: right;">0</td>
 <td style="text-align: right;">13</td>
 </tr>
@@ -15190,8 +15204,8 @@
 <tr>
 <td style="text-align: left;">合計</td>
 <td style="text-align: right;">84</td>
-<td style="text-align: right;">78</td>
-<td style="text-align: right;">6</td>
+<td style="text-align: right;">75</td>
+<td style="text-align: right;">9</td>
 <td style="text-align: right;">4</td>
 <td style="text-align: right;">88</td>
 </tr>
@@ -15228,9 +15242,27 @@
 <td style="text-align: left;">ツールの違い</td>
 </tr>
 <tr>
+<td style="text-align: left;">NF-P2</td>
+<td style="text-align: left;">週確定から全ブラウザの反映まで p95 2 秒以下（p99 5 秒以下）</td>
+<td style="text-align: left;">p95 4 秒以下（現行の画面の 3 秒間隔のポーリングに合わせた再定義。ユーザーの決定、2026-11-25）。SSE で 2 秒を保つのは全実装共通の画面の改善として別に扱う</td>
+<td style="text-align: left;">画面を共有し変えないため、2 秒は満たせない（Rust 版の先例）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P4</td>
+<td style="text-align: left;">SSE が使えない場合、1 秒間隔のポーリング</td>
+<td style="text-align: left;">3 秒間隔のポーリング（現行の画面の実態）</td>
+<td style="text-align: left;">画面の実際の間隔に合わせる（<code>*_POLL_MS = 3000</code>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-O4</td>
+<td style="text-align: left;">アラートの反映の閾値は p95 2 秒超</td>
+<td style="text-align: left;">p95 4 秒超（NF-P2 の再定義に合わせる）</td>
+<td style="text-align: left;">NF-P2 との整合</td>
+</tr>
+<tr>
 <td style="text-align: left;">NF-O7</td>
 <td style="text-align: left;">行 85%、分岐 75%（Kover）</td>
-<td style="text-align: left;">文 85%、分岐 75%（scoverage。暫定）。team の行 80% との関係は人が決める</td>
+<td style="text-align: left;">team の行 80% をゲートにし、scoverage の XML から行率を算出する（案 C。ユーザーの決定、2026-11-25）。文 85%・分岐 75% は暫定の追加のゲート</td>
 <td style="text-align: left;">計測の指標が違う（STT2）</td>
 </tr>
 <tr>
@@ -15271,7 +15303,50 @@
 </tr>
 </tbody>
 </table>
-<p><strong>削除した要件はありません。</strong> 上記以外（NF-P1〜NF-P20、NF-R の他、NF-S の他、NF-O の他、NF-C、NF-U）は Kotlin 版と同じです。</p>
+<p><strong>削除した要件はありません。</strong> 上記以外（NF-P1〜NF-P20（NF-P2・NF-P4 を除く）、NF-R の他、NF-S の他、NF-O の他、NF-C、NF-U）は Kotlin 版と同じです。</p>
+<h2 id="2026-11-25">変更の記録（レビュー対応。2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<p><a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a> の指摘への対応です。<strong>ユーザーが決めたのは H3・H6・H7・H9 の方針だけで、他の直し方は AI の案です（承認を得ていません）。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">H1</td>
+<td style="text-align: left;">確認状況の一覧へのリンクを足した</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">H4</td>
+<td style="text-align: left;">NF-SC2 の測定方法を、<code>Tx.run</code> と <code>.transact(</code> の Scalafix 禁止に確定（旧: 方式は未決）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">H6</td>
+<td style="text-align: left;">NF-O7・SN3・未決事項 5 を案 C（行 80% を XML から算出。文 85%・分岐 75% は暫定の追加のゲート）に</td>
+<td style="text-align: left;">ユーザーの決定</td>
+</tr>
+<tr>
+<td style="text-align: left;">H9</td>
+<td style="text-align: left;">NF-P2 を p95 4 秒に再定義、NF-P4 を 3 秒間隔に、NF-O4 の反映の閾値を 4 秒に、SLO の要約を 4 秒に。未決事項 2 を解消</td>
+<td style="text-align: left;">ユーザーの決定</td>
+</tr>
+<tr>
+<td style="text-align: left;">M10</td>
+<td style="text-align: left;">再試行の上限の定義（総試行回数の案）を未決事項 9 に追記</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M12</td>
+<td style="text-align: left;">NF-SC1 の SIGTERM の終了コードを未決に揃え、「一定時間」の決め方（案）を書いた</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_19">設計判断<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
 <h3 id="kotlin-n-1n-3">Kotlin 版の設計判断 N-1〜N-3 との対応<a class="headerlink" href="#kotlin-n-1n-3" title="Permanent link">&para;</a></h3>
 <table>
@@ -15320,7 +15395,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">SN3</td>
-<td style="text-align: left;">カバレッジのゲートは scoverage の文・分岐とし（NF-O7）、team の行 80% との関係は人が決める</td>
+<td style="text-align: left;">カバレッジのゲートは team の行 80% とし、scoverage の XML から行率を算出する（案 C。NF-O7。ユーザーの決定、2026-11-25）。文 85%・分岐 75% は暫定の追加のゲート。行を出せなければ代替の可否を人が再度決める</td>
 </tr>
 </tbody>
 </table>
@@ -15356,14 +15431,14 @@
 <h2 id="_20">未決事項<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>数値目標（SLO、保持、容量、資格の有効期間）を、運営者と合意する</strong>（Kotlin 版と同じ）。</li>
-<li><strong>NF-P2 の扱い</strong>: Kotlin 版は p95 2 秒。Rust 版は 2026-11-23 に、現行の画面が SSE を使わず 3 秒間隔のポーリングであることを理由に 4 秒へ再定義した（ユーザーの承認）。Scala 版は同じ画面（<code>beer-game-web</code>）を共有する。<strong>同じ再定義を適用するか、2 秒のまま SSE を実装するかを、人が決める</strong>。</li>
+<li><strong>NF-P2 の扱い（解消。ユーザーの決定、2026-11-25）</strong>: p95 4 秒に再定義した（Kotlin 版は 2 秒。Rust 版が 2026-11-23 に同じ再定義をした）。残る課題は、<strong>SSE で 2 秒を保つ画面の改善</strong>を、全実装共通の別の課題として扱うこと（Scala 版だけでは決めない）と、Scala 版の値の実測（B1 以降）。</li>
 <li><strong>Scala 版の実測</strong>: NF-P15・NF-P16・NF-P17・NF-P18・NF-P19 の目標値は、すべて提案で、Scala の実測で見直す。計測の道具（JMH の採否）は未選定。</li>
-<li><strong>SBD2〜SBD4 の前提の確認</strong>（B1）: 取消時の ROLLBACK、<code>Supervisor</code> の追跡、ember の切断時の挙動、シャットダウンの待ち方。<code>Left</code> の COMMIT と <code>FC.rollback</code> の効果は確認済み。</li>
-<li><strong>NF-O7 の基準</strong>（SN3、STT2）: 文を行とみなす仮定と、team の行 80% の floor との整合を人が決める。</li>
+<li><strong>SBD2〜SBD4 の前提の確認</strong>（B1）: 取消時の ROLLBACK、<code>Supervisor</code> の追跡、ember の切断時の挙動、シャットダウンの待ち方。<code>Left</code> の COMMIT と <code>FC.rollback</code> の効果は確認済み（一覧: <a href="../tech-stack/#確認状況の一覧">技術スタック</a>）。</li>
+<li><strong>NF-O7 の基準</strong>（SN3、STT2）: 方針は案 C（行 80% を XML から算出）で、ユーザーが決めた（2026-11-25）。<strong>B1 で行率を出せるか確かめる</strong>。出せなければ、文の率での代替が team の行 80% とみなせるかを、人が再度決める。<strong>行 80% の充足は実測まで主張しない</strong>。</li>
 <li><strong>NF-O12 の取得方法</strong>: cats-effect の実行基盤の指標と、<code>HikariTransactor</code> の接続プールの使用率の取り方。</li>
 <li><strong>NF-S13 の依存関係の脆弱性検査の道具</strong>（選定未決。Dependabot か Renovate かも未決）。</li>
 <li><strong>ローカル開発の DB</strong>（ST9）: H2 の採用は決定済み。NF-S20（追記専用）・NF-S18（観察者の権限）は、<strong>H2 版（ローカル）では守られない</strong>ため、検証範囲は PostgreSQL の統合テストに限る。残る未決は、H2 の導入の承認と、B1 の最初の実測（動作範囲、性能は H2 では計測しない）。</li>
-<li><strong>保存回数の上限</strong>（NF-C8。最大の長さ 2000 件の根拠）、<strong>資格の有効期間の既定値</strong>、<strong>負荷試験の実施環境</strong>、<strong>追記の競合の自動再試行の上限と間隔</strong>（NF-R17。初期値 10 を引き継ぎ、Scala で再計測）、<strong>研修中の再構築の方式</strong>（NF-R15。暫定）、<strong>保持の起点</strong>（NF-S16。暫定）、<strong>出力のキャッシュ</strong>（NF-P9）。いずれも <a href="../../beer-game-kotlin/non-functional/">Kotlin 版の未決事項</a> に追従する。</li>
+<li><strong>保存回数の上限</strong>（NF-C8。最大の長さ 2000 件の根拠）、<strong>資格の有効期間の既定値</strong>、<strong>負荷試験の実施環境</strong>、<strong>追記の競合の自動再試行の上限と間隔</strong>（NF-R17。初期値 10 を引き継ぎ、Scala で再計測。<strong>上限が「総試行回数」か「再試行回数」かを 1 つに決める</strong>。<code>execute</code> のスケッチは総試行回数で、案は総試行回数。境界値は <a href="../test-strategy/">テスト戦略</a>。M10）、<strong>研修中の再構築の方式</strong>（NF-R15。暫定）、<strong>保持の起点</strong>（NF-S16。暫定）、<strong>出力のキャッシュ</strong>（NF-P9）。いずれも <a href="../../beer-game-kotlin/non-functional/">Kotlin 版の未決事項</a> に追従する。</li>
 <li><strong>コンテナのメモリの割り当て</strong>（NF-P17。JVM のヒープの設定をインフラの設計と合わせて決める）と、<strong>NF-P16 の Fargate での実測</strong>。</li>
 </ol>
 <h2 id="_21">出典<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h2>

@@ -9125,7 +9125,35 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        対応状況（2026-11-25）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="対応状況（2026-11-25）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反映後も残る未確認・要判断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -14706,11 +14734,94 @@
 </tbody>
 </table>
 <p>上の表は指摘の重複を除いた統合後の番号で、エージェント別の件数は元の指摘数である。各エージェントの全文はこの文書に転記していない。根拠となる文書名・節・行は、上の表の「理由」と事実確認の結果に残した。</p>
-<h2 id="_12">次のステップ<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<h2 id="2026-11-25">対応状況（2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<p>重要度「高」の 10 件を設計文書へ反映した。<strong>ユーザーの決定は 4 件だけ</strong>で、他は AI の案であり承認を得ていない。</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>対応</th>
+<th>決定の区分</th>
+<th>主な反映先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H1</td>
+<td>確認状況の一覧（K1〜K23）を新設し、各文書の食い違いを事実に直してリンクにした</td>
+<td>AI の案</td>
+<td>tech-stack の「確認状況の一覧」、architecture-backend、operation、ADR-001</td>
+</tr>
+<tr>
+<td>H2</td>
+<td><code>Started</code> の自己遷移（<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>）、<code>RoleHolderReplaced</code> は session の <code>Active</code>・<code>Paused</code> の自己遷移とし、受入テストと性質テストの生成器に入れ替えを加えた</td>
+<td>AI の案</td>
+<td>domain-model、test-strategy</td>
+</tr>
+<tr>
+<td>H3</td>
+<td><code>Ignored</code> で止める設計を維持。利用者に見える変更として変更表に載せ、障害パターン 17 の初動と新パターン 18、ui-design #15 を足した</td>
+<td><strong>ユーザーの決定</strong></td>
+<td>domain-model、operation、ui-design、ADR-001、index</td>
+</tr>
+<tr>
+<td>H4</td>
+<td><code>Tx.run</code> を唯一の公開入口にし、<code>.transact(</code> を Scalafix で禁止。旧案の合成子は不採用</td>
+<td>AI の案</td>
+<td>architecture-backend、tech-stack ST4、test-strategy、non-functional</td>
+</tr>
+<tr>
+<td>H5</td>
+<td><code>ProjectionLock</code> を <code>Resource[IO, Unit]</code>、<code>ChangeNotifier</code> を集めて <code>Tx.run</code> の後に配信する型に変更</td>
+<td>AI の案（B1 の最初に実測して確定）</td>
+<td>architecture-backend、data-model、test-strategy</td>
+</tr>
+<tr>
+<td>H6</td>
+<td>行率を XML から算出する案 C を第一にし、案 A に反例を書いた。文 85%・分岐 75% は暫定の追加ゲート</td>
+<td><strong>ユーザーの決定</strong>（案 C を第一）</td>
+<td>tech-stack ST4、test-strategy、non-functional、ADR-001</td>
+</tr>
+<tr>
+<td>H7</td>
+<td>ADR-001 に Intent（案）・成功の測り方（数値は B1 で承認を得る案）・範囲の表を追加。U1〜U3 を約束、U4〜U6・専用 AWS 環境・CI の新設は指標を見て決める</td>
+<td><strong>ユーザーの決定</strong>（範囲）。Intent の文面は案</td>
+<td>ADR-001、index</td>
+</tr>
+<tr>
+<td>H8</td>
+<td>引き継ぎ表を Kotlin ADR 002〜020 の本文で検証した。判定ラベルは 20 行とも変わらず、内容と根拠を直した</td>
+<td>AI の案</td>
+<td>ADR-001</td>
+</tr>
+<tr>
+<td>H9</td>
+<td>NF-P2 を p95 4 秒に再定義。NF-P4、NF-O4、監視の閾値（Warning 3 秒・Critical 4 秒）も揃えた。SSE の 2 秒は全実装共通の画面の改善として別扱い</td>
+<td><strong>ユーザーの決定</strong></td>
+<td>non-functional、operation、ui-design、architecture-frontend</td>
+</tr>
+<tr>
+<td>H10</td>
+<td>ポーリングの範囲を実際の画面に合わせ、2.86 秒を「Rust 版の推定」に直した</td>
+<td>AI の案</td>
+<td>ui-design、architecture-frontend</td>
+</tr>
+</tbody>
+</table>
+<p>あわせて、中・低の一部（M1〜M4、M9〜M15、M17、L1〜L6、L8〜L11）も直した。M5〜M8、M16 の「ストーリー化」、L7 は未対応で、各文書の未決事項に残る。</p>
+<h3 id="_12">反映後も残る未確認・要判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<ul>
+<li>新しく書いた Scala のコード（<code>Tx.run</code>、<code>Committed</code>、<code>Ports</code> など）は<strong>型検査していない</strong>。<code>FC.rollback</code> の後の書き込みの扱い、<code>transact</code> の外のアドバイザリロック、専用接続の <code>LISTEN</code>、キャンセルと <code>Supervisor</code>、<code>IOApp</code> の SIGTERM の終了コードは未確認。</li>
+<li>日本語見出しのアンカー（<code>#確認状況の一覧</code> など）は、<code>mkdocs.yml</code> の <code>toc</code> が slugify を設定していないため、公開サイトで解決するか未確認。ソース上は見出しと一致している。</li>
+<li>行率を scoverage の XML から出せるかは B1 で確かめる。出せなければ、文の率で代替してよいかを人が再度決める。</li>
+<li>Intent の文面、成功の測り方の数値目標、H1・H2・H4・H5・H8・H10 の直し方は、人の承認が要る。</li>
+<li>設計文書への反映後の<strong>再レビュー</strong>は未実施。<code>verified</code> の記録と <code>stable</code> への昇格は人が行う。</li>
+</ul>
+<h2 id="_13">次のステップ<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li>重要度「高」の対応方針（修正する／許容する／保留する）を人が確定する。特に H3（<code>Ignored</code> で止めるか）、H6（カバレッジの扱い）、H7（範囲）、H9（NF-P2）は人の決定が要る。</li>
-<li>確定した方針を設計文書に反映する（まず H1 の確認状況の統一、H2・H4・H5 の設計の穴）。</li>
-<li>反映後に再レビューし、人が <code>verified</code> を記録して <code>stable</code> に昇格する。</li>
+<li>反映した設計文書を人が確認する。</li>
+<li>再レビューを実施する。</li>
+<li>人が <code>verified</code> を記録して <code>stable</code> に昇格する。</li>
 </ol>
 
 

@@ -3327,10 +3327,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        範囲（ユーザーの決定、2026-11-25）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-11-25_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ユーザーの決定（2026-11-25）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        設計判断（すべて未承認）
+        設計判断
       
     </span>
   </a>
@@ -3341,7 +3363,7 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        未確認の前提
+        承認待ちの判断
       
     </span>
   </a>
@@ -3350,6 +3372,17 @@
       
         <li class="md-nav__item">
   <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        未確認の前提
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         補足
@@ -14364,79 +14397,217 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_6">設計判断（すべて未承認）<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
-<p>次の判断はすべて<strong>提案</strong>で、ユーザーの承認を得ていません。承認の記録は、ユーザーが指示した範囲だけを追記します。</p>
+<h2 id="2026-11-25">範囲（ユーザーの決定、2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">区分</th>
+<th style="text-align: left;">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">今回の範囲（約束する）</td>
+<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定</td>
+</tr>
+<tr>
+<td style="text-align: left;">範囲外・後回し（指標を見て決める）</td>
+<td style="text-align: left;">U4 学習ビュー、U5 保持・運用、U6 仕上げ、専用の AWS 環境、CI の新設</td>
+</tr>
+</tbody>
+</table>
+<p>設計書は U1〜U6 の全範囲の設計を扱いますが、実装として約束するのは U1〜U3 だけです。Intent（案）と成功の測り方（案）は <a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> にあります。最優先の価値である役割別の振り返り（US4.2）は U4 にあり、U1〜U3 だけでは研修として振り返りまで完結しません。Unit 定義の U1 は CI/CD とステージングを含むため、決定の「CI の新設・専用 AWS 環境は後回し」との差は、B1 の計画で人が決めます。</p>
+<h2 id="2026-11-25_1">ユーザーの決定（2026-11-25）<a class="headerlink" href="#2026-11-25_1" title="Permanent link">&para;</a></h2>
+<p>承認済みの判断は、次の 5 件だけです（作成計画の承認を除く）。それ以外は、すべて AI の案で、ユーザーの承認を得ていません。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">決定</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">出典</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ローカル DB</td>
+<td style="text-align: left;">H2 の PostgreSQL モード（ST9）。H2 の導入の承認と動作範囲の実測は残る</td>
+<td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a>、<a href="tech-stack/">技術スタック</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">不正な遷移（<code>Ignored</code>）</td>
+<td style="text-align: left;">止める設計を維持する（Kotlin 版は続行。利用者に見える差）</td>
+<td style="text-align: left;"><a href="../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a> H3</td>
+</tr>
+<tr>
+<td style="text-align: left;">カバレッジ</td>
+<td style="text-align: left;">行率を算出する案 C を第一とする（B1 で確かめる）</td>
+<td style="text-align: left;">同 H6</td>
+</tr>
+<tr>
+<td style="text-align: left;">範囲</td>
+<td style="text-align: left;">U1〜U3 を約束し、U4〜U6 は指標を見て決める</td>
+<td style="text-align: left;">同 H7</td>
+</tr>
+<tr>
+<td style="text-align: left;">NF-P2</td>
+<td style="text-align: left;">p95 4 秒に揃える</td>
+<td style="text-align: left;">同 H9</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_6">設計判断<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>次の判断は、上の 5 件の決定を除き、すべて<strong>案</strong>で、ユーザーの承認を得ていません。承認の記録は、ユーザーが指示した範囲だけを追記します。</p>
 <table>
 <thead>
 <tr>
 <th style="text-align: left;">判断</th>
 <th style="text-align: left;">内容</th>
+<th style="text-align: left;">状態</th>
 <th style="text-align: left;">文書</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td style="text-align: left;">ADR-001</td>
-<td style="text-align: left;">beer-game-kotlin を Scala 版として作り、設計と ADR を流用する</td>
+<td style="text-align: left;">beer-game-kotlin を Scala 版として作り、設計と ADR を流用する。引き継ぎ表は 2026-11-25 に ADR の本文で検証済み（案）</td>
+<td style="text-align: left;">案（範囲の決定を除く）</td>
 <td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">ST1〜ST9</td>
-<td style="text-align: left;">技術スタックの判断（ローカル開発だけ H2 の PostgreSQL モードを使う ST9（ユーザーの決定、2026-11-25）、JSON は circe、接続プールは HikariCP など）</td>
+<td style="text-align: left;">技術スタックの判断（JSON は circe、接続プールは HikariCP など）</td>
+<td style="text-align: left;">ST9（ローカル開発だけ H2 の PostgreSQL モード）は<strong>決定済み</strong>。ST1〜ST8 は案</td>
 <td style="text-align: left;"><a href="tech-stack/">技術スタック</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SD1〜SD7</td>
-<td style="text-align: left;">ドメインの判断（<code>enum</code> による状態、<code>Evolution</code>、<code>ValidatedNec</code> による検証など）</td>
+<td style="text-align: left;">ドメインの判断（<code>enum</code> による状態、<code>Evolution</code>、<code>ValidatedNec</code> による検証、<code>Long</code> など）</td>
+<td style="text-align: left;">SD2 のうち「<code>Ignored</code> で止める」は<strong>決定済み</strong>。ほかは案</td>
 <td style="text-align: left;"><a href="domain-model/">ドメインモデル</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SBD1〜SBD11</td>
-<td style="text-align: left;">バックエンドの判断（<code>Left</code> での明示 ROLLBACK、<code>Supervisor</code>、<code>Kleisli</code> による文脈など）</td>
+<td style="text-align: left;">バックエンドの判断（<code>Left</code> での明示 ROLLBACK、<code>Supervisor</code>、<code>Kleisli</code> による文脈など）。SBD7・SBD11 は ST6・ST8 の参照</td>
+<td style="text-align: left;">案</td>
 <td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SI1〜SI5</td>
 <td style="text-align: left;">インフラの判断（配布物の作り方は 3 案で未決、タスクサイズの初期案、SIGTERM の終了コードは未確認、Terraform と CI の Scala 版専用化）</td>
+<td style="text-align: left;">案。Terraform・CI の専用化は、範囲の決定により後回し</td>
 <td style="text-align: left;"><a href="architecture-infrastructure/">インフラストラクチャ</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SF1〜SF3</td>
 <td style="text-align: left;">フロントの判断（共有 web の再利用、起動案内の差し替え、<code>@ui</code> による同等性の確認）</td>
+<td style="text-align: left;">案</td>
 <td style="text-align: left;"><a href="architecture-frontend/">フロントエンドアーキテクチャ</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SU1〜SU2</td>
 <td style="text-align: left;">UI 設計は複製しない、契約の逸脱はバックエンドで直す</td>
+<td style="text-align: left;">案</td>
 <td style="text-align: left;"><a href="ui-design/">UI 設計</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">STT1〜STT4</td>
-<td style="text-align: left;">テスト戦略の判断（カバレッジは文 85%・分岐 75% を暫定とし、scoverage に行の指標がないため行 80% の基準を文の率で代替してよいかは人の判断待ち）</td>
+<td style="text-align: left;">テスト戦略の判断。カバレッジは、行率を scoverage の XML から算出する案 C を第一とする（STT2）</td>
+<td style="text-align: left;">STT2 の「案 C を第一」は<strong>決定済み</strong>。しきい値の数値と STT1・STT3・STT4 は案</td>
 <td style="text-align: left;"><a href="test-strategy/">テスト戦略</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">SN1〜SN3</td>
-<td style="text-align: left;">非機能要件の判断。NF-P2 は Rust 版に倣い p95 4 秒へ再定義するか、SSE で 2 秒を保つかが未決</td>
+<td style="text-align: left;">非機能要件の判断</td>
+<td style="text-align: left;">NF-P2 は p95 4 秒に揃えることが<strong>決定済み</strong>。ほかは案</td>
 <td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-SC1〜</td>
 <td style="text-align: left;">Scala 固有の非機能要件の追加（<code>NF-C</code> は容量用で使用済みのため、この接頭辞にした）</td>
+<td style="text-align: left;">案（未承認）</td>
 <td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
 </tr>
 </tbody>
 </table>
-<h2 id="_7">未確認の前提<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>判断 ID の接頭辞の規則（SD・SBD・ST・SI・SF・SU・STT・SN・NF-SC）と、同じ判断を 2 つの ID で持たない規則（JSON は ST6、接続プールは ST8 が正本）は、<a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の「決定」にあります（AI の案）。</p>
+<h2 id="_7">承認待ちの判断<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>承認者はすべてユーザーです。時期は未定です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">#</th>
+<th style="text-align: left;">判断</th>
+<th style="text-align: left;">承認の範囲</th>
+<th style="text-align: left;">備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">1</td>
+<td style="text-align: left;">ADR-001 の引き継ぎ表（20 行）、Intent、成功の測り方の数値目標</td>
+<td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a></td>
+<td style="text-align: left;">数値は B1 の計画で承認を得る（案）。Kotlin 版で未承認の ADR を暗黙に承認することにはならない</td>
+</tr>
+<tr>
+<td style="text-align: left;">2</td>
+<td style="text-align: left;">H2 の依存の導入、H2 の版の確認結果、動作範囲</td>
+<td style="text-align: left;">ST9</td>
+<td style="text-align: left;">採用そのものは決定済み。動作範囲は B1 の最初に実測して確定する</td>
+</tr>
+<tr>
+<td style="text-align: left;">3</td>
+<td style="text-align: left;">ST1〜ST8（特に circe の ST6、doobie-hikari の ST8）、Scala の版（3.7 系に据え置き）、doobie RC12</td>
+<td style="text-align: left;"><a href="tech-stack/">技術スタック</a></td>
+<td style="text-align: left;">新規の依存は導入時に承認を得る</td>
+</tr>
+<tr>
+<td style="text-align: left;">4</td>
+<td style="text-align: left;">SD1〜SD7（特に <code>Evolution</code> の型と版の持ち方、<code>Long</code>）</td>
+<td style="text-align: left;"><a href="domain-model/">ドメインモデル</a></td>
+<td style="text-align: left;">「<code>Ignored</code> で止める」は決定済み</td>
+</tr>
+<tr>
+<td style="text-align: left;">5</td>
+<td style="text-align: left;">SBD1〜SBD11（特に SBD2 の <code>Left</code> での ROLLBACK、SBD3、SBD4）と、レビューの直し方の案（H2 の <code>Started</code> の自己遷移、H4 の <code>Tx.run</code>、H5 の <code>ProjectionLock</code> と <code>ChangeNotifier</code>）</td>
+<td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a>、<a href="domain-model/">ドメインモデル</a></td>
+<td style="text-align: left;">H4・H5 は B1 の最初に実測して確定する</td>
+</tr>
+<tr>
+<td style="text-align: left;">6</td>
+<td style="text-align: left;">SI1〜SI5、SF1〜SF3、SU1〜SU2</td>
+<td style="text-align: left;">各文書</td>
+<td style="text-align: left;">U1 の CI/CD・ステージングをどこまで約束に含めるかは B1 の計画で決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">7</td>
+<td style="text-align: left;">STT1〜STT4、カバレッジのしきい値の数値</td>
+<td style="text-align: left;"><a href="test-strategy/">テスト戦略</a></td>
+<td style="text-align: left;">案 C（行率の算出）が成り立つかは B1 で確かめる。共有の <code>apps/beer-game-features/</code> の運用の承認を含む</td>
+</tr>
+<tr>
+<td style="text-align: left;">8</td>
+<td style="text-align: left;">SN1〜SN3、NF-SC1〜（接頭辞を含む）</td>
+<td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
+<td style="text-align: left;">NF-P2 は決定済み。SIGTERM の終了コードなどは未決</td>
+</tr>
+<tr>
+<td style="text-align: left;">9</td>
+<td style="text-align: left;">生きたドキュメントの生成方式（ADR-018 の置き換え）と公開先</td>
+<td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a>、<a href="test-strategy/">テスト戦略</a></td>
+<td style="text-align: left;">コード着手後に方式を決める</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_8">未確認の前提<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>
-<li>設計時の検証は、一時プロジェクトでのドメイン断片のコンパイルと munit 2 件までです。実 DB での ROLLBACK、キャンセル、http4s の SSE は<strong>未確認</strong>で、各文書に明記しています。</li>
-<li>ガイドが書く doobie 1.0.0-RC13 は Maven Central の一覧になく、RC12 を設計時の版にしました。</li>
-<li>ローカル開発の DB は、H2 の PostgreSQL モードを使うことがユーザーの決定（2026-11-25）です。ただし H2 の依存の導入の承認と、動作範囲の実測（B1 の最初）は残っています。scoverage のしきい値（暫定値）と Scala の版（3.7 系に据え置き）は、人の承認待ちです。</li>
+<li>確認した事項と未確認の事項の状態は、<a href="tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a> を唯一の正本とします。ここには状態を複製しません。</li>
+<li>設計時の検証は、一時プロジェクトでのドメイン断片のコンパイルと munit 2 件までです。実 DB での動作は一覧のとおり未確認の項目が中心で、B1 の最初のスライドで、切断・再送・SIGTERM を含めて確かめます。</li>
 <li>実装（<code>apps/beer-game-scala/</code>）はまだありません。生成物（<code>generated/</code>）は、コード着手後に方式を決めます。</li>
 </ul>
-<h2 id="_8">補足<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_9">補足<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>実ドキュメントを追加したら、この一覧を更新します。</li>
+<li>設計書のレビュー結果は、<a href="../../review/beer-game-scala/design_review_20261125/">設計書レビュー（2026-11-25）</a> にあります。「高」の指摘への対応は、上記の決定 4 件以外は AI の案です。</li>
 </ul>
 
 

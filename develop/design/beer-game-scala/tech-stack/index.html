@@ -3525,6 +3525,17 @@
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
+        確認状況の一覧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
         バックエンド
       
     </span>
@@ -3550,7 +3561,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_6" class="md-nav__link">
+  <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
         データストア
@@ -3561,7 +3572,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_7" class="md-nav__link">
+  <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
         フロントエンド
@@ -3572,7 +3583,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_8" class="md-nav__link">
+  <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
         テスト・品質
@@ -3583,7 +3594,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_9" class="md-nav__link">
+  <a href="#_10" class="md-nav__link">
     <span class="md-ellipsis">
       
         インフラ・運用
@@ -3594,7 +3605,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_10" class="md-nav__link">
+  <a href="#_11" class="md-nav__link">
     <span class="md-ellipsis">
       
         新しく導入する依存関係（導入時に承認を得る）
@@ -3605,7 +3616,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_11" class="md-nav__link">
+  <a href="#_12" class="md-nav__link">
     <span class="md-ellipsis">
       
         設計判断
@@ -3732,7 +3743,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_12" class="md-nav__link">
+  <a href="#_13" class="md-nav__link">
     <span class="md-ellipsis">
       
         アップグレード計画
@@ -3743,7 +3754,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_13" class="md-nav__link">
+  <a href="#_14" class="md-nav__link">
     <span class="md-ellipsis">
       
         未決事項
@@ -3754,7 +3765,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#_14" class="md-nav__link">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レビュー対応の記録（2026-11-25）
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
     <span class="md-ellipsis">
       
         出典
@@ -14480,8 +14502,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">Scala・WartRemover・Scalafix の対応</td>
-<td style="text-align: left;">ガイド §9.4 の確認（Scala 3.7.0、WartRemover 3.4.1、Scalafix 0.14.3、Scala CLI 1.7.1）を引用。本書の組み合わせ（Scala 3.7.4 + WartRemover 3.6.3）は上の断片で <code>var</code> と <code>head</code> を拒否することまで確認した（<code>Scalafix</code> は未確認）</td>
+<td style="text-align: left;">ガイド §9.4 の確認（Scala 3.7.0、WartRemover 3.4.1、Scalafix 0.14.3、Scala CLI 1.7.1）を引用。本書の組み合わせ（Scala 3.7.4 + WartRemover 3.6.3）は上の断片で <code>var</code> と <code>head</code> を拒否することまで確認した。sbt-scalafix 0.14.10 の <code>DisableSyntax.regex</code>（<code>println</code>・<code>System.currentTimeMillis</code>）が、Scala 3 のインデント構文のソースで <code>Compile/scalafix --check</code> に効くことも確認した（<a href="../test-strategy/">テスト戦略</a> の確認した事項 9。<code>scalafixAll</code> と、<code>.transact(</code> の禁止・ファイル単位の除外は未確認）</td>
 <td style="text-align: left;">2026-11-17（ガイド）、2026-11-25</td>
+</tr>
+<tr>
+<td style="text-align: left;">実 DB・テスト道具での確認</td>
+<td style="text-align: left;">doobie の <code>Left</code> での COMMIT と <code>FC.rollback</code>、制約名、アドバイザリロック、<code>LISTEN/NOTIFY</code>（<a href="../data-model/">データモデル</a> の検証 A）、scoverage、cucumber-scala、WartRemover のテスト除外など。<strong>事項ごとの状況は、下の「確認状況の一覧」を唯一の正本とする</strong>（他の文書はこの一覧へリンクする）</td>
+<td style="text-align: left;">2026-11-25</td>
 </tr>
 <tr>
 <td style="text-align: left;">PostgreSQL、JDK、Node.js、フロントエンド・インフラ・CI</td>
@@ -14622,13 +14649,13 @@
 <td style="text-align: left;">17</td>
 <td style="text-align: left;">Testcontainers</td>
 <td style="text-align: left;"><code>testcontainers-scala-postgresql_3</code> / <code>testcontainers-scala-munit_3</code> の最新は <strong>0.44.1</strong>（更新 2025-12-23）。Java 側の <code>org.testcontainers:postgresql</code> の 1 系の最新は 1.21.4（beer-game-kotlin は Java の 2.0.5 を使用）</td>
-<td style="text-align: left;"><strong>0.44.1</strong> を第一候補。<strong>これが依存する Java 側の Testcontainers の版と、PostgreSQL 18 のイメージの指定は要確認</strong>。使えなければ Java 版を直接使う（ガイド ADR-051 は doobie と Testcontainers を使った）</td>
+<td style="text-align: left;"><strong>0.44.1</strong>。<code>postgres:18.6</code> を <code>TestContainerForAll</code> で起動でき、<code>select version()</code> が <code>PostgreSQL 18</code> を含むことを確認した（2026-11-25。<a href="#確認状況の一覧">一覧</a> の K12）。<strong>依存する Java 側の Testcontainers の版は未確認</strong>。使えなければ Java 版を直接使う（ガイド ADR-051 は doobie と Testcontainers を使った）</td>
 </tr>
 <tr>
 <td style="text-align: left;">18</td>
 <td style="text-align: left;">cucumber-scala</td>
 <td style="text-align: left;"><code>cucumber-scala_3</code> の最新は <strong>9.3.0</strong></td>
-<td style="text-align: left;"><strong>9.3.0</strong>（ST7。日本語 Gherkin の対応と、Scala 3 での動作は要確認。ガイドは「動いた（シナリオ 2 件）」と記す）</td>
+<td style="text-align: left;"><strong>9.3.0</strong>（ST7。<code># language: ja</code> の <code>.feature</code> が <code>io.cucumber.core.cli.Main</code> で実行できることを確認した（2026-11-25。<a href="#確認状況の一覧">一覧</a> の K14）。別の sbt プロジェクトからの実行は未確認）</td>
 </tr>
 <tr>
 <td style="text-align: left;">19</td>
@@ -14652,13 +14679,13 @@
 <td style="text-align: left;">22</td>
 <td style="text-align: left;">Scalafix</td>
 <td style="text-align: left;">ガイドの確認版は 0.14.3（<code>scalafix-cli_2.13.16</code> の最新が 0.14.3）。<code>sbt-scalafix</code> の最新は <strong>0.14.10</strong></td>
-<td style="text-align: left;"><strong>sbt-scalafix 0.14.10</strong>、CLI は <strong>0.14.3</strong> を第一候補。sbt プラグインの版と <code>scalafix-cli</code> の版の関係は要確認。Scala 3 のインデント構文の解析の指定（ガイド §9.4）は B1 で確認</td>
+<td style="text-align: left;"><strong>sbt-scalafix 0.14.10</strong>。<code>DisableSyntax.regex</code> が Scala 3 のインデント構文のソースに効くことを確認した（2026-11-25。<a href="#確認状況の一覧">一覧</a> の K15）。<code>scalafix-cli</code> の版との関係と、<code>.transact(</code> の禁止・ファイル単位の除外は B1 で確認</td>
 </tr>
 <tr>
 <td style="text-align: left;">23</td>
 <td style="text-align: left;">scoverage</td>
 <td style="text-align: left;"><code>sbt-scoverage</code> の最新は <strong>2.4.4</strong></td>
-<td style="text-align: left;"><strong>2.4.4</strong>（ST4。Scala 3 での分岐の計測は要確認）</td>
+<td style="text-align: left;"><strong>2.4.4</strong>（ST4。Scala 3.7.4 で文と分岐の率が出ることを確認した。<strong>行の率は出ない</strong>。<a href="#確認状況の一覧">一覧</a> の K16）</td>
 </tr>
 <tr>
 <td style="text-align: left;">24</td>
@@ -14674,7 +14701,185 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_5">バックエンド<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<h2 id="_5">確認状況の一覧<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p><strong>この表が、Scala 版の設計書で「確認済み」「未確認」を書く唯一の正本です</strong>（2026-11-25 のレビュー指摘 H1 への対応。承認済みの判断ではなく、AI の案）。他の文書は、この一覧にリンクします（<code>./tech-stack.md#確認状況の一覧</code>）。事項ごとに、確認した場合は「何で・いつ」を書き、確認していない場合は「未確認」の欄に書きます。<strong>確認していないことを確認済みに直さず、確認結果を作りません。</strong> 一覧と本文が食い違ったときは、一覧を正とし、本文を直します。</p>
+<p>「確認済み」の根拠は、特記がなければ、リポジトリの外の使い捨てのプロジェクト（sbt 1.13.1、JetBrains Runtime 25.0.4.1、Scala 3.7.4、doobie 1.0.0-RC12、ローカルの Docker の <code>postgres:18.6</code>。<strong>リポジトリには残していない</strong>）での実行です。再現の手順と結果は、各行の参照先にあります。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ID</th>
+<th style="text-align: left;">事項</th>
+<th style="text-align: left;">確認済み（何で・いつ）</th>
+<th style="text-align: left;">未確認</th>
+<th style="text-align: left;">参照</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">K1</td>
+<td style="text-align: left;">ライブラリ・sbt プラグインの版</td>
+<td style="text-align: left;">Maven Central の <code>maven-metadata.xml</code> の版の一覧（2026-11-25）。分かるのは版の番号と更新日だけ</td>
+<td style="text-align: left;">サポート期限、機能、Scala の版との互換性（B1 のビルドで確認）</td>
+<td style="text-align: left;">上の「確認の方法と範囲」</td>
+</tr>
+<tr>
+<td style="text-align: left;">K2</td>
+<td style="text-align: left;">型の断片のコンパイル</td>
+<td style="text-align: left;">Scala 3.7.4、cats-core 2.13.0、cats-effect 3.7.1、doobie-core 1.0.0-RC12、munit 1.3.6 の組み合わせで、<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code> と WartRemover 3.6.3（ガイド §9.4 の 13 個）を有効にしてコンパイル（2026-11-25）</td>
+<td style="text-align: left;">下の K4・K7</td>
+<td style="text-align: left;"><a href="../domain-model/">ドメインモデル</a>、<a href="../architecture-backend/">バックエンドアーキテクチャ</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K3</td>
+<td style="text-align: left;">ドメインの断片（<code>Quantity</code>、<code>RoleMap</code>、<code>ValidatedNec</code> による設定の検証、<code>GameError.code</code>、<code>Game.handle</code>、<code>Events.apply</code> と <code>Evolution</code>、<code>replay</code>）</td>
+<td style="text-align: left;">上のコンパイルと、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ること。状態を 1 つ足すと <code>match</code> の網羅の警告が出ること。<code>var</code> と <code>head</code> が WartRemover に拒否されること（2026-11-25）</td>
+<td style="text-align: left;">2026-11-25 のレビュー対応で書き直した <code>Game.handle</code>（権限が先の判定順）と <code>Started</code> の自己遷移は、<strong>再コンパイルしていない</strong></td>
+<td style="text-align: left;"><a href="../domain-model/">ドメインモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K4</td>
+<td style="text-align: left;">Session 集約、<code>startGame</code>、<code>simulateWeek</code>、投影、<code>RetentionSaga</code>、<code>Functor[RoleMap]</code>・<code>Monoid[TeamTotals]</code> の法則</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">すべて型検査していない設計のスケッチ。法則のテストは書いていない</td>
+<td style="text-align: left;"><a href="../domain-model/">ドメインモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K5</td>
+<td style="text-align: left;"><code>ConnectionIO</code> が <code>Left</code> を返して完了したときの COMMIT と、<code>FC.rollback</code></td>
+<td style="text-align: left;">doobie の <code>transact</code> は、値が <code>Left</code> でも <strong>COMMIT する</strong>。<code>FC.rollback</code> を挟むと、その書き込みは<strong>残らない</strong>（実 PostgreSQL 18.6、縮小した DDL、2026-11-25）</td>
+<td style="text-align: left;"><code>FC.rollback</code> の<strong>後</strong>に同じ <code>ConnectionIO</code> で書き込みが続いたときの扱い（JDBC の仕様から、新しいトランザクションとして COMMIT されると<strong>推論</strong>した。実行していない。B1 で確かめる）</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 2</td>
+</tr>
+<tr>
+<td style="text-align: left;">K6</td>
+<td style="text-align: left;"><code>Tx</code> のトランザクション境界を DB なしで検証する方法</td>
+<td style="text-align: left;"><code>Transactor.fromConnection[IO](stub, None)</code> に、呼び出しを記録する <code>java.sql.Connection</code> のスタブを渡すと、<strong>成功は <code>commit</code> だけ（<code>rollback</code> なし）</strong>、<strong><code>Left</code> は <code>rollback</code> が呼ばれる</strong>（記録は <code>setAutoCommit, rollback, commit</code>）。<strong>旧案の <code>Tx.rollbackOnLeft</code> を単体で確かめたもの</strong>（2026-11-25）</td>
+<td style="text-align: left;">新しい案の <code>Tx.run</code>（コマンド全体を 1 回で包む）での確認。<code>.transact(</code> を <code>Tx</code> の外に置くと CI が落ちること</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 8</td>
+</tr>
+<tr>
+<td style="text-align: left;">K7</td>
+<td style="text-align: left;"><code>execute</code> の再試行、キャンセル</td>
+<td style="text-align: left;"><code>execute</code> の型のコンパイル（旧案の形）</td>
+<td style="text-align: left;">競合が 2 回続いても成功する、上限で <code>RetryExhausted</code>、業務の失敗は再試行しない、の実行。<strong>キャンセル時の ROLLBACK と接続の返却</strong>、<code>Supervisor</code> で切り離した <code>Fiber</code> の完了と追跡、<strong>ember の切断時のハンドラの取消</strong>とシャットダウンの待ち方、同じ <code>Idempotency-Key</code> の実行中の再送の待ち方</td>
+<td style="text-align: left;"><a href="../architecture-backend/">バックエンドアーキテクチャ</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K8</td>
+<td style="text-align: left;">一意制約違反の判別</td>
+<td style="text-align: left;"><code>attemptSql</code> で <code>PSQLException</code> を取り出せ、SQLSTATE <code>23505</code> と制約名 <code>uq_events_stream_version</code>（<code>getServerErrorMessage.getConstraint</code>）が得られた（2026-11-25）</td>
+<td style="text-align: left;"><code>doobie.postgres.sqlstate</code> の定数、40001・40P01・55P03 の写像、<strong>23505 の後に同じ <code>ConnectionIO</code> で次の文を発行したときの PostgreSQL の中断（25P02）</strong>（PostgreSQL の仕様の知識で、実行していない）、本番コードでの <code>PSQLException</code> の型の判定と WartRemover（<code>IsInstanceOf</code>・<code>AsInstanceOf</code>）の相性</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 4</td>
+</tr>
+<tr>
+<td style="text-align: left;">K9</td>
+<td style="text-align: left;">型の対応</td>
+<td style="text-align: left;"><code>uuid</code> ← <code>java.util.UUID</code>、<code>timestamptz</code> → <code>OffsetDateTime</code> と <code>Instant</code>（どちらも読めた）、<code>jsonb</code> は文字列 + <code>::jsonb</code> で書き <code>payload::text</code> で読める（2026-11-25）</td>
+<td style="text-align: left;"><code>opaque type</code> の <code>Meta</code>・<code>Get</code>・<code>Put</code>、<code>Array[Byte]</code>（<code>bytea</code>）、circe による <code>jsonb</code> の読み書き（<code>doobie-postgres-circe</code> は技術スタックに無い）、<code>EventCodec</code> の派生</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 3</td>
+</tr>
+<tr>
+<td style="text-align: left;">K10</td>
+<td style="text-align: left;">アドバイザリロック</td>
+<td style="text-align: left;"><code>sql"select pg_advisory_xact_lock(42)".query[Unit].unique</code> と <code>pg_advisory_xact_lock_shared</code> が <code>ConnectionIO</code> として実行できた（2026-11-25）</td>
+<td style="text-align: left;"><strong>トランザクションの外の <code>Resource</code> として取る PostgreSQL 版</strong>（専用の接続で <code>pg_advisory_lock(_shared)</code> を取り、解放で <code>pg_advisory_unlock</code> する形。セッションのロックの取得・解放・接続断での解放は実行していない）、<code>lock_timeout</code> の効き方</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 5</td>
+</tr>
+<tr>
+<td style="text-align: left;">K11</td>
+<td style="text-align: left;"><code>LISTEN/NOTIFY</code></td>
+<td style="text-align: left;"><code>PHC.pgListen</code>・<code>PHC.pgNotify</code>・<code>PHC.pgGetNotifications</code>（<code>doobie.postgres.hi.connection</code>）で、<strong>同じ接続</strong>の通知を受け取れた（2026-11-25）</td>
+<td style="text-align: left;">別の接続・プールの外の専用の接続・切断後の再購読、fs2 の <code>Topic</code> が遅い購読者で発行側を止めるか</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 6</td>
+</tr>
+<tr>
+<td style="text-align: left;">K12</td>
+<td style="text-align: left;">テスト用の PostgreSQL</td>
+<td style="text-align: left;">testcontainers-scala-postgresql・testcontainers-scala-munit 0.44.1 が <code>postgres:18.6</code> を <code>TestContainerForAll</code> で起動し、<code>select version()</code> が <code>PostgreSQL 18</code> を含んだ（2026-11-25）</td>
+<td style="text-align: left;">依存する Java 側の Testcontainers の版、用途別のロールと接続のテスト用の分離</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 6</td>
+</tr>
+<tr>
+<td style="text-align: left;">K13</td>
+<td style="text-align: left;">テストの道具</td>
+<td style="text-align: left;">munit 1.3.6 の日本語・記号のテスト名と名前の絞り込み、JUnit XML。munit-scalacheck 1.3.1 の <code>property</code> と munit-cats-effect 2.2.1 の <code>IO</code> のテスト。cats-laws 2.13.0 + discipline-munit 2.0.0 の <code>MonoidTests</code>（<code>empty</code> を壊した実装が 4 件で落ちる）（2026-11-25）</td>
+<td style="text-align: left;">ScalaCheck で状態に応じて操作を選ぶ操作列の生成、<code>HttpRoutes</code> を関数として呼ぶ HTTP のテスト、契約テストのスキーマ検証の道具</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 1〜3</td>
+</tr>
+<tr>
+<td style="text-align: left;">K14</td>
+<td style="text-align: left;">cucumber-scala</td>
+<td style="text-align: left;">9.3.0 が <code># language: ja</code>（<code>機能</code>・<code>シナリオ</code>・<code>前提</code>・<code>もし</code>・<code>ならば</code>）の <code>.feature</code> を <code>io.cucumber.core.cli.Main</code> で実行できる。タグも出る。定義のないステップは <code>Undefined</code> で終了コード 1（2026-11-25）</td>
+<td style="text-align: left;">別の sbt プロジェクト（<code>acceptance</code>）からの実行、シナリオの数が増えたときの動作</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 5</td>
+</tr>
+<tr>
+<td style="text-align: left;">K15</td>
+<td style="text-align: left;">Scalafix</td>
+<td style="text-align: left;">sbt-scalafix 0.14.10 + Scala 3.7.4 で、<code>DisableSyntax.regex</code>（<code>println</code>・<code>System.currentTimeMillis</code>）が <code>Compile/scalafix --check</code> で、インデント構文のソースの該当行を報告し、該当しない関数は報告しない（2026-11-25）</td>
+<td style="text-align: left;"><code>scalafixAll</code>、<code>.transact(</code> を禁止して <code>Tx</code> のファイルだけ除外する方法、<code>domain</code> の <code>import</code> の禁止、<code>scalafix-cli</code> の版との関係</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 9</td>
+</tr>
+<tr>
+<td style="text-align: left;">K16</td>
+<td style="text-align: left;">scoverage</td>
+<td style="text-align: left;">sbt-scoverage 2.4.4（Scala 3.7.4）で <code>coverage test coverageReport</code> が<strong>文</strong>と<strong>分岐</strong>の率を出す（例: 87.50% と 75.00%）。Cobertura の <code>line-rate</code> は文の率と同じ値（0.88）で、<strong>行の独立した指標ではない</strong>。<code>coverageMinimumStmtTotal</code>・<code>coverageMinimumBranchTotal</code>・<code>coverageFailOnMinimum := true</code> が効き、分岐 75% &lt; 80% で <code>Coverage minimum was not reached</code> になる（2026-11-25）</td>
+<td style="text-align: left;"><strong>scoverage の XML の文の行番号から行率を算出できるか</strong>（ST4。B1 で確かめる）、プロジェクトごとのしきい値、<code>coverageAggregate</code>、統合テストの計測の合算、生成コード・<code>enum</code> の扱い</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 4、ST4</td>
+</tr>
+<tr>
+<td style="text-align: left;">K17</td>
+<td style="text-align: left;">WartRemover とテスト</td>
+<td style="text-align: left;">3.6.3 は既定で <code>Test</code> にも適用される。<code>Test / wartremoverErrors := Seq.empty</code> では外れず、<strong><code>Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))</code> で外せる</strong>。scalac のオプション（<code>-Werror</code> など）は、munit・ScalaCheck・discipline・<code>IO</code> の小さなテストにそのまま通った（2026-11-25）</td>
+<td style="text-align: left;">大きなコードでの <code>opaque type</code> との相性</td>
+<td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 10・11</td>
+</tr>
+<tr>
+<td style="text-align: left;">K18</td>
+<td style="text-align: left;">DDL、ロールと GRANT（Rust 版・Kotlin 版の引用）</td>
+<td style="text-align: left;"><strong>引用</strong>: Rust 版が PostgreSQL 18.6 で実測した追記専用の拒否、部分一意索引、権限のないロールでの連鎖削除、制約名（2026-11-19）。Kotlin 版 ADR-010 の連鎖削除の確認。<strong>Scala 版で確認したのは <code>game_roots</code>・<code>events</code> の縮小した DDL の適用と、権限のあるユーザーでの連鎖削除だけ</strong>（2026-11-25）</td>
+<td style="text-align: left;">Scala 版の接続での全文の DDL、ロールと GRANT、権限のないロールでの確認（B1 の受入条件）、<code>NOLOGIN</code> ロールの設定の継承</td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K19</td>
+<td style="text-align: left;">永続化の周辺</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">V003〜V006 の DDL の適用、Flyway の実行と PostgreSQL 用のモジュール名、<code>HikariTransactor</code> と用途別のロール（<code>SET ROLE</code>）、読み取り専用の <code>REPEATABLE READ</code></td>
+<td style="text-align: left;"><a href="../data-model/">データモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K20</td>
+<td style="text-align: left;">http4s 0.23.39</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">ルートの書き方、ミドルウェアの名前（CORS・Throttle・RequestId・ErrorHandling・HSTS）、<code>ServerSentEvent</code> の API。ガイドの例が 0.23 系で動くか</td>
+<td style="text-align: left;">上の「Ktor プラグインとの対応」</td>
+</tr>
+<tr>
+<td style="text-align: left;">K21</td>
+<td style="text-align: left;">H2（ローカル開発のみ）</td>
+<td style="text-align: left;">版 2.5.252 とライセンス（MPL 2.0・EPL 1.0）、<code>doobie-h2_3</code> 1.0.0-RC12 の存在を Maven Central で確認（2026-11-25）</td>
+<td style="text-align: left;"><strong>PostgreSQL モードの動作範囲</strong>（アドバイザリロックの代替、<code>jsonb</code>、部分一意索引）、Flyway の H2 への適用、doobie 経由の SQLSTATE と制約名、<code>Left</code> の明示 ROLLBACK の H2 での動作、公式のサポート期限、JDK 25・Flyway 13.12.2 との組み合わせ。Kotlin 版の実測（H2 2.5.252、2026-11-14）を<strong>引用するだけ</strong></td>
+<td style="text-align: left;">ST9、<a href="../data-model/">データモデル</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K22</td>
+<td style="text-align: left;">引用だけのもの</td>
+<td style="text-align: left;">ガイド §9.4 の確認（Scala 3.7.0、WartRemover 3.4.1、Scalafix 0.14.3、Scala CLI 1.7.1。2026-11-17）。Kotlin 版の確認（PostgreSQL 18、JDK 25、2026-11-14）、beer-game2 の確認（Node 26、2026-11-09）</td>
+<td style="text-align: left;">本書の組み合わせでの再確認（PostgreSQL・JDK・Node.js・フロントエンド・インフラ・CI）。SIGTERM の終了コードと <code>IOApp</code> の既定の動作</td>
+<td style="text-align: left;">上の「確認の方法と範囲」、<a href="../operation/">運用要件</a></td>
+</tr>
+<tr>
+<td style="text-align: left;">K23</td>
+<td style="text-align: left;">context7</td>
+<td style="text-align: left;">使えなかった（API キーの検証に失敗。2026-11-25）。ライブラリの機能の確認には使っていない</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">上の「確認の方法と範囲」</td>
+</tr>
+</tbody>
+</table>
+<p>この一覧に載せていない検証は、<strong>行っていない</strong>ものとして扱います。B1 の最初のスライドで、K5・K7・K10・K11・K16・K20・K21 の未確認の部分を、システムレベルのテスト（切断・再送・SIGTERM を含む）で確かめます。前提が成り立たなければ、設計の見直しの条件（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）に従います。</p>
+<h2 id="_6">バックエンド<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -14858,7 +15063,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_6">データストア<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<h2 id="_7">データストア<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -14914,9 +15119,9 @@
 </tbody>
 </table>
 <p>イベントストアの専用製品（EventStoreDB など）は、<strong>導入しません</strong>（ST3。beer-game-kotlin の T1 を引き継ぐ）。<strong>H2 は、統合テスト・CI・受け入れ・ステージング・本番に使いません</strong>（ST9）。</p>
-<h2 id="_7">フロントエンド<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<h2 id="_8">フロントエンド<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <p>既存の React / TypeScript を踏襲します。版は beer-game-kotlin の <a href="../../beer-game-kotlin/tech-stack/">技術スタック</a> と <a href="../../beer-game-kotlin/architecture-frontend/">フロントエンド</a> に従い、<strong>本書では再確認していません</strong>。実装開始時に最新の安定版へ更新します。API の型は、手書きの <code>openapi.yaml</code> から生成する方針を引き継ぎます。バックエンドの言語が Scala に変わっても、契約が変わらなければ、フロントエンドと E2E は変わりません。</p>
-<h2 id="_8">テスト・品質<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<h2 id="_9">テスト・品質<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -14945,14 +15150,14 @@
 <tr>
 <td style="text-align: left;">代数構造の法則</td>
 <td style="text-align: left;">cats-laws + discipline-munit</td>
-<td style="text-align: left;"><strong>2.13.0</strong>、<strong>2.0.0</strong>（要確認）</td>
+<td style="text-align: left;"><strong>2.13.0</strong>、<strong>2.0.0</strong>（<code>MonoidTests</code> の動作は確認済み。K13）</td>
 <td style="text-align: left;">（なし）</td>
 <td style="text-align: left;"><code>Monoid</code>・<code>Functor</code> の法則。壊した実装を見分ける（ガイド §8.4）</td>
 </tr>
 <tr>
 <td style="text-align: left;">受入（Gherkin）</td>
 <td style="text-align: left;">cucumber-scala</td>
-<td style="text-align: left;"><strong>9.3.0</strong>（日本語対応・Scala 3 は要確認）</td>
+<td style="text-align: left;"><strong>9.3.0</strong>（日本語 Gherkin の CLI での実行は確認済み。K14）</td>
 <td style="text-align: left;">Cucumber-JVM 8.0.4</td>
 <td style="text-align: left;">受入条件のシナリオ（<code>@US…</code> <code>@AC…</code> タグ）。<code>sbt test</code> には載せず、専用のジョブで実行（ST7）</td>
 </tr>
@@ -14966,7 +15171,7 @@
 <tr>
 <td style="text-align: left;">統合</td>
 <td style="text-align: left;">testcontainers-scala-postgresql、testcontainers-scala-munit</td>
-<td style="text-align: left;"><strong>0.44.1</strong>（要確認）</td>
+<td style="text-align: left;"><strong>0.44.1</strong>（<code>postgres:18.6</code> の起動は確認済み。K12）</td>
 <td style="text-align: left;">Testcontainers 2.0.5</td>
 <td style="text-align: left;">PostgreSQL 18 での統合テスト</td>
 </tr>
@@ -14996,21 +15201,21 @@
 <td style="text-align: left;">WartRemover</td>
 <td style="text-align: left;"><strong>3.6.3</strong>（<code>sbt-wartremover</code>）</td>
 <td style="text-align: left;">detekt 1.23.8、PMD 7.29.0</td>
-<td style="text-align: left;"><code>Var</code>・<code>Null</code>・<code>Throw</code>・<code>OptionPartial</code>・<code>TryPartial</code>・<code>EitherProjectionPartial</code>・<code>IterableOps</code>・<code>AsInstanceOf</code>・<code>IsInstanceOf</code>・<code>Return</code>・<code>MutableDataStructures</code>・<code>TripleQuestionMark</code>・<code>DefaultArguments</code>（ガイド §9.4 の 13 個）</td>
+<td style="text-align: left;"><code>Var</code>・<code>Null</code>・<code>Throw</code>・<code>OptionPartial</code>・<code>TryPartial</code>・<code>EitherProjectionPartial</code>・<code>IterableOps</code>・<code>AsInstanceOf</code>・<code>IsInstanceOf</code>・<code>Return</code>・<code>MutableDataStructures</code>・<code>TripleQuestionMark</code>・<code>DefaultArguments</code>（ガイド §9.4 の 13 個）。テストのソースには <code>Test / scalacOptions</code> から <code>-P:wartremover</code> を除いて適用しない（確認済み。<a href="#確認状況の一覧">一覧</a> の K17）</td>
 </tr>
 <tr>
 <td style="text-align: left;">静的解析</td>
 <td style="text-align: left;">Scalafix（<code>DisableSyntax</code>）</td>
-<td style="text-align: left;"><strong>sbt-scalafix 0.14.10</strong>、CLI 0.14.3（要確認）</td>
+<td style="text-align: left;"><strong>sbt-scalafix 0.14.10</strong>（<code>DisableSyntax.regex</code> は確認済み。K15）、CLI 0.14.3</td>
 <td style="text-align: left;"><code>ForbiddenMethodCall</code></td>
-<td style="text-align: left;"><code>println</code>、<code>System.currentTimeMillis</code>、<code>Thread.sleep</code>、ドメインでの時計・乱数・<code>IO</code> の <code>import</code> の禁止（文字列のパターン。限界はガイド §9.4）</td>
+<td style="text-align: left;"><code>println</code>、<code>System.currentTimeMillis</code>、<code>Thread.sleep</code>、<strong><code>.transact(</code> の直接の呼び出し（<code>Tx</code> のファイルだけ除外。ST4）</strong>、ドメインでの時計・乱数・<code>IO</code> の <code>import</code> の禁止（文字列のパターン。限界はガイド §9.4）</td>
 </tr>
 <tr>
 <td style="text-align: left;">カバレッジ</td>
 <td style="text-align: left;">sbt-scoverage（scoverage）</td>
 <td style="text-align: left;"><strong>2.4.4</strong></td>
 <td style="text-align: left;">Kover 0.9.11</td>
-<td style="text-align: left;">文と分岐の計測としきい値（ST4）。<strong>行の指標は無い</strong>（要確認）</td>
+<td style="text-align: left;"><strong>行 80%（scoverage の XML の文の行番号から算出。ST4 の案 C）をゲート</strong>にし、文 85%・分岐 75%（<code>coverageMinimum*</code>）を暫定の追加のゲートにする。scoverage 自体に行の指標は無い（確認済み。K16）</td>
 </tr>
 <tr>
 <td style="text-align: left;">契約テスト</td>
@@ -15035,7 +15240,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_9">インフラ・運用<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<h2 id="_10">インフラ・運用<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -15082,7 +15287,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_10">新しく導入する依存関係（導入時に承認を得る）<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<h2 id="_11">新しく導入する依存関係（導入時に承認を得る）<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <p>プロジェクトの規約により、新しい依存関係は導入時に承認を得ます。<strong>本書の段階ではどれも導入していません。</strong> 承認は、B1（ウォーキングスケルトン）の計画で、実際に使うものを確定してから求めます（Rust 版と同じ運用）。</p>
 <table>
 <thead>
@@ -15120,8 +15325,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_11">設計判断<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
-<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
+<h2 id="_12">設計判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 のレビュー対応で、ユーザーが決めたのは次の 4 点です。<strong>H3</strong>（不正な遷移 <code>Ignored</code> は止める設計を維持）、<strong>H6</strong>（カバレッジは行率を算出する案 C を第一）、<strong>H7</strong>（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、<strong>H9</strong>（NF-P2 は p95 4 秒）。<strong>H1・H2・H4・H5・H8・H10 の直し方（本書の確認状況の一覧、<code>Tx.run</code>、<code>.transact(</code> の禁止など）は AI の案で、承認を得ていません。</strong> 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
 <table>
 <thead>
 <tr>
@@ -15224,17 +15429,22 @@
 <p>beer-game-kotlin の T5・T6 に対応し、ガイド第 9 章の設定を CI で必須にする。</p>
 <ul>
 <li>scalac: <code>-deprecation -feature -Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code>。<code>enum</code> の <code>match</code> の漏れ（本書の断片で、状態を 1 つ足すとパターンの網羅の警告が出ることを確認した）が、<code>-Werror</code> でビルドの失敗になる。</li>
-<li>WartRemover: ガイド §9.4 の 13 個の Wart を <code>Compile</code> に適用し、<strong>テストのソースには適用しない</strong>（ガイド §9.4「テストには適用しない」）。<strong>違反は 0 件、ベースラインなし、<code>@SuppressWarnings</code> を理由なしに使わない</strong>。層ごとに許す Wart が違う場合は、sbt のプロジェクトごとに設定を分ける（ガイド §9.4 の導入の進め方 3）。</li>
-<li>Scalafix: <code>DisableSyntax.regex</code> で <code>println</code>、<code>System.currentTimeMillis</code>・<code>nanoTime</code>、<code>Thread.sleep</code>、<code>unsafeRunSync</code> 系を禁止し、<code>domain</code> では時計・乱数・<code>java.util.UUID.randomUUID</code>・<code>scala.util.Random</code> と <code>cats.effect</code> の <code>import</code> も禁止する。文字列のパターンの限界（別名の <code>import</code> やラッパーの中の呼び出しは見逃す）は、ガイド §9.4 のとおり。</li>
+<li>WartRemover: ガイド §9.4 の 13 個の Wart を <code>Compile</code> に適用し、<strong>テストのソースには適用しない</strong>（ガイド §9.4「テストには適用しない」）。WartRemover 3.6.3 は既定で <code>Test</code> にも適用されるため、<strong><code>Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))</code> で外す</strong>（<code>Test / wartremoverErrors := Seq.empty</code> では外れない。確認済み、2026-11-25。<a href="#確認状況の一覧">一覧</a> の K17）。<strong>違反は 0 件、ベースラインなし、抑制なし</strong>（Kotlin 版 ADR-011 の「抑制なし」を引き継ぐ。<code>@SuppressWarnings</code> は使わない。緩和が要るときは ADR に記録する。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の 011 の行）。層ごとに許す Wart が違う場合は、sbt のプロジェクトごとに設定を分ける（ガイド §9.4 の導入の進め方 3）。</li>
+<li>Scalafix: <code>DisableSyntax.regex</code> で <code>println</code>、<code>System.currentTimeMillis</code>・<code>nanoTime</code>、<code>Thread.sleep</code>、<code>unsafeRunSync</code> 系を禁止し、<code>domain</code> では時計・乱数・<code>java.util.UUID.randomUUID</code>・<code>scala.util.Random</code> と <code>cats.effect</code> の <code>import</code> も禁止する。<code>DisableSyntax.regex</code> が Scala 3 のインデント構文のソースに効くことは確認済み（K15）。文字列のパターンの限界（別名の <code>import</code> やラッパーの中の呼び出しは見逃す）は、ガイド §9.4 のとおり。</li>
+<li><strong><code>.transact(</code> の禁止（H4。AI の案で、承認を得ていない）</strong>: トランザクションの実行は <code>Tx.run</code>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の SBD2）だけに限るため、<code>DisableSyntax.regex</code> で <strong><code>.transact(</code> の直接の呼び出しを禁止し、<code>Tx</code> を定義するファイルだけ除外する</strong>。同じ regex に、別名（<code>xa.trans</code>・<code>rawTrans</code> など）も足す。<strong>除外の方法（ファイル単位の設定か、<code>scalafix:off</code> の範囲指定か）は未確認</strong>（K15）。最初のビルドの受入条件に、<strong>「<code>Tx</code> を通さない <code>.transact(</code> を置くと CI が落ちる」</strong>を入れる。</li>
 <li>Scalafmt: <code>scalafmtCheckAll</code> を CI で止める。</li>
-<li><strong>カバレッジのしきい値（未決の解消案）</strong>: beer-game-kotlin の Kover のゲートは、<strong>全体の行 85%・分岐 75%、<code>domain</code> の行 100%（暫定の下限 97%）</strong>である（<a href="../../beer-game-kotlin/test-strategy/">テスト戦略（Kotlin 版）</a>。Kover の実測 96.8%・78.1% は B2 の値）。scoverage は<strong>文（statement）と分岐（branch）</strong>を計測し、<strong>行の指標を持たない</strong>と見込む（要確認）。そこで、<strong>文 85%・分岐 75% を全体の暫定のしきい値、<code>domain</code> の文 97% を暫定の下限として引き継ぐ</strong>。いずれも team.md の「行 80% を基準（floor）」を下回らない。<strong>未実測のため暫定</strong>で、最初の Bolt で実測して見直す。sbt-scoverage の設定名（<code>coverageMinimumStmtTotal</code>、<code>coverageMinimumBranchTotal</code>、<code>coverageFailOnMinimum</code>）は、設計時に確認していない（要確認）。</li>
+<li><strong>カバレッジのしきい値（ユーザーの決定、2026-11-25: 行率を算出する案 C を第一とする）</strong>: beer-game-kotlin の Kover のゲートは、<strong>全体の行 85%・分岐 75%、<code>domain</code> の行 100%（暫定の下限 97%）</strong>である（<a href="../../beer-game-kotlin/test-strategy/">テスト戦略（Kotlin 版）</a>。Kover の実測 96.8%・78.1% は B2 の値）。team.md の規約は<strong>行 80% の floor</strong>で、弱めて通してはならない。scoverage は<strong>文（statement）と分岐（branch）</strong>を計測し、<strong>行の指標を持たない</strong>（確認済み。K16）。</li>
+<li><strong>第一案（C）</strong>: scoverage の XML（<code>scoverage.xml</code>）の各文が持つ<strong>行番号</strong>から、行ごとの実行の有無を集計して<strong>行率を算出</strong>し、<strong>行 80% をそのままゲート</strong>にする（Rust 版が行 80% を承認済みのゲートにした先例 RT3 と同じ）。行の数え方（文を持つ行のうち、その行のいずれかの文が実行された行の割合、とする案）は B1 で決める。<strong>算出できるかは未確認</strong>で、B1 で確かめる。<strong>出せなければ、文の率で代替してよいかを、再度人が決める</strong>（AI は代替を採らない）。</li>
+<li><strong>追加のゲート（暫定）</strong>: 文 85%・分岐 75%（全体）と <code>domain</code> の文 97% を、scoverage の標準の設定（<code>coverageMinimumStmtTotal</code>・<code>coverageMinimumBranchTotal</code>・<code>coverageFailOnMinimum</code>。確認済み。K16）で、<strong>暫定の追加のゲート</strong>として残す。行 80% の代わりではなく、<strong>行 80% と両方</strong>を満たす。</li>
+<li><strong>案 A（前の提案。第一にしない）の反例</strong>: 「文 85% なら行 80% を満たすとみなす」は成り立たない。1 行に 9 文があって<strong>その行だけ</strong>が実行され、1 文だけの別の行が未実行なら、<strong>文 90%・行 50%</strong> になる。文の率が高くても、行の率は floor を下回りうる。</li>
+<li><strong>行 80% の充足は、実測するまで主張しない。</strong> いずれの値も<strong>未実測の暫定値</strong>で、最初の Bolt で実測して見直す。<strong>プロジェクトごとのしきい値、複数プロジェクトと統合テストの合算</strong>は未確認（K16）。</li>
 </ul>
 <h3 id="st5-munit-scalacheck-cats-laws-testcontainers">ST5: テストは munit + ScalaCheck + cats-laws + Testcontainers<a class="headerlink" href="#st5-munit-scalacheck-cats-laws-testcontainers" title="Permanent link">&para;</a></h3>
 <p>ガイドは munit と全パターンの列挙で足り、ScalaCheck を入れなかった（§8.3、§10.1）。beer-game-scala は、週次計算の不変条件（在庫・受注残が非負、出荷が利用可能量を超えない）を広い入力で守る必要があり、Kotlin 版・Rust 版もプロパティベーステストを持つため、munit-scalacheck を採る（<strong>ガイドの方針からの変更</strong>。導入の承認を得る）。代数構造の法則（<code>TeamTotals</code> の <code>Monoid</code>、<code>RoleMap</code> の <code>Functor</code>）は、cats-laws と discipline-munit か、ガイドの全パターンの列挙のどちらでも書ける。小さな範囲は後者で足りるため、<strong>法則の道具は B1 で比較して決める</strong>。</p>
 <h3 id="st6-json-circe">ST6: JSON は circe（提案。未決）<a class="headerlink" href="#st6-json-circe" title="Permanent link">&para;</a></h3>
 <p>ガイドは、JSON の木を自作した（ADR-052）。理由は「載せるものを型で決める方針」である。beer-game-scala は API の本文が多く、イベントの <code>payload</code> の相互変換（<code>EventCodec</code>）と、problem+json、<code>openapi.yaml</code> との一致検査が要るため、自作は割に合わないと判断し、http4s の標準的な組み合わせ（<code>http4s-circe</code>）の circe を提案する。<strong>ドメインのイベントに codec を付けず、永続化・HTTP の DTO と相互変換する</strong>（BD5）。派生（<code>derives</code>）を使うか手書きかは、<code>schema_version</code> とアップキャストの扱いやすさで B1 に決める。<strong>ガイドが試していない道具のため、承認を得る</strong>。代替の自作は、ガイド ADR-052 のとおり型で出力を限定できるが、パースの部分も要る。</p>
 <h3 id="st7-gherkin">ST7: 受入は、日本語 Gherkin を契約として共有し、実行は関数値の経路とは別にする<a class="headerlink" href="#st7-gherkin" title="Permanent link">&para;</a></h3>
-<p>ガイドは、cucumber-scala を「決定のあとで試して動いた（シナリオ 2 件）が <code>sbt test</code> には載せず、CLI で実行する確認用」とし、受け入れテストの本線は、関数値の <code>case class</code> で経路を差し替える方式にした（ADR-049）。Scala 版は、(a) Gherkin の <code>.feature</code> を beer-game-kotlin と共有し（<code>features/</code>）、(b) シナリオは cucumber-scala の専用のジョブで実行し、(c) 同じ受入条件を、munit の関数値の経路（ドメイン直接・アプリケーション・HTTP）でも確かめる。<strong><code>sbt test</code> に Cucumber を載せない</strong>。日本語の Gherkin（<code># language: ja</code>）を cucumber-scala 9.3.0 が扱えるかは<strong>未確認</strong>で、B1 で確かめ、不可なら英語のキーワード + 日本語の本文を比較する。</p>
+<p>ガイドは、cucumber-scala を「決定のあとで試して動いた（シナリオ 2 件）が <code>sbt test</code> には載せず、CLI で実行する確認用」とし、受け入れテストの本線は、関数値の <code>case class</code> で経路を差し替える方式にした（ADR-049）。Scala 版は、(a) Gherkin の <code>.feature</code> を beer-game-kotlin と共有し（<code>features/</code>）、(b) シナリオは cucumber-scala の専用のジョブで実行し、(c) 同じ受入条件を、munit の関数値の経路（ドメイン直接・アプリケーション・HTTP）でも確かめる。<strong><code>sbt test</code> に Cucumber を載せない</strong>。日本語の Gherkin（<code># language: ja</code>）は、cucumber-scala 9.3.0 が CLI で実行できることを<strong>確認した</strong>（2026-11-25。K14）。別の sbt プロジェクトからの実行は未確認で、B1 で確かめる。</p>
 <h3 id="st8-doobie-hikari">ST8: 接続プールは doobie-hikari（ガイドは入れていない）<a class="headerlink" href="#st8-doobie-hikari" title="Permanent link">&para;</a></h3>
 <p>ガイドは HikariCP を入れず、トランザクションごとに接続を開く（<code>Transactor.fromDriverManager</code>。§10.1）。beer-game-scala は、用途別の DB ロール（api の書き込み・読み取り・観察者、削除、migrate。ADR-009）ごとにプールを分け、接続数の上限と待ち時間を計測する必要があるため、<code>doobie-hikari</code> の <code>HikariTransactor</code>（<code>Resource</code>）を採る。<strong>ガイドからの変更で、導入の承認を得る</strong>。<code>LISTEN</code> の専用の接続は、プールの外に持つ（アーキテクチャ）。</p>
 <h3 id="st9-h2-postgresql-2026-11-25">ST9: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-25）<a class="headerlink" href="#st9-h2-postgresql-2026-11-25" title="Permanent link">&para;</a></h3>
@@ -15271,9 +15481,9 @@
 <p><strong>Scala 固有の論点</strong>:</p>
 <ul>
 <li><strong>doobie</strong>: <code>Transactor</code> は JDBC の接続元（URL・<code>DataSource</code>）から作れ、H2 でも使える。doobie-h2（1.0.0-RC12 が Maven Central にある）は H2 固有の型の対応を足すもので、<strong>要るかは B1 で確認する（未確認）</strong>。</li>
-<li><strong>明示 ROLLBACK（SBD2）</strong>: <code>Left</code> でも COMMIT する doobie の挙動は H2 でも同じ。<strong><code>Left</code> を返す経路は、H2 でも明示 ROLLBACK を行う</strong>。</li>
+<li><strong>明示 ROLLBACK（SBD2）</strong>: <code>Left</code> でも COMMIT する doobie の挙動は PostgreSQL で確認した（K5）。H2 でも同じと見込むが<strong>未確認</strong>（K21）。<strong><code>Left</code> を返す経路は、H2 でも <code>Tx.run</code> で明示 ROLLBACK を行う</strong>。</li>
 <li><strong>SQLSTATE</strong>: 一意制約違反（23505）の取得は、doobie の <code>sqlstate</code> の抽出（<code>SqlState</code>）で行う。Kotlin 版は JDBC で H2 の 23505・23513・40001 を実測したが、<strong>doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認</strong>（B1 で実測）。制約名は、PostgreSQL では専用のフィールドから、H2 ではメッセージ中の名前から取る（Kotlin 版の実測の引用）。</li>
-<li><strong>確認状況</strong>: H2 の版（2.5.252）、ライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。<strong>公式のサポート期限、PostgreSQL モードの動作範囲（アドバイザリロック、<code>LISTEN/NOTIFY</code>、部分一意索引、ロール、<code>jsonb</code>）、JDK 25・Flyway 13.12.2 との組み合わせは、Scala 版では未確認</strong>（Kotlin 版の実測を引用するのみ）。<strong>H2 の導入（依存の追加）は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>。</li>
+<li><strong>確認状況</strong>: <a href="#確認状況の一覧">確認状況の一覧</a> の K21 を正とする。H2 の版（2.5.252）、ライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。<strong>公式のサポート期限、PostgreSQL モードの動作範囲、JDK 25・Flyway 13.12.2 との組み合わせは、Scala 版では未確認</strong>（Kotlin 版の実測を引用するのみ）。<strong>H2 の導入（依存の追加）は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>。<strong><code>ProjectionLock</code> と <code>ChangeNotifier</code> は、H2 版と PostgreSQL 版が同じ型</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。H5 の案）。</li>
 </ul>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
@@ -15376,9 +15586,21 @@
 <td style="text-align: left;">WartRemover + Scalafix の <code>DisableSyntax</code> + <code>domain</code> の依存の制限（ST3）</td>
 <td style="text-align: left;">ツールの違い</td>
 </tr>
+<tr>
+<td style="text-align: left;">16</td>
+<td style="text-align: left;">カバレッジのゲートは Kover の行 85%・分岐 75%</td>
+<td style="text-align: left;"><strong>行 80%（scoverage の XML の文の行番号から算出。案 C）をゲート</strong>にし、文 85%・分岐 75% を暫定の追加のゲートにする（ST4）。行 80% の充足は実測まで主張しない</td>
+<td style="text-align: left;">scoverage に行の指標が無い（K16）。ユーザーの決定（2026-11-25）。team.md の行 80% の floor を弱めない</td>
+</tr>
+<tr>
+<td style="text-align: left;">17</td>
+<td style="text-align: left;"><code>EventStore.transaction</code> が、ブロックが <code>Left</code> を返したら ROLLBACK する</td>
+<td style="text-align: left;"><code>.transact(</code> の直接の呼び出しを Scalafix の <code>DisableSyntax.regex</code> で禁止し、<code>Tx.run</code> だけに限る（ST4）。AI の案</td>
+<td style="text-align: left;">doobie は <code>Left</code> でも COMMIT する（K5）ため、<code>Tx</code> を通さない実行を CI で止める</td>
+</tr>
 </tbody>
 </table>
-<h2 id="_12">アップグレード計画<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<h2 id="_13">アップグレード計画<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -15425,17 +15647,17 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_13">未決事項<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
+<h2 id="_14">未決事項<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>ローカル開発の DB</strong>（ST9）: H2 の採用は決定済み（2026-11-25）。残る未決は、<strong>H2 の依存の導入の承認</strong>、<strong>B1 の最初に行う動作範囲の実測</strong>（アドバイザリロック、<code>LISTEN/NOTIFY</code>、部分一意索引、ロール、<code>jsonb</code>、SQLSTATE、doobie 経由の挙動）、doobie-h2 の要否、公式のサポート期限（未確認）。</li>
-<li><strong>カバレッジのしきい値</strong>（ST4）: 文 85%・分岐 75%、<code>domain</code> 文 97% を暫定で引き継いだ。<strong>未実測</strong>。scoverage の Scala 3 での指標と設定名は<strong>要確認</strong>。</li>
-<li><strong>Scala と周辺の版の組み合わせ</strong>: Scala 3.7.4 と WartRemover 3.6.3・sbt-scalafix 0.14.10・sbt-scoverage 2.4.4 の組み合わせ（Scalafix と scoverage は本書では未確認）。JDK 25 との組み合わせ。</li>
+<li><strong>カバレッジのゲート</strong>（ST4）: 行 80% を、scoverage の XML の文の行番号から算出してゲートにする案 C が第一（ユーザーの決定、2026-11-25）。<strong>B1 で算出できるかを確かめる。出せなければ、文の率で代替してよいかを再度人が決める。</strong> 文 85%・分岐 75%、<code>domain</code> 文 97% は暫定の追加のゲートで、<strong>未実測</strong>。設定名（<code>coverageMinimum*</code>）は確認済み（K16）。</li>
+<li><strong>Scala と周辺の版の組み合わせ</strong>: Scala 3.7.4 と WartRemover 3.6.3・sbt-scalafix 0.14.10・sbt-scoverage 2.4.4 の組み合わせは、小さな断片で動くことを確認した（K15〜K17）。大きなコードでの確認と、JDK 25 との組み合わせは未確認。</li>
 <li><strong>doobie の RC13</strong>: ガイドが記す 1.0.0-RC13 は、Maven Central の一覧に無かった。RC12 でガイドの例（<code>Transactor</code>、<code>ConnectionIO</code>、<code>Update</code>）が動くかは要確認。</li>
 <li><strong>http4s 0.23.39 の API</strong>: ガイドの例と、SSE（<code>ServerSentEvent</code>）、ミドルウェア（CORS・Throttle・RequestId・ErrorHandling など）の名前。</li>
 <li><strong>JSON ライブラリ</strong>（ST6）: circe を提案。派生か手書きか。<strong>承認を得る</strong>。</li>
-<li><strong>cucumber-scala の日本語対応</strong>（ST7）と、Gherkin のファイルの共有の配置。</li>
-<li><strong>Testcontainers</strong>: <code>testcontainers-scala</code> 0.44.1 が依存する Java 側の版と、PostgreSQL 18 のイメージの指定。</li>
-<li><strong>ドメインの依存の検査の方式</strong>（ST3）: sbt のタスクか、Scalafix の <code>DisableSyntax.regex</code> か。</li>
+<li><strong>cucumber-scala</strong>（ST7）: 日本語 Gherkin の実行は確認済み（K14）。残る未決は、別の sbt プロジェクトからの実行と、Gherkin のファイルの共有の配置。</li>
+<li><strong>Testcontainers</strong>: <code>postgres:18.6</code> の起動は確認済み（K12）。残る未決は、<code>testcontainers-scala</code> 0.44.1 が依存する Java 側の版。</li>
+<li><strong>依存の検査の方式</strong>（ST3・ST4）: sbt のタスクか、Scalafix の <code>DisableSyntax.regex</code> か。<code>.transact(</code> の禁止と <code>Tx</code> のファイルの除外の方法も同じ検査の仕組みで行えるか（K15）。</li>
 <li><strong>生きたドキュメントの生成方式</strong>（ADR-001 の 018 の置き換え）: Scala 3 の注釈、<code>enum</code> のメタ情報、scaladoc の走査の比較。</li>
 <li><strong>コンテナ</strong>: 実行イメージ、<code>sbt-native-packager</code> の採否、JVM のヒープ（NF-P17 に対応）。</li>
 <li><strong>選定未決（Kotlin 版から継続）</strong>: 変異テストの道具、依存関係の脆弱性検査、Dependabot か Renovate か、生きたドキュメントの公開の道具。</li>
@@ -15443,7 +15665,40 @@
 <li><strong>Nix の開発シェル</strong>: JDK の指定、<code>scala_3</code> の版（<code>scalaVersion</code> で固定するため、REPL と scala-cli 用）。</li>
 <li><strong>JSON スキーマの検査ライブラリ、<code>@redocly/cli</code>、<code>openapi-typescript</code></strong> の版（フロントエンド側は共有。バックエンド側の契約テストの検査ライブラリは JVM の共有を見込むが要確認）。</li>
 </ol>
-<h2 id="_14">出典<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<h2 id="2026-11-25">レビュー対応の記録（2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<p><a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a> への対応のうち、本書に関するもの（行番号は編集で動くため、節名で記録します）。<strong>H6 の第一案（行率の算出）だけがユーザーの決定で、他の直し方は AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">直した箇所</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">H1</td>
+<td style="text-align: left;">新設の「確認状況の一覧」、「確認の方法と範囲」、確認した重要な事項の 17・18・22・23、ST7、未決事項の 2・3・7〜9</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">H4</td>
+<td style="text-align: left;">ST4 の <code>.transact(</code> の禁止、テスト・品質の表の Scalafix の行、変更表の 17</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">H6</td>
+<td style="text-align: left;">ST4 のカバレッジ（案 C を第一、反例、行 80% の充足は実測まで主張しない）、変更表の 16、未決事項の 2</td>
+<td style="text-align: left;">第一案はユーザーの決定。算出できるかは未確認</td>
+</tr>
+<tr>
+<td style="text-align: left;">L5</td>
+<td style="text-align: left;">ST4 の WartRemover のテスト除外の設定、Scalafix の確認済みの範囲</td>
+<td style="text-align: left;">直した</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_15">出典<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Maven Central の <code>maven-metadata.xml</code>（<code>org.typelevel:cats-core_3</code>、<code>cats-effect_3</code>、<code>co.fs2:fs2-core_3</code>、<code>org.http4s:http4s-ember-server_3</code>・<code>http4s-circe_3</code>、<code>org.tpolecat:doobie-core_3</code>・<code>doobie-postgres_3</code>・<code>doobie-hikari_3</code>、<code>io.circe:circe-core_3</code>、<code>com.zaxxer:HikariCP</code>、<code>org.postgresql:postgresql</code>、<code>org.flywaydb:flyway-core</code>、<code>org.scalameta:munit_3</code>・<code>munit-scalacheck_3</code>・<code>scalafmt-core_2.13</code>・<code>sbt-scalafmt_2.12_1.0</code>、<code>org.typelevel:munit-cats-effect_3</code>・<code>discipline-munit_3</code>・<code>cats-laws_3</code>・<code>log4cats-slf4j_3</code>、<code>org.scalacheck:scalacheck_3</code>、<code>com.dimafeng:testcontainers-scala-*_3</code>、<code>io.cucumber:cucumber-scala_3</code>、<code>ch.qos.logback:logback-classic</code>、<code>org.scala-lang:scala3-compiler_3</code>、<code>org.scala-sbt:sbt</code>、<code>org.wartremover:wartremover_3.7.*</code>・<code>sbt-wartremover_2.12_1.0</code>、<code>ch.epfl.scala:scalafix-cli_2.13.16</code>・<code>sbt-scalafix_2.12_1.0</code>、<code>org.scoverage:sbt-scoverage_2.12_1.0</code>）、2026-11-25</li>
 <li>ローカルの sbt 1.13.1（JetBrains Runtime 25.0.4.1）での断片のコンパイルとテスト、2026-11-25</li>

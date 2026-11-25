@@ -3442,6 +3442,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#started-h2ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        開始後の役割の入れ替えと Started の自己遷移（H2。AI の案、承認を得ていない）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3640,6 +3651,17 @@
     <span class="md-ellipsis">
       
         未決事項
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        レビュー対応の記録（2026-11-25）
       
     </span>
   </a>
@@ -14525,7 +14547,8 @@
 <p>入力は <a href="../../../requirements/beer-game-ts/requirements_definition/">要件定義</a>（BR・FR・NFR）、<a href="../../../requirements/beer-game-ts/system_usecase/">システムユースケース</a>、<a href="../../../requirements/beer-game-ts/user_story/">ユーザーストーリー</a> です。<strong><code>docs/</code> を設計の正本</strong>とします。実装コードはまだ存在しません（アプリの置き場は <code>apps/beer-game-scala</code> を予定）。</p>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>本書で確認したこと</strong>: 3 章の型とコードの断片（<code>Quantity</code>、<code>RoleMap</code>、<code>ValidatedNec</code> による設定の検証、<code>GameError.code</code>、Game 集約の <code>handle</code>、<code>Events.apply</code> と <code>Evolution</code>、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code> と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、<code>Events.apply</code> の <code>match</code> で網羅の警告が出ること（<code>-Werror</code> で失敗する形）も確認しました。<code>var</code> と <code>head</code> が WartRemover に拒否されることも確認しました。</li>
+<li><strong>本書で確認したこと</strong>: 3 章の型とコードの断片（<code>Quantity</code>、<code>RoleMap</code>、<code>ValidatedNec</code> による設定の検証、<code>GameError.code</code>、Game 集約の <code>handle</code>、<code>Events.apply</code> と <code>Evolution</code>、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code> と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、<code>Events.apply</code> の <code>match</code> で網羅の警告が出ること（<code>-Werror</code> で失敗する形）も確認しました。<code>var</code> と <code>head</code> が WartRemover に拒否されることも確認しました。<strong>確認状況の正本は <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>（K2〜K4）</strong> です。</li>
+<li><strong>2026-11-25 のレビュー対応で書き直した部分は、再コンパイルしていません</strong>: <code>Game.handle</code> の <code>AssignRole</code> の判定順（権限が先。L6）と、<code>GameEvents.apply</code> の <code>Started</code> の自己遷移（H2）、<code>GameEvent</code> に足したイベント。いずれも AI の案で、承認を得ていない。</li>
 <li><strong>確認していないこと</strong>: Session 集約、<code>startGame</code>、<code>simulateWeek</code>、投影、<code>RetentionSaga</code> の Scala のコードは、<strong>型検査していない設計のスケッチ</strong>です。<code>Monoid</code>・<code>Functor</code> の法則のテストは書いていません。</li>
 <li><strong>引き継ぐだけで再検討していないこと</strong>: 週次計算の規則（12 ステップ）、観察者の開示の規則、保持削除の細部、エラーコードの一覧、投影の購読表、ユビキタス言語の定義は、Kotlin 版の該当節を正本として参照します。Scala 版で変わるのは表現であり、API の契約（<code>code</code>、problem+json）は変えません。</li>
 <li><strong>Kotlin 版の実装の経緯（B1〜B13 の注記）は引き継ぎません。</strong> 本書は、Kotlin 版の設計の現在の形を出発点とします。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。</li>
@@ -14533,7 +14556,7 @@
 <h3 id="_3">設計の前提と原則<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の前提と原則をそのまま引き継ぎます（学習用シミュレーション、アカウントなし、決定論的な週次計算、役割別の情報制限、ルールは集約が持つ、ドメインは純粋、集約は最小の整合性の範囲、個人情報と秘密はイベントに入れない）。Scala 版で加わる原則は次のとおりです。</p>
 <ul>
-<li><strong>ドメインのプロジェクトは <code>cats-core</code> だけに依存する。</strong> <code>cats-effect</code>・<code>doobie</code>・<code>http4s</code>・<code>circe</code> を持たない。時刻・乱数・識別子の生成・永続化は、コマンドの値として渡す（<a href="../tech-stack/">技術スタック</a> の ST3、ガイド §4.4、§1.3）。</li>
+<li><strong>ドメインのプロジェクトは <code>cats-core</code> だけに依存する。</strong> <code>cats-effect</code>・<code>doobie</code>・<code>http4s</code>・<code>circe</code> を持たない。時刻・乱数・識別子の生成・永続化は、コマンドの値として渡す（<a href="../tech-stack/">技術スタック</a> の ST3、ガイド §4.3、§1.3）。</li>
 <li><strong><code>var</code>・<code>null</code>・<code>throw</code>・<code>return</code>・可変コレクション・<code>head</code> などの部分関数・<code>asInstanceOf</code> を使わない。</strong> WartRemover で守る（ガイド §9.4）。遷移関数は全域で、例外を投げない。</li>
 <li><strong>新しい値を作って返す。</strong> <code>case class</code> の <code>copy</code> と不変の <code>List</code>・<code>Map</code> だけを使い、共有可変状態は持たない（ガイド第 2 章）。</li>
 </ul>
@@ -14556,7 +14579,7 @@
 <tr>
 <td style="text-align: left;"><code>decideGame</code>、<code>evolveGame</code></td>
 <td style="text-align: left;"><code>Game.handle</code>、<code>Events.apply</code>（<code>GameEvents</code>・<code>SessionEvents</code> に分ける）</td>
-<td style="text-align: left;">ガイド §7.3・§7.4 の <code>handle</code> と <code>Events.apply</code> に合わせる</td>
+<td style="text-align: left;">ガイド §7.3・§7.4 の <code>handle</code> と <code>Events.apply</code> に合わせる。<strong>引数の順は、本書は <code>handle(state, command)</code>、ガイド §7.6 は <code>handle(command, state)</code> で違う</strong>（Kotlin 版の <code>decide(state, command)</code> に合わせた。どちらかに揃えるかは B1 で決める）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>decideSession</code>、<code>evolveSession</code></td>
@@ -14711,6 +14734,8 @@
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span>
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleUnassigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span>
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">GameStarted</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">,</span><span class="w"> </span><span class="n">replacedBy</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">)</span><span class="w">   </span><span class="c1">// EV-G12。開始後の入れ替え</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">CredentialRevoked</span><span class="p">(</span><span class="n">subject</span><span class="p">:</span><span class="w"> </span><span class="nc">CredentialSubject</span><span class="p">)</span><span class="w">                                              </span><span class="c1">// EV-G08。入れ替えの自動失効にも使う</span>
 <span class="w">  </span><span class="c1">// … EV-G01〜G12。Kotlin 版の表のとおり</span>
 
 <span class="k">enum</span><span class="w"> </span><span class="nc">GameCommand</span><span class="p">:</span>
@@ -14721,6 +14746,12 @@
 <p><code>GameState</code> は<strong>版を持ちません</strong>。ストリームの版は、永続化の層が <code>(state, version)</code> として持ちます（SD2。ガイド §7.6 の <code>Versioned</code>）。</p>
 <h4 id="handle-eventsapply">handle と Events.apply<a class="headerlink" href="#handle-eventsapply" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code><span class="k">object</span><span class="w"> </span><span class="nc">Game</span><span class="p">:</span>
+<span class="w">  </span><span class="cm">/** 作成前（NotCreated）は、誰も進行役ではない。権限の判定に使う（L6） */</span>
+<span class="w">  </span><span class="k">private</span><span class="w"> </span><span class="k">def</span><span class="w"> </span><span class="nf">isFacilitator</span><span class="p">(</span><span class="n">state</span><span class="p">:</span><span class="w"> </span><span class="nc">GameState</span><span class="p">,</span><span class="w"> </span><span class="n">actor</span><span class="p">:</span><span class="w"> </span><span class="nc">Actor</span><span class="p">):</span><span class="w"> </span><span class="nc">Boolean</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="k">match</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">NotCreated</span><span class="w">         </span><span class="o">=&gt;</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w">    </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">actor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nc">Actor</span><span class="p">.</span><span class="nc">Facilitator</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+<span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w">      </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">actor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nc">Actor</span><span class="p">.</span><span class="nc">Facilitator</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+
 <span class="w">  </span><span class="k">def</span><span class="w"> </span><span class="nf">handle</span><span class="p">(</span><span class="n">state</span><span class="p">:</span><span class="w"> </span><span class="nc">GameState</span><span class="p">,</span><span class="w"> </span><span class="n">command</span><span class="p">:</span><span class="w"> </span><span class="nc">GameCommand</span><span class="p">):</span><span class="w"> </span><span class="nc">Either</span><span class="p">[</span><span class="nc">GameError</span><span class="p">,</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">GameEvent</span><span class="p">]]</span><span class="w"> </span><span class="o">=</span>
 <span class="w">    </span><span class="n">command</span><span class="w"> </span><span class="k">match</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="nc">GameCommand</span><span class="p">.</span><span class="nc">CreateGame</span><span class="p">(</span><span class="n">actor</span><span class="p">,</span><span class="w"> </span><span class="n">gameId</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
@@ -14729,11 +14760,12 @@
 <span class="w">          </span><span class="n">_</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="nc">Either</span><span class="p">.</span><span class="n">cond</span><span class="p">(</span><span class="n">actor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nc">Actor</span><span class="p">.</span><span class="nc">Anonymous</span><span class="p">,</span><span class="w"> </span><span class="p">(),</span><span class="w"> </span><span class="nc">GameError</span><span class="p">.</span><span class="nc">Forbidden</span><span class="p">)</span>
 <span class="w">        </span><span class="k">yield</span><span class="w"> </span><span class="nc">List</span><span class="p">(</span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">GameCreated</span><span class="p">(</span><span class="n">gameId</span><span class="p">))</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="nc">GameCommand</span><span class="p">.</span><span class="nc">AssignRole</span><span class="p">(</span><span class="n">actor</span><span class="p">,</span><span class="w"> </span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">        </span><span class="c1">// 判定順: 権限 → 準備中か → 参加者の存在（L6。権限のない人に状態を知らせない。Kotlin 版の原則）</span>
 <span class="w">        </span><span class="k">for</span>
+<span class="w">          </span><span class="n">_</span><span class="w">       </span><span class="o">&lt;-</span><span class="w"> </span><span class="nc">Either</span><span class="p">.</span><span class="n">cond</span><span class="p">(</span><span class="n">isFacilitator</span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">actor</span><span class="p">),</span><span class="w"> </span><span class="p">(),</span><span class="w"> </span><span class="nc">GameError</span><span class="p">.</span><span class="nc">Forbidden</span><span class="p">)</span>
 <span class="w">          </span><span class="n">data</span><span class="w">    </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="k">match</span>
 <span class="w">                       </span><span class="k">case</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">Right</span><span class="p">((</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">))</span>
-<span class="w">                       </span><span class="k">case</span><span class="w"> </span><span class="n">_</span><span class="w">                          </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">Left</span><span class="p">(</span><span class="nc">GameError</span><span class="p">.</span><span class="nc">NotPreparing</span><span class="p">)</span>
-<span class="w">          </span><span class="n">_</span><span class="w">       </span><span class="o">&lt;-</span><span class="w"> </span><span class="nc">Either</span><span class="p">.</span><span class="n">cond</span><span class="p">(</span><span class="n">actor</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nc">Actor</span><span class="p">.</span><span class="nc">Facilitator</span><span class="p">(</span><span class="n">data</span><span class="p">.</span><span class="n">_1</span><span class="p">),</span><span class="w"> </span><span class="p">(),</span><span class="w"> </span><span class="nc">GameError</span><span class="p">.</span><span class="nc">Forbidden</span><span class="p">)</span>
+<span class="w">                       </span><span class="k">case</span><span class="w"> </span><span class="n">_</span><span class="w">                          </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">Left</span><span class="p">(</span><span class="nc">GameError</span><span class="p">.</span><span class="nc">NotPreparing</span><span class="p">)</span><span class="w">   </span><span class="c1">// 開始後は assignRoleAfterStart（下記）</span>
 <span class="w">          </span><span class="n">current</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">data</span><span class="p">.</span><span class="n">_2</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">pid</span><span class="p">).</span><span class="n">toRight</span><span class="p">(</span><span class="nc">GameError</span><span class="p">.</span><span class="nc">ParticipantNotFound</span><span class="p">(</span><span class="n">pid</span><span class="p">))</span>
 <span class="w">        </span><span class="k">yield</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="k">match</span>
 <span class="w">          </span><span class="k">case</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">role</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="nc">Nil</span><span class="w">                                        </span><span class="c1">// 変化なし。履歴に足さない</span>
@@ -14757,6 +14789,13 @@
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">None</span><span class="p">)))</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">GameStarted</span><span class="p">(</span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">))</span>
+<span class="w">      </span><span class="c1">// 開始後の役割の入れ替え（H2。Kotlin 版の変更表 38 に倣う）。Started の自己遷移として受ける</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">        </span><span class="c1">// 入れ替えの新担当者</span>
+<span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">r</span><span class="p">))))</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 旧担当者の役割を外す。行は消さない</span>
+<span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">None</span><span class="p">)))</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">@</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">CredentialRevoked</span><span class="p">(</span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 実際は資格の状態を更新する（スケッチは参加者だけ）</span>
+<span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">@</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">NotCreated</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)),</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Ignored</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
 
@@ -14769,6 +14808,52 @@
 </code></pre></div>
 <p>（上のコードの <code>GameEvents</code> は、検証した断片では <code>Events</code> の名前です。集約ごとに分けるため、本書では <code>GameEvents</code> と書きます。）</p>
 <p>最後の腕は、<strong>状態の列挙子だけを列挙して</strong>、イベントを <code>_</code> で受けます。状態を足すと、この <code>match</code> が網羅の警告になり、<code>-Werror</code> でビルドが止まります（<strong>本書の断片で、状態を 1 つ足して警告を確認しました</strong>）。イベントを足したときは、有効な組の追加を忘れても <code>Ignored</code> になるため、<strong>性質テストで「<code>handle</code> が作る列は <code>Ignored</code> にならない」を守ります</strong>（ガイド §7.3 の「許す組を足し忘れても、コンパイラは止めない」と同じ注意。Kotlin 版・Rust 版と同じ方針）。再生は <code>foldLeft</code> で、<code>Ignored</code> の件数を再生側が受け取ります（ガイド §7.4、§6.1）。</p>
+<h4 id="started-h2ai">開始後の役割の入れ替えと <code>Started</code> の自己遷移（H2。AI の案、承認を得ていない）<a class="headerlink" href="#started-h2ai" title="Permanent link">&para;</a></h4>
+<p>Kotlin 版は、開始後の入れ替えを <code>Started</code> の<strong>自己遷移</strong>として扱います（<a href="../../beer-game-kotlin/domain-model/">Kotlin 版の「役割の入れ替え」</a> と変更表 37・38）。Scala 版の初稿は、<code>RoleAssigned</code> を <code>Preparing</code> だけが受け、<code>ParticipantReplaced</code> を持たなかったため、<strong>入れ替えたゲームが <code>Ignored</code> になり、「止める」設計（ユーザーの決定、2026-11-25）と合わせると、研修中に担当者を入れ替えたゲームが操作不能になる</strong>状態でした。次のとおり直します。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ストリーム</th>
+<th style="text-align: left;">状態</th>
+<th style="text-align: left;">イベント</th>
+<th style="text-align: left;">遷移</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>game</code></td>
+<td style="text-align: left;"><code>Started</code></td>
+<td style="text-align: left;"><code>RoleAssigned</code>（入れ替えの新担当者）</td>
+<td style="text-align: left;">参加者の役割を付ける（自己遷移）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>game</code></td>
+<td style="text-align: left;"><code>Started</code></td>
+<td style="text-align: left;"><code>ParticipantReplaced</code>（旧担当者。<code>replacedBy</code> を持つ）</td>
+<td style="text-align: left;">旧担当者の役割を外す。参加者の行・表示名・過去の入力は消さない（自己遷移）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>game</code></td>
+<td style="text-align: left;"><code>Preparing</code>・<code>Started</code></td>
+<td style="text-align: left;"><code>CredentialRevoked</code>（入れ替えの自動失効を含む）</td>
+<td style="text-align: left;">資格を失効にする（自己遷移）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session</code></td>
+<td style="text-align: left;"><code>Active</code>・<code>Paused</code></td>
+<td style="text-align: left;"><code>RoleHolderReplaced</code>（<code>removed</code>・<code>added</code>）</td>
+<td style="text-align: left;"><code>SessionData.assignments[role]</code> を更新する（自己遷移）。<code>NotStarted</code>・<code>Ended</code> は状態を変えない</td>
+</tr>
+</tbody>
+</table>
+<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJTVEFURSIgc3R5bGU9IndpZHRoOjQ0NHB4O2hlaWdodDo1MDJweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNDQ0cHgiIGhlaWdodD0iNTAycHgiIHZpZXdCb3g9IjAgMCA0NDQgNTAyIiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjEwIiB5PSIyMi45OTUiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjQxNy4zNzQiIGZvbnQtd2VpZ2h0PSI3MDAiPmdhbWUg44K544OI44Oq44O844Og44Gu54q25oWL77yI6ZaL5aeL5b6M44Gu5YWl44KM5pu/44GI44KS5ZCr44KA44CCU2NhbGEg54mI77yJPC90ZXh0PjwvZz48ZyBjbGFzcz0ic3RhcnRfZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSIuc3RhcnQuIiBpZD0iZW50MDAwMSIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PGVsbGlwc2UgY3g9IjY2Ljc0MSIgY3k9IjUzLjI5NyIgcng9IjEwIiByeT0iMTAiIGZpbGw9IiMyMjIiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48L2c+PGcgY2xhc3M9ImVudGl0eSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iTm90Q3JlYXRlZCIgaWQ9ImVudDAwMDIiIGRhdGEtc291cmNlLWxpbmU9IjIiPjxyZWN0IHg9IjE2LjYyMSIgeT0iMTI0LjI5NyIgd2lkdGg9IjEwMC4yNCIgaGVpZ2h0PSI1MCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48bGluZSB4MT0iMTYuNjIxIiB5MT0iMTUwLjU5NCIgeDI9IjExNi44NjIiIHkyPSIxNTAuNTk0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiLz48dGV4dCB4PSIyNi42MjEiIHk9IjE0Mi4yOTIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjgwLjI0Ij5Ob3RDcmVhdGVkPC90ZXh0PjwvZz48ZyBjbGFzcz0iZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSJQcmVwYXJpbmciIGlkPSJlbnQwMDA0IiBkYXRhLXNvdXJjZS1saW5lPSIzIj48cmVjdCB4PSIyMi45MDEiIHk9IjI2Mi4yOTciIHdpZHRoPSI4Ny42ODMiIGhlaWdodD0iNTAiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PGxpbmUgeDE9IjIyLjkwMSIgeTE9IjI4OC41OTQiIHgyPSIxMTAuNTg0IiB5Mj0iMjg4LjU5NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7Ii8+PHRleHQgeD0iMzIuOTAxIiB5PSIyODAuMjkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI2Ny42ODMiPlByZXBhcmluZzwvdGV4dD48L2c+PGcgY2xhc3M9ImVudGl0eSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iU3RhcnRlZCIgaWQ9ImVudDAwMDciIGRhdGEtc291cmNlLWxpbmU9IjUiPjxyZWN0IHg9IjMwLjg5MSIgeT0iNDE4Ljc5NyIgd2lkdGg9IjcxLjciIGhlaWdodD0iNTAiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PGxpbmUgeDE9IjMwLjg5MSIgeTE9IjQ0NS4wOTQiIHgyPSIxMDIuNTkyIiB5Mj0iNDQ1LjA5NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7Ii8+PHRleHQgeD0iNDAuODkxIiB5PSI0MzYuNzkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI1MS43Ij5TdGFydGVkPC90ZXh0PjwvZz48IS0tbGluayAqc3RhcnQqIHRvIE5vdENyZWF0ZWQtLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMSIgZGF0YS1lbnRpdHktMj0iZW50MDAwMiIgaWQ9ImxuazMiIGRhdGEtc291cmNlLWxpbmU9IjIiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNNjYuNzQxLDYzLjY1NyBDNjYuNzQxLDc3LjU4NyA2Ni43NDEsOTkuMjQ3IDY2Ljc0MSwxMTguOTQ3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iKnN0YXJ0Ki10by1Ob3RDcmVhdGVkIi8+PHBvbHlnb24gcG9pbnRzPSI2Ni43NDEsMTIzLjk0Nyw3MC43NDEsMTE0Ljk0Nyw2Ni43NDEsMTE4Ljk0Nyw2Mi43NDEsMTE0Ljk0Nyw2Ni43NDEsMTIzLjk0NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48L2c+PCEtLWxpbmsgTm90Q3JlYXRlZCB0byBQcmVwYXJpbmctLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMiIgZGF0YS1lbnRpdHktMj0iZW50MDAwNCIgaWQ9ImxuazUiIGRhdGEtc291cmNlLWxpbmU9IjMiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNNjYuNzQxLDE3NC42MDcgQzY2Ljc0MSwxOTkuMzY3IDY2Ljc0MSwyMzIuNTE3IDY2Ljc0MSwyNTcuMTk3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iTm90Q3JlYXRlZC10by1QcmVwYXJpbmciLz48cG9seWdvbiBwb2ludHM9IjY2Ljc0MSwyNjIuMTk3LDcwLjc0MSwyNTMuMTk3LDY2Ljc0MSwyNTcuMTk3LDYyLjc0MSwyNTMuMTk3LDY2Ljc0MSwyNjIuMTk3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjx0ZXh0IHg9IjY3Ljc0MSIgeT0iMjE3LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iOTAuNDM1Ij5HYW1lQ3JlYXRlZDwvdGV4dD48L2c+PCEtLWxpbmsgUHJlcGFyaW5nIHRvIFByZXBhcmluZy0tPjxnIGNsYXNzPSJsaW5rIiBkYXRhLWVudGl0eS0xPSJlbnQwMDA0IiBkYXRhLWVudGl0eS0yPSJlbnQwMDA0IiBpZD0ibG5rNiIgZGF0YS1zb3VyY2UtbGluZT0iNCIgZGF0YS1saW5rLXR5cGU9ImRlcGVuZGVuY3kiPjxwYXRoIGQ9Ik0xMTAuOTIxLDI3My40NzcgQzEyOS42NDEsMjcyLjQyNyAxNDUuNTgxLDI3Ny4wMzcgMTQ1LjU4MSwyODcuMjk3IEMxNDUuNTgxLDI5Ny41NTcgMTM0LjYzNCwzMDIuNDQ3IDExNS45MTQsMzAxLjM5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlByZXBhcmluZy10by1QcmVwYXJpbmciLz48cG9seWdvbiBwb2ludHM9IjExMC45MjEsMzAxLjExNywxMTkuNjgzLDMwNS42MTUsMTE1LjkxNCwzMDEuMzk3LDEyMC4xMzEsMjk3LjYyNywxMTAuOTIxLDMwMS4xMTciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PHRleHQgeD0iMjI3LjYzNiIgeT0iMjY5LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMTEwLjA2MiI+UGFydGljaXBhbnRKb2luZWQ8L3RleHQ+PHRleHQgeD0iMTgwLjU0MyIgeT0iMjg0LjQ5NyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjA0LjI0OSI+Um9sZUFzc2lnbmVkIC8gUm9sZVVuYXNzaWduZWQ8L3RleHQ+PHRleHQgeD0iMTc0LjQwMSIgeT0iMjk5LjYyOSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjE2LjUzMSI+T2JzZXJ2ZXJJbnZpdGVkIC8gT2JzZXJ2ZXJKb2luZWQ8L3RleHQ+PHRleHQgeD0iMTUxLjU4MSIgeT0iMzE0Ljc2MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjYyLjE3MSI+Q3JlZGVudGlhbFJldm9rZWQgLyBDcmVkZW50aWFsUmVpc3N1ZWQ8L3RleHQ+PC9nPjwhLS1saW5rIFByZXBhcmluZyB0byBTdGFydGVkLS0+PGcgY2xhc3M9ImxpbmsiIGRhdGEtZW50aXR5LTE9ImVudDAwMDQiIGRhdGEtZW50aXR5LTI9ImVudDAwMDciIGlkPSJsbms4IiBkYXRhLXNvdXJjZS1saW5lPSI1IiBkYXRhLWxpbmstdHlwZT0iZGVwZW5kZW5jeSI+PHBhdGggZD0iTTY2Ljc0MSwzMTIuNzc3IEM2Ni43NDEsMzQxLjcwNyA2Ni43NDEsMzg0LjU0NyA2Ni43NDEsNDEzLjQyNyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlByZXBhcmluZy10by1TdGFydGVkIi8+PHBvbHlnb24gcG9pbnRzPSI2Ni43NDEsNDE4LjQyNyw3MC43NDEsNDA5LjQyNyw2Ni43NDEsNDEzLjQyNyw2Mi43NDEsNDA5LjQyNyw2Ni43NDEsNDE4LjQyNyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48dGV4dCB4PSI2Ny43NDEiIHk9IjM2Ni4zNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9Ijg2LjcwOSI+R2FtZVN0YXJ0ZWQ8L3RleHQ+PC9nPjwhLS1saW5rIFN0YXJ0ZWQgdG8gU3RhcnRlZC0tPjxnIGNsYXNzPSJsaW5rIiBkYXRhLWVudGl0eS0xPSJlbnQwMDA3IiBkYXRhLWVudGl0eS0yPSJlbnQwMDA3IiBpZD0ibG5rOSIgZGF0YS1zb3VyY2UtbGluZT0iNiIgZGF0YS1saW5rLXR5cGU9ImRlcGVuZGVuY3kiPjxwYXRoIGQ9Ik0xMDIuODMxLDQyOC45MTcgQzEyMS4xNjEsNDI2Ljc0NyAxMzcuNTkxLDQzMS43MDcgMTM3LjU5MSw0NDMuNzk3IEMxMzcuNTkxLDQ1NS44ODcgMTI2LjEyNyw0NjEuNDM1IDEwNy43OTcsNDU5LjI2NSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlN0YXJ0ZWQtdG8tU3RhcnRlZCIvPjxwb2x5Z29uIHBvaW50cz0iMTAyLjgzMSw0NTguNjc3LDExMS4yOTksNDYzLjcwNywxMDcuNzk3LDQ1OS4yNjUsMTEyLjIzOSw0NTUuNzYzLDEwMi44MzEsNDU4LjY3NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48dGV4dCB4PSIxNjYuNDExIiB5PSI0MTguMzY0IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyMTYuNTMxIj5PYnNlcnZlckludml0ZWQgLyBPYnNlcnZlckpvaW5lZDwvdGV4dD48dGV4dCB4PSIxNDMuNTkxIiB5PSI0MzMuNDk3IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNjIuMTcxIj5DcmVkZW50aWFsUmV2b2tlZCAvIENyZWRlbnRpYWxSZWlzc3VlZDwvdGV4dD48dGV4dCB4PSIxOTkuMDk4IiB5PSI0NDguNjI5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxNTEuMTU3Ij5QYXJ0aWNpcGF0aW9uUmVjb3ZlcmVkPC90ZXh0Pjx0ZXh0IHg9IjE1OS43MDUiIHk9IjQ2My43NjIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjIyOS45NDQiPuW9ueWJsuOBruWFpeOCjOabv+OBiDogUGFydGljaXBhbnRSZXBsYWNlZDwvdGV4dD48dGV4dCB4PSIxNTIuMDY1IiB5PSI0NzguODk1IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNDUuMjIzIj4rIENyZWRlbnRpYWxSZXZva2VkICsgUm9sZUFzc2lnbmVkPC90ZXh0PjwvZz48P3BsYW50dW1sLXNyYyBoUDZfSXlEMDVDVnRfMUxsalhIdDFxNFNIMFNqQUt4NnVLbVV1SjNVWFNrUGtLcWU5QVEzRUJZdWs4WVd1RTBXNTVCek91dmhTVWdfdTJLc3pqVmdUa3pwN3p4eHRaajlQTzNXYW9pNGJPbktjZ2RxSFFNYklYekxfc3J3eXA0UDVCQ28teHVsejdFWEZ1UzZ3aTZKSWVRSlhvX0xwckhvZnN6VkxUOUpsUUpoYWUzMERDemNQTXdUUlByM2t4cUJucnBrMm9HSUZNam5oNnl3MGFDWUFGRFgxbXhDLTRQUnk3TWhHdUlhQldxOWFxVVNDbEdTUGxDMHp3QTgtZ1EyUlFaQUtxUmNtNjRkNW42QTZDS1hZd2NpWk9PcTNTbkszdmNhOUIwbnZmVXJpeW5lNTVybFhFZkFheUllbHk3ZGJUTkdMVUVfOFpaaXhfY0lTY1Fab3FzRllrbG5JRVZsUW4tcGlZcVJtdTJ1YlRrMnBNYWpNRHhZM20wMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
+<p><strong>入れ替えは <code>assignRoleAfterStart</code>（<code>game</code> と <code>session</code> の両方を入力に取る関数）が、1 回の追記で返します</strong>。<code>game</code> に <code>ParticipantReplaced</code>（旧担当者ごとに 1 件）・<code>CredentialRevoked</code>・<code>RoleAssigned</code>、<code>session</code> に <code>RoleHolderReplaced</code> を返し、旧担当者の資格の失効と <code>session</code> の写しの更新を同じ追記で行います（Kotlin 版と同じ規則。1 人だけ外す案、終了後の扱い、イベント名と形は Kotlin 版のゲート 3.5 の未決事項に追従する）。</p>
+<p><strong>この要件を、テストに必ず入れます</strong>（テスト戦略は別の担当が書くため、ここでは domain-model の要件として書く）。</p>
+<ul>
+<li><strong>受入テスト</strong>: 「開始後に担当者を入れ替えたゲームで、新担当者が意思決定を保存でき、週を確定できる（再生しても同じ状態が復元される）」。</li>
+<li><strong>性質テスト</strong>: 「<code>handle</code> が作る列は <code>Ignored</code> にならない」の生成器に、<strong>開始後の入れ替え（<code>assignRoleAfterStart</code>）を含める</strong>。生成器が入れ替えを作らないと、遷移の腕の漏れを検知できない。</li>
+<li><strong>「許さない組の拒否」のテスト</strong>: <code>Preparing</code> や <code>NotCreated</code> が <code>ParticipantReplaced</code> を受けても状態を変えない（<code>Ignored</code>）ことを確かめる。</li>
+</ul>
 <h3 id="session">Session 集約（進行）<a class="headerlink" href="#session" title="Permanent link">&para;</a></h3>
 <p>ストリームは <code>session</code>。責務、State（<code>NotStarted</code>・<code>Active</code>・<code>Paused</code>・<code>Ended</code>）、Command、不変条件（意思決定の条件、保存回数の上限 9 回、共同入力、代理入力、役割の確認、週確定の条件と一回性、自動確定、終了、権限、非負・保存則）、状態遷移は Kotlin 版を引き継ぎます。Scala での形のスケッチ（<strong>型検査していない</strong>）:</p>
 <div class="highlight"><pre><span></span><code><span class="k">enum</span><span class="w"> </span><span class="nc">SessionState</span><span class="p">:</span>
@@ -14805,10 +14890,10 @@
 <span class="w">      </span><span class="c1">// …</span>
 </code></pre></div>
 <p><strong>停止中の代理入力</strong>: <code>SubmitProxyDecision</code>（進行役）は、<code>SaveDecision</code>（参加者）と違い、<strong>一時停止中も受け付けます</strong>（UC-09: 停止 → 代理入力 → 再開）。<strong>進行中で <code>AUTO</code> かつ 4 役割が揃えば自動確定し、一時停止中は確定しません</strong>（<code>SetCommitMode(AUTO)</code> も同じ。再開時に判定する）。Kotlin 版は初版でここを「進行中のみ」と誤り、レビューで直した経緯があるため、Scala 版は最初から明記します。</p>
-<p><strong><code>Ignored</code> の扱い</strong>: <code>applyDecided</code> は、保存直後の状態を求め、<code>Ignored</code> が出たら<strong>失敗</strong>にします（<code>handle</code> が作る列は <code>Ignored</code> にならないはずなので、出た場合は不具合）。<strong>コマンドの経路で、保存済みのイベントの再生中に <code>Ignored</code> が出た場合も、状態を信用せず <code>AppFailure.Persistence</code>（500・相関 ID）で失敗させます</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。fail closed）。再生を診断する用途（<code>verify-projections</code> など）では、<code>Ignored</code> を記録して続けます。</p>
+<p><strong><code>Ignored</code> の扱い</strong>: <code>applyDecided</code> は、保存直後の状態を求め、<code>Ignored</code> が出たら<strong>失敗</strong>にします（<code>handle</code> が作る列は <code>Ignored</code> にならないはずなので、出た場合は不具合）。<strong>コマンドの経路で、保存済みのイベントの再生中に <code>Ignored</code> が出た場合も、状態を信用せず <code>AppFailure.Persistence</code>（500・相関 ID）で失敗させます</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。fail closed）。再生を診断する用途（<code>verify-projections</code> など）では、<code>Ignored</code> を記録して続けます。<strong>コマンドの経路で止める設計は、ユーザーの決定（2026-11-25、H3）で維持します</strong>。ただし、これは Kotlin 版（状態を変えずに記録して続行）からの<strong>利用者に見える変更</strong>です（下の変更表の 10。運用は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> の「<code>Ignored</code> で止めること」）。</p>
 <p>自動確定は、Kotlin 版と同じく <strong>1 回の <code>handle</code> が複数のイベントを返す</strong>ことで表します（D6）。<code>WeekCommitted</code> は結果と次週の状態を事実として含み、<code>SessionEvents.apply</code> はそれを採用するだけで、<code>simulateWeek</code> を呼び直しません（D5）。</p>
 <h4 id="_9">状態遷移<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h4>
-<p>状態遷移図は <a href="../../beer-game-kotlin/domain-model/">Kotlin 版</a> の <code>session ストリームの状態</code> と同じです（<code>NotStarted</code> → <code>Active</code> ⇄ <code>Paused</code> → <code>Ended</code>）。遷移の「許す組」は <code>match</code> に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。</p>
+<p>状態遷移図は <a href="../../beer-game-kotlin/domain-model/">Kotlin 版</a> の <code>session ストリームの状態</code> と同じです（<code>NotStarted</code> → <code>Active</code> ⇄ <code>Paused</code> → <code>Ended</code>）。<strong><code>Active</code>・<code>Paused</code> は <code>RoleHolderReplaced</code>（開始後の入れ替え）を自己遷移として受けます</strong>（上の「開始後の役割の入れ替えと <code>Started</code> の自己遷移」）。遷移の「許す組」は <code>match</code> に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。</p>
 <h3 id="2-startgame">2 ストリームにまたがる StartGame<a class="headerlink" href="#2-startgame" title="Permanent link">&para;</a></h3>
 <p>開始は、<code>game</code> に <code>GameStarted</code>、<code>session</code> に <code>SessionStarted</code> を<strong>同一トランザクションで</strong>追記する唯一のコマンドです（D3）。Scala 版でも、2 ストリームを入力に取る独立の関数にします。</p>
 <div class="highlight"><pre><span></span><code><span class="k">final</span><span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">StartDecision</span><span class="p">(</span><span class="n">game</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">GameEvent</span><span class="p">],</span><span class="w"> </span><span class="n">session</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">SessionEvent</span><span class="p">])</span>
@@ -15107,6 +15192,24 @@
 <td style="text-align: left;"><code>Functor[RoleMap]</code>・<code>Monoid[TeamTotals]</code> を使い、法則をテストする（SD6）</td>
 <td style="text-align: left;">ガイド第 6 章</td>
 </tr>
+<tr>
+<td style="text-align: left;">10</td>
+<td style="text-align: left;">コマンドの経路で不正な遷移（<code>Ignored</code> に当たる組）が出ても、状態を変えずに <code>InvalidTransition</code> を記録して続行する</td>
+<td style="text-align: left;"><strong>コマンドの経路で <code>Ignored</code> が出たら、<code>AppFailure.Persistence</code>（500・相関 ID）で処理を止める</strong>（fail closed）。診断の用途だけ、記録して続行する。<strong>利用者に見える変更</strong>: 該当するゲームの保存・確定などが失敗し続け、運用の復旧まで続けられない</td>
+<td style="text-align: left;">保存済みの事実を無視した状態で <code>handle</code> すると不変条件が崩れるため。<strong>止める設計はユーザーの決定（2026-11-25、H3）</strong>。影響と運用（進行役への依頼の文言、研修中の原則）は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> の「<code>Ignored</code> で止めること」と運用要件に置く</td>
+</tr>
+<tr>
+<td style="text-align: left;">11</td>
+<td style="text-align: left;"><code>evolveGame</code> の <code>RoleAssigned</code> は開始後も役割を付け、<code>ParticipantReplaced</code> は開始後だけ旧担当者の役割を外す（Kotlin 版の変更表 38）</td>
+<td style="text-align: left;"><strong>同じ</strong>。<code>Started</code> の自己遷移として、<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>（game）と <code>RoleHolderReplaced</code>（session）を受ける。初稿は持っていなかった（H2）</td>
+<td style="text-align: left;">Kotlin 版に追従。<code>Ignored</code> で止める設計と合わせると、持たないと入れ替えたゲームが操作不能になる</td>
+</tr>
+<tr>
+<td style="text-align: left;">12</td>
+<td style="text-align: left;">権限を先に判定し、権限のない人に状態を知らせない（Kotlin 版の原則）</td>
+<td style="text-align: left;"><code>AssignRole</code> の判定順を、権限 → 準備中か → 参加者の存在にそろえる（L6。本書の初稿は準備中かが先だった）。作成前は <code>Forbidden</code></td>
+<td style="text-align: left;">Kotlin 版の原則に合わせる</td>
+</tr>
 </tbody>
 </table>
 <p>上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。</p>
@@ -15120,8 +15223,52 @@
 <li><strong>純粋性の検査</strong>: Scalafix の <code>DisableSyntax.regex</code> と、<code>domain</code> の依存の制限で足りるか（SD5）。</li>
 <li><strong>法則のテストの道具</strong>: cats-laws + discipline-munit か、ガイドの全パターンの列挙か（<a href="../tech-stack/">技術スタック</a> の ST5）。</li>
 <li><strong><code>opaque type</code> と WartRemover・Scalafix の相性</strong>: 断片では問題なかったが、大きなコードでの確認は B1。</li>
-<li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 開始後の共同担当の追加と開始後の参加、遅延 0 を許すか、需要の上限、キット準拠の既定の需要系列（JSD の値の確認）、保持の開始の起点、AC1.2.5 の文言の改訂、観察者への入力済みの役割の開示、<code>InvalidTransition</code> の通知先、再構築とコマンドの同時実行制御、<code>WeekCommitted.contributors</code> の意味。いずれも <a href="../../beer-game-kotlin/domain-model/">Kotlin 版の未決事項</a> と同じ扱いで、Kotlin 版の決定に追従する。</li>
+<li>
+<p><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 開始後の共同担当の追加と開始後の参加、遅延 0 を許すか、需要の上限、キット準拠の既定の需要系列（JSD の値の確認）、保持の開始の起点、AC1.2.5 の文言の改訂、観察者への入力済みの役割の開示、<code>InvalidTransition</code> の通知先、再構築とコマンドの同時実行制御、<code>WeekCommitted.contributors</code> の意味。いずれも <a href="../../beer-game-kotlin/domain-model/">Kotlin 版の未決事項</a> と同じ扱いで、Kotlin 版の決定に追従する。</p>
+</li>
+<li>
+<p><strong>開始後の入れ替えの型</strong>（H2）: <code>Started</code> の自己遷移（<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>）と <code>RoleHolderReplaced</code>、<code>assignRoleAfterStart</code> の戻り値（<code>StartDecision</code> と同じ形か）を B1 で型検査する。1 人だけ外す案・終了後の扱い・イベント名は Kotlin 版のゲート 3.5 に追従する。</p>
+</li>
+<li><strong><code>handle</code> の引数の順</strong>: 本書は <code>handle(state, command)</code>（Kotlin 版の <code>decide</code> と同じ）、ガイド §7.6 は <code>handle(command, state)</code>。B1 で揃えるか決める。</li>
 </ol>
+<h2 id="2026-11-25">レビュー対応の記録（2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<p><a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a> への対応のうち、本書に関するもの（行番号は編集で動くため、節名で記録します）。<strong>H3 の「止める」設計だけがユーザーの決定で、他の直し方は AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">直した箇所</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">H2</td>
+<td style="text-align: left;">「Game 集約（準備）」の <code>GameEvent</code>・<code>GameEvents.apply</code>、新設の「開始後の役割の入れ替えと <code>Started</code> の自己遷移」、「Session 集約」の状態遷移</td>
+<td style="text-align: left;">AI の案。再コンパイルしていない</td>
+</tr>
+<tr>
+<td style="text-align: left;">H3</td>
+<td style="text-align: left;">「beer-game-kotlin からの変更」の 10、「Session 集約」の <code>Ignored</code> の扱い</td>
+<td style="text-align: left;">止める設計はユーザーの決定。運用は architecture-backend</td>
+</tr>
+<tr>
+<td style="text-align: left;">H1</td>
+<td style="text-align: left;">「本書の位置づけと確認の範囲」を <a href="../tech-stack/#確認状況の一覧">確認状況の一覧</a> への参照に</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">L4</td>
+<td style="text-align: left;">「設計の前提と原則」のガイドの節（§4.4 を §4.3 に）、「戦略的設計」の <code>handle</code> の引数の順の注記</td>
+<td style="text-align: left;">直した</td>
+</tr>
+<tr>
+<td style="text-align: left;">L6</td>
+<td style="text-align: left;"><code>Game.handle</code> の <code>AssignRole</code>（権限が先。<code>isFacilitator</code>）、変更表の 12</td>
+<td style="text-align: left;">AI の案。再コンパイルしていない</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_14">出典<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
 <ul>
 <li>型の断片の検査: sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6、WartRemover 3.6.3、2026-11-25</li>
