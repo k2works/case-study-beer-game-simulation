@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Scala 3（Cats Effect + http4s + doobie）と既存の React で作り直す。Intent・成功の測り方・範囲（U1〜U3 を約束。検証用の CI と統合・受け入れの実行は U1 に含め、AWS・デプロイは後回し）、ユーザーの決定と AI が推奨案で決めたもの（D1〜D5。確認は未了）の区別、ステージングへの自動反映を持たない間の team 規約の例外（案）、beer-game-kotlin の ADR の引き継ぎ表（AI が本文と照合した。人のレビューは未了）、Scala 固有の判断、関数型プログラミングガイド（Scala 編）の各章から設計書へのトレース表を含む。">
+        <meta name="description" content="beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Scala 3（Cats Effect + http4s + doobie）と既存の React で作り直す。Intent・成功の測り方・範囲（U1〜U3 を約束。検証用の CI と統合・受け入れの実行は U1 に含め、AWS・デプロイは後回し）、ユーザーが承認した決定（本人が選んだ 9 件と、AI が推奨案で決めてユーザーが承認した D1〜D5。計 14 件）とそれ以外の AI の案の区別、ステージングへの自動反映を持たない間の team 規約の例外（案）、beer-game-kotlin の ADR の引き継ぎ表（AI が本文と照合した。人のレビューは未了）、Scala 固有の判断、関数型プログラミングガイド（Scala 編）の各章から設計書へのトレース表を含む。">
       
       
         <meta name="author" content="k2works">
@@ -3233,7 +3233,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3268,7 +3268,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3303,7 +3303,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3338,7 +3338,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3373,7 +3373,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3408,7 +3408,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3443,7 +3443,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3478,7 +3478,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3513,7 +3513,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3548,7 +3548,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -14452,7 +14452,7 @@
 <p>提案中（レビュー待ち）</p>
 <p>ユーザーが承認したのは、<strong>作成計画</strong>（beer-game-kotlin の設計書を正本とし、Scala 版の設計書 10 本と本 ADR を作る。スタックはガイド準拠）である。本書の<strong>引き継ぎ表の判定</strong>、<strong>Scala 固有の判断</strong>、<strong>版の選定</strong>、<strong>Intent と成功の測り方</strong>は、AI が beer-game-kotlin の ADR・設計書と Scala 編ガイドを読んで作った案で、<strong>人の承認を得ていない</strong>。承認の記録は、承認を得た時点でこの節に追記する。</p>
 <p><strong>ユーザーの決定（2026-11-25）</strong>: 「ローカル DB は Kotlin と同じく H2 で」。ローカル開発（開発機での起動・動作確認）だけ H2 の PostgreSQL モードを使い、統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18 のままとする（下の 014 の行、<a href="../../../design/beer-game-scala/tech-stack/">技術スタック</a> の ST9）。当初 AI が起草した「ローカルも PostgreSQL 18（Docker）のみ」の提案は、この決定により取り下げた。<strong>この決定が含まないもの</strong>: H2 の導入（依存の追加）そのものの承認、H2 の版の確認結果の承認、H2 の PostgreSQL モードでの動作範囲（B1 の最初に実測して確定する）。これらは Kotlin 版と同様に未了である。</p>
-<p><strong>ユーザーの決定（2026-11-25）の一覧</strong>: ユーザー本人が選んだ決定は、上のローカル DB（H2）の 1 件と、次の 8 件の計 9 件だけである（件数の数え方は<a href="../../../design/beer-game-scala/">設計書の入口</a>と揃える）。次の表の前の 4 件は<a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a>（最初の決定）、後の 4 件は<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>への回答（再レビュー後の決定）である。範囲（H7）は最初の決定で「U1〜U3 を約束し、U4〜U6 は指標を見て決める」まで、再レビュー後の決定（N-H4）で CI と AWS の線引きを確定した。</p>
+<p><strong>ユーザーの決定（2026-11-25）の一覧</strong>: ユーザー本人が選んだ決定は、上のローカル DB（H2）の 1 件と、次の 8 件の計 9 件である。これに、下の D1〜D5（AI が推奨案で決め、ユーザーが承認。2026-11-25）を足した 14 件が、ユーザーが承認した決定である（件数の数え方は<a href="../../../design/beer-game-scala/">設計書の入口</a>と揃える）。次の表の前の 4 件は<a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a>（最初の決定）、後の 4 件は<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>への回答（再レビュー後の決定）である。範囲（H7）は最初の決定で「U1〜U3 を約束し、U4〜U6 は指標を見て決める」まで、再レビュー後の決定（N-H4）で CI と AWS の線引きを確定した。</p>
 <table>
 <thead>
 <tr>
@@ -14504,50 +14504,50 @@
 </tr>
 </tbody>
 </table>
-<p><strong>ユーザーの指示に基づき AI が推奨案で決めたもの（D1〜D5。2026-11-25。確認は未了）</strong>: <a href="../../../review/beer-game-scala/design_rereview2_20261125/">再々レビュー</a>の人の判断が要る論点 5 件について、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示した。AI が、再々レビューの推奨案で決めて設計書に反映した。<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了である</strong>。上の「ユーザーの決定」とは区別し、ユーザーの決定と書かない。</p>
+<p><strong>ユーザーが承認した決定（D1〜D5。2026-11-25。AI が推奨案で決め、ユーザーが承認）</strong>: <a href="../../../review/beer-game-scala/design_rereview2_20261125/">再々レビュー</a>の人の判断が要る論点 5 件について、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示した。AI が、再々レビューの推奨案で決めて設計書に反映した。その後、ユーザーが「D1〜D5 を承認」と明示した（2026-11-25）。上の表の、ユーザー本人が選択肢を選んだ決定とは経緯が違うため、表を分けている。</p>
 <table>
 <thead>
 <tr>
 <th style="text-align: left;">区分</th>
 <th style="text-align: left;">ID</th>
 <th style="text-align: left;">内容（再々レビューの ID）</th>
-<th style="text-align: left;">確認</th>
+<th style="text-align: left;">承認</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;">ユーザーの指示に基づき AI が推奨案で決めた</td>
+<td style="text-align: left;">AI が推奨案で決め、ユーザーが承認した</td>
 <td style="text-align: left;">D1</td>
-<td style="text-align: left;">統合テスト（PostgreSQL 18、Testcontainers）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)）</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">統合テスト（PostgreSQL 18、Testcontainers）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)。<code>check</code> に含めるか別ジョブかは案 X・Y で人が決める。D1 に含まれず未決）</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">同上</td>
 <td style="text-align: left;">D2</td>
 <td style="text-align: left;">U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（R-H1。CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定 N-H4 として別の行）</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">同上</td>
 <td style="text-align: left;">D3</td>
 <td style="text-align: left;">失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（R-H3 案 (a)。Kotlin 版の <code>revoked()</code> が失効済みで <code>null</code> を返す設計に合わせる）</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">同上</td>
 <td style="text-align: left;">D4</td>
 <td style="text-align: left;">H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末）にする（R-H5）</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">同上</td>
 <td style="text-align: left;">D5</td>
 <td style="text-align: left;">team 規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">手順を承認（2026-11-25）。規約の例外の承認と project.md への記録は未実施</td>
 </tr>
 </tbody>
 </table>
-<p><strong>これら（ユーザーの決定 9 件と D1〜D5）以外の指摘（H1・H2・H4・H5・H8・H10、N-H1・N-H2・N-H3・N-H5、R-H4・R-H6〜R-H10 ほか）の直し方は、すべて AI の案で、ユーザーの承認を得ていない</strong>。本書で「H4 案」「N-H2 案」などと書いたものも同じである。</p>
+<p><strong>これら（ユーザーが承認した決定 14 件。本人が選んだ 9 件と D1〜D5）以外の指摘（H1・H2・H4・H5・H8・H10、N-H1・N-H2・N-H3・N-H5、R-H4・R-H6〜R-H10 ほか）の直し方は、すべて AI の案で、ユーザーの承認を得ていない</strong>。本書で「H4 案」「N-H2 案」などと書いたものも同じである。</p>
 <p><strong>決定と案の区別（再レビュー M16）</strong>: 作成計画の承認（beer-game-kotlin の設計書を正本とし、スタックは関数型プログラミングガイド（Scala 編）準拠）から<strong>導かれたもの</strong>は、Scala 3・sbt・Cats / Cats Effect・http4s・doobie という道具の系列である。ただし、<strong>具体的な版（例: Scala 3.7.4）、circe（ST6）、HikariCP（ST8）、JDK などの個別の選定は AI の案</strong>で、導入時の承認が要る。ガイド準拠から導かれるのは系列までである。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>beer-game2 は要件（BR・FR・NFR）、ユースケース、ストーリー、Unit 定義（U1〜U6）を持つ。beer-game-kotlin は、それを正本として、ES + CQRS と関数型コア（Arrow）で設計した（<a href="../../../design/beer-game-kotlin/">設計書の入口</a>、ADR 001〜020）。beer-game-rust は、その設計を Rust に写した前例である（<a href="../../beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001（Rust 版）</a>）。</p>
@@ -14587,7 +14587,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">Must のストーリーの受入条件のパリティ（Kotlin 版と同じ受入条件で通る数）</td>
-<td style="text-align: left;">U1〜U3 に含まれる Must のストーリーの全受入条件。<strong>US6.1（正本では「障害と性能の劣化を検知する」。CI ではない）のうち、U1 に入れる AC は AC6.1.1（構造化ログ）・AC6.1.2（相関 ID つきの記録）・AC6.1.4（<code>/ready</code>）</strong>（D1〜D5 の D2。ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了）。共有 <code>apps/beer-game-features/</code> に <code>@AC6.1.1</code>（<code>operations/observability.feature</code> 7 行）と <code>@AC6.1.4</code>（同 14 行）のシナリオが実在する。AC6.1.2 は専用のシナリオが見つからず、B1 の計画で既存シナリオへの対応づけを確かめる。<strong>US6.1 の残り（AC6.1.3 メトリクス、AC6.1.5・6.1.6 通知）は約束の外</strong>（運用の完成。再開するときに Unit を決める）。<strong>US6.2 は、AC6.2.4（スキーマ変更の順序）が AWS を要らないが、他（AC6.2.1 ステージングへの自動デプロイ、6.2.2 本番の承認、6.2.3 ロールバック、6.2.5 復元の訓練）は AWS・デプロイが後回しのため約束の外</strong>。約束の外の AC はパリティの分母に入れない。<strong>CI の <code>check</code> ジョブ 1 本は US の受入条件ではなく、範囲の決定（N-H4）として次の行に別に書く</strong>。<strong>正本の食い違い（正本側の整理が要る）</strong>: US6.1・US6.2 の Unit が、<code>user_story.md</code> 59〜60 行は U6、<code>unit_definition.md</code> 94〜95 行は U1（基本）・U5（完成）（US6.2 は U1 ステージング・U5 本番と復元）で一致しない。本書は Unit 定義の U1 の区分に従い、その中で上の AC に絞る</td>
+<td style="text-align: left;">U1〜U3 に含まれる Must のストーリーの全受入条件。<strong>US6.1（正本では「障害と性能の劣化を検知する」。CI ではない）のうち、U1 に入れる AC は AC6.1.1（構造化ログ）・AC6.1.2（相関 ID つきの記録）・AC6.1.4（<code>/ready</code>）</strong>（D1〜D5 の D2。AI が推奨案で決め、ユーザーが承認した。2026-11-25）。共有 <code>apps/beer-game-features/</code> に <code>@AC6.1.1</code>（<code>operations/observability.feature</code> 7 行）と <code>@AC6.1.4</code>（同 14 行）のシナリオが実在する。AC6.1.2 は専用のシナリオが見つからず、B1 の計画で既存シナリオへの対応づけを確かめる。<strong>US6.1 の残り（AC6.1.3 メトリクス、AC6.1.5・6.1.6 通知）は約束の外</strong>（運用の完成。再開するときに Unit を決める）。<strong>US6.2 は、AC6.2.4（スキーマ変更の順序）が AWS を要らないが、他（AC6.2.1 ステージングへの自動デプロイ、6.2.2 本番の承認、6.2.3 ロールバック、6.2.5 復元の訓練）は AWS・デプロイが後回しのため約束の外</strong>。約束の外の AC はパリティの分母に入れない。<strong>CI の <code>check</code> ジョブ 1 本は US の受入条件ではなく、範囲の決定（N-H4）として次の行に別に書く</strong>。<strong>正本の食い違い（正本側の整理が要る）</strong>: US6.1・US6.2 の Unit が、<code>user_story.md</code> 59〜60 行は U6、<code>unit_definition.md</code> 94〜95 行は U1（基本）・U5（完成）（US6.2 は U1 ステージング・U5 本番と復元）で一致しない。本書は Unit 定義の U1 の区分に従い、その中で上の AC に絞る</td>
 <td style="text-align: left;">B1 の計画で承認を得る</td>
 </tr>
 <tr>
@@ -14628,7 +14628,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>今回の範囲（約束する）</strong></td>
-<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定（<a href="../../../requirements/beer-game-ts/unit_definition/">Unit 定義</a>）。<strong>U1 には検証用の CI（<code>check</code> ジョブ 1 本）を含める</strong>（N-H4 のユーザーの決定。内訳の formatter・linter・type-check・テストは AI の補いで、決定は「<code>check</code> ジョブ 1 本」まで）。<strong>さらに D1（ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）により、PostgreSQL 18 の統合テストと <code>@api</code> の受け入れテストの CI 実行も U1 の約束に含める</strong>（検証用 CI の範囲は <code>check</code> ジョブ + 統合・受け入れの実行）。US6.1 のうち AC6.1.1・6.1.2・6.1.4 も U1 に含める（D2）</td>
+<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定（<a href="../../../requirements/beer-game-ts/unit_definition/">Unit 定義</a>）。<strong>U1 には検証用の CI（<code>check</code> ジョブ 1 本）を含める</strong>（N-H4 のユーザーの決定。内訳の formatter・linter・type-check・テストは AI の補いで、決定は「<code>check</code> ジョブ 1 本」まで）。<strong>さらに D1（AI が推奨案で決め、ユーザーが承認した。2026-11-25）により、PostgreSQL 18 の統合テストと <code>@api</code> の受け入れテストの CI 実行も U1 の約束に含める</strong>（検証用 CI の範囲は <code>check</code> ジョブ + 統合・受け入れの実行）。US6.1 のうち AC6.1.1・6.1.2・6.1.4 も U1 に含める（D2）</td>
 </tr>
 <tr>
 <td style="text-align: left;">範囲外・後回し</td>
@@ -14654,7 +14654,7 @@
 <td style="text-align: left;">検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境、デプロイ用ワークフロー、ステージングへの自動反映は後回し</td>
 </tr>
 <tr>
-<td style="text-align: left;">再々レビュー対応（2026-11-25。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）</td>
+<td style="text-align: left;">再々レビュー対応（2026-11-25。AI が推奨案で決め、同日ユーザーが D1〜D5 を承認した）</td>
 <td style="text-align: left;">D1: 統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストの CI 実行を U1 の約束に含める。D2: U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（成功の測り方の「US6.1（CI）」は正本と違う誤りだったので直した）。CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定として別の行にした</td>
 </tr>
 </tbody>
@@ -14691,7 +14691,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">例外の間の条件</td>
-<td style="text-align: left;">U1〜U3 の成果物を、実際の研修・本番に使わない（N-H8）。デプロイされないため、規約の趣旨（自動反映で実環境の乖離を早く見つける）の代わりに、Testcontainers の実 DB の統合テストと受け入れテストを CI で実行する。<strong>この条件は D1 により U1 の約束に含めた</strong>（ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）。team.md の Testing Posture「主要境界の Integration Test を CI で実行」も、この約束で満たす。約束に入っていなければ例外を承認しても趣旨が守られない、という再々レビューの指摘（R-H2）への対応である。<strong>残るリスク</strong>: 統合・受け入れの CI は実 DB（PostgreSQL 18）を使うが、実環境（AWS）との乖離は見つけられない。それは AWS の環境を作るまで残る</td>
+<td style="text-align: left;">U1〜U3 の成果物を、実際の研修・本番に使わない（N-H8）。デプロイされないため、規約の趣旨（自動反映で実環境の乖離を早く見つける）の代わりに、Testcontainers の実 DB の統合テストと受け入れテストを CI で実行する。<strong>この条件は D1 により U1 の約束に含めた</strong>（AI が推奨案で決め、ユーザーが承認した。2026-11-25）。team.md の Testing Posture「主要境界の Integration Test を CI で実行」も、この約束で満たす。約束に入っていなければ例外を承認しても趣旨が守られない、という再々レビューの指摘（R-H2）への対応である。<strong>残るリスク</strong>: 統合・受け入れの CI は実 DB（PostgreSQL 18）を使うが、実環境（AWS）との乖離は見つけられない。それは AWS の環境を作るまで残る</td>
 </tr>
 <tr>
 <td style="text-align: left;">承認</td>
@@ -14699,7 +14699,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">規約の対象範囲の確認と記録（D5。M1）</td>
-<td style="text-align: left;">team.md の Way of Working・Deployment は beer-game3 を対象に書かれている（Kotlin 版・Rust 版・Scala 版にも当てはめて運用されている）。規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code>（現在は空）への learnings の手続きによる記録は、<strong>人の承認の場で行う</strong>（ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）。<strong>AI は project.md を編集しない</strong></td>
+<td style="text-align: left;">team.md の Way of Working・Deployment は beer-game3 を対象に書かれている（Kotlin 版・Rust 版・Scala 版にも当てはめて運用されている）。規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code>（現在は空）への learnings の手続きによる記録は、<strong>人の承認の場で行う</strong>（この手順は D5 としてユーザーが承認した。2026-11-25。<strong>規約の例外そのものの承認と、project.md への記録は未実施</strong>）。<strong>AI は project.md を編集しない</strong></td>
 </tr>
 </tbody>
 </table>
@@ -14921,7 +14921,7 @@
 <td style="text-align: left;">バックエンド・ドメイン・tech-stack（中核担当が記述）</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造</strong>（D4。R-H5。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）</td>
+<td style="text-align: left;"><strong>H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造</strong>（D4。R-H5。AI が推奨案で決め、ユーザーが承認した。2026-11-25）</td>
 <td style="text-align: left;"><code>StampedLock</code> 系（取得と解放のスレッドが違ってよい。<code>ReentrantReadWriteLock</code> は所有スレッド固有で、<code>Fiber</code> は別スレッドで再開しうるので採らない）、<code>tryReadLock</code>/<code>tryWriteLock</code> の待ちの上限（超えたら <code>RetryExhausted</code>）、トランザクション終了後の後始末（Kotlin 版の <code>afterEnd</code> 相当）。<code>Tx.run</code> が COMMIT・ROLLBACK の後に <code>guaranteeCase</code> で実行する。H2 版で「COMMIT の後まで直列化する」契約を両実装で確かめる。別案（1 ゲーム 1 行のロック行への <code>SELECT … FOR UPDATE</code>）は H2 での動作が未確認。実行時の挙動なので B1 の最初のスライドで動かして確かめる</td>
 <td style="text-align: left;">§5、§7.6</td>
 <td style="text-align: left;">バックエンド・data-model・test-strategy（中核担当が記述）</td>
@@ -14939,7 +14939,7 @@
 <td style="text-align: left;">バックエンド（中核担当が記述）</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>許す組の表の条件、失効済みの旧担当者、性質テストの 3 方向</strong>（R-H3・R-H4。D3 は AI が推奨案で決めた。確認は未了。R-H4 は AI の案、承認なし）</td>
+<td style="text-align: left;"><strong>許す組の表の条件、失効済みの旧担当者、性質テストの 3 方向</strong>（R-H3・R-H4。D3 は AI が推奨案で決め、ユーザーが承認した。2026-11-25。R-H4 は AI の案、承認なし）</td>
 <td style="text-align: left;">許す組の表に Kotlin 版の条件（<code>invited</code> は既知の招待で変えない、<code>revoked</code> は未知の主体と失効済みで変えない、<code>reissued</code> は失効していない資格で変えない、<code>recovered</code> は失効済みで変えない、<code>withRole</code> は未知の参加者で変えない など）を書く。<strong>D3</strong>: 失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す。性質テストの「<code>Ignored</code> にならない」生成器は表からでなくコマンドから作る: (a) 状態に応じたコマンド列を <code>foldLeft</code> して <code>Ignored</code> が 0 件、(b) 表の各 ○ の組が (a) の列に N 回以上現れる、(c) 表 × <code>apply</code> の全組の状態遷移テスト。表から生成器を作ると表と同じ前提に立ち、表そのものの漏れを見逃すため</td>
 <td style="text-align: left;">§7.3〜§7.4、§8</td>
 <td style="text-align: left;">ドメイン・test-strategy（中核担当が記述）</td>

@@ -3233,7 +3233,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3268,7 +3268,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3303,7 +3303,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3338,7 +3338,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3373,7 +3373,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3408,7 +3408,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3443,7 +3443,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3478,7 +3478,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3513,7 +3513,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3548,7 +3548,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -9216,6 +9216,17 @@
   
     <nav class="md-nav" aria-label="対応状況（2026-11-25）">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-11-25_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        承認と昇格（2026-11-25、追記）
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#_12" class="md-nav__link">
@@ -14946,6 +14957,14 @@
 </tbody>
 </table>
 <p>あわせて、中・低の多く（M1〜M17、L1〜L11 の多く）も直した。範囲は各文書の変更記録にある。</p>
+<h3 id="2026-11-25_1">承認と昇格（2026-11-25、追記）<a class="headerlink" href="#2026-11-25_1" title="Permanent link">&para;</a></h3>
+<p>その後、ユーザーが「D1〜D5 を承認して stable に昇格して」と明示した。</p>
+<ul>
+<li><strong>D1〜D5 は、ユーザーが承認した決定になった。</strong> ユーザーが承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）。上の表の「AI が推奨案で決めた（確認未了）」は、承認前の記録である。設計書の本文は、承認の記述に直した。</li>
+<li><strong>D5 で承認したのは手順だけ</strong>で、team 規約の例外そのものの承認と、project.md の <code>## Scope Overrides</code> への記録は未実施。</li>
+<li><strong>設計書 10 本に <code>verified</code>（<code>human:kakimomokuri</code>、2026-11-25T09:12:07Z）を記録し、<code>stable</code> にした。</strong> Rust 版の前例どおり、<code>index.md</code>・ADR-001・レビューレポートは昇格していない。ADR-001 のステータスは「提案中（レビュー待ち）」のまま。</li>
+<li><strong>文書の検証と設計判断の承認は別の記録である。</strong> <code>stable</code> の設計書にも、承認していない判断（N-H1・N-H2・N-H3・N-H5 の直し方、SD・SBD・ST1〜ST8・SI・SF・SU・STT・SN・NF-SC、規約の例外、案 X・Y、依頼文言の 15 分など）は未承認のまま残り、設計書の各承認状況の段落に書いてある。</li>
+</ul>
 <h3 id="_12">反映後も残る未確認・要判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>D1〜D5 のユーザーの確認</strong>: 未了。特に D3（失効済みの旧担当者の入れ替え）と D4（H2 版のロック）は設計の中身を決めているので、確認が要る。D5 の project.md への記録は未実施。</li>
@@ -14958,9 +14977,9 @@
 </ul>
 <h2 id="_13">次のステップ<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li>人が D1〜D5 を確認する（特に D3・D4）。</li>
+<li>~~人が D1〜D5 を確認する~~ → 2026-11-25 に承認済み。~~<code>verified</code> を記録して <code>stable</code> に昇格する~~ → 設計書 10 本は昇格済み。</li>
 <li>B1 の最初のスライドで、型検査と実測（ロック、<code>lock_timeout</code>、<code>Left</code> の ROLLBACK、キャンセル）を行う。</li>
-<li>人が <code>verified</code> を記録して <code>stable</code> に昇格する。</li>
+<li>承認待ちの判断（規約の例外、案 X・Y、Intent・指標の数値、ST1〜ST8 ほか）を人が決める。</li>
 </ol>
 
 

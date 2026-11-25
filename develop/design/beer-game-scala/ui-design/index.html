@@ -3240,7 +3240,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3275,7 +3275,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3310,7 +3310,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3345,7 +3345,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3380,7 +3380,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3415,7 +3415,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3459,7 +3459,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3484,7 +3484,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3722,7 +3722,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3757,7 +3757,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3792,7 +3792,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -14446,7 +14446,7 @@
 <li><strong>確認状況の唯一の一覧</strong>は <a href="../tech-stack/#確認状況の一覧">技術スタック</a> です。</li>
 <li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、一覧を直すときは根拠も直します。</li>
 <li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）に加え、再レビューへの対応の次の 4 件です。<strong>N-H4（検証用の CI は U1 の約束に含め、AWS 環境・デプロイ用ワークフローは後回し）、N-H6（<code>domain</code> の文 97% は目安）、N-H7（止まったゲームでも状態取得の読み取りは返すことを要件にする）、N-H8（U1〜U3 は実際の研修に使わない）</strong>。<strong>#12・#15・#16 の記述の直し、画面の改善の受入条件の案を含め、これら以外は AI の案で、承認を得ていません</strong>。</li>
-<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、D1〜D5（統合テストと <code>@api</code> の受け入れを U1 の約束に含める、US6.1 は AC6.1.1・6.1.2・6.1.4、失効済みの旧担当者の入れ替えは未失効にだけ <code>CredentialRevoked</code>、H2 版のロックは Kotlin 版と同じ構造、team 規約の及ぶ範囲の確認は人の承認の場）を AI が推奨案で決めました（<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了</strong>）。画面に関わるのは #15・#16 と未決事項 8 で、依頼文言・受入条件の案はすべて AI の案です。</li>
+<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、D1〜D5（統合テストと <code>@api</code> の受け入れを U1 の約束に含める、US6.1 は AC6.1.1・6.1.2・6.1.4、失効済みの旧担当者の入れ替えは未失効にだけ <code>CredentialRevoked</code>、H2 版のロックは Kotlin 版と同じ構造、team 規約の及ぶ範囲の確認は人の承認の場）を AI が推奨案で決め、<strong>2026-11-25 にユーザーが承認しました</strong>（D5 は手順の承認で、例外の承認と project.md への記録は未実施。D1 は案 X・Y が未決）。画面に関わるのは #15・#16 と未決事項 8 で、依頼文言・受入条件の案はすべて AI の案です。</li>
 <li><strong>確認していないこと</strong>: 画面そのものは、コードを動かして確認していません（Scala 版の実装がまだ無い）。下の影響の表の「検証」はすべて、B1 以降で確かめる計画です。<strong>http4s・circe の既定の応答の形は未確認</strong>です（<a href="../architecture-backend/">バックエンド</a> の未決事項と同じ）。</li>
 <li><strong>UI 設計を複製しない理由</strong>: 画面イメージと遷移を複数の文書に持つと、片方だけが更新されて食い違うため（設計判断 SU1）。</li>
 <li>Kotlin 版の実装の経緯（B5・B15 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
@@ -14721,7 +14721,7 @@
 </tbody>
 </table>
 <h3 id="2026-11-25_2">再々レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_2" title="Permanent link">&para;</a></h3>
-<p><strong>ユーザー本人が選択肢を選んだ決定は、前回までの 8 件とローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です。他の直し方はすべて AI の案で、承認を得ていません。</strong></p>
+<p><strong>ユーザーが承認した決定は 14 件です（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）。D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（D1 は案 X・Y が未決のまま。D5 は手順の承認で、例外の承認と project.md への記録は未実施）。他の直し方（SU の各判断、依頼文言、受入条件の案など）はすべて AI の案で、承認を得ていません。</strong> 文書の検証（verified、stable への昇格）と設計判断の承認は別の記録で、stable でも上の未承認の判断は未承認のままです。</p>
 <table>
 <thead>
 <tr>
@@ -14750,6 +14750,11 @@
 <td style="text-align: left;">R-H9・M8・M11</td>
 <td style="text-align: left;">8c の 1 枚の案内に、予備の参加者・代理入力・長く止めない・控える数字を追加。「入荷予定」は画面に項目が無く結果表から復元することを書いた（<code>ConsolePage.tsx</code>・<code>ResultsTable.tsx</code>・<code>StatusTable.tsx</code> を読んで確認）</td>
 <td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">D1〜D5 の承認</td>
+<td style="text-align: left;">D1〜D5 の承認（2026-11-25）を反映。確認未了の記述を「ユーザーが承認」に直し、承認した決定を 14 件に数え直した。当時は確認未了だった</td>
+<td style="text-align: left;">ユーザーが D1〜D5 を承認（D1 は案 X・Y が未決、D5 は手順のみ）</td>
 </tr>
 </tbody>
 </table>

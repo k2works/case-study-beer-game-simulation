@@ -3240,7 +3240,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3284,7 +3284,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3309,7 +3309,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3698,6 +3698,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#d1d5-2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D1〜D5 の承認（2026-11-25）の反映
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3747,7 +3758,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3782,7 +3793,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3817,7 +3828,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3852,7 +3863,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3887,7 +3898,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3922,7 +3933,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3957,7 +3968,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3992,7 +4003,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -15015,7 +15026,7 @@
 <td style="text-align: left;">再構築との直列化（アドバイザリロック）</td>
 <td style="text-align: left;"><code>pg_advisory_xact_lock(_shared)</code>（<code>ConnectionIO</code> の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。<code>lock_timeout</code> はロックを取る間だけ設定する（R-H6）。共有と排他の待ち合いは<strong>未確認</strong></td>
 <td style="text-align: left;">動かない（関数が無い）</td>
-<td style="text-align: left;">ポート <code>ProjectionLock</code>（<code>withShared</code>・<code>withExclusive</code>: <code>ConnectionIO[Either[AppFailure, A]]</code> の変換）の裏に隠す。H2 版は<strong>プロセス内の <code>StampedLock</code> 系のロック</strong>（<code>Fiber</code> から安全な部品）+ <strong>待ちの上限</strong>（超えたら <code>RetryExhausted</code>）+ <strong>トランザクション終了後の後始末</strong>（<code>AfterEnd</code>。COMMIT・ROLLBACK の後に解放。Kotlin 版の <code>LocalProjectionLock</code> と同じ構造。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）（単一プロセスでのみ有効）。<strong>PostgreSQL 版と同じ型</strong>（H5・N-H2・R-H5。AI の案）。別案の <code>SELECT … FOR UPDATE</code> のロック行は不採用の比較（H2 での動作は未確認。<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）</td>
+<td style="text-align: left;">ポート <code>ProjectionLock</code>（<code>withShared</code>・<code>withExclusive</code>: <code>ConnectionIO[Either[AppFailure, A]]</code> の変換）の裏に隠す。H2 版は<strong>プロセス内の <code>StampedLock</code> 系のロック</strong>（<code>Fiber</code> から安全な部品）+ <strong>待ちの上限</strong>（超えたら <code>RetryExhausted</code>）+ <strong>トランザクション終了後の後始末</strong>（<code>AfterEnd</code>。COMMIT・ROLLBACK の後に解放。Kotlin 版の <code>LocalProjectionLock</code> と同じ構造。D4。AI が推奨案で決め、ユーザーが承認した。2026-11-25）（単一プロセスでのみ有効）。<strong>PostgreSQL 版と同じ型</strong>（H5・N-H2・R-H5。AI の案）。別案の <code>SELECT … FOR UPDATE</code> のロック行は不採用の比較（H2 での動作は未確認。<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）</td>
 </tr>
 <tr>
 <td style="text-align: left;">SSE の版の通知（LISTEN/NOTIFY）</td>
@@ -15217,7 +15228,7 @@
 </tbody>
 </table>
 <h3 id="_22">再レビュー（<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
-<p>ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。<strong>N-H2・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
+<p>ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）です。再々レビューの D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（当時は確認未了でした）。承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）です。<strong>N-H2・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
 <table>
 <thead>
 <tr>
@@ -15240,7 +15251,7 @@
 </tbody>
 </table>
 <h3 id="_23">再々レビュー（<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h3>
-<p>ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。<strong>D4（H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造）は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了</strong>です。それ以外の直し方は AI の案で、承認を得ていません。</p>
+<p>ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。<strong>D4（H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造）は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（反映時点では確認未了でした）</strong>。D1〜D5 の承認を含め、承認した決定は 14 件です。それ以外の直し方は AI の案で、承認を得ていません。「文書の検証（verified）」と「設計判断の承認」は別の記録で、文書が stable でも、承認していない判断は未承認のままです。</p>
 <table>
 <thead>
 <tr>
@@ -15258,10 +15269,12 @@
 <tr>
 <td style="text-align: left;">R-H5（D4）</td>
 <td style="text-align: left;">方言の差分の H2 版の <code>ProjectionLock</code>（<code>bracket</code> から、<code>StampedLock</code> 系 + 待ちの上限 + <code>AfterEnd</code> へ）、型を <code>ConnectionIO[Either[AppFailure, A]]</code> の変換に</td>
-<td style="text-align: left;">ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施</td>
+<td style="text-align: left;">AI が推奨案で決め、ユーザーが承認した（2026-11-25。当時は確認未了）。実測は未実施</td>
 </tr>
 </tbody>
 </table>
+<h3 id="d1d5-2026-11-25">D1〜D5 の承認（2026-11-25）の反映<a class="headerlink" href="#d1d5-2026-11-25" title="Permanent link">&para;</a></h3>
+<p>ユーザーが D1〜D5 を承認しました。本書に関わる D4（H2 版の <code>ProjectionLock</code>）の記述を、この承認に合わせて直しました（過去の行の「確認は未了」は当時の状況として残しています）。H2 での実測、R-H6 などの直し方、N-H2・N-H5 は未実施・未承認のままです。</p>
 <h2 id="_24">出典<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Scala 版の確認: sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、doobie-core・doobie-postgres・doobie-hikari 1.0.0-RC12、testcontainers-scala-postgresql・testcontainers-scala-munit 0.44.1、ローカルの Docker の <code>postgres:18.6</code>（使い捨てのコンテナ）、2026-11-25。リポジトリの外の使い捨てのプロジェクトで行い、リポジトリには残していない。</li>

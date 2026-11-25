@@ -3227,7 +3227,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3262,7 +3262,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3297,7 +3297,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3332,7 +3332,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3367,7 +3367,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3402,7 +3402,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3437,7 +3437,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3472,7 +3472,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3507,7 +3507,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3542,7 +3542,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -14159,6 +14159,18 @@
 <h1 id="docs-update-log">Docs Update Log<a class="headerlink" href="#docs-update-log" title="Permanent link">&para;</a></h1>
 <h2 id="2026-11-25">2026-11-25<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
 <ul>
+<li><strong>Approval</strong>: ユーザーが <a href="/design/beer-game-scala/index.md">beer-game-scala</a> の D1〜D5 を承認し、設計書 10 本の <code>stable</code> への昇格を指示（D1 統合・受け入れテストを U1 に、D2 US6.1 は AC6.1.1・6.1.2・6.1.4、D3 未失効の旧担当者にだけ <code>CredentialRevoked</code>、D4 H2 版ロックは Kotlin 版と同じ構造、D5 規約の対象範囲の確認と例外の記録は人の承認の場で。D5 は手順のみで、例外の承認と project.md への記録は未実施。ADR-001 のステータスは「提案中」のまま。claude-code/claude-sonnet-5-5）</li>
+<li><strong>Update</strong>: 設計書 10 本・<a href="/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md">ADR-001</a>・<a href="/design/beer-game-scala/index.md">index</a> の D1〜D5 の記述を、承認済みに直した（claude-code/claude-sonnet-5-5）</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/ui-design.md">ui-design</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/test-strategy.md">test-strategy</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/tech-stack.md">tech-stack</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/operation.md">operation</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/non-functional.md">non-functional</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/domain-model.md">domain-model</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/data-model.md">data-model</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/architecture-infrastructure.md">architecture-infrastructure</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/architecture-frontend.md">architecture-frontend</a> を human:kakimomokuri が検証</li>
+<li><strong>Verification</strong>: <a href="/design/beer-game-scala/architecture-backend.md">architecture-backend</a> を human:kakimomokuri が検証</li>
 <li><strong>Update</strong>: <a href="/design/beer-game-scala/index.md">beer-game-scala の設計書</a> 10 本と <a href="/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md">ADR-001</a> を更新（再々レビューの高 10 件の反映。論点 1〜5 は、ユーザーの指示「決定を行い」に基づき AI が推奨案で決めた D1〜D5 で、ユーザー本人の決定ではなく確認は未了。US6.1 の取り違えと B1 確認項目の旧文言の訂正、許す組の表の修正と D3、H2 版ロックの <code>StampedLock</code> 系、<code>lock_timeout</code> と SQLSTATE の写像、<code>.transact(</code> の受入条件の統一、パターン 17・18 の依頼文言と紙で続ける手順。status は draft のまま。claude-code/claude-sonnet-5-5）</li>
 <li><strong>Update</strong>: <a href="/review/beer-game-scala/design_rereview2_20261125.md">設計書の再々レビュー（beer-game-scala）</a> に対応状況を追記（claude-code/claude-sonnet-5-5）</li>
 <li><strong>Creation</strong>: <a href="/review/beer-game-scala/design_rereview2_20261125.md">設計書の再々レビュー（beer-game-scala）</a> を作成（再レビューの高 8 件の反映後の 5 視点の再々レビュー。前回の高は解消 3・一部 5。新たな指摘は高 10・中 17・低 11。事実の誤りは US6.1 の取り違えと B1 確認項目 (e) の旧文言。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）</li>

@@ -3240,7 +3240,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3275,7 +3275,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3310,7 +3310,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3345,7 +3345,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3380,7 +3380,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3424,7 +3424,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3449,7 +3449,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3798,6 +3798,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#d1d5-2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D1〜D5 の承認（2026-11-25）の反映
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3847,7 +3858,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3882,7 +3893,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3917,7 +3928,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3952,7 +3963,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -15424,7 +15435,7 @@
 </tbody>
 </table>
 <h2 id="_12">設計判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
-<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 にユーザーが決めたのは、レビュー対応の次の 4 点と、再レビュー対応の次の 4 点の<strong>8 件だけ</strong>です。<strong>H3</strong>（不正な遷移 <code>Ignored</code> は止める設計を維持）、<strong>H6</strong>（カバレッジは行率を算出する案 C を第一）、<strong>H7</strong>（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、<strong>H9</strong>（NF-P2 は p95 4 秒）、<strong>N-H4</strong>（検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境・デプロイ用のワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、<strong>N-H6</strong>（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、<strong>N-H7</strong>（止まったゲームでも状態取得（読み取り）は返す）、<strong>N-H8</strong>（U1〜U3 の間は実際の研修に使わない。検証・事例用）。<strong>H1・H2・H4・H5・H8・H10 と、N-H1・N-H2・N-H3・N-H5 の直し方（本書の確認状況の一覧と正本の規則、<code>Tx.run</code>、<code>.transact(</code> の入口の一覧と禁止、<code>ProjectionLock</code> の <code>ConnectionIO</code> の変換など）は AI の案で、承認を得ていません。</strong>再々レビュー（2026-11-25）の <strong>D1〜D5 は、ユーザーの「決定を行い、高 10 件を設計書に反映」という指示に基づき、AI が推奨案で決めたもの</strong>です（ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）。D1=統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)）。D2=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定 N-H4 として別の行）。D3=失効済みの旧担当者の入れ替えは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（R-H3 案 (a)）。D4=H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末。R-H5）。D5=team 規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）。<strong>R-H5・R-H6・R-H7 など、D1〜D5 以外の直し方は AI の案で、承認を得ていません。</strong>また、<strong>「Scala 3」「http4s」「doobie」という道具の系列は、作成計画の承認（ガイド準拠）から導かれたもの</strong>で、<strong>具体的な版（Scala 3.7.4、http4s 0.23.39 など）、circe（ST6）、HikariCP（ST8）、JDK の選定は AI の案</strong>です（再レビュー M16。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の「決定と案の区別」と同じ）。 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
+<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 にユーザーが決めたのは、レビュー対応の次の 4 点と、再レビュー対応の次の 4 点の<strong>8 件だけ</strong>です。<strong>H3</strong>（不正な遷移 <code>Ignored</code> は止める設計を維持）、<strong>H6</strong>（カバレッジは行率を算出する案 C を第一）、<strong>H7</strong>（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、<strong>H9</strong>（NF-P2 は p95 4 秒）、<strong>N-H4</strong>（検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境・デプロイ用のワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、<strong>N-H6</strong>（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、<strong>N-H7</strong>（止まったゲームでも状態取得（読み取り）は返す）、<strong>N-H8</strong>（U1〜U3 の間は実際の研修に使わない。検証・事例用）。<strong>H1・H2・H4・H5・H8・H10 と、N-H1・N-H2・N-H3・N-H5 の直し方（本書の確認状況の一覧と正本の規則、<code>Tx.run</code>、<code>.transact(</code> の入口の一覧と禁止、<code>ProjectionLock</code> の <code>ConnectionIO</code> の変換など）は AI の案で、承認を得ていません。</strong>再々レビュー（2026-11-25）の <strong>D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認したもの</strong>です（反映時点では確認未了でした）。この承認で、ユーザーが承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2（ST9）+ D1〜D5）になります。D1=統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)。<code>check</code> に含めるか別ジョブかの案 X・Y は未決のまま）。D2=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定 N-H4 として別の行）。D3=失効済みの旧担当者の入れ替えは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（R-H3 案 (a)）。D4=H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末。R-H5）。D5=team 規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）。承認したのは手順で、例外の承認と project.md への記録は未実施。「文書の検証（verified）」と「設計判断の承認」は別の記録で、文書が stable でも、承認していない判断は未承認のまま。<strong>R-H5・R-H6・R-H7 など、D1〜D5 以外の直し方は AI の案で、承認を得ていません。</strong>また、<strong>「Scala 3」「http4s」「doobie」という道具の系列は、作成計画の承認（ガイド準拠）から導かれたもの</strong>で、<strong>具体的な版（Scala 3.7.4、http4s 0.23.39 など）、circe（ST6）、HikariCP（ST8）、JDK の選定は AI の案</strong>です（再レビュー M16。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の「決定と案の区別」と同じ）。 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
 <table>
 <thead>
 <tr>
@@ -15804,7 +15815,7 @@
 </tbody>
 </table>
 <h3 id="_15">再レビュー（<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
-<p>ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2（ST9）の 1 件）です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません（ST の冒頭の段落）。<strong>N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
+<p>ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2（ST9）の 1 件）です。再々レビューの D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（当時は確認未了でした。ST の冒頭の段落）。承認した決定は 14 件です。<strong>N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
 <table>
 <thead>
 <tr>
@@ -15857,7 +15868,7 @@
 </tbody>
 </table>
 <h3 id="_16">再々レビュー（<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
-<p><strong>ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件</strong>です。<strong>D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）</strong>です（ST の冒頭の段落に列挙した）。それ以外の直し方は AI の案で、承認を得ていません。</p>
+<p><strong>ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件</strong>です。<strong>D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（反映時点では確認未了でした）</strong>（ST の冒頭の段落に列挙した）。承認した決定は合わせて 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）です。D1 の案 X・Y は未決、D5 は手順の承認で例外の承認と project.md への記録は未実施です。それ以外の直し方は AI の案で、承認を得ていません。</p>
 <table>
 <thead>
 <tr>
@@ -15875,7 +15886,7 @@
 <tr>
 <td style="text-align: left;">R-H5（D4）・R-H6</td>
 <td style="text-align: left;">K10 の未確認（<code>lock_timeout</code> の手順、55P03・40P01・40001 の写像、待ち行列）、K21 の未確認（H2 版の <code>ProjectionLock</code>）、ST9 の確認状況（H2 版は Kotlin 版と同じ構造。<code>ReentrantReadWriteLock</code> は不適）</td>
-<td style="text-align: left;">D4 はユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施</td>
+<td style="text-align: left;">D4 は AI が推奨案で決め、ユーザーが承認した（2026-11-25。当時は確認未了）。実測は未実施</td>
 </tr>
 <tr>
 <td style="text-align: left;">K 番号</td>
@@ -15884,6 +15895,8 @@
 </tr>
 </tbody>
 </table>
+<h3 id="d1d5-2026-11-25">D1〜D5 の承認（2026-11-25）の反映<a class="headerlink" href="#d1d5-2026-11-25" title="Permanent link">&para;</a></h3>
+<p>ユーザーが D1〜D5 を承認しました。ST の冒頭の段落、この対応の記録、R-H5（D4）の行を、この承認に合わせて直しました（過去の行の「確認は未了」は当時の状況として残しています）。ST1〜ST8、H2 の依存の導入、案 X・Y、規約の例外そのもの、K の未確認の項目は、未承認・未確認のままです。</p>
 <h2 id="_17">出典<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Maven Central の <code>maven-metadata.xml</code>（<code>org.typelevel:cats-core_3</code>、<code>cats-effect_3</code>、<code>co.fs2:fs2-core_3</code>、<code>org.http4s:http4s-ember-server_3</code>・<code>http4s-circe_3</code>、<code>org.tpolecat:doobie-core_3</code>・<code>doobie-postgres_3</code>・<code>doobie-hikari_3</code>、<code>io.circe:circe-core_3</code>、<code>com.zaxxer:HikariCP</code>、<code>org.postgresql:postgresql</code>、<code>org.flywaydb:flyway-core</code>、<code>org.scalameta:munit_3</code>・<code>munit-scalacheck_3</code>・<code>scalafmt-core_2.13</code>・<code>sbt-scalafmt_2.12_1.0</code>、<code>org.typelevel:munit-cats-effect_3</code>・<code>discipline-munit_3</code>・<code>cats-laws_3</code>・<code>log4cats-slf4j_3</code>、<code>org.scalacheck:scalacheck_3</code>、<code>com.dimafeng:testcontainers-scala-*_3</code>、<code>io.cucumber:cucumber-scala_3</code>、<code>ch.qos.logback:logback-classic</code>、<code>org.scala-lang:scala3-compiler_3</code>、<code>org.scala-sbt:sbt</code>、<code>org.wartremover:wartremover_3.7.*</code>・<code>sbt-wartremover_2.12_1.0</code>、<code>ch.epfl.scala:scalafix-cli_2.13.16</code>・<code>sbt-scalafix_2.12_1.0</code>、<code>org.scoverage:sbt-scoverage_2.12_1.0</code>）、2026-11-25</li>

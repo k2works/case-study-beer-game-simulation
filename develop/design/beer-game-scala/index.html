@@ -3350,10 +3350,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ai-d1d52026-11-25" class="md-nav__link">
+  <a href="#d1d52026-11-25ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ユーザーの指示に基づき AI が推奨案で決めたもの（D1〜D5。2026-11-25。確認は未了）
+        ユーザーが承認した決定（D1〜D5。2026-11-25。AI が推奨案で決め、ユーザーが承認）
       
     </span>
   </a>
@@ -3407,6 +3407,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="補足">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        承認の条件・留意点
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -3442,7 +3459,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3477,7 +3494,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3512,7 +3529,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3547,7 +3564,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3582,7 +3599,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3617,7 +3634,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3652,7 +3669,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3687,7 +3704,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3722,7 +3739,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -3757,7 +3774,7 @@
     
   
   
-    <span class="md-status md-status--draft"></span>
+    <span class="md-status md-status--stable"></span>
   
 
   
@@ -14387,17 +14404,17 @@
 <tr>
 <td style="text-align: left;"><a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
 <td style="text-align: left;">sbt のモジュール分割、<code>IO</code> と <code>ConnectionIO</code> の境界、<code>handle</code> / <code>apply</code>、<code>Kleisli</code> による文脈</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="architecture-frontend/">フロントエンドアーキテクチャ</a></td>
 <td style="text-align: left;">React 画面の共有と、Scala 版バックエンドとの接点の差分</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="architecture-infrastructure/">インフラストラクチャ</a></td>
 <td style="text-align: left;">実行環境、sbt によるビルド、コンテナ、デプロイ構成</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -14414,12 +14431,12 @@
 <tr>
 <td style="text-align: left;"><a href="data-model/">データモデル設計</a></td>
 <td style="text-align: left;">論理データモデル、テーブル定義、doobie との対応</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="domain-model/">ドメインモデル設計</a></td>
 <td style="text-align: left;">集約、<code>enum</code> による状態・コマンド・イベント・誤り、<code>Evolution</code></td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -14436,7 +14453,7 @@
 <tr>
 <td style="text-align: left;"><a href="ui-design/">UI 設計</a></td>
 <td style="text-align: left;">画面設計は Kotlin 版を継承し、差分だけを整理</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -14453,17 +14470,17 @@
 <tr>
 <td style="text-align: left;"><a href="test-strategy/">テスト戦略</a></td>
 <td style="text-align: left;">munit、代数法則のテスト、Testcontainers、受け入れテスト、静的解析</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="non-functional/">非機能要件</a></td>
 <td style="text-align: left;">性能、可用性、セキュリティ、保守性、拡張性（NF-SC の追加を含む）</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><a href="operation/">運用要件</a></td>
 <td style="text-align: left;"><code>LogRecord</code> による監視、バックアップ、デプロイ、障害対応</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -14480,7 +14497,7 @@
 <tr>
 <td style="text-align: left;"><a href="tech-stack/">技術スタック選定</a></td>
 <td style="text-align: left;">Scala 3、Cats Effect、http4s、doobie など。版は Maven Central で確認した値</td>
-<td style="text-align: left;">Draft</td>
+<td style="text-align: left;">検証済み（2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -14495,7 +14512,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">今回の範囲（約束する）</td>
-<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定。U1 には検証用の CI（<code>check</code> ジョブ 1 本）を含む（決定）。さらに統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストの CI 実行、US6.1 の AC6.1.1・6.1.2・6.1.4 も U1 に含める（D1・D2。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）</td>
+<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定。U1 には検証用の CI（<code>check</code> ジョブ 1 本）を含む（決定）。さらに統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストの CI 実行、US6.1 の AC6.1.1・6.1.2・6.1.4 も U1 に含める（D1・D2。ユーザーが承認した。2026-11-25。AI が推奨案で決め、ユーザーが承認）</td>
 </tr>
 <tr>
 <td style="text-align: left;">範囲外・後回し</td>
@@ -14506,13 +14523,13 @@
 <p>設計書は U1〜U6 の全範囲の設計を扱いますが、実装として約束するのは U1〜U3 だけです。Intent（案）と成功の測り方（案）は <a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> にあります。</p>
 <ul>
 <li><strong>U1〜U3 の間は実際の研修に使いません（検証・事例用。ユーザーの決定）。</strong> U5 の保持削除（US5.1、Must）が範囲外で参加者の表示名が期限後も消えず、U4 の役割別の振り返り（US4.2）が範囲外で研修として完結しないためです。</li>
-<li>指標のうち Must のパリティは、US6.1（正本では「障害と性能の劣化を検知する」。CI ではありません）のうち AC6.1.1（構造化ログ）・6.1.2（相関 ID つきの記録）・6.1.4（<code>/ready</code>）を U1 に含めます（D2。共有 features に <code>@AC6.1.1</code>・<code>@AC6.1.4</code> のシナリオがあります）。US6.1 の残り（AC6.1.3 メトリクス、6.1.5・6.1.6 通知）は約束の外、US6.2 は AC6.2.4（スキーマ変更の順序。AWS が不要）を除いて AWS・デプロイが後回しのため約束の外です（再開するときに Unit を決めます）。CI の <code>check</code> ジョブは US の受入条件でなく、範囲の決定（N-H4）として別に扱います。なお正本の要件では US6.1・US6.2 の Unit が食い違っています（<code>user_story.md</code> は U6、<code>unit_definition.md</code> は U1・U5）。</li>
+<li>指標のうち Must のパリティは、US6.1（正本では「障害と性能の劣化を検知する」。CI ではありません）のうち AC6.1.1（構造化ログ）・6.1.2（相関 ID つきの記録）・6.1.4（<code>/ready</code>）を U1 に含めます（D2。ユーザーが承認済み。共有 features に <code>@AC6.1.1</code>・<code>@AC6.1.4</code> のシナリオがあります）。US6.1 の残り（AC6.1.3 メトリクス、6.1.5・6.1.6 通知）は約束の外、US6.2 は AC6.2.4（スキーマ変更の順序。AWS が不要）を除いて AWS・デプロイが後回しのため約束の外です（再開するときに Unit を決めます）。CI の <code>check</code> ジョブは US の受入条件でなく、範囲の決定（N-H4）として別に扱います。なお正本の要件では US6.1・US6.2 の Unit が食い違っています（<code>user_story.md</code> は U6、<code>unit_definition.md</code> は U1・U5）。</li>
 <li>許可リストは U1〜U3 の <code>@AC</code> タグから導きますが、Unit 定義の U1〜U3 には AC の番号まで書かれていない項目があるため、B1 の計画で AC の一覧を番号まで確定して人が承認し、それを入力にします（案）。NF-P2 の実測は範囲外（U6）の性能を早めに計測するもので、約束ではありません。</li>
 <li>研修に使い始める前提の時期は、U4 と U5 の判断の後です。U5 に着手する条件として、運営者との合意（依頼文言・15 分・研修中の原則）を置きます（案）。</li>
 <li>ステージングへの自動反映を持たない間は、team 規約（Mandated）の例外が要ります。例外は ADR-001 に<strong>案として</strong>記録しており、<strong>人の承認を待っています</strong>。</li>
 </ul>
 <h2 id="2026-11-25_1">ユーザーの決定（2026-11-25）<a class="headerlink" href="#2026-11-25_1" title="Permanent link">&para;</a></h2>
-<p>ユーザー本人が選んだ決定は、次の 9 件だけです（ローカル DB（H2）の 1 件と、レビューへの回答 8 件。作成計画の承認を除く）。件数の数え方はこの 9 件で揃えます（ADR-001・データモデル・ドメインモデルの「8 件」は、レビューへの回答だけを数えた記述で、ローカル DB を足すと 9 件です）。D1〜D5 は別の区分で、下の表にあります。それ以外は、すべて AI の案で、ユーザーの承認を得ていません。作成計画の承認（ガイド準拠）から導かれるのは Scala 3・sbt・Cats Effect・http4s・doobie という道具の系列までで、具体的な版（例: Scala 3.7.4）や circe・HikariCP などの個別の選定は AI の案です。</p>
+<p>ユーザーが承認した決定は 14 件です（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5。作成計画の承認を除く）。本人が選んだ決定（ローカル DB の 1 件とレビューへの回答 8 件の計 9 件）と、AI が推奨案で決めてユーザーが承認した D1〜D5 は、選び方が違うため表を分けます（ADR-001・データモデル・ドメインモデルの「8 件」は、レビューへの回答だけを数えた古い記述で、ローカル DB と D1〜D5 を足すと 14 件です）。それ以外は、すべて AI の案で、ユーザーの承認を得ていません。作成計画の承認（ガイド準拠）から導かれるのは Scala 3・sbt・Cats Effect・http4s・doobie という道具の系列までで、具体的な版（例: Scala 3.7.4）や circe・HikariCP などの個別の選定は AI の案です。</p>
 <table>
 <thead>
 <tr>
@@ -14569,15 +14586,15 @@
 </tr>
 </tbody>
 </table>
-<h3 id="ai-d1d52026-11-25">ユーザーの指示に基づき AI が推奨案で決めたもの（D1〜D5。2026-11-25。確認は未了）<a class="headerlink" href="#ai-d1d52026-11-25" title="Permanent link">&para;</a></h3>
-<p><a href="../../review/beer-game-scala/design_rereview2_20261125/">再々レビュー</a>の人の判断が要る論点 5 件について、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示し、AI が推奨案で決めて反映しました。<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了です。</strong> 上の「ユーザーの決定」とは区別し、ユーザーの決定と書きません。</p>
+<h3 id="d1d52026-11-25ai">ユーザーが承認した決定（D1〜D5。2026-11-25。AI が推奨案で決め、ユーザーが承認）<a class="headerlink" href="#d1d52026-11-25ai" title="Permanent link">&para;</a></h3>
+<p><a href="../../review/beer-game-scala/design_rereview2_20261125/">再々レビュー</a>の人の判断が要る論点 5 件について、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示し、AI が推奨案で決めて反映しました。その後、ユーザーが「D1〜D5 を承認」と明示したため、<strong>ユーザーが承認した決定</strong>になりました（2026-11-25）。上の表の、ユーザー本人が選択肢を選んだ決定とは経緯が違うため、表を分けています。</p>
 <table>
 <thead>
 <tr>
 <th style="text-align: left;">ID</th>
 <th style="text-align: left;">内容</th>
 <th style="text-align: left;">再々レビューの ID</th>
-<th style="text-align: left;">確認</th>
+<th style="text-align: left;">承認</th>
 </tr>
 </thead>
 <tbody>
@@ -14585,37 +14602,37 @@
 <td style="text-align: left;">D1</td>
 <td style="text-align: left;">統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストを U1 の約束に含める</td>
 <td style="text-align: left;">R-H2 案 (a)</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）。統合・受け入れを <code>check</code> に含めるか別ジョブかは案 X・Y で人が決める（D1 に含まない。未決）</td>
 </tr>
 <tr>
 <td style="text-align: left;">D2</td>
 <td style="text-align: left;">U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4。CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定（N-H4）として別の行</td>
 <td style="text-align: left;">R-H1</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">D3</td>
 <td style="text-align: left;">失効済みの旧担当者の入れ替えは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（Kotlin 版の <code>revoked()</code> が失効済みで <code>null</code> を返す設計に合わせる）</td>
 <td style="text-align: left;">R-H3 案 (a)</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">D4</td>
 <td style="text-align: left;">H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末）</td>
 <td style="text-align: left;">R-H5</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">承認済み（2026-11-25）</td>
 </tr>
 <tr>
 <td style="text-align: left;">D5</td>
 <td style="text-align: left;">team 規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（AI は project.md を編集しない）</td>
 <td style="text-align: left;">M1</td>
-<td style="text-align: left;">未了</td>
+<td style="text-align: left;">手順を承認（2026-11-25）。規約の例外の承認と project.md への記録は未実施</td>
 </tr>
 </tbody>
 </table>
 <p>再レビューの N-H1（許す組の表を規範にする）・N-H2（<code>ProjectionLock</code> は <code>ConnectionIO</code> の変換）・N-H3（<code>.transact(</code> の許可する入口の一覧）・N-H5（確認状況の正本の規則）の直し方は、<strong>AI の案で承認を得ていません</strong>。</p>
 <h2 id="_6">設計判断<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
-<p>次の判断は、ユーザー本人が選んだ決定 9 件（上の表）を除き、すべて<strong>案</strong>で、ユーザーの承認を得ていません。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です（ユーザーの決定ではありません）。承認の記録は、ユーザーが指示した範囲だけを追記します。</p>
+<p>次の判断は、ユーザーが承認した決定 14 件（上の 2 つの表。本人が選んだ 9 件と D1〜D5 の 5 件）を除き、すべて<strong>案</strong>で、ユーザーの承認を得ていません。承認の記録は、ユーザーが指示した範囲だけを追記します。</p>
 <table>
 <thead>
 <tr>
@@ -14629,7 +14646,7 @@
 <tr>
 <td style="text-align: left;">ADR-001</td>
 <td style="text-align: left;">beer-game-kotlin を Scala 版として作り、設計と ADR を流用する。引き継ぎ表は 2026-11-25 に AI が ADR の本文と照合した（人のレビューは未了）。team 規約の例外（案）を含む</td>
-<td style="text-align: left;">案（範囲・CI と AWS の線引きの決定を除く。D1〜D5 は AI が推奨案で決めたもので確認は未了。規約の例外は未承認）</td>
+<td style="text-align: left;">案（範囲・CI と AWS の線引きの決定と、承認済みの D1〜D5 を除く。規約の例外は案で未承認。ADR-001 のステータスは「提案中（レビュー待ち）」のまま）</td>
 <td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a></td>
 </tr>
 <tr>
@@ -14757,9 +14774,9 @@
 </tr>
 <tr>
 <td style="text-align: left;">10</td>
-<td style="text-align: left;">D1〜D5 の確認（AI が推奨案で決めたもの）。D1: 統合・受け入れの CI を U1 の約束に含める、D2: U1 の US6.1 は AC6.1.1・6.1.2・6.1.4、D3: 失効済みの旧担当者の入れ替え、D4: H2 版ロックの構造、D5: team 規約の対象範囲の確認と <code>## Scope Overrides</code> への記録</td>
-<td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a>、<a href="domain-model/">ドメインモデル</a>、<a href="architecture-backend/">バックエンドアーキテクチャ</a></td>
-<td style="text-align: left;">ユーザー本人の選択ではなく確認が未了。D5 は人の承認の場で行い、AI は project.md を編集しない</td>
+<td style="text-align: left;">D5 の実施（D1〜D4 は 2026-11-25 に承認済みで、この表から外した）。team 規約が beer-game-scala に及ぶかの確認と、承認した例外の <code>## Scope Overrides</code> への記録。あわせて、規約の例外そのもの、案 X・Y（統合・受け入れを <code>check</code> に含めるか別ジョブか）、<code>@AC6.1.2</code> の共有シナリオ、AC の一覧の確定、依頼文言（15 分を含む）</td>
+<td style="text-align: left;"><a href="../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a></td>
+<td style="text-align: left;">D5 で承認したのは手順で、例外の承認でも project.md への記録でもない（記録は未実施）。記録は人の承認の場で行い、AI は project.md を編集しない</td>
 </tr>
 </tbody>
 </table>
@@ -14773,7 +14790,14 @@
 <h2 id="_9">補足<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <ul>
 <li>実ドキュメントを追加したら、この一覧を更新します。</li>
-<li>設計書のレビュー結果は、<a href="../../review/beer-game-scala/design_review_20261125/">設計書レビュー（2026-11-25）</a> にあります。「高」の指摘への対応は、上記の決定以外は AI の案です。再レビュー結果は <a href="../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー（2026-11-25）</a>、再々レビュー結果は <a href="../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー（2026-11-25）</a> にあります。再々レビューの高 10 件の直し方も、D1〜D5 を除いて AI の案で、承認を得ていません。</li>
+<li>設計書のレビュー結果は、<a href="../../review/beer-game-scala/design_review_20261125/">設計書レビュー（2026-11-25）</a> にあります。「高」の指摘への対応は、上記の決定以外は AI の案です。再レビュー結果は <a href="../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー（2026-11-25）</a>、再々レビュー結果は <a href="../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー（2026-11-25）</a> にあります。再々レビューの高 10 件の直し方も、2026-11-25 にユーザーが承認した D1〜D5 を除いて AI の案で、承認を得ていません。</li>
+</ul>
+<h3 id="_10">承認の条件・留意点<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>設計書 10 本の検証</strong>: 2026-11-25 に、ユーザーの承認で設計書 10 本に OKF の <code>verified</code>（人: kakimomokuri）を記録し、<code>status: stable</code> にしました。上の一覧の「状況」はこれを表します。</li>
+<li><strong><code>index.md</code> と ADR-001 には <code>verified</code> を付けていません</strong>（Rust 版の前例どおり）。ADR-001 のステータスは「提案中（レビュー待ち）」のままで、引き継ぎ表・Scala 固有の判断など未承認の案を多く含むためです。</li>
+<li>承認された<strong>設計判断</strong>（ユーザーが承認した決定 14 件）と、文書の<strong>検証</strong>（<code>verified</code>）は別の記録です。設計書が <code>stable</code> でも、ST1〜ST8・SD・SBD・SI・SF・SU・STT・SN・NF-SC などの AI の案が承認されたことにはなりません。承認待ちの判断は上の表にあります。</li>
+<li>規約の例外（ステージングへの自動反映を持たない間）、案 X・Y、Intent・成功の指標の数値、依頼文言（15 分を含む）は、承認待ちのままです。</li>
 </ul>
 
 
