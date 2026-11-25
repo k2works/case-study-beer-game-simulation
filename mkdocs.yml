@@ -137,6 +137,18 @@ nav:
               - 'サイトシーイング・マップ: アーキテクチャ（生成）': design/beer-game-kotlin/generated/architecture-sightseeing-map.md
       - beer-game-rust:
           - 概要: design/beer-game-rust/index.md
+      - beer-game-scala:
+          - 概要: design/beer-game-scala/index.md
+          - ドメインモデル: design/beer-game-scala/domain-model.md
+          - データモデル: design/beer-game-scala/data-model.md
+          - バックエンドアーキテクチャ: design/beer-game-scala/architecture-backend.md
+          - フロントエンドアーキテクチャ: design/beer-game-scala/architecture-frontend.md
+          - インフラストラクチャ: design/beer-game-scala/architecture-infrastructure.md
+          - 技術スタック: design/beer-game-scala/tech-stack.md
+          - UI 設計: design/beer-game-scala/ui-design.md
+          - テスト戦略: design/beer-game-scala/test-strategy.md
+          - 非機能要件: design/beer-game-scala/non-functional.md
+          - 運用要件: design/beer-game-scala/operation.md
   - 開発:
       - 概要: development/index.md
       - beer-game:
@@ -332,6 +344,9 @@ nav:
           - ADR-020 タブごとの資格の Cookie: adr/beer-game-kotlin/020-tab-scoped-credential-cookies.md
       - beer-game-rust:
           - 概要: adr/beer-game-rust/index.md
+      - beer-game-scala:
+          - 概要: adr/beer-game-scala/index.md
+          - ADR-001 Scala 版として作る: adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md
   - ジャーナル:
       - 概要: journal/index.md
       - beer-game:
