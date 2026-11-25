@@ -1,6 +1,7 @@
 # Docs Update Log
 
 ## 2026-11-25
+* **Creation**: [設計書の再レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview_20261125.md) を作成（高 10 件の反映後の 5 視点の再レビュー。前回の高は解消 2・一部 8。新たな指摘は高 8・中 20・低 11。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）
 * **Update**: [beer-game-scala の設計書](/design/beer-game-scala/index.md) 10 本と [ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を更新（レビューの高 10 件の反映。ユーザーの決定は H3 止める設計の維持・H6 行率を算出する案 C・H7 U1〜U3 を約束・H9 NF-P2 を p95 4 秒。他は AI の案で未承認。確認状況の一覧 K1〜K23 を tech-stack に新設、`Tx.run` と `Started` の自己遷移、パターン 18。status は draft のまま。claude-code/claude-sonnet-5-5）
 * **Update**: [設計書レビュー（beer-game-scala）](/review/beer-game-scala/design_review_20261125.md) に対応状況を追記（claude-code/claude-sonnet-5-5）
 * **Creation**: [設計書レビュー（beer-game-scala）](/review/beer-game-scala/design_review_20261125.md)・[review index](/review/beer-game-scala/index.md) を作成（5 視点。高 10・中 17・低 11。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）

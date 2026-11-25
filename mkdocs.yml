@@ -295,6 +295,7 @@ nav:
       - beer-game-scala:
           - 概要: review/beer-game-scala/index.md
           - 設計書レビュー（2026-11-25）: review/beer-game-scala/design_review_20261125.md
+          - 設計書の再レビュー（2026-11-25）: review/beer-game-scala/design_rereview_20261125.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
