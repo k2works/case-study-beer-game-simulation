@@ -3787,13 +3787,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再々レビュー（設計書の再々レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#_16" class="md-nav__link">
+  <a href="#_17" class="md-nav__link">
     <span class="md-ellipsis">
       
         出典
@@ -9373,6 +9384,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-scala/design_rereview2_20261125/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書の再々レビュー（2026-11-25）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14785,7 +14831,7 @@
 <td style="text-align: left;">K3</td>
 <td style="text-align: left;">ドメインの断片（<code>Quantity</code>、<code>RoleMap</code>、<code>ValidatedNec</code> による設定の検証、<code>GameError.code</code>、<code>Game.handle</code>、<code>Events.apply</code> と <code>Evolution</code>、<code>replay</code>）</td>
 <td style="text-align: left;">上のコンパイルと、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ること。状態を 1 つ足すと <code>match</code> の網羅の警告が出ること。<code>var</code> と <code>head</code> が WartRemover に拒否されること（2026-11-25）</td>
-<td style="text-align: left;">2026-11-25 のレビュー対応で書き直した <code>Game.handle</code>（権限が先の判定順）と <code>Started</code> の自己遷移、再レビュー N-H1 で書き直した <code>GameEvents.apply</code>（12 イベントと「許す組の表」）は、<strong>再コンパイルしていない</strong></td>
+<td style="text-align: left;">2026-11-25 のレビュー対応で書き直した <code>Game.handle</code>（権限が先の判定順）と <code>Started</code> の自己遷移、再レビュー N-H1 で書き直した <code>GameEvents.apply</code>（12 イベントと「許す組の表」）と、再々レビュー R-H3 で書き直した <code>GameData</code>・条件つきの腕・<code>SessionEvents.apply</code> のスケッチ・<code>replacementEvents</code> は、<strong>再コンパイルしていない</strong></td>
 <td style="text-align: left;"><a href="../domain-model/">ドメインモデル</a></td>
 </tr>
 <tr>
@@ -14834,7 +14880,7 @@
 <td style="text-align: left;">K10</td>
 <td style="text-align: left;">アドバイザリロック</td>
 <td style="text-align: left;"><code>sql"select pg_advisory_xact_lock(42)".query[Unit].unique</code> と <code>pg_advisory_xact_lock_shared</code> が <code>ConnectionIO</code> として実行できた（2026-11-25）</td>
-<td style="text-align: left;"><strong><code>ConnectionIO</code> の変換としての PostgreSQL 版</strong>（トランザクションの先頭の <code>pg_advisory_xact_lock(_shared)</code>。再レビュー N-H2 の案）の、<strong>共有と排他が互いを待つこと</strong>、<strong>再構築用の <code>pg_advisory_xact_lock</code>（排他）の実測</strong>、COMMIT・ROLLBACK での解放、<code>lock_timeout</code> の効き方（55P03）。前回の <code>Resource</code> 案（セッションのロック）は不採用にしたため、確かめない</td>
+<td style="text-align: left;"><strong><code>ConnectionIO</code> の変換としての PostgreSQL 版</strong>（トランザクションの先頭の <code>pg_advisory_xact_lock(_shared)</code>。再レビュー N-H2 の案）の、<strong>共有と排他が互いを待つこと</strong>、<strong>再構築用の <code>pg_advisory_xact_lock</code>（排他）の実測</strong>、COMMIT・ROLLBACK での解放、<code>lock_timeout</code> の効き方（55P03）、<strong>ロックを取る間だけ <code>set_config('lock_timeout', ms, true)</code> で設定して取った後に <code>'0'</code> に戻す手順</strong>（Kotlin 版の <code>PostgresProjectionLock</code> を読んだ。Scala 版では未実行）、<code>attemptSomeSqlState</code> での 55P03 の写像と、40P01・40001 の <code>IO</code> での写像、排他を待つ要求の後ろに共有が並ぶ挙動（L8。未実測）。前回の <code>Resource</code> 案（セッションのロック）は不採用にしたため、確かめない</td>
 <td style="text-align: left;"><a href="../data-model/">データモデル</a> の検証 A の 5</td>
 </tr>
 <tr>
@@ -14869,7 +14915,7 @@
 <td style="text-align: left;">K15</td>
 <td style="text-align: left;">Scalafix</td>
 <td style="text-align: left;">sbt-scalafix 0.14.10 + Scala 3.7.4 で、<code>DisableSyntax.regex</code>（<code>println</code>・<code>System.currentTimeMillis</code>）が <code>Compile/scalafix --check</code> で、インデント構文のソースの該当行を報告し、該当しない関数は報告しない（2026-11-25）</td>
-<td style="text-align: left;"><code>scalafixAll</code>、<code>.transact(</code>・<code>.transact[</code>・<code>xa.trans</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code> を禁止して、許す入口を置く 1 つのファイル（<code>Transactions.scala</code>）だけ除外する方法（<code>scalafix:off</code> は使わない。ADR-001 の 011）、<code>Test</code> のソースを対象にするか（<code>Compile</code> だけ確認）、<code>domain</code> の <code>import</code> の禁止、<code>scalafix-cli</code> の版との関係</td>
+<td style="text-align: left;"><code>scalafixAll</code>、<strong>メソッド名のパターン</strong>（<code>\.transact\b</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>\bF[CH]\.(commit\|rollback)\b</code>。変数名に依存しない。M14）を禁止して、許す入口を置く <code>Transactions.scala</code> と <code>TestTx</code> を置く 1 ファイルだけ除外する方法（<code>scalafix:off</code> は使わない。ADR-001 の 011）、<strong><code>scalafix:off</code> のコメントを <code>DisableSyntax.regex</code> で検出できるか</strong>、<code>Test</code> のソースを対象にするか（<code>Compile</code> だけ確認。テスト本体の <code>.transact(</code> も落ちる設計のため、<code>Test</code> への適用が要る）、<strong>文字列・コメントの中の語を拾うか</strong>（拾うならルールを直す）、<code>domain</code> の <code>import</code> の禁止、<code>scalafix-cli</code> の版との関係</td>
 <td style="text-align: left;"><a href="../test-strategy/">テスト戦略</a> の確認した事項 9</td>
 </tr>
 <tr>
@@ -14911,7 +14957,7 @@
 <td style="text-align: left;">K21</td>
 <td style="text-align: left;">H2（ローカル開発のみ）</td>
 <td style="text-align: left;">版 2.5.252 とライセンス（MPL 2.0・EPL 1.0）、<code>doobie-h2_3</code> 1.0.0-RC12 の存在を Maven Central で確認（2026-11-25）</td>
-<td style="text-align: left;"><strong>PostgreSQL モードの動作範囲</strong>（アドバイザリロックの代替、<code>jsonb</code>、部分一意索引）、Flyway の H2 への適用、doobie 経由の SQLSTATE と制約名、<code>Left</code> の明示 ROLLBACK の H2 での動作、公式のサポート期限、JDK 25・Flyway 13.12.2 との組み合わせ。Kotlin 版の実測（H2 2.5.252、2026-11-14）を<strong>引用するだけ</strong></td>
+<td style="text-align: left;"><strong>PostgreSQL モードの動作範囲</strong>（アドバイザリロックの代替、<code>jsonb</code>、部分一意索引）、<strong>H2 版の <code>ProjectionLock</code>（<code>StampedLock</code> 系 + 待ちの上限 + <code>AfterEnd</code>）が動くこと</strong>（登録簿の持ち方、<code>FC.delay</code> の中の待ち。D4）、Flyway の H2 への適用、doobie 経由の SQLSTATE と制約名、<code>Left</code> の明示 ROLLBACK の H2 での動作、公式のサポート期限、JDK 25・Flyway 13.12.2 との組み合わせ。Kotlin 版の実測（H2 2.5.252、2026-11-14）を<strong>引用するだけ</strong></td>
 <td style="text-align: left;">ST9、<a href="../data-model/">データモデル</a></td>
 </tr>
 <tr>
@@ -15260,7 +15306,7 @@
 <td style="text-align: left;">Scalafix（<code>DisableSyntax</code>）</td>
 <td style="text-align: left;"><strong>sbt-scalafix 0.14.10</strong>（<code>DisableSyntax.regex</code> は確認済み。K15）、CLI 0.14.3</td>
 <td style="text-align: left;"><code>ForbiddenMethodCall</code></td>
-<td style="text-align: left;"><code>println</code>、<code>System.currentTimeMillis</code>、<code>Thread.sleep</code>、<strong><code>.transact(</code>・<code>.transact[</code>・<code>xa.trans</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code>（許す入口を置く <code>Transactions.scala</code> だけ除外。<code>scalafix:off</code> は使わない。ST4）</strong>、ドメインでの時計・乱数・<code>IO</code> の <code>import</code> の禁止（文字列のパターン。限界はガイド §9.4）</td>
+<td style="text-align: left;"><code>println</code>、<code>System.currentTimeMillis</code>、<code>Thread.sleep</code>、<strong>メソッド名のパターン <code>\.transact\b</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code> と <code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code>（許す入口を置く <code>Transactions.scala</code> と、テストの補助 <code>TestTx</code> の 1 ファイルだけ除外。全 <code>Compile</code> のソースとテスト本体が対象。<code>scalafix:off</code> は使わない。ST4。R-H7・M14）</strong>、ドメインでの時計・乱数・<code>IO</code> の <code>import</code> の禁止（文字列のパターン。限界はガイド §9.4）</td>
 </tr>
 <tr>
 <td style="text-align: left;">カバレッジ</td>
@@ -15378,7 +15424,7 @@
 </tbody>
 </table>
 <h2 id="_12">設計判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
-<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 にユーザーが決めたのは、レビュー対応の次の 4 点と、再レビュー対応の次の 4 点の<strong>8 件だけ</strong>です。<strong>H3</strong>（不正な遷移 <code>Ignored</code> は止める設計を維持）、<strong>H6</strong>（カバレッジは行率を算出する案 C を第一）、<strong>H7</strong>（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、<strong>H9</strong>（NF-P2 は p95 4 秒）、<strong>N-H4</strong>（検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境・デプロイ用のワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、<strong>N-H6</strong>（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、<strong>N-H7</strong>（止まったゲームでも状態取得（読み取り）は返す）、<strong>N-H8</strong>（U1〜U3 の間は実際の研修に使わない。検証・事例用）。<strong>H1・H2・H4・H5・H8・H10 と、N-H1・N-H2・N-H3・N-H5 の直し方（本書の確認状況の一覧と正本の規則、<code>Tx.run</code>、<code>.transact(</code> の入口の一覧と禁止、<code>ProjectionLock</code> の <code>ConnectionIO</code> の変換など）は AI の案で、承認を得ていません。</strong>また、<strong>「Scala 3」「http4s」「doobie」という道具の系列は、作成計画の承認（ガイド準拠）から導かれたもの</strong>で、<strong>具体的な版（Scala 3.7.4、http4s 0.23.39 など）、circe（ST6）、HikariCP（ST8）、JDK の選定は AI の案</strong>です（再レビュー M16。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の「決定と案の区別」と同じ）。 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
+<p><strong>ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません</strong>（Rust 版の R1〜R7 とは違う）。<strong>ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）</strong>です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 にユーザーが決めたのは、レビュー対応の次の 4 点と、再レビュー対応の次の 4 点の<strong>8 件だけ</strong>です。<strong>H3</strong>（不正な遷移 <code>Ignored</code> は止める設計を維持）、<strong>H6</strong>（カバレッジは行率を算出する案 C を第一）、<strong>H7</strong>（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、<strong>H9</strong>（NF-P2 は p95 4 秒）、<strong>N-H4</strong>（検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境・デプロイ用のワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、<strong>N-H6</strong>（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、<strong>N-H7</strong>（止まったゲームでも状態取得（読み取り）は返す）、<strong>N-H8</strong>（U1〜U3 の間は実際の研修に使わない。検証・事例用）。<strong>H1・H2・H4・H5・H8・H10 と、N-H1・N-H2・N-H3・N-H5 の直し方（本書の確認状況の一覧と正本の規則、<code>Tx.run</code>、<code>.transact(</code> の入口の一覧と禁止、<code>ProjectionLock</code> の <code>ConnectionIO</code> の変換など）は AI の案で、承認を得ていません。</strong>再々レビュー（2026-11-25）の <strong>D1〜D5 は、ユーザーの「決定を行い、高 10 件を設計書に反映」という指示に基づき、AI が推奨案で決めたもの</strong>です（ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）。D1=統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)）。D2=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（CI の <code>check</code> ジョブは US の受入条件でなく範囲の決定 N-H4 として別の行）。D3=失効済みの旧担当者の入れ替えは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（R-H3 案 (a)）。D4=H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末。R-H5）。D5=team 規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）。<strong>R-H5・R-H6・R-H7 など、D1〜D5 以外の直し方は AI の案で、承認を得ていません。</strong>また、<strong>「Scala 3」「http4s」「doobie」という道具の系列は、作成計画の承認（ガイド準拠）から導かれたもの</strong>で、<strong>具体的な版（Scala 3.7.4、http4s 0.23.39 など）、circe（ST6）、HikariCP（ST8）、JDK の選定は AI の案</strong>です（再レビュー M16。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の「決定と案の区別」と同じ）。 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。</p>
 <table>
 <thead>
 <tr>
@@ -15483,7 +15529,7 @@
 <li>scalac: <code>-deprecation -feature -Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code>。<code>enum</code> の <code>match</code> の漏れ（本書の断片で、状態を 1 つ足すとパターンの網羅の警告が出ることを確認した）が、<code>-Werror</code> でビルドの失敗になる。</li>
 <li>WartRemover: ガイド §9.4 の 13 個の Wart を <code>Compile</code> に適用し、<strong>テストのソースには適用しない</strong>（ガイド §9.4「テストには適用しない」）。WartRemover 3.6.3 は既定で <code>Test</code> にも適用されるため、<strong><code>Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))</code> で外す</strong>（<code>Test / wartremoverErrors := Seq.empty</code> では外れない。確認済み、2026-11-25。<a href="#確認状況の一覧">一覧</a> の K17）。<strong>違反は 0 件、ベースラインなし、抑制なし</strong>（Kotlin 版 ADR-011 の「抑制なし」を引き継ぐ。<code>@SuppressWarnings</code> は使わない。緩和が要るときは ADR に記録する。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の 011 の行）。層ごとに許す Wart が違う場合は、sbt のプロジェクトごとに設定を分ける（ガイド §9.4 の導入の進め方 3）。</li>
 <li>Scalafix: <code>DisableSyntax.regex</code> で <code>println</code>、<code>System.currentTimeMillis</code>・<code>nanoTime</code>、<code>Thread.sleep</code>、<code>unsafeRunSync</code> 系を禁止し、<code>domain</code> では時計・乱数・<code>java.util.UUID.randomUUID</code>・<code>scala.util.Random</code> と <code>cats.effect</code> の <code>import</code> も禁止する。<code>DisableSyntax.regex</code> が Scala 3 のインデント構文のソースに効くことは確認済み（K15）。文字列のパターンの限界（別名の <code>import</code> やラッパーの中の呼び出しは見逃す）は、ガイド §9.4 のとおり。</li>
-<li><strong><code>.transact(</code> の入口の一覧と禁止（H4・再レビュー N-H3。AI の案で、承認を得ていない）</strong>: 書き込みのトランザクションの実行は <code>Tx.run</code>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の SBD2）だけに限る。ただし、読み取り・再構築・LISTEN の正しいコードも <code>.transact(</code> を使うため、<strong>許す入口を一覧にし、同じファイル（<code>beergame.adapter.persistence.Transactions</code>）に置く</strong>。入口は 4 つ: <code>Tx</code>（書き込み。<code>Tx.run</code>）、<code>ReadTx</code>（<code>ReadXa</code>・<code>ObserverXa</code> の読み取り専用 REPEATABLE READ）、<code>ModeTx</code>（<code>rebuild-projections</code>・<code>verify-projections</code>・retention・migrate のモード）、<code>LISTEN</code> の専用接続。<strong>Scalafix の除外は、このファイル 1 か所</strong>にする。<code>DisableSyntax.regex</code> で、このファイルの外の <strong><code>.transact(</code>、<code>.transact[</code>（型引数つき）、<code>xa.trans</code>、<code>FC.commit</code>・<code>FC.rollback</code>・<code>HC.commit</code>・<code>HC.rollback</code></strong> を禁止する（<code>rawTrans</code> などの別名も足す）。<strong>除外に <code>scalafix:off</code> は使わない</strong>（<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の 011 の「無効化コメントを使わない」）。<strong>ファイル単位の除外の方法は未確認</strong>（K15）。<strong>「<code>Tx.run</code> の外で書き込みの <code>transact</code> を置くと Scalafix で落ちる」</strong>（型の上で作れなくなるのではなく、CI の検査で止める。「型で作れなくする」は言いすぎとして直した）と、<strong>許す入口とテストのソースは落ちない</strong>ことを、最初のビルドの受入条件にする（落ちるべきものと落ちてはならないものの 2 方向の表。バックエンドアーキテクチャの SBD2）。文字列のパターンの限界（別名の <code>import</code> など）は残る（ガイド §9.4）。</li>
+<li><strong><code>.transact(</code> の入口の一覧と禁止（H4・再レビュー N-H3。AI の案で、承認を得ていない）</strong>: 書き込みのトランザクションの実行は <code>Tx.run</code>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の SBD2）だけに限る。ただし、読み取り・再構築・LISTEN の正しいコードも <code>.transact(</code> を使うため、<strong>許す入口を一覧にし、同じファイル（<code>beergame.adapter.persistence.Transactions</code>）に置く</strong>。入口は 4 つ: <code>Tx</code>（書き込み。<code>Tx.run</code>。実装は <code>Transactions.writeTx(xa)</code>）、<code>ReadTx</code>（<code>application</code> の trait <code>ParticipantReadTx</code>・<code>ObserverReadTx</code>。読み取り専用 REPEATABLE READ。生の <code>Transactor</code> を <code>application</code> に渡さない。再々レビュー M12）、<code>ModeTx</code>（<code>rebuild-projections</code>・<code>verify-projections</code>・retention・migrate のモード。<code>Tx.run</code> と同じ規則）、<code>LISTEN</code> の専用接続。<strong>テストの補助の入口 <code>TestTx</code>（テストのソースの 1 ファイル）</strong>も除外する。<strong>Scalafix の除外は、<code>Transactions.scala</code> と <code>TestTx</code> を置く 1 ファイルの 2 か所</strong>にする。<code>DisableSyntax.regex</code> で、<strong>メソッド名のパターン</strong>（変数名に依存しない。M14）を禁止する: <strong><code>\.transact\b</code>（<code>.transact(</code> と <code>.transact[</code>）、<code>\.trans\b</code>、<code>\.rawTrans\b</code>、<code>\bF[CH]\.(commit|rollback)\b</code></strong>。前の <code>xa.trans</code> は <code>writeXa.trans</code>・<code>transactor.trans</code> をすり抜けるため改めた。<strong>除外に <code>scalafix:off</code> は使わない</strong>（<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の 011 の「無効化コメントを使わない」）。<strong><code>scalafix:off</code> のコメントを <code>DisableSyntax.regex</code> で検出できるかは未確認</strong>（K15）。<strong>ファイル単位の除外の方法は未確認</strong>（K15）。<strong>「落ちるべき」ソースの範囲は、<code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース</strong>（<code>application</code>・<code>adapter-http</code>・<code>adapter-persistence</code> の他のファイル・<code>app</code>・<code>domain</code>。再々レビュー R-H7）。<strong>テストのソースの扱い</strong>: テスト本体の <code>.transact(</code> も落ちる（<code>Test</code> も対象にする。<code>Test</code> への適用は未確認）。除外は <code>TestTx</code> を置くファイルだけ。<strong>文字列・コメントの中の語は落ちない</strong>（拾うならルールを直す）。<strong>「<code>Tx.run</code> の外で書き込みの <code>transact</code> を置くと Scalafix で落ちる」</strong>（型の上で作れなくなるのではなく、CI の検査で止める。「型で作れなくする」は言いすぎとして直した）と、<strong>許す入口は落ちない</strong>ことを、最初のビルドの受入条件にする（1 つの表。バックエンドアーキテクチャの SBD2。2 方向の検査は fixture と期待件数のテストとして <code>check</code> に入れる）。文字列のパターンの限界（別名の <code>import</code> など）は残る（ガイド §9.4）。</li>
 <li>Scalafmt: <code>scalafmtCheckAll</code> を CI で止める。</li>
 <li><strong>カバレッジのしきい値（ユーザーの決定、2026-11-25: 行率を算出する案 C を第一とする）</strong>: beer-game-kotlin の Kover のゲートは、<strong>全体の行 85%・分岐 75%、<code>domain</code> の行 100%（暫定の下限 97%）</strong>である（<a href="../../beer-game-kotlin/test-strategy/">テスト戦略（Kotlin 版）</a>。Kover の実測 96.8%・78.1% は B2 の値）。team.md の規約は<strong>行 80% の floor</strong>で、弱めて通してはならない。scoverage は<strong>文（statement）と分岐（branch）</strong>を計測し、<strong>行の指標を持たない</strong>（確認済み。K16）。</li>
 <li><strong>第一案（C）</strong>: scoverage の XML（<code>scoverage.xml</code>）の各文が持つ<strong>行番号</strong>から、行ごとの実行の有無を集計して<strong>行率を算出</strong>し、<strong>行 80% をそのままゲート</strong>にする（Rust 版が行 80% を承認済みのゲートにした先例 RT3 と同じ）。行の数え方（文を持つ行のうち、その行のいずれかの文が実行された行の割合、とする案）は B1 で決める。<strong>算出できるかは未確認</strong>で、B1 で確かめる。<strong>出せなければ、文の率で代替してよいかを、再度人が決める</strong>（AI は代替を採らない）。</li>
@@ -15536,7 +15582,7 @@
 <li><strong>doobie</strong>: <code>Transactor</code> は JDBC の接続元（URL・<code>DataSource</code>）から作れ、H2 でも使える。doobie-h2（1.0.0-RC12 が Maven Central にある）は H2 固有の型の対応を足すもので、<strong>要るかは B1 で確認する（未確認）</strong>。</li>
 <li><strong>明示 ROLLBACK（SBD2）</strong>: <code>Left</code> でも COMMIT する doobie の挙動は PostgreSQL で確認した（K5）。H2 でも同じと見込むが<strong>未確認</strong>（K21）。<strong><code>Left</code> を返す経路は、H2 でも <code>Tx.run</code> で明示 ROLLBACK を行う</strong>。</li>
 <li><strong>SQLSTATE</strong>: 一意制約違反（23505）の取得は、doobie の <code>sqlstate</code> の抽出（<code>SqlState</code>）で行う。Kotlin 版は JDBC で H2 の 23505・23513・40001 を実測したが、<strong>doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認</strong>（B1 で実測）。制約名は、PostgreSQL では専用のフィールドから、H2 ではメッセージ中の名前から取る（Kotlin 版の実測の引用）。</li>
-<li><strong>確認状況</strong>: <a href="#確認状況の一覧">確認状況の一覧</a> の K21 を正とする。H2 の版（2.5.252）、ライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。<strong>公式のサポート期限、PostgreSQL モードの動作範囲、JDK 25・Flyway 13.12.2 との組み合わせは、Scala 版では未確認</strong>（Kotlin 版の実測を引用するのみ）。<strong>H2 の導入（依存の追加）は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>。<strong><code>ProjectionLock</code> と <code>ChangeNotifier</code> は、H2 版と PostgreSQL 版が同じ型</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。H5 の案）。</li>
+<li><strong>確認状況</strong>: <a href="#確認状況の一覧">確認状況の一覧</a> の K21 を正とする。H2 の版（2.5.252）、ライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。<strong>公式のサポート期限、PostgreSQL モードの動作範囲、JDK 25・Flyway 13.12.2 との組み合わせは、Scala 版では未確認</strong>（Kotlin 版の実測を引用するのみ）。<strong>H2 の導入（依存の追加）は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>。<strong><code>ProjectionLock</code> と <code>ChangeNotifier</code> は、H2 版と PostgreSQL 版が同じ型</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。H5 の案）。<strong>H2 版の <code>ProjectionLock</code> は、Kotlin 版の <code>LocalProjectionLock</code> と同じ構造</strong>（<code>StampedLock</code> 系の <code>Fiber</code> から安全な部品 + 待ちの上限 + トランザクション終了後の後始末。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）。<code>ReentrantReadWriteLock</code> は所有スレッド固有で、<code>Fiber</code> が別のスレッドで再開しうるため採らない（JDK の仕様の知識。未実行）。cats-effect の <code>Semaphore</code> を <code>ConnectionIO</code> へ持ち上げる案は、持ち上げ方が未確認の代替。実測は未実施で、B1 の最初に確かめる。</li>
 </ul>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
 <table>
@@ -15648,7 +15694,7 @@
 <tr>
 <td style="text-align: left;">17</td>
 <td style="text-align: left;"><code>EventStore.transaction</code> が、ブロックが <code>Left</code> を返したら ROLLBACK する</td>
-<td style="text-align: left;">書き込みの実行は <code>Tx.run</code> だけ。許す <code>.transact(</code> の入口（<code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続）を 1 つのファイルに置き、その外の <code>.transact(</code>・<code>.transact[</code>・<code>xa.trans</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code> を Scalafix の <code>DisableSyntax.regex</code> で禁止する（ST4。N-H3）。AI の案</td>
+<td style="text-align: left;">書き込みの実行は <code>Tx.run</code> だけ。許す <code>.transact(</code> の入口（<code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続）を 1 つのファイルに置き、その外（全 <code>Compile</code> のソースとテスト本体）のメソッド名のパターン（<code>\.transact\b</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code>）を Scalafix の <code>DisableSyntax.regex</code> で禁止する（ST4。N-H3・R-H7・M14）。AI の案</td>
 <td style="text-align: left;">doobie は <code>Left</code> でも COMMIT する（K5）ため、<code>Tx</code> を通さない書き込みの実行を CI で止める。正しい読み取り・再構築のコードを落とさない</td>
 </tr>
 <tr>
@@ -15716,7 +15762,7 @@
 <li><strong>JSON ライブラリ</strong>（ST6）: circe を提案。派生か手書きか。<strong>承認を得る</strong>。</li>
 <li><strong>cucumber-scala</strong>（ST7）: 日本語 Gherkin の実行は確認済み（K14）。残る未決は、別の sbt プロジェクトからの実行と、Gherkin のファイルの共有の配置。</li>
 <li><strong>Testcontainers</strong>: <code>postgres:18.6</code> の起動は確認済み（K12）。残る未決は、<code>testcontainers-scala</code> 0.44.1 が依存する Java 側の版。</li>
-<li><strong>依存の検査の方式</strong>（ST3・ST4）: sbt のタスクか、Scalafix の <code>DisableSyntax.regex</code> か。<code>.transact(</code>・<code>.transact[</code>・<code>xa.trans</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code> の禁止と、許す入口を置く <code>Transactions.scala</code> だけの除外（<code>scalafix:off</code> は使わない）も同じ検査の仕組みで行えるか、<code>Test</code> のソースを対象にするか（K15）。</li>
+<li><strong>依存の検査の方式</strong>（ST3・ST4）: sbt のタスクか、Scalafix の <code>DisableSyntax.regex</code> か。メソッド名のパターン（<code>\.transact\b</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>FC</code>/<code>HC</code> の <code>commit</code>・<code>rollback</code>）の禁止と、許す入口を置く <code>Transactions.scala</code>（と <code>TestTx</code> の 1 ファイル）だけの除外（<code>scalafix:off</code> は使わない。<code>scalafix:off</code> の検出可否も）も同じ検査の仕組みで行えるか、<code>Test</code> のソースを対象にするか（K15）。</li>
 <li><strong>生きたドキュメントの生成方式</strong>（ADR-001 の 018 の置き換え）: Scala 3 の注釈、<code>enum</code> のメタ情報、scaladoc の走査の比較。</li>
 <li><strong>コンテナ</strong>: 実行イメージ、<code>sbt-native-packager</code> の採否、JVM のヒープ（NF-P17 に対応）。</li>
 <li><strong>選定未決（Kotlin 版から継続）</strong>: 変異テストの道具、依存関係の脆弱性検査、Dependabot か Renovate か、生きたドキュメントの公開の道具。</li>
@@ -15758,7 +15804,7 @@
 </tbody>
 </table>
 <h3 id="_15">再レビュー（<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
-<p>ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけです（ST の冒頭の段落）。<strong>N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
+<p>ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2（ST9）の 1 件）です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません（ST の冒頭の段落）。<strong>N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
 <table>
 <thead>
 <tr>
@@ -15810,7 +15856,35 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_16">出典<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<h3 id="_16">再々レビュー（<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件</strong>です。<strong>D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）</strong>です（ST の冒頭の段落に列挙した）。それ以外の直し方は AI の案で、承認を得ていません。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">直した箇所</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">R-H7・M14</td>
+<td style="text-align: left;">ST4 の <code>.transact(</code> の入口の一覧（<code>TestTx</code> を足した。禁止はメソッド名のパターン。落ちるべき範囲は <code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース、テスト本体も落ちる、文字列・コメントは落ちない）、K15 の未確認（<code>scalafix:off</code> の検出可否、<code>Test</code> への適用、文字列・コメントを拾うか）、変更表の 17、未決事項 9</td>
+<td style="text-align: left;">AI の案。未確認は B1</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H5（D4）・R-H6</td>
+<td style="text-align: left;">K10 の未確認（<code>lock_timeout</code> の手順、55P03・40P01・40001 の写像、待ち行列）、K21 の未確認（H2 版の <code>ProjectionLock</code>）、ST9 の確認状況（H2 版は Kotlin 版と同じ構造。<code>ReentrantReadWriteLock</code> は不適）</td>
+<td style="text-align: left;">D4 はユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施</td>
+</tr>
+<tr>
+<td style="text-align: left;">K 番号</td>
+<td style="text-align: left;">K1〜K23 の番号と、他の文書からの参照（K5・K8〜K11・K15・K16・K21）は変えていない。新しい K 番号は足していない（未確認は既存の K10・K15・K21 に足した）</td>
+<td style="text-align: left;">確認した</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_17">出典<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Maven Central の <code>maven-metadata.xml</code>（<code>org.typelevel:cats-core_3</code>、<code>cats-effect_3</code>、<code>co.fs2:fs2-core_3</code>、<code>org.http4s:http4s-ember-server_3</code>・<code>http4s-circe_3</code>、<code>org.tpolecat:doobie-core_3</code>・<code>doobie-postgres_3</code>・<code>doobie-hikari_3</code>、<code>io.circe:circe-core_3</code>、<code>com.zaxxer:HikariCP</code>、<code>org.postgresql:postgresql</code>、<code>org.flywaydb:flyway-core</code>、<code>org.scalameta:munit_3</code>・<code>munit-scalacheck_3</code>・<code>scalafmt-core_2.13</code>・<code>sbt-scalafmt_2.12_1.0</code>、<code>org.typelevel:munit-cats-effect_3</code>・<code>discipline-munit_3</code>・<code>cats-laws_3</code>・<code>log4cats-slf4j_3</code>、<code>org.scalacheck:scalacheck_3</code>、<code>com.dimafeng:testcontainers-scala-*_3</code>、<code>io.cucumber:cucumber-scala_3</code>、<code>ch.qos.logback:logback-classic</code>、<code>org.scala-lang:scala3-compiler_3</code>、<code>org.scala-sbt:sbt</code>、<code>org.wartremover:wartremover_3.7.*</code>・<code>sbt-wartremover_2.12_1.0</code>、<code>ch.epfl.scala:scalafix-cli_2.13.16</code>・<code>sbt-scalafix_2.12_1.0</code>、<code>org.scoverage:sbt-scoverage_2.12_1.0</code>）、2026-11-25</li>
 <li>ローカルの sbt 1.13.1（JetBrains Runtime 25.0.4.1）での断片のコンパイルとテスト、2026-11-25</li>

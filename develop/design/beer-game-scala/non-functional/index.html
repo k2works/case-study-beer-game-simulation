@@ -3877,6 +3877,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#2026-11-25_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再々レビュー（2026-11-25。設計書の再々レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9436,6 +9447,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-scala/design_rereview2_20261125/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書の再々レビュー（2026-11-25）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14586,7 +14632,7 @@
 <h1 id="-scala">非機能要件定義 - ビールゲームシミュレーション（Scala 版）<a class="headerlink" href="#-scala" title="Permanent link">&para;</a></h1>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game-scala の非機能要件を、<strong>測定できる形</strong>で定義します。<strong><code>docs/</code> を正本</strong>とします。実装コードはまだ存在せず、<strong>Scala 版の性能・メモリ・起動時間の実測値はありません</strong>。</p>
-<p><strong>範囲（ユーザーの決定、2026-11-25）</strong>: 実装として約束するのは U1〜U3 です。<strong>U1〜U3 の間は、実際の研修には使いません（検証・事例用）。</strong> 本番・復元・観測の完成と、範囲外（U6）の性能の実測は約束ではありません。</p>
+<p><strong>範囲（ユーザーの決定、2026-11-25）</strong>: 実装として約束するのは U1〜U3 です。<strong>U1〜U3 の間は、実際の研修には使いません（検証・事例用）。</strong> 本番・復元・観測の完成と、範囲外（U6）の性能の実測は約束ではありません。<strong>U1 の約束は、ジョブの本数ではなく検証の範囲</strong>です（D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）: 検証用の CI（<code>check</code>）に加え、統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストの CI 実行を含みます（<a href="../test-strategy/">テスト戦略</a>）。<strong>U1 に入れる US6.1（障害と性能の劣化を検知する）の AC は AC6.1.1（構造化ログ）・AC6.1.2（相関 ID つきの記録）・AC6.1.4（<code>/ready</code>）</strong>です（D2。同上。AC6.1.3 メトリクスと AC6.1.5〜6.1.6 通知は約束の外）。<strong>対応する NF の見立て（AI の案）</strong>: AC6.1.1・6.1.2 は NF-O1・NF-O2、AC6.1.4 は NF-O10 に当たり、これらは U1 の範囲。NF-O3・NF-O4・NF-O5（メトリクス・アラート・ダッシュボード）の完成は約束の外です。</p>
 <p><a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> により、<a href="../../beer-game-kotlin/non-functional/">beer-game-kotlin の非機能要件</a>（84 件。beer-game2 の 69 件 + Kotlin 版で追加した 15 件）を<strong>正本として引き継ぎ</strong>、Scala の言語とツールで変わるものだけを見直しました。<strong>Scala は Kotlin と同じ JVM（JDK 25 を第一候補）で動くため、Rust 版と違い、ウォームアップ・ヒープと GC・起動時間に関する要件は読み替えずに継続</strong>します。</p>
 <ul>
 <li><strong>すべての ID を維持</strong>しました（削除はありません）。要件定義の NFR-01〜NFR-12 は変えません（<a href="../../../requirements/beer-game-ts/requirements_definition/">要件定義</a>）。</li>
@@ -14607,6 +14653,7 @@
 <li><strong>それ以外の要件は、すべて未検証</strong>です。</li>
 <li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、<strong>一覧を直すときは根拠も直します</strong>。</li>
 <li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3（<code>Ignored</code> で止める設計を維持）、H6（カバレッジは行率を算出する案 C を第一）、H7（範囲は U1〜U3 を約束）、H9（NF-P2 は p95 4 秒）に加え、再レビューへの対応の次の 4 件です。<strong>N-H4（検証用の CI の <code>check</code> ジョブ 1 本は U1 の約束に含める。AWS 環境・デプロイ用ワークフロー・ステージングへの自動反映は後回し。自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、N-H6（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、N-H7（止まったゲームでも状態取得の読み取りは返すことを要件にする）、N-H8（U1〜U3 は実際の研修に使わない）</strong>。<strong>これら以外（N-H1・N-H2・N-H3・N-H5 の直し方など）は AI の案で、承認を得ていません</strong>。</li>
+<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、AI が推奨案で決めたものがあります（<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了</strong>）。<strong>D1</strong>=統合テストと <code>@api</code> の受け入れを U1 の約束に含める、<strong>D2</strong>=US6.1 は AC6.1.1・6.1.2・6.1.4、<strong>D3</strong>=失効済みの旧担当者の入れ替えは未失効の旧担当者にだけ <code>CredentialRevoked</code>、<strong>D4</strong>=H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + 後始末）、<strong>D5</strong>=team 規約が beer-game-scala に及ぶかの確認と例外の記録は人の承認の場で行う（M1。AI は <code>project.md</code> を編集しない）。<strong>これら以外はすべて AI の案で、承認を得ていません。</strong></li>
 <li>Kotlin 版の実装の経緯（B3・B6・B15 の実測の注記）は引き継ぎません（Scala 版の値ではないため）。</li>
 </ul>
 <h2 id="slo">品質特性の優先順位と SLO の要約<a class="headerlink" href="#slo" title="Permanent link">&para;</a></h2>
@@ -14703,7 +14750,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-P2</td>
-<td style="text-align: left;">週確定から全ブラウザの表示まで <strong>p95 4 秒以下</strong>。同一の時計（確定した側のブラウザの時刻を基準）で測る。同期投影のため、通知の版以上の状態が取れる。<strong>目標の再定義（2026-11-25 にユーザーが決定。旧: p95 2 秒以下・p99 5 秒以下）</strong>: 現行の画面は SSE を使わず、3 秒間隔のポーリング（<code>PlayPage</code>・<code>LobbyPage</code>・<code>ObservationPage</code> が各 <code>*_POLL_MS = 3000</code>。console にはポーリングがない）で、Scala 版は画面を変えない（SU2・SF1）。2 秒は 3 秒間隔のポーリングでは満たせないため、ポーリングの間隔（3 秒）＋取得の所要に収まる 4 秒に定めた（Rust 版が 2026-11-23 に同じ再定義をした先例と揃える）。<strong>根拠の数値は Rust 版の推定</strong>（GET の実測 + 3 秒間隔からの計算で p95 約 2.86 秒。画面を介した実測ではない。<a href="../../../development/beer-game-rust/nfr_results/">Rust 版の NFR の検証結果</a>）で、<strong>Scala 版の値は実測していない</strong>。<strong>SSE で 2 秒を保つことは、全実装共通の画面の改善として別に扱う</strong>（画面を変えない前提と両立しない。<a href="../ui-design/">UI 設計</a> の #12、<a href="../architecture-frontend/">フロントエンド</a>）。<strong>扱いの補足（M3）</strong>: (1) <strong>旧の「p99 5 秒以下」を外したのは、AI の解釈</strong>（ユーザーの決定は「p95 4 秒」。p99 を持たないことまでは決めていない）。(2) 「全ブラウザ」のうち、<strong>S06（進行役のコンソール）には自動更新が無く、手動の操作でしか更新されないため、ポーリングの測定の対象にならない</strong>。測るのは S05・S04・S07 に限る案（AI の案）。コンソールが自動更新されないことは、全実装共通の画面の課題（<a href="../ui-design/">UI 設計</a> の未決事項 8）。(3) 実測の方法（画面を通すか、GET の実測 + 計算か）は B1 で決める（<a href="../test-strategy/">テスト戦略</a>）。<strong>範囲外（U6）の性能を早めに計測することは約束ではない</strong></td>
+<td style="text-align: left;">週確定から全ブラウザの表示まで <strong>p95 4 秒以下</strong>。同一の時計（確定した側のブラウザの時刻を基準）で測る（<strong>この「同一の時計」は複数端末では成り立たない。B1 では同じ機械の複数タブで測る前提を置く</strong>。L4）。同期投影のため、通知の版以上の状態が取れる。<strong>目標の再定義（2026-11-25 にユーザーが決定。旧: p95 2 秒以下・p99 5 秒以下）</strong>: 現行の画面は SSE を使わず、3 秒間隔のポーリング（<code>PlayPage</code>・<code>LobbyPage</code>・<code>ObservationPage</code> が各 <code>*_POLL_MS = 3000</code>。console にはポーリングがない）で、Scala 版は画面を変えない（SU2・SF1）。2 秒は 3 秒間隔のポーリングでは満たせないため、ポーリングの間隔（3 秒）＋取得の所要に収まる 4 秒に定めた（Rust 版が 2026-11-23 に同じ再定義をした先例と揃える）。<strong>根拠の数値は Rust 版の推定</strong>（GET の実測 + 3 秒間隔からの計算で p95 約 2.86 秒。画面を介した実測ではない。<a href="../../../development/beer-game-rust/nfr_results/">Rust 版の NFR の検証結果</a>）で、<strong>Scala 版の値は実測していない</strong>。<strong>SSE で 2 秒を保つことは、全実装共通の画面の改善として別に扱う</strong>（画面を変えない前提と両立しない。<a href="../ui-design/">UI 設計</a> の #12、<a href="../architecture-frontend/">フロントエンド</a>）。<strong>扱いの補足（M3）</strong>: (1) <strong>旧の「p99 5 秒以下」を外したのは、AI の解釈</strong>（ユーザーの決定は「p95 4 秒」。p99 を持たないことまでは決めていない）。(2) 「全ブラウザ」のうち、<strong>S06（進行役のコンソール）には自動更新が無く、手動の操作でしか更新されないため、ポーリングの測定の対象にならない</strong>。測るのは S05・S07 に限る案（AI の案。<strong>S04 ロビーのポーリングは準備中だけで、週確定の反映の対象ではないので外した</strong>。L4）。コンソールが自動更新されないことは、全実装共通の画面の課題（<a href="../ui-design/">UI 設計</a> の未決事項 8）。(3) 実測の方法（画面を通すか、GET の実測 + 計算か）は B1 で決める（<a href="../test-strategy/">テスト戦略</a>）。<strong>範囲外（U6）の性能を早めに計測することは約束ではない</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P3</td>
@@ -14795,8 +14842,8 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-R9</td>
-<td style="text-align: left;">データベースが使えない場合、受理済みと表示せず、再試行できる失敗と相関 ID を返す（<strong>永続化の失敗は、<code>IO</code> の失敗（例外）を境界で <code>AppFailure.Persistence</code>（<code>Either</code> の左）に写して扱い、例外のまま漏らさない。業務の失敗は <code>Either</code>、<code>IO</code> の失敗は想定外に限る</strong>）。<strong>加えて（N-H7。ユーザーの決定、2026-11-25）: 不正な遷移（<code>Ignored</code>）でゲームが止まっても、状態取得（読み取り。<code>GET /games/{id}/state</code>・<code>GET /sessions/{id}/state</code>）は投影を返す</strong>（書き込みだけが止まる。画面の在庫・受注残・今週の入力を控えて、紙で続けるため。<a href="../operation/">運用要件</a> のパターン 18）。止まったときの 500 には <code>type</code> と相関 ID を付け、書き込みは残さない</td>
-<td style="text-align: left;">障害の注入（<code>ConnectionIO</code>・<code>IO</code> の失敗を返すポートへの差し替え）。止まったストリームのイベント列をフィクスチャにした回帰（修正版で <code>Applied</code> になり操作を再開できる）、<code>Ignored</code> の件数のメトリクス、止まったゲームの読み取り（<a href="../test-strategy/">テスト戦略</a> の NF-R9 の行）</td>
+<td style="text-align: left;">データベースが使えない場合、受理済みと表示せず、再試行できる失敗と相関 ID を返す（<strong>永続化の失敗は、<code>IO</code> の失敗（例外）を境界で <code>AppFailure.Persistence</code>（<code>Either</code> の左）に写して扱い、例外のまま漏らさない。業務の失敗は <code>Either</code>、<code>IO</code> の失敗は想定外に限る</strong>）。<strong>加えて（N-H7。ユーザーの決定、2026-11-25）: 不正な遷移（<code>Ignored</code>）でゲームが止まっても、状態取得（読み取り。メソッドつきの 3 経路: <code>GET /games/{id}/state</code>・<code>GET /sessions/{id}/state</code>・<code>GET /games/{id}/lobby</code>。観察 <code>GET /games/{id}/observation</code> は ADR-001 の U4 で U1〜U3 の範囲外（決定済み）で、U4 で足すときは 4 経路に拡げる。M7）は投影を返す</strong>（書き込みだけが止まる。画面の在庫・受注残・今週の入力を控えて、紙で続けるため。<a href="../operation/">運用要件</a> のパターン 18）。止まったときの 500 には <code>type</code> と相関 ID を付け、書き込みは残さない</td>
+<td style="text-align: left;">障害の注入（<code>ConnectionIO</code>・<code>IO</code> の失敗を返すポートへの差し替え）。止まったストリームのイベント列をフィクスチャにした回帰（修正版で <code>Applied</code> になり操作を再開できる）、<code>Ignored</code> の件数のメトリクス、止まったゲームの読み取り（上の 3 経路。(a) 200、(b) 書き込みが残らない、(c) 他のゲームは通る、(d) メトリクスが出る。<a href="../test-strategy/">テスト戦略</a> の NF-R9 の行と B1 の表）</td>
 <td style="text-align: center;">変更</td>
 </tr>
 </tbody>
@@ -14821,7 +14868,7 @@
 <tr>
 <td style="text-align: left;">NF-SC2</td>
 <td style="text-align: left;"><strong><code>Left</code> の ROLLBACK</strong>: 書き込みを伴うトランザクションは、<code>Left</code>（業務の失敗・追記の競合・再試行の上限）を返す経路で、<strong>書き込み（追記・投影・周辺ストア・冪等記録）を一切残さない</strong>。doobie は <code>Left</code> でも COMMIT するため、すべての書き込みのトランザクションが、<strong><code>Tx.run</code>（案。書き込みの公開の入口をこれだけにし、コマンドの <code>ConnectionIO</code> 全体を 1 回で包む。ロックは <code>ConnectionIO</code> の変換として同じトランザクションの中に入る。N-H2）</strong>を通る</td>
-<td style="text-align: left;"><code>execute</code> の性質（成功は COMMIT だけ、競合の再試行、上限で <code>RetryExhausted</code>、業務の失敗は ROLLBACK して追記しない）のテストと、実 DB で <code>Left</code> の行が残らないこと。<strong>Scalafix の <code>DisableSyntax.regex</code> の 2 方向の検査（案。N-H3）</strong>: 「落ちるべきもの」（<code>application</code>・<code>adapter-persistence</code> に置いた <code>.transact(</code>・<code>.transact[IO](</code>・<code>FC.commit</code>・<code>xa.trans</code>・<code>scalafix:off</code>）で CI が落ち、「落ちてはならないもの」（許可した入口 <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続と、テストの補助の入口）で落ちないこと。テストのソースにも <code>DisableSyntax</code> を適用し、統合テストの準備と検証の SQL は補助の入口を通す。「型の上で作れなくする」とは言わない（文字列のパターンで別名は見逃す）。<strong>これを最初のビルドの受入条件にする</strong>（AI の案で承認を得ていない。<a href="../test-strategy/">テスト戦略</a>）。<strong>止まったゲーム（<code>Ignored</code>）で書き込みが残らず、500 に <code>type</code> と相関 ID が付くことも検査する</strong>（N-H7）</td>
+<td style="text-align: left;"><code>execute</code> の性質（成功は COMMIT だけ、競合の再試行、上限で <code>RetryExhausted</code>、業務の失敗は ROLLBACK して追記しない）のテストと、実 DB で <code>Left</code> の行が残らないこと。<strong>Scalafix の <code>DisableSyntax.regex</code> の 2 方向の検査（案。N-H3・R-H7）</strong>: 「落ちるべきもの」（<strong><code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース</strong>に置いた <code>.transact(</code>・<code>.transact[IO](</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>FC.commit</code>・<code>scalafix:off</code>、<strong>テスト本体の <code>.transact(</code></strong>）で CI が落ち、「落ちてはならないもの」（<code>Transactions.scala</code> の入口 <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>、<code>TestTx</code>、文字列・コメントの中の語）で落ちないこと。<strong>パターンはメソッド名で、変数名に依存しない。受け入れ条件は <a href="../test-strategy/">テスト戦略</a> の 1 つの表を正本とする</strong>。2 方向の検査は、fixture と期待件数のテストとして <code>check</code> に入れる（M14）。テストのソースにも <code>DisableSyntax</code> を適用し、統合テストの準備と検証の SQL は補助の入口を通す。「型の上で作れなくする」とは言わない（文字列のパターンで別名は見逃す）。<strong>これを最初のビルドの受入条件にする</strong>（AI の案で承認を得ていない。<a href="../test-strategy/">テスト戦略</a>）。<strong>止まったゲーム（<code>Ignored</code>）で書き込みが残らず、500 に <code>type</code> と相関 ID が付くことも検査する</strong>（N-H7）</td>
 <td style="text-align: center;">新</td>
 </tr>
 <tr>
@@ -14838,7 +14885,7 @@
 </tr>
 </tbody>
 </table>
-<p>NF-SC1・NF-SC2 は、設計判断 SBD2〜SBD4（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）の前提に依存します。<strong>NF-SC2 の「<code>Left</code> でも COMMIT する」ことと <code>FC.rollback</code> の効果は確認しました</strong>が、<strong><code>Fiber</code> の取消時に doobie が ROLLBACK して接続を返すか、<code>Supervisor</code> の追跡、ember の切断時の挙動は未確認</strong>です。<strong>確認できなければ設計を見直す</strong>ことを、NF-SC1 の受入条件に含めます。待ちの上限とロック・接続の解放時間の数値は、先に置いた案（解放 2 秒以内）を B1 の実測で見直します（測定が必ず合格する形にしない）。</p>
+<p>NF-SC1・NF-SC2 は、設計判断 SBD2〜SBD4（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）の前提に依存します。<strong>NF-SC2 の「<code>Left</code> でも COMMIT する」ことと <code>FC.rollback</code> の効果は確認しました</strong>が、<strong><code>Fiber</code> の取消時に doobie が ROLLBACK して接続を返すか、<code>Supervisor</code> の追跡、ember の切断時の挙動は未確認</strong>です。<strong>確認できなければ設計を見直す</strong>ことを、NF-SC1 の受入条件に含めます。待ちの上限とロック・接続の解放時間の数値は、先に置いた案（解放 2 秒以内）を B1 の実測で見直します（測定が必ず合格する形にしない）。<strong><code>lock_timeout</code> は、ロックを取る間だけ設定する</strong>（NF-R17。取った後に戻すので、COMMIT・ROLLBACK 後の解放の時間とは別の上限）。<strong>H2 版のロックは、Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + <code>Tx.run</code> の COMMIT・ROLLBACK の後の後始末。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）</strong>で、NF-SC1 の (2)（ロックと接続が 2 秒以内に解放される）を H2 版でも確かめる。</p>
 <h3 id="_8">継続する要件（要約）<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -14910,7 +14957,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-R17</td>
-<td style="text-align: left;">追記の競合の自動再試行は上限で止まり、<code>app.retry_exhausted</code>（503 と <code>Retry-After</code>）を返す。再構築の排他ロックの待ちの超過も同じ</td>
+<td style="text-align: left;">追記の競合の自動再試行は上限で止まり、<code>app.retry_exhausted</code>（503 と <code>Retry-After</code>）を返す。再構築の排他ロックの待ちの超過も同じ。<strong>写し方（R-H6。案。中核の設計は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> を正本とする）</strong>: <code>lock_timeout</code> は<strong>ロックを取る間だけ</strong>設定し（取った後に戻す。投影の行のロック待ちには効かせず、平常時に 503 を出さない）、ロック待ちの超過（SQLSTATE 55P03）は <code>Left(RetryExhausted)</code>（503）に写して即返す。デッドロック（40P01）・直列化の失敗（40001）は <code>Tx.run</code> の後に <code>ConcurrencyConflict</code> に写して再試行に戻り、上限まで続けば同じ 503</td>
 </tr>
 </tbody>
 </table>
@@ -15041,7 +15088,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-O7</td>
-<td style="text-align: left;">テストのカバレッジは、<strong>行 80% 以上</strong>（team の規約の floor。CI のゲート）。scoverage は行の指標を持たないため、<strong>XML の各文のソースの行番号と実行回数から行率を算出する</strong>（案 C。ユーザーの決定、2026-11-25。<strong>出せるかは B1 で確かめる</strong>）。<strong>文 85% 以上・分岐 75% 以上（技術スタックの ST4 の暫定値）は、暫定の追加のゲート</strong>とする。<strong><code>domain</code> の文 97% 以上は「目安」（ユーザーの決定、2026-11-25。ゲートにするかは B1 の実測後。プロジェクトごとのしきい値を設定できるか（K16）は未確認で、設定できなければ全体のしきい値だけにする）</strong>。<strong>文の率は行の率の代わりにならない</strong>（9 文の行 1 行だけ実行で文 90%・行 50% になりうる）ため、<strong>行 80% の充足は実測まで主張しない</strong>。行を出せなければ、文の率での代替が行 80% とみなせるかを人が再度決める（STT2）。<strong>出せない間は、CI のカバレッジのジョブを失敗のまま</strong>にする</td>
+<td style="text-align: left;">テストのカバレッジは、<strong>行 80% 以上</strong>（team の規約の floor。CI のゲート）。scoverage は行の指標を持たないため、<strong>XML の各文のソースの行番号と実行回数から行率を算出する</strong>（案 C。ユーザーの決定、2026-11-25。<strong>出せるかは B1 で確かめる</strong>）。<strong>文 85% 以上・分岐 75% 以上（技術スタックの ST4 の暫定値）は、暫定の追加のゲート</strong>とする。<strong><code>domain</code> の文 97% 以上は「目安」（ユーザーの決定、2026-11-25。ゲートにするかは B1 の実測後。プロジェクトごとのしきい値を設定できるか（K16）は未確認で、設定できなければ全体のしきい値だけにする）</strong>。<strong>文の率は行の率の代わりにならない</strong>（9 文の行 1 行だけ実行で文 90%・行 50% になりうる）ため、<strong>行 80% の充足は実測まで主張しない</strong>。行を出せなければ、文の率での代替が行 80% とみなせるかを人が再度決める（STT2）。<strong>出せない間は、CI のカバレッジのジョブを失敗のまま</strong>にする（<strong>ジョブが赤の間はマージが止まるので、算出スクリプトとそのテストは B1 の最初のスライドに置く</strong>。M15。<strong>比較は表示の丸めでなく、有理数か整数の積</strong>で行う: 7999/10000 = 79.99% は、表示が 80.0% になっても失敗）。<strong><code>adapter-persistence</code> の文 90%（層ごとの目標）は DB の統合の合算が前提</strong>で、統合テストが U1 の CI の範囲（D1）に入ることで成り立つ</td>
 <td style="text-align: left;">カバレッジの計測（行率の算出を含む）。<strong>算出スクリプトのテスト</strong>（既知の値のフィクスチャ XML で 79.9% は落ち 80.0% は通る、XML がなければ落ちる、文が 0 件・<code>ignored</code>・複数行にまたがる文の扱い。行は「いずれかの文が実行された行」。<a href="../test-strategy/">テスト戦略</a> の STT2。M7）</td>
 <td style="text-align: center;">変更</td>
 </tr>
@@ -15082,7 +15129,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-O4</td>
-<td style="text-align: left;">アラート（API p95 1 秒超、反映 p95 4 秒超（NF-P2 の再定義に合わせた。Kotlin 版は 2 秒。<strong>Critical 4 秒は SLO と同値で余裕がなく、Warning は平常時の p95（約 3 秒）に近いため実測の後に決める。<a href="../operation/">運用要件</a>。M11</strong>）、重複した週結果・不変条件の違反、再試行の上限超過の増加、削除の恒久的な失敗）</td>
+<td style="text-align: left;">アラート（API p95 1 秒超、反映 p95 4 秒超（NF-P2 の再定義に合わせた。Kotlin 版は 2 秒。<strong>Critical 4 秒は SLO と同値で余裕がなく、Warning は平常時の p95（約 3 秒）に近いため実測の後に決める。<a href="../operation/">運用要件</a>。M11。ユーザーが決めたのは NF-P2（p95 4 秒）だけで、アラートの閾値そのものは AI の案。M5</strong>）、重複した週結果・不変条件の違反、再試行の上限超過の増加、削除の恒久的な失敗）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-O5</td>
@@ -15455,6 +15502,49 @@
 <td style="text-align: left;">M12</td>
 <td style="text-align: left;">SSE に依存する NF-P7・NF-C1・NF-C3・NF-C5 の部分は、画面を通して検証できないため、API 層の検証に移す、または保留と明記</td>
 <td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2026-11-25_2">再々レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_2" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザー本人が選択肢を選んだ決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です。他の直し方はすべて AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">R-H1・R-H2・D1・D2</td>
+<td style="text-align: left;">冒頭の範囲に、U1 の約束は検証の範囲（統合と <code>@api</code> の受け入れを含む）と、US6.1 の AC6.1.1・6.1.2・6.1.4 を追加。NF-O7 に <code>adapter-persistence</code> 90% の統合の合算前提を注記</td>
+<td style="text-align: left;">D1・D2: 指示に基づき AI が推奨案で決めた（確認未了）</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H6・D4</td>
+<td style="text-align: left;">NF-R17 に、<code>lock_timeout</code> をロックを取る間だけ設定、55P03 は <code>RetryExhausted</code>（503）、40P01・40001 は <code>Tx.run</code> の後に <code>ConcurrencyConflict</code>。NF-SC1 の注記に、H2 版のロックと <code>lock_timeout</code></td>
+<td style="text-align: left;">AI の案（D4 は指示に基づき AI が推奨案で決めた。確認未了）</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H7・M14</td>
+<td style="text-align: left;">NF-SC2 の Scalafix の 2 方向を、「<code>Transactions.scala</code> 以外の全 <code>Compile</code>」・テスト本体も落ちる・パターンはメソッド名・fixture のテストに揃えた</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M7</td>
+<td style="text-align: left;">NF-R9 の止まったゲームの読み取りを、メソッドつきの 3 経路（観察は U4）と (a)〜(d) に</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M5・M15・L4</td>
+<td style="text-align: left;">NF-O4 の閾値は案。NF-O7 の丸めとマージ停止。NF-P2 の測定の対象から S04 を外し、同一の時計は同じ機械の複数タブ</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M1・D5</td>
+<td style="text-align: left;">team 規約の及ぶ範囲の確認と例外の記録は人の承認の場で行う</td>
+<td style="text-align: left;">D5: 指示に基づき AI が推奨案で決めた（確認未了）</td>
 </tr>
 </tbody>
 </table>

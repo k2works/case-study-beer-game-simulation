@@ -3651,6 +3651,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#2026-11-25_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再々レビュー（2026-11-25。設計書の再々レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9213,6 +9224,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-scala/design_rereview2_20261125/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書の再々レビュー（2026-11-25）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14400,6 +14446,7 @@
 <li><strong>確認状況の唯一の一覧</strong>は <a href="../tech-stack/#確認状況の一覧">技術スタック</a> です。</li>
 <li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、一覧を直すときは根拠も直します。</li>
 <li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）に加え、再レビューへの対応の次の 4 件です。<strong>N-H4（検証用の CI は U1 の約束に含め、AWS 環境・デプロイ用ワークフローは後回し）、N-H6（<code>domain</code> の文 97% は目安）、N-H7（止まったゲームでも状態取得の読み取りは返すことを要件にする）、N-H8（U1〜U3 は実際の研修に使わない）</strong>。<strong>#12・#15・#16 の記述の直し、画面の改善の受入条件の案を含め、これら以外は AI の案で、承認を得ていません</strong>。</li>
+<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、D1〜D5（統合テストと <code>@api</code> の受け入れを U1 の約束に含める、US6.1 は AC6.1.1・6.1.2・6.1.4、失効済みの旧担当者の入れ替えは未失効にだけ <code>CredentialRevoked</code>、H2 版のロックは Kotlin 版と同じ構造、team 規約の及ぶ範囲の確認は人の承認の場）を AI が推奨案で決めました（<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了</strong>）。画面に関わるのは #15・#16 と未決事項 8 で、依頼文言・受入条件の案はすべて AI の案です。</li>
 <li><strong>確認していないこと</strong>: 画面そのものは、コードを動かして確認していません（Scala 版の実装がまだ無い）。下の影響の表の「検証」はすべて、B1 以降で確かめる計画です。<strong>http4s・circe の既定の応答の形は未確認</strong>です（<a href="../architecture-backend/">バックエンド</a> の未決事項と同じ）。</li>
 <li><strong>UI 設計を複製しない理由</strong>: 画面イメージと遷移を複数の文書に持つと、片方だけが更新されて食い違うため（設計判断 SU1）。</li>
 <li>Kotlin 版の実装の経緯（B5・B15 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
@@ -14506,13 +14553,13 @@
 <td style="text-align: left;">15</td>
 <td style="text-align: left;"><strong>不正な遷移（<code>Ignored</code>）で止まったゲームの見え方</strong>（Kotlin 版との利用者に見える違い）</td>
 <td style="text-align: left;">コマンドの経路で <code>Ignored</code> が出ると、該当ゲームのコマンドが <code>Persistence</code>（500・<code>code: app.internal</code>・<code>type</code> つき・相関 ID）で失敗し続ける。Kotlin 版は記録して続行するため、操作は止まらない。<strong>止める設計の維持は、ユーザーの決定（2026-11-25）</strong>。<strong>状態取得（読み取り）は返す</strong>ことを要件にする（N-H7。ユーザーの決定。B1 の確認項目）</td>
-<td style="text-align: left;"><strong>画面の実際の文言</strong>（<code>api/problems.ts</code>・<code>components/ErrorNotice.tsx</code> を読んで確認）: <code>code: app.internal</code> は辞書の文言「<strong>問題が発生しました。時間をおいて、もう一度お試しください。</strong>」で、その下に「相関 ID: …」が出る（<code>ErrorNotice</code>。相関 ID は本文の <code>correlationId</code> から読む）。<strong>S06 コンソールは <code>extra</code> が付き、「…もう一度お試しください。 最新状態を確認して、再度操作してください。」と出る</strong>（<code>ConsolePage.tsx</code> 291 行）。「サーバーで問題が発生しました。…」は、<code>app.internal</code> 以外の 5xx の一般の文言（<code>fallbackText</code>）で、<code>app.internal</code> には使われない（旧版の記述の誤り）。<strong>画面は再操作を促すが、この状態では再操作しても同じ失敗になる</strong>（<code>type</code> つきの 500 は自動再送されない）。<strong>依頼文言（<a href="../operation/">運用要件</a> パターン 18。「操作を繰り返さず、画面の相関 ID を運営者に伝える」）と、画面の案内（「もう一度お試しください」）がかみ合わない</strong>。進行役への依頼文言が、画面の案内に勝つことを、運営者との合意に入れる。<strong>ポーリングの画面（S05 プレイ・S07 観察）は、止まったことに気づけない</strong>: <code>Ignored</code> はコマンドの経路でだけ起き、GET は成功し続け、ポーリングの失敗は無言のため、気づくのは<strong>次に操作した人だけ</strong>。<strong>画面の改善（未決事項 8）の受入条件の案: 「<code>app.internal</code> が同じゲームで続くとき、再操作を促す文言を出さない」</strong>（承認を得ていない案）</td>
+<td style="text-align: left;"><strong>画面の実際の文言</strong>（<code>api/problems.ts</code>・<code>components/ErrorNotice.tsx</code> を読んで確認）: <code>code: app.internal</code> は辞書の文言「<strong>問題が発生しました。時間をおいて、もう一度お試しください。</strong>」で、その下に「相関 ID: …」が出る（<code>ErrorNotice</code>。相関 ID は本文の <code>correlationId</code> から読む）。<strong>S06 コンソールは <code>extra</code> が付き、「…もう一度お試しください。 最新状態を確認して、再度操作してください。」と出る</strong>（<code>ConsolePage.tsx</code> 291 行）。「サーバーで問題が発生しました。…」は、<code>app.internal</code> 以外の 5xx の一般の文言（<code>fallbackText</code>）で、<code>app.internal</code> には使われない（旧版の記述の誤り）。<strong>画面は再操作を促すが、この状態では再操作しても同じ失敗になる</strong>（<code>type</code> つきの 500 は自動再送されない）。<strong>依頼文言（<a href="../operation/">運用要件</a> パターン 18 が正本。「同じ操作が 2 回続けて失敗したら、それ以上操作せず、相関 ID を書き写して運営者に伝える」）と、画面の案内（「もう一度お試しください」）がかみ合わない</strong>。進行役への依頼文言が、画面の案内に勝つことを、運営者との合意に入れる。<strong>パターン 17（ROLLBACK の漏れ・取り残し）とパターン 18（<code>Ignored</code> で止まった）は、画面では同じ</strong>（どちらも 500・<code>type</code> つき・<code>app.internal</code>・相関 ID）で、<strong>利用者にも進行役にも見分けがつかない</strong>。判別は運営者側の監視（<code>Ignored</code> のメトリクス、<code>idle in transaction</code>）だけで行う（R-H8）。<strong>相関 ID が出るのは、操作した人のタブだけ</strong>で、進行役の画面に出るとは限らない。<strong>相関 ID は、<code>PlayPage.tsx</code> の <code>refresh</code>（手動更新ボタン。先頭の 90 行の <code>setFailure(null)</code>）を押した時点で消える</strong>（失敗の表示は成功を待たずに消える）。次の保存の開始（166 行）でも消える。<strong>だから依頼文言は「まず相関 ID を書き写す（または画面を撮る）。そのあと手動更新を押してよい」の順にする</strong>（<code>PlayPage.tsx</code> の 90・166 行を読んで確認。S06 コンソールには手動更新が無く、ブラウザの再読み込みで消える）。<strong>ポーリングの画面（S05 プレイ・S07 観察）は、止まったことに気づけない</strong>: <code>Ignored</code> はコマンドの経路でだけ起き、GET は成功し続け、ポーリングの失敗は無言のため、気づくのは<strong>次に操作した人だけ</strong>。<strong>画面の改善（未決事項 8）の受入条件の案は、未決事項 8 の Given/When/Then</strong>（承認を得ていない案）</td>
 </tr>
 <tr>
 <td style="text-align: left;">16</td>
 <td style="text-align: left;"><strong>範囲外の画面（U1〜U3 では API が無い）</strong>: 最終週の後の「<strong>振り返りを見る</strong>」リンクと、S08 振り返り・S09 保持状態・結果の出力。<strong>U1〜U3 の間は実際の研修に使わない</strong>（N-H8。ユーザーの決定）</td>
 <td style="text-align: left;">最終週の後、S05 プレイ（<code>PlayPage.tsx</code> 299 行）と S06 コンソール（<code>ConsolePage.tsx</code> 396 行）が <code>/games/{id}/review</code> へのリンクを出す。S08 は <code>GET /games/{id}/review</code>（<code>api/client.ts</code> 222 行）を呼ぶ。S06 は「保持状態を見る」リンクも常に出し（S09 は <code>GET /games/{id}/retention</code>）、S08 の出力のボタンは <code>GET /games/{id}/exports</code> を呼ぶ。<strong>U1〜U3 には、この API が無い</strong>（U4〜U6 の範囲）</td>
-<td style="text-align: left;"><strong>openapi の <code>getReview</code>・<code>getRetention</code>・<code>getExport</code> が返しうる状態は、200・403・409（<code>game.not_ended</code>・review と export）・422（export の <code>format</code>）・429・500</strong>（<code>openapi.yaml</code> の該当操作を読んで確認）。<strong>U1〜U3 の実装では、これらの経路が http4s の「経路なし」になる</strong>。<strong>この応答の形は未確認</strong>（#1。<code>request.not_found</code>（404）に写せば、S08 は <code>ErrorNotice</code> で辞書の値が <code>null</code> のため一般の文言「処理できませんでした。」と相関 ID を示す。写せなければ JSON でない 404 で、同じ文言になる見込み。いずれも<strong>画面では未確認</strong>）。S08（<code>ReviewPage.tsx</code>）は、<code>game.not_ended</code> だけ別の文言（「ゲームが終了するまで、振り返りは開けません。」）で示し、それ以外は <code>ErrorNotice</code>。S09（<code>RetentionPage.tsx</code>）は <code>ErrorNotice</code>。振り返りの見出しの近くの削除予定日の注記（<code>RetentionNotice</code>）は、取得に失敗したら<strong>何も示さない</strong>。結果の出力のボタン（<code>ExportButtons</code>）は <code>ErrorNotice</code>。<strong>観察（S07。<code>GET /games/{id}/observation</code>）は、U1〜U3 で実装するかを範囲の表で決める</strong>。実装しない場合は、<code>ObservationPage</code> が <code>ErrorNotice</code> を示し、403 のとき以外は参加の導線を出さない（403 のときだけ「観察者として参加する」のリンクが出る）。<strong>U1〜U3 の画面の確認は、最終週の後の画面に進まない範囲で行い、進んだときの見え方は上のとおり「使わない」ことを前提にする</strong>（U1〜U3 の約束の範囲は、ADR-001 と index が正本）</td>
+<td style="text-align: left;"><strong>openapi の <code>getReview</code>・<code>getRetention</code>・<code>getExport</code> が返しうる状態は、200・403・409（<code>game.not_ended</code>・review と export）・422（export の <code>format</code>）・429・500</strong>（<code>openapi.yaml</code> の該当操作を読んで確認）。<strong>U1〜U3 の実装では、これらの経路が http4s の「経路なし」になる</strong>。<strong>この応答の形は未確認</strong>（#1。<code>request.not_found</code>（404）に写せば、S08 は <code>ErrorNotice</code> で辞書の値が <code>null</code> のため一般の文言「処理できませんでした。」と相関 ID を示す。写せなければ JSON でない 404 で、同じ文言になる見込み。いずれも<strong>画面では未確認</strong>）。S08（<code>ReviewPage.tsx</code>）は、<code>game.not_ended</code> だけ別の文言（「ゲームが終了するまで、振り返りは開けません。」）で示し、それ以外は <code>ErrorNotice</code>。S09（<code>RetentionPage.tsx</code>）は <code>ErrorNotice</code>。振り返りの見出しの近くの削除予定日の注記（<code>RetentionNotice</code>）は、取得に失敗したら<strong>何も示さない</strong>。結果の出力のボタン（<code>ExportButtons</code>）は <code>ErrorNotice</code>。<strong>観察（S07。<code>GET /games/{id}/observation</code>）は、ADR-001 の U4（学習ビュー。観察者・振り返り・出力）で、U1〜U3 の範囲外（決定済み。M6）</strong>。<strong>導線は次のとおり漏れなく範囲外の画面へ出る</strong>（実際のソースを読んで確認）: (1) 観察（S07）も、終了後に「<strong>振り返りを見る</strong>」を出す（<code>ObservationPage.tsx</code> 156〜160 行）。(2) 「<strong>保持状態を見る</strong>」は、最終週の後ではなく、<strong>開始後の S06 コンソールに常に出る</strong>（<code>ConsolePage.tsx</code> 391〜393 行。S09 は <code>GET /games/{id}/retention</code>）。(3) <strong>S04 ロビーの観察者の招待パネル</strong>（<code>InvitationsPanel</code>。<code>LobbyPage.tsx</code> 200 行。常に出る。準備中の導線）と <strong>S10 <code>/observe</code></strong>（観察者の参加）は、観察者を U4 とするため、<strong>範囲外の API（<code>inviteObserver</code>・<code>joinAsObserver</code>、<code>getObservation</code>）を呼ぶ</strong>。実装しない間は、<code>ObservationPage</code> が <code>ErrorNotice</code> を示し、403 のときだけ「観察者として参加する」のリンクが出る。(4) <strong><code>ExportButtons</code> は、振り返りの取得に成功したときだけ描かれる</strong>（<code>ReviewPage.tsx</code> 176 行）ので、U1〜U3 では描かれず、<strong>画面に見える失敗は S08 と S09 の 2 つだけ</strong>（出力のボタンの失敗は見えない）。(5) <strong>範囲外の画面は行き止まり</strong>: S08（<code>ReviewPage.tsx</code>）と S09（<code>RetentionPage.tsx</code>）のエラーの表示は、見出しと <code>ErrorNotice</code> だけで、<strong>戻る導線がない</strong>（ブラウザの戻るで戻る）。(6) <strong>JSON でない 404 では相関 ID が出ない</strong>: <code>ErrorNotice</code> は本文の <code>correlationId</code> だけを示す（<code>ErrorNotice.tsx</code> 29 行）。<code>request.not_found</code>（problem+json）に写せば相関 ID が出る。写すかは契約テストの「ルートの網羅」と同じ箇所で決める（<a href="../test-strategy/">テスト戦略</a>。案 (a) 写す、(b) 既定のまま）。<strong>U1〜U3 の画面の確認は、最終週の後の画面に進まない範囲で行い、進んだときの見え方は上のとおり「使わない」ことを前提にする</strong>（U1〜U3 の約束の範囲は、ADR-001 と index が正本）</td>
 </tr>
 </tbody>
 </table>
@@ -14673,6 +14720,39 @@
 </tr>
 </tbody>
 </table>
+<h3 id="2026-11-25_2">再々レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_2" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザー本人が選択肢を選んだ決定は、前回までの 8 件とローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です。他の直し方はすべて AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">R-H8</td>
+<td style="text-align: left;">#15 に、パターン 17 と 18 が画面では同じ（見分けは運営者側の監視だけ）、相関 ID が操作した人のタブにだけ出て手動更新・次の保存で消える（<code>PlayPage.tsx</code> 90・166 行を読んで確認）ことを書いた。依頼文言の形は「同じ操作が 2 回続けて失敗したら、それ以上操作せず、相関 ID を書き写して運営者に伝える」（正本は operation.md のパターン 18）。未決事項 8 の受入条件の案 (a) を Given/When/Then に書き直した</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H10</td>
+<td style="text-align: left;">#15 の画面文言は、B1 の確認項目 (e) が参照する正本のまま（<code>app.internal</code> の実物の文言。コンソールは <code>extra</code> つき）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M6・L5</td>
+<td style="text-align: left;">#16 の導線を完全に（観察 S07 の「振り返りを見る」、開始後のコンソールの「保持状態を見る」、S04 の招待パネルと S10、<code>ExportButtons</code> が描かれず見える失敗は S08・S09 の 2 つ、範囲外の画面は行き止まり、JSON でない 404 では相関 ID が出ない）。観察は ADR-001 の U4 で範囲外（決定済み）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H9・M8・M11</td>
+<td style="text-align: left;">8c の 1 枚の案内に、予備の参加者・代理入力・長く止めない・控える数字を追加。「入荷予定」は画面に項目が無く結果表から復元することを書いた（<code>ConsolePage.tsx</code>・<code>ResultsTable.tsx</code>・<code>StatusTable.tsx</code> を読んで確認）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_7">未決事項<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>SU1・SU2 の承認</strong>。</li>
@@ -14682,12 +14762,21 @@
 <li><strong>circe による誤りの集約</strong>（#13）: 型の誤りも含めて集められるか。集められない場合の扱い。</li>
 <li><strong>SSE の API と、遅い購読者の扱い</strong>（#5）。</li>
 <li><strong>数値の型の範囲</strong>（#10）: 契約に整数の範囲を書くか。</li>
-<li><strong>ポーリングの失敗が黙って無視される</strong>（#12。S05・S07。S04 は 403 だけ表示）: Kotlin 版・Rust 版と共通の課題。<strong>数回続けて失敗したら、最終更新の時刻と「接続を確認しています」を示す</strong>ことを、全実装共通の画面の課題として優先度を上げ、ストーリー化する案（M16。承認を得ていない）。画面側の対応は、Kotlin 版の UI 設計と合わせて決める。<code>Ignored</code> で止まったゲームの知らせ方（#15）も同じ枠で扱う。<strong>受入条件の案（承認を得ていない）</strong>: (a) 「<code>app.internal</code> が同じゲームで続くとき、再操作を促す文言（「もう一度お試しください」「再度操作してください」）を出さない」、(b) その状態で、「操作を繰り返さず、相関 ID を運営者に伝えてください」と案内する、(c) S06 コンソールが自動更新（または手動更新のボタン）を持つ（コンソールが自動更新されないことは、全実装共通の画面の課題）。
+<li><strong>ポーリングの失敗が黙って無視される</strong>（#12。S05・S07。S04 は 403 だけ表示）: Kotlin 版・Rust 版と共通の課題。<strong>数回続けて失敗したら、最終更新の時刻と「接続を確認しています」を示す</strong>ことを、全実装共通の画面の課題として優先度を上げ、ストーリー化する案（M16。承認を得ていない）。画面側の対応は、Kotlin 版の UI 設計と合わせて決める。<code>Ignored</code> で止まったゲームの知らせ方（#15）も同じ枠で扱う。<strong>受入条件の案（承認を得ていない。R-H8）</strong>:</li>
+</ol>
+<p>(a) <strong>「続くとき」の判定は、同じタブで同じゲームへの操作が <code>app.internal</code> で 2 回続けて失敗したとき</strong>（画面は、パターン 17 と 18 を見分けられないため、1 回目では再操作を促し、2 回目で止める）。Given/When/Then で書くと次のとおり。</p>
+<div class="highlight"><pre><span></span><code><span class="k">シナリオ:</span><span class="nf"> 同じ操作が 2 回続けて app.internal で失敗したら、再操作を促さず運営者への連絡を促す</span>
+<span class="k">  前提</span><span class="nf"> 参加者が S</span><span class="s">05</span><span class="nf"> で、同じゲームへの保存が app.internal（</span><span class="s">500</span><span class="nf">・相関 ID つき）で </span><span class="s">1</span><span class="nf"> 回失敗した状態である</span>
+<span class="nf">  </span><span class="k">もし</span><span class="nf"> 同じタブで、もう一度同じ操作が app.internal で失敗する</span>
+<span class="nf">  </span><span class="k">ならば</span><span class="nf"> 画面は「もう一度お試しください」「再度操作してください」を出さない</span>
+<span class="nf">  </span><span class="k">かつ</span><span class="nf"> 「操作を繰り返さず、相関 ID を運営者に伝えてください。」と相関 ID を示す</span>
+<span class="nf">  </span><span class="k">かつ</span><span class="nf"> 相関 ID は、まず書き写せるよう、手動更新を押しても消えない</span>
+</code></pre></div>
+<p>(b) 相関 ID は、<strong>操作した人のタブにだけ出る</strong>（他の参加者・進行役の画面には出ない）。(c) 手動更新の成功で消える（<code>PlayPage.tsx</code> の <code>refresh</code> の先頭 90 行の <code>setFailure(null)</code> は現状、押した時点で消える。(a) の最後の「消えない」は現状の挙動と逆で、<strong>画面の変更が要る</strong>）。(d) S06 コンソールが自動更新（または手動更新のボタン）を持つ（コンソールが自動更新されないことは、全実装共通の画面の課題）。<strong>画面を変えない前提（SU2）の間は、この条件は満たせず、依頼文言（<a href="../operation/">運用要件</a> パターン 18。「まず書き写す、そのあと手動更新」）で補う</strong>。
 8a. <strong>SSE で 2 秒を保つ画面の改善</strong>（#12）: 全実装共通の別の課題として扱う。Scala 版だけでは決めない。
 8b. <strong>ゲーム作成の二重送信</strong>（#11。L7）: ゲーム作成は <code>If-Match</code> で守られないため、結果が不明のとき、同じキーの自動再送と、利用者の再操作（新しいキー）で、ゲームが 2 つできうる。Kotlin 版と共通の課題として、未決のまま残す。
-8c. <strong>進行役向けの 1 枚の案内</strong>（L11。beer-game2 から一貫して欠けている）: 「研修中にシステムが止まったら・人が入れ替わったら」を 1 枚にまとめる案。内容の案は <a href="../operation/">運用要件</a> の未決事項 3b。ポーリング失敗の無言（未決事項 8）と合わせてストーリー化する（承認を得ていない案）。</li>
-<li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 手動のアクセシビリティの確認の担当者と時期、保持の表示（暫定。M5）、自動確定の本人へのフィードバックの文言、参加者のロビーの扱い、ヘルプの教材の本文の人による確認。いずれも <a href="../../beer-game-kotlin/ui-design/">Kotlin 版の未決事項</a> に追従する。</li>
-</ol>
+8c. <strong>進行役向けの 1 枚の案内</strong>（L11。beer-game2 から一貫して欠けている）: 「研修中にシステムが止まったら・人が入れ替わったら」を 1 枚にまとめる案。内容の案は <a href="../operation/">運用要件</a> の未決事項 3b。ポーリング失敗の無言（未決事項 8）と合わせてストーリー化する（承認を得ていない案）。<strong>1 枚に入れる項目（M11・M8。案）</strong>: (i) 準備中に、<strong>予備の参加者を参加させておく</strong>（開始後の参加は受け付けない）、(ii) 予備がいない場合は、<strong>残りを進行役の代理入力で続けられる</strong>、(iii) 研修 1 回が 90〜120 分（運営者の想定。出典は要確認）で、長く止まると場が冷えるので<strong>止まったら早めに紙に切り替えてよい</strong>、(iv) 止まったときは、同じ操作が 2 回続けて失敗したら操作を繰り返さず、<strong>まず相関 ID を書き写し</strong>（そのあと手動更新）、運営者に伝える、(v) 参加者に伝える、控える数字（S05 の在庫・受注残・入荷・受注と、保存済みの現在の入力と未保存の <code>draft</code>。進行役は S06 を再読み込みして結果表を撮る）。<strong>「入荷予定」と「上流へ送って未着の発注」は、画面に項目が無く、結果表の出荷・発注から復元する</strong>（<a href="../operation/">運用要件</a> のパターン 18）。画面に「入荷予定」を出すかは、全実装共通の画面の課題。
+9. <strong>Kotlin 版の未決事項の引き継ぎ</strong>: 手動のアクセシビリティの確認の担当者と時期、保持の表示（暫定。M5）、自動確定の本人へのフィードバックの文言、参加者のロビーの扱い、ヘルプの教材の本文の人による確認。いずれも <a href="../../beer-game-kotlin/ui-design/">Kotlin 版の未決事項</a> に追従する。</p>
 <h2 id="_8">出典<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../beer-game-kotlin/ui-design/">UI 設計（beer-game-kotlin）</a>、<a href="../../beer-game-rust/ui-design/">UI 設計（Rust 版）</a>、<a href="../../beer-game-ts/ui-design/">beer-game2 の UI 設計</a></li>

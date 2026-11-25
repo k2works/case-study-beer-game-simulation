@@ -4019,6 +4019,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#2026-11-25_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再々レビュー（2026-11-25。設計書の再々レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -9546,6 +9557,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-scala/design_rereview2_20261125/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書の再々レビュー（2026-11-25）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14696,7 +14742,7 @@
 <h1 id="-scala">テスト戦略 - ビールゲームシミュレーション（Scala 版）<a class="headerlink" href="#-scala" title="Permanent link">&para;</a></h1>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game-scala のテスト戦略を定義します。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の決定により、<strong>受入条件は beer-game2、テストの構造は <a href="../../beer-game-kotlin/test-strategy/">beer-game-kotlin のテスト戦略</a>、実装規約は <a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Scala%E7%B7%A8/">関数型プログラミングガイド（Scala 編）</a>（以下「ガイド」。テストは第 8 章、静的解析は第 9 章）を正本</strong>として引き継ぎ、本書は Scala での実現方法と、Scala で変わる点だけを定めます。<strong><code>docs/</code> を設計の正本</strong>とします。実装コードはまだ存在しません（アプリの置き場は <code>apps/beer-game-scala</code> を予定）。</p>
-<p><strong>範囲の約束（ユーザーの決定、2026-11-25）</strong>: 実装として約束するのは U1〜U3 です。<strong>U1〜U3 の間は、実際の研修には使いません（検証・事例用）。</strong> 検証用の CI（<code>check</code> ジョブ 1 本）は U1 に含め、AWS 環境・デプロイ用のワークフロー・本番運用・復元訓練は後回し（U5）です（下の「CI との連携」）。</p>
+<p><strong>範囲の約束（ユーザーの決定、2026-11-25）</strong>: 実装として約束するのは U1〜U3 です。<strong>U1〜U3 の間は、実際の研修には使いません（検証・事例用）。</strong> 検証用の CI（<code>check</code> ジョブ 1 本）は U1 に含め、AWS 環境・デプロイ用のワークフロー・本番運用・復元訓練は後回し（再開するときに Unit を決める。Unit 定義ではステージングは U1 の US6.2 にあり、U5 への付け替えは AI の整理。L2）です（下の「CI との連携」）。<strong>U1 の約束は、ジョブの本数ではなく検証の範囲です</strong>（D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）: 統合テスト（PostgreSQL 18、testcontainers-scala）と <code>@api</code> の受け入れテストを CI で実行することを、U1 の約束に含めます。<strong>U1 に入れる US6.1（障害と性能の劣化を検知する）の AC は AC6.1.1（構造化ログ）・AC6.1.2（相関 ID つきの記録）・AC6.1.4（<code>/ready</code>）</strong>です（D2。同上。AC6.1.3 メトリクスと AC6.1.5・6.1.6 通知は約束の外）。CI の <code>check</code> ジョブは、US の受入条件ではなく範囲の決定（N-H4）です。</p>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>本書で確認したこと</strong>（2026-11-25。リポジトリの外の使い捨てのプロジェクトで、sbt 1.13.1、Scala 3.7.4、JetBrains Runtime 25.0.4.1、ローカルの Docker の <code>postgres:18.6</code> を使用。下の表）。</li>
@@ -14705,6 +14751,7 @@
 <li>Kotlin 版の実装の経緯（B1〜B15 の結果の記述）は引き継ぎません。H2 に関する記述は、ST9（ユーザーの決定、2026-11-25）に従って読み替えて引き継ぎますが、<strong>Scala 版では H2 を実測していません</strong>。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
 <li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と、本書の「確認した事項」1〜11）で、<strong>一覧を直すときは根拠も直します</strong>。</li>
 <li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは、H3（不正な遷移 <code>Ignored</code> は止める設計を維持）、H6（カバレッジは行率を算出する案 C を第一）、H7（範囲は U1〜U3 を約束し U4〜U6 は指標を見て決める）、H9（NF-P2 は p95 4 秒）に加え、再レビュー（2026-11-25）への対応の次の 4 件です。<strong>N-H4（検証用の CI の <code>check</code> ジョブ 1 本は U1 の約束に含める。AWS 環境・デプロイ用ワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、N-H6（<code>domain</code> の文 97% は目安。ゲートにするかは B1 の実測後）、N-H7（止まったゲームでも状態取得の読み取りは返すことを要件にする）、N-H8（U1〜U3 の間は実際の研修に使わない）</strong>。<strong>これら以外（N-H1・N-H2・N-H3・N-H5 の直し方など）は AI の案で、承認を得ていません</strong>。本書の N-H1（許す組の表）・N-H2・N-H3 の記述は案です。</li>
+<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、AI が推奨案で決めたものがあります（<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了</strong>）。<strong>D1</strong>=統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れテストを U1 の約束に含める（R-H2 案 (a)）、<strong>D2</strong>=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（R-H1）、<strong>D3</strong>=失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す（R-H3 案 (a)）、<strong>D4</strong>=H2 版の <code>ProjectionLock</code> は Kotlin 版と同じ構造（<code>StampedLock</code> 系 + 待ちの上限 + トランザクション終了後の後始末。R-H5）、<strong>D5</strong>=team 規約が beer-game-scala に及ぶかの確認と、例外の project.md <code>## Scope Overrides</code> への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）。<strong>これら以外の直し方はすべて AI の案で、承認を得ていません。</strong></li>
 </ul>
 <table>
 <thead>
@@ -14914,7 +14961,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">(b) ポートの契約テストを両実装で実行</td>
-<td style="text-align: left;">ポートの型は、H2 版にも合う形にする（<strong>案。H5・N-H2。AI の案で承認を得ていない。B1 の最初に実測して確定する</strong>）。<code>ProjectionLock</code> は <strong><code>ConnectionIO</code> の変換 <code>withShared(gameId)(program)</code></strong>（PostgreSQL 版は先頭で <code>pg_advisory_xact_lock_shared</code> を発行して同じトランザクションの中で保持し、COMMIT で自動解放する。H2 版はプロセス内の読み書きロックを <code>bracket</code> で取る）。接続は 1 本のままで、接続数の見積もりは増えない。<code>Resource</code> 案は不採用（コマンドごとに接続が 2 本要るため）。<code>ChangeNotifier</code> は<strong>トランザクション内で集め、<code>Tx.run</code> の後に <code>IO</code> で配信</strong>する（PostgreSQL 版は中で <code>pg_notify</code>）。同じ契約テストを、<strong>PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト</strong>で実行し、テスト用のインメモリ実装にも流す。H2 版で保証する範囲は、契約を満たす範囲のすべて</td>
+<td style="text-align: left;">ポートの型は、H2 版にも合う形にする（<strong>案。H5・N-H2。AI の案で承認を得ていない。B1 の最初に実測して確定する</strong>）。<code>ProjectionLock</code> は <strong><code>ConnectionIO</code> の変換 <code>withShared(gameId)(program)</code></strong>（PostgreSQL 版は先頭で <code>pg_advisory_xact_lock_shared</code> を発行して同じトランザクションの中で保持し、COMMIT で自動解放する。<strong>H2 版は Kotlin 版と同じ構造（D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了。R-H5）</strong>: <code>StampedLock</code> 系の部品（取得と解放のスレッドが違ってよい。<code>Fiber</code> は別スレッドで再開しうるため、所有スレッド固有の <code>ReentrantReadWriteLock</code> は使わない）に、<strong>待ちの上限</strong>（超えたら <code>RetryExhausted</code>）を置き、解放は <strong><code>Tx.run</code> が COMMIT・ROLLBACK の後に <code>guaranteeCase</code> で行う後始末</strong>に登録する（COMMIT の前に解放しない。詳細は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> を正本とする）。接続は 1 本のままで、接続数の見積もりは増えない。<code>Resource</code> 案は不採用（コマンドごとに接続が 2 本要るため）。<code>ChangeNotifier</code> は<strong>トランザクション内で集め、<code>Tx.run</code> の後に <code>IO</code> で配信</strong>する（PostgreSQL 版は中で <code>pg_notify</code>）。同じ契約テストを、<strong>PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト</strong>で実行し、テスト用のインメモリ実装にも流す。H2 版で保証する範囲は、契約を満たす範囲のすべて（<strong>COMMIT の後まで直列化する条項は、H2 版も <code>Tx.run</code> の後始末を通して検証する。ロックの取得と解放が別スレッドになる場合を含める</strong>）。通知の出所と契約の分類（(T)(N)）は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> を正本とし、本書は写し（食い違えばバックエンドに従う。M13）</td>
 </tr>
 <tr>
 <td style="text-align: left;">(b-2) 契約の条項を分けて列挙する</td>
@@ -15024,11 +15071,11 @@
 </tr>
 <tr>
 <td style="text-align: left;"><strong>許す組の表（N-H1。案。承認を得ていない）</strong></td>
-<td style="text-align: left;"><strong>EV-G01〜G12・EV-S01〜S10 × 状態の「許す組の表」を規範</strong>にする（正本は <a href="../domain-model/">ドメインモデル</a>。<code>Started</code> の自己遷移を、状態遷移図と Kotlin 版の表に揃える。<code>Started</code> で受けるのは <code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code>・<code>ObserverInvited</code>・<code>ObserverJoined</code> など。未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>）。<strong>状態遷移テスト</strong>は、この表から機械的に作る: 許す組（イベント × 状態）はすべて <code>Applied</code>、それ以外の組はすべて <code>Ignored</code> で、状態が変わらないことを確かめる。<strong>スケッチ（<code>Events.apply</code> の <code>match</code>）を基準にして表を作らない</strong>（スケッチの漏れを見逃すため。再レビューの N-H1）。止める設計では、許す組の漏れがそのまま研修の停止（P1）になるため、この表と状態遷移テストが安全性の中心になる</td>
+<td style="text-align: left;"><strong>EV-G01〜G12・EV-S01〜S10 × 状態の「許す組の表」を規範</strong>にする（正本は <a href="../domain-model/">ドメインモデル</a>。<code>Started</code> の自己遷移を、状態遷移図と Kotlin 版の表に揃える。<code>Started</code> で受けるのは <code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code>・<code>ObserverInvited</code>・<code>ObserverJoined</code> など。未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>。<strong>表の行の列数（session は <code>Ended</code> を含む 7 列）、Kotlin 版の条件（例: <code>invited</code> は既知の招待で変えない、<code>revoked</code> は未知の主体と失効済みで変えない、<code>reissued</code> は失効していない資格で変えない、<code>recovered</code> は失効済みで変えない、<code>withRole</code> は未知の参加者で変えない）、EV-S04 の <code>Paused</code> の扱い（Kotlin 版の <code>EndReason</code> は <code>FINAL_WEEK</code> だけ）は、<a href="../domain-model/">ドメインモデル</a> の表を正本とする。</strong> <strong>D3（ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）: 失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ <code>CredentialRevoked</code> を出す</strong>ので、「失効 → 入れ替え」の自然な流れが <code>Ignored</code> にならない）。<strong>状態遷移テスト</strong>は、この表から機械的に作る<strong>（(c)。次の「3 方向」）</strong>: 許す組（イベント × 状態）はすべて <code>Applied</code>、それ以外の組はすべて <code>Ignored</code> で、状態が変わらないことを確かめる。<strong>ただし、表から作るテストは、表と <code>apply</code> が一致することしか確かめない</strong>（表自体の漏れ、つまり P1 の本当の原因を見逃す）ので、<strong>コマンドから作る生成器 (a) と、表の ○ の出現の検査 (b) を併せて置く</strong>（下の「プロパティベーステスト」の 3 方向。R-H4）。<strong>スケッチ（<code>Events.apply</code> の <code>match</code>）を基準にして表を作らない</strong>（スケッチの漏れを見逃すため。再レビューの N-H1）。止める設計では、許す組の漏れがそのまま研修の停止（P1）になるため、この表と状態遷移テストが安全性の中心になる</td>
 </tr>
 <tr>
 <td style="text-align: left;">開始後の入れ替え・復帰（H2・N-H1。案）</td>
-<td style="text-align: left;"><code>Started</code> で入れ替え（<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>・<code>RoleHolderReplaced</code>）、開始後の復帰（<code>ParticipationRecovered</code>。US3.2、U2 の約束）、資格の再発行（<code>CredentialReissued</code>）、観察者の招待（<code>ObserverInvited</code>・<code>ObserverJoined</code>）を<strong>自己遷移として受ける</strong>（<code>Ignored</code> にしない）。<strong>受入テスト（2 件を足す）</strong>: (1) <strong>「停止中に入れ替え → 代理入力 → 再開して確定」</strong>（<code>Paused</code> の状態での入れ替えのあと、進行役が代理入力し、再開して週が確定する。現場で最も起きやすい流れ）、(2) <strong>「入れ替え後の再開で新担当者だけが保存できる」</strong>（旧担当者の再送は 403、新担当者の保存は成功）。Given は <code>SessionStarted</code> の後の入れ替えのイベント列。<strong>入れ替えの受入は、共有の <code>apps/beer-game-features/continuation/credentials.feature</code>（<code>@AC3.2.5</code>）と二重にしない</strong>: 共有のシナリオを許可リストに載せ、(1)(2) のうち共有側に無い部分だけを munit の <code>test("…")</code> で書く（M15。同ファイルの 113〜114 行の古いコメントの鮮度は B1 で確かめる）。<strong>U2 の Bolt で書く</strong>（旧記述の「B5 相当」を改めた）</td>
+<td style="text-align: left;"><code>Started</code>（game）で入れ替え（<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>）を受け、<strong><code>RoleHolderReplaced</code> は session のイベントで、受けるのは <code>Active</code>・<code>Paused</code>（<code>Started</code> ではない。L6）</strong>。開始後の復帰（<code>ParticipationRecovered</code>。US3.2、U2 の約束）、資格の再発行（<code>CredentialReissued</code>）、観察者の招待（<code>ObserverInvited</code>・<code>ObserverJoined</code>）を<strong>自己遷移として受ける</strong>（<code>Ignored</code> にしない）。<strong>受入テスト（4 件。<a href="../domain-model/">ドメインモデル</a> と同じ件数。M10・R-H3・R-H4）</strong>: (1) <strong>「停止中に入れ替え → 代理入力 → 再開して確定」</strong>（<code>Paused</code> の状態での入れ替えのあと、進行役が代理入力し、再開して週が確定する。現場で最も起きやすい流れ）、(2) <strong>「入れ替え後の再開で新担当者だけが保存できる」</strong>（旧担当者の再送は 403、新担当者の保存は成功）、(3) <strong>「失効 → 入れ替え → 新担当者が保存・確定 → 再生しても同じ状態」</strong>（旧担当者の資格を先に失効させてから入れ替えても <code>Ignored</code> にならず、保存済みのイベントを最初から畳み込み直した状態が、途中の状態と一致する。D3 の穴を捕まえる）、(4) <strong>「当週の旧担当者の入力が残り、新担当者に最新値と保存者が見える」</strong>（Kotlin 版の <code>apps/beer-game-kotlin/app/src/test/kotlin/beergame/app/ContinuationHttpSpec.kt</code> の 615 行以降「入れ替え（開始後の assignRole）」に当たる。再レビューが挙げた「624 行」はこの付近で、<strong>読んで確認した範囲は、入れ替え前の保存を新担当者が引き継ぐ流れまで</strong>。最新値と保存者の見え方は、Scala 版のテストで新たに確かめる。<code>ReplaceRoleSpec.kt</code>（domain）には「失効済みの旧担当者の入れ替え」のテストがない）。Given は <code>SessionStarted</code> の後の入れ替えのイベント列。<strong>入れ替えの業務上の出どころ</strong>: AC3.2.5 の本文は「資格の失効と再発行」で、<strong>開始後の入れ替えは Kotlin 版で足した業務ルール</strong>（正本の受入条件に無い）。<strong>共有 <code>credentials.feature</code> との分担（案）</strong>: 共有の <code>@AC3.2.5</code> のシナリオは許可リストに載せるだけとし、(1)〜(4) は<strong>共有の feature に Scala 専用のシナリオを書き込まず、munit の <code>test("…")</code> で書く</strong>（共有ファイルは Kotlin 版・Rust 版に影響するため。M15。同ファイルの 111〜115 行のコメントは Kotlin 版の経緯のままで、「開始後に参加できる人はいない（入れ替えの対象は開始前に参加し、役割を持たなかった参加者だけ）」が (1)〜(4) のテストデータの前提になる）。<strong>U2 の Bolt で書く</strong>（旧記述の「B5 相当」を改めた）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>match</code> の網羅</td>
@@ -15040,7 +15087,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">golden</td>
-<td style="text-align: left;">既知の系列と期待値の組。<strong>期待値は、Gherkin のようにデータファイル（JSON など）として置き、Kotlin 版・Rust 版と同じ値を 3 実装で検証する案</strong>（L8。置き場は共有の <code>apps/beer-game-features/</code> を想定。承認を得ていない）。<strong>遅延 0 を許すかは未決</strong>（Kotlin 版と同じ）。キット準拠の需要系列は、JSD の値が確定するまで保留し、<strong>カスタムの需要系列で書く</strong></td>
+<td style="text-align: left;">既知の系列と期待値の組。<strong>期待値は、Gherkin のようにデータファイル（JSON など）として置き、Kotlin 版・Rust 版と同じ値を 3 実装で検証する案</strong>（L8。置き場は共有の <code>apps/beer-game-features/</code> を想定。承認を得ていない）。<strong>遅延 0 を許すかは未決</strong>（Kotlin 版と同じ）。キット準拠の需要系列は、JSD の値が確定するまで保留し、<strong>カスタムの需要系列で書く</strong>。<strong>紙で続けた後の追いつき（R-H9。案）</strong>: 紙で続けた週の各役割の発注数を、復旧後に代理入力と週ごとの確定で入れ直したとき、紙の計算と同じ数字になるかは、golden（既知の系列と期待値）で確かめる候補とする（<a href="../operation/">運用要件</a> のパターン 18）。Kotlin 版・Rust 版の運用手順にも、この追いつきは無い</td>
 </tr>
 <tr>
 <td style="text-align: left;">失敗の型</td>
@@ -15050,7 +15097,34 @@
 </table>
 <h2 id="_9">プロパティベーステストと代数構造の法則<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
 <h3 id="_10">プロパティベーステスト<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h3>
-<p>munit-scalacheck（ScalaCheck 1.20.0）を使います（ガイド §8.3。ガイドの Zettai 版は ScalaCheck を入れず全パターンの列挙で足りたが、Scala 版は週次計算の不変条件を広い入力で守る必要があるため採る。ST5）。入力は、型（<code>Quantity</code>、<code>Week</code>、<code>RoleMap</code> など）の<strong>有効な値だけを生成する <code>Gen</code>・<code>Arbitrary</code></strong> を値オブジェクトごとに用意します。<strong>有効なコマンド列の生成</strong>（状態に応じて、その時点で受理されうるコマンドを選ぶ）も用意します。<strong>生成器は、上の「許す組の表」から導きます</strong>（N-H1。案）。<strong>開始後の復帰（<code>ParticipationRecovered</code>）、資格の再発行（<code>CredentialReissued</code>）、観察者の招待（<code>ObserverInvited</code>・<code>ObserverJoined</code>）、入れ替え（<code>Started</code> の自己遷移。H2 の案）を含めます</strong>（含めないと、これらの列が <code>Ignored</code> にならないことを性質テストが守れない）。表に無い組を生成器が作らないことも、表との突き合わせで確かめます。<strong>ScalaCheck に、状態に応じて操作を選ぶ操作列の機能があるかは確認していません</strong>（なければ <code>Gen</code> を合成して自前に書く。確認した事項 2 は単純な <code>forAll</code> のみ）。</p>
+<p>munit-scalacheck（ScalaCheck 1.20.0）を使います（ガイド §8.3。ガイドの Zettai 版は ScalaCheck を入れず全パターンの列挙で足りたが、Scala 版は週次計算の不変条件を広い入力で守る必要があるため採る。ST5）。入力は、型（<code>Quantity</code>、<code>Week</code>、<code>RoleMap</code> など）の<strong>有効な値だけを生成する <code>Gen</code>・<code>Arbitrary</code></strong> を値オブジェクトごとに用意します。<strong>有効なコマンド列の生成</strong>（状態に応じて、その時点で受理されうるコマンドを選ぶ）も用意します。<strong>「<code>Ignored</code> にならない」性質は、表からではなく、コマンドから作る生成器で確かめます</strong>（R-H4。案。承認を得ていない）。表から列を作ると、表と <code>apply</code> が一致することしか確かめられず、<strong>表自体の漏れ（P1 の本当の原因）を見逃す</strong>ためです。検査は 3 方向です。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">方向</th>
+<th style="text-align: left;">内容</th>
+<th style="text-align: left;">捕まえるもの</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">(a) コマンドから作る</td>
+<td style="text-align: left;">状態に応じたコマンド列（<code>handle</code>・<code>assignRoleAfterStart</code> を通す）を <code>foldLeft</code> し、<strong><code>Ignored</code> が 0 件</strong>であること</td>
+<td style="text-align: left;">表の漏れ（<code>handle</code> が出すのに表が受けない組）</td>
+</tr>
+<tr>
+<td style="text-align: left;">(b) 表の ○ の出現</td>
+<td style="text-align: left;">表の各 ○ の組が、(a) の列の中で N 回以上現れること（<code>collect</code>。N は B1 で決める）</td>
+<td style="text-align: left;">表が広すぎる（<code>handle</code> が決して作らない組を ○ にしている）</td>
+</tr>
+<tr>
+<td style="text-align: left;">(c) 表 × <code>apply</code> の全組</td>
+<td style="text-align: left;">許す組は <code>Applied</code>、それ以外は <code>Ignored</code> で状態が変わらない（上の状態遷移テスト）</td>
+<td style="text-align: left;"><code>apply</code> の腕の漏れ・余り</td>
+</tr>
+</tbody>
+</table>
+<p><strong>生成器には、開始後の復帰（<code>ParticipationRecovered</code>）、資格の再発行（<code>CredentialReissued</code>）、観察者の招待（<code>ObserverInvited</code>・<code>ObserverJoined</code>）、入れ替え（<code>Started</code> の自己遷移。H2 の案）に加え、「失効 → 入れ替え」の流れを明示して含めます</strong>（含めないと、これらの列が <code>Ignored</code> にならないことを性質テストが守れない。D3）。<strong>表は、テストが読む値と同じ 1 か所から生成するか、テストで <a href="../domain-model/">ドメインモデル</a> の Markdown の表を読んで突き合わせます</strong>（二重管理にしない。置き場は未決事項 16）。<strong>ScalaCheck に、状態に応じて操作を選ぶ操作列の機能があるかは確認していません</strong>（なければ <code>Gen</code> を合成して自前に書く。確認した事項 2 は単純な <code>forAll</code> のみ）。</p>
 <p>性質の一覧は、Kotlin 版と同じです。</p>
 <ul>
 <li><strong>週次計算</strong>: 決定論、非負、保存、費用、遅延、役割別の合計とチーム合計の一致。</li>
@@ -15099,7 +15173,34 @@
 <li>業務の失敗（<code>handle</code> が <code>Left</code>）は、ROLLBACK して、再試行も追記もしない。</li>
 </ol>
 <p>（1）と（4）の commit・rollback の記録は、スタブの <code>Connection</code> で DB なしに書ける見込みです（確認した事項 8 は、旧案の合成子（<code>Tx.rollbackOnLeft</code>。不採用）を単体で確かめたもので、<code>Tx.run</code> そのものの確認ではありません）。<strong>案（H4・N-H2）では、公開の入口を <code>Tx.run(program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]</code> だけにし、コマンドの <code>ConnectionIO</code> 全体（認証 → 冪等記録 → step → 投影 → 周辺ストア → 通知 → 冪等記録の保存）を 1 回で包む</strong>。<strong>ロックは <code>ConnectionIO</code> の変換（<code>withShared</code>）として <code>program</code> の中に入り、<code>transact</code> の外には出ない</strong>（同じトランザクション内。PostgreSQL 版は <code>pg_advisory_xact_lock_shared</code>）。このため、<code>FC.rollback</code> の後に同じ <code>ConnectionIO</code> で書き込みが続いて新しいトランザクションとして COMMIT される経路がなくなる、と<strong>推論</strong>しています（<strong>この「<code>FC.rollback</code> の後の書き込み」の挙動（K5）は未実行</strong>で、B1 の最初のスライドで確かめます。事実として扱いません。M5）。スタブの検証は、呼び出し順の完全一致（<code>setAutoCommit, rollback, commit</code>）にせず、<strong>「<code>Left</code> の経路で <code>rollback</code> が呼ばれ、それより前の書き込みが commit されない」「成功で <code>rollback</code> が呼ばれない」</strong>に絞ります（doobie の <code>Strategy</code> の内部実装に依存しないため。M13）。</p>
-<p>その他のテスト（Kotlin 版と同じ）: 空のイベントは追記しない、結果が変わる場合（<code>DecisionConflict</code>、<code>WeekAdvanced</code>、<code>DecisionsChanged</code>、<code>AlreadyStarted</code>）は再評価した結果を返す、冪等（同じキー・同じ内容は保存済みの応答、内容が違えば 409）、<strong>処理の順（ロック → 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → <code>handle</code> → 追記・投影。認可が冪等照合より先）</strong>、失効した資格の再送は 403、冪等記録は成功だけ、制約ごとの再試行・再照合、周辺ストアに書かれイベントに含まれない、永続化の失敗で受理済みと表示しない、ログ・計測のラッパーが結果を変えず、ログに表示名・資格が含まれない（<code>LogRecord</code> に項目が無いことの型の検査）。<strong>処理の順の検査</strong>は、呼び出し順を記録するテスト用のポートで行います。</p>
+<p>その他のテスト（Kotlin 版と同じ）: 空のイベントは追記しない、結果が変わる場合（<code>DecisionConflict</code>、<code>WeekAdvanced</code>、<code>DecisionsChanged</code>、<code>AlreadyStarted</code>）は再評価した結果を返す、冪等（同じキー・同じ内容は保存済みの応答、内容が違えば 409）、<strong>処理の順（ロック → 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → <code>handle</code> → 追記・投影。認可が冪等照合より先）</strong>、失効した資格の再送は 403、冪等記録は成功だけ、制約ごとの再試行・再照合、周辺ストアに書かれイベントに含まれない、永続化の失敗で受理済みと表示しない、ログ・計測のラッパーが結果を変えず、ログに表示名・資格が含まれない（<code>LogRecord</code> に項目が無いことの型の検査）。<strong>処理の順の検査</strong>は、呼び出し順を記録するテスト用のポートで行います。<strong>処理の順（通知と冪等記録の保存の前後を含む）の正本は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> で、本書の並びは写しです。食い違いがあればバックエンドに従う（M13）。</strong></p>
+<p><strong><code>lock_timeout</code> と SQLSTATE の写像のテスト（R-H6。案。中核の設計は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> を正本とする。承認を得ていない）</strong>: <code>lock_timeout</code> は<strong>ロックを取る間だけ</strong>設定し（取った後に戻して、投影の行のロック待ちには効かせない）、例外で届く SQLSTATE を次のとおり写す。実 DB の統合テストで確かめる（B1 の最初のスライド）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">検証</th>
+<th style="text-align: left;">期待</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">ロック待ちの超過（55P03）</td>
+<td style="text-align: left;"><code>Left(RetryExhausted)</code>（503・<code>app.retry_exhausted</code>・<code>Retry-After</code>）を即返す。<strong>中断したトランザクションで次の文を出さない</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">デッドロック（40P01）・直列化の失敗（40001）</td>
+<td style="text-align: left;"><code>Tx.run</code> の後の <code>IO</code> で <code>ConcurrencyConflict</code> に写し、<code>loop</code>（再試行）に戻る。上限まで続けば <code>RetryExhausted</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">投影の行のロック待ち</td>
+<td style="text-align: left;"><code>lock_timeout</code> が効かない（ロックを取った後は <code>'0'</code> に戻っている）ので、平常時に 503 が出ない</td>
+</tr>
+<tr>
+<td style="text-align: left;">例外のまま漏れない</td>
+<td style="text-align: left;">上記以外の例外は <code>Persistence</code>（500・相関 ID）。例外のまま画面に届かない</td>
+</tr>
+</tbody>
+</table>
 <h3 id="scala-stt4">キャンセル安全性のテスト（Scala 固有。設計判断 STT4）<a class="headerlink" href="#scala-stt4" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の「COMMIT / ROLLBACK は <code>NonCancellable</code>、<code>CancellationException</code> を再送出」に当たる検証です。Cats Effect では、キャンセルは <code>Fiber</code> の取消で、<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の SBD4（<code>execute</code> を <code>Supervisor</code> で切り離し、失敗の経路は ROLLBACK を明示）を検証します。<strong>「部分更新が残らない」ことは PostgreSQL が保証する</strong>ため、検証の中心は<strong>ロックと接続が速やかに解放されること</strong>です。</p>
 <table>
@@ -15230,8 +15331,13 @@
 </tr>
 <tr>
 <td style="text-align: left;">ルートの網羅</td>
-<td style="text-align: left;">実装のルートがすべて仕様にあり、仕様のルートがすべて実装にある</td>
+<td style="text-align: left;">実装のルートがすべて仕様にあり、仕様のルートがすべて実装にある。<strong>ただし、U1〜U3 では実装しない操作の許可リスト（範囲外の操作）を持つ</strong>（M9）: 共有の <code>openapi.yaml</code> には、U1〜U3 で実装しない操作がある（<code>getReview</code>（<code>GET /games/{gameId}/review</code>）・<code>getExport</code>（<code>GET /games/{gameId}/exports</code>）・<code>getRetention</code>（<code>GET /games/{gameId}/retention</code>）、観察系の <code>getObservation</code>・<code>inviteObserver</code>・<code>revokeObserverInvitation</code>・<code>joinAsObserver</code>。<strong>観察（S07）は ADR-001 の U4 で、U1〜U3 の範囲外（決定済み）</strong>）。許可リストなしでは、U1 の <code>check</code> ジョブが「仕様のルートが実装に無い」で落ちる。<strong>許可リストは、U1〜U3 の <code>@AC</code>（AC の番号まで確定した一覧。M3）から導く</strong>。範囲外の経路は、許可リストにあるあいだ、<strong>実装されない（経路なし）ことを確かめる</strong>（後で実装したら許可リストから外す）</td>
 <td style="text-align: left;"><code>HttpRoutes</code> から経路を列挙できるかは<strong>未確認</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">「経路なし」の応答（M9・L5。案）</td>
+<td style="text-align: left;">範囲外の経路と、未知の経路・メソッド違いの応答を、<strong>problem+json の <code>request.not_found</code>（404）に写すか</strong>を、<strong>同じ箇所（許可リストの検査）で決める</strong>。<code>request.not_found</code> は <code>openapi.yaml</code> の <code>ErrorCode</code> に宣言されている（964 行付近）。<strong>案 (a)</strong>＝写す（<code>type</code> つき。画面は <code>ErrorNotice</code> で相関 ID を示せる。契約テストは「許可リストの外の経路は 404 の problem+json」を確かめる。AI の推奨）、<strong>案 (b)</strong>＝http4s の既定の応答のまま（JSON でない 404 で、<strong>画面に相関 ID が出ない</strong>。<a href="../ui-design/">UI 設計</a> の #16）</td>
+<td style="text-align: left;">既定の応答の形は<strong>未確認</strong>（<a href="../ui-design/">UI 設計</a> の #1）</td>
 </tr>
 <tr>
 <td style="text-align: left;">SSE</td>
@@ -15287,6 +15393,10 @@
 <td style="text-align: left;">既知の値のフィクスチャ XML で、<strong>79.9% は失敗、80.0% は成功</strong>（例: 1000 行中 799 行・800 行を実行）</td>
 </tr>
 <tr>
+<td style="text-align: left;">丸め（M15）</td>
+<td style="text-align: left;"><strong>7999/10000 = 79.99% は、表示の丸め（小数 1 桁）で 80.0% になっても失敗</strong>。比較は<strong>表示用の小数でなく、有理数か整数の積</strong>（<code>実行された行 × 100 ≥ 80 × 計測対象の行</code>）で行う。800/1000・8000/10000 は成功。表示と判定を分ける</td>
+</tr>
+<tr>
 <td style="text-align: left;">XML が無い</td>
 <td style="text-align: left;">入力の XML が存在しない、または空のとき、<strong>失敗</strong>（緑にしない）</td>
 </tr>
@@ -15310,7 +15420,7 @@
 </table>
 <p><strong>いずれも未実測の暫定値</strong>で、最初の Bolt で実測して見直します。<code>coverageMinimumStmtTotal</code>・<code>coverageMinimumBranchTotal</code>・<code>coverageFailOnMinimum</code> が効くことは確認しました（確認した事項 4）。<strong>プロジェクトごとのしきい値（<code>domain</code> だけ高く）が設定できるか、複数プロジェクトと統合テストの計測が合算できるか</strong>は未確認です。</p>
 <p><strong><code>domain</code> の文 97% は「目安」です（N-H6。ユーザーの決定、2026-11-25。ゲートにするかは B1 の実測後に決める）</strong>。技術スタックの ST4・NF-O7・SN3 も同じ「目安（ゲートにするかは B1 の実測後）」に揃えます。<strong>プロジェクトごとのしきい値を設定できるか（K16）は未確認</strong>で、<strong>設定できなければ、全体のしきい値だけにし、<code>domain</code> の 97% は目安のまま</strong>（レポートで推移を見る）にします。</p>
-<p><strong>層ごとの目標（目安。下回っても失敗にしない。推移を見て見直す）</strong>: <code>domain</code> は文 97% 以上（目安。上のとおり）、投影は文 100%、<code>application</code> は文 95%、<code>adapter-persistence</code> は文 90%（DB の統合を合算する前提）、<code>adapter-http</code> は文 90%、UI は Vitest で行 85%・分岐 80%（既存）。</p>
+<p><strong>層ごとの目標（目安。下回っても失敗にしない。推移を見て見直す）</strong>: <code>domain</code> は文 97% 以上（目安。上のとおり）、投影は文 100%、<code>application</code> は文 95%、<code>adapter-persistence</code> は文 90%（DB の統合を合算する前提。<strong>統合テストが U1 の CI の範囲に入る（D1）ことで成り立つ</strong>。入らないと、行 80% が赤のままになりうる）、<code>adapter-http</code> は文 90%、UI は Vitest で行 85%・分岐 80%（既存）。</p>
 <p><strong>計測の範囲</strong>: <code>domain</code>・<code>application</code>・<code>adapter-*</code> を対象とし、除外するのは起動部（<code>app</code> の <code>IOApp</code>）と設定の組み立てだけです。<code>coverageExcludedPackages</code> などの除外の指定が、実コードだけに効くかは実装開始時に確認します（<strong>scoverage の生成コード・<code>enum</code> の扱いは未確認</strong>）。</p>
 <h2 id="_13">テストデータ<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版と同じです。ドメインは <strong>Given のビルダー</strong>（Object Mother）で過去のイベントの列を組み立て、時刻・ID・乱数はコマンドの値として固定で与える。週次計算は golden と ScalaCheck による性質。アップキャストは、旧い <code>schema_version</code> のイベントの JSON をフィクスチャとして保存する（変更しない）。DB の統合は、testcontainers-scala の PostgreSQL 18 の専用のコンテナで、接続先の名前を検査して誤った DB への接続を防ぎ、マイグレーションを適用した空の DB から始める。資格は、テスト用の鍵（複数の版）とテストごとの乱数で、生の値を保存や出力に含めない。</p>
@@ -15328,7 +15438,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">NF-R9</td>
-<td style="text-align: left;"><code>ConnectionIO</code>・<code>IO</code> の失敗を返すポートに差し替える。<strong>想定外の失敗が <code>AppFailure.Persistence</code> に写ること</strong>、障害の注入。<strong>加えて（N-H7・M14。パターン 18 の回帰）</strong>: (a) <strong>止まったストリームのイベント列をフィクスチャ</strong>にし、遷移の表を直した版で <code>Applied</code> になり<strong>操作を再開できる</strong>（回帰テスト）、(b) <strong><code>Ignored</code> の件数のメトリクスが出る</strong>、(c) <code>Ignored</code> で止まるとき、<strong>500 に <code>type</code> と相関 ID が付き、書き込みが残らない</strong>、(d) <strong>止まったゲームでも、状態取得（GET の投影）は 200 で返る</strong>（読み取りは止めない。B1 の確認項目。返せなければ、設計を見直す）</td>
+<td style="text-align: left;"><code>ConnectionIO</code>・<code>IO</code> の失敗を返すポートに差し替える。<strong>想定外の失敗が <code>AppFailure.Persistence</code> に写ること</strong>、障害の注入。<strong>加えて（N-H7・M14。パターン 18 の回帰）</strong>: (a) <strong>止まったストリームのイベント列をフィクスチャ</strong>にし、遷移の表を直した版で <code>Applied</code> になり<strong>操作を再開できる</strong>（回帰テスト）、(b) <strong><code>Ignored</code> の件数のメトリクスが出る</strong>、(c) <code>Ignored</code> で止まるとき、<strong>500 に <code>type</code> と相関 ID が付き、書き込みが残らない</strong>、(d) <strong>止まったゲームでも、状態取得（GET の投影）は 200 で返る</strong>（読み取りは止めない。B1 の確認項目。返せなければ、設計を見直す。<strong>対象の経路は、B1 の受入条件の表の「止まったゲームの読み取り」の行のとおり、メソッドつきの 3 経路（観察は U4 で足す）</strong>）</td>
 <td style="text-align: left;">毎回</td>
 </tr>
 <tr>
@@ -15348,7 +15458,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-P2</td>
-<td style="text-align: left;"><strong>B1 で、画面を通した実測か、GET の実測 + 3 秒間隔からの計算の推定かを決める</strong>（B1 の受入条件の表の 1 行。M13）。<strong>範囲外（U6）の性能を早めに計測することは約束ではない</strong>。<strong>対象（全ブラウザ）のうち S06（コンソール）は自動更新が無く測れない</strong>（全実装共通の画面の課題。<a href="../ui-design/">UI 設計</a> 未決事項 8）ため、測るのは S05・S04・S07（ポーリングのある画面）に限る（NF-P2 の p99 を外したのは AI の解釈）</td>
+<td style="text-align: left;"><strong>B1 で、画面を通した実測か、GET の実測 + 3 秒間隔からの計算の推定かを決める</strong>（B1 の受入条件の表の 1 行。M13）。<strong>範囲外（U6）の性能を早めに計測することは約束ではない</strong>。<strong>対象（全ブラウザ）のうち S06（コンソール）は自動更新が無く測れない</strong>（全実装共通の画面の課題。<a href="../ui-design/">UI 設計</a> 未決事項 8）ため、測るのは S05・S07（ポーリングのある画面）に限る（NF-P2 の p99 を外したのは AI の解釈）。<strong>S04（ロビー）は、ポーリングが準備中だけで、週確定の反映の対象ではないので外す</strong>（L4）。<strong>「同一の時計（確定した側のブラウザの時刻）」は、複数端末では成り立たない</strong>ため、B1 では<strong>同じ機械の複数タブ</strong>で測る前提を置く（L4。端末をまたぐ測定は、時計のずれを別に見積もる）</td>
 <td style="text-align: left;">実測は B1 以降</td>
 </tr>
 <tr>
@@ -15378,7 +15488,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-SC2</td>
-<td style="text-align: left;"><code>execute</code> の性質（1）〜（4）と、実 DB で <code>Left</code> の行が残らないこと。<strong>Scalafix の <code>DisableSyntax.regex</code> の 2 方向の検査</strong>（案。N-H3）: 「落ちるべきもの」（<code>application</code>・<code>adapter-persistence</code> に置いた <code>.transact(</code>・<code>.transact[IO](</code>・<code>FC.commit</code>・<code>xa.trans</code>・<code>scalafix:off</code>）で CI が落ち、「落ちてはならないもの」（許可した入口 <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・テストの補助）で落ちないこと（下の「Scalafix の受け入れ条件」）。<strong>加えて（N-H7・M14）: 止まったゲーム（<code>Ignored</code>）の書き込みが残らず、500 に <code>type</code> と相関 ID が付くこと</strong>（NF-R9 の (c) と同じ検査）</td>
+<td style="text-align: left;"><code>execute</code> の性質（1）〜（4）と、実 DB で <code>Left</code> の行が残らないこと。<strong>Scalafix の <code>DisableSyntax.regex</code> の 2 方向の検査</strong>（案。N-H3・R-H7）: 「落ちるべきもの」（<strong><code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース</strong>に置いた <code>.transact(</code>・<code>.transact[IO](</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>FC.commit</code>・<code>scalafix:off</code>、<strong>テスト本体の <code>.transact(</code></strong>）で CI が落ち、「落ちてはならないもの」（<code>Transactions.scala</code> の入口、<code>TestTx</code>、文字列・コメントの中の語）で落ちないこと。<strong>受け入れ条件は 1 つの表にまとめた</strong>（下の「Scalafix の受け入れ条件」。architecture-backend・tech-stack と同じ表）。<strong>加えて（N-H7・M14）: 止まったゲーム（<code>Ignored</code>）の書き込みが残らず、500 に <code>type</code> と相関 ID が付くこと</strong>（NF-R9 の (c) と同じ検査）</td>
 <td style="text-align: left;">毎回</td>
 </tr>
 <tr>
@@ -15454,7 +15564,7 @@
 <tr>
 <td style="text-align: left;">Scalafix（sbt-scalafix 0.14.10）</td>
 <td style="text-align: left;">副作用を持つ呼び出しの禁止</td>
-<td style="text-align: left;"><code>DisableSyntax.regex</code>（<code>println</code>、<code>System.currentTimeMillis</code>・<code>nanoTime</code>、<code>Thread.sleep</code>、<code>unsafeRun*</code>、<strong><code>.transact(</code>・<code>.transact[</code>・<code>xa.trans</code>・<code>FC.commit</code>・<code>FC.rollback</code>・<code>HC.commit</code>・<code>HC.rollback</code></strong>。<strong>許可する入口は <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続で、同じファイルに置き、Scalafix の除外はそのファイルの 1 か所だけ</strong>にする。<strong><code>scalafix:off</code> は使わない</strong>。N-H3・H4 の案で承認を得ていない）。<strong>sbt の <code>scalafix --check</code> で、Scala 3 のインデント構文のソースを解析して報告できることを確認した</strong>（確認した事項 9）。<code>scalafixAll</code> は未確認</td>
+<td style="text-align: left;"><code>DisableSyntax.regex</code>（<code>println</code>、<code>System.currentTimeMillis</code>・<code>nanoTime</code>、<code>Thread.sleep</code>、<code>unsafeRun*</code>、<strong><code>.transact(</code>・<code>.transact[</code>・<code>\.trans\b</code>・<code>\.rawTrans\b</code>・<code>FC.commit</code>・<code>FC.rollback</code>・<code>HC.commit</code>・<code>HC.rollback</code></strong>。<strong>パターンはメソッド名で書き、変数名（<code>xa</code>・<code>writeXa</code>・<code>transactor</code> など）に依存しない</strong>。<strong>許可する入口は <code>Transactions.scala</code>（<code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>）の 1 ファイルで、Scalafix の除外はそのファイルの 1 か所だけ</strong>にする。<strong><code>scalafix:off</code> は使わない</strong>（<code>DisableSyntax.regex</code> で検出できるかは未確認の一覧（K15）に足す）。N-H3・H4・R-H7 の案で承認を得ていない）。<strong>sbt の <code>scalafix --check</code> で、Scala 3 のインデント構文のソースを解析して報告できることを確認した</strong>（確認した事項 9）。<code>scalafixAll</code> は未確認</td>
 </tr>
 </tbody>
 </table>
@@ -15472,7 +15582,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">副作用・トランザクションの入口</td>
-<td style="text-align: left;">Scalafix の <code>DisableSyntax.regex</code>。<strong><code>.transact(</code> などの直接の呼び出しを、許可した入口のファイルの外で禁止し、書き込みの公開の入口を <code>Tx.run</code> だけにする</strong>（H4・N-H3 の案）。「型の上で作れなくする」とは言わない（文字列のパターンで、別名やラッパーの中の呼び出しは見逃す）。<code>domain</code> では <code>Random</code>・<code>UUID.randomUUID</code>・<code>cats.effect</code> の <code>import</code> も禁止</td>
+<td style="text-align: left;">Scalafix の <code>DisableSyntax.regex</code>。<strong><code>.transact(</code> などの直接の呼び出しを、許可した入口のファイル（<code>Transactions.scala</code>）の外で禁止し、書き込みの公開の入口を <code>Tx.run</code> だけにする</strong>（H4・N-H3・R-H7 の案）。読み取りの入口 <code>ReadTx</code> は <code>application</code> の trait で、生の <code>Transactor</code> は <code>application</code> に置かない（M12。中核の設計は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> を正本とする）。「型の上で作れなくする」とは言わない（文字列のパターンで、別名やラッパーの中の呼び出しは見逃す）。<code>domain</code> では <code>Random</code>・<code>UUID.randomUUID</code>・<code>cats.effect</code> の <code>import</code> も禁止</td>
 </tr>
 <tr>
 <td style="text-align: left;">層の依存</td>
@@ -15526,7 +15636,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">テスト（ステップ定義を含む）</td>
-<td style="text-align: left;">scalac のオプションと Scalafmt は有効。<strong>WartRemover は適用しない</strong>（ガイド §9.4「テストには適用しない」）。Scalafix の <code>DisableSyntax</code> は<strong>テストのソースにも有効</strong>にし、<code>unsafeRun*</code> だけテストの境界として許す。<strong>統合テストの準備と検証の SQL は、<code>.transact(</code> を直接書かず、テストの補助の入口（<code>TestTx</code> など。テストのソースの 1 ファイル）を通す</strong>。除外はこの補助のファイル 1 か所だけで、テストの本体からの <code>.transact(</code>・<code>xa.trans</code>・<code>FC.commit</code> は禁止（<code>scalafix:off</code> も使わない。N-H3。案）</td>
+<td style="text-align: left;">scalac のオプションと Scalafmt は有効。<strong>WartRemover は適用しない</strong>（ガイド §9.4「テストには適用しない」）。Scalafix の <code>DisableSyntax</code> は<strong>テストのソースにも有効</strong>にし、<code>unsafeRun*</code> だけテストの境界として許す。<strong>統合テストの準備と検証の SQL は、<code>.transact(</code> を直接書かず、テストの補助の入口（<code>TestTx</code>。テストのソースの 1 ファイル）を通す</strong>。除外はこの補助のファイル 1 か所だけで、<strong>テスト本体からの <code>.transact(</code>・<code>.trans</code>・<code>.rawTrans</code>・<code>FC.commit</code> も落ちる</strong>（<code>scalafix:off</code> も使わない。N-H3・R-H7。案）</td>
 <td style="text-align: left;"><strong>外し方は <code>Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))</code></strong>（<code>Test / wartremoverErrors := Seq.empty</code> では外れない。確認した事項 10）。<code>Thread.sleep</code> は外さない（<code>IO.sleep</code> と <code>TestControl</code> 相当の仮想時間を使う。<strong>後者は未確認</strong>）</td>
 </tr>
 </tbody>
@@ -15541,7 +15651,7 @@
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> WartRemover と Scalafix が、全プロジェクトで違反 0、ベースラインなし、<code>@SuppressWarnings</code> なしで緑（層単位の緩和は ADR で承認）</li>
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <code>scalafixAll --check</code> が、全プロジェクトのインデント構文のソースを解析できる（<strong><code>Compile/scalafix --check</code> のみ確認済み</strong>）</li>
 </ul>
-<p><strong>Scalafix の <code>.transact(</code> の受け入れ条件（2 方向。N-H3。案。承認を得ていない）</strong>: 「落ちるべきもの」だけを確かめると、読み取り側とテストの正しいコードが落ちる。「落ちてはならないもの」も同じ重さで確かめる。</p>
+<p><strong>Scalafix の <code>.transact(</code> の受け入れ条件（2 方向。N-H3・R-H7。案。承認を得ていない。1 つの表にまとめ、<a href="../architecture-backend/">バックエンドアーキテクチャ</a>・<a href="../tech-stack/">技術スタック</a> と同じ判定にする）</strong>: 「落ちるべきもの」だけを確かめると、読み取り側とテストの正しいコードが落ちる。「落ちてはならないもの」も同じ重さで確かめる。<strong>規則は、「落ちるべき」ソースを「<code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース」とする</strong>（<code>application</code>・<code>adapter-http</code>・<code>adapter-persistence</code>・<code>app</code> のどこに置いても落ちる）。テストのソースは、<code>TestTx</code> の 1 ファイルだけを除いて落ちる。</p>
 <table>
 <thead>
 <tr>
@@ -15556,63 +15666,71 @@
 <td style="text-align: left;"><strong>落ちるべきもの</strong></td>
 <td style="text-align: left;"><code>.transact(xa)</code> の直接の呼び出し</td>
 <td style="text-align: left;">CI が落ちる</td>
-<td style="text-align: left;"><code>application</code></td>
+<td style="text-align: left;"><code>Transactions.scala</code> 以外の全 <code>Compile</code> のソース（例: <code>application</code>・<code>adapter-http</code>・<code>adapter-persistence</code>）</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;"><code>.transact[IO](xa)</code>（型引数つき）</td>
 <td style="text-align: left;">落ちる</td>
-<td style="text-align: left;"><code>application</code>・<code>adapter-persistence</code></td>
+<td style="text-align: left;">同上</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;"><code>xa.trans</code>・<code>xa.rawTrans</code></td>
+<td style="text-align: left;"><code>.trans</code>・<code>.rawTrans</code> の呼び出し（<strong>パターンは <code>\.trans\b</code>・<code>\.rawTrans\b</code>。変数名（<code>xa</code>・<code>writeXa</code>・<code>transactor</code>）に依存しない</strong>）</td>
 <td style="text-align: left;">落ちる</td>
-<td style="text-align: left;"><code>adapter-persistence</code></td>
+<td style="text-align: left;">同上</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;"><code>FC.commit</code>・<code>FC.rollback</code>・<code>HC.commit</code>・<code>HC.rollback</code>（入口の外）</td>
 <td style="text-align: left;">落ちる</td>
-<td style="text-align: left;"><code>adapter-persistence</code></td>
+<td style="text-align: left;">同上</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
 <td style="text-align: left;"><code>scalafix:off</code>（無効化コメント）</td>
-<td style="text-align: left;">落ちる（ADR-001 の 011 の行）</td>
+<td style="text-align: left;">落ちる（ADR-001 の 011 の行。<strong><code>DisableSyntax.regex</code> で検出できるかは未確認の一覧（K15）に足す</strong>）</td>
 <td style="text-align: left;">全プロジェクト</td>
 </tr>
 <tr>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"><strong>テスト本体の <code>.transact(</code></strong></td>
+<td style="text-align: left;">落ちる（<code>TestTx</code> 以外では使えない）</td>
+<td style="text-align: left;">テストのソース（<code>TestTx</code> の 1 ファイルを除く）</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>落ちてはならないもの</strong></td>
-<td style="text-align: left;">許可した入口（<code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>、<code>LISTEN</code> の専用接続）のファイルの <code>.transact(</code></td>
+<td style="text-align: left;">許可した入口（<code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>）のファイル <code>Transactions.scala</code> の <code>.transact(</code></td>
 <td style="text-align: left;">落ちない</td>
 <td style="text-align: left;"><code>adapter-persistence</code> の入口のファイル（除外は 1 か所）</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;">テストの補助の入口（<code>TestTx</code> など）の <code>.transact(</code></td>
+<td style="text-align: left;">テストの補助の入口 <code>TestTx</code> の <code>.transact(</code></td>
 <td style="text-align: left;">落ちない</td>
 <td style="text-align: left;">テストのソースの補助のファイル（1 か所）</td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;">入口を呼ぶ側（<code>Tx.run(program)</code>、<code>ReadTx.run(query)</code>）</td>
+<td style="text-align: left;">入口を呼ぶ側（<code>Tx.run(program)</code>、<code>ReadTx</code> の読み取り）</td>
 <td style="text-align: left;">落ちない</td>
 <td style="text-align: left;"><code>application</code>・<code>adapter-persistence</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"></td>
-<td style="text-align: left;">文字列・コメントに含まれる <code>transact</code> という語</td>
-<td style="text-align: left;">落ちない（規則の適用範囲の確認。<strong><code>DisableSyntax.regex</code> が文字列の中を拾うかは未確認</strong>。拾うなら、ルールの書き方を直す）</td>
+<td style="text-align: left;"><strong>文字列・コメントに含まれる <code>transact</code>・<code>trans</code> という語</strong></td>
+<td style="text-align: left;">落ちない（<strong><code>DisableSyntax.regex</code> が文字列の中を拾うかは未確認</strong>。拾うなら、ルールの書き方を直す。期待は「落ちない」）</td>
 <td style="text-align: left;">全プロジェクト</td>
 </tr>
 </tbody>
 </table>
+<p><strong>2 方向の検査は、一度きりの確認でなく、違反するコードとしないコードの fixture と期待件数のテストとして <code>check</code> に入れる</strong>（M14。回帰テストにする）。fixture の置き場、「Scalafix を fixture に対して実行して違反の件数を数える」方式は B1 で決める（<strong>未確認</strong>）。期待件数がずれる（ルールを緩めた、または fixture を消した）と <code>check</code> が落ちる。</p>
 <p>テストのソースに <code>DisableSyntax</code> を適用する範囲（案）: <strong>テストにも有効</strong>（<code>println</code>・<code>Thread.sleep</code>・<code>.transact(</code> などを禁止）。統合テストの準備と検証の SQL は、テストの補助の入口（1 ファイル）を通す。<strong>除外の設定が書けるか（ファイル単位の除外の書き方。<code>scalafixAll</code> を含む）は未確認</strong>で、B1 で確かめる。確かめられなければ、除外ではなく、入口を別の sbt プロジェクトに分ける案へ切り替える（人の承認が要る）。</p>
 <h2 id="ci">CI との連携<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h2>
-<p>team の規約（<code>aidlc/active-memory/team.md</code>）により、<strong>CI と deploy のワークフローは beer-game3 用とは別に新しく作ります</strong>（<code>.github/workflows/beer-game-scala.yml</code>。<strong>未作成</strong>）。formatter・linter・type-check を CI で実行し、失敗した変更はマージしません。</p>
-<p><strong>範囲（N-H4。ユーザーの決定、2026-11-25）</strong>: <strong>検証用の CI（<code>check</code> ジョブ 1 本。Scalafmt、コンパイル <code>-Werror</code>、WartRemover、Scalafix、テスト、カバレッジ）は U1 の約束に含めます。</strong> B1 の受入条件の「CI が落ちる」は、この <code>check</code> ジョブで判定します。<strong>AWS 環境と、デプロイ用のワークフロー（インフラの SI5 のうち <code>deploy</code> 側）、ステージングへの自動反映は後回し（U5）です。</strong> team の規約は「<code>main</code> の merge で staging へ自動反映」を求めるため、<strong>自動反映を持たない間の例外は、ADR に記録して人が承認します</strong>（ADR-001 は別担当。承認を得るまでは規約との衝突が残る）。U1〜U3 の間は実際の研修に使わないため、この例外が研修に影響することはありません。</p>
-<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJBQ1RJVklUWSIgc3R5bGU9IndpZHRoOjU0OXB4O2hlaWdodDoxMTg2cHg7YmFja2dyb3VuZDojRkZGRkZGOyIgd2lkdGg9IjU0OXB4IiBoZWlnaHQ9IjExODZweCIgdmlld0JveD0iMCAwIDU0OSAxMTg2IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjE1Ni4wNDciIHk9IjMyLjk5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjM1LjMwNiIgZm9udC13ZWlnaHQ9IjcwMCI+Q0kg44Gu44OG44K544OI5a6f6KGM77yIU2NhbGEg54mI44CC5o+Q5qGI77yJPC90ZXh0PjwvZz48ZWxsaXBzZSBjeD0iMjcyLjciIGN5PSI2Mi4yOTciIHJ4PSIxMCIgcnk9IjEwIiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PHJlY3QgeD0iMTYxLjk2NSIgeT0iOTIuMjk3IiB3aWR0aD0iMjIxLjQ3IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxNzEuOTY1IiB5PSIxMTMuNDM2IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIyMDEuNDciPuODl+ODq+ODquOCr+OCqOOCueODiCAvIG1haW4g44G444Gu44OX44OD44K344OlPC90ZXh0PjxyZWN0IHg9IjE2IiB5PSIxMzYuMjY2IiB3aWR0aD0iNTEzLjQiIGhlaWdodD0iNzg3LjY3MiIgZmlsbD0ibm9uZSIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7Ii8+PHBhdGggZD0iTTU0LDEzNi4yNjYgTDU0LDE0NS41NjMgTDQ0LDE1NS41NjMgTDE2LDE1NS41NjMiIHN0eWxlPSJzdHJva2U6IzAwMDtzdHJva2Utd2lkdGg6MS41OyIgZmlsbD0ibm9uZSIvPjx0ZXh0IHg9IjE5IiB5PSIxNTAuMjYxIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSIyOCI+5q+O5ZuePC90ZXh0PjxyZWN0IHg9IjMyLjY1NyIgeT0iMTcyLjU2MyIgd2lkdGg9IjQ4MC4wODUiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjQyLjY1NyIgeT0iMTkzLjcwMSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNDYwLjA4NSI+c2NhbGFmbXRDaGVja0FsbOOAgeOCs+ODs+ODkeOCpOODq++8iC1XZXJyb3LvvInjgIFXYXJ0UmVtb3ZlcuOAgXNjYWxhZml4QWxsIC0tY2hlY2s8L3RleHQ+PHRleHQgeD0iNDIuNjU3IiB5PSIyMDcuNjciIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjMzNS40NTIiPumBleWPjSAw44CB44OZ44O844K544Op44Kk44Oz44Gq44GX44CB5oqR5Yi244Gq44GX77yI54Sh5Yq55YyW44Kz44Oh44Oz44OI44Gq44GX77yJPC90ZXh0PjxyZWN0IHg9IjEwOC45MjUiIHk9IjI0MC41IiB3aWR0aD0iMzI3LjU0OSIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTE4LjkyNSIgeT0iMjYxLjYzOSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMzA3LjU0OSI+6Z2Z55qE6Kej5p6Q44Gu5qSc5p+777yI6KaP57SE6YGV5Y+N44Gu44Kz44O844OJ44GnIENJIOOBjOiQveOBoeOCi+OBk+OBqO+8iTwvdGV4dD48cmVjdCB4PSIxMjUuNjE2IiB5PSIyOTQuNDY5IiB3aWR0aD0iMjk0LjE2OCIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTM1LjYxNiIgeT0iMzE1LjYwNyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjc0LjE2OCI+QVBJIOOBruWlkee0hO+8iOS7leanmOOBruaknOiovCDihpIg5Z6L44Gu55Sf5oiQIOKGkiDlnovjga7mpJzmn7vvvIk8L3RleHQ+PHJlY3QgeD0iMTQyLjY5OSIgeT0iMzQ4LjQzOCIgd2lkdGg9IjI2MC4wMDIiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjE1Mi42OTkiIHk9IjM2OS41NzYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjIzNy40MzUiPuODpuODi+ODg+ODiOODu+aAp+izquODu+azleWJh+OBruODhuOCueODiO+8iHNidCB0ZXN077yJPC90ZXh0Pjx0ZXh0IHg9IjE1Mi42OTkiIHk9IjM4My41NDUiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI0MC4wMDIiPu+8iOOCouODl+ODquOCseODvOOCt+ODp+ODs+WxpOOBr+ODhuOCueODiOeUqOOBruODneODvOODiO+8iTwvdGV4dD48cmVjdCB4PSIxMDYuMDQ2IiB5PSI0MTYuMzc1IiB3aWR0aD0iMzMzLjMwNyIgaGVpZ2h0PSI0Ny45MzgiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTE2LjA0NiIgeT0iNDM3LjUxNCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMzEzLjMwNyI+57Wx5ZCI44OG44K544OI77yIdGVzdGNvbnRhaW5lcnMtc2NhbGEg44GuIFBvc3RncmVTUUwgMTjjgII8L3RleHQ+PHRleHQgeD0iMTE2LjA0NiIgeT0iNDUxLjQ4MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjk4LjgxMiI+RG9ja2VyIOOBjOeEoeOBkeOCjOOBsOWkseaVl+OAgkRCIOOBrue1seWQiOOBjCAwIOS7tuOBp+OCguWkseaVl++8iTwvdGV4dD48cmVjdCB4PSI2MC4wMjYiIHk9IjQ4NC4zMTMiIHdpZHRoPSI0MjUuMzQ4IiBoZWlnaHQ9IjYxLjkwNiIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSI3MC4wMjYiIHk9IjUwNS40NTEiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjQwNS4zNDgiPuOCq+ODkOODrOODg+OCuOOBruOCsuODvOODiO+8iHNjb3ZlcmFnZSDjga4gWE1MIOOBi+OCieeul+WHuuOBl+OBn+ihjCA4MCXvvIjmoYggQ++8ieOAgTwvdGV4dD48dGV4dCB4PSI3MC4wMjYiIHk9IjUxOS40MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjY0Ljk3NCI+5pqr5a6a44Gu6L+95Yqg44Gu44Ky44O844OI44Go44GX44Gm5paHIDg1JeODu+WIhuWykCA3NSXjgII8L3RleHQ+PHRleHQgeD0iNzAuMDI2IiB5PSI1MzMuMzg5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzNDYuNTU1Ij5kb21haW4g44Gu5paHIDk3JSDjga/nm67lronvvIjjgrLjg7zjg4jjgavjgZnjgovjgYvjga8gQjEg44Gu5a6f5ris5b6M77yJ77yJPC90ZXh0PjxyZWN0IHg9IjkxLjE5MiIgeT0iNTY2LjIxOSIgd2lkdGg9IjM2My4wMTUiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjEwMS4xOTIiIHk9IjU4Ny4zNTciIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjMwMS42NzEiPuWPl+OBkeWFpeOCjO+8iGN1Y3VtYmVyLXNjYWxhIEBhcGnjgIJQb3N0Z3JlU1FMIDE444CCPC90ZXh0Pjx0ZXh0IHg9IjEwMS4xOTIiIHk9IjYwMS4zMjYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjM0My4wMTUiPnNidCB0ZXN0IOOBqOOBr+WIpeOCuOODp+ODluOAglVuZGVmaW5lZOODu1BlbmRpbmcg44GM44GC44KM44Gw5aSx5pWX77yJPC90ZXh0PjxyZWN0IHg9Ijg4LjExNiIgeT0iNjM0LjE1NiIgd2lkdGg9IjM2OS4xNjgiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9Ijk4LjExNiIgeT0iNjU1LjI5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMzQ5LjE2OCI+44OV44Ot44Oz44OI44Ko44Oz44OJ77yIZm9ybWF044CBbGludOOAgXR5cGVjaGVja+OAgeOCs+ODs+ODneODvOODjeODs+ODiO+8iTwvdGV4dD48cmVjdCB4PSI2My45MjkiIHk9IjY4OC4xMjUiIHdpZHRoPSI0MTcuNTQyIiBoZWlnaHQ9IjQ3LjkzOCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSI3My45MjkiIHk9IjcwOS4yNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjM5Ny41NDIiPuWPl+OBkeWFpeOCjO+8iEN1Y3VtYmVyLUpTIEB1aSArIFBsYXl3cmlnaHTvvInjgIFQbGF5d3JpZ2h0IGUyZSArIGF4ZTwvdGV4dD48dGV4dCB4PSI3My45MjkiIHk9IjcyMy4yMzIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjE1OC41NzkiPu+8iENocm9taXVt44CB5a6f44K144O844OQ44O877yJPC90ZXh0PjxyZWN0IHg9IjE0My4xNTYiIHk9Ijc1Ni4wNjMiIHdpZHRoPSIyNTkuMDg4IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxNTMuMTU2IiB5PSI3NzcuMjAxIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIyMzkuMDg4Ij7kvp3lrZjplqLkv4Ljg7vnp5jlr4bmg4XloLHjg7vjgrPjg7Pjg4bjg4rjg7tJYUMg44Gu5qSc5p+7PC90ZXh0PjxyZWN0IHg9IjI2IiB5PSI4MTAuMDMxIiB3aWR0aD0iNDkzLjQiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjM2IiB5PSI4MzEuMTciIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjQ3My40Ij7jgr/jgrDvvIhAVVPjg7tAQUPvvInjgajjg4bjgrnjg4jlkI3jga4gSUQg44GL44KJ44OI44Os44O844K144OT44Oq44OG44Kj44Gu6KGo44KS55Sf5oiQ44GX44CB5pW05ZCI44KS5qSc5p+7PC90ZXh0PjxyZWN0IHg9IjE0Mi4zMjEiIHk9Ijg2NCIgd2lkdGg9IjI2MC43NTgiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjE1Mi4zMjEiIHk9Ijg4NS4xMzkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI0MC43NTgiPk4tMSDkupLmj5vvvIjnm7TliY3jga7jg6rjg6rjg7zjgrnjga7oqq3jgb/lj5bjgorlgbTjgafjgIE8L3RleHQ+PHRleHQgeD0iMTUyLjMyMSIgeT0iODk5LjEwNyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMTgwLjUyOCI+54++5Zyo44Gu5pu444GP54mI44GuIGdvbGRlbiDjgpLlho3nlJ/vvIk8L3RleHQ+PHJlY3QgeD0iMTAwLjUxMyIgeT0iOTMzLjkzOCIgd2lkdGg9IjM0NC4zNzMiIGhlaWdodD0iMTkwLjIwMyIgZmlsbD0ibm9uZSIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7Ii8+PHBhdGggZD0iTTE5NC41MTMsOTMzLjkzOCBMMTk0LjUxMyw5NDMuMjM0IEwxODQuNTEzLDk1My4yMzQgTDEwMC41MTMsOTUzLjIzNCIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7IiBmaWxsPSJub25lIi8+PHRleHQgeD0iMTAzLjUxMyIgeT0iOTQ3LjkzMyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iODQiPuWumuacn++8iOWknOmWk++8iTwvdGV4dD48cmVjdCB4PSIyMjYuNjk5IiB5PSI5NzAuMjM0IiB3aWR0aD0iOTIuMDAxIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyMzYuNjk5IiB5PSI5OTEuMzczIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSI3Mi4wMDEiPuODluODqeOCpuOCtuihjOWIlzwvdGV4dD48cmVjdCB4PSIxMTAuNTEzIiB5PSIxMDI0LjIwMyIgd2lkdGg9IjMyNC4zNzMiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjEyMC41MTMiIHk9IjEwNDUuMzQyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzMDQuMzczIj7osqDojbfoqabpqJPvvIjlrp8gRELjgIE3NSDmjqXntprvvInjgIHnorrlrprjgYvjgonlj43mmKDjgb7jgafjga7oqIjmuKw8L3RleHQ+PHJlY3QgeD0iMTE4LjY5OSIgeT0iMTA3OC4xNzIiIHdpZHRoPSIzMDguMDAyIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxMjguNjk5IiB5PSIxMDk5LjMxMSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjg4LjAwMiI+44K544OI44Oq44O844Og6ZW344O76LW35YuV5pmC6ZaT44O744Oh44Oi44Oq44O75YaN5qeL56+J5pmC6ZaT44Gu6KiI5risPC90ZXh0PjxlbGxpcHNlIGN4PSIyNzIuNyIgY3k9IjExNTUuMTQxIiByeD0iMTEiIHJ5PSIxMSIgZmlsbD0ibm9uZSIgc3R5bGU9InN0cm9rZTojMjIyO3N0cm9rZS13aWR0aDoxOyIvPjxlbGxpcHNlIGN4PSIyNzIuNyIgY3k9IjExNTUuMTQxIiByeD0iNiIgcnk9IjYiIGZpbGw9IiMyMjIiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI3Mi4yOTciIHgyPSIyNzIuNyIgeTI9IjkyLjI5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsODIuMjk3LDI3Mi43LDkyLjI5NywyNzYuNyw4Mi4yOTcsMjcyLjcsODYuMjk3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjIyMC41IiB4Mj0iMjcyLjciIHkyPSIyNDAuNSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMjMwLjUsMjcyLjcsMjQwLjUsMjc2LjcsMjMwLjUsMjcyLjcsMjM0LjUiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iMjc0LjQ2OSIgeDI9IjI3Mi43IiB5Mj0iMjk0LjQ2OSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMjg0LjQ2OSwyNzIuNywyOTQuNDY5LDI3Ni43LDI4NC40NjksMjcyLjcsMjg4LjQ2OSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSIzMjguNDM4IiB4Mj0iMjcyLjciIHkyPSIzNDguNDM4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNywzMzguNDM4LDI3Mi43LDM0OC40MzgsMjc2LjcsMzM4LjQzOCwyNzIuNywzNDIuNDM4IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjM5Ni4zNzUiIHgyPSIyNzIuNyIgeTI9IjQxNi4zNzUiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDQwNi4zNzUsMjcyLjcsNDE2LjM3NSwyNzYuNyw0MDYuMzc1LDI3Mi43LDQxMC4zNzUiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iNDY0LjMxMyIgeDI9IjI3Mi43IiB5Mj0iNDg0LjMxMyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsNDc0LjMxMywyNzIuNyw0ODQuMzEzLDI3Ni43LDQ3NC4zMTMsMjcyLjcsNDc4LjMxMyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI1NDYuMjE5IiB4Mj0iMjcyLjciIHkyPSI1NjYuMjE5IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw1NTYuMjE5LDI3Mi43LDU2Ni4yMTksMjc2LjcsNTU2LjIxOSwyNzIuNyw1NjAuMjE5IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjYxNC4xNTYiIHgyPSIyNzIuNyIgeTI9IjYzNC4xNTYiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDYyNC4xNTYsMjcyLjcsNjM0LjE1NiwyNzYuNyw2MjQuMTU2LDI3Mi43LDYyOC4xNTYiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iNjY4LjEyNSIgeDI9IjI3Mi43IiB5Mj0iNjg4LjEyNSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsNjc4LjEyNSwyNzIuNyw2ODguMTI1LDI3Ni43LDY3OC4xMjUsMjcyLjcsNjgyLjEyNSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI3MzYuMDYzIiB4Mj0iMjcyLjciIHkyPSI3NTYuMDYzIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw3NDYuMDYzLDI3Mi43LDc1Ni4wNjMsMjc2LjcsNzQ2LjA2MywyNzIuNyw3NTAuMDYzIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9Ijc5MC4wMzEiIHgyPSIyNzIuNyIgeTI9IjgxMC4wMzEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDgwMC4wMzEsMjcyLjcsODEwLjAzMSwyNzYuNyw4MDAuMDMxLDI3Mi43LDgwNC4wMzEiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iODQ0IiB4Mj0iMjcyLjciIHkyPSI4NjQiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDg1NCwyNzIuNyw4NjQsMjc2LjcsODU0LDI3Mi43LDg1OCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSIxMjYuMjY2IiB4Mj0iMjcyLjciIHkyPSIxNzIuNTYzIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNywxNjIuNTYzLDI3Mi43LDE3Mi41NjMsMjc2LjcsMTYyLjU2MywyNzIuNywxNjYuNTYzIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjEwMDQuMjAzIiB4Mj0iMjcyLjciIHkyPSIxMDI0LjIwMyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMTAxNC4yMDMsMjcyLjcsMTAyNC4yMDMsMjc2LjcsMTAxNC4yMDMsMjcyLjcsMTAxOC4yMDMiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iMTA1OC4xNzIiIHgyPSIyNzIuNyIgeTI9IjEwNzguMTcyIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNywxMDY4LjE3MiwyNzIuNywxMDc4LjE3MiwyNzYuNywxMDY4LjE3MiwyNzIuNywxMDcyLjE3MiIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI5MTEuOTM4IiB4Mj0iMjcyLjciIHkyPSI5NzAuMjM0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw5NjAuMjM0LDI3Mi43LDk3MC4yMzQsMjc2LjcsOTYwLjIzNCwyNzIuNyw5NjQuMjM0IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjExMTIuMTQxIiB4Mj0iMjcyLjciIHkyPSIxMTQ0LjE0MSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMTEzNC4xNDEsMjcyLjcsMTE0NC4xNDEsMjc2LjcsMTEzNC4xNDEsMjcyLjcsMTEzOC4xNDEiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PD9wbGFudHVtbC1zcmMgUkxMUkpuajc1N3h0aG5YNXVnY28yZktZQTdhMXAwakxNajZZQTd0V25KNEJoNkJsZWxOSTlnZVlpUkY0aEJkNDFjQmtPNG5peDcybm1wclcxX3ZCM3BFeFZpZlZvOWJQY3JYZzlLa3hpdEVrdF9jLU9yQ3JlbWU5M0gybW9jMGRXNXczeFIxb3JpbERWd3F2R3Y1bUQ0cFNmMERKYkFWSUZFVHloSUszV1JXUERpbjBEelloTzEtMlZHMnEwaEphLXY4VklJb2lRWFpsaW1vOTlaUkdBeDBCSm04SndBUVFnZ3dISHhwb1pjdGtGMkJfMUJoWjhpYmVwMG9EQXY2TmxUNGVKNWIwcHkzNnRvQkdGQVIwSWVCRjVTRkczS29Gcnl5bnBYekFKRnpCQ1YzYS13a2xxOUs0V240SFBMWWhNbmNNTVkzajhmWXozZFBETGxUSG5aaTN3bTJpTFJwWWl1bENrVklGY0NJVHBoN1BRcFFfOGxGZFAwYkV5cFJ2OUQxVHRydnREd1F6dVdVLWF5UmtVN3dCUHdsZXdFc2R0RkRmRndWZU1oWk5tNHcyTFZJbmRWVklOeTNBMFBxM1FuY2lhWC1rVHIzWXBXZ0J3OHJYeGdpUE5icHAwdGtiNmxhdGlLSk8zaGdLdFZUUHhnSFJGWkhKWXAxV3h1Q3o5dDM2UWtxZ2RvZndQbVZZdklwM2FaRWpXeUtTeUhTY0NQTXVZUXgzNmZ3MXhpYVh1SDFGOTRtdWdZOXNwYXhvTzVLVUZEdHQ5SGJlTXBSYy04ZFRZbkVNVGJnWll5V0hOSkVIME9lSDN5aEhZMVI5ZTF1dG5tbmJ3RlVkZkFDQnNKSWl6VWtIYnVlWGk0N09tUzlIcHVGcllVTEZVMFA3R19seFg1eVpXcExGc2liejVJVEwxNGZ6Y3FSbDUwY08xbGo4cWFuSVpmdXNRdEpZNFM2SHk5V1lRX1pwcndWdWQwRVFUQ2toUkVQNlNDMElKMlRUeE1yZVpWR2M4UHpYbW5oVkU2SmIzTkpweGh3bXNUdE1tM1dfd1JoRkxzUDhyLUNzWDlldjJOUVE5ZnJ1NEJzRHcwcURiOE45cHZyai01Zm5EeWtpZDlJR0ZtR3cxNmpUYVc5XzVUQk44VWJHcGxCRkgtbU0xUFpxY3NHZnBCUjh0WE9HOF9JRko0T2NPb3lLZW01bEp0WDJuUXBfSFJXdlFZOEJoWjJkODEwSXFydDEtc1ZRWTNBQU9uaDF5V1NMUktKTG5pR21tQUFqYXNXb0IwRnNTS0NGZzdKbjhaZVByT3JPczRJeWVnZWM3a1JoMktLQWk0TjNGY0NNVkVWX3hJVkt4RVVOOFQ4cGdQOFZvNjBxX0ZmbEducVJEX3JuVjN5SnZJUzUzU0FsNUNkVXFCWVhueko5NkRlV1I0MGxQM0JhR3l0RlQ3LXhwT3hOd1lqeHp0U0stdElCUXdvSXVGUFJqZWphaHBQQko4MHpZeVUxUzhXeUk0am93bXhlOXlwSXlzbThodGp3OUphR291U3pjSFBnOW1GejNMZjlfSHI5NU00WG9xOUttbEkzTzU0RXotRUlCLUY2eGljUzJzaEpmT1R5bG1LeG9GdEQ0YXpqWWJzcVVTd0lTZmM4QTBVRDNPUTEzZXgxa2NDZnQ1NnBwM2VOWVgxcVRMRXRSNGo4YjYtWTI1OVlQTURiT3RmcUg0NFVxWU1NTUMzYTRmR3RoTmlPRVN3dHlCbDN5YmxyYk1LcWEzalBLNEhpb3RzV2JvV0d2Z25ZVlR4ZmhoVG12TnRTaHZVTVhLU3ZJX2h4QzdsZE95QlY1VHBCM056T3hqd0RMOHYwMUZTWE5xRm50OGV3aVZZSVd6SU1xNXZCaTZIVnpjdXpXcmtkd2JyU2lSYUNOd1RPWTlZRXNDMXhxZ1FBdlZGWWQ1ajlEY3dfWHRnM19xUnduM1MwPz48L2c+PC9zdmc+" class="uml" alt="uml diagram" title="" /></p>
+<p>team の規約（<code>aidlc/active-memory/team.md</code>）は、beer-game3 について「CI と deploy のワークフローを beer-game3 用に別に新しく作る」と書いています。<strong>この規約が beer-game-scala に及ぶかは、人の承認の場で確認します（M1・D5）。及ぶものとして読み</strong>、Scala 版の CI と deploy のワークフローも<strong>別に新しく作ります</strong>（<code>.github/workflows/beer-game-scala.yml</code>。<strong>未作成</strong>）。formatter・linter・type-check を CI で実行し、失敗した変更はマージしません。</p>
+<p><strong>範囲（N-H4。ユーザーの決定、2026-11-25）</strong>: <strong>検証用の CI（<code>check</code> ジョブ 1 本。Scalafmt、コンパイル <code>-Werror</code>、WartRemover、Scalafix、テスト、カバレッジ）は U1 の約束に含めます。</strong> B1 の受入条件の「CI が落ちる」は、この <code>check</code> ジョブで判定します。<strong>AWS 環境と、デプロイ用のワークフロー（インフラの SI5 のうち <code>deploy</code> 側）、ステージングへの自動反映は後回し（再開するときに Unit を決める。L2）です。</strong></p>
+<p><strong>U1 の約束の範囲（R-H2・D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）</strong>: <strong>U1 の約束は、ジョブの本数ではなく検証の範囲</strong>です。<strong>統合テスト（PostgreSQL 18、testcontainers-scala）と <code>@api</code> の受け入れテストの CI 実行を、U1 の約束に含めます</strong>（案 (a)。案 (b)＝代わりの条件を <code>check</code> の範囲に縮めてリスクを例外の節に書く、は採らない）。理由は 3 つです。(1) ADR-001 の「例外の間の条件」（Testcontainers の統合テストと受け入れテストを CI で実行）を U1 で満たさないと、例外を承認しても趣旨が守られない。(2) team の Testing Posture「主要境界の Integration Test を CI で実行」が、デプロイ以外の例外でカバーされない。(3) <code>adapter-persistence</code> の文 90%（層ごとの目標）は DB の統合を合算する前提で、統合が CI に無いと行 80% が赤のままになりうる。<strong>実現の形は 2 案で、人が決める</strong>: <strong>案 X</strong>＝<code>check</code> ジョブに統合テストと <code>@api</code> の受け入れを含める（ジョブは 1 本のまま。時間が延びる）、<strong>案 Y</strong>＝別ジョブ <code>integration</code>・<code>acceptance</code> を U1 に足す（<a href="../architecture-infrastructure/">インフラ</a> の SI5 の表のとおり。<code>check</code> は速く保てる）。<strong>ADR-012 のコンプライアンス（CI で Undefined・Pending があれば失敗）は、<code>@api</code> の受け入れが U1 の範囲に入ることで、U1 で果たせます</strong>（旧記述では、<code>acceptance</code> ジョブが範囲に入るまで果たせなかった。L3）。下の CI の図の「毎回」は、<strong>U1 で約束する範囲（<code>check</code>、統合、<code>@api</code> の受け入れ）と、対応する検証が範囲に入る Bolt で足す工程（フロントエンド、<code>@ui</code>、e2e、<code>container</code>、<code>n1</code>、<code>infra</code> など）を区別して読みます</strong>（M16）。 team の規約は「<code>main</code> の merge で staging へ自動反映」を求めるため、<strong>自動反映を持たない間の例外は、ADR に記録して人が承認します</strong>（ADR-001 は別担当。承認を得るまでは規約との衝突が残る）。U1〜U3 の間は実際の研修に使わないため、この例外が研修に影響することはありません。</p>
+<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJBQ1RJVklUWSIgc3R5bGU9IndpZHRoOjc2MXB4O2hlaWdodDoxMjI3cHg7YmFja2dyb3VuZDojRkZGRkZGOyIgd2lkdGg9Ijc2MXB4IiBoZWlnaHQ9IjEyMjdweCIgdmlld0JveD0iMCAwIDc2MSAxMjI3IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjI2Mi4wMDkiIHk9IjMyLjk5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjM1LjMwNiIgZm9udC13ZWlnaHQ9IjcwMCI+Q0kg44Gu44OG44K544OI5a6f6KGM77yIU2NhbGEg54mI44CC5o+Q5qGI77yJPC90ZXh0PjwvZz48ZWxsaXBzZSBjeD0iMjcyLjciIGN5PSI2Mi4yOTciIHJ4PSIxMCIgcnk9IjEwIiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBhdGggZD0iTTQzMy4zMjMsODIuMjk3IEw0MzMuMzIzLDEyMS4xMjkgTDQxMy4zMjMsMTI1LjEyOSBMNDMzLjMyMywxMjkuMTI5IEw0MzMuMzIzLDE2Ny45NjEgQTAsMCAwIDAgMCA0MzMuMzIzLDE2Ny45NjEgTDc0MC4zMjQsMTY3Ljk2MSBBMCwwIDAgMCAwIDc0MC4zMjQsMTY3Ljk2MSBMNzQwLjMyNCw5Mi4yOTcgTDczMC4zMjQsODIuMjk3IEw0MzMuMzIzLDgyLjI5NyBBMCwwIDAgMCAwIDQzMy4zMjMsODIuMjk3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIGZpbGw9IiNGRUZGREQiLz48cGF0aCBkPSJNNzMwLjMyNCw4Mi4yOTcgTDczMC4zMjQsOTIuMjk3IEw3NDAuMzI0LDkyLjI5NyBMNzMwLjMyNCw4Mi4yOTciIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgZmlsbD0iI0ZFRkZERCIvPjx0ZXh0IHg9IjQzOS4zMjMiIHk9Ijk5LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjU1LjkxOSI+44CM5q+O5Zue44CN44Gu5bel56iL44Gu44GG44Gh44CBVTEg44Gn57SE5p2f44GZ44KL44Gu44GvPC90ZXh0Pjx0ZXh0IHg9IjQzOS4zMjMiIHk9IjExNC40OTciIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjI4NiI+6Z2Z55qE6Kej5p6Q44O75aWR57SE44O744Om44OL44OD44OI44O757Wx5ZCI44O744Kr44OQ44Os44OD44K444O7PC90ZXh0Pjx0ZXh0IHg9IjQzOS4zMjMiIHk9IjEyOS42MjkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjE4NS4yNDQiPkBhcGkg44Gu5Y+X44GR5YWl44KM44G+44Gn77yIRDHvvInjgII8L3RleHQ+PHRleHQgeD0iNDM5LjMyMyIgeT0iMTQ0Ljc2MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjM0Ij7jg5Xjg63jg7Pjg4jjgqjjg7Pjg4nku6XpmY3jga/jgIHlr77lv5zjgZnjgovmpJzoqLzjgYw8L3RleHQ+PHRleHQgeD0iNDM5LjMyMyIgeT0iMTU5Ljg5NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMTkxLjYwNCI+56+E5Zuy44Gr5YWl44KLIEJvbHQg44Gn6Laz44GZ77yITTE277yJPC90ZXh0PjxyZWN0IHg9IjEzMi4wNzYiIHk9IjEwOC4xNDUiIHdpZHRoPSIyODEuMjQ3IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxNDIuMDc2IiB5PSIxMjkuMjgzIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIyNjEuMjQ3Ij7jg5fjg6vjg6rjgq/jgqjjgrnjg4ggLyBkZXZlbG9w44O7bWFpbiDjgbjjga7jg5fjg4Pjgrfjg6U8L3RleHQ+PHJlY3QgeD0iMTYiIHk9IjE3Ny45NjEiIHdpZHRoPSI1MTMuNCIgaGVpZ2h0PSI3ODcuNjcyIiBmaWxsPSJub25lIiBzdHlsZT0ic3Ryb2tlOiMwMDA7c3Ryb2tlLXdpZHRoOjEuNTsiLz48cGF0aCBkPSJNMzcxLjYwMywxNzcuOTYxIEwzNzEuNjAzLDE4Ny4yNTggTDM2MS42MDMsMTk3LjI1OCBMMTYsMTk3LjI1OCIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7IiBmaWxsPSJub25lIi8+PHRleHQgeD0iMTkiIHk9IjE5MS45NTYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjM0NS42MDMiPuavjuWbnu+8iOWbs+OBruWFqOS9k+OAglUxIOOBp+e0hOadn+OBmeOCi+OBruOBr+S4iuOBruazqOOBruOBqOOBiuOCiu+8iTwvdGV4dD48cmVjdCB4PSIzMi42NTciIHk9IjIxNC4yNTgiIHdpZHRoPSI0ODAuMDg1IiBoZWlnaHQ9IjQ3LjkzOCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSI0Mi42NTciIHk9IjIzNS4zOTYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjQ2MC4wODUiPnNjYWxhZm10Q2hlY2tBbGzjgIHjgrPjg7Pjg5HjgqTjg6vvvIgtV2Vycm9y77yJ44CBV2FydFJlbW92ZXLjgIFzY2FsYWZpeEFsbCAtLWNoZWNrPC90ZXh0Pjx0ZXh0IHg9IjQyLjY1NyIgeT0iMjQ5LjM2NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMzM1LjQ1MiI+6YGV5Y+NIDDjgIHjg5njg7zjgrnjg6njgqTjg7PjgarjgZfjgIHmipHliLbjgarjgZfvvIjnhKHlirnljJbjgrPjg6Hjg7Pjg4jjgarjgZfvvIk8L3RleHQ+PHJlY3QgeD0iMTA4LjkyNSIgeT0iMjgyLjE5NSIgd2lkdGg9IjMyNy41NDkiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjExOC45MjUiIHk9IjMwMy4zMzQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjMwNy41NDkiPumdmeeahOino+aekOOBruaknOafu++8iOimj+e0hOmBleWPjeOBruOCs+ODvOODieOBpyBDSSDjgYzokL3jgaHjgovjgZPjgajvvIk8L3RleHQ+PHJlY3QgeD0iMTI1LjYxNiIgeT0iMzM2LjE2NCIgd2lkdGg9IjI5NC4xNjgiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjEzNS42MTYiIHk9IjM1Ny4zMDMiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI3NC4xNjgiPkFQSSDjga7lpZHntITvvIjku5Xmp5jjga7mpJzoqLwg4oaSIOWei+OBrueUn+aIkCDihpIg5Z6L44Gu5qSc5p+777yJPC90ZXh0PjxyZWN0IHg9IjE0Mi42OTkiIHk9IjM5MC4xMzMiIHdpZHRoPSIyNjAuMDAyIiBoZWlnaHQ9IjQ3LjkzOCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxNTIuNjk5IiB5PSI0MTEuMjcxIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIyMzcuNDM1Ij7jg6bjg4vjg4Pjg4jjg7vmgKfos6rjg7vms5XliYfjga7jg4bjgrnjg4jvvIhzYnQgdGVzdO+8iTwvdGV4dD48dGV4dCB4PSIxNTIuNjk5IiB5PSI0MjUuMjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI0MC4wMDIiPu+8iOOCouODl+ODquOCseODvOOCt+ODp+ODs+WxpOOBr+ODhuOCueODiOeUqOOBruODneODvOODiO+8iTwvdGV4dD48cmVjdCB4PSIxMDYuMDQ2IiB5PSI0NTguMDciIHdpZHRoPSIzMzMuMzA3IiBoZWlnaHQ9IjQ3LjkzOCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxMTYuMDQ2IiB5PSI0NzkuMjA5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzMTMuMzA3Ij7ntbHlkIjjg4bjgrnjg4jvvIh0ZXN0Y29udGFpbmVycy1zY2FsYSDjga4gUG9zdGdyZVNRTCAxOOOAgjwvdGV4dD48dGV4dCB4PSIxMTYuMDQ2IiB5PSI0OTMuMTc4IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIyOTguODEyIj5Eb2NrZXIg44GM54Sh44GR44KM44Gw5aSx5pWX44CCREIg44Gu57Wx5ZCI44GMIDAg5Lu244Gn44KC5aSx5pWX77yJPC90ZXh0PjxyZWN0IHg9IjYwLjAyNiIgeT0iNTI2LjAwOCIgd2lkdGg9IjQyNS4zNDgiIGhlaWdodD0iNjEuOTA2IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjcwLjAyNiIgeT0iNTQ3LjE0NiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNDA1LjM0OCI+44Kr44OQ44Os44OD44K444Gu44Ky44O844OI77yIc2NvdmVyYWdlIOOBriBYTUwg44GL44KJ566X5Ye644GX44Gf6KGMIDgwJe+8iOahiCBD77yJ44CBPC90ZXh0Pjx0ZXh0IHg9IjcwLjAyNiIgeT0iNTYxLjExNSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjY0Ljk3NCI+5pqr5a6a44Gu6L+95Yqg44Gu44Ky44O844OI44Go44GX44Gm5paHIDg1JeODu+WIhuWykCA3NSXjgII8L3RleHQ+PHRleHQgeD0iNzAuMDI2IiB5PSI1NzUuMDg0IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzNDYuNTU1Ij5kb21haW4g44Gu5paHIDk3JSDjga/nm67lronvvIjjgrLjg7zjg4jjgavjgZnjgovjgYvjga8gQjEg44Gu5a6f5ris5b6M77yJ77yJPC90ZXh0PjxyZWN0IHg9IjkxLjE5MiIgeT0iNjA3LjkxNCIgd2lkdGg9IjM2My4wMTUiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjEwMS4xOTIiIHk9IjYyOS4wNTMiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjMwMS42NzEiPuWPl+OBkeWFpeOCjO+8iGN1Y3VtYmVyLXNjYWxhIEBhcGnjgIJQb3N0Z3JlU1FMIDE444CCPC90ZXh0Pjx0ZXh0IHg9IjEwMS4xOTIiIHk9IjY0My4wMjEiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjM0My4wMTUiPnNidCB0ZXN0IOOBqOOBr+WIpeOCuOODp+ODluOAglVuZGVmaW5lZOODu1BlbmRpbmcg44GM44GC44KM44Gw5aSx5pWX77yJPC90ZXh0PjxyZWN0IHg9Ijg4LjExNiIgeT0iNjc1Ljg1MiIgd2lkdGg9IjM2OS4xNjgiIGhlaWdodD0iMzMuOTY5IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9Ijk4LjExNiIgeT0iNjk2Ljk5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzNDkuMTY4Ij7jg5Xjg63jg7Pjg4jjgqjjg7Pjg4nvvIhmb3JtYXTjgIFsaW5044CBdHlwZWNoZWNr44CB44Kz44Oz44Od44O844ON44Oz44OI77yJPC90ZXh0PjxyZWN0IHg9IjYzLjkyOSIgeT0iNzI5LjgyIiB3aWR0aD0iNDE3LjU0MiIgaGVpZ2h0PSI0Ny45MzgiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iNzMuOTI5IiB5PSI3NTAuOTU5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIzOTcuNTQyIj7lj5fjgZHlhaXjgozvvIhDdWN1bWJlci1KUyBAdWkgKyBQbGF5d3JpZ2h077yJ44CBUGxheXdyaWdodCBlMmUgKyBheGU8L3RleHQ+PHRleHQgeD0iNzMuOTI5IiB5PSI3NjQuOTI4IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEyIiB0ZXh0TGVuZ3RoPSIxNTguNTc5Ij7vvIhDaHJvbWl1beOAgeWun+OCteODvOODkOODvO+8iTwvdGV4dD48cmVjdCB4PSIxNDMuMTU2IiB5PSI3OTcuNzU4IiB3aWR0aD0iMjU5LjA4OCIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTUzLjE1NiIgeT0iODE4Ljg5NiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMjM5LjA4OCI+5L6d5a2Y6Zai5L+C44O756eY5a+G5oOF5aCx44O744Kz44Oz44OG44OK44O7SWFDIOOBruaknOafuzwvdGV4dD48cmVjdCB4PSIyNiIgeT0iODUxLjcyNyIgd2lkdGg9IjQ5My40IiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIzNiIgeT0iODcyLjg2NSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNDczLjQiPuOCv+OCsO+8iEBVU+ODu0BBQ++8ieOBqOODhuOCueODiOWQjeOBriBJRCDjgYvjgonjg4jjg6zjg7zjgrXjg5Pjg6rjg4bjgqPjga7ooajjgpLnlJ/miJDjgZfjgIHmlbTlkIjjgpLmpJzmn7s8L3RleHQ+PHJlY3QgeD0iMTQyLjMyMSIgeT0iOTA1LjY5NSIgd2lkdGg9IjI2MC43NTgiIGhlaWdodD0iNDcuOTM4IiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjx0ZXh0IHg9IjE1Mi4zMjEiIHk9IjkyNi44MzQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI0MC43NTgiPk4tMSDkupLmj5vvvIjnm7TliY3jga7jg6rjg6rjg7zjgrnjga7oqq3jgb/lj5bjgorlgbTjgafjgIE8L3RleHQ+PHRleHQgeD0iMTUyLjMyMSIgeT0iOTQwLjgwMyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMTgwLjUyOCI+54++5Zyo44Gu5pu444GP54mI44GuIGdvbGRlbiDjgpLlho3nlJ/vvIk8L3RleHQ+PHJlY3QgeD0iMTAwLjUxMyIgeT0iOTc1LjYzMyIgd2lkdGg9IjM0NC4zNzMiIGhlaWdodD0iMTkwLjIwMyIgZmlsbD0ibm9uZSIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7Ii8+PHBhdGggZD0iTTE5NC41MTMsOTc1LjYzMyBMMTk0LjUxMyw5ODQuOTMgTDE4NC41MTMsOTk0LjkzIEwxMDAuNTEzLDk5NC45MyIgc3R5bGU9InN0cm9rZTojMDAwO3N0cm9rZS13aWR0aDoxLjU7IiBmaWxsPSJub25lIi8+PHRleHQgeD0iMTAzLjUxMyIgeT0iOTg5LjYyOCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iODQiPuWumuacn++8iOWknOmWk++8iTwvdGV4dD48cmVjdCB4PSIyMjYuNjk5IiB5PSIxMDExLjkzIiB3aWR0aD0iOTIuMDAxIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIyMzYuNjk5IiB5PSIxMDMzLjA2OCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iNzIuMDAxIj7jg5bjg6njgqbjgrbooYzliJc8L3RleHQ+PHJlY3QgeD0iMTEwLjUxMyIgeT0iMTA2NS44OTgiIHdpZHRoPSIzMjQuMzczIiBoZWlnaHQ9IjMzLjk2OSIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48dGV4dCB4PSIxMjAuNTEzIiB5PSIxMDg3LjAzNyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMiIgdGV4dExlbmd0aD0iMzA0LjM3MyI+6LKg6I236Kmm6aiT77yI5a6fIERC44CBNzUg5o6l57aa77yJ44CB56K65a6a44GL44KJ5Y+N5pig44G+44Gn44Gu6KiI5risPC90ZXh0PjxyZWN0IHg9IjExOC42OTkiIHk9IjExMTkuODY3IiB3aWR0aD0iMzA4LjAwMiIgaGVpZ2h0PSIzMy45NjkiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PHRleHQgeD0iMTI4LjY5OSIgeT0iMTE0MS4wMDYiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjI4OC4wMDIiPuOCueODiOODquODvOODoOmVt+ODu+i1t+WLleaZgumWk+ODu+ODoeODouODquODu+WGjeani+evieaZgumWk+OBruioiOa4rDwvdGV4dD48ZWxsaXBzZSBjeD0iMjcyLjciIGN5PSIxMTk2LjgzNiIgcng9IjExIiByeT0iMTEiIGZpbGw9Im5vbmUiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48ZWxsaXBzZSBjeD0iMjcyLjciIGN5PSIxMTk2LjgzNiIgcng9IjYiIHJ5PSI2IiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iNzIuMjk3IiB4Mj0iMjcyLjciIHkyPSIxMDguMTQ1IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw5OC4xNDUsMjcyLjcsMTA4LjE0NSwyNzYuNyw5OC4xNDUsMjcyLjcsMTAyLjE0NSIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSIyNjIuMTk1IiB4Mj0iMjcyLjciIHkyPSIyODIuMTk1IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNywyNzIuMTk1LDI3Mi43LDI4Mi4xOTUsMjc2LjcsMjcyLjE5NSwyNzIuNywyNzYuMTk1IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjMxNi4xNjQiIHgyPSIyNzIuNyIgeTI9IjMzNi4xNjQiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDMyNi4xNjQsMjcyLjcsMzM2LjE2NCwyNzYuNywzMjYuMTY0LDI3Mi43LDMzMC4xNjQiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iMzcwLjEzMyIgeDI9IjI3Mi43IiB5Mj0iMzkwLjEzMyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMzgwLjEzMywyNzIuNywzOTAuMTMzLDI3Ni43LDM4MC4xMzMsMjcyLjcsMzg0LjEzMyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI0MzguMDciIHgyPSIyNzIuNyIgeTI9IjQ1OC4wNyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsNDQ4LjA3LDI3Mi43LDQ1OC4wNywyNzYuNyw0NDguMDcsMjcyLjcsNDUyLjA3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjUwNi4wMDgiIHgyPSIyNzIuNyIgeTI9IjUyNi4wMDgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDUxNi4wMDgsMjcyLjcsNTI2LjAwOCwyNzYuNyw1MTYuMDA4LDI3Mi43LDUyMC4wMDgiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iNTg3LjkxNCIgeDI9IjI3Mi43IiB5Mj0iNjA3LjkxNCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsNTk3LjkxNCwyNzIuNyw2MDcuOTE0LDI3Ni43LDU5Ny45MTQsMjcyLjcsNjAxLjkxNCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI2NTUuODUyIiB4Mj0iMjcyLjciIHkyPSI2NzUuODUyIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw2NjUuODUyLDI3Mi43LDY3NS44NTIsMjc2LjcsNjY1Ljg1MiwyNzIuNyw2NjkuODUyIiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjcwOS44MiIgeDI9IjI3Mi43IiB5Mj0iNzI5LjgyIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw3MTkuODIsMjcyLjcsNzI5LjgyLDI3Ni43LDcxOS44MiwyNzIuNyw3MjMuODIiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iNzc3Ljc1OCIgeDI9IjI3Mi43IiB5Mj0iNzk3Ljc1OCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsNzg3Ljc1OCwyNzIuNyw3OTcuNzU4LDI3Ni43LDc4Ny43NTgsMjcyLjcsNzkxLjc1OCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSI4MzEuNzI3IiB4Mj0iMjcyLjciIHkyPSI4NTEuNzI3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7Ii8+PHBvbHlnb24gcG9pbnRzPSIyNjguNyw4NDEuNzI3LDI3Mi43LDg1MS43MjcsMjc2LjcsODQxLjcyNywyNzIuNyw4NDUuNzI3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9Ijg4NS42OTUiIHgyPSIyNzIuNyIgeTI9IjkwNS42OTUiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDg5NS42OTUsMjcyLjcsOTA1LjY5NSwyNzYuNyw4OTUuNjk1LDI3Mi43LDg5OS42OTUiIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iMTQyLjExMyIgeDI9IjI3Mi43IiB5Mj0iMjE0LjI1OCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMjA0LjI1OCwyNzIuNywyMTQuMjU4LDI3Ni43LDIwNC4yNTgsMjcyLjcsMjA4LjI1OCIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSIxMDQ1Ljg5OCIgeDI9IjI3Mi43IiB5Mj0iMTA2NS44OTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDEwNTUuODk4LDI3Mi43LDEwNjUuODk4LDI3Ni43LDEwNTUuODk4LDI3Mi43LDEwNTkuODk4IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjxsaW5lIHgxPSIyNzIuNyIgeTE9IjEwOTkuODY3IiB4Mj0iMjcyLjciIHkyPSIxMTE5Ljg2NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMTEwOS44NjcsMjcyLjcsMTExOS44NjcsMjc2LjcsMTEwOS44NjcsMjcyLjcsMTExMy44NjciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PGxpbmUgeDE9IjI3Mi43IiB5MT0iOTUzLjYzMyIgeDI9IjI3Mi43IiB5Mj0iMTAxMS45MyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIvPjxwb2x5Z29uIHBvaW50cz0iMjY4LjcsMTAwMS45MywyNzIuNywxMDExLjkzLDI3Ni43LDEwMDEuOTMsMjcyLjcsMTAwNS45MyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48bGluZSB4MT0iMjcyLjciIHkxPSIxMTUzLjgzNiIgeDI9IjI3Mi43IiB5Mj0iMTE4NS44MzYiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTsiLz48cG9seWdvbiBwb2ludHM9IjI2OC43LDExNzUuODM2LDI3Mi43LDExODUuODM2LDI3Ni43LDExNzUuODM2LDI3Mi43LDExNzkuODM2IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjw/cGxhbnR1bWwtc3JjIFRMTFRKbmZQNkJ4ZEx2bXF5TWZaTFpWZndoT3RWanJxcXN4U0RLdHRtWGtBZXY4Mk9zM2lqamFxU01RSzNlVzVqVlk1NWhLWUw1a2V1YlVCN196YjNzUzZobGVOLWhuZEdEYmtEbzRtWHRhX2RfVHZkd0Z2ak8zMi1reW5oWFV2NlVONjlzdlFlZllqUklNLWQ1ajNGY18wb3ZvT25RU0NFdmNvandtbHZwNkY5dzl2bXZoZDNaVU5rUmRGcEpya2JCWEhTN3RQWnNuNFVRZTRyMGJrTGU5VVZtWUhwc0htNjlsU0VFTGN4Z3VkZjZlQTJfbDduWktGZHFoT2ZMU1l5dVBGcFM1RWRFUVNtWW12dzU2a1JfNGZfTTRkR2tJVGVzYng4eWxyTE13dVJxa1UtaVFnaXBQVG94LXJ0d0lHSkVKY09PRzdSa3ZvU3ZRb2NIUUVwbDYxSUQ0M0RyMGlCRF9CR2l4bVp3VjdFLTZkcmFMb2NVbHBPWVI3WkdKTkJ2NEZ0R3pxZWJqcXhrNWNjZmlWazVjY1c2WUs3Y0JMSWd3LVllZkJBNTZLQmlOTGtia1NsUkRVQXZucEZVNW5JakNZU3laclZIYnRibE1mME9yUWdQc0tPT2U0M3BmXzlab0xxMFdaRzNtSldETWwtVEtHay1MMjBYa0hBTER6Q3VOZ25JOWctSnltZ2NUbkZEWmJXWnBZRXl3REU4QlZPZHp4eGFIZVpBRDFoTnpTeUp0ZjNHSEdDSlZBaWVydlJrbldZNFpLX2FXOVh6TW1SNWJfWDRoLUs4QmdLb01DYS1sbFZtUE5yanhrZW9aM2VSZ1U1aWF2cmE3MXA1TGtkaWx2bHZGbktGOFVydlZub2V4RjItbDRGSUE5Q3hxYnVmejRPYWRjdHNmMHNkV1JrLWt2eXctUGVnNlRUSmpSV01EakR1Y2N0UHBLOGhjVk9tZTBtc0xsZWZRdzhCdUc4OGowbTB0TkVvWVB4TDgzT1FnTGo5clZTR0RaSWtvVncwOEpSbVgzdnROTWpiOGpWcEhKS3ZYbDY2TEZ2TWxiRk5lZWZxTmlQVWxnODRWYWlTT3E5UUIxVEpZNENwVXM5VmNuOVdTSTlnbjA3ZnNCV25yWUp6RkpVSXJkUHN4OG5ZbXRTUEV4RHo0ZmlheURRVFdpOUhuZmJ3RVg1amNXNmo3Nm1paEd4X1RQUHBVT0NYbVFLN3JGYjMxWDB6WDFSeWRqWnNCZG00dlpEQ1AwN19hckNrVzlyaTZnNUttZ3BtdDNqTWRxX2l0TTRGWTdwSGdqWTh5dXVYckpQMHJfRmhZRnRyYmtuOXBZaWRadmNKWVdhdlFteGV1c000RDBNQl9CaUU2R2xST2xZY2ptZ3JyVFlGWGNRczM5T0Jaa3NhaWxNVlZqRGpma0FvZUVLd21CMS1makg2cmVJdjVDVmtiZ21zRjlvSEg1Q0lPWGxtd3F0em1JVjRnaWhyRkllUFlycHp3QklxWFNwNnNvVFZfWHh2bHFKR09WQS00NmxBR0lvRmZWWDlrWlBoQldhaDFvS2JTbXRJTlFyVDI4Q2VlblpRM3lHSW92RnBINm0tMndxSmc5OWlFLThwNmVQNUdEMXhxUXkwaHVHX0laRlB6R3YwQXN4QjNCYzNkTi1SbHp6M1Z4LU5NOHpLcHdzR3ppQ0Uxel9mU0tPN1NTRHNVY19BSjBtRmpDYVVwajdtLWhHVnphYTVJa2NFTjZpS202RmZveGNRZ042LUIzSWRyZmt0ZmJhRFpjTHFHZlFmaXBPbEQwSWd2Uk9mSVJTSHBsVVZsUHpNZjlSYnJudW9Fb3ozbVNta2tVTmFhRU83Yno0d0xlc3pjeldHUWp2Rnd6YnJrNEdYUGZnU1pxQlI1ZTJwVkdXaGw2M1VyOTduNnJaT05oVkItclR4Qmd2bUt4Y0k0am9YbzljMUdKWWhCTkszMDRzbGwweklrSFg0UjVYTnY0NnE1cVRQQU5PZnJNckN2VzJQOXFBUUFvQ0pLbWVlMjduZUE4cFk2djFFTDVndkEzdV9Qd2JmSHlQeHMtakRaS1BBODhnVUtrRHF3bThDOVFIZHNybXl0UXQ2ZGp0TXd6aTRXVW5JbVJ3NEZzaGpsQ1ZmTHBKalJTT0pkUmQtTmM0MkJHR3RqYnF4c3BnRlkyMU1mQlEzejlpNkhWdmNPejNUTWZyOHZGbk1wUU5aTEdZQm1lZVMzUnFnUTJ5a3R5aDVFQURUeFVYN2cxLXJ3VC0wZTA/PjwvZz48L3N2Zz4=" class="uml" alt="uml diagram" title="" /></p>
 <table>
 <thead>
 <tr>
@@ -15655,7 +15773,15 @@
 </tr>
 <tr>
 <td style="text-align: left;">カバレッジのジョブ</td>
-<td style="text-align: left;">行率を算出できない間（XML が無い、スクリプトが失敗）は、<strong>ジョブを失敗のまま</strong>にする（M7）。基準を下げて緑にしない</td>
+<td style="text-align: left;">行率を算出できない間（XML が無い、スクリプトが失敗）は、<strong>ジョブを失敗のまま</strong>にする（M7）。基準を下げて緑にしない。<strong>ジョブが赤の間はマージが止まる</strong>（team の規約: 失敗した変更はマージしない）。そのため、<strong>算出スクリプトとそのテストは、B1 の最初のスライドに置く</strong>（赤のまま長く止めないため。M15）。「手元で緑なら CI も緑」とは扱わず、<strong>CI の <code>check</code> ジョブの結果を正とする</strong>（N-H4）</td>
+</tr>
+<tr>
+<td style="text-align: left;">U1 の範囲（D1）</td>
+<td style="text-align: left;"><code>check</code>・統合・<code>@api</code> の受け入れ。実現は案 X（<code>check</code> に含める）か案 Y（別ジョブ <code>integration</code>・<code>acceptance</code> を U1 に足す）で、人が決める。<strong>統合が CI に無い間は、<code>adapter-persistence</code> の行率が合算にならず、行 80% が赤のままになりうる</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">トリガー（L7）</td>
+<td style="text-align: left;"><code>pull_request</code> と、<code>develop</code>・<code>main</code> へのプッシュ（team の規約: <code>develop</code> で統合し、リリース時に <code>main</code> へ。<a href="../architecture-infrastructure/">インフラ</a> の SI5 と同じ）</td>
 </tr>
 </tbody>
 </table>
@@ -15664,7 +15790,7 @@
 <ul>
 <li><strong>Gherkin のシナリオ</strong>: タグ <code>@US&lt;番号&gt;</code>・<code>@AC&lt;番号&gt;</code> と層のタグから抽出し、cucumber-scala の実行結果と突き合わせる。<strong>実行結果の形式（JSON、JUnit XML など）は、cucumber-core 8.1.0 が出せるものを B1 で確認して選ぶ</strong>。</li>
 <li><strong>munit のテスト</strong>: テスト名の <code>[US…/AC…]</code>（STT1）を、sbt が出す JUnit XML（確認した事項 1）から抽出する。</li>
-<li><strong>許可リストの導き方（M18。案）</strong>: <code>@api</code> の許可リストは、<strong>U1〜U3 の Unit 定義の受入条件（<code>@AC</code> タグ）から機械的に導く</strong>（手で選ばない）。許可リストの外のシナリオは、通ると数えない（下の価値の指標）。Must のストーリーのパリティの指標では、<strong>U1 の US6.1・US6.2（ステージングまで）は、デプロイ用ワークフローを後回しにする範囲（N-H4）のため、U1〜U3 の約束の外として扱う</strong>（指標の分母から外すか、未達として別枠に出すかは人が決める）。</li>
+<li><strong>許可リストの導き方（M18・M3。案）</strong>: <code>@api</code> の許可リストは、<strong>U1〜U3 の受入条件（<code>@AC</code> タグ）から機械的に導く</strong>（手で選ばない）。<strong>ただし、unit_definition の U1〜U3 には AC の番号まで書かれていない項目がある</strong>（US1.2 共同担当を除く、US6.1 基本、US6.2 ステージングまで、US3.1、US3.2、US2.4）ため、書いたとおりには実行できない。<strong>入力は、B1 の計画で確定する「U1〜U3 の AC の一覧（AC の番号まで。人の承認つき）」</strong>とし、それを入力にして導く。許可リストの外のシナリオは、通ると数えない（下の価値の指標）。<strong>U1 の US6.1 は、AC6.1.1・6.1.2・6.1.4 を約束に入れる</strong>（D2。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了。共有の features に <code>@AC6.1.1</code>・<code>@AC6.1.4</code> が実在する。<strong><code>@AC6.1.2</code> のシナリオは共有の features に無い</strong>（<code>apps/beer-game-features</code> を検索して確認。user_story.md の AC6.1.2 は ✗）ので、AC6.1.2 は munit の <code>test("[US6.1/AC6.1.2] …")</code> で保証する。共有の feature に足すかは人が決める）。AC6.1.3（メトリクス）と AC6.1.5・6.1.6（通知）は約束の外。<strong>US6.2（ステージングまで）のうち、デプロイ用ワークフローと自動反映は後回し（N-H4）のため約束の外</strong>で、指標の分母から外すか、未達として別枠に出すかは人が決める（旧記述の「US6.1・US6.2 は約束の外」は、ADR-001 と逆だったため直した。R-H1）。</li>
 <li><strong>整合の検査</strong>: ストーリー・受入条件の一覧（<a href="../../../requirements/beer-game-ts/user_story/">ユーザーストーリー</a>）に存在しない ID、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。</li>
 </ul>
 <h2 id="b1">B1 の受入条件（未確認の前提を、観察できる形にする）<a class="headerlink" href="#b1" title="Permanent link">&para;</a></h2>
@@ -15680,7 +15806,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><code>Fiber</code> の取消と ROLLBACK</td>
-<td style="text-align: left;">STT4 の測定: 取消から ROLLBACK までの時間と、その間のロック・接続の状態を記録する。<strong>失敗の経路の明示の ROLLBACK で、ロックと接続が一定時間内に解放される</strong></td>
+<td style="text-align: left;">STT4 の測定: 取消から ROLLBACK までの時間と、その間のロック・接続の状態を記録する。<strong>失敗の経路の明示の ROLLBACK で、ロックと接続が 2 秒以内に解放される</strong>（案。NF-SC1 と同じ上限。先に置き、測定が合格するよう後から決めない）</td>
 <td style="text-align: left;">SBD2・SBD4 の見直し（明示の ROLLBACK を唯一の手段にする。取消の保険を外す）</td>
 </tr>
 <tr>
@@ -15695,8 +15821,23 @@
 </tr>
 <tr>
 <td style="text-align: left;">ScalaCheck の操作列</td>
-<td style="text-align: left;"><strong><code>Events.apply</code> の腕を 1 つ消すと、性質テストが落ちる</strong>。生成列の分類（M19）の下限を判定できる</td>
+<td style="text-align: left;"><strong>(a)</strong> <code>Events.apply</code> の<strong>腕を 1 つ消すと、(c)（表 × <code>apply</code> の全組）が落ちる</strong>。<strong>(b)</strong> 許す組の<strong>表の ○ を 1 つ × に変えると、(a)（コマンドから作る生成列の <code>Ignored</code> が 0 件）が落ちる</strong>（表の漏れを捕まえる。R-H4）。「失効 → 入れ替え」の列が生成され、D3 の穴を入れ戻す（旧担当者の <code>CredentialRevoked</code> を無条件に出す）と落ちる。生成列の分類（M19）の下限を判定できる</td>
 <td style="text-align: left;"><code>Gen</code> の合成で自前に書く</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lock_timeout</code> と SQLSTATE の写像（R-H6）</td>
+<td style="text-align: left;">55P03 は <code>Left(RetryExhausted)</code>（503）、40P01・40001 は <code>Tx.run</code> の後に <code>ConcurrencyConflict</code> へ写って再試行に戻る。<strong><code>lock_timeout</code> はロックを取る間だけ</strong>で、投影の行のロック待ちに効かない。中断したトランザクションで次の文を出さない</td>
+<td style="text-align: left;"><code>withShared</code>/<code>withExclusive</code> を Kotlin 版と同じ手順に直す（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）</td>
+</tr>
+<tr>
+<td style="text-align: left;">H2 版のロックの直列化（R-H5・D4）</td>
+<td style="text-align: left;">取得と解放が別スレッドになっても解放できる（<code>StampedLock</code> 系）。待ちの上限を超えると <code>RetryExhausted</code>。解放は COMMIT・ROLLBACK の後の後始末で、COMMIT の前に解放しない。契約テストを H2 版にも実行する</td>
+<td style="text-align: left;"><code>FOR UPDATE</code> のロック行（H2 での動作は未確認）を別案として試す</td>
+</tr>
+<tr>
+<td style="text-align: left;">Scalafix の fixture（M14）</td>
+<td style="text-align: left;">違反するコードとしないコードの fixture に対し、期待件数が一致することが <code>check</code> の中のテストになっている（ルールを緩める・fixture を消すと <code>check</code> が落ちる）</td>
+<td style="text-align: left;">fixture 方式が書けなければ、一度きりの確認 + レビューにとどめる（人が決める）</td>
 </tr>
 <tr>
 <td style="text-align: left;">cucumber-scala</td>
@@ -15719,8 +15860,8 @@
 <td style="text-align: left;">別の道具、または自前の検査</td>
 </tr>
 <tr>
-<td style="text-align: left;">止まったゲームの読み取り（N-H7）</td>
-<td style="text-align: left;"><strong><code>Ignored</code> で止まったゲームでも、<code>GET /games/{id}/state</code>・<code>GET /sessions/{id}/state</code> が 200 で投影を返す</strong>（書き込みは 500 で止まる）。画面の在庫・受注残・今週の入力が読める</td>
+<td style="text-align: left;">止まったゲームの読み取り（N-H7・M7）</td>
+<td style="text-align: left;"><strong><code>Ignored</code> で止まったゲームでも、メソッドつきの 3 経路（<code>GET /games/{id}/state</code>・<code>GET /sessions/{id}/state</code>・<code>GET /games/{id}/lobby</code>）が 200 で投影を返す</strong>（書き込みは 500 で止まる。観察 <code>GET /games/{id}/observation</code> は ADR-001 の U4 で U1〜U3 の範囲外（決定済み）。U4 で足すときは 4 経路に拡げる）。確認項目は (a) 3 経路が 200、(b) 書き込みが 500 で止まり残らない（<code>type</code> と相関 ID つき）、(c) <strong>他のゲームの読み書きは通る</strong>、(d) <strong><code>Ignored</code> の件数のメトリクスが出る</strong>、(e) 500 の画面文言が <a href="../ui-design/">UI 設計</a> #15 の実物（文言は複製せず、#15 を正本として参照する。R-H10）。<strong>返る内容に、紙で続けるための数字が含まれる</strong>: 各役割の今週の入力、当週に処理する入荷（<code>arrivals</code>）、受注、<strong>セッションの状態の確定済み週の結果（週ごと・役割ごとの受注・発注・在庫・受注残・出荷。進行役のコンソールの結果表の材料）</strong>。<strong>画面の「入荷予定（輸送中の品）」「上流へ送って未着の発注」は、API の応答にも画面にも項目として無く、結果表の出荷・発注と遅延の週数から復元する</strong>（<code>ConsolePage.tsx</code>・<code>ResultsTable.tsx</code>・<code>openapi.yaml</code> の <code>RoleStatus</code> を読んで確認）。復元に足りるかは B1 で確かめる</td>
 <td style="text-align: left;">読み取りも止まる設計なら、紙で続けるための数字が残らないため、設計を見直す（人が決める）</td>
 </tr>
 <tr>
@@ -15730,8 +15871,18 @@
 </tr>
 <tr>
 <td style="text-align: left;"><code>check</code> ジョブ（N-H4）</td>
-<td style="text-align: left;">検証用の CI の <code>check</code> ジョブ 1 本が、規約違反・<code>.transact(</code> の違反・カバレッジの不足で落ち、緑のときだけマージできる</td>
-<td style="text-align: left;">手元の同じコマンドを正とし、CI の整備を B1 の最初のスライドにする</td>
+<td style="text-align: left;">検証用の CI の <code>check</code> ジョブ 1 本が、規約違反・<code>.transact(</code> の違反・カバレッジの不足で落ち、緑のときだけマージできる。<strong>カバレッジの算出スクリプトとそのテスト（丸め・境界値を含む）は、B1 の最初のスライドに置く</strong>（赤の間はマージが止まるため。M15）</td>
+<td style="text-align: left;">CI の整備を B1 の最初のスライドにする。<strong>基準を下げて緑にしない</strong>（旧記述の「手元の同じコマンドを正とし」は N-H4 の決定を弱めるので外した）</td>
+</tr>
+<tr>
+<td style="text-align: left;">U1 の範囲（D1・R-H2）</td>
+<td style="text-align: left;">統合テスト（PostgreSQL 18）と <code>@api</code> の受け入れが CI で実行される（<code>check</code> に含める案 X、または別ジョブ <code>integration</code>・<code>acceptance</code> を U1 に足す案 Y）。<strong>Undefined・Pending で失敗する</strong>（ADR-012 のコンプライアンス）</td>
+<td style="text-align: left;">約束を <code>check</code> の範囲に縮める案 (b) は採らない（リスクを ADR-001 の例外の節に書く場合は、人が決める）</td>
+</tr>
+<tr>
+<td style="text-align: left;">ルートの網羅（M9）</td>
+<td style="text-align: left;">U1〜U3 で実装しない操作の許可リストがあり、<code>check</code> が「仕様のルートが実装に無い」で落ちない。許可リスト外の経路・メソッド違いが 404 の problem+json（<code>request.not_found</code>）で返る（案 (a)）</td>
+<td style="text-align: left;">案 (b)（JSON でない 404）にする場合は、画面に相関 ID が出ないことを UI 設計の #16 に残す</td>
 </tr>
 </tbody>
 </table>
@@ -16025,6 +16176,74 @@
 </tr>
 </tbody>
 </table>
+<h3 id="2026-11-25_2">再々レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_2" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザー本人が選択肢を選んだ決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したのに基づき、AI が推奨案で決めたもので、確認は未了です。それ以外の直し方はすべて AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">R-H1・D2</td>
+<td style="text-align: left;">U1 に入れる US6.1 の AC を AC6.1.1・6.1.2・6.1.4 に。旧記述「US6.1・US6.2 は約束の外」を直した。<code>@AC6.1.2</code> の共有シナリオが無いことを書いた</td>
+<td style="text-align: left;">D2: 指示に基づき AI が推奨案で決めた（確認未了）</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H2・D1・L3・M16</td>
+<td style="text-align: left;">統合（PostgreSQL 18）と <code>@api</code> の受け入れを U1 の約束に含め、実現の形（案 X・Y）を書いた。約束はジョブの本数でなく検証の範囲。ADR-012 のコンプライアンスが U1 で果たせること。CI の図の「毎回」を U1 の範囲と区別</td>
+<td style="text-align: left;">D1: 指示に基づき AI が推奨案で決めた（確認未了）。X・Y の選択は未決</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H3・R-H4・D3・M10・L6</td>
+<td style="text-align: left;">許す組の表の条件と列数は domain-model を正本に。性質テストを (a) コマンドから作る・(b) 表の ○ の出現・(c) 表 × <code>apply</code> の 3 方向に。B1 の表に、表の ○ を × に変える・<code>apply</code> の腕を消す基準。受入テストを 4 件に（失効 → 入れ替え → 保存・確定 → 再生、旧担当者の入力が残る）。入れ替えの出どころ、共有 <code>credentials.feature</code> との分担（munit）。<code>RoleHolderReplaced</code> は session のイベント</td>
+<td style="text-align: left;">D3: 指示に基づき AI が推奨案で決めた（確認未了）。他は AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H5・R-H6・D4</td>
+<td style="text-align: left;">H2 版の <code>ProjectionLock</code> を <code>StampedLock</code> 系 + 待ちの上限 + <code>Tx.run</code> の後始末に。<code>lock_timeout</code> と SQLSTATE の写像のテスト</td>
+<td style="text-align: left;">D4: 指示に基づき AI が推奨案で決めた（確認未了）。他は AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H7・M14</td>
+<td style="text-align: left;"><code>.transact(</code> の受け入れ条件を 1 つの表に（「<code>Transactions.scala</code> 以外の全 <code>Compile</code>」、テスト本体も落ちる、文字列・コメントは落ちない、パターンはメソッド名）。fixture と期待件数のテストを <code>check</code> に</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H9</td>
+<td style="text-align: left;">B1 の確認項目に、返る内容（結果表の出荷・発注、入荷、受注）を加え、入荷予定・未着の発注は項目が無く復元することを書いた。追いつきの golden 候補</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H10</td>
+<td style="text-align: left;">確認項目 (e) は UI 設計 #15 を正本として参照</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M3・M4・M7</td>
+<td style="text-align: left;"><code>@AC</code> の導出は AC の番号まで確定した一覧が入力。止まったゲームの読み取りは 3 経路（観察は U4）、(c) 他のゲーム、(d) メトリクス</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M9・L5</td>
+<td style="text-align: left;">契約テストのルートの網羅に、範囲外の操作の許可リストと「経路なし」の応答（案）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M15・M16・L4・L7</td>
+<td style="text-align: left;">カバレッジのジョブが赤の間のマージ停止、算出スクリプトを B1 の最初に、丸め（整数の積で比較）、「手元の同じコマンドを正とし」を外す、<code>Fiber</code> の行を 2 秒に、トリガーを <code>develop</code>・<code>main</code> に、NF-P2 の測定の対象から S04 を外し同一の時計の前提</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M1・D5</td>
+<td style="text-align: left;">team 規約が beer-game-scala に及ぶかの確認と、例外の記録先は、人の承認の場で行う（project.md は編集しない）。「beer-game3 用とは別に」の言い換えを注記</td>
+<td style="text-align: left;">D5: 指示に基づき AI が推奨案で決めた（確認未了）</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_21">未決事項<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>STT1〜STT4 の承認</strong>: 人の承認を得る。STT2 は方針（行 80% を算出する案 C を第一）をユーザーが決めた（2026-11-25）。残るのは、B1 で行率を出せるかの確認と、出せなかった場合の代替の可否の再決定。</li>
@@ -16045,7 +16264,12 @@
 <li><strong>許す組の表（N-H1）の置き場と、表から状態遷移テストと生成器を導く方法</strong>（正本は <a href="../domain-model/">ドメインモデル</a>。別担当が書く表との整合）。</li>
 <li><strong>Scalafix の除外の書き方</strong>（ファイル単位。<code>scalafixAll</code> を含む）と、<code>DisableSyntax.regex</code> が文字列・コメントの中の語を拾うか（N-H3）。</li>
 <li><strong>U1〜U3 で自動反映を持たない間の team 規約の例外</strong>の ADR への記録と人の承認（N-H4）。</li>
-<li><strong>U1 の US6.1・US6.2 の扱い</strong>（パリティの指標の分母から外すか、未達として別枠に出すか。M18）。</li>
+<li><strong>U1 の US6.2 の扱い</strong>（パリティの指標の分母から外すか、未達として別枠に出すか。M18）。US6.1 は AC6.1.1・6.1.2・6.1.4 を U1 に入れる（D2。確認は未了）。</li>
+<li><strong>D1 の実現の形</strong>: 統合と <code>@api</code> の受け入れを <code>check</code> に含める（案 X）か、別ジョブ <code>integration</code>・<code>acceptance</code> を U1 に足す（案 Y）か。人が決める。</li>
+<li><strong>U1〜U3 の AC の一覧（AC の番号まで）</strong>の確定（M3。許可リストと範囲外の操作の許可リストの入力。人の承認つき）。</li>
+<li><strong>「経路なし」の応答を <code>request.not_found</code> に写すか</strong>（M9・L5。案 (a)・(b)）。</li>
+<li><strong><code>@AC6.1.2</code> の共有シナリオ</strong>を共有 features に足すか、munit だけで保証するか。</li>
+<li><strong>team 規約が beer-game-scala に及ぶかの確認と、例外の project.md <code>## Scope Overrides</code> への記録</strong>（M1・D5。人の承認の場で行う。AI は project.md を編集しない）。「CI との連携」の冒頭の引用（「beer-game3 用とは別に」）は、team.md の原文（beer-game3 用の CI と deploy を新しく作り、AWS 環境も beer-game3 専用に用意する）の意味を、Scala 版にも当てはめた読みに変えている。原文そのままではない。</li>
 </ol>
 <h2 id="_22">出典<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>
 <ul>

@@ -3438,6 +3438,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="既存の web/ のバックエンドへの結合点">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#u1u3-api-m6m9l5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        U1〜U3 で API が無い画面（範囲外。M6・M9・L5）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3601,6 +3618,17 @@
     <span class="md-ellipsis">
       
         再レビュー（2026-11-25。設計書の再レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-11-25_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再々レビュー（2026-11-25。設計書の再々レビュー）への対応
       
     </span>
   </a>
@@ -9274,6 +9302,41 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../review/beer-game-scala/design_rereview2_20261125/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    設計書の再々レビュー（2026-11-25）
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -14436,6 +14499,7 @@
 <li><code>support/hooks.mjs</code> は、バックエンドの未起動時に、<strong>Kotlin 版（<code>./gradlew :app:run</code>）と TS 版の起動コマンドを案内する文言</strong>を出して失敗する。Scala 版の案内は無い。</li>
 <li><strong>確認状況の唯一の一覧</strong>は <a href="../tech-stack/#確認状況の一覧">技術スタック</a> です。</li>
 <li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）に加え、再レビューへの対応の次の 4 件です。<strong>N-H4（検証用の CI は U1 の約束に含め、AWS 環境・デプロイ用ワークフローは後回し）、N-H6、N-H7、N-H8（U1〜U3 は実際の研修に使わない）</strong>。<strong>H10・M17・SF2 の記述の直しを含め、これら以外は AI の案で、承認を得ていません</strong>。</li>
+<li><strong>再々レビュー（2026-11-25）への対応の区分</strong>: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、D1〜D5 を AI が推奨案で決めました（<strong>ユーザー本人が選択肢を選んだ決定ではなく、確認は未了</strong>）。D1=統合テストと <code>@api</code> の受け入れを U1 の約束に含める、D2=US6.1 は AC6.1.1・6.1.2・6.1.4、D3=失効済みの旧担当者の入れ替えは未失効にだけ <code>CredentialRevoked</code>、D4=H2 版のロックは Kotlin 版と同じ構造、D5=team 規約の及ぶ範囲の確認は人の承認の場。本書に関わるのは範囲外の画面（M6・M9・L5）で、直し方は AI の案です。</li>
 <li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、一覧を直すときは根拠も直します。</li>
 <li><strong>確認していないこと</strong>: Scala のバックエンドに <code>web/</code> を向けたときの実際の動作は、<strong>未検証</strong>です（Scala 版のバックエンドがまだ存在しないため）。契約が同じなら動く、という<strong>設計上の見込み</strong>にとどまります。</li>
 <li>Kotlin 版の実装の経緯（B1〜B15 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
@@ -14515,6 +14579,44 @@
 </tr>
 </tbody>
 </table>
+<h3 id="u1u3-api-m6m9l5">U1〜U3 で API が無い画面（範囲外。M6・M9・L5）<a class="headerlink" href="#u1u3-api-m6m9l5" title="Permanent link">&para;</a></h3>
+<p>共有の <code>web/</code> は、U1〜U3 で実装しない API を呼ぶ画面を持ちます（実際のソースと <code>openapi.yaml</code> を読んで確認、2026-11-25）。詳細と導線は <a href="../ui-design/">UI 設計</a> の #16 を正本とし、本書は<strong>フロントエンドとバックエンドの契約の側</strong>だけを記します。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">画面・導線</th>
+<th style="text-align: left;">呼ぶ API（<code>openapi.yaml</code> の操作）</th>
+<th style="text-align: left;">範囲</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">S08 振り返り（最終週の後。S05・S06・<strong>S07 観察</strong>の「振り返りを見る」から）</td>
+<td style="text-align: left;"><code>getReview</code>（<code>GET /games/{gameId}/review</code>）</td>
+<td style="text-align: left;">U4 以降（範囲外）</td>
+</tr>
+<tr>
+<td style="text-align: left;">S09 保持状態（開始後の S06 コンソールに常に出る「保持状態を見る」から）</td>
+<td style="text-align: left;"><code>getRetention</code>（<code>GET /games/{gameId}/retention</code>）</td>
+<td style="text-align: left;">U5 以降（範囲外）</td>
+</tr>
+<tr>
+<td style="text-align: left;">結果の出力（<code>ExportButtons</code>。振り返りの取得に成功したときだけ描かれる）</td>
+<td style="text-align: left;"><code>getExport</code>（<code>GET /games/{gameId}/exports</code>）</td>
+<td style="text-align: left;">U4 以降。U1〜U3 では描かれない</td>
+</tr>
+<tr>
+<td style="text-align: left;">S07 観察、S04 ロビーの観察者の招待パネル、S10 <code>/observe</code></td>
+<td style="text-align: left;"><code>getObservation</code>・<code>inviteObserver</code>・<code>revokeObserverInvitation</code>・<code>joinAsObserver</code></td>
+<td style="text-align: left;"><strong>ADR-001 の U4 で、U1〜U3 の範囲外（決定済み）</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>画面に見える失敗は、S08 と S09 の 2 つだけ</strong>です（<code>ExportButtons</code> は描かれないため）。どちらもエラーの表示は見出しと <code>ErrorNotice</code> だけで、<strong>戻る導線がありません</strong>（ブラウザの戻る）。</li>
+<li><strong>「経路なし」の応答が JSON でない 404 だと、相関 ID が出ません</strong>（<code>ErrorNotice</code> は本文の <code>correlationId</code> だけを示す）。<code>request.not_found</code> の problem+json（<code>openapi.yaml</code> の <code>ErrorCode</code> に宣言済み）に写せば出ます。写すかは、契約テストの「ルートの網羅」の許可リストと<strong>同じ箇所で決める</strong>（<a href="../test-strategy/">テスト戦略</a>。案 (a) 写す、(b) 既定のまま）。</li>
+<li><strong>契約テストの「ルートの網羅」は、共有の <code>openapi.yaml</code> にある範囲外の操作の許可リスト</strong>（U1〜U3 の <code>@AC</code> から導く。AC の番号まで確定した一覧が入力。M3）を持ちます。持たないと、U1 の <code>check</code> ジョブが「仕様のルートが実装に無い」で落ちます。</li>
+</ul>
 <h2 id="_3">決定の整理<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版の決定を<strong>そのまま引き継ぎます</strong>（小規模・<code>features/</code> の機能単位の構造、SPA（React）、Vite でビルドし CloudFront から配信、URL ルーター、画面ごとのカスタムフックと <code>useState</code>（グローバルな状態ライブラリなし）、OpenAPI を正本とした型の生成、<code>ApiClient</code>、<code>problem+json</code> の <code>code</code> を鍵にした表示名の辞書、保存後は応答の <code>versions</code> を受けてスナップショットを取得、スタイルは CSS の設計トークン、アクセシビリティは WCAG 2.2 AA）。</p>
 <p><strong>Scala 版で変わるのは、バックエンドの接続先と起動の案内だけ</strong>です。</p>
@@ -14778,6 +14880,29 @@
 <tr>
 <td style="text-align: left;">N-H5</td>
 <td style="text-align: left;">確認状況の正本の規則を追加</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2026-11-25_2">再々レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview2_20261125/">設計書の再々レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_2" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザー本人が選択肢を選んだ決定は、前回までの 8 件とローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です。他の直し方はすべて AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">M6・M9・L5</td>
+<td style="text-align: left;">「U1〜U3 で API が無い画面」の節を追加（S08・S09・<code>ExportButtons</code>・観察系の操作と範囲。観察は ADR-001 の U4 で範囲外（決定済み）。見える失敗は S08・S09 の 2 つ、戻る導線なし、JSON でない 404 では相関 ID が出ない、契約テストの許可リスト）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">R-H8・R-H9</td>
+<td style="text-align: left;">画面の改善（失敗の知らせ方、相関 ID の見え方、コンソールの更新）は UI 設計の未決事項 8 を正本とし、本書は重複して持たない</td>
 <td style="text-align: left;">AI の案</td>
 </tr>
 </tbody>
