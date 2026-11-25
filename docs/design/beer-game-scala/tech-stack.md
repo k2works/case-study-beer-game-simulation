@@ -1,7 +1,7 @@
 ---
 type: Design
 title: "技術スタック選定 - ビールゲームシミュレーション（Scala 版）"
-description: "Scala 版の技術スタック。Maven Central で確認した版、確認できなかった項目、beer-game-kotlin からの変更、新規の依存関係の承認表、設計判断 ST1〜ST9、ローカル DB・カバレッジのしきい値などの未決事項を整理した正本。"
+description: "Scala 版の技術スタック。Maven Central で確認した版、確認できなかった項目、beer-game-kotlin からの変更、新規の依存関係の承認表、設計判断 ST1〜ST9（ST9 はローカル開発の H2 というユーザーの決定）、H2 の導入承認・カバレッジのしきい値などの未決事項を整理した正本。"
 tags: [design]
 status: draft
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
@@ -58,6 +58,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 | 9 | circe | `circe-core_3` の最新の安定版は **0.14.17**（0.15.0 はマイルストーン `M1`） | **0.14.17**（提案。ST6。ガイドは circe を試していない） |
 | 10 | HikariCP | **7.1.0**（beer-game-kotlin と同じ。JDK 25 との組み合わせは Kotlin 版でビルドとテストが動作したことを引用） | **7.1.0**（`doobie-hikari` が使う版は要確認） |
 | 11 | PostgreSQL JDBC | `org.postgresql:postgresql` の最新は **42.7.15** | **42.7.15**（beer-game-kotlin の確認値 42.7.14 から更新） |
+| 11a | H2（ローカル開発用 DB。`com.h2database:h2`）、doobie-h2 | `h2` の `maven-metadata.xml` の `<release>` は **2.5.252**（`lastUpdated` 2026-09-26）。pom の `<licenses>` は **MPL 2.0 と EPL 1.0**。Kotlin 版の確認値（2.5.252、2026-11-14）と一致した。`org.tpolecat:doobie-h2_3` は **1.0.0-RC12**（更新 2026-02-21）があり、doobie-core と版が揃う。**公式のサポート期限（EOL）は確認できていない**。PostgreSQL モードで動く機能の範囲は、Scala 版では**未実測**（Kotlin 版の実測を引用するだけ） | **2.5.252**（第一候補。確認日 2026-11-25）。H2 の採用はユーザーの決定（2026-11-25）だが、**依存の導入は承認待ち**。doobie-h2 が要るかは設計で書く（ST9。`Transactor` は JDBC の `DataSource` や URL から作れるため、H2 の JDBC ドライバだけで足りる見込み。doobie-h2 の型の対応が要るかは B1 で確認する。**未確認**）。動作範囲は B1 の最初に実測して確定する |
 | 12 | Flyway | `flyway-core` の最新は **13.13.0**。beer-game-kotlin の確認値は 13.12.2 | **13.12.2**（beer-game-kotlin と同じ。最新の 13.13.0 への更新は B1 で判断）。PostgreSQL 用のモジュールの名前は要確認 |
 | 13 | munit | `munit_3` の最新は **1.3.6**（更新 2026-09-03） | **1.3.6** |
 | 14 | munit-cats-effect | `munit-cats-effect_3` の最新の安定版は **2.2.1** | **2.2.1**（`IO` を返すテスト。要確認） |
@@ -87,6 +88,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 | DB アクセス | doobie（`doobie-core`、`doobie-postgres`、`doobie-hikari`） | **1.0.0-RC12** | JDBC + HikariCP | `ConnectionIO`、直接の SQL（`sql"..."`）、`Transactor`、PostgreSQL の通知・型 | - |
 | 接続プール | HikariCP（`doobie-hikari` 経由） | **7.1.0**（要確認） | HikariCP 7.1.0 | 用途別のプール（書き込み・読み取り・観察者）。**ガイドは入れていない**（ST8） | - |
 | DB ドライバ | PostgreSQL JDBC | **42.7.15** | 42.7.14 | PostgreSQL への接続 | - |
+| DB ドライバ（ローカル開発のみ） | H2（`com.h2database:h2`）。**開発用。導入は承認待ち** | **2.5.252**（第一候補。確認日 2026-11-25） | 2.5.252 | 開発機で Docker なしに起動するための DB（PostgreSQL モード）。本番・ステージング・CI・統合テストでは使わない（ST9）。sbt の依存は**開発用の構成だけ**に置き、本番のイメージに入れない（インフラ）。doobie-h2 の要否は B1 で確認（**未確認**） | - |
 | マイグレーション | Flyway（`flyway-core` と PostgreSQL 用） | **13.12.2** | Flyway 13.12.2 | 番号つきの SQL マイグレーションと履歴 | - |
 | シリアライズ | circe（`circe-core`、`circe-parser`。`http4s-circe`） | **0.14.17**（提案） | kotlinx.serialization | API の JSON と、イベントの `payload`（`event_type` を判別子にした DTO）。変換は `EventCodec` | - |
 | 入力検証 | 自前のスマートコンストラクタ + `ValidatedNec` と `mapN` | cats-core に含む | `zipOrAccumulate` | 境界の検証、誤りを集める（[ドメインモデル](./domain-model.md)） | - |
@@ -113,13 +115,13 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 
 | カテゴリ | 技術 | 版 | beer-game-kotlin | 用途 | サポート期限 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| RDBMS | PostgreSQL | **18**（RDS、CI、統合テスト、ステージング、本番、**ローカル**） | 18 | **イベントストア**、投影、周辺ストア、保持削除の状態 | beer-game-kotlin の確認値は 2030-11-14（再確認していない） |
+| RDBMS | PostgreSQL | **18**（RDS、CI、統合テスト、ステージング、本番。ローカル開発だけ下の H2 を選べる） | 18 | **イベントストア**、投影、周辺ストア、保持削除の状態 | beer-game-kotlin の確認値は 2030-11-14（再確認していない） |
 | スキーマ管理 | Flyway | 13.12.2 | Flyway | 履歴テーブルで管理。拡張 → 互換 → 縮小 | - |
 | ORM | なし | - | なし | 直接の SQL（doobie） | - |
 | イベントのペイロード | `jsonb` + circe | - | `jsonb` + kotlinx.serialization | `schema_version` とアップキャスト（データモデルは別文書） | - |
-| ローカル開発用 DB | **PostgreSQL 18（Docker）**（提案。ST9） | 18 | H2（PostgreSQL モード） | 開発機での起動・動作確認 | - |
+| ローカル開発用 DB | **H2（PostgreSQL モード）**（ユーザーの決定、2026-11-25。ST9。導入は承認待ち） | **2.5.252**（第一候補） | H2（PostgreSQL モード） | **開発機での起動・動作確認だけ**。PostgreSQL 固有の機能は、ポート（`ProjectionLock`、`ChangeNotifier`）の H2 版で代える。省略した制約はローカルで守られない（[データモデル](./data-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md)） | 公式のサポート期限は確認できていない |
 
-イベントストアの専用製品（EventStoreDB など）は、**導入しません**（ST3。beer-game-kotlin の T1 を引き継ぐ）。
+イベントストアの専用製品（EventStoreDB など）は、**導入しません**（ST3。beer-game-kotlin の T1 を引き継ぐ）。**H2 は、統合テスト・CI・受け入れ・ステージング・本番に使いません**（ST9）。
 
 ## フロントエンド
 
@@ -150,7 +152,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | カテゴリ | 技術 | Scala 版での扱い |
 | :--- | :--- | :--- |
 | クラウド | AWS（ap-northeast-1） | 同左 |
-| コンテナ | Docker | ビルドは sbt のマルチステージ（`sbt-native-packager` などの採否は B1 で比較。**未確認**）。実行イメージは JDK 25 の JRE を含むもの（`eclipse-temurin:25-jre-noble` を第一候補。Kotlin 版は B3 で実在を確認した値。**本書では再確認していない**）。ローカルの DB は Docker の PostgreSQL 18 |
+| コンテナ | Docker | ビルドは sbt のマルチステージ（`sbt-native-packager` などの採否は B1 で比較。**未確認**）。実行イメージは JDK 25 の JRE を含むもの（`eclipse-temurin:25-jre-noble` を第一候補。Kotlin 版は B3 で実在を確認した値。**本書では再確認していない**）。ローカルの DB は **H2 の PostgreSQL モード（Docker 不要。ST9）**。統合テストは Testcontainers の PostgreSQL 18 のため、テストの実行には Docker が要る |
 | 実行基盤 | ECS Fargate | JVM のヒープと、タスクのメモリの割り当ては [非機能要件](./non-functional.md) で実測して決める |
 | データベース | RDS for PostgreSQL 18（Multi-AZ、PITR） | 同左 |
 | 配信・観測・IaC・CI | CloudFront、S3、ALB、CloudWatch、Terraform、GitHub Actions | 同左。CI のビルドは sbt。詳細は [インフラ](./architecture-infrastructure.md)、[運用要件](./operation.md) |
@@ -166,11 +168,12 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | 実行時（中核） | cats-core、cats-effect、fs2-core、http4s（ember-server・dsl・circe）、doobie（core・postgres・hikari）、circe、PostgreSQL JDBC、Flyway、log4cats-slf4j、logback-classic | 選定済み。承認待ち。circe（ST6）と doobie-hikari（ST8）は特に、ガイドが採らなかった・入れなかったものなので、承認の際に理由を確認する |
 | 開発・テスト | munit、munit-cats-effect、munit-scalacheck、cats-laws、discipline-munit、testcontainers-scala、cucumber-scala | 選定済み。承認待ち。cucumber-scala は日本語対応の確認後 |
 | sbt プラグイン・CI のツール | sbt-scalafmt、sbt-wartremover、sbt-scalafix、sbt-scoverage | 選定済み。承認待ち |
+| ローカル開発用（開発用の構成だけ） | H2（`com.h2database:h2` 2.5.252。必要なら doobie-h2） | ユーザーの決定（2026-11-25。ST9）。**導入は承認待ち**。本番のイメージに入れない。ローカルも Docker の PostgreSQL 18 を使う案（Rust 版と同じ）が代替 |
 | 候補（採否は設計時） | JSON スキーマの検査ライブラリ、`sbt-native-packager`、依存関係の脆弱性検査、変異テスト | 未決。確定してから承認を求める |
 
 ## 設計判断
 
-**ST1〜ST9 は、AI が起草した案で、ユーザーの承認を得ていません**（Rust 版の R1〜R7 とは違う）。承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。
+**ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません**（Rust 版の R1〜R7 とは違う）。**ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）**です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。
 
 | ID | Kotlin 版（T*） | Scala 版 | 扱い |
 | :--- | :--- | :--- | :--- |
@@ -182,7 +185,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | ST6 | （kotlinx.serialization） | JSON は circe（提案） | **新規** |
 | ST7 | ADR-012 の Gherkin | 日本語 Gherkin は契約として共有。cucumber-scala は別ジョブ。経路の切り替えは関数値 | **変更** |
 | ST8 | HikariCP、Logback | doobie-hikari、log4cats-slf4j + Logback | **新規** |
-| ST9 | T7 ローカルは H2 | ローカルは PostgreSQL のみ | **見直す**（提案） |
+| ST9 | T7 ローカルは H2 | ローカル開発だけ H2 の PostgreSQL モード（T7 を読み替えて**引き継ぐ**） | **引き継ぐ**（ユーザーの決定、2026-11-25） |
 
 ### ST1: ビルドは sbt 1.13.1（sbt 2 を採らない）
 
@@ -228,15 +231,28 @@ beer-game-kotlin の T5・T6 に対応し、ガイド第 9 章の設定を CI �
 
 ガイドは HikariCP を入れず、トランザクションごとに接続を開く（`Transactor.fromDriverManager`。§10.1）。beer-game-scala は、用途別の DB ロール（api の書き込み・読み取り・観察者、削除、migrate。ADR-009）ごとにプールを分け、接続数の上限と待ち時間を計測する必要があるため、`doobie-hikari` の `HikariTransactor`（`Resource`）を採る。**ガイドからの変更で、導入の承認を得る**。`LISTEN` の専用の接続は、プールの外に持つ（アーキテクチャ）。
 
-### ST9: ローカル開発の DB は PostgreSQL のみ（提案）
+### ST9: ローカル開発は H2 の PostgreSQL モード（ユーザーの決定、2026-11-25）
+
+beer-game-kotlin の T7 を Scala 版に読み替えたものです。当初は「ローカルも PostgreSQL 18（Docker）のみ」を提案していましたが、ユーザーが「ローカル DB は Kotlin と同じく H2 で」と決定したため、提案を取り下げました。
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用の提案）** | ローカルも PostgreSQL 18（Docker）。ポート `ProjectionLock`・`ChangeNotifier` は、テスト用のインメモリ実装との差し替えのために維持する | 環境が本番と同じで乖離がない。実装が 1 つで、契約テストを両実装で実行する維持費がない。`doobie-postgres` の機能（通知、PostgreSQL の型）をそのまま使える。Docker が要る |
-| B | Kotlin 版と同じく H2 の PostgreSQL モード | H2 は JVM の組み込み DB で、Scala からも使える。Docker が要らない。アドバイザリロック、`LISTEN/NOTIFY`、部分一意索引、ロール、`jsonb` の差を、ポートの 2 実装と契約テストで埋める必要があり、Kotlin 版の ADR-014 が認める「ローカルで通っても CI で落ちる」乖離のリスクを負う |
-| C | H2 を統合テストにも使う | 並行性・権限・部分一意索引・連鎖削除を検証できない。却下（Kotlin 版と同じ） |
+| **A（採用）** | **ローカル開発（開発機での起動・動作確認）だけ**、H2 の PostgreSQL モード。統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18（Testcontainers、RDS）のまま。PostgreSQL 固有の機能（アドバイザリロック、`LISTEN/NOTIFY`）はポート（`ProjectionLock`、`ChangeNotifier`）の裏に置き、PostgreSQL 版と H2 版を持つ（テスト用のインメモリ実装は、これとは別に維持する）。部分一意索引、DB ロールと GRANT、接続プールの分離、`jsonb` は PostgreSQL の統合テストでだけ検証する。H2 版のマイグレーションは Flyway のベンダー別の場所で、共通部分を最大化し差分だけを分ける（配置は B1 で確定） | Docker なしで起動でき、開発の初動が軽い。ただし、**H2 版では、省略した制約がローカルで守られず、単一プロセスの制約（プロセス内のロックとイベント）がある**。ローカルで通っても CI で落ちる乖離が起きうる |
+| B | ローカルも PostgreSQL 18（Docker）のみ（Rust 版と同じ。当初の提案） | 環境が本番と同じで乖離がない。実装が 1 つで、契約テストを両実装で実行する維持費がない。Docker が要る。**ユーザーの決定により採らない** |
+| C | H2 を統合テストにも使う | テストが速い。並行性・権限・部分一意索引・連鎖削除という設計の中核を検証できない。**却下**（設計の検証に H2 を使わない。Kotlin 版と同じ） |
 
-**Rust 版は、H2 が JVM の DB で使えないことを理由にしたが、Scala 版は使える**。そのため、この判断は「使えない」ではなく、**使う価値が維持費を上回るか**で行った。人が決める。Kotlin 版の ADR-014 の「ユーザーの決定」（Kotlin 版では H2）を、Scala 版へ当然に引き継ぐものではない。
+トレードオフ: A は、開発の手軽さと引き換えに、ローカルと CI の乖離のリスクを持つ。対策は、(a) H2 でしか通らない記述を禁止し、PostgreSQL の統合テストを正とする、(b) ポートの契約テストを両実装で実行する（PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト）、(c) 受け入れ（`@api`）は PostgreSQL で実行する。
+
+**選択と安全策**: 実行する DB は、設定（例: `DB_KIND=postgres|h2`）で選ぶ。**本番・ステージングで H2 が選ばれないよう、起動時の検査で、本番・ステージングの環境では H2 を拒否し、起動に失敗する**（[インフラ](./architecture-infrastructure.md)）。**H2 は本番イメージに含めない**（sbt の依存は開発用の構成だけに置く）。
+
+**Rust 版との対比**: Rust 版は、「H2 は JVM の DB のため使えない」ことを理由に、ローカルも PostgreSQL 18（Docker）のみとした（[技術スタック（Rust 版）](../beer-game-rust/tech-stack.md)）。**Scala 版は JVM 上で動くため、H2 をプロセス内に組み込める**。この違いが、Kotlin 版と同じ判断を採れる根拠である。
+
+**Scala 固有の論点**:
+
+- **doobie**: `Transactor` は JDBC の接続元（URL・`DataSource`）から作れ、H2 でも使える。doobie-h2（1.0.0-RC12 が Maven Central にある）は H2 固有の型の対応を足すもので、**要るかは B1 で確認する（未確認）**。
+- **明示 ROLLBACK（SBD2）**: `Left` でも COMMIT する doobie の挙動は H2 でも同じ。**`Left` を返す経路は、H2 でも明示 ROLLBACK を行う**。
+- **SQLSTATE**: 一意制約違反（23505）の取得は、doobie の `sqlstate` の抽出（`SqlState`）で行う。Kotlin 版は JDBC で H2 の 23505・23513・40001 を実測したが、**doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認**（B1 で実測）。制約名は、PostgreSQL では専用のフィールドから、H2 ではメッセージ中の名前から取る（Kotlin 版の実測の引用）。
+- **確認状況**: H2 の版（2.5.252）、ライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。**公式のサポート期限、PostgreSQL モードの動作範囲（アドバイザリロック、`LISTEN/NOTIFY`、部分一意索引、ロール、`jsonb`）、JDK 25・Flyway 13.12.2 との組み合わせは、Scala 版では未確認**（Kotlin 版の実測を引用するのみ）。**H2 の導入（依存の追加）は承認待ち、動作範囲は B1 の最初に実測して確定する**。
 
 ## beer-game-kotlin からの変更
 
@@ -254,7 +270,7 @@ beer-game-kotlin の T5・T6 に対応し、ガイド第 9 章の設定を CI �
 | 10 | Cucumber-JVM（Gradle の `acceptanceTest`） | cucumber-scala（`sbt test` に載せない）+ 関数値の経路 | ガイド §10.1、ADR-049（ST7） |
 | 11 | kotlinx.serialization | circe（提案。ST6） | JSON の道具 |
 | 12 | 状態の版は `State.version`、`evolve` は版を進める | 版は永続化の層。`Evolution.Applied/Ignored`（[ドメインモデル](./domain-model.md) SD2） | 検知を直接にする（Rust 版 RD2 と同じ） |
-| 13 | ローカルは H2 | ローカルも PostgreSQL 18（提案） | ST9 |
+| 13 | ローカルは H2（Kotlin 版の T7） | ローカルも H2 の PostgreSQL モード（ユーザーの決定、2026-11-25。導入は承認待ち） | ST9 |
 | 14 | JDK 25（Temurin）の JRE | 同じ（JDK 25 を第一候補。要確認） | JVM 版 |
 | 15 | 純粋性は detekt の `ForbiddenMethodCall` | WartRemover + Scalafix の `DisableSyntax` + `domain` の依存の制限（ST3） | ツールの違い |
 
@@ -272,7 +288,7 @@ beer-game-kotlin の T5・T6 に対応し、ガイド第 9 章の設定を CI �
 
 ## 未決事項
 
-1. **ローカル開発の DB**（ST9）: PostgreSQL のみを提案した。**人の承認を得る**。承認されれば、本書と ADR-001 の 014 の「提案」を外す。
+1. **ローカル開発の DB**（ST9）: H2 の採用は決定済み（2026-11-25）。残る未決は、**H2 の依存の導入の承認**、**B1 の最初に行う動作範囲の実測**（アドバイザリロック、`LISTEN/NOTIFY`、部分一意索引、ロール、`jsonb`、SQLSTATE、doobie 経由の挙動）、doobie-h2 の要否、公式のサポート期限（未確認）。
 2. **カバレッジのしきい値**（ST4）: 文 85%・分岐 75%、`domain` 文 97% を暫定で引き継いだ。**未実測**。scoverage の Scala 3 での指標と設定名は**要確認**。
 3. **Scala と周辺の版の組み合わせ**: Scala 3.7.4 と WartRemover 3.6.3・sbt-scalafix 0.14.10・sbt-scoverage 2.4.4 の組み合わせ（Scalafix と scoverage は本書では未確認）。JDK 25 との組み合わせ。
 4. **doobie の RC13**: ガイドが記す 1.0.0-RC13 は、Maven Central の一覧に無かった。RC12 でガイドの例（`Transactor`、`ConnectionIO`、`Update`）が動くかは要確認。

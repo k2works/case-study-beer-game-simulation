@@ -17,7 +17,9 @@ beer-game-kotlin と同じ機能と振る舞いを、Scala 3（Cats Effect + htt
 
 提案中（レビュー待ち）
 
-ユーザーが承認したのは、**作成計画**（beer-game-kotlin の設計書を正本とし、Scala 版の設計書 10 本と本 ADR を作る。スタックはガイド準拠）である。本書の**引き継ぎ表の判定**、**Scala 固有の判断**、**ローカル DB を PostgreSQL のみとする提案**、**版の選定**は、AI が beer-game-kotlin の ADR・設計書と Scala 編ガイドを読んで作った案で、**人の承認を得ていない**。承認の記録は、承認を得た時点でこの節に追記する。
+ユーザーが承認したのは、**作成計画**（beer-game-kotlin の設計書を正本とし、Scala 版の設計書 10 本と本 ADR を作る。スタックはガイド準拠）である。本書の**引き継ぎ表の判定**、**Scala 固有の判断**、**版の選定**は、AI が beer-game-kotlin の ADR・設計書と Scala 編ガイドを読んで作った案で、**人の承認を得ていない**。承認の記録は、承認を得た時点でこの節に追記する。
+
+**ユーザーの決定（2026-11-25）**: 「ローカル DB は Kotlin と同じく H2 で」。ローカル開発（開発機での起動・動作確認）だけ H2 の PostgreSQL モードを使い、統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18 のままとする（下の 014 の行、[技術スタック](../../design/beer-game-scala/tech-stack.md) の ST9）。当初 AI が起草した「ローカルも PostgreSQL 18（Docker）のみ」の提案は、この決定により取り下げた。**この決定が含まないもの**: H2 の導入（依存の追加）そのものの承認、H2 の版の確認結果の承認、H2 の PostgreSQL モードでの動作範囲（B1 の最初に実測して確定する）。これらは Kotlin 版と同様に未了である。
 
 ## コンテキスト
 
@@ -38,7 +40,7 @@ Scala 版は、同じ学習の価値を、**型クラスと `IO` の値による
 - **設計の構造は、beer-game-kotlin を正本として引き継ぐ。** ES + CQRS、`game` と `session` の 2 ストリーム、状態遷移の純粋関数、投影、保持削除、API の契約（`openapi.yaml`、`code`、problem+json）などの構造は変えず、Scala の表現に置き換える。設計書は `docs/design/beer-game-scala/` に、beer-game-kotlin と同じ文書構成（10 本 + 入口）で作り、各文書に「beer-game-kotlin からの変更」を設ける。言語に依存しない節は、Rust 版の方法に倣い、Kotlin 版の節を参照して継承する。
 - **技術スタックは、バックエンドを Scala 3（インデント構文）+ sbt + Cats / Cats Effect + http4s + doobie、フロントエンドを既存の React / TypeScript とする。** 版は設計時（2026-11-25）に Maven Central の `maven-metadata.xml` で確認した値を [技術スタック](../../design/beer-game-scala/tech-stack.md) に記録する。確認できなかったものは「要確認」と書き、B1 で確かめる。
 - **コーディングは、関数型プログラミングガイド（Scala 編）に準拠する。** 型は `enum` と `case class`（`copy`）で表し、`val` と不変の `List` だけを使う。業務の失敗は `Either[業務の enum, A]`、独立な検証は `ValidatedNec` と `mapN`、`IO` の失敗は想定外に限る（ガイド ADR-050）。状態の遷移は `handle(state, command): Either[Error, List[Event]]` と `Events.apply` の `foldLeft` の再生で表し、Kotlin 版の `decide` / `evolve` に対応づける。依存は関数を持つ `case class` で受け取り、文脈は `Kleisli` で渡す。`IO` の実行は `IOApp` とテストの境界に限る。
-- **ローカル開発の DB は PostgreSQL 18（Docker）のみとする（提案）。** beer-game-kotlin の H2 は継承しない。理由は下の 014 の行に書く。
+- **ローカル開発の DB は、Kotlin 版と同じく H2 の PostgreSQL モード（ユーザーの決定、2026-11-25）。** ローカル開発だけで、本番・ステージングでは起動時の検査で拒否し、本番イメージに含めない。詳細は下の 014 の行に書く。
 - **beer-game-kotlin の ADR は、次の表のとおり扱う。** beer-game-kotlin の ADR のファイルは履歴として変更しない。
 - **判断 ID の接頭辞**: ドメインの Scala 固有の判断は `SD1〜`、バックエンドは `SBD1〜`、技術スタックは `ST1〜`、非機能要件の Scala 固有の追加は `NF-SC1〜`（Scala・Cats 系）とする。**`NF-C1〜C9` は beer-game-kotlin の非機能要件で「容量・同時実行」として既に使われている**（[非機能要件（Kotlin 版）](../../design/beer-game-kotlin/non-functional.md)）ため、`NF-C` を Cats 系に使うと番号が衝突する。このため `NF-SC` とした（2026-11-25、起草時の判断。変更するなら人が決める）。
 
@@ -61,7 +63,7 @@ Scala 版は、同じ学習の価値を、**型クラスと `IO` の値による
 | 011 厳格な静的解析（detekt、PMD） | **置き換える** | 厳格さの原則（違反 0 件、ベースラインなし、抑制なし、緩和は ADR に記録して人が承認、純粋性の静的検査）は引き継ぐ。ツールを scalac のオプション（`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement`）、Scalafmt、WartRemover、Scalafix（`DisableSyntax`）に置き換える（ガイド第 9 章）。`@SuppressWarnings` は理由なしに使わない |
 | 012 日本語 Gherkin と Cucumber | **変更** | 日本語 Gherkin を契約として共有する点は引き継ぐ。ガイドは cucumber-scala を「動いたが `sbt test` には載せず CLI で実行」とし、受け入れの経路の切り替えは関数値の `case class` で行った（ガイド ADR-049）。Scala 版は両方を使う（ST7）。Cucumber の `sbt test` への組み込みはしない |
 | 013 技術スタックの版 | **置き換える**（バックエンド部分）。PostgreSQL 18、Node 26 LTS、フロントエンド・インフラ・CI の版と運用原則は引き継ぐ | Scala・Cats・http4s・doobie などの版を、確認したうえで固定する（記録先は tech-stack.md の ST1 と版の表）。「ライブラリのサポート期限は書かない」「新規の依存は導入時に承認を得る」「確認日を記録する」は引き継ぐ |
-| 014 ローカル開発だけ H2 | **見直す**（PostgreSQL のみを提案） | 動機（ローカル起動を軽くする）は引き継ぐが、**H2 は採らない**。理由: (1) H2 は JVM から使えるが、PostgreSQL 固有の機能（アドバイザリロック、`LISTEN/NOTIFY`、部分一意索引、DB ロール、`jsonb`）を使う中核の設計が、H2 では別実装になる。(2) doobie の PostgreSQL 向けの機能（`doobie-postgres`）を使う設計と、H2 の互換モードが合わない。(3) Kotlin 版の ADR-014 が自ら挙げる「ローカルで通っても CI で落ちる乖離」の対策（ポートの 2 実装、契約テストの両実行）の維持費を負わない。(4) Docker で PostgreSQL 18 を使えば、ローカル・CI・統合テスト・ステージング・本番が同じ DB になる。ポート `ProjectionLock`・`ChangeNotifier` は、テスト用のインメモリ実装との差し替えのために維持する。**Rust 版は「H2 が JVM の DB で使えない」ことを理由にしたが、Scala 版は使えるので、理由が違う**。人の承認を得る |
+| 014 ローカル開発だけ H2 | **引き継ぐ**（読み替え。ユーザーの決定、2026-11-25） | Kotlin 版の ADR-014 と T7 を Scala 版に読み替える。ローカル開発だけ H2 の PostgreSQL モード。PostgreSQL 固有の機能（アドバイザリロック、`LISTEN/NOTIFY`）はポート `ProjectionLock`・`ChangeNotifier` の裏に置き、PostgreSQL 版と H2 版を持つ。部分一意索引、DB ロール・GRANT、接続プールの分離、`jsonb` は PostgreSQL の統合テストでだけ検証する。実行する DB は `DB_KIND=postgres\|h2` で選び、**本番・ステージングでは起動時の検査で H2 を拒否**し、**本番イメージに H2 を含めない**。乖離への対策は、(a) H2 でしか通らない記述の禁止、(b) ポートの契約テストを両実装で実行、(c) 受け入れは PostgreSQL。**Scala 固有の論点**: doobie の `Transactor` は H2 でも使える（doobie-h2 の要否、doobie 経由の SQLSTATE と制約名の取得は**未確認**。B1 で実測）。`Left` の明示 ROLLBACK（SBD2）は H2 でも同じ。**Rust 版は「H2 は JVM の DB のため使えない」ことを理由にローカルも PostgreSQL のみとしたが、Scala 版は JVM なので H2 を組み込める**（理由が違う）。H2 の版（2.5.252）とライセンス（MPL 2.0・EPL 1.0）は 2026-11-25 に Maven Central で確認した。**H2 の導入は承認待ち、動作範囲は B1 の最初に実測して確定する** |
 | 015 復帰資格の受け渡しと失効 | **引き継ぐ** | 言語に依存しない |
 | 016 資格の鍵の版 | **引き継ぐ** | 言語に依存しない |
 | 017 参加・復帰の失敗の窓を DB に持つ | **引き継ぐ** | 言語に依存しない |
@@ -119,7 +121,7 @@ Scala 版は、同じ学習の価値を、**型クラスと `IO` の値による
 - 要件・設計を Scala 版にコピーして改訂する: 正本が複数になり、差が生まれる。
 - Scala の別の枠組み（ZIO + zio-http、Play、Akka/Pekko HTTP）を採る: ガイドの前提が Cats Effect であり、ガイドの道具（http4s、doobie）を使う方針のため採らない。
 - 型クラスの代わりに、ガイドが採らなかったタグレスファイナルで書く: 3 通りを書いて比べた結果、ガイドが採らなかった。
-- beer-game-kotlin の ADR をすべて有効とする: 層の強制、静的解析、技術スタックの版、H2 が Scala 版と矛盾する。
+- beer-game-kotlin の ADR をすべて有効とする: 層の強制、静的解析、技術スタックの版が Scala 版と矛盾する（H2 は、ユーザーの決定により Kotlin 版と同じく使う）。
 
 ## 影響
 
@@ -135,7 +137,7 @@ Scala 版は、同じ学習の価値を、**型クラスと `IO` の値による
 - beer-game-kotlin の設計が変わると、Scala 版にも影響する。変更は正本側で行い、Scala 版へ追従する。
 - 引き継ぎ元の ADR の多くは Kotlin 版でも未承認のため、Kotlin 版で内容が変わると、この表の「引き継ぐ」が揺らぐ。003・019 の計測値（千件の再生時間、再試行の上限 10）と 017 の仮置き値（10 回・10 分）は、Scala 版で取り直す。
 - doobie が RC 版で、http4s の安定版が 0.23 系である。更新のたびに破壊的変更の影響を調べる運用が要る。
-- Scala 版は H2 を使わないため、Docker が開発機に要る。
+- ローカル開発の H2 により、ローカルと CI の乖離のリスクを負う。ポートの 2 実装と契約テストの両実行の維持費がかかり、H2 版では省略した制約（追記専用、ロールの分離など）がローカルで守られない。Scala 版では H2 の動作範囲を未実測のため、B1 の最初に確かめる。
 
 ## コンプライアンス
 

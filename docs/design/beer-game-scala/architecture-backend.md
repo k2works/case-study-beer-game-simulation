@@ -58,7 +58,7 @@ package "adapter-persistence（doobie）" {
   [投影の書き込み（SQL）] as PW
   [問い合わせの実装（SQL・読み取り専用ロール）] as QR
   [周辺ストア・冪等記録] as Aux
-  [ProjectionLock・ChangeNotifier\nアドバイザリロック・NOTIFY] as Port2
+  [ProjectionLock・ChangeNotifier\nPostgreSQL 版: アドバイザリロック・NOTIFY\nH2 版（ローカルのみ）: プロセス内のロック・イベント] as Port2
   [EventCodec（circe の DTO）] as Codec
 }
 
@@ -100,7 +100,7 @@ Port2 --> DB
 | `domain`（`beergame.domain`） | 値オブジェクト、`Command`、`Event`、エラー、`handle` / `Events.apply`、再生、`startGame`、`simulateWeek`、`KitPreset`、投影の純粋関数、`RetentionSaga` の純粋関数。**業務ルールはここにある** | なし（外部は `cats-core` のみ） |
 | `application`（`beergame.application`） | ポート（関数を持つ `case class`）の定義、コマンド処理 `execute`、問い合わせ、競合の再試行、周辺ストアへの書き込み内容の導出（純粋）、開示の判定 `Disclosure`。トランザクションの境界を決める。**ルールは持たない** | `domain`。外部は `cats-effect`、`doobie-core`（`ConnectionIO` の型だけ。SBD3） |
 | `adapter-http`（`beergame.adapter.http`） | http4s のルート、DTO の検証（誤りを集める）、認証の入口（生の資格を取り出す）、Origin 検査、レート制限、ヘッダー、SSE、エラーの写像 | `application`、`domain` |
-| `adapter-persistence`（`beergame.adapter.persistence`） | doobie による `EventStore`、投影の書き込み、問い合わせ、周辺ストア、冪等記録、`ProjectionLock` と `ChangeNotifier`、イベントの JSON 変換（`EventCodec`）、マイグレーション | `application`、`domain` |
+| `adapter-persistence`（`beergame.adapter.persistence`） | doobie による `EventStore`、投影の書き込み、問い合わせ、周辺ストア、冪等記録、`ProjectionLock` と `ChangeNotifier` の **PostgreSQL 版と H2 版**（ST9）、イベントの JSON 変換（`EventCodec`）、マイグレーション（共通と PostgreSQL 専用の場所） | `application`、`domain` |
 | `app`（`beergame.app`） | 設定の読み込みと検証、ポートの組み立て（ワイヤリング）、`IOApp`、起動のモード（api、retention、migrate、rebuild-projections） | 全プロジェクト |
 
 sbt のプロジェクト名は、ディレクトリ名に合わせて `domain`・`application`・`adapterHttp`（`adapter-http/`）・`adapterPersistence`（`adapter-persistence/`）・`app` とし、依存は `dependsOn` で宣言します。この規則は、**sbt の依存宣言**（宣言していないプロジェクトの型は参照できない）と、**依存の検査**（下の「モジュール構成と依存の検査」）の二重で守ります。
@@ -385,14 +385,22 @@ Kotlin 版の表を引き継ぎます（資格は 256 ビットの乱数とダ�
 | 依存関係 | CI で依存関係の検査（**ツールは選定未決**。[技術スタック](./tech-stack.md)）。秘密情報の検査のツールは [インフラストラクチャ](../beer-game-kotlin/architecture-infrastructure.md) の方針に従う |
 | 型の安全 | WartRemover の `Null`・`Throw`・`AsInstanceOf` などで、危険な書き方を CI で止める（ガイド §9.4） |
 
-## ローカル開発（Kotlin 版の H2 の節の扱い）
+## ローカル開発（H2 の PostgreSQL モード）と実行の選択
 
-Kotlin 版は、H2 の PostgreSQL モードでのローカル起動を許し、PostgreSQL 固有の機能を `ProjectionLock` と `ChangeNotifier` のポートの裏に隠し、2 実装を持ちます（ADR-014）。**Scala 版は H2 を使いません**（[技術スタック](./tech-stack.md) の ST9。**提案で、人の承認を得る**）。ローカル開発の DB は PostgreSQL 18（Docker）です。
+ユーザーの決定（2026-11-25）により、**開発機でのローカル開発（起動と動作確認）だけ**、H2 の PostgreSQL モードで動かせます（[技術スタック](./tech-stack.md) の ST9。Kotlin 版の T7・ADR-014 を読み替えたもの。**H2 の依存の導入は承認待ち、動作範囲は B1 の最初に実測して確定する**）。PostgreSQL 固有の機能を `ProjectionLock` と `ChangeNotifier` のポートの裏に隠し、**PostgreSQL 版と H2 版の 2 実装**を持ちます。統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18 のままです。
 
-- **ポート `ProjectionLock` と `ChangeNotifier` は維持します。** 動機（PostgreSQL 固有の機能を隠す）と、契約テストの考え方は言語に依存しません。
-- ローカルの DB を PostgreSQL にするため、実装が 1 つになり、ポートは**テスト用のインメモリ実装との差し替え**のためだけに残ります（関数を持つ `case class` の `IO` の値を、インメモリの実装に差し替える）。
-- **本番・ステージングで、想定外の DB 実装が選ばれないようにする起動時の検査**（許可リスト方式。`APP_ENV` × DB の種別）は、DB が PostgreSQL だけのため要りません。
-- 承認されず H2 を採る場合は、Kotlin 版の「乖離のリスクと対策」と「本番での拒否の検査」を引き継ぎ、本節を書き換える。
+| ポート | PostgreSQL 版（統合テスト・CI・ステージング・本番） | H2 版（ローカルのみ） | 契約テスト |
+| :--- | :--- | :--- | :--- |
+| `ProjectionLock` | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中で取り、トランザクションの終了で解放） | **プロセス内の読み書きロック**（単一プロセスでのみ有効。複数のプロセスでは保証しない） | 両実装で同じ契約を実行する |
+| `ChangeNotifier` | `pg_notify`（追記と同じトランザクション）と、`LISTEN` 専用の接続（プールの外） | **プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） | 両実装で同じ契約を実行する |
+
+- **ポートは両実装で維持します。** 動機（PostgreSQL 固有の機能を隠す）と、契約テストの考え方は言語に依存しません。ポートは、関数を持つ `case class` の `IO` / `ConnectionIO` の値で、実装を差し替えます。
+- **テスト用のインメモリ実装との関係**: 既存のテスト用のインメモリ実装（ドメイン・アプリケーションの受け入れで使う関数値の経路）と、H2 版の本体の実装は**別のもの**です。H2 版は、DB（H2）に接続する経路の実装であり、インメモリ実装は DB を使わない。ただし、**ロックと通知のプロセス内の実装は共通の部品を使える**（プロセス内の読み書きロックと `Topic`。共通化するかは B1 で決める）。契約テストは、PostgreSQL 版、H2 版、インメモリ実装の 3 つで同じ内容を実行する。
+- **実行する DB の選択**: 設定 `DB_KIND=postgres|h2`（既定は `postgres`）で選び、`app` が組み立てる（`Transactor`・`ProjectionLock`・`ChangeNotifier` と、マイグレーションの場所）。**H2 版でも `Left` の明示 ROLLBACK（SBD2）は同じ**です（doobie の `Tx.rollbackOnLeft` は DB に依らない）。
+- **本番・ステージングでの H2 の拒否**（許可リスト方式。`APP_ENV` × `DB_KIND`）: `AppConfig.load` が、**`APP_ENV` が本番・ステージングのとき `DB_KIND=h2` を拒否し、起動に失敗する**（`ValidatedNec` の設定の誤りとして、足りない設定と同じ経路で終了する）。環境ごとの全組み合わせを単体テストで確かめる（[インフラ](./architecture-infrastructure.md)）。**H2 は本番イメージに含めない**ため、H2 のドライバの欠落でも、本番・ステージングでは起動が失敗する（二重の防御）。
+- **乖離への対策**: (a) H2 でしか通らない記述を禁止し、PostgreSQL の統合テストを正とする、(b) ポートの契約テストを両実装で実行する、(c) 受け入れは PostgreSQL で実行する（[データモデル](./data-model.md)「乖離のリスクと対策」、[テスト戦略](./test-strategy.md)）。
+- **ローカルで守られない制約**（H2 版）: `uq_idempotency_create`、追記専用、DB ロールとプールの分離、複数プロセスの直列化と通知、分離レベルによる一貫した読み取り（[データモデル](./data-model.md) の 7 項目）。冪等記録の重複は、H2 版ではアプリ側で挿入前に `(scope, key_digest)` を検索して `ConcurrencyConflict` を返す（Kotlin 版と同じ方針）。
+- **SQLSTATE の写像**: PostgreSQL 版は `PSQLException` から制約名を取る。H2 版は、メッセージ中の制約名（大文字小文字を区別せず）で写し、`PersistenceFailure` にメッセージを載せない。**doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認**（B1 で実測）。
 
 ## モジュール構成と依存の検査
 
@@ -448,7 +456,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | BD9 | メトリクスは CloudWatch の EMF の JSON を標準出力へ | **引き継ぐ** |
 | BD10 | 出力は問い合わせ時に純粋関数で作る | **引き継ぐ**（D11） |
 | BD11 | 冪等記録の照合は認可の後、成功の応答だけを保存 | **引き継ぐ**（ADR-004） |
-| BD12 | ローカル開発の DB と、PostgreSQL 固有機能のポート | **見直す**: ポートは維持。ローカルの DB は PostgreSQL 18（提案。ST9） |
+| BD12 | ローカル開発の DB と、PostgreSQL 固有機能のポート | **引き継ぐ**: ポートは両実装（PostgreSQL 版・H2 版）で維持。ローカルだけ H2、本番・ステージングで拒否（ST9。ユーザーの決定、2026-11-25） |
 
 ### Scala 固有の判断 SBD1〜SBD11
 
@@ -494,7 +502,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | 7 | `Dispatchers.IO` にブロッキング I/O を閉じ込める | doobie は `IO` の中で JDBC を `blocker` の実行コンテキストで動かす（既定。**詳細は要確認**） | JDBC の扱いが違う |
 | 8 | `SharedFlow` と `Flow` による SSE の配信 | fs2 の `Stream[IO, A]` と `Topic`（SBD9） | 言語の違い |
 | 9 | `Secret<A>` は `value class` | `Secret[A]` は `opaque type` か `case class`（`toString` を伏せ字） | 言語の違い |
-| 10 | H2 版と PostgreSQL 版の 2 実装、本番での H2 の拒否 | ローカルの DB は PostgreSQL 18（提案）。ポートは維持 | ST9 |
+| 10 | H2 版と PostgreSQL 版の 2 実装、本番での H2 の拒否 | 同じ（2 実装、`DB_KIND`、本番・ステージングで拒否）。テスト用のインメモリ実装は別に維持 | ST9 |
 | 11 | `LogRecord` と Logback | `LogRecord` と `LogSink`（ガイド §7.8）、フレームワークのログは Logback | ガイドに合わせる |
 | 12 | Cucumber-JVM の `acceptanceTest` | `acceptance` プロジェクト（cucumber-scala + 関数値の経路。`sbt test` に載せない） | ST7 |
 

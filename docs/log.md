@@ -3,6 +3,7 @@
 ## 2026-11-25
 * **Creation**: [beer-game-scala の設計](/design/beer-game-scala/index.md)（index・ドメインモデル・バックエンド・技術スタックほか 10 本）と [ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を作成（beer-game-kotlin を正本とする Scala 版。関数型プログラミングガイド Scala 編に準拠。status: draft、判断は未承認。claude-code/claude-sonnet-5-5）
 * **Update**: [設計の索引](/design/index.md)・[ADR の索引](/adr/index.md)・mkdocs.yml に beer-game-scala を登録（claude-code/claude-sonnet-5-5）
+* **Update**: [beer-game-scala の設計](/design/beer-game-scala/index.md)・[ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を更新（ローカル開発の DB を、ユーザーの決定で PostgreSQL のみから H2 の PostgreSQL モード（Kotlin 版 T7 と同じ）へ変更。tech-stack・data-model・architecture-backend・architecture-infrastructure・test-strategy・non-functional・operation・architecture-frontend。claude-code/claude-sonnet-5-5）
 
 ## 2026-11-24
 * **Creation**: [ADR-014](/adr/beer-game-ts/014-shared-api-contract-and-web.md) を作成（TS 版は共有の API 契約と共有の画面を使う。claude-code/claude-sonnet-5-5）

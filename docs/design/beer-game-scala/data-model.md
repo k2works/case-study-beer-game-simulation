@@ -1,7 +1,7 @@
 ---
 type: Design
 title: "データモデル設計 - ビールゲームシミュレーション（Scala 版）"
-description: "Scala 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、Flyway の 1 系統の連番、doobie での型の対応と一意制約・アドバイザリロック・LISTEN/NOTIFY の確認結果、H2 を持たない前提での差分を整理した正本。"
+description: "Scala 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、Flyway の連番とベンダー別の場所、doobie での型の対応と一意制約・アドバイザリロック・LISTEN/NOTIFY の確認結果、ローカル開発だけ H2 の PostgreSQL モードを使う扱い（ユーザーの決定、2026-11-25）を整理した正本。"
 tags: [design]
 status: draft
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
@@ -11,7 +11,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
 
 ## 概要
 
-本書は、beer-game-scala のデータモデルを定義します。[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の決定により、**スキーマの構造は [beer-game-kotlin のデータモデル](../beer-game-kotlin/data-model.md) を正本として引き継ぎ**ます（ES + CQRS、`game_roots` を根にした連鎖削除、追記専用の `events`、同期投影、周辺ストア）。本書は、Scala 版で変わる点（マイグレーションの置き方、doobie での型の対応と制約違反の扱い、H2 を持たないこと）と、**実際の PostgreSQL 18.6 と doobie で確認した事項**を定めます。**`docs/` を設計の正本**とします。実装コードはまだ存在しません（アプリの置き場は `apps/beer-game-scala` を予定）。
+本書は、beer-game-scala のデータモデルを定義します。[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の決定により、**スキーマの構造は [beer-game-kotlin のデータモデル](../beer-game-kotlin/data-model.md) を正本として引き継ぎ**ます（ES + CQRS、`game_roots` を根にした連鎖削除、追記専用の `events`、同期投影、周辺ストア）。本書は、Scala 版で変わる点（マイグレーションの置き方、doobie での型の対応と制約違反の扱い、ローカル開発だけ H2 を使うこと）と、**実際の PostgreSQL 18.6 と doobie で確認した事項**を定めます。**`docs/` を設計の正本**とします。実装コードはまだ存在しません（アプリの置き場は `apps/beer-game-scala` を予定）。
 
 ### 本書の位置づけと確認の範囲
 
@@ -23,19 +23,20 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
 - **引用したもの**: [Rust 版のデータモデル](../beer-game-rust/data-model.md) が、**`events`・`game_roots` ほかの DDL と DB ロール・GRANT を PostgreSQL 18.6 に適用して実測した結果**（追記専用の拒否、部分一意索引、連鎖削除、制約名）を持ちます。DDL は言語に依存しないため、本書はそれを引用します。**Scala 版では、その全文を再適用していません**（上の縮小した DDL だけ）。ロールと GRANT を doobie の接続から検証することも、未実施です。
 - **確認していないこと**: 投影・周辺ストア・保持削除の他の表の DDL（Kotlin 版の ER 図と実ファイル `V002〜V006` に基づく設計で、Scala 版では**未適用**）、Flyway の実行、`HikariTransactor` と用途別のロール、`SET ROLE`、読み取り専用の `REPEATABLE READ`、circe による `jsonb` の読み書き（`doobie-postgres-circe` は[技術スタック](./tech-stack.md)に載せておらず、未確認）。
 - **引き継ぐだけのもの**: 投影テーブルの定義（購読するイベント、閲覧できる人）、読み取りの規則、設計判断のまとめは、Kotlin 版を正本とします。
-- Kotlin 版の実装の経緯（B1〜B12 の注記）と H2 に関する記述は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。
+- **H2（ローカル開発のみ）は Scala 版では実測していません。** H2 の版（2.5.252）とライセンスは Maven Central で確認しましたが、PostgreSQL モードの動作範囲、Flyway の H2 への適用、doobie 経由の SQLSTATE は**未確認**です。「ローカル開発のデータベース」の表は Kotlin 版の実測（H2 2.5.252、2026-11-14）の引用で、**B1 の最初に Scala 版で実測して確定します**。
+- Kotlin 版の実装の経緯（B1〜B12 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。
 
 ### beer-game-kotlin からの設計方針の変更
 
 | # | beer-game-kotlin | beer-game-scala | 理由 |
 | :--- | :--- | :--- | :--- |
-| 1 | Flyway（共通・PostgreSQL・H2 の 3 つの場所に分ける） | **Flyway の 1 系統の連番**（PostgreSQL のみ） | H2 を持たないため方言の分岐が不要（[技術スタック](./tech-stack.md) の ST9。**提案で、人の承認待ち**） |
+| 1 | Flyway（共通・PostgreSQL・H2 の 3 つの場所に分ける。B1 で H2 専用は不要と確定） | **Flyway の連番を 1 系統**で持ち、**共通と PostgreSQL の 2 つの場所**に分ける（H2 は共通だけを適用。H2 専用の場所は、Kotlin 版の実測を引用して作らない見込み。B1 で確定） | ローカルは H2、それ以外は PostgreSQL（[技術スタック](./tech-stack.md) の ST9。ユーザーの決定、2026-11-25） |
 | 2 | 共通 V001〜V008 と PostgreSQL V101〜V102。番号の付け替えがあった | **最初から連番**。表を足す番号と、その表の GRANT の番号を分け、GRANT は表より後ろに置く | Kotlin 版で、番号の順序の不整合（V101 と V102）が起きた教訓 |
 | 3 | `lobby_participants.replaced_at` は V007 で後から追加 | **ロビーの表の作成時から持つ** | 設計が確定済み（開始後の入れ替え） |
-| 4 | `uq_idempotency_create` は H2 版で省略 | **常に PostgreSQL の部分一意索引** | H2 を持たない |
-| 5 | `${json_type}` のプレースホルダ、`timestamp with time zone` の書き方、`jsonb` の書き込みを方言ごとに分ける | `jsonb`・`timestamptz` をそのまま使う | PostgreSQL のみ |
+| 4 | `uq_idempotency_create` は H2 版で省略 | **同じく、PostgreSQL 専用のマイグレーションに置き、H2 版では省略**（アプリ側の再照合） | ST9 |
+| 5 | `${json_type}` のプレースホルダ、`timestamp with time zone` の書き方、`jsonb` の書き込みを方言ごとに分ける | **同じく分ける**（`events.payload` は PostgreSQL が `jsonb`、H2 が `json`。書き込みの SQL は方言ごと。Kotlin 版の実測の引用で、Scala 版では未確認） | ST9 |
 | 6 | JDBC の直接の SQL | **doobie の直接の SQL**（`sql"..."`、`ConnectionIO`）。ORM は使わない | 技術スタック（ST2、SBD3） |
-| 7 | ロールと GRANT は PostgreSQL の統合テストでだけ検証し、H2 では省略 | すべての環境（ローカルを含む）で PostgreSQL を使う前提なので、**全環境で同じ**（H2 を採る場合は Kotlin 版の節へ戻す。「ローカル開発のデータベース」） | ST9 |
+| 7 | ロールと GRANT は PostgreSQL の統合テストでだけ検証し、H2 では省略 | **同じ**（PostgreSQL 専用のマイグレーションに置き、PostgreSQL の統合テストでだけ検証する。H2 では省略。「ローカル開発のデータベース」） | ST9 |
 
 ## 概念データモデル
 
@@ -233,7 +234,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 
 ### 追記専用の保護
 
-アプリケーションが使う DB ロールには、`events` の **INSERT と SELECT だけ**を与え、UPDATE と DELETE と TRUNCATE を与えません。保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。**ローカルを含むすべての環境で PostgreSQL を使うため、H2 版の「追記専用は守られない」という例外はありません**（ST9 が承認された場合）。
+アプリケーションが使う DB ロールには、`events` の **INSERT と SELECT だけ**を与え、UPDATE と DELETE と TRUNCATE を与えません。保持削除は、別のロールが `game_roots` を削除し、**外部キーの連鎖**で `events` の行が消えます。**ローカル開発の H2 版では、この保護（ロール、GRANT、`TRUNCATE` の拒否）を省略し、単一の接続ユーザーで動かします。ローカルでは追記専用は守られません**（ST9。検証は PostgreSQL の統合テストでだけ行う。下の「ローカル開発のデータベース」）。
 
 ロールは次の 5 つです（`NOLOGIN`。ログイン用のユーザーはこれらのメンバーとして運用で作る。作り方は Kotlin 版と同じ未決事項）。
 
@@ -309,16 +310,19 @@ Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[Row
 - **イベントは、マイグレーションで書き換えません。** 形の変更は `schema_version` とアップキャストで吸収します。投影の形の変更は、マイグレーションで表を直し、**再構築**で埋めます。
 - **表を足す番号と、その表の GRANT の番号を分け、GRANT は表より後ろの番号に置く**（Kotlin 版で、ロールの番号が表の番号と前後して適用できなくなった教訓）。既定の権限は与えない。
 - ファイルの置き場は `adapter-persistence` の中（[バックエンドアーキテクチャ](./architecture-backend.md) のモジュール構成）。具体的なパスと命名は B1 で決める。
+- **PostgreSQL 用と H2 用で、共通の部分を最大化し、差分だけを分ける**（Flyway のベンダー別の場所。ST9）。PostgreSQL は「共通 + PostgreSQL 専用」、H2（ローカル開発のみ）は「共通」を適用する。**共通に置けるか（`text` 型の主キー、`GENERATED ALWAYS AS IDENTITY`、`timestamp with time zone`、`bytea`）は、Kotlin 版の実測（Flyway 13.12.2 で共通の V001〜V005 が H2 にそのまま適用できた）の引用で、Scala 版では未確認**。B1 の最初に実測し、H2 専用の場所が要るかを確定する。
+- **PostgreSQL 専用に置くもの**: 部分一意索引 `uq_idempotency_create`、ロールと GRANT（V007）、`jsonb` の型。H2 は `${json_type}` のプレースホルダで `json` にする（予定）。H2 でしか通らない記述のために共通の DDL を曲げない（乖離への対策 1）。
 
 | 番号（予定） | 内容 |
 | :--- | :--- |
 | V001 | `game_roots`、`events`（名前つきの一意制約、`CHECK`）、`projection_checkpoints` |
-| V002 | 周辺ストアと横断: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records`（`pk_idempotency_records`、部分一意索引 `uq_idempotency_create`）、`participation_attempts` |
+| V002 | 周辺ストアと横断: `display_profiles`、`credentials`、`browser_sessions`、`idempotency_records`（`pk_idempotency_records`。**部分一意索引 `uq_idempotency_create` は PostgreSQL 専用の番号に分ける。H2 では省略**）、`participation_attempts` |
 | V003 | 投影（準備）: `game_overview`、`game_join_codes`、`game_settings`、`lobby_participants`（`replaced_at` を含む）、`lobby_observer_invitations`、`lobby_observers` |
 | V004 | 投影（進行）: `session_overview`、`role_current_states`、`current_decisions` |
 | V005 | 投影（結果）: `week_commits`、`week_role_results`、`week_team_totals` |
 | V006 | 保持: `retention_policies`、`deletion_runs`、`deletion_attempts`、`deletion_receipts` |
-| V007 | ロールと GRANT（上の 5 ロール）。**表（V001〜V006）がすべて揃った後に適用される番号** |
+| V007（PostgreSQL 専用） | ロールと GRANT（上の 5 ロール）。**表（V001〜V006）がすべて揃った後に適用される番号**。H2 では適用しない |
+| V008（PostgreSQL 専用） | 部分一意索引 `uq_idempotency_create`（V002 から分けたもの。番号と配置は B1 で確定） |
 
 **Scala 版で適用して確認したのは、V001 の `game_roots`・`events` の縮小版だけ**です。V001〜V006 の他の表は、Rust 版が V001 と V002 の一部とロールまわりを実測しました。**V003〜V006 は、Kotlin 版には実ファイルがありますが、Rust 版と Scala 版では未適用**です。実装時に Kotlin 版の実ファイル（`V003`〜`V006`）を元に書き、PostgreSQL の統合テストで確認します。
 
@@ -340,24 +344,69 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 ## ローカル開発のデータベース
 
-Kotlin 版は、H2 の PostgreSQL モードでローカル起動を許し、省略する制約の一覧（`uq_idempotency_create`、追記専用、ロールの分離、プールの分離、複数プロセスの直列化、削除ロールの限定、REPEATABLE READ）と、乖離への対策を持ちます。**Scala は JVM 上で動くため、H2 を使うこと自体はできます**が、[技術スタック](./tech-stack.md) の ST9（**提案。人の承認待ち**）は、**ローカルも PostgreSQL 18（Docker）のみ**とします。データモデルの観点では、次のとおりです。
+ユーザーの決定（2026-11-25）により、**開発機でのローカル開発（起動と動作確認）だけ**、H2 の PostgreSQL モードで動かせるようにします（[技術スタック](./tech-stack.md) の ST9、[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の 014。Kotlin 版の T7・ADR-014 を読み替えたもの）。Docker や PostgreSQL がなくても起動できることが目的です。**H2 の導入（依存の追加）は承認待ちで、動作範囲は B1 の最初に Scala 版で実測して確定します。**
 
-- **PostgreSQL をローカルでも使うなら**、上の制約・ロール・部分一意索引・アドバイザリロック・`LISTEN/NOTIFY` がすべて使え、**Kotlin 版の「H2 版で省略する制約」の一覧と、`${json_type}` のような方言の分岐は不要**になる。
-- ST9 が承認されず H2 を採る場合は、Kotlin 版の「方言の差分」「省略する制約」「乖離のリスクと対策」を引き継ぎ、本書の「マイグレーション」を、共通と PostgreSQL の 2 つの場所に分ける形へ書き換える。
+**範囲の線引き。**
+
+| 用途 | データベース |
+| :--- | :--- |
+| ローカル開発（開発機での起動・動作確認） | **H2（PostgreSQL モード）** または PostgreSQL。設定 `DB_KIND=h2\|postgres` で選ぶ（[バックエンドアーキテクチャ](./architecture-backend.md)） |
+| 統合テスト、受け入れ（`@api`）、CI | **PostgreSQL 18**（testcontainers-scala） |
+| ステージング、本番 | **PostgreSQL 18**（RDS）。起動時の検査で H2 を拒否する |
+
+**H2 を、設計の検証（並行性、権限、部分一意索引、連鎖削除）や性能の計測には使いません。** それらの正は PostgreSQL の統合テストです。
+
+**確認できた事実と、できなかった事実。** 下の「方言の差分」の表は、**Kotlin 版の実測（H2 2.5.252、PostgreSQL モード。2026-11-14。[データモデル（Kotlin 版）](../beer-game-kotlin/data-model.md)）の引用**です。**Scala 版（doobie 経由）では未実測**で、B1 の最初に確かめます。未確認のまま残るもの: H2 での性能、分離レベルの動作の同一性、表の所有者の扱い（`GRANT` まわり）、2 つの API プロセスでの動作、doobie 経由の SQLSTATE と制約名の取得、`Left` の明示 ROLLBACK（SBD2）の H2 での動作（doobie の挙動は DB に依らない見込みだが未実測）。
+
+### 方言の差分
+
+| 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ。Kotlin 版の実測の引用） | 扱い |
+| :--- | :--- | :--- | :--- |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（Scala 版で確認済み） | 動かない（関数が無い） | ポート `ProjectionLock` の裏に隠す。H2 版は**プロセス内のロック**（単一プロセスでのみ有効） |
+| SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（Scala 版で確認済み） | 動かない（構文エラー） | ポート `ChangeNotifier` の裏に隠す。H2 版は**プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） |
+| 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 動かない（構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える（PostgreSQL 専用のマイグレーション） |
+| DB ロールと GRANT、追記専用、`TRUNCATE` の拒否 | あり | 一部動く（`GRANT TRUNCATE` は構文エラー。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。**権限の検証の正は PostgreSQL の統合テスト** |
+| 接続プールの分離（観察者用など） | 用途別の `HikariTransactor` | 単一のプール | H2 版は**省略** |
+| `jsonb` | `events.payload` は `jsonb`（文字列 + `::jsonb`） | 型は通るが挙動が違う（`jsonb` は `json`。`setString` の文字列は JSON の文字列値になる。`FORMAT JSON` で書く） | H2 版は `json` 型、書き込みの SQL を方言で分ける。**doobie の `Put` で同じになるかは未確認** |
+| `timestamptz` | あり | 不明なデータ型（`timestamp with time zone` なら通る） | 共通の DDL は `timestamp with time zone` と書く |
+| 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | 設定は通る（動作の同一性は未確認） | H2 では検証しない |
+| SQLSTATE（40001、23505 の制約名） | `PSQLException` の `getServerErrorMessage.getConstraint`（Scala 版で確認済み） | 一意違反は 23505、REPEATABLE READ の同時更新は 40001。**制約名はメッセージ中に大文字で含まれ、専用のフィールドは無い**。メッセージには行の値も含まれる | H2 版の写像: メッセージ中の制約名（大文字小文字を区別せず）で `ConcurrencyConflict` に写す。**`PersistenceFailure` にメッセージを載せない**。**doobie 経由で取れるかは未確認** |
+| Flyway の適用 | 共通 + PostgreSQL 専用 | Kotlin 版は共通の V001〜V005 がそのまま適用できた | **Scala 版では未確認**（B1 で確認） |
+
+### H2 版で省略する制約（ローカルでは守られない）
+
+次の制約は、H2 版では**守られません**。ローカルで動いたことは、これらの制約が正しいことを意味しません。
+
+1. `uq_idempotency_create`（同じキーのゲーム作成の同時の重複。アプリ側の再照合だけ）。
+2. `events` の追記専用（UPDATE・DELETE・`TRUNCATE` の拒否）。
+3. DB ロールの分離と、観察者のロールが `game_join_codes` などへ到達できないこと（NF-S18）。アプリのバグによる漏えいを DB が止めない。
+4. 接続プールの分離（観察者用のプールの配線）。
+5. 複数のプロセスにまたがる、再構築との直列化と SSE の通知（`ProjectionLock`・`ChangeNotifier` の H2 版は単一のプロセスでだけ有効）。
+6. 削除用のロールの限定（`game_roots` 以外を直接削除できないこと）。
+7. 分離レベルによる一貫した読み取り（REPEATABLE READ）の保証。
+
+### 乖離のリスクと対策
+
+ローカル（H2）で通っても、CI（PostgreSQL）で落ちる乖離が起きえます。対策は次のとおりです。
+
+1. **H2 でしか通らない記述を禁止する。** PostgreSQL の統合テストが正で、H2 のために共通の DDL や SQL を曲げない（通らない文は PostgreSQL 側と H2 側に分ける）。
+2. **ポートの契約テストを両実装で実行する。** `ProjectionLock`・`ChangeNotifier` の契約テストを、PostgreSQL 版は統合テスト、H2 版は munit のユニットテストで実行する。テスト用のインメモリ実装との関係は[バックエンドアーキテクチャ](./architecture-backend.md)で整理する。
+3. **受け入れ（`@api`）は PostgreSQL で実行する。**
+4. 本番・ステージングでの H2 の拒否（起動時の検査。[バックエンドアーキテクチャ](./architecture-backend.md)、[インフラ](./architecture-infrastructure.md)）。
 
 ## 設計判断のまとめ
 
-Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの単位、並行制御、スナップショットなし、同期投影、観察の合計、周辺ストア、保持削除、冪等性、出力）。判断 10（ローカル開発の DB）は**見直し**です（ST9。提案）。Scala 固有の判断は、このデータモデルには追加していません（`Left` の ROLLBACK は SBD2、`ConnectionIO` のポートは SBD3、接続プールは SBD11）。
+Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの単位、並行制御、スナップショットなし、同期投影、観察の合計、周辺ストア、保持削除、冪等性、出力）。判断 10（ローカル開発の DB）も、**読み替えて引き継ぎます**（ST9。H2 の PostgreSQL モード。ユーザーの決定、2026-11-25）。Scala 固有の判断は、このデータモデルには追加していません（`Left` の ROLLBACK は SBD2、`ConnectionIO` のポートは SBD3、接続プールは SBD11）。
 
 ## beer-game-kotlin からの変更
 
 | # | beer-game-kotlin | beer-game-scala | 理由 |
 | :--- | :--- | :--- | :--- |
-| 1 | Flyway、共通・PostgreSQL・H2 の 3 つの場所 | Flyway、1 系統（ST9 の承認が前提） | H2 を持たない |
-| 2 | 番号の付け替え（V101 と V102 の入れ替え）、後から V007・V008 | 最初から連番 V001〜V007。表と GRANT の番号を分け、GRANT は後ろ | 教訓の反映 |
-| 3 | `${json_type}`、`timestamp with time zone` の書き方、`jsonb` の書き込みを方言ごとに分ける | `jsonb`・`timestamptz` をそのまま使う | PostgreSQL のみ |
-| 4 | H2 版で `uq_idempotency_create` を省略し、アプリ側で再照合 | 常に部分一意索引 | 同上 |
-| 5 | H2 版で省略する制約の一覧 | なし | 同上 |
+| 1 | Flyway、共通・PostgreSQL・H2 の 3 つの場所 | Flyway、共通と PostgreSQL の 2 つの場所（H2 専用は B1 で要否を確定） | ST9。共通部分を最大化 |
+| 2 | 番号の付け替え（V101 と V102 の入れ替え）、後から V007・V008 | 最初から連番 V001〜V008。表と GRANT の番号を分け、GRANT は後ろ。V007・V008 は PostgreSQL 専用 | 教訓の反映 |
+| 3 | `${json_type}`、`timestamp with time zone` の書き方、`jsonb` の書き込みを方言ごとに分ける | 同じく方言ごとに分ける（Kotlin 版の実測の引用。Scala 版では未確認） | ST9 |
+| 4 | H2 版で `uq_idempotency_create` を省略し、アプリ側で再照合 | 同じ（PostgreSQL 専用のマイグレーション） | 同上 |
+| 5 | H2 版で省略する制約の一覧 | 同じ 7 項目を引き継ぐ | 同上 |
 | 6 | JDBC の直接の SQL、`Tx` を引数で渡す | doobie の `ConnectionIO`（`ConnectionIO` をポートの戻り値にする。SBD3）。`Left` は `Tx.rollbackOnLeft` で ROLLBACK（SBD2） | Scala の表現。**doobie は `Left` でも COMMIT する**（検証 A の 2） |
 | 7 | 制約名は JDBC の例外のメッセージ・`PSQLException` から取る | `attemptSql` と `PSQLException.getServerErrorMessage.getConstraint`（検証 A の 4） | ライブラリの違い |
 | 8 | Kotlin の `kotlinx.serialization` による `payload` | circe の DTO と文字列の `::jsonb`（`doobie-postgres-circe` は未採用） | 技術スタック（ST6） |
@@ -367,7 +416,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 ## 未決事項
 
-1. **ローカル開発の DB**（ST9）: PostgreSQL のみを提案した。**人の承認を得る**。承認されなければ、本書を Kotlin 版の H2 の節に沿って書き換える。
+1. **ローカル開発の DB**（ST9）: H2 の採用は決定済み（2026-11-25）。残る未決は、**H2 の依存の導入の承認**と、**B1 の最初の実測**（上の方言の差分の表。Flyway の H2 への適用、doobie 経由の SQLSTATE と制約名、`jsonb` の書き込み、H2 専用のマイグレーションの要否）。
 2. **V003〜V006 の DDL**: Kotlin 版の実ファイルを元に書き、PostgreSQL で適用して検証する。V001・V002 の全文も、Flyway で適用して確認する。
 3. **ロールと GRANT の Scala からの検証**: 権限のないロールで `events` の UPDATE・DELETE・TRUNCATE が拒否され、`game_roots` の連鎖削除が動くこと。ログインユーザーとプールの結びつけ（メンバーのログインユーザーか `SET ROLE` か）、セッションの設定（`idle_in_transaction_session_timeout`・`lock_timeout`）が効くこと。
 4. **doobie の残りの確認**: `opaque type` の `Meta`、`Array[Byte]`、`HikariTransactor`、読み取り専用の `REPEATABLE READ`、専用の接続での `LISTEN`・切断後の再購読、`PSQLException` の型の判定と WartRemover（`IsInstanceOf`・`AsInstanceOf`）の相性。

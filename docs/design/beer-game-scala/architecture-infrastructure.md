@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:20:00Z }
 - **ビルド**: Gradle から **sbt**（マルチプロジェクト）へ。成果物の作り方（配布物）は未決。
 - **コンテナ**: JRE のイメージは同じ（Temurin 25）。**依存の JAR とアプリの JAR を別の層に分ける方法**が、Gradle の配布から sbt のものに変わる（`sbt-native-packager` の採否は未決）。
 - **データベースの接続**: JDBC + HikariCP から **doobie の `HikariTransactor`**（用途別。ST8）へ。ロールを用途別に分けるのは同じ。
-- **ローカル開発の DB**: H2 を使わず、**PostgreSQL 18（Docker）のみ**（提案。ST9）。**H2 を本番・ステージングで拒否する検査は要らない**。
+- **ローカル開発の DB**: ローカル開発だけ **H2 の PostgreSQL モード**（ユーザーの決定、2026-11-25。ST9）。**本番・ステージングでは起動時の検査で H2 を拒否**し、**配布（本番イメージ）から H2 を除外**する。H2 の依存の導入は承認待ち。
 - **CI/CD**: 検証の手順が sbt になる。**Scala 版専用のワークフローを新設する**（team の規約）。デプロイは「設計」のみで、ワークフローはまだ作らない。
 - **Terraform**: Scala 版専用に複製して出発する案（SI4。提案）。
 
@@ -157,16 +157,24 @@ Kotlin 版の構成要素の表（CloudFront、ALB、API サービス、保持�
 
 | 環境 | 用途 | デプロイ | Terraform の状態 |
 | :--- | :--- | :--- | :--- |
-| ローカル | 開発・確認 | バックエンドは sbt で起動、フロントエンドは Vite（`/api` をプロキシ）。**DB は PostgreSQL 18（Docker）のみ**（提案。ST9）。開発環境は `nix develop .#scala` | — |
+| ローカル | 開発・確認 | バックエンドは sbt で起動、フロントエンドは Vite（`/api` をプロキシ）。**DB は H2 の PostgreSQL モード（Docker 不要。ST9）**。PostgreSQL を使う場合は Docker の PostgreSQL 18 を選べる（`DB_KIND`）。開発環境は `nix develop .#scala` | — |
 | CI | 検証 | GitHub Actions（**PostgreSQL 18** のサービスコンテナと Testcontainers）。統合テストと受け入れ（`@api`）は PostgreSQL で実行 | — |
 | ステージング | 本番前の確認 | main へのマージで自動（ローリング） | 専用 |
 | 本番 | 運用 | 手動の承認後（ブルー/グリーン） | 専用 |
 
 各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（Kotlin 版と同じ）。
 
-### ローカルの開発環境（H2 の拒否の節の扱い）
+### ローカルの開発環境と H2 の拒否
 
-Kotlin 版の「ローカルの開発環境と H2 の拒否」（`DB_KIND`、本番・ステージングでの H2 の起動前の拒否、環境ごとの全組み合わせの単体テスト、配布からの H2 の除外）は、**Scala 版では要りません**（H2 を使わないため。ST9）。承認されず H2 を採る場合は、Kotlin 版の節を引き継ぐ。**設定の環境変数**（`APP_ENV`、`CREDENTIAL_KEY`、`IDEMPOTENCY_KEY`、`RESPONSE_KEY`、`DB_URL`、`DB_USER`、`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）は、フロントエンドの E2E の案内と手順書の差分を減らすため、**Kotlin 版と名前を揃える**（提案。`DB_KIND` は持たない）。`AppConfig.load` が全項目の誤りを `ValidatedNec` で集め、失敗なら、足りない設定の**名前だけ**をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。
+Kotlin 版の「ローカルの開発環境と H2 の拒否」を、Scala 版に読み替えて引き継ぎます（ST9。ユーザーの決定、2026-11-25）。
+
+- **実行する DB は `DB_KIND=postgres|h2`**（既定は `postgres`）で選ぶ。ローカル開発では `h2` を選べる。
+- **本番・ステージングでの H2 の拒否**: `AppConfig.load` が、`APP_ENV` が本番・ステージングのとき `DB_KIND=h2` を**起動前に拒否**し、起動に失敗する（許可リスト方式。足りない設定と同じ終了の経路）。**環境（`local`・`test`・ステージング・本番）× `DB_KIND` の全組み合わせを単体テストで確かめる**。
+- **配布からの H2 の除外**: sbt の H2 の依存（`com.h2database:h2`。必要なら doobie-h2）は、**開発用の構成（sbt の独立した設定、または開発用の起動プロジェクト）だけに置き**、配布物（本番イメージの JAR の集合）に含めない。**構成の具体（sbt の設定名、`sbt run` と `Test` のクラスパスに残す範囲）は B1 で確定する（未確認）**。イメージの `lib` に H2 が無いことを、イメージの検査で確かめる。
+- **H2 のドライバが無い環境で `DB_KIND=h2`** を選んだ場合も、起動に失敗する（本番・ステージングは、拒否の検査とドライバの欠落の二重の防御になる）。
+- 起動の失敗（終了コード 70）や設定の誤り（78）の使い分けは、下の終了コードのとおり。
+
+**設定の環境変数**（`APP_ENV`、`CREDENTIAL_KEY`、`IDEMPOTENCY_KEY`、`RESPONSE_KEY`、`DB_URL`、`DB_USER`、`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）は、フロントエンドの E2E の案内と手順書の差分を減らすため、**Kotlin 版と名前を揃える**（提案。`DB_KIND` を含む）。`AppConfig.load` が全項目の誤りを `ValidatedNec` で集め、失敗なら、足りない設定の**名前だけ**をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。
 
 ## コンテナと JVM
 
@@ -183,7 +191,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 - 実行は**非 root のユーザー**。ファイルシステムは読み取り専用を目指します。
 - イメージのタグは、コミット SHA（ECR の不変のタグ）。
 - ベースイメージ（`25-jre-noble`）の実在とサポート期限は、Kotlin 版の確認値です。**本書では再確認していません**（B1 で `docker pull` により確かめる）。軽量な派生の採否は、脆弱性の検査の結果とサイズで決めます（未決）。
-- **H2 の依存関係はそもそも入りません**（ST9）。
+- **H2 の依存関係は入れません。** 開発用の構成だけに置き、実行イメージ（`lib`）に含めない（ST9。上の「ローカルの開発環境と H2 の拒否」）。
 
 ### 配布物の作り方（設計判断 SI1）
 
@@ -210,7 +218,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 | `verify-projections` | 投影が、イベントから作り直した結果と一致するかを検査する（日次。投影は変えない） | 不一致があれば 1 |
 | 不明なモード | 使い方を示す | 64 |
 
-終了コードの意味（0 成功、1 一部失敗、64 使い方の誤り、70 起動の失敗、78 設定の誤り）は sysexits の慣例で、Kotlin 版と同じです。起動の失敗（70）は、H2 のドライバの欠落でなく、**接続の失敗など**に読み替えます。**モードを `CMD` で渡し、上書きできる形**は、Kotlin 版の実装に倣う案で、人の確認が要る（未決）。
+終了コードの意味（0 成功、1 一部失敗、64 使い方の誤り、70 起動の失敗、78 設定の誤り）は sysexits の慣例で、Kotlin 版と同じです。起動の失敗（70）は、H2 のドライバの欠落（`DB_KIND=h2` のとき）や、**接続の失敗など**に当てます。**モードを `CMD` で渡し、上書きできる形**は、Kotlin 版の実装に倣う案で、人の確認が要る（未決）。
 
 ### JVM の設定（初期案。測定で決める）
 
@@ -356,7 +364,7 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 | 1 | Gradle（Kotlin DSL、バージョンカタログ、ラッパーの固定） | sbt（`build.sbt` の版は 1 か所、`project/build.properties`） | ビルドの違い |
 | 2 | 配布は Gradle の `installDist`（依存の JAR を別の層に） | **配布物の作り方は未決**（SI1: `sbt-native-packager`、sbt の標準、fat JAR） | ビルドの違い |
 | 3 | JDBC + HikariCP | doobie の `HikariTransactor`（用途別。`LISTEN` は外の専用の接続） | ST8 |
-| 4 | ローカルは H2 の PostgreSQL モード。本番・ステージングで H2 を起動前に拒否。配布から H2 を除外 | ローカルも PostgreSQL 18（Docker。提案）。**拒否の検査も除外も要らない** | ST9 |
+| 4 | ローカルは H2 の PostgreSQL モード。本番・ステージングで H2 を起動前に拒否。配布から H2 を除外 | 同じ（ユーザーの決定、2026-11-25）。拒否の検査は `AppConfig.load`、除外は sbt の開発用の構成（B1 で確定） | ST9 |
 | 5 | CI は Gradle（ktlint、detekt（JDK 21）、PMD、Kover）+ 契約テスト + 型の生成 + npm | sbt（Scalafmt、WartRemover、Scalafix、scoverage）+ 契約 + cucumber-scala の専用ジョブ + npm | ツールの違い |
 | 6 | SIGTERM のコンテナの終了コードは 143（人の判断待ち） | **Scala 版では未確認**（SI3） | `IOApp` の挙動が未確認 |
 | 7 | Kotlin 版専用の Terraform | Scala 版専用に複製する案（SI4。提案） | team の規約 |
@@ -423,7 +431,7 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 11. **投影の再構築のタスクを、デプロイの標準の手順に含める条件**と、再構築中のコマンドの応答（短い待ちか 503 か。Kotlin 版から継続）。
 12. **業務のスモークテストの範囲**、**秘密が Terraform の状態に入る問題**、**RDS の CA バンドルと `sslmode`**、**CloudFront の CSP と SSE のオリジン待ち時間**（Kotlin 版から継続）。
 13. **設定の環境変数の名前を、Kotlin 版と揃えること**（提案。E2E の案内と手順書の差分が減る）と、設定の誤りの終了コード 78。
-14. **ローカル開発の DB**（ST9）の承認。承認されなければ、本書の「ローカルの開発環境」を書き換える。
+14. **ローカル開発の DB**（ST9）: H2 の採用は決定済み。残る未決は、H2 の依存の導入の承認、sbt の依存の置き場（開発用の構成）の確定、本番イメージに H2 が無いことの検査の方法。
 
 ## 出典
 

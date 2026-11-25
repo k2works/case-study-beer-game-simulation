@@ -46,7 +46,7 @@ beer-game-scala プロジェクトの設計ドキュメントです。beer-game-
 | 判断 | 内容 | 文書 |
 | :--- | :--- | :--- |
 | ADR-001 | beer-game-kotlin を Scala 版として作り、設計と ADR を流用する | [ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) |
-| ST1〜ST9 | 技術スタックの判断（ローカル DB を PostgreSQL のみにする案 ST9、JSON は circe、接続プールは HikariCP など） | [技術スタック](./tech-stack.md) |
+| ST1〜ST9 | 技術スタックの判断（ローカル開発だけ H2 の PostgreSQL モードを使う ST9（ユーザーの決定、2026-11-25）、JSON は circe、接続プールは HikariCP など） | [技術スタック](./tech-stack.md) |
 | SD1〜SD7 | ドメインの判断（`enum` による状態、`Evolution`、`ValidatedNec` による検証など） | [ドメインモデル](./domain-model.md) |
 | SBD1〜SBD11 | バックエンドの判断（`Left` での明示 ROLLBACK、`Supervisor`、`Kleisli` による文脈など） | [バックエンドアーキテクチャ](./architecture-backend.md) |
 | SI1〜SI5 | インフラの判断（配布物の作り方は 3 案で未決、タスクサイズの初期案、SIGTERM の終了コードは未確認、Terraform と CI の Scala 版専用化） | [インフラストラクチャ](./architecture-infrastructure.md) |
@@ -60,7 +60,7 @@ beer-game-scala プロジェクトの設計ドキュメントです。beer-game-
 
 - 設計時の検証は、一時プロジェクトでのドメイン断片のコンパイルと munit 2 件までです。実 DB での ROLLBACK、キャンセル、http4s の SSE は**未確認**で、各文書に明記しています。
 - ガイドが書く doobie 1.0.0-RC13 は Maven Central の一覧になく、RC12 を設計時の版にしました。
-- ローカル開発の DB、scoverage のしきい値（暫定値）、Scala の版（3.7 系に据え置き）は、人の承認待ちです。
+- ローカル開発の DB は、H2 の PostgreSQL モードを使うことがユーザーの決定（2026-11-25）です。ただし H2 の依存の導入の承認と、動作範囲の実測（B1 の最初）は残っています。scoverage のしきい値（暫定値）と Scala の版（3.7 系に据え置き）は、人の承認待ちです。
 - 実装（`apps/beer-game-scala/`）はまだありません。生成物（`generated/`）は、コード着手後に方式を決めます。
 
 ## 補足

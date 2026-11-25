@@ -101,7 +101,7 @@ Sc ..> Spec : 契約テスト（Scala）
 
 | 項目 | 設計 |
 | :--- | :--- |
-| 開発 | Vite の開発サーバーが、`/api` を Scala のバックエンドへプロキシする（接続先は `API_PORT`。固定のポートを書かない）。バックエンドは sbt で起動し、データベースは PostgreSQL 18（Docker。提案。ST9）。開発環境は `nix develop .#scala` |
+| 開発 | Vite の開発サーバーが、`/api` を Scala のバックエンドへプロキシする（接続先は `API_PORT`。固定のポートを書かない）。バックエンドは sbt で起動し、データベースは H2 の PostgreSQL モード（ユーザーの決定、2026-11-25。ST9。導入は承認待ち）。E2E は PostgreSQL で実行する。開発環境は `nix develop .#scala` |
 | Origin の検査 | 上の確認事項 c |
 | 型の生成 | `apps/beer-game-contracts/openapi.yaml` から、`apps/beer-game-web/src/api/generated/schema.d.ts` へ生成する。生成物はコミットし、`api:check` で差分 0 を検査する（Kotlin 版の運用を引き継ぐ） |
 | 配信 | 静的ファイルを S3 へ版つきで配置し、CloudFront から配信する（[インフラ](./architecture-infrastructure.md)）。**フロントエンドは、バックエンドのイメージに含めない** |
