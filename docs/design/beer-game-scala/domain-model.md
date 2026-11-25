@@ -3,8 +3,10 @@ type: Design
 title: "ドメインモデル設計 - ビールゲームシミュレーション（Scala 版）"
 description: "Scala 版のドメインモデル。beer-game-kotlin の構造（2 ストリーム、decide / evolve、simulateWeek、投影、全イベント）を引き継ぎ、enum・case class・opaque type・Either・ValidatedNec で表す。Kotlin 版の設計判断 D1〜D11 との対応と、Scala 固有の判断 SD1〜SD7 を整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-25T09:12:07Z }
 ---
 
 # ドメインモデル設計 - ビールゲームシミュレーション（Scala 版）
@@ -397,7 +399,7 @@ Started --> Started : ObserverInvited / ObserverInvitationRevoked\nObserverJoine
 
 **入れ替えは `assignRoleAfterStart`（`game` と `session` の両方を入力に取る関数）が、1 回の追記で返します**。`game` に `ParticipantReplaced`（旧担当者ごとに 1 件）・`CredentialRevoked`・`RoleAssigned`、`session` に `RoleHolderReplaced` を返し、旧担当者の資格の失効と `session` の写しの更新を同じ追記で行います（Kotlin 版と同じ規則。1 人だけ外す案、終了後の扱い、イベント名と形は Kotlin 版のゲート 3.5 の未決事項に追従する）。
 
-**失効済みの旧担当者の扱い（再々レビュー R-H3 (d)。D3。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）**: Kotlin 版の `assignRoleAfterStart`（`ReplaceDecision.kt`）は、旧担当者の**全員に `CredentialRevoked` を無条件に出します**。一方 `evolveGame` の `revoked()` は、失効済みの資格には `null` を返し、状態を変えません。Kotlin 版は `null` を黙って受けるので動きますが、Scala 版の `apply` は同じ組を `Ignored` にし、**コマンドの経路では止める**ため、次の流れでゲームが止まります: 進行役が参加者 P1（役割 R の担当）の資格を失効させる（`CredentialRevoked(P1)`）→ 進行役が別の参加者 P2 を R に割り当てて入れ替える → `ReplaceDecision` が P1 に再び `CredentialRevoked` を出す → `Ignored` → 500。「失効 → 入れ替え」は自然な流れ（資格を失効させてから担当を替える）で、Kotlin 版でも `replayGame` が `InvalidTransition` として記録する（Kotlin 版のテスト `ReplaceRoleSpec.kt` にこの組はない）。
+**失効済みの旧担当者の扱い（再々レビュー R-H3 (d)。D3。AI が推奨案で決め、ユーザーが承認した。2026-11-25）**: Kotlin 版の `assignRoleAfterStart`（`ReplaceDecision.kt`）は、旧担当者の**全員に `CredentialRevoked` を無条件に出します**。一方 `evolveGame` の `revoked()` は、失効済みの資格には `null` を返し、状態を変えません。Kotlin 版は `null` を黙って受けるので動きますが、Scala 版の `apply` は同じ組を `Ignored` にし、**コマンドの経路では止める**ため、次の流れでゲームが止まります: 進行役が参加者 P1（役割 R の担当）の資格を失効させる（`CredentialRevoked(P1)`）→ 進行役が別の参加者 P2 を R に割り当てて入れ替える → `ReplaceDecision` が P1 に再び `CredentialRevoked` を出す → `Ignored` → 500。「失効 → 入れ替え」は自然な流れ（資格を失効させてから担当を替える）で、Kotlin 版でも `replayGame` が `InvalidTransition` として記録する（Kotlin 版のテスト `ReplaceRoleSpec.kt` にこの組はない）。
 
 案は 2 つ: (a) **旧担当者のうち、資格が未失効の人にだけ `CredentialRevoked` を出す**（採用。`assignRoleAfterStart` の側を直す。`apply` と表は変えない）、(b) EV-G08 を失効済みの主体にも届く冪等な ○ にする（表と `apply` を広げる。`revoked()` の「失効済みは変えない」という Kotlin 版の条件から外れる）。**(a) に決めた理由**: 失効済みの資格をもう一度失効させる事実は、何も変えないのにイベントの列に残り、再生の `Ignored` の検査を弱める。表を狭いまま保つほうが、P1 の検知（(a) の生成器）が効く。
 
@@ -656,7 +658,7 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 | 13 | 遷移の「許す組」の正本は、`evolve` のコードと状態遷移図（どちらも手で書く） | **「許す組の表」（EV × 状態）を規範**にし、`apply`・図・状態遷移テストをこの表から導く。**性質テストの生成器は、表からでなくコマンドから作る**（N-H1・R-H4。AI の案） | 止める設計では、組の漏れが研修の停止になる。スケッチや図を基準にすると漏れを見逃す |
 | 14 | `AutoCommitChanged`（EV-S07）と `CommitModeChanged`（EV-S10）が表に並ぶ。コードにあるのは `CommitModeChanged` だけ | 表（許す組の表）には `CommitModeChanged` だけを置き、EV-S07 は重複の疑いとして未決事項 12 に置く | Kotlin 版の `SessionEvent` に `AutoCommitChanged` が無い（`SessionEvolve.kt` の `when` で確認） |
 
-| 15 | `assignRoleAfterStart` は旧担当者の全員に `CredentialRevoked` を出す。`evolve` は失効済みで状態を変えず、記録して続行する | **未失効の旧担当者にだけ `CredentialRevoked` を出す**（D3。R-H3）。失効済みの旧担当者には `ParticipantReplaced` だけ | `Ignored` で止める設計（変更表 10）と合わせると、「失効 → 入れ替え」でゲームが止まるため。ユーザーの指示に基づき AI が推奨案で決めた（確認は未了） |
+| 15 | `assignRoleAfterStart` は旧担当者の全員に `CredentialRevoked` を出す。`evolve` は失効済みで状態を変えず、記録して続行する | **未失効の旧担当者にだけ `CredentialRevoked` を出す**（D3。R-H3）。失効済みの旧担当者には `ParticipantReplaced` だけ | `Ignored` で止める設計（変更表 10）と合わせると、「失効 → 入れ替え」でゲームが止まるため。AI が推奨案で決め、ユーザーが承認した（2026-11-25） |
 | 16 | `evolveSession` は `Paused` でも `DecisionSaved`・`WeekCommitted`・`SessionEnded` を適用する | `SessionEvents.apply` は `Active` だけが受ける（`handle` が作る組だけ ○）。`ProxyDecisionSubmitted`・`RoleHolderReplaced`・`CommitModeChanged` は `Paused` も受ける | `handle` が作らない列を `Ignored` として検知する（変更表 10・13） |
 
 上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。
@@ -679,7 +681,7 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 13. **「許す組の表」の確認**（N-H1。再々レビュー R-H3・L11 で、読んで確認できた分を閉じた）: **閉じた**（Kotlin 版のコードを読んで確認した）: `revoked`・`reissued`・`recovered` は未知の主体で状態を変えない（失効の有無の条件も）、`invited`・`invitationRevoked`・`observerJoined` の条件、`withRole`（`RoleAssigned`・`ParticipantReplaced`）は未知の参加者で変えない、`SetCommitMode` は停止中も受け付ける、`EndReason` は `FINAL_WEEK` だけ。**残る未確認**: (1) 表は AI が導いた案で、人の確認を得ていない。(2) 表と `apply` を型検査していない（B1 の最初のスライドで、(a)(b)(c) の 3 方向のテストで確かめる）。(3) `decideInvite` が招待 ID の重複を検査しない前提（ID は生成器が作る）。(4) `startGame` と全コマンドが (a) の生成器で網羅されるか（(b) の `collect` で確かめる）。
 14. **`session_overview.week` が最終週 + 1 になる問題**（再レビュー M20。前回の M8）: [データモデル](./data-model.md) の未決事項 7 に載せた（`WeekCommitted` のペイロードに次の週を持たせる案はドメインのイベントの構造に影響するため、ここでも決める）。
 15. **ユーザーストーリー・受入条件への導線**（再レビュー M20。前回の M7）: 下の導線の表は、本書に書いた範囲だけの一部。全体は、Unit 定義の `@AC` タグから機械的に導く（[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の許可リスト。別の担当）。
-16. **Kotlin 版の潜在不具合: 失効済みの旧担当者への `CredentialRevoked`**（再々レビュー R-H3 (d)。**正本側の整理が要る**）: Kotlin 版の `ReplaceDecision.kt`（`assignRoleAfterStart`）は、旧担当者の全員に `CredentialRevoked` を出し、`GameData.revoked()` は失効済みで `null` を返す。このため、失効済みの旧担当者がいる入れ替えで、`replayGame` が `InvalidTransition` を記録する（`ReplaceRoleSpec.kt` にこの組のテストがない）。Scala 版は D3（未失効にだけ出す）で避ける。**Kotlin 版・Rust 版の側で直すかは、各版の正本の判断**（Scala 版は変えない）。Scala 版の `Ignored` で止める設計（H3）は、同じ穴を Kotlin 版より早く、500 として表に出す。D3 は、ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。
+16. **Kotlin 版の潜在不具合: 失効済みの旧担当者への `CredentialRevoked`**（再々レビュー R-H3 (d)。**正本側の整理が要る**）: Kotlin 版の `ReplaceDecision.kt`（`assignRoleAfterStart`）は、旧担当者の全員に `CredentialRevoked` を出し、`GameData.revoked()` は失効済みで `null` を返す。このため、失効済みの旧担当者がいる入れ替えで、`replayGame` が `InvalidTransition` を記録する（`ReplaceRoleSpec.kt` にこの組のテストがない）。Scala 版は D3（未失効にだけ出す）で避ける。**Kotlin 版・Rust 版の側で直すかは、各版の正本の判断**（Scala 版は変えない）。Scala 版の `Ignored` で止める設計（H3）は、同じ穴を Kotlin 版より早く、500 として表に出す。D3 は、AI が推奨案で決め、ユーザーが承認した（2026-11-25）。
 
 ### ユーザーストーリー・受入条件への導線（一部）
 
@@ -704,7 +706,7 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 
 ### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
 
-**ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）**です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。**N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。**
+**ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）**です。再々レビューの D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（当時は確認未了でした）。この承認で、ユーザーが承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）になります。**N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
@@ -716,12 +718,16 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 
 ### 再々レビュー（[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
 
-**ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件**です。**D1〜D5 は、ユーザーの「決定を行い、高 10 件を設計書に反映」という指示に基づき、AI が推奨案で決めたもの（2026-11-25。ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）**です。それ以外の直し方は AI の案で、承認を得ていません。
+**ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件**です。**D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（反映時点では確認未了でした）**。承認した決定は合わせて 14 件です。D1 の案 X・Y（`check` に含めるか別ジョブか）は未決のままです。D5 で承認したのは手順で、例外の承認と project.md への記録は未実施です。それ以外の直し方は AI の案で、承認を得ていません。「文書の検証（verified）」と「設計判断の承認」は別の記録です。文書が stable でも、承認していない判断は未承認のままです。
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
-| R-H3 | 「許す組の表」の session の表を全行 7 列に（EV-S06・S09・S10 の `Ended` の列）、EV-S04 の `Paused` を ×、規則の文言（`handle`・`startGame`・`assignRoleAfterStart` が作る組）、Kotlin 版のコードで確かめた条件を game の表の備考に、`GameData` と `GameEvents.apply` の条件つきの腕（6 イベントを条件なしの `Applied` にしていた箇所）、`SessionEvents.apply` のスケッチ、D3（`replacementEvents`。失効済みの旧担当者には `CredentialRevoked` を出さない）、受入テスト 5（失効 → 入れ替え → 保存・確定 → 再生）、未決事項 13 の縮小（L11）と 16（Kotlin 版の潜在不具合）、変更表 15・16 | D3 はユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。表と条件は Kotlin 版のコードを読んで確認。Scala のコードは型検査していない |
+| R-H3 | 「許す組の表」の session の表を全行 7 列に（EV-S06・S09・S10 の `Ended` の列）、EV-S04 の `Paused` を ×、規則の文言（`handle`・`startGame`・`assignRoleAfterStart` が作る組）、Kotlin 版のコードで確かめた条件を game の表の備考に、`GameData` と `GameEvents.apply` の条件つきの腕（6 イベントを条件なしの `Applied` にしていた箇所）、`SessionEvents.apply` のスケッチ、D3（`replacementEvents`。失効済みの旧担当者には `CredentialRevoked` を出さない）、受入テスト 5（失効 → 入れ替え → 保存・確定 → 再生）、未決事項 13 の縮小（L11）と 16（Kotlin 版の潜在不具合）、変更表 15・16 | D3 は AI が推奨案で決め、ユーザーが承認した（2026-11-25。当時は確認未了）。表と条件は Kotlin 版のコードを読んで確認。Scala のコードは型検査していない |
 | R-H4 | 「表の使い方」を、コマンドから作る 3 方向（(a) `Ignored` が 0 件、(b) 表の ○ が N 回以上現れる、(c) 表 × `apply` の全組）に。表は 1 か所の値から生成するか、Markdown の表を読んで突き合わせる。合格の基準（○ を × にすると (a) が落ちる、腕を消すと (c) が落ちる） | AI の案。B1 で実装して確かめる |
+
+### D1〜D5 の承認（2026-11-25）の反映
+
+ユーザーが D1〜D5 を承認しました（AI が推奨案で決め、ユーザーが承認）。本書に関わるのは D3 です。上の「失効済みの旧担当者の扱い」、変更表の 15、未決事項の 16、再々レビューの R-H3 の行を、この承認に合わせて直しました（過去の「確認は未了」の記述は、当時の状況として上の行に残しています）。承認していない判断（SD1〜SD7 の SD2 の「止める」以外、N-H1・N-H2・N-H3・N-H5 などの直し方、規約の例外そのもの、案 X・Y）は未承認のままです。本書の「文書の検証（verified）」と「設計判断の承認」は別の記録です。
 
 ## 出典
 

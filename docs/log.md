@@ -1,6 +1,18 @@
 # Docs Update Log
 
 ## 2026-11-25
+* **Approval**: ユーザーが [beer-game-scala](/design/beer-game-scala/index.md) の D1〜D5 を承認し、設計書 10 本の `stable` への昇格を指示（D1 統合・受け入れテストを U1 に、D2 US6.1 は AC6.1.1・6.1.2・6.1.4、D3 未失効の旧担当者にだけ `CredentialRevoked`、D4 H2 版ロックは Kotlin 版と同じ構造、D5 規約の対象範囲の確認と例外の記録は人の承認の場で。D5 は手順のみで、例外の承認と project.md への記録は未実施。ADR-001 のステータスは「提案中」のまま。claude-code/claude-sonnet-5-5）
+* **Update**: 設計書 10 本・[ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md)・[index](/design/beer-game-scala/index.md) の D1〜D5 の記述を、承認済みに直した（claude-code/claude-sonnet-5-5）
+* **Verification**: [ui-design](/design/beer-game-scala/ui-design.md) を human:kakimomokuri が検証
+* **Verification**: [test-strategy](/design/beer-game-scala/test-strategy.md) を human:kakimomokuri が検証
+* **Verification**: [tech-stack](/design/beer-game-scala/tech-stack.md) を human:kakimomokuri が検証
+* **Verification**: [operation](/design/beer-game-scala/operation.md) を human:kakimomokuri が検証
+* **Verification**: [non-functional](/design/beer-game-scala/non-functional.md) を human:kakimomokuri が検証
+* **Verification**: [domain-model](/design/beer-game-scala/domain-model.md) を human:kakimomokuri が検証
+* **Verification**: [data-model](/design/beer-game-scala/data-model.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-infrastructure](/design/beer-game-scala/architecture-infrastructure.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-frontend](/design/beer-game-scala/architecture-frontend.md) を human:kakimomokuri が検証
+* **Verification**: [architecture-backend](/design/beer-game-scala/architecture-backend.md) を human:kakimomokuri が検証
 * **Update**: [beer-game-scala の設計書](/design/beer-game-scala/index.md) 10 本と [ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を更新（再々レビューの高 10 件の反映。論点 1〜5 は、ユーザーの指示「決定を行い」に基づき AI が推奨案で決めた D1〜D5 で、ユーザー本人の決定ではなく確認は未了。US6.1 の取り違えと B1 確認項目の旧文言の訂正、許す組の表の修正と D3、H2 版ロックの `StampedLock` 系、`lock_timeout` と SQLSTATE の写像、`.transact(` の受入条件の統一、パターン 17・18 の依頼文言と紙で続ける手順。status は draft のまま。claude-code/claude-sonnet-5-5）
 * **Update**: [設計書の再々レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview2_20261125.md) に対応状況を追記（claude-code/claude-sonnet-5-5）
 * **Creation**: [設計書の再々レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview2_20261125.md) を作成（再レビューの高 8 件の反映後の 5 視点の再々レビュー。前回の高は解消 3・一部 5。新たな指摘は高 10・中 17・低 11。事実の誤りは US6.1 の取り違えと B1 確認項目 (e) の旧文言。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）

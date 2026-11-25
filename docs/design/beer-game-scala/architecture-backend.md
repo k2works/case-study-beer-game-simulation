@@ -3,8 +3,10 @@ type: Design
 title: "バックエンドアーキテクチャ - ビールゲームシミュレーション（Scala 版）"
 description: "Scala 版のバックエンドアーキテクチャ。beer-game-kotlin の構造（ES + CQRS、薄いコマンド処理、同期投影、冪等性、競合の再試行、SSE、保持削除）を引き継ぎ、sbt のプロジェクト、関数を持つ case class によるポート、Cats Effect、http4s、doobie、Left での ROLLBACK、キャンセルで表す。Kotlin 版の設計判断 BD1〜BD12 との対応と、Scala 固有の判断 SBD1〜SBD11 を含む。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-25T09:12:07Z }
 ---
 
 # バックエンドアーキテクチャ - ビールゲームシミュレーション（Scala 版）
@@ -18,8 +20,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 - **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の本文は、その一覧へリンクします。**正本の規則（再レビュー N-H5。AI の案）**: 一覧が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、**一覧を直すときは根拠も直します**。本文が一覧と食い違ったら、本文を直します。
 - **確認したこと**: `AppFailure`、`EventStore`、**旧形の** `Ports`（1 本のストリームの `store` と 1 つの `Transactor`。新しい形は下の「依存を表す」で、型検査していない）、`App`（`Kleisli`）、**旧案の** `Tx.rollbackOnLeft`、`Execute.step` / `Execute.execute` の型は、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3 を有効にして**コンパイルできる**（K2。2026-11-25）。**実 DB で、`Left` を返しても doobie が COMMIT すること、`FC.rollback` を挟むと書き込みが残らないこと**を確認した（K5）。旧案の `Tx.rollbackOnLeft` が、スタブの `Connection` で「成功は `commit` だけ、`Left` は `rollback` が呼ばれる」ことも確認した（K6）。
 - **本書の「Tx と execute」「ProjectionLock と ChangeNotifier」の新しい形（`Tx.run`、`ConnectionIO` の変換としてのロック、通知の出所、`.transact(` の入口の一覧）は、2026-11-25 のレビュー対応と再レビュー対応（N-H2・N-H3・M4）で書き直した AI の案**で、承認を得ていない。**型検査も実行もしていない**（旧案がコンパイルできたことは、新案の根拠にならない）。前回の `Resource` 版のロックは、再レビュー N-H2 で不採用にした（下の「ProjectionLock の接続の出所」）。
-- **ユーザーの決定（2026-11-25）と AI の案の区別**: ユーザーの決定は、H3（`Ignored` は止める）・H6（行率を算出する案 C）・H7（U1〜U3 を約束）・H9（NF-P2 は p95 4 秒）と、再レビューの N-H4（検証用の CI は U1 に含める）・N-H6（`domain` の文 97% は目安）・N-H7（止まったゲームでも状態取得は返す）・N-H8（U1〜U3 の間は実際の研修に使わない）の 8 件。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていない。**
-- **再々レビュー（2026-11-25）の D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）**: 本書に関わるのは D4（H2 版の `ProjectionLock` は Kotlin 版と同じ構造にする。R-H5）と D3（失効済みの旧担当者への `CredentialRevoked`。[ドメインモデル](./domain-model.md)）。D1・D2・D5 は ADR・テスト戦略・人の承認の場の側にある。**R-H5・R-H6・R-H7・M12・M13・R-H10 の直し方は AI の案で、承認を得ていない。書き直したコード（`ProjectionLock`・`Tx.run`・`execute` の SQLSTATE の写像）は、型検査も実行もしていない。**
+- **ユーザーの決定（2026-11-25）と AI の案の区別**: ユーザーの決定は、H3（`Ignored` は止める）・H6（行率を算出する案 C）・H7（U1〜U3 を約束）・H9（NF-P2 は p95 4 秒）と、再レビューの N-H4（検証用の CI は U1 に含める）・N-H6（`domain` の文 97% は目安）・N-H7（止まったゲームでも状態取得は返す）・N-H8（U1〜U3 の間は実際の研修に使わない）の 8 件（ほかにローカル DB の H2 の 1 件）。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていない。**
+- **再々レビュー（2026-11-25）の D1〜D5 は、AI が推奨案で決め、ユーザーが承認した（2026-11-25）。ユーザーが承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）**: 本書に関わるのは D4（H2 版の `ProjectionLock` は Kotlin 版と同じ構造にする。R-H5）と D3（失効済みの旧担当者への `CredentialRevoked`。[ドメインモデル](./domain-model.md)）。D1・D2・D5 は ADR・テスト戦略・人の承認の場の側にある（D1 の案 X・Y は未決。D5 は手順の承認で、例外の承認と project.md への記録は未実施）。「文書の検証（verified）」と「設計判断の承認」は別の記録で、文書が stable でも、承認していない判断は未承認のままである。**R-H5・R-H6・R-H7・M12・M13・R-H10 の直し方は AI の案で、承認を得ていない。書き直したコード（`ProjectionLock`・`Tx.run`・`execute` の SQLSTATE の写像）は、型検査も実行もしていない。**
 - **確認していないこと**: `ConcurrencyConflict` の再試行の実行、キャンセル時の ROLLBACK、`Supervisor` による切り離し、ember の切断時の挙動（K7）、`doobie.postgres.sqlstate` の定数と制約名以外の写像（K8）、トランザクションのアドバイザリロックの共有と排他の待ち合い（K10）、専用の接続の `LISTEN` と再購読（K11）、http4s（0.23.39）のルート・ミドルウェア・SSE（K20）、`HikariTransactor`（K19）、circe による `EventCodec`（K9）、各ミドルウェアの名前は、**未確認の設計のスケッチ**です。B1 で確かめます。
 - **引き継ぐだけのもの**: 冪等性の表、競合の再試行の一意制約の表、問い合わせ側の開示、API のエンドポイントと認可の表、エラーの写像の表、SSE の仕様（版の通知だけ、再生なし）、保持削除の手順、セキュリティの表は、Kotlin 版の該当節を正本とします。**API の契約（`openapi.yaml`、`code`、problem+json）は変えません。**
 - Kotlin 版の実装の経緯（B1〜B13 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。
@@ -262,7 +264,7 @@ final class PostgresProjectionLock(timeoutMillis: Long) extends ProjectionLock:
 
 **確認状況**: Kotlin 版の `PostgresProjectionLock`（`set_config` の手順）と `SqlFailures.kt`（55P03 → `RetryExhausted`、40001・40P01 → `ConcurrencyConflict`）は読んだ。Scala 版では、**`attemptSomeSqlState` が `ConnectionIO` で使えること**（`doobie.postgres.sqlstate` の定数の名前）、**`IO` に対する 40P01・40001 の写像の書き方**（`attemptSomeSqlState` が `IO` に適用できなければ、`handleErrorWith` で `SQLException` の `getSQLState` を見る）、**`set_config(…, true)` が doobie の 1 つのトランザクションの中で期待どおり効くこと**、`lock_timeout` を 0 に戻した後の行ロック待ちが無期限になること（これは意図した動作）は、**未確認**（K10。B1 の最初に実 PostgreSQL で確かめる）。
 
-#### H2 版の ProjectionLock（再々レビュー R-H5。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）
+#### H2 版の ProjectionLock（再々レビュー R-H5。D4。AI が推奨案で決め、ユーザーが承認した。2026-11-25）
 
 ```scala
 // H2 版（ローカルのみ。スケッチ。型検査していない。Kotlin 版の LocalProjectionLock と同じ構造）
@@ -803,7 +805,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 
 ### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
 
-**ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）**です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていません。**
+**ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）**です。再々レビューの D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（当時は確認未了でした）。承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）です。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
@@ -822,18 +824,22 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 
 ### 再々レビュー（[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
 
-**ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件**です。**D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（2026-11-25。ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）**です。本書に関わるのは D3（失効済みの旧担当者。[ドメインモデル](./domain-model.md)）と D4（H2 版のロック）です。それ以外の直し方は AI の案で、承認を得ていません。**書き直したコードは、すべて型検査も実行もしていません。**
+**ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件**です。**D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（反映時点では確認未了でした）**。承認した決定は合わせて 14 件です。D1 の案 X・Y は未決、D5 は手順の承認で例外の承認と project.md への記録は未実施です。「文書の検証（verified）」と「設計判断の承認」は別の記録で、文書が stable でも、承認していない判断は未承認のままです。本書に関わるのは D3（失効済みの旧担当者。[ドメインモデル](./domain-model.md)）と D4（H2 版のロック）です。それ以外の直し方は AI の案で、承認を得ていません。**書き直したコードは、すべて型検査も実行もしていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
 | R-H4 | 「`Ignored` で止めること」の「防ぐ側」を、コマンドから作る 3 方向（(a)(b)(c)）に | AI の案。主な記述は [ドメインモデル](./domain-model.md) の「表の使い方」 |
-| R-H5（D4） | `ProjectionLock` の H2 版を `StampedLock` 系 + 待ちの上限 + `AfterEnd`（Kotlin 版の `LocalProjectionLock` と同じ構造）に、`ReentrantReadWriteLock` は所有スレッド固有で不適と明記、`bracket` 案を取り下げ、契約の「COMMIT の後まで直列化する」条項を両実装の共通条項に、比較表に案 C（`SELECT … FOR UPDATE`。不採用の比較）、新設の「H2 版の ProjectionLock」、「ローカル開発」の表、変更表の 14、未決事項 1 | ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施 |
+| R-H5（D4） | `ProjectionLock` の H2 版を `StampedLock` 系 + 待ちの上限 + `AfterEnd`（Kotlin 版の `LocalProjectionLock` と同じ構造）に、`ReentrantReadWriteLock` は所有スレッド固有で不適と明記、`bracket` 案を取り下げ、契約の「COMMIT の後まで直列化する」条項を両実装の共通条項に、比較表に案 C（`SELECT … FOR UPDATE`。不採用の比較）、新設の「H2 版の ProjectionLock」、「ローカル開発」の表、変更表の 14、未決事項 1 | AI が推奨案で決め、ユーザーが承認した（2026-11-25。当時は確認未了）。実測は未実施 |
 | R-H6 | `ProjectionLock` の型を `ConnectionIO[Either[AppFailure, A]]` に、新設の「lock_timeout の手順と SQLSTATE の写像」（`set_config('lock_timeout', ms, true)` をロックを取る間だけ、取った後に `'0'`。55P03 は `attemptSomeSqlState` で `Left(RetryExhausted)`。40P01・40001 は `execute` の `loop` で `ConcurrencyConflict`）、`execute` のスケッチ、性質 (7)(8)、NF-R17 との関係。[データモデル](./data-model.md) の接続・ロールの設定の記述も直した | AI の案。Kotlin 版の `PostgresProjectionLock`・`SqlFailures.kt` を読んだ。Scala 版は未確認 |
 | R-H7・M14 | `.transact(` の入口の表（`TestTx` を足した）、禁止のパターンをメソッド名に（`\.transact\b`・`\.trans\b`・`\.rawTrans\b`・`F[CH]\.(commit\|rollback)`）、受入条件を 1 つの表に（落ちるべき範囲は `Transactions.scala` 以外の全 `Compile` のソース、テスト本体も落ちる、文字列・コメントは落ちない（拾うならルールを直す））、`scalafix:off` の検出可否を未確認に | AI の案。K15 の未確認に足した（[技術スタック](./tech-stack.md)） |
 | M12 | `ReadTx` を `application` の trait（`ParticipantReadTx`・`ObserverReadTx`）に、`QueryPorts`、`ModeTx` が `Tx.run` と同じ規則（`Left` で `FC.rollback`）、L8（`object Tx` を `Transactions.writeTx(xa)` に） | AI の案。型検査していない |
 | M13 | 「Tx.run と Left の ROLLBACK」の案 A の記述（ロックは `program` を包む変換で同じトランザクション）、処理の順を「冪等記録の保存 → 通知の収集 → COMMIT → 配信」に、契約の (T)・(N) の分類名を明記（test-strategy が揃える） | AI の案 |
 | R-H10・R-H8・R-H9 | B1 の確認項目 (e) の画面文言を削除して [UI 設計](./ui-design.md) #15 への参照に、依頼文言の複製を削除して [運用要件](./operation.md) のパターン 18 への参照に、B1 の確認項目 (b) に入荷予定と未着の発注を追加 | AI の案 |
 | L8 | `lock_timeout` を NF-P18 と比べて決める、PostgreSQL のロックの待ち行列（排他を待つ要求の後ろに共有が並ぶ。未実測）を「待ちとプール」に | AI の案。実測は未実施 |
+
+### D1〜D5 の承認（2026-11-25）の反映
+
+ユーザーが D1〜D5 を承認しました。本書に関わる D4（H2 版の `ProjectionLock`）と D3 の記述を、この承認に合わせて直しました（過去の行の「確認は未了」は当時の状況として残しています）。書き直したコードの型検査と実行、承認していない判断（R-H6・R-H7・M12・M13・R-H10 の直し方など）、D1 の案 X・Y は未了・未承認のままです。
 
 ## 出典
 

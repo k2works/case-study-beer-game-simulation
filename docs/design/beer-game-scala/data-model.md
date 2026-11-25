@@ -3,8 +3,10 @@ type: Design
 title: "データモデル設計 - ビールゲームシミュレーション（Scala 版）"
 description: "Scala 版のデータモデル。beer-game-kotlin のイベントストア・投影・周辺ストア・保持削除のスキーマを引き継ぎ、Flyway の連番とベンダー別の場所、doobie での型の対応と一意制約・アドバイザリロック・LISTEN/NOTIFY の確認結果、ローカル開発だけ H2 の PostgreSQL モードを使う扱い（ユーザーの決定、2026-11-25）を整理した正本。"
 tags: [design]
-status: draft
+status: stable
 generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
+verified:
+  - { by: human:kakimomokuri, at: 2026-11-25T09:12:07Z }
 ---
 
 # データモデル設計 - ビールゲームシミュレーション（Scala 版）
@@ -365,7 +367,7 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 | 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ。Kotlin 版の実測の引用） | 扱い |
 | :--- | :--- | :--- | :--- |
-| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。`lock_timeout` はロックを取る間だけ設定する（R-H6）。共有と排他の待ち合いは**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[Either[AppFailure, A]]` の変換）の裏に隠す。H2 版は**プロセス内の `StampedLock` 系のロック**（`Fiber` から安全な部品）+ **待ちの上限**（超えたら `RetryExhausted`）+ **トランザクション終了後の後始末**（`AfterEnd`。COMMIT・ROLLBACK の後に解放。Kotlin 版の `LocalProjectionLock` と同じ構造。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）（単一プロセスでのみ有効）。**PostgreSQL 版と同じ型**（H5・N-H2・R-H5。AI の案）。別案の `SELECT … FOR UPDATE` のロック行は不採用の比較（H2 での動作は未確認。[バックエンドアーキテクチャ](./architecture-backend.md)） |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。`lock_timeout` はロックを取る間だけ設定する（R-H6）。共有と排他の待ち合いは**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[Either[AppFailure, A]]` の変換）の裏に隠す。H2 版は**プロセス内の `StampedLock` 系のロック**（`Fiber` から安全な部品）+ **待ちの上限**（超えたら `RetryExhausted`）+ **トランザクション終了後の後始末**（`AfterEnd`。COMMIT・ROLLBACK の後に解放。Kotlin 版の `LocalProjectionLock` と同じ構造。D4。AI が推奨案で決め、ユーザーが承認した。2026-11-25）（単一プロセスでのみ有効）。**PostgreSQL 版と同じ型**（H5・N-H2・R-H5。AI の案）。別案の `SELECT … FOR UPDATE` のロック行は不採用の比較（H2 での動作は未確認。[バックエンドアーキテクチャ](./architecture-backend.md)） |
 | SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（同じ接続で Scala 版で確認済み。K11） | 動かない（構文エラー） | ポート `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`）の裏に隠す。呼ぶのは `execute` だけ（M4）。H2 版は `enqueue` が何もせず、`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効）。PostgreSQL 版は `enqueue` が `pg_notify`。**同じ型**（H5。AI の案） |
 | 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 動かない（構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える（PostgreSQL 専用のマイグレーション） |
 | DB ロールと GRANT、追記専用、`TRUNCATE` の拒否 | あり | 一部動く（`GRANT TRUNCATE` は構文エラー。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。**権限の検証の正は PostgreSQL の統合テスト** |
@@ -447,7 +449,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 ### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
 
-ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。**N-H2・N-H5 の直し方は AI の案で、承認を得ていません。**
+ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）です。再々レビューの D1〜D5 は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（当時は確認未了でした）。承認した決定は 14 件（本人が選んだ 8 件 + ローカル DB の H2 + D1〜D5）です。**N-H2・N-H5 の直し方は AI の案で、承認を得ていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
@@ -456,12 +458,16 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 ### 再々レビュー（[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
 
-ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。**D4（H2 版の `ProjectionLock` は Kotlin 版と同じ構造）は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了**です。それ以外の直し方は AI の案で、承認を得ていません。
+ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。**D4（H2 版の `ProjectionLock` は Kotlin 版と同じ構造）は、AI が推奨案で決め、2026-11-25 にユーザーが承認しました（反映時点では確認未了でした）**。D1〜D5 の承認を含め、承認した決定は 14 件です。それ以外の直し方は AI の案で、承認を得ていません。「文書の検証（verified）」と「設計判断の承認」は別の記録で、文書が stable でも、承認していない判断は未承認のままです。
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
 | R-H6 | 「ログインユーザーとセッションの設定」に、`lock_timeout` を接続・ロールの設定に置かず、ロックを取る間だけ `set_config('lock_timeout', ms, true)` で設定して取った後に 0 に戻す手順（Kotlin 版の `PostgresProjectionLock` を読んで確認した）、「投影」の `ProjectionLock` の記述、方言の差分の PostgreSQL 版、未決事項 3 | AI の案。Scala 版では未確認 |
-| R-H5（D4） | 方言の差分の H2 版の `ProjectionLock`（`bracket` から、`StampedLock` 系 + 待ちの上限 + `AfterEnd` へ）、型を `ConnectionIO[Either[AppFailure, A]]` の変換に | ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施 |
+| R-H5（D4） | 方言の差分の H2 版の `ProjectionLock`（`bracket` から、`StampedLock` 系 + 待ちの上限 + `AfterEnd` へ）、型を `ConnectionIO[Either[AppFailure, A]]` の変換に | AI が推奨案で決め、ユーザーが承認した（2026-11-25。当時は確認未了）。実測は未実施 |
+
+### D1〜D5 の承認（2026-11-25）の反映
+
+ユーザーが D1〜D5 を承認しました。本書に関わる D4（H2 版の `ProjectionLock`）の記述を、この承認に合わせて直しました（過去の行の「確認は未了」は当時の状況として残しています）。H2 での実測、R-H6 などの直し方、N-H2・N-H5 は未実施・未承認のままです。
 
 ## 出典
 
