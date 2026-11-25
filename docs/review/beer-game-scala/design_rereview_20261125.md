@@ -150,8 +150,34 @@ H8 は、Kotlin 版 ADR 7 件の本文との突き合わせで、判定がすべ
 
 上の表は元の指摘数で、本文の統合後の番号とは重複を除く分だけ異なる。各エージェントの全文はこの文書に転記していない。根拠となる文書名・行は、上の表と事実確認の結果に残した。
 
+## 対応状況（2026-11-25）
+
+論点のうち 4 件はユーザーが決めた（N-H4・N-H6・N-H7・N-H8）。N-H1・N-H2・N-H3・N-H5 と、中・低の直し方は AI の案で、承認を得ていない。
+
+| # | 対応 | 決定の区分 | 主な反映先 |
+|---|------|------------|------------|
+| N-H1 | `GameEvent` を 12 個にし、`Started`・`Preparing` が観察者の招待・取り消し・参加、資格の失効・再発行、復帰を受ける。未知の参加者への `ParticipantReplaced` は `Ignored`。EV × 状態の「遷移の許す組の表」を規範にして、`apply`・状態遷移図・生成器・状態遷移テストを導く。受入テストを 4 点足した | AI の案 | domain-model、test-strategy、ADR-001 |
+| N-H2 | `ProjectionLock` を `ConnectionIO` の変換（`withShared`・`withExclusive`）にした。PostgreSQL 版は `pg_advisory_xact_lock(_shared)`、H2 版は `bracket`。接続は増えない。`Resource` 案は接続 2 本・プール枯渇のため不採用 | AI の案（B1 の最初に実測して確定） | architecture-backend、data-model、tech-stack、ADR-001 |
+| N-H3 | `.transact(` の入口を `Tx`・`ReadTx`・`ModeTx`・`LISTEN` の専用接続に絞って 1 か所（`Transactions.scala`）に置き、禁止を拡張。受入条件を「落ちるべき」「落ちてはならない」の 2 方向の表にした。「型で作れなくする」は言い換えた | AI の案 | architecture-backend、tech-stack、test-strategy、non-functional |
+| N-H4 | 検証用の CI（`check` ジョブ 1 本）は U1 に含める。AWS 環境・デプロイ用ワークフロー・ステージングへの自動反映は後回し。自動反映を持たない間の team 規約の例外は ADR-001 に「案。人の承認が必要」として記録した | **ユーザーの決定**（例外の記録は案） | ADR-001、index、test-strategy、architecture-infrastructure |
+| N-H5 | 正本の規則を「一覧が正。一覧の根拠は実測の記録で、一覧を直すときは根拠も直す」に統一。`index.md` の古い記述と旧名を直した | AI の案 | tech-stack、test-strategy、non-functional、operation、data-model、index |
+| N-H6 | `domain` の文 97% は目安に統一した。プロジェクトごとのしきい値の設定可否（K16）は未確認で、設定できなければ全体のしきい値だけにする。案 C の算出スクリプトのテスト（M7）も足した | **ユーザーの決定** | tech-stack、test-strategy、non-functional、ADR-001 |
+| N-H7 | 止まったゲームでも読み取りは 200 で返すことを要件にし、B1 の確認項目 (a)〜(e) に入れた。パターン 18 の依頼文言に「操作を繰り返さず相関 ID を伝える」「15 分以内に見込み（15 分は AI の案）」「画面の数字を控える」を足し、#15 の画面文言を実物に直した | **ユーザーの決定**（文言は案） | architecture-backend、operation、ui-design、test-strategy、non-functional |
+| N-H8 | U1〜U3 の間は実際の研修に使わない（検証・事例用）と、ADR-001・index・各文書の冒頭に明記。ui-design に #16（範囲外の画面）を新設した | **ユーザーの決定** | ADR-001、index、ui-design、operation、architecture-infrastructure、architecture-backend |
+
+あわせて、中・低の一部（M1〜M20 の多く、L1〜L10 の多く）も直した。範囲は各文書の末尾の変更記録に残してある。
+
+### 反映後も残る未確認・要判断
+
+- 新しく書いた Scala のコード（`Tx.run`、`withShared`、`Transactions.scala` の入口、`Committed` など）は**型検査していない**。排他の `pg_advisory_xact_lock` の待ち合いと `lock_timeout`、H2 版の `bracket` が COMMIT の前に解放される弱点（ローカル専用なので許容する案）は未確認。
+- 「遷移の許す組の表」は Kotlin 版のコードと図から AI が作った案で、人の確認がない。Kotlin 版の `revoked`・`reissued`・`recovered` が未知の主体を無視するかは未確認（domain-model の未決事項 13）。
+- 規約の例外、依頼文言（15 分を含む）、パターン 18、Intent の文面、成功の指標の数値は、運営者・ユーザーの承認が要る。
+- 範囲外の画面（#16）の見え方のうち、http4s の「経路なし」の応答の形、Scalafix の除外の書き方、`DisableSyntax.regex` が文字列の中の語を拾うかは未確認。画面を動かした確認は未実施。
+- 日本語見出しのアンカー（`#確認状況の一覧` など）が公開サイトで解決するかは未確認のまま。
+- 反映後の**再々レビュー**は未実施。`verified` の記録と `stable` への昇格は人が行う。
+
 ## 次のステップ
 
-1. 人が論点 1〜5 を決める。特に N-H4（CI）は B1 の計画より前に必要。
-2. 高 8 件（N-H1〜N-H8）を設計文書へ反映する。N-H1・N-H2・N-H3 は設計の穴なので先に。
-3. 反映後に再々レビューし、人が `verified` を記録して `stable` に昇格する。
+1. 反映した設計文書を人が確認する。
+2. 再々レビューを実施する。
+3. 人が `verified` を記録して `stable` に昇格する。

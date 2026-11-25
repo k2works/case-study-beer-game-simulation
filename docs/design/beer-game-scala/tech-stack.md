@@ -29,7 +29,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 | ライブラリ・sbt プラグインの版 | Maven Central の `maven-metadata.xml`（`repo1.maven.org/maven2/<group>/<artifact>/maven-metadata.xml`）の版の一覧。**公開日（更新日）と安定版か否かは、版の文字列（`-RC`・`-M`）から判断した** | 2026-11-25 |
 | 実行できるか | ローカルの sbt 1.13.1（JetBrains Runtime 25.0.4.1）で、Scala 3.7.4、WartRemover 3.6.3、cats-core 2.13.0、cats-effect 3.7.1、doobie-core 1.0.0-RC12、munit 1.3.6 の組み合わせの断片をコンパイルし、2 件のテストを通した | 2026-11-25 |
 | Scala・WartRemover・Scalafix の対応 | ガイド §9.4 の確認（Scala 3.7.0、WartRemover 3.4.1、Scalafix 0.14.3、Scala CLI 1.7.1）を引用。本書の組み合わせ（Scala 3.7.4 + WartRemover 3.6.3）は上の断片で `var` と `head` を拒否することまで確認した。sbt-scalafix 0.14.10 の `DisableSyntax.regex`（`println`・`System.currentTimeMillis`）が、Scala 3 のインデント構文のソースで `Compile/scalafix --check` に効くことも確認した（[テスト戦略](./test-strategy.md) の確認した事項 9。`scalafixAll` と、`.transact(` の禁止・ファイル単位の除外は未確認） | 2026-11-17（ガイド）、2026-11-25 |
-| 実 DB・テスト道具での確認 | doobie の `Left` での COMMIT と `FC.rollback`、制約名、アドバイザリロック、`LISTEN/NOTIFY`（[データモデル](./data-model.md) の検証 A）、scoverage、cucumber-scala、WartRemover のテスト除外など。**事項ごとの状況は、下の「確認状況の一覧」を唯一の正本とする**（他の文書はこの一覧へリンクする） | 2026-11-25 |
+| 実 DB・テスト道具での確認 | doobie の `Left` での COMMIT と `FC.rollback`、制約名、アドバイザリロック、`LISTEN/NOTIFY`（[データモデル](./data-model.md) の検証 A）、scoverage、cucumber-scala、WartRemover のテスト除外など。**事項ごとの状況は、下の「確認状況の一覧」を正とする**（他の文書はこの一覧へリンクする。**一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、一覧を直すときは根拠も直す**。再レビュー N-H5。AI の案） | 2026-11-25 |
 | PostgreSQL、JDK、Node.js、フロントエンド・インフラ・CI | 再確認していない。beer-game-kotlin（2026-11-14）と beer-game2（2026-11-09）の確認値を参照する | - |
 | context7 | 使えなかった（API キーの検証に失敗。2026-11-25）。ライブラリの機能の確認には使っていない | - |
 
@@ -77,7 +77,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 
 ## 確認状況の一覧
 
-**この表が、Scala 版の設計書で「確認済み」「未確認」を書く唯一の正本です**（2026-11-25 のレビュー指摘 H1 への対応。承認済みの判断ではなく、AI の案）。他の文書は、この一覧にリンクします（`./tech-stack.md#確認状況の一覧`）。事項ごとに、確認した場合は「何で・いつ」を書き、確認していない場合は「未確認」の欄に書きます。**確認していないことを確認済みに直さず、確認結果を作りません。** 一覧と本文が食い違ったときは、一覧を正とし、本文を直します。
+**この表が、Scala 版の設計書で「確認済み」「未確認」を書く正本です**（2026-11-25 のレビュー指摘 H1・再レビュー N-H5 への対応。承認済みの判断ではなく、AI の案）。**正本の規則**: **確認状況の一覧（この表）が正。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、一覧を直すときは根拠も直す。** 他の文書は、この一覧にリンクします（`./tech-stack.md#確認状況の一覧`）。事項ごとに、確認した場合は「何で・いつ」を書き、確認していない場合は「未確認」の欄に書きます。**確認していないことを確認済みに直さず、確認結果を作りません。** 一覧と本文が食い違ったときは、一覧を正とし、本文を直します（本文を直しても根拠の記録が合わないときは、根拠の側も直す）。
 
 「確認済み」の根拠は、特記がなければ、リポジトリの外の使い捨てのプロジェクト（sbt 1.13.1、JetBrains Runtime 25.0.4.1、Scala 3.7.4、doobie 1.0.0-RC12、ローカルの Docker の `postgres:18.6`。**リポジトリには残していない**）での実行です。再現の手順と結果は、各行の参照先にあります。
 
@@ -85,20 +85,20 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 | :--- | :--- | :--- | :--- | :--- |
 | K1 | ライブラリ・sbt プラグインの版 | Maven Central の `maven-metadata.xml` の版の一覧（2026-11-25）。分かるのは版の番号と更新日だけ | サポート期限、機能、Scala の版との互換性（B1 のビルドで確認） | 上の「確認の方法と範囲」 |
 | K2 | 型の断片のコンパイル | Scala 3.7.4、cats-core 2.13.0、cats-effect 3.7.1、doobie-core 1.0.0-RC12、munit 1.3.6 の組み合わせで、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3（ガイド §9.4 の 13 個）を有効にしてコンパイル（2026-11-25） | 下の K4・K7 | [ドメインモデル](./domain-model.md)、[バックエンドアーキテクチャ](./architecture-backend.md) |
-| K3 | ドメインの断片（`Quantity`、`RoleMap`、`ValidatedNec` による設定の検証、`GameError.code`、`Game.handle`、`Events.apply` と `Evolution`、`replay`） | 上のコンパイルと、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ること。状態を 1 つ足すと `match` の網羅の警告が出ること。`var` と `head` が WartRemover に拒否されること（2026-11-25） | 2026-11-25 のレビュー対応で書き直した `Game.handle`（権限が先の判定順）と `Started` の自己遷移は、**再コンパイルしていない** | [ドメインモデル](./domain-model.md) |
+| K3 | ドメインの断片（`Quantity`、`RoleMap`、`ValidatedNec` による設定の検証、`GameError.code`、`Game.handle`、`Events.apply` と `Evolution`、`replay`） | 上のコンパイルと、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ること。状態を 1 つ足すと `match` の網羅の警告が出ること。`var` と `head` が WartRemover に拒否されること（2026-11-25） | 2026-11-25 のレビュー対応で書き直した `Game.handle`（権限が先の判定順）と `Started` の自己遷移、再レビュー N-H1 で書き直した `GameEvents.apply`（12 イベントと「許す組の表」）は、**再コンパイルしていない** | [ドメインモデル](./domain-model.md) |
 | K4 | Session 集約、`startGame`、`simulateWeek`、投影、`RetentionSaga`、`Functor[RoleMap]`・`Monoid[TeamTotals]` の法則 | - | すべて型検査していない設計のスケッチ。法則のテストは書いていない | [ドメインモデル](./domain-model.md) |
 | K5 | `ConnectionIO` が `Left` を返して完了したときの COMMIT と、`FC.rollback` | doobie の `transact` は、値が `Left` でも **COMMIT する**。`FC.rollback` を挟むと、その書き込みは**残らない**（実 PostgreSQL 18.6、縮小した DDL、2026-11-25） | `FC.rollback` の**後**に同じ `ConnectionIO` で書き込みが続いたときの扱い（JDBC の仕様から、新しいトランザクションとして COMMIT されると**推論**した。実行していない。B1 で確かめる） | [データモデル](./data-model.md) の検証 A の 2 |
 | K6 | `Tx` のトランザクション境界を DB なしで検証する方法 | `Transactor.fromConnection[IO](stub, None)` に、呼び出しを記録する `java.sql.Connection` のスタブを渡すと、**成功は `commit` だけ（`rollback` なし）**、**`Left` は `rollback` が呼ばれる**（記録は `setAutoCommit, rollback, commit`）。**旧案の `Tx.rollbackOnLeft` を単体で確かめたもの**（2026-11-25） | 新しい案の `Tx.run`（コマンド全体を 1 回で包む）での確認。`.transact(` を `Tx` の外に置くと CI が落ちること | [テスト戦略](./test-strategy.md) の確認した事項 8 |
 | K7 | `execute` の再試行、キャンセル | `execute` の型のコンパイル（旧案の形） | 競合が 2 回続いても成功する、上限で `RetryExhausted`、業務の失敗は再試行しない、の実行。**キャンセル時の ROLLBACK と接続の返却**、`Supervisor` で切り離した `Fiber` の完了と追跡、**ember の切断時のハンドラの取消**とシャットダウンの待ち方、同じ `Idempotency-Key` の実行中の再送の待ち方 | [バックエンドアーキテクチャ](./architecture-backend.md) |
 | K8 | 一意制約違反の判別 | `attemptSql` で `PSQLException` を取り出せ、SQLSTATE `23505` と制約名 `uq_events_stream_version`（`getServerErrorMessage.getConstraint`）が得られた（2026-11-25） | `doobie.postgres.sqlstate` の定数、40001・40P01・55P03 の写像、**23505 の後に同じ `ConnectionIO` で次の文を発行したときの PostgreSQL の中断（25P02）**（PostgreSQL の仕様の知識で、実行していない）、本番コードでの `PSQLException` の型の判定と WartRemover（`IsInstanceOf`・`AsInstanceOf`）の相性 | [データモデル](./data-model.md) の検証 A の 4 |
 | K9 | 型の対応 | `uuid` ← `java.util.UUID`、`timestamptz` → `OffsetDateTime` と `Instant`（どちらも読めた）、`jsonb` は文字列 + `::jsonb` で書き `payload::text` で読める（2026-11-25） | `opaque type` の `Meta`・`Get`・`Put`、`Array[Byte]`（`bytea`）、circe による `jsonb` の読み書き（`doobie-postgres-circe` は技術スタックに無い）、`EventCodec` の派生 | [データモデル](./data-model.md) の検証 A の 3 |
-| K10 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が `ConnectionIO` として実行できた（2026-11-25） | **トランザクションの外の `Resource` として取る PostgreSQL 版**（専用の接続で `pg_advisory_lock(_shared)` を取り、解放で `pg_advisory_unlock` する形。セッションのロックの取得・解放・接続断での解放は実行していない）、`lock_timeout` の効き方 | [データモデル](./data-model.md) の検証 A の 5 |
+| K10 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が `ConnectionIO` として実行できた（2026-11-25） | **`ConnectionIO` の変換としての PostgreSQL 版**（トランザクションの先頭の `pg_advisory_xact_lock(_shared)`。再レビュー N-H2 の案）の、**共有と排他が互いを待つこと**、**再構築用の `pg_advisory_xact_lock`（排他）の実測**、COMMIT・ROLLBACK での解放、`lock_timeout` の効き方（55P03）。前回の `Resource` 案（セッションのロック）は不採用にしたため、確かめない | [データモデル](./data-model.md) の検証 A の 5 |
 | K11 | `LISTEN/NOTIFY` | `PHC.pgListen`・`PHC.pgNotify`・`PHC.pgGetNotifications`（`doobie.postgres.hi.connection`）で、**同じ接続**の通知を受け取れた（2026-11-25） | 別の接続・プールの外の専用の接続・切断後の再購読、fs2 の `Topic` が遅い購読者で発行側を止めるか | [データモデル](./data-model.md) の検証 A の 6 |
 | K12 | テスト用の PostgreSQL | testcontainers-scala-postgresql・testcontainers-scala-munit 0.44.1 が `postgres:18.6` を `TestContainerForAll` で起動し、`select version()` が `PostgreSQL 18` を含んだ（2026-11-25） | 依存する Java 側の Testcontainers の版、用途別のロールと接続のテスト用の分離 | [テスト戦略](./test-strategy.md) の確認した事項 6 |
 | K13 | テストの道具 | munit 1.3.6 の日本語・記号のテスト名と名前の絞り込み、JUnit XML。munit-scalacheck 1.3.1 の `property` と munit-cats-effect 2.2.1 の `IO` のテスト。cats-laws 2.13.0 + discipline-munit 2.0.0 の `MonoidTests`（`empty` を壊した実装が 4 件で落ちる）（2026-11-25） | ScalaCheck で状態に応じて操作を選ぶ操作列の生成、`HttpRoutes` を関数として呼ぶ HTTP のテスト、契約テストのスキーマ検証の道具 | [テスト戦略](./test-strategy.md) の確認した事項 1〜3 |
 | K14 | cucumber-scala | 9.3.0 が `# language: ja`（`機能`・`シナリオ`・`前提`・`もし`・`ならば`）の `.feature` を `io.cucumber.core.cli.Main` で実行できる。タグも出る。定義のないステップは `Undefined` で終了コード 1（2026-11-25） | 別の sbt プロジェクト（`acceptance`）からの実行、シナリオの数が増えたときの動作 | [テスト戦略](./test-strategy.md) の確認した事項 5 |
-| K15 | Scalafix | sbt-scalafix 0.14.10 + Scala 3.7.4 で、`DisableSyntax.regex`（`println`・`System.currentTimeMillis`）が `Compile/scalafix --check` で、インデント構文のソースの該当行を報告し、該当しない関数は報告しない（2026-11-25） | `scalafixAll`、`.transact(` を禁止して `Tx` のファイルだけ除外する方法、`domain` の `import` の禁止、`scalafix-cli` の版との関係 | [テスト戦略](./test-strategy.md) の確認した事項 9 |
-| K16 | scoverage | sbt-scoverage 2.4.4（Scala 3.7.4）で `coverage test coverageReport` が**文**と**分岐**の率を出す（例: 87.50% と 75.00%）。Cobertura の `line-rate` は文の率と同じ値（0.88）で、**行の独立した指標ではない**。`coverageMinimumStmtTotal`・`coverageMinimumBranchTotal`・`coverageFailOnMinimum := true` が効き、分岐 75% < 80% で `Coverage minimum was not reached` になる（2026-11-25） | **scoverage の XML の文の行番号から行率を算出できるか**（ST4。B1 で確かめる）、プロジェクトごとのしきい値、`coverageAggregate`、統合テストの計測の合算、生成コード・`enum` の扱い | [テスト戦略](./test-strategy.md) の確認した事項 4、ST4 |
+| K15 | Scalafix | sbt-scalafix 0.14.10 + Scala 3.7.4 で、`DisableSyntax.regex`（`println`・`System.currentTimeMillis`）が `Compile/scalafix --check` で、インデント構文のソースの該当行を報告し、該当しない関数は報告しない（2026-11-25） | `scalafixAll`、`.transact(`・`.transact[`・`xa.trans`・`FC`/`HC` の `commit`・`rollback` を禁止して、許す入口を置く 1 つのファイル（`Transactions.scala`）だけ除外する方法（`scalafix:off` は使わない。ADR-001 の 011）、`Test` のソースを対象にするか（`Compile` だけ確認）、`domain` の `import` の禁止、`scalafix-cli` の版との関係 | [テスト戦略](./test-strategy.md) の確認した事項 9 |
+| K16 | scoverage | sbt-scoverage 2.4.4（Scala 3.7.4）で `coverage test coverageReport` が**文**と**分岐**の率を出す（例: 87.50% と 75.00%）。Cobertura の `line-rate` は文の率と同じ値（0.88）で、**行の独立した指標ではない**。`coverageMinimumStmtTotal`・`coverageMinimumBranchTotal`・`coverageFailOnMinimum := true` が効き、分岐 75% < 80% で `Coverage minimum was not reached` になる（2026-11-25） | **scoverage の XML の文の行番号から行率を算出できるか**（ST4。B1 で確かめる）、**プロジェクト（`domain` など）ごとのしきい値を設定できるか**（`domain` の文 97% をゲートにするかは、この実測の後に決める。N-H6）、`coverageAggregate`、統合テストの計測の合算、生成コード・`enum` の扱い。算出スクリプトのテスト（既知の値のフィクスチャ XML）は B1 で書く | [テスト戦略](./test-strategy.md) の確認した事項 4、ST4 |
 | K17 | WartRemover とテスト | 3.6.3 は既定で `Test` にも適用される。`Test / wartremoverErrors := Seq.empty` では外れず、**`Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))` で外せる**。scalac のオプション（`-Werror` など）は、munit・ScalaCheck・discipline・`IO` の小さなテストにそのまま通った（2026-11-25） | 大きなコードでの `opaque type` との相性 | [テスト戦略](./test-strategy.md) の確認した事項 10・11 |
 | K18 | DDL、ロールと GRANT（Rust 版・Kotlin 版の引用） | **引用**: Rust 版が PostgreSQL 18.6 で実測した追記専用の拒否、部分一意索引、権限のないロールでの連鎖削除、制約名（2026-11-19）。Kotlin 版 ADR-010 の連鎖削除の確認。**Scala 版で確認したのは `game_roots`・`events` の縮小した DDL の適用と、権限のあるユーザーでの連鎖削除だけ**（2026-11-25） | Scala 版の接続での全文の DDL、ロールと GRANT、権限のないロールでの確認（B1 の受入条件）、`NOLOGIN` ロールの設定の継承 | [データモデル](./data-model.md) |
 | K19 | 永続化の周辺 | - | V003〜V006 の DDL の適用、Flyway の実行と PostgreSQL 用のモジュール名、`HikariTransactor` と用途別のロール（`SET ROLE`）、読み取り専用の `REPEATABLE READ` | [データモデル](./data-model.md) |
@@ -176,8 +176,8 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | 整形 | Scalafmt | **3.11.5**（`sbt-scalafmt` **2.6.2**） | ktlint 1.8.0 | CI で `scalafmtCheckAll` |
 | コンパイラの検査 | scalac のオプション | `-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement`（`-deprecation -feature` を含む） | detekt 1.23.8 の一部 | 警告をビルドの失敗にする。`enum` の `match` の漏れもここで止まる |
 | 静的解析 | WartRemover | **3.6.3**（`sbt-wartremover`） | detekt 1.23.8、PMD 7.29.0 | `Var`・`Null`・`Throw`・`OptionPartial`・`TryPartial`・`EitherProjectionPartial`・`IterableOps`・`AsInstanceOf`・`IsInstanceOf`・`Return`・`MutableDataStructures`・`TripleQuestionMark`・`DefaultArguments`（ガイド §9.4 の 13 個）。テストのソースには `Test / scalacOptions` から `-P:wartremover` を除いて適用しない（確認済み。[一覧](#確認状況の一覧) の K17） |
-| 静的解析 | Scalafix（`DisableSyntax`） | **sbt-scalafix 0.14.10**（`DisableSyntax.regex` は確認済み。K15）、CLI 0.14.3 | `ForbiddenMethodCall` | `println`、`System.currentTimeMillis`、`Thread.sleep`、**`.transact(` の直接の呼び出し（`Tx` のファイルだけ除外。ST4）**、ドメインでの時計・乱数・`IO` の `import` の禁止（文字列のパターン。限界はガイド §9.4） |
-| カバレッジ | sbt-scoverage（scoverage） | **2.4.4** | Kover 0.9.11 | **行 80%（scoverage の XML の文の行番号から算出。ST4 の案 C）をゲート**にし、文 85%・分岐 75%（`coverageMinimum*`）を暫定の追加のゲートにする。scoverage 自体に行の指標は無い（確認済み。K16） |
+| 静的解析 | Scalafix（`DisableSyntax`） | **sbt-scalafix 0.14.10**（`DisableSyntax.regex` は確認済み。K15）、CLI 0.14.3 | `ForbiddenMethodCall` | `println`、`System.currentTimeMillis`、`Thread.sleep`、**`.transact(`・`.transact[`・`xa.trans`・`FC`/`HC` の `commit`・`rollback`（許す入口を置く `Transactions.scala` だけ除外。`scalafix:off` は使わない。ST4）**、ドメインでの時計・乱数・`IO` の `import` の禁止（文字列のパターン。限界はガイド §9.4） |
+| カバレッジ | sbt-scoverage（scoverage） | **2.4.4** | Kover 0.9.11 | **行 80%（scoverage の XML の文の行番号から算出。ST4 の案 C）をゲート**にし、文 85%・分岐 75%（`coverageMinimum*`）を暫定の追加のゲートにする。`domain` の文 97% は**目安**（ゲートにするかは B1 の実測後。N-H6）。scoverage 自体に行の指標は無い（確認済み。K16） |
 | 契約テスト | JVM の JSON スキーマの検査ライブラリ（beer-game-kotlin は `json-schema-validator` 3.0.9）。`@redocly/cli`・`openapi-typescript` は共有 | 要確認 | json-schema-validator 3.0.9 | OpenAPI の応答の検査。**採否と版は未確認** |
 | 依存関係の脆弱性検査 | **選定未決**（Kotlin 版と同じ） | 要確認 | **選定未決** | `sbt-dependency-check` などの候補は未確認。Dependabot または Renovate |
 | 変異テスト | **選定未決** | 要確認 | **選定未決** | stryker4s などの候補は本書では確認していない |
@@ -190,7 +190,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 | コンテナ | Docker | ビルドは sbt のマルチステージ（`sbt-native-packager` などの採否は B1 で比較。**未確認**）。実行イメージは JDK 25 の JRE を含むもの（`eclipse-temurin:25-jre-noble` を第一候補。Kotlin 版は B3 で実在を確認した値。**本書では再確認していない**）。ローカルの DB は **H2 の PostgreSQL モード（Docker 不要。ST9）**。統合テストは Testcontainers の PostgreSQL 18 のため、テストの実行には Docker が要る |
 | 実行基盤 | ECS Fargate | JVM のヒープと、タスクのメモリの割り当ては [非機能要件](./non-functional.md) で実測して決める |
 | データベース | RDS for PostgreSQL 18（Multi-AZ、PITR） | 同左 |
-| 配信・観測・IaC・CI | CloudFront、S3、ALB、CloudWatch、Terraform、GitHub Actions | 同左。CI のビルドは sbt。詳細は [インフラ](./architecture-infrastructure.md)、[運用要件](./operation.md) |
+| 配信・観測・IaC・CI | CloudFront、S3、ALB、CloudWatch、Terraform、GitHub Actions | 同左。CI のビルドは sbt。**実装として約束するのは U1〜U3 で、そのうち CI は検証用の `check` ジョブ 1 本（formatter・linter・type-check・テスト）を U1 に含める**（N-H4 のユーザーの決定）。AWS 環境、デプロイ用のワークフロー、ステージングへの自動反映は後回し（自動反映を持たない間の team 規約の例外は ADR-001 に記録して人が承認する）。詳細は [インフラ](./architecture-infrastructure.md)、[運用要件](./operation.md) |
 | CI の検査 | gitleaks、Trivy、Checkov（または同等のもの） | 同左 |
 | ドキュメント | MkDocs、PlantUML、Mermaid | 同左 |
 
@@ -208,7 +208,7 @@ AWS SDK は、キューを持たない設計のため、**依存関係に含め�
 
 ## 設計判断
 
-**ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません**（Rust 版の R1〜R7 とは違う）。**ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）**です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 のレビュー対応で、ユーザーが決めたのは次の 4 点です。**H3**（不正な遷移 `Ignored` は止める設計を維持）、**H6**（カバレッジは行率を算出する案 C を第一）、**H7**（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、**H9**（NF-P2 は p95 4 秒）。**H1・H2・H4・H5・H8・H10 の直し方（本書の確認状況の一覧、`Tx.run`、`.transact(` の禁止など）は AI の案で、承認を得ていません。** 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。
+**ST1〜ST8 は、AI が起草した案で、ユーザーの承認を得ていません**（Rust 版の R1〜R7 とは違う）。**ST9（ローカル開発の DB）だけは、ユーザーの決定（2026-11-25）**です。ただし H2 の依存の導入の承認、動作範囲の実測は残っています。2026-11-25 にユーザーが決めたのは、レビュー対応の次の 4 点と、再レビュー対応の次の 4 点の**8 件だけ**です。**H3**（不正な遷移 `Ignored` は止める設計を維持）、**H6**（カバレッジは行率を算出する案 C を第一）、**H7**（範囲は U1〜U3 を約束し、U4〜U6 は指標を見て決める）、**H9**（NF-P2 は p95 4 秒）、**N-H4**（検証用の CI（`check` ジョブ 1 本）は U1 の約束に含める。AWS 環境・デプロイ用のワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、**N-H6**（`domain` の文 97% は目安。ゲートにするかは B1 の実測後）、**N-H7**（止まったゲームでも状態取得（読み取り）は返す）、**N-H8**（U1〜U3 の間は実際の研修に使わない。検証・事例用）。**H1・H2・H4・H5・H8・H10 と、N-H1・N-H2・N-H3・N-H5 の直し方（本書の確認状況の一覧と正本の規則、`Tx.run`、`.transact(` の入口の一覧と禁止、`ProjectionLock` の `ConnectionIO` の変換など）は AI の案で、承認を得ていません。**また、**「Scala 3」「http4s」「doobie」という道具の系列は、作成計画の承認（ガイド準拠）から導かれたもの**で、**具体的な版（Scala 3.7.4、http4s 0.23.39 など）、circe（ST6）、HikariCP（ST8）、JDK の選定は AI の案**です（再レビュー M16。[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の「決定と案の区別」と同じ）。 承認の前提として、確認できなかった項目（互換性、機能）は B1 で確かめ、判断と食い違えば改訂します。beer-game-kotlin の T1〜T7 との対応は下の表のとおりです。
 
 | ID | Kotlin 版（T*） | Scala 版 | 扱い |
 | :--- | :--- | :--- | :--- |
@@ -247,11 +247,12 @@ beer-game-kotlin の T5・T6 に対応し、ガイド第 9 章の設定を CI �
 - scalac: `-deprecation -feature -Werror -Wunused:all -Wvalue-discard -Wnonunit-statement`。`enum` の `match` の漏れ（本書の断片で、状態を 1 つ足すとパターンの網羅の警告が出ることを確認した）が、`-Werror` でビルドの失敗になる。
 - WartRemover: ガイド §9.4 の 13 個の Wart を `Compile` に適用し、**テストのソースには適用しない**（ガイド §9.4「テストには適用しない」）。WartRemover 3.6.3 は既定で `Test` にも適用されるため、**`Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))` で外す**（`Test / wartremoverErrors := Seq.empty` では外れない。確認済み、2026-11-25。[一覧](#確認状況の一覧) の K17）。**違反は 0 件、ベースラインなし、抑制なし**（Kotlin 版 ADR-011 の「抑制なし」を引き継ぐ。`@SuppressWarnings` は使わない。緩和が要るときは ADR に記録する。[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の 011 の行）。層ごとに許す Wart が違う場合は、sbt のプロジェクトごとに設定を分ける（ガイド §9.4 の導入の進め方 3）。
 - Scalafix: `DisableSyntax.regex` で `println`、`System.currentTimeMillis`・`nanoTime`、`Thread.sleep`、`unsafeRunSync` 系を禁止し、`domain` では時計・乱数・`java.util.UUID.randomUUID`・`scala.util.Random` と `cats.effect` の `import` も禁止する。`DisableSyntax.regex` が Scala 3 のインデント構文のソースに効くことは確認済み（K15）。文字列のパターンの限界（別名の `import` やラッパーの中の呼び出しは見逃す）は、ガイド §9.4 のとおり。
-- **`.transact(` の禁止（H4。AI の案で、承認を得ていない）**: トランザクションの実行は `Tx.run`（[バックエンドアーキテクチャ](./architecture-backend.md) の SBD2）だけに限るため、`DisableSyntax.regex` で **`.transact(` の直接の呼び出しを禁止し、`Tx` を定義するファイルだけ除外する**。同じ regex に、別名（`xa.trans`・`rawTrans` など）も足す。**除外の方法（ファイル単位の設定か、`scalafix:off` の範囲指定か）は未確認**（K15）。最初のビルドの受入条件に、**「`Tx` を通さない `.transact(` を置くと CI が落ちる」**を入れる。
+- **`.transact(` の入口の一覧と禁止（H4・再レビュー N-H3。AI の案で、承認を得ていない）**: 書き込みのトランザクションの実行は `Tx.run`（[バックエンドアーキテクチャ](./architecture-backend.md) の SBD2）だけに限る。ただし、読み取り・再構築・LISTEN の正しいコードも `.transact(` を使うため、**許す入口を一覧にし、同じファイル（`beergame.adapter.persistence.Transactions`）に置く**。入口は 4 つ: `Tx`（書き込み。`Tx.run`）、`ReadTx`（`ReadXa`・`ObserverXa` の読み取り専用 REPEATABLE READ）、`ModeTx`（`rebuild-projections`・`verify-projections`・retention・migrate のモード）、`LISTEN` の専用接続。**Scalafix の除外は、このファイル 1 か所**にする。`DisableSyntax.regex` で、このファイルの外の **`.transact(`、`.transact[`（型引数つき）、`xa.trans`、`FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`** を禁止する（`rawTrans` などの別名も足す）。**除外に `scalafix:off` は使わない**（[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の 011 の「無効化コメントを使わない」）。**ファイル単位の除外の方法は未確認**（K15）。**「`Tx.run` の外で書き込みの `transact` を置くと Scalafix で落ちる」**（型の上で作れなくなるのではなく、CI の検査で止める。「型で作れなくする」は言いすぎとして直した）と、**許す入口とテストのソースは落ちない**ことを、最初のビルドの受入条件にする（落ちるべきものと落ちてはならないものの 2 方向の表。バックエンドアーキテクチャの SBD2）。文字列のパターンの限界（別名の `import` など）は残る（ガイド §9.4）。
 - Scalafmt: `scalafmtCheckAll` を CI で止める。
 - **カバレッジのしきい値（ユーザーの決定、2026-11-25: 行率を算出する案 C を第一とする）**: beer-game-kotlin の Kover のゲートは、**全体の行 85%・分岐 75%、`domain` の行 100%（暫定の下限 97%）**である（[テスト戦略（Kotlin 版）](../beer-game-kotlin/test-strategy.md)。Kover の実測 96.8%・78.1% は B2 の値）。team.md の規約は**行 80% の floor**で、弱めて通してはならない。scoverage は**文（statement）と分岐（branch）**を計測し、**行の指標を持たない**（確認済み。K16）。
   - **第一案（C）**: scoverage の XML（`scoverage.xml`）の各文が持つ**行番号**から、行ごとの実行の有無を集計して**行率を算出**し、**行 80% をそのままゲート**にする（Rust 版が行 80% を承認済みのゲートにした先例 RT3 と同じ）。行の数え方（文を持つ行のうち、その行のいずれかの文が実行された行の割合、とする案）は B1 で決める。**算出できるかは未確認**で、B1 で確かめる。**出せなければ、文の率で代替してよいかを、再度人が決める**（AI は代替を採らない）。
-  - **追加のゲート（暫定）**: 文 85%・分岐 75%（全体）と `domain` の文 97% を、scoverage の標準の設定（`coverageMinimumStmtTotal`・`coverageMinimumBranchTotal`・`coverageFailOnMinimum`。確認済み。K16）で、**暫定の追加のゲート**として残す。行 80% の代わりではなく、**行 80% と両方**を満たす。
+  - **追加のゲート（暫定）**: 文 85%・分岐 75%（全体）を、scoverage の標準の設定（`coverageMinimumStmtTotal`・`coverageMinimumBranchTotal`・`coverageFailOnMinimum`。確認済み。K16）で、**暫定の追加のゲート**として残す。行 80% の代わりではなく、**行 80% と両方**を満たす。
+  - **`domain` の文 97% は目安（ユーザーの決定、2026-11-25。再レビュー N-H6）**: Kotlin 版の `domain` の行 100%（暫定の下限 97%）に当たる値。**ゲートにするかは、B1 の実測の後に決める**（ゲートとは書かない。目安を下回っても CI を失敗にしない）。プロジェクトごとのしきい値を scoverage で設定できるかは**未確認**（K16）。**設定できなかったとき**: `domain` だけのしきい値は置かず、全体のしきい値（行 80%・文 85%・分岐 75%）だけにする。`domain` の値は、CI のレポートに出して目安として見る（`domain` を別のプロジェクトとして `coverageReport` を出し、算出スクリプトに目安の値を表示させる案）。その扱い（ゲートにするか）は、実測の結果を見て人が決める。
   - **案 A（前の提案。第一にしない）の反例**: 「文 85% なら行 80% を満たすとみなす」は成り立たない。1 行に 9 文があって**その行だけ**が実行され、1 文だけの別の行が未実行なら、**文 90%・行 50%** になる。文の率が高くても、行の率は floor を下回りうる。
   - **行 80% の充足は、実測するまで主張しない。** いずれの値も**未実測の暫定値**で、最初の Bolt で実測して見直す。**プロジェクトごとのしきい値、複数プロジェクトと統合テストの合算**は未確認（K16）。
 
@@ -298,8 +299,8 @@ beer-game-kotlin の T7 を Scala 版に読み替えたものです。当初は�
 
 | # | beer-game-kotlin | Scala 版 | 理由 |
 | :--- | :--- | :--- | :--- |
-| 1 | Kotlin 2.4.21（JVM） | Scala 3.7.4（JVM） | ユーザーの決定（作成計画） |
-| 2 | Ktor | http4s | 同上 |
+| 1 | Kotlin 2.4.21（JVM） | Scala 3（JVM）。版は 3.7.4 | **Scala 3 の採用は作成計画の承認から導かれたもの。版 3.7.4 の選定は AI の案**（M16。以前は「ユーザーの決定」と書いて混ぜていた） |
+| 2 | Ktor | http4s（版 0.23.39） | **http4s の採用はガイド準拠（作成計画の承認）から導かれたもの。版の選定は AI の案**（M16） |
 | 3 | 関数型の道具 Arrow（`Either`、`Raise`、`zipOrAccumulate`） | 標準の `Either`、cats-core の `ValidatedNec`・`mapN` | ガイド第 3・6 章。Scala の標準と Cats で足りる |
 | 4 | 非同期 coroutines（`suspend`） | cats-effect の `IO`（値）。実行は `IOApp` とテストの境界 | ガイド第 4・5 章 |
 | 5 | JDBC + HikariCP + Flyway | doobie（`ConnectionIO`）+ HikariCP（doobie-hikari）+ Flyway | ガイド §7.6 |
@@ -313,8 +314,9 @@ beer-game-kotlin の T7 を Scala 版に読み替えたものです。当初は�
 | 13 | ローカルは H2（Kotlin 版の T7） | ローカルも H2 の PostgreSQL モード（ユーザーの決定、2026-11-25。導入は承認待ち） | ST9 |
 | 14 | JDK 25（Temurin）の JRE | 同じ（JDK 25 を第一候補。要確認） | JVM 版 |
 | 15 | 純粋性は detekt の `ForbiddenMethodCall` | WartRemover + Scalafix の `DisableSyntax` + `domain` の依存の制限（ST3） | ツールの違い |
-| 16 | カバレッジのゲートは Kover の行 85%・分岐 75% | **行 80%（scoverage の XML の文の行番号から算出。案 C）をゲート**にし、文 85%・分岐 75% を暫定の追加のゲートにする（ST4）。行 80% の充足は実測まで主張しない | scoverage に行の指標が無い（K16）。ユーザーの決定（2026-11-25）。team.md の行 80% の floor を弱めない |
-| 17 | `EventStore.transaction` が、ブロックが `Left` を返したら ROLLBACK する | `.transact(` の直接の呼び出しを Scalafix の `DisableSyntax.regex` で禁止し、`Tx.run` だけに限る（ST4）。AI の案 | doobie は `Left` でも COMMIT する（K5）ため、`Tx` を通さない実行を CI で止める |
+| 16 | カバレッジのゲートは Kover の行 85%・分岐 75% | **行 80%（scoverage の XML の文の行番号から算出。案 C）をゲート**にし、文 85%・分岐 75% を暫定の追加のゲートにする（ST4）。`domain` の文 97% は目安（N-H6）。行 80% の充足は実測まで主張しない | scoverage に行の指標が無い（K16）。ユーザーの決定（2026-11-25）。team.md の行 80% の floor を弱めない |
+| 17 | `EventStore.transaction` が、ブロックが `Left` を返したら ROLLBACK する | 書き込みの実行は `Tx.run` だけ。許す `.transact(` の入口（`Tx`・`ReadTx`・`ModeTx`・`LISTEN` の専用接続）を 1 つのファイルに置き、その外の `.transact(`・`.transact[`・`xa.trans`・`FC`/`HC` の `commit`・`rollback` を Scalafix の `DisableSyntax.regex` で禁止する（ST4。N-H3）。AI の案 | doobie は `Left` でも COMMIT する（K5）ため、`Tx` を通さない書き込みの実行を CI で止める。正しい読み取り・再構築のコードを落とさない |
+| 18 | （なし） | `domain` の文 97% は目安（ゲートにするかは B1 の実測後）（ST4。N-H6。ユーザーの決定） | scoverage のプロジェクトごとのしきい値の設定が未確認（K16） |
 
 ## アップグレード計画
 
@@ -331,14 +333,14 @@ beer-game-kotlin の T7 を Scala 版に読み替えたものです。当初は�
 ## 未決事項
 
 1. **ローカル開発の DB**（ST9）: H2 の採用は決定済み（2026-11-25）。残る未決は、**H2 の依存の導入の承認**、**B1 の最初に行う動作範囲の実測**（アドバイザリロック、`LISTEN/NOTIFY`、部分一意索引、ロール、`jsonb`、SQLSTATE、doobie 経由の挙動）、doobie-h2 の要否、公式のサポート期限（未確認）。
-2. **カバレッジのゲート**（ST4）: 行 80% を、scoverage の XML の文の行番号から算出してゲートにする案 C が第一（ユーザーの決定、2026-11-25）。**B1 で算出できるかを確かめる。出せなければ、文の率で代替してよいかを再度人が決める。** 文 85%・分岐 75%、`domain` 文 97% は暫定の追加のゲートで、**未実測**。設定名（`coverageMinimum*`）は確認済み（K16）。
+2. **カバレッジのゲート**（ST4）: 行 80% を、scoverage の XML の文の行番号から算出してゲートにする案 C が第一（ユーザーの決定、2026-11-25）。**B1 で算出できるかを確かめる。出せなければ、文の率で代替してよいかを再度人が決める。** 文 85%・分岐 75%（全体）は暫定の追加のゲートで、**未実測**。**`domain` の文 97% は目安**（ユーザーの決定。ゲートにするかは B1 の実測後。プロジェクトごとのしきい値を設定できるか（K16）が未確認で、**設定できなければ全体のしきい値だけにする**）。設定名（`coverageMinimum*`）は確認済み（K16）。
 3. **Scala と周辺の版の組み合わせ**: Scala 3.7.4 と WartRemover 3.6.3・sbt-scalafix 0.14.10・sbt-scoverage 2.4.4 の組み合わせは、小さな断片で動くことを確認した（K15〜K17）。大きなコードでの確認と、JDK 25 との組み合わせは未確認。
 4. **doobie の RC13**: ガイドが記す 1.0.0-RC13 は、Maven Central の一覧に無かった。RC12 でガイドの例（`Transactor`、`ConnectionIO`、`Update`）が動くかは要確認。
 5. **http4s 0.23.39 の API**: ガイドの例と、SSE（`ServerSentEvent`）、ミドルウェア（CORS・Throttle・RequestId・ErrorHandling など）の名前。
 6. **JSON ライブラリ**（ST6）: circe を提案。派生か手書きか。**承認を得る**。
 7. **cucumber-scala**（ST7）: 日本語 Gherkin の実行は確認済み（K14）。残る未決は、別の sbt プロジェクトからの実行と、Gherkin のファイルの共有の配置。
 8. **Testcontainers**: `postgres:18.6` の起動は確認済み（K12）。残る未決は、`testcontainers-scala` 0.44.1 が依存する Java 側の版。
-9. **依存の検査の方式**（ST3・ST4）: sbt のタスクか、Scalafix の `DisableSyntax.regex` か。`.transact(` の禁止と `Tx` のファイルの除外の方法も同じ検査の仕組みで行えるか（K15）。
+9. **依存の検査の方式**（ST3・ST4）: sbt のタスクか、Scalafix の `DisableSyntax.regex` か。`.transact(`・`.transact[`・`xa.trans`・`FC`/`HC` の `commit`・`rollback` の禁止と、許す入口を置く `Transactions.scala` だけの除外（`scalafix:off` は使わない）も同じ検査の仕組みで行えるか、`Test` のソースを対象にするか（K15）。
 10. **生きたドキュメントの生成方式**（ADR-001 の 018 の置き換え）: Scala 3 の注釈、`enum` のメタ情報、scaladoc の走査の比較。
 11. **コンテナ**: 実行イメージ、`sbt-native-packager` の採否、JVM のヒープ（NF-P17 に対応）。
 12. **選定未決（Kotlin 版から継続）**: 変異テストの道具、依存関係の脆弱性検査、Dependabot か Renovate か、生きたドキュメントの公開の道具。
@@ -356,6 +358,21 @@ beer-game-kotlin の T7 を Scala 版に読み替えたものです。当初は�
 | H4 | ST4 の `.transact(` の禁止、テスト・品質の表の Scalafix の行、変更表の 17 | AI の案 |
 | H6 | ST4 のカバレッジ（案 C を第一、反例、行 80% の充足は実測まで主張しない）、変更表の 16、未決事項の 2 | 第一案はユーザーの決定。算出できるかは未確認 |
 | L5 | ST4 の WartRemover のテスト除外の設定、Scalafix の確認済みの範囲 | 直した |
+
+### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
+
+ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけです（ST の冒頭の段落）。**N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。**
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| N-H5 | 「確認の方法と範囲」の「実 DB・テスト道具での確認」の行と「確認状況の一覧」の冒頭の規則（一覧が正。根拠は実測の記録。一覧を直すときは根拠も直す。「唯一の正本」の文言を改めた） | AI の案 |
+| N-H3 | ST4 の `.transact(` の入口の一覧と禁止（`scalafix:off` を使わない）、テスト・品質の表の Scalafix の行、K15、変更表の 17、未決事項 9 | AI の案。除外の方法は未確認 |
+| N-H2 | K10 の未確認の書き直し（`ConnectionIO` の変換の案に合わせた。確認済みの欄は変えていない） | AI の案 |
+| N-H6 | ST4 のカバレッジ（`domain` の文 97% は目安。設定できなければ全体のしきい値だけ）、テスト・品質の表のカバレッジの行、K16、変更表の 16・18、未決事項 2 | ユーザーの決定（目安）。設定の可否は未確認 |
+| N-H4 | ST の冒頭の段落と、インフラ・運用の表の CI の行（検証用の `check` ジョブは U1。AWS・デプロイ・自動反映は後回し） | ユーザーの決定。例外の記録は ADR-001（別の担当） |
+| N-H7・N-H8 | ST の冒頭の段落に決定を列挙（N-H7 の要件は [バックエンドアーキテクチャ](./architecture-backend.md)） | ユーザーの決定 |
+| M16 | ST の冒頭の段落（決定と案の区別）、変更表の 1・2（「Scala 3.7.4 … ユーザーの決定」を、系列は作成計画から導かれ、版の選定は AI の案、に直した） | 直した |
+| N-H1 | K3 の未確認に、書き直した `GameEvents.apply` を足した | [ドメインモデル](./domain-model.md) に主な記述 |
 
 ## 出典
 

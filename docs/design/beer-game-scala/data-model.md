@@ -15,12 +15,12 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
 
 ### 本書の位置づけと確認の範囲
 
-- **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の「検証の結果」は、その一覧の K5・K8〜K11・K18 の根拠で、本文は一覧にリンクします。
+- **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の「検証の結果」は、その一覧の K5・K8〜K11・K18 の根拠で、本文は一覧にリンクします。**正本の規則（再レビュー N-H5。AI の案）**: 一覧が正です。一覧の根拠は実測の記録（本書の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、**一覧を直すときは根拠も直します**（一覧と本書の記述が食い違ったら、両方を見直す）。
 - **本書で確認したこと**（2026-11-25。リポジトリの外の使い捨てのプロジェクトで、sbt 1.13.1、Scala 3.7.4、doobie 1.0.0-RC12、testcontainers-scala 0.44.1、ローカルの Docker の `postgres:18.6` を使用）。結果は「検証の結果」の表にまとめました。
   - `events`・`game_roots` を**縮小した DDL**（主キー、名前つきの一意制約 `uq_events_stream_version`、外部キー `ON DELETE CASCADE`、`jsonb`、identity の `seq`）を適用できる。
   - doobie の `transact` は、`ConnectionIO` が例外なく完了すれば、値が `Left` でも **COMMIT する**。`FC.rollback` を挟むと、その書き込みは残らない（[バックエンドアーキテクチャ](./architecture-backend.md) の SBD2 の前提を実 DB で確認）。
   - 一意制約違反は、`attemptSql` で `PSQLException` として取り出せ、SQLSTATE `23505` と制約名（`getServerErrorMessage.getConstraint`）が得られる。
-  - `uuid`・`timestamptz`・`jsonb` の読み書き、アドバイザリロック（`pg_advisory_xact_lock(_shared)`）、`LISTEN/NOTIFY`（`doobie.postgres.hi.connection` の `pgListen`・`pgNotify`・`pgGetNotifications`。同じ接続）が動く。トランザクションの外のセッションのロック、専用の接続の `LISTEN`、切断後の再購読は**未確認**。
+  - `uuid`・`timestamptz`・`jsonb` の読み書き、アドバイザリロック（`pg_advisory_xact_lock(_shared)`）、`LISTEN/NOTIFY`（`doobie.postgres.hi.connection` の `pgListen`・`pgNotify`・`pgGetNotifications`。同じ接続）が動く。共有と排他のロックが互いを待つこと、`lock_timeout`、専用の接続の `LISTEN`、切断後の再購読は**未確認**（セッションのロック `pg_advisory_lock` を使う `Resource` 案は、再レビュー N-H2 で不採用にした）。
 - **引用したもの**: [Rust 版のデータモデル](../beer-game-rust/data-model.md) が、**`events`・`game_roots` ほかの DDL と DB ロール・GRANT を PostgreSQL 18.6 に適用して実測した結果**（追記専用の拒否、部分一意索引、連鎖削除、制約名）を持ちます。DDL は言語に依存しないため、本書はそれを引用します。**Scala 版では、その全文を再適用していません**（上の縮小した DDL だけ）。ロールと GRANT を doobie の接続から検証することも、未実施です。
 - **確認していないこと**: 投影・周辺ストア・保持削除の他の表の DDL（Kotlin 版の ER 図と実ファイル `V002〜V006` に基づく設計で、Scala 版では**未適用**）、Flyway の実行、`HikariTransactor` と用途別のロール、`SET ROLE`、読み取り専用の `REPEATABLE READ`、circe による `jsonb` の読み書き（`doobie-postgres-circe` は[技術スタック](./tech-stack.md)に載せておらず、未確認）。
 - **引き継ぐだけのもの**: 投影テーブルの定義（購読するイベント、閲覧できる人）、読み取りの規則、設計判断のまとめは、Kotlin 版を正本とします。
@@ -261,7 +261,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 | 2 | `ConnectionIO` が `Left` を返して完了 | **COMMIT された**（行が残る）。`FC.rollback` を挟んだ `Left` の経路は、**書き込みが残らない** |
 | 3 | 型と `jsonb` | `uuid` ← `java.util.UUID`（`doobie.postgres.implicits`）、`timestamptz` → `java.time.OffsetDateTime` と `java.time.Instant`（どちらも読めた）。`jsonb` は、文字列の引数に `::jsonb` を付けて書き、`payload::text` で読める（PostgreSQL が正規化して `{"a": 1}` の形で返す） |
 | 4 | 同じストリームの同じ版への 2 回目の追記 | `attemptSql` で `PSQLException`。**SQLSTATE `23505`、制約名 `uq_events_stream_version`** |
-| 5 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が `ConnectionIO` として実行できた。**`transact` の外のセッションのロック（`pg_advisory_lock(_shared)`）は未確認**（`ProjectionLock` の `Resource` 版。H5） |
+| 5 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が `ConnectionIO` として実行できた。**未確認**: 共有（`pg_advisory_xact_lock_shared`）と排他（`pg_advisory_xact_lock`）が互いを待つこと、`lock_timeout` での 55P03、COMMIT・ROLLBACK で外れること（`ProjectionLock` の `ConnectionIO` の変換版。N-H2）。セッションのロック（`pg_advisory_lock(_shared)`）は、`Resource` 案を不採用にしたため確かめない |
 | 6 | `LISTEN/NOTIFY` | `PHC.pgListen`・`PHC.pgNotify`・`PHC.pgGetNotifications`（`doobie.postgres.hi.connection`）で、同じ接続の通知を受け取れた。**別の接続・専用の接続・切断後の再購読は未確認** |
 | 7 | `game_roots` の 1 行削除 | そのゲームの `events` が連鎖して消えた。**接続ユーザーは `events` の DELETE 権限を持つユーザーで、権限のないロールでの確認ではない**（下の B） |
 
@@ -284,7 +284,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 
 同期投影（追記と同じトランザクションで更新）、`projection_checkpoints`、投影の再構築（ゲームごとに 1 トランザクション、アドバイザリロック。コマンドは共有、再構築は排他）、複数の投影の行を更新する順序（表の順序の固定。表名と主キーの順）、投影テーブルの定義、出力を投影にしない（`export_packages` の廃止。`buildExport` を問い合わせ時に実行）、読み取りの規則（参加者・進行役・観察者の読める範囲）、観察のための `week_team_totals` は、**Kotlin 版と同じ**です。
 
-Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。**`transact` の外の `Resource[IO, Unit]`**。H5 の案で、承認を得ていない。確認済みなのは `ConnectionIO` の中の `pg_advisory_xact_lock(_shared)` で、セッションのロックは未確認。検証の 5、[バックエンドアーキテクチャ](./architecture-backend.md)）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
+Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。**`ConnectionIO` の変換で、トランザクションの先頭の `pg_advisory_xact_lock(_shared)`**。H5・N-H2 の案で、承認を得ていない。確認済みなのは `ConnectionIO` として実行できることだけで、共有と排他の待ち合いは未確認。検証の 5、[バックエンドアーキテクチャ](./architecture-backend.md)）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
 
 ## 周辺ストア
 
@@ -363,8 +363,8 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 | 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ。Kotlin 版の実測の引用） | 扱い |
 | :--- | :--- | :--- | :--- |
-| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版は `transact` の外のセッションのロックで、**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`GameId => Resource[IO, Unit]`）の裏に隠す。H2 版は**プロセス内のロック**を `Resource` に包む（単一プロセスでのみ有効）。**PostgreSQL 版と同じ型**（H5。AI の案） |
-| SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（同じ接続で Scala 版で確認済み。K11） | 動かない（構文エラー） | ポート `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`）の裏に隠す。H2 版は `enqueue` が何もせず、`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効）。PostgreSQL 版は `enqueue` が `pg_notify`。**同じ型**（H5。AI の案） |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。共有と排他の待ち合いは**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[A] => ConnectionIO[A]`）の裏に隠す。H2 版は**プロセス内のロック**を `ConnectionIO` の `bracket` で包む（単一プロセスでのみ有効。解放は COMMIT の前）。**PostgreSQL 版と同じ型**（H5・N-H2。AI の案） |
+| SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（同じ接続で Scala 版で確認済み。K11） | 動かない（構文エラー） | ポート `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`）の裏に隠す。呼ぶのは `execute` だけ（M4）。H2 版は `enqueue` が何もせず、`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効）。PostgreSQL 版は `enqueue` が `pg_notify`。**同じ型**（H5。AI の案） |
 | 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 動かない（構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える（PostgreSQL 専用のマイグレーション） |
 | DB ロールと GRANT、追記専用、`TRUNCATE` の拒否 | あり | 一部動く（`GRANT TRUNCATE` は構文エラー。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。**権限の検証の正は PostgreSQL の統合テスト** |
 | 接続プールの分離（観察者用など） | 用途別の `HikariTransactor` | 単一のプール | H2 版は**省略** |
@@ -442,6 +442,15 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 | H5 | 「投影」のアドバイザリロック、「ローカル開発のデータベース」の方言の差分（`ProjectionLock`・`ChangeNotifier`） | AI の案 |
 | M2 | 「イベントストア」に 23505 の後の規則 | AI の案 |
 | L3 | 方言の差分の `PersistenceFailure` を `AppFailure.Persistence` に | 直した |
+
+### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
+
+ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけです。**N-H2・N-H5 の直し方は AI の案で、承認を得ていません。**
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| N-H2 | 「本書の位置づけと確認の範囲」の未確認の記述、検証 A の 5（未確認の範囲を、共有と排他の待ち合いなどに書き直した。**実測の結果そのものは変えていない**）、「投影」のアドバイザリロック、方言の差分（`ProjectionLock`・`ChangeNotifier`） | AI の案。`ProjectionLock` を `ConnectionIO` の変換にした。`Resource` 版は不採用 |
+| N-H5 | 「本書の位置づけと確認の範囲」に正本の規則（一覧が正。根拠は実測の記録。一覧を直すときは根拠も直す） | AI の案 |
 
 ## 出典
 

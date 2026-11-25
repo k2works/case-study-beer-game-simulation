@@ -21,16 +21,20 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:20:00Z }
 - **コンテナ**: JRE のイメージは同じ（Temurin 25）。**依存の JAR とアプリの JAR を別の層に分ける方法**が、Gradle の配布から sbt のものに変わる（`sbt-native-packager` の採否は未決）。
 - **データベースの接続**: JDBC + HikariCP から **doobie の `HikariTransactor`**（用途別。ST8）へ。ロールを用途別に分けるのは同じ。
 - **ローカル開発の DB**: ローカル開発だけ **H2 の PostgreSQL モード**（ユーザーの決定、2026-11-25。ST9）。**本番・ステージングでは起動時の検査で H2 を拒否**し、**配布（本番イメージ）から H2 を除外**する。H2 の依存の導入は承認待ち。
-- **CI/CD**: 検証の手順が sbt になる。**Scala 版専用のワークフローを新設する**（team の規約）。デプロイは「設計」のみで、ワークフローはまだ作らない。
+- **CI/CD**: 検証の手順が sbt になる。**Scala 版専用のワークフローを新設する**（team の規約）。**検証用の CI（`check` ジョブ 1 本）は U1 に含める**（N-H4）。デプロイは「設計」のみで、ワークフローは U5 まで作らない。
 - **Terraform**: Scala 版専用に複製して出発する案（SI4。提案）。
 
 アプリは [バックエンド](./architecture-backend.md)、[フロントエンド](./architecture-frontend.md)、運用は [運用要件](./operation.md) を参照してください。
+
+**範囲（ユーザーの決定、2026-11-25。N-H4・N-H8・M19）**: 実装として約束するのは U1〜U3 です。**U1〜U3 の間は、実際の研修には使いません（検証・事例用）。** 本書のうち、**U1 で約束するのは、検証用の CI（`check` ジョブ 1 本）だけ**です。**AWS 環境（Terraform、ECS、RDS、CloudFront など）、デプロイ用のワークフロー（SI5 のうちデプロイとロールバックの側）、ステージングへの自動反映、本番運用、復元訓練は後回し（U5）で、指標を見て決めます。** team の規約は「`main` の merge で staging へ自動反映」を求めるため、**自動反映を持たない間の例外は、ADR に記録して人が承認します**（ADR-001 は別担当。承認を得るまでは、規約との衝突が残る）。以降の AWS・デプロイの記述は、**U5 に着手するときの設計**です。
 
 ### 本書の位置づけと確認の範囲
 
 - **本書で確認したこと**: Kotlin 版・Rust 版のインフラ設計と、既存の `.github/workflows` の Kotlin 版・Rust 版のジョブ構成を読み、Scala 版で変わる点を洗い出しました（2026-11-25）。版は [技術スタック](./tech-stack.md) の記載のみを使います。
 - **確認していないこと**: コンテナのビルドと実行、起動モード、SIGTERM の振る舞い、起動時間、メモリ、sbt の配布物の作り方、Terraform、CI/CD は、**すべて未実装・未検証**です。実行イメージの実在（`eclipse-temurin:25-jre-noble`）は、Kotlin 版が 2026-11-15 に確認した値の引用で、**本書では再確認していません**。
 - Kotlin 版の実装の経緯（B2・B3・B14 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。
+- **確認状況の正本の規則（N-H5。AI の案で承認を得ていない）**: [技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」と [テスト戦略](./test-strategy.md) の「確認した事項」）で、一覧を直すときは根拠も直します。
+- **承認の状況**: ユーザーが決めたのは H3・H6・H7・H9 に加え、再レビューへの対応の N-H4（`check` ジョブ 1 本は U1 の約束に含め、AWS 環境・デプロイ用ワークフロー・自動反映は後回し）、N-H6、N-H7、N-H8（U1〜U3 は研修に使わない）です。**N-H2（ロックは接続を増やさない）・N-H3 など、これら以外は AI の案で、承認を得ていません**。
 
 ## 確認したバージョン
 
@@ -151,7 +155,7 @@ Kotlin 版の構成要素の表（CloudFront、ALB、API サービス、保持�
 | 削除 | retention | 小さな `HikariTransactor`（削除用のロール。Kotlin 版は `SET ROLE` で実現した） |
 | 所有者 | migrate | 1 回限りの接続（Flyway） |
 
-プールの配線の検査（`SELECT current_user`）は書き直します（バックエンドの「問い合わせ側」）。**接続数の見積もり**は Kotlin 版と同じ式（タスク数 × （書き込み + 読み取り + 観察者の各プールの最大 + 通知 1 本）+ 運用のタスク）で、タスクの最大数（4）で RDS の接続数の上限を超えないことを確認します。プールの大きさは負荷試験で決めます（未決）。**接続を集約するプロキシや接続プーラーは、`LISTEN` が動かない可能性があるため、置きません。** `doobie-hikari` が内部で使う HikariCP の版は要確認です。
+プールの配線の検査（`SELECT current_user`）は書き直します（バックエンドの「問い合わせ側」）。**接続数の見積もり**は Kotlin 版と同じ式（タスク数 × （書き込み + 読み取り + 観察者の各プールの最大 + 通知 1 本）+ 運用のタスク）で、**ロック用の接続は式に足さない**（案。N-H2: `ProjectionLock` は `ConnectionIO` の変換で、PostgreSQL 版は先頭で `pg_advisory_xact_lock_shared` を発行し、書き込みのトランザクションと同じ接続・同じトランザクションの中で保持して COMMIT で自動解放する。コマンドごとに接続が 2 本要る `Resource` 案は不採用。承認を得ていない）。タスクの最大数（4）で RDS の接続数の上限を超えないことを確認します。プールの大きさは負荷試験で決めます（未決）。**接続を集約するプロキシや接続プーラーは、`LISTEN` が動かない可能性があるため、置きません。** `doobie-hikari` が内部で使う HikariCP の版は要確認です。
 
 ## 環境
 
@@ -175,7 +179,7 @@ Kotlin 版の「ローカルの開発環境と H2 の拒否」を、Scala 版に
 - **H2 のドライバが無い環境で `DB_KIND=h2`** を選んだ場合も、起動に失敗する（本番・ステージングは、拒否の検査とドライバの欠落の二重の防御になる）。
 - 起動の失敗（終了コード 70）や設定の誤り（78）の使い分けは、下の終了コードのとおり。
 
-**設定の環境変数**（`APP_ENV`、`CREDENTIAL_KEY`、`IDEMPOTENCY_KEY`、`RESPONSE_KEY`、`DB_URL`、`DB_USER`、`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）は、フロントエンドの E2E の案内と手順書の差分を減らすため、**Kotlin 版と名前を揃える**（提案。`DB_KIND` を含む）。`AppConfig.load` が全項目の誤りを `ValidatedNec` で集め、失敗なら、足りない設定の**名前だけ**をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。
+**設定の環境変数**（`APP_ENV`、`CREDENTIAL_KEY`、`IDEMPOTENCY_KEY`、`RESPONSE_KEY`、`DB_URL`、`DB_USER`、`DB_PASSWORD`、`PORT`、`HOST`、`ALLOWED_ORIGINS`、`COMMAND_MAX_ATTEMPTS`、`MIGRATE_ON_START`）は、フロントエンドの E2E の案内と手順書の差分を減らすため、**Kotlin 版と名前を揃える**（提案。`DB_KIND` を含む）。**E2E 用のレート制限をゆるめる設定（TS 版の `AUTH_RATE_LIMIT_PER_MINUTE` に当たるもの）の名前も、SF2 に含めて揃える**（L3。E2E が参加・復帰の専用の制限に当たらないようにする。本番・ステージングでは、ゆるめた値を受け付けない検査を、H2 の拒否と同じ `AppConfig.load` に置く案。承認を得ていない）。`AppConfig.load` が全項目の誤りを `ValidatedNec` で集め、失敗なら、足りない設定の**名前だけ**をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。
 
 ## コンテナと JVM
 
@@ -311,9 +315,11 @@ stop
 
 既存の `.github/workflows` には、`beer-game-kotlin.yml`（`contract`・`test`・`detekt`・`pmd`・`web`・`ui`・`container`・`n1`・`deploy-demo` などのジョブ）と、`beer-game-rust.yml`（`check`・`container`・`infra` のジョブ）、それぞれのデプロイとロールバックの 4 本があります（2026-11-25 に確認）。Scala 版は、**これらを変更せず、Scala 版専用のワークフローを新設する設計**とします（ワークフロー自体は、本書の段階では作りません）。トリガーは Rust 版に倣い、`pull_request` と `push`（`develop`・`main`）、`workflow_dispatch` とし、パスは `apps/beer-game-scala/**`、共有の `apps/beer-game-features/**`・`apps/beer-game-web/**`・`apps/beer-game-contracts/**`、`docs/design/beer-game-scala/**`、ワークフロー自身にします（設計書の生成物の検査のパスは、生きたドキュメントの方式（ADR-001 の 018）が決まってから）。
 
+**U1 で約束するのは `check` ジョブ 1 本だけです**（N-H4。ユーザーの決定、2026-11-25）。B1 の受入条件の「CI が落ちる」（規約違反、`.transact(` の違反、カバレッジの不足）は、この `check` ジョブで判定します（[テスト戦略](./test-strategy.md)）。**他のジョブ（`integration`・`acceptance`・`contract`・`web`・`ui`・`container`・`n1`・`infra`）は、対応する検証が範囲に入る Bolt で足します**（時期は未決。人が決める）。**デプロイとロールバックのワークフロー（下の 4 本）、AWS 環境、ステージングへの自動反映は後回し（U5）**で、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認します。
+
 | ジョブ（予定） | 内容 | 参考にした既存のジョブ |
 | :--- | :--- | :--- |
-| `check` | `scalafmtCheckAll`、`scalafixAll --check`、コンパイル（`-Werror`、WartRemover）、`test`、`scoverage` のしきい値（行 80% の算出と、文・分岐の暫定のゲート）。**sbt のキャッシュ**（依存と `target`。キーは `build.sbt`・`project/` のハッシュ）を使う | Rust 版の `check`、Kotlin 版の `test` |
+| `check`（**U1 で約束**） | `scalafmtCheckAll`、`scalafixAll --check`、コンパイル（`-Werror`、WartRemover）、`test`、`scoverage` のしきい値（行 80% の算出と、文・分岐の暫定のゲート。`domain` の文 97% は目安。N-H6。行を出せない間はジョブを失敗のまま）。**sbt のキャッシュ**（依存と `target`。キーは `build.sbt`・`project/` のハッシュ）を使う | Rust 版の `check`、Kotlin 版の `test` |
 | `integration` | Testcontainers による統合テスト（PostgreSQL 18）。`Left` の ROLLBACK、キャンセル、競合の再試行、連鎖削除、ロールの権限 | Kotlin 版の `test`（`integrationTest`） |
 | `acceptance` | cucumber-scala の専用ジョブ（日本語 Gherkin。ST7）と、関数値の経路の受入 | Kotlin 版の `test`（`acceptanceTest`） |
 | `contract` | OpenAPI の検証と、型の生成物の差分 0（共有） | Kotlin 版の `contract` |
@@ -326,7 +332,7 @@ stop
 
 ### デプロイとロールバックのワークフロー（設計）
 
-Kotlin 版・Rust 版と同じ 4 本を、Scala 版専用に新設する設計とします。**ワークフローは作りません。**
+Kotlin 版・Rust 版と同じ 4 本を、Scala 版専用に新設する設計とします。**ワークフローは作りません。U1〜U3 の約束の外で、U5 に着手するときの設計です**（N-H4）。
 
 | ワークフロー（予定） | 起動 | 内容（Kotlin 版・Rust 版の流れを引き継ぐ） |
 | :--- | :--- | :--- |
@@ -334,7 +340,7 @@ Kotlin 版・Rust 版と同じ 4 本を、Scala 版専用に新設する設計�
 | `beer-game-scala-deploy-production` | 手動（承認） | ステージングのダイジェストを昇格（ビルドしない）。ブルー/グリーン |
 | `beer-game-scala-rollback-staging`・`-production` | 手動 | 履歴から版を選び、旧イメージが現在のイベントを読めることの確認を必須入力にする |
 
-- **team の規約**: `main` へ merge された application を staging へ自動反映し、production は手動承認後に deploy します。**この自動反映は、beer-game2 では未達だった点を含め、実際に動かす**ことが規約です。Kotlin 版のデプロイは、AWS では未実行の定義でした。Scala 版も、**AWS への適用は別のゲート（人の判断）**です。
+- **team の規約**: `main` へ merge された application を staging へ自動反映し、production は手動承認後に deploy します。**この自動反映は、beer-game2 では未達だった点を含め、実際に動かす**ことが規約です。Kotlin 版のデプロイは、AWS では未実行の定義でした。Scala 版も、**AWS への適用は別のゲート（人の判断）**です。**U1〜U3 では、この自動反映を持たない**（N-H4）ため、規約の例外を ADR に記録して人が承認します。
 - CI は、GitHub Actions の **OIDC** で、環境ごとの最小権限のロールを引き受けます（長期のアクセスキーを置かない）。値（ロール ARN、リージョン、クラスタ名など）はワークフローに書かず、環境の変数から取ります。
 - ステージングで承認した**同じイメージのダイジェスト**を、本番へ昇格させます。
 - スキーマの変更は、旧アプリが動く間は、必須の列・制約を削除しない（拡張 → 互換 → 縮小）。**イベントは書き換えない**。投影の形の変更は、マイグレーションの後に投影の再構築で埋める。
@@ -383,6 +389,19 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 | M4 | H2 の拒否に、JDBC の URL `jdbc:h2:` の検査を足した（Kotlin 版 173 行に倣う）。H2 で 2 つ目のプロセスを拒否する手段を未決事項に加えた | AI の案 |
 | M17 | `DB_KIND` の記述を、[フロントエンド](./architecture-frontend.md) と揃えた（持つ） | AI の案 |
 | M12 | SIGTERM の終了コードは SI3 のとおり未決のまま。テスト戦略・非機能要件の NF-SC1 の記述を、これに揃えた | AI の案 |
+
+### 再レビュー（2026-11-25。[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
+
+**ユーザーが決めたのは N-H4・N-H6・N-H7・N-H8 の方針だけで、他は AI の案です（承認を得ていません）。**
+
+| 指摘 | 変更 | 状態 |
+| :--- | :--- | :--- |
+| N-H4 | 検証用の CI（`check` ジョブ 1 本）を U1 の約束に含め、AWS 環境・デプロイ用ワークフロー・自動反映を U5 に後回しと書いた。自動反映を持たない間の team 規約の例外を ADR に記録して人が承認する | ユーザーの決定（範囲）。ADR への記録は未承認 |
+| N-H8・M19 | 冒頭に、U1〜U3 は研修に使わないこと、U5 の設計であることを書いた | ユーザーの決定 |
+| N-H2 | 接続数の式に、ロック用の接続を足さない案を書いた | AI の案 |
+| L3 | E2E 用のレート制限をゆるめる設定の名前を、設定名を揃える対象（SF2）に含めた | AI の案 |
+| N-H6 | `check` ジョブの記述に、`domain` の文 97% は目安、行を出せない間は失敗のまま | N-H6 はユーザーの決定 |
+| N-H5 | 確認状況の正本の規則を追加 | AI の案 |
 
 ## 設計判断
 

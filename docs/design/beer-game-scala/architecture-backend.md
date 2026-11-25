@@ -15,10 +15,11 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 
 ### 本書の位置づけと確認の範囲
 
-- **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の本文は、その一覧へリンクします。一覧と食い違ったら、一覧を正とします。
-- **確認したこと**: `AppFailure`、`EventStore`、`Ports`、`App`（`Kleisli`）、**旧案の** `Tx.rollbackOnLeft`、`Execute.step` / `Execute.execute` の型は、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3 を有効にして**コンパイルできる**（K2。2026-11-25）。**実 DB で、`Left` を返しても doobie が COMMIT すること、`FC.rollback` を挟むと書き込みが残らないこと**を確認した（K5）。旧案の `Tx.rollbackOnLeft` が、スタブの `Connection` で「成功は `commit` だけ、`Left` は `rollback` が呼ばれる」ことも確認した（K6）。
-- **本書の「Tx と execute」「ProjectionLock と ChangeNotifier」の新しい形（`Tx.run`、`Resource` のロック、通知の配信）は、2026-11-25 のレビュー対応で書き直した AI の案**で、承認を得ていない。**型検査も実行もしていない**（旧案がコンパイルできたことは、新案の根拠にならない）。
-- **確認していないこと**: `ConcurrencyConflict` の再試行の実行、キャンセル時の ROLLBACK、`Supervisor` による切り離し、ember の切断時の挙動（K7）、`doobie.postgres.sqlstate` の定数と制約名以外の写像（K8）、トランザクションの外のセッションのアドバイザリロック（K10）、専用の接続の `LISTEN` と再購読（K11）、http4s（0.23.39）のルート・ミドルウェア・SSE（K20）、`HikariTransactor`（K19）、circe による `EventCodec`（K9）、各ミドルウェアの名前は、**未確認の設計のスケッチ**です。B1 で確かめます。
+- **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の本文は、その一覧へリンクします。**正本の規則（再レビュー N-H5。AI の案）**: 一覧が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、**一覧を直すときは根拠も直します**。本文が一覧と食い違ったら、本文を直します。
+- **確認したこと**: `AppFailure`、`EventStore`、**旧形の** `Ports`（1 本のストリームの `store` と 1 つの `Transactor`。新しい形は下の「依存を表す」で、型検査していない）、`App`（`Kleisli`）、**旧案の** `Tx.rollbackOnLeft`、`Execute.step` / `Execute.execute` の型は、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3 を有効にして**コンパイルできる**（K2。2026-11-25）。**実 DB で、`Left` を返しても doobie が COMMIT すること、`FC.rollback` を挟むと書き込みが残らないこと**を確認した（K5）。旧案の `Tx.rollbackOnLeft` が、スタブの `Connection` で「成功は `commit` だけ、`Left` は `rollback` が呼ばれる」ことも確認した（K6）。
+- **本書の「Tx と execute」「ProjectionLock と ChangeNotifier」の新しい形（`Tx.run`、`ConnectionIO` の変換としてのロック、通知の出所、`.transact(` の入口の一覧）は、2026-11-25 のレビュー対応と再レビュー対応（N-H2・N-H3・M4）で書き直した AI の案**で、承認を得ていない。**型検査も実行もしていない**（旧案がコンパイルできたことは、新案の根拠にならない）。前回の `Resource` 版のロックは、再レビュー N-H2 で不採用にした（下の「ProjectionLock の接続の出所」）。
+- **ユーザーの決定（2026-11-25）と AI の案の区別**: ユーザーの決定は、H3（`Ignored` は止める）・H6（行率を算出する案 C）・H7（U1〜U3 を約束）・H9（NF-P2 は p95 4 秒）と、再レビューの N-H4（検証用の CI は U1 に含める）・N-H6（`domain` の文 97% は目安）・N-H7（止まったゲームでも状態取得は返す）・N-H8（U1〜U3 の間は実際の研修に使わない）の 8 件。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていない。**
+- **確認していないこと**: `ConcurrencyConflict` の再試行の実行、キャンセル時の ROLLBACK、`Supervisor` による切り離し、ember の切断時の挙動（K7）、`doobie.postgres.sqlstate` の定数と制約名以外の写像（K8）、トランザクションのアドバイザリロックの共有と排他の待ち合い（K10）、専用の接続の `LISTEN` と再購読（K11）、http4s（0.23.39）のルート・ミドルウェア・SSE（K20）、`HikariTransactor`（K19）、circe による `EventCodec`（K9）、各ミドルウェアの名前は、**未確認の設計のスケッチ**です。B1 で確かめます。
 - **引き継ぐだけのもの**: 冪等性の表、競合の再試行の一意制約の表、問い合わせ側の開示、API のエンドポイントと認可の表、エラーの写像の表、SSE の仕様（版の通知だけ、再生なし）、保持削除の手順、セキュリティの表は、Kotlin 版の該当節を正本とします。**API の契約（`openapi.yaml`、`code`、problem+json）は変えません。**
 - Kotlin 版の実装の経緯（B1〜B13 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。
 
@@ -134,11 +135,14 @@ type App[A] = Kleisli[IO, Ports, A]
 **`Ports` と、書き込み・読み取り・観察者の区別（M1。AI の案、型検査していない）**: Kotlin 版・旧スケッチは 1 本のストリームの `store` と 1 つの `Transactor` を持ちましたが、`StartGame` と開始後の入れ替えは `game` と `session` の 2 ストリームに書き、観察者の分離（NF-S18）は配線の誤りに弱いため、次の形にします。
 
 ```scala
-/** 書き込み用のプールだけを包む。`Transactor` を直接渡さない（H4: 公開する実行は Tx.run だけ） */
-final class Tx private (xa: Transactor[IO]):
-  def run[E, A](program: ConnectionIO[Either[E, A]]): IO[Either[E, A]] = ???   // 下の SBD2。スケッチ
+// application（型だけ。実装は adapter-persistence の Transactions.scala に置く。N-H3）
+/** 書き込みの実行。`Transactor` を直接渡さない（H4: 公開する書き込みの実行は run だけ）。
+  * 型パラメーターを持つ関数のため、case class でなく trait にする（SBD1 の例外） */
+trait Tx:
+  def run[E, A](program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]   // 実装は下の SBD2。Left で FC.rollback
 
-/** 読み取り・観察者のプールは、別の型で区別する（取り違えるとコンパイルが通らない） */
+/** 読み取り・観察者のプールは、別の型で区別する。**守れるのは取り違えの一部だけ**（L9）:
+  * `ReadXa(writeXa)` と書けば通る。取り違えは、プールの配線テスト（`SELECT current_user`。NF-S18）で守る */
 final case class ReadXa(xa: Transactor[IO])
 final case class ObserverXa(xa: Transactor[IO])
 
@@ -148,6 +152,7 @@ final case class Ports(
     tx: Tx,                          // 書き込み（api の書き込みプール）
     lock: ProjectionLock,
     notifier: ChangeNotifier,
+    logSink: LogSink,                // deliver の失敗の記録に使う（L4）
     maxAttempts: Int
     // … IdempotencyStore・PeripheralStore・Generators・CredentialIssuer
 )
@@ -155,16 +160,23 @@ final case class Ports(
 final case class QueryPorts(read: ReadXa, observer: ObserverXa /* , … */)
 ```
 
-`ProjectionLock` と `ChangeNotifier` は、H2 版と PostgreSQL 版が**同じ型**になるよう、次の形にします（H5。AI の案、型検査していない。**B1 の最初に実測して確定する**）。
+**`Ports` の旧形と新形（L4）**: K2 で型検査したのは、1 本のストリームの `store` と 1 つの `Transactor` を持つ**旧形**です。上の `gameStore`・`sessionStore`・`tx: Tx`・`lock`・`notifier`・`logSink` を持つ**新形は、型検査していません**。
+
+**`Tx` の二重のシグネチャを避ける（L4）**: 初稿は、クラス `Tx`（`run(program)`）とオブジェクト `Tx`（`run(xa)(program)`）の 2 つの `run` を持っていた。**公開する書き込みの実行は、`Tx` の 1 つの `run` だけ**にし、実装（`Transactions.scala` の `Tx.fromTransactor(xa)`）だけが `xa` を持つ。`app` が `Tx.fromTransactor` で作って `Ports` に渡す。
+
+`ProjectionLock` と `ChangeNotifier` は、H2 版と PostgreSQL 版が**同じ型**になるよう、次の形にします（H5・再レビュー N-H2。AI の案、型検査していない。**B1 の最初に実測して確定する**）。**ロックは `Resource` でなく、`ConnectionIO` の変換**にします（前回の `Resource` 案は、下の「ProjectionLock の接続の出所」で不採用にした）。
 
 ```scala
-/** transact の外の Resource。PostgreSQL 版は、ロックを取る専用の接続を持つ。H2 版はプロセス内の読み書きロック */
-final case class ProjectionLock(
-    shared: GameId => Resource[IO, Unit],      // コマンド
-    exclusive: GameId => Resource[IO, Unit]    // 再構築
-)
+/** ConnectionIO の変換。`program` を、ゲームのロックを取った後に実行する形で包む。
+  * PostgreSQL 版: 先頭で pg_advisory_xact_lock_shared / pg_advisory_xact_lock（COMMIT・ROLLBACK で自動解放。接続は program の接続の 1 本）。
+  * H2 版: プロセス内の読み書きロックを ConnectionIO の bracket で取る（下に注意）。
+  * 型パラメーター A を持つ関数のため、trait にする */
+trait ProjectionLock:
+  def withShared[A](gameId: GameId)(program: ConnectionIO[A]): ConnectionIO[A]      // コマンド
+  def withExclusive[A](gameId: GameId)(program: ConnectionIO[A]): ConnectionIO[A]   // 再構築
 
-/** トランザクションの中で通知を集め（enqueue）、Tx.run の後に IO で配信する（deliver） */
+/** execute が、トランザクションの中で通知を集め（enqueue）、Tx.run の後に IO で配信する（deliver）。
+  * 呼ぶのは execute だけ（通知の出所は 1 つ。M4） */
 final case class ChangeNotifier(
     enqueue: List[VersionNotice] => ConnectionIO[Unit],   // PostgreSQL 版: 中で pg_notify。H2 版: 何もしない
     deliver: List[VersionNotice] => IO[Unit]              // PostgreSQL 版: 何もしない（LISTEN の受信が配る）。H2 版: プロセス内のイベントへ配る
@@ -173,13 +185,32 @@ final case class ChangeNotifier(
 
 `IdempotencyStore`・`PeripheralStore`・`Generators`（時刻・識別子・乱数）・`CredentialIssuer` も同じ形の `case class` で、**型検査していません**。
 
+#### ProjectionLock の接続の出所と見積もり（再レビュー N-H2。AI の案）
+
+| 項目 | 内容 |
+| :--- | :--- |
+| 接続の出所 | **PostgreSQL 版のロックは、コマンドのトランザクションと同じ 1 本の接続**で取る（`Tx.run` が開いた書き込みプールの接続。先頭の `pg_advisory_xact_lock_shared`）。**ロックのための専用の接続を取らない**。再構築（排他）も、`rebuild-projections` モードの 1 ゲーム 1 トランザクションの接続で取る（`pg_advisory_xact_lock`） |
+| 接続数の見積もり | 1 タスクあたりの接続は、**3 プール（書き込み・読み取り・観察者）+ `LISTEN` の専用の接続 1 本**のままで、**ロックのために増えない**。見積もりの式は [インフラストラクチャ](./architecture-infrastructure.md) の式（タスク数 ×（3 プール + 通知 1 本））をそのまま使う |
+| 解放 | `pg_advisory_xact_lock(_shared)` は、トランザクションの終わり（COMMIT・ROLLBACK）で自動的に外れる。**解放の呼び出しを書かない**ので、解放の失敗と、外れないままプールに戻る接続の問題が構造上ない。接続が切れても、サーバーがトランザクションを中止してロックが外れる |
+| 確認状況 | `ConnectionIO` として `pg_advisory_xact_lock(42)` と `pg_advisory_xact_lock_shared` を**実行できること**は確認済み（K10。2026-11-25）。**未確認**: 共有と排他が互いを待つこと、`lock_timeout` での 55P03、再構築（排他）の実測、COMMIT・ROLLBACK で外れること。B1 の最初に確かめる |
+| 再試行との関係 | 初稿は「ロックを再試行のあいだも持つ」としていたが、トランザクションのロックは ROLLBACK で外れるため、**試行ごとに取り直す**（`execute` の `loop` の中で `withShared` を包む）。再試行のあいだに再構築が入りうるが、再試行は読み直しから始めるので問題ない |
+| 待ちとプール | 再構築（排他）の間、コマンドは**自分のトランザクションの接続を持ったまま**ロックを待つ。待つコマンドの数が書き込みプールの大きさに達すると、ほかの要求はプール取得のタイムアウト（`RetryExhausted`・503）になる。**待ちは `lock_timeout`（55P03 → `RetryExhausted`）で上限があり、同時に走るコマンドの数の上限（`Semaphore`）が先に効く**。値は実測で決める（未決事項 6）。研修中に再構築しない運用（[運用要件](./operation.md)）が前提 |
+| H2 版 | プロセス内の読み書きロック（`ReentrantReadWriteLock` などを `Ref` の `Map[GameId, …]` で持つ）を、`ConnectionIO` の `bracket`（Kotlin 版 T7 の H2 版に倣う）で包む。**注意**: `bracket` の解放は `program` の完了時で、**`Tx.run` の COMMIT より前**になる。PostgreSQL 版（COMMIT まで保持）より弱く、再構築が COMMIT 前のコマンドを追い越しうる。H2 版はローカル専用で、複数のプロセスでは保証しない（既存の制限）ので、**許容する案**。契約テストの「COMMIT の後まで直列化する」条項は PostgreSQL 版だけで確かめ、H2 版は「実行中の相互排除」だけ確かめる。`ConnectionIO` へ `IO` を持ち上げる方法（`WeakAsync` など）は**未確認** |
+
+**不採用: `Resource[IO, Unit]` のセッションのロック（前回の案。再レビュー N-H2）**
+
+| 案 | 内容 | 評価 |
+| :--- | :--- | :--- |
+| **A（採用の提案）** | `ConnectionIO` の変換。PostgreSQL 版は先頭の `pg_advisory_xact_lock(_shared)`、H2 版は `bracket` | 接続が増えない。解放が構造的に保証される。H2 版は COMMIT 前に外れる弱さがある（上） |
+| B（不採用） | `GameId => Resource[IO, Unit]`。専用の接続で `pg_advisory_lock(_shared)` を取り、解放で `pg_advisory_unlock` | (1) **ロックの専用接続を書き込みプールから取ると、コマンドごとに接続を 2 本使う**。同時のコマンドがプールの大きさに達すると、全員がロックの接続を持ったまま、トランザクションの接続を待ち、プールが枯渇する。(2) セッションのロックは**接続に残る**。解放（`pg_advisory_unlock`）に失敗した接続がプールに戻ると、**HikariCP は接続を閉じずにプールへ戻し、返却時にセッションのロックを外さない**ため（再レビューの指摘。本書では実測していない）、再構築が止まり続ける（解放の失敗・取消・タイムアウトのテストが要る）。(3) 接続数の見積もりにロックの接続を足す必要がある。実測も未実施（K10） |
+
 ## コマンド側
 
 ### コマンド処理の流れ
 
 流れと順序は Kotlin 版と同じです。**処理の順は固定**で、ロック（共有）→ 認証（操作者・資格の有効性）→ 認可の前提検査 → 冪等記録の照合 → 読み込み → `handle` → 追記・投影 → 周辺ストア → 通知 → 冪等記録の保存 → COMMIT です。認可を冪等記録の照合より**先**に置くため、入れ替えで失効した旧担当者が過去のキーを再送しても 403 になります（ADR-004）。
 
-**Scala 版（H4・H5 の案）での違い**: ロックは `transact` の**外**の `Resource`（`ProjectionLock.shared`）で取り、**認証以降の全体（認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `handle` → 追記・投影 → 周辺ストア → 通知の収集 → 冪等記録の保存）を 1 つの `ConnectionIO` として組み、1 回の `Tx.run` で包みます**。通知は、トランザクションの中で集め（`enqueue`）、**COMMIT された後**に `IO` で配信します（`deliver`）。ロールバックした試行の通知は配信されません。
+**Scala 版（H4・H5・N-H2 の案）での違い**: ロックは `ConnectionIO` の変換（`ProjectionLock.withShared`。PostgreSQL 版は先頭の `pg_advisory_xact_lock_shared`）で、**トランザクションの先頭**で取ります（前回の「`transact` の外の `Resource`」は不採用。上の「ProjectionLock の接続の出所」）。**認証以降の全体（認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `handle` → 追記・投影 → 周辺ストア → 冪等記録の保存）を 1 つの `ConnectionIO`（`program`）として組み、`execute` が、ロックの変換と通知の `enqueue` で包んで、1 回の `Tx.run` で実行します**。通知は、**`execute` だけが**、`program` が `Right(committed)` を返したときに、**同じトランザクションの中で集め**（`notifier.enqueue(committed.notices)`。PostgreSQL 版は `pg_notify`。COMMIT されたときだけ届く）、**COMMIT された後**に `IO` で配信します（`deliver`）。ロールバックした試行の通知は、集められず、配信されません（M4）。
 
 ```plantuml
 @startuml
@@ -195,8 +226,8 @@ database "PostgreSQL" as DB
 P -> R : PUT /sessions/:id/decisions\n（Idempotency-Key、If-Match = 意思決定の版）
 R -> R : 本文の検証（ValidatedNec で誤りを集める）-> SaveDecision\n生の資格を RequestMeta に入れる
 R -> X : Supervisor で execute を切り離して起動し、完了を待つ
-X -> X : ProjectionLock.shared（transact の外の Resource）を取る
 X -> DB : Tx.run: begin（READ COMMITTED）
+X -> DB : ProjectionLock.withShared（先頭で pg_advisory_xact_lock_shared。同じ接続）
 X -> X : 認証 -> 認可の前提検査
 X -> DB : 冪等記録を照合
 alt 記録あり、ダイジェストが同じ
@@ -214,8 +245,9 @@ else 記録なし
     alt 一意制約の違反
       ES --> X : ConcurrencyConflict -> ROLLBACK し再試行
     else 成功
-      X -> DB : 投影・周辺ストア・冪等記録（成功の応答だけ）・通知を集める（enqueue）
-      X -> DB : COMMIT
+      X -> DB : 投影・周辺ストア・冪等記録（成功の応答だけ）
+      X -> DB : 通知を集める（execute が Right のときに enqueue。PostgreSQL 版は pg_notify）
+      X -> DB : COMMIT（ロックも外れる）
       X -> X : COMMIT の後に通知を配信（deliver）
     end
   end
@@ -228,17 +260,19 @@ R --> P : 200（versions のみ）/ problem+json
 `execute` は、ストリームの種類に依存しない汎用の関数です。ストリームごとの初期状態・遷移・`handle` を引数で受け取り、ルールを持ちません（Kotlin 版と同じ）。**`Tx.run` と `execute` の形は 2026-11-25 のレビュー対応で書き直した AI の案（H4・H5）で、型検査していません**。`step` と `AppFailure`・`EventStore` の型は、コンパイルを確認した旧案の形のままです（K2）。
 
 ```scala
+// adapter-persistence の Transactions.scala（`.transact(` を書いてよいファイル。下の「`.transact(` の入口」）
 object Tx:
-  /** 公開する実行はこれだけ。Left を返したら ROLLBACK（FC.rollback）してから transact する。
+  /** 公開する書き込みの実行は、Tx.run（これ）だけ。Left を返したら ROLLBACK（FC.rollback）してから transact する。
     * doobie の既定の戦略は、値が Left でも COMMIT するため（確認済み。K5）。
-    * コマンドの ConnectionIO 全体（認証 → … → 冪等記録の保存）を、1 回の run で包む */
-  def run[E, A](xa: Transactor[IO])(program: ConnectionIO[Either[E, A]]): IO[Either[E, A]] =
-    program
-      .flatMap:
-        case left @ Left(_) => FC.rollback.as(left)
-        case right          => FC.pure(right)
-      .transact(xa)
-  // 実際は、上の Tx クラスの run がこれを呼ぶ。合成子（ConnectionIO のまま ROLLBACK を足す関数）は公開しない
+    * コマンドの ConnectionIO 全体（ロック → 認証 → … → 冪等記録の保存 → 通知の収集）を、1 回の run で包む */
+  def fromTransactor(xa: Transactor[IO]): Tx = new Tx:
+    def run[E, A](program: ConnectionIO[Either[E, A]]): IO[Either[E, A]] =
+      program
+        .flatMap:
+          case left @ Left(_) => FC.rollback.as(left)
+          case right          => FC.pure(right)
+        .transact(xa)
+  // 合成子（ConnectionIO のまま ROLLBACK を足す関数）は公開しない。二重のシグネチャ（クラスとオブジェクトの run）は持たない（L4）
 
 final case class Committed[A](value: A, notices: List[VersionNotice])   // 通知を戻り値で運ぶ（H5）
 
@@ -253,21 +287,31 @@ object Execute:
         case Right(Nil)    => FC.pure(Right(read.version))     // 空の列は追記しない
         case Right(events) => store.append(read.version, events)
 
-  /** program は、認証 → 認可の前提検査 → 冪等記録の照合 → step → 投影 → 周辺ストア → 通知の収集 → 冪等記録の保存、を 1 つにした ConnectionIO */
+  /** program は、認証 → 認可の前提検査 → 冪等記録の照合 → step → 投影 → 周辺ストア → 冪等記録の保存、を 1 つにした ConnectionIO。
+    * 通知の enqueue は program の中で呼ばない。execute が、Right(committed) のときに、同じトランザクションの中で呼ぶ（通知の出所は 1 つ。M4） */
   def execute[A](gameId: GameId)(program: ConnectionIO[Either[AppFailure, Committed[A]]]): App[Either[AppFailure, A]] =
     Kleisli: ports =>
+      val inTx: ConnectionIO[Either[AppFailure, Committed[A]]] =
+        ports.lock.withShared(gameId)(program).flatMap:
+          case Right(committed) => ports.notifier.enqueue(committed.notices).as(Right(committed))   // PostgreSQL 版: pg_notify。H2 版: 何もしない
+          case left             => FC.pure(left)
       def loop(attempt: Int): IO[Either[AppFailure, A]] =
-        ports.tx.run(program).flatMap:
+        ports.tx.run(inTx).flatMap:        // ロックは試行ごとに取り直す（トランザクションのロック。ROLLBACK で外れる）
           case Right(committed) =>
-            // COMMIT の後。配信の失敗は握りつぶして記録し、成功の応答を返す（コミット済みのため）
-            ports.notifier.deliver(committed.notices).handleError(_ => ()).as(Right(committed.value))
+            // COMMIT の後。配信の失敗は成功の応答を変えないが、捨てずにログに記録する（L4。コミット済みのため応答は成功）
+            ports.notifier
+              .deliver(committed.notices)
+              .handleErrorWith(e => ports.logSink.write(deliverFailedLog(gameId, e)).handleError(_ => ()))
+              .as(Right(committed.value))
           case Left(AppFailure.ConcurrencyConflict) if attempt < ports.maxAttempts => loop(attempt + 1)
           case Left(AppFailure.ConcurrencyConflict)                                 => IO.pure(Left(AppFailure.RetryExhausted))
           case Left(other)                                                          => IO.pure(Left(other))
-      ports.lock.shared(gameId).use(_ => loop(1))      // ロックは transact の外。再試行のあいだも持ち続ける
+      loop(1)
 ```
 
-上のコードは、**型検査していません**（旧案の `execute` は、コンパイルが通ることだけを確認した。K2）。次の 5 つの性質は、**テストを書いて B1 で確かめる**（Rust 版が型検査とテストで確かめたものに対応）。(1) 成功は COMMIT だけで、ROLLBACK しない。(2) 競合が 2 回続いても、再試行して成功する。(3) 競合が上限まで続くと、すべて ROLLBACK して `RetryExhausted` を返す。(4) 業務の失敗（`handle` が `Left`）は、ROLLBACK して、再試行も追記もしない。(5) ロールバックした試行の通知は配信されず、COMMIT の後にだけ配信される。**`Left` を返しても COMMIT されること、`FC.rollback` が書き込みを残さないことは、実 DB で確認した**（K5）。**ロールバックの後に同じ `ConnectionIO` で書き込みが続くとどうなるか、`Tx.run` 全体の実行、`Resource` のロックは未確認**（K5・K6・K10）。
+**通知の出所は 1 つ（再レビュー M4。AI の案）**: 前回は、PostgreSQL 版の `enqueue` を `program` の中で呼び、H2 版は `Committed.notices` から出る、と読めた（ローカルでだけ通る乖離になる）。**両方の実装で、`execute` が `Right(committed)` のときに `notifier.enqueue(committed.notices)` を呼ぶ**（`Tx.run` の中。`Left` のときは呼ばず、`Tx.run` が ROLLBACK するので `pg_notify` も残らない）。PostgreSQL 版の `enqueue` は `pg_notify`（同じトランザクション）、H2 版の `enqueue` は何もせず、`deliver` がプロセス内のイベントへ配る。`deliver` は COMMIT の後に 1 回だけ呼ぶ。**`deliver` の失敗は握りつぶさず、`LogSink` に記録する**（`LogSink.write` 自体の失敗だけを捨てる。ガイド §7.8）。テストにする（L4）: `deliver` が失敗しても応答は成功で、ログに失敗の記録が 1 件残る。
+
+上のコードは、**型検査していません**（旧案の `execute` は、コンパイルが通ることだけを確認した。K2。`deliverFailedLog` は未定義のスケッチ）。次の 6 つの性質は、**テストを書いて B1 で確かめる**（Rust 版が型検査とテストで確かめたものに対応）。(1) 成功は COMMIT だけで、ROLLBACK しない。(2) 競合が 2 回続いても、再試行して成功する。(3) 競合が上限まで続くと、すべて ROLLBACK して `RetryExhausted` を返す。(4) 業務の失敗（`handle` が `Left`）は、ROLLBACK して、再試行も追記もしない。(5) ロールバックした試行の通知は配信されず（`enqueue` も呼ばれない）、COMMIT の後にだけ配信される。(6) `deliver` が失敗しても成功の応答を返し、失敗をログに記録する。**`Left` を返しても COMMIT されること、`FC.rollback` が書き込みを残さないことは、実 DB で確認した**（K5）。**ロールバックの後に同じ `ConnectionIO` で書き込みが続くとどうなるか、`Tx.run` 全体の実行、トランザクションのアドバイザリロックの共有と排他の待ち合いは未確認**（K5・K6・K10）。
 
 **`Ignored` の扱い**: 実際の `step` の再生は `Evolution`（[ドメインモデル](./domain-model.md) の SD2）を畳み込み、**コマンドの経路で `Ignored` が出たら、状態を信用せず `AppFailure.Persistence`（500・相関 ID）で失敗させます**（fail closed）。保存済みの事実を無視した状態で `handle` すると、不変条件が崩れるためです。`StreamRead.version` は、読み込んだイベントの**件数ではなく、`MAX(stream_version)`** とします（追記の期待する版）。上のスケッチは、簡単のため `(S, E) => S` の遷移を使っています。
 
@@ -275,9 +319,12 @@ object Execute:
 
 | 項目 | 内容 |
 | :--- | :--- |
-| 進行役への依頼の文言 | 「このゲームは一時的に操作できません。運用担当が復旧中です。参加者には手元で数量をメモして待つよう伝えてください」 |
+| 進行役への依頼の文言 | 「このゲームは一時的に操作できません。運用担当が復旧中です。**画面の在庫・受注残・今週の入力を控えたうえで**、参加者には手元で数量をメモして待つよう伝えてください」。**判断の期限と次の手**（案の例: 運用担当から 15 分以内に見込みを伝え、立たなければ控えた数字で紙で続ける）は、[運用要件](./operation.md) と揃える（別の担当。AI の案、承認を得ていない）。画面の相関 ID を運営者に伝える（操作を繰り返さない） |
 | 研修中の原則 | **該当するゲームだけを止める**。他のゲームの操作は続ける。手順 A（DB 全体の復元）は、同時進行の最大 15 ゲームの直近の確定も巻き戻すため、**研修の時間帯には行わない** |
-| 防ぐ側 | 「`handle` が作る列は `Ignored` にならない」性質テストの生成器に、**開始後の入れ替えを含める**（[ドメインモデル](./domain-model.md) の H2）。入れ替えを遷移で扱っていないと、入れ替えた時点でそのゲームが止まる |
+| 防ぐ側 | 「`handle` が作る列は `Ignored` にならない」性質テストの生成器に、**開始後の入れ替え、観察者の招待・参加、資格の失効・再発行、復帰を含める**（[ドメインモデル](./domain-model.md) の「遷移の許す組の表」。N-H1）。入れ替えなどを遷移で扱っていないと、入れ替えた時点でそのゲームが止まる |
+| **止まったゲームでも状態取得（読み取り）は返す（N-H7。ユーザーの決定、2026-11-25）** | **要件**: 書き込み（コマンド）が `Persistence`（500）で失敗し続けるゲームでも、**読み取り（`GET /games/{id}/state`・`GET /sessions/{id}/state`・`GET /games/{id}/lobby` など、投影の行から返す経路）は 200 で返す**。研修の現場で、進行役が画面の在庫・受注残・今週の入力を控えて紙で続けられるようにするため（表示まで 500 になると数字が残らない）。読み取りは、投影の行と `projection_checkpoints` を SQL で読む経路で、**イベントの再生をしない**ため、`Ignored` の検査の対象外になる見込み。ただし、**見込みであって実測していない** |
+| B1 の確認項目（N-H7） | (a) `Ignored` を意図的に起こしたゲーム（保存済みのイベント列に、許さない組を入れる）で、書き込みが 500（`type` と相関 ID つき）になり、**書き込みが残らない**。(b) 同じゲームで、読み取りが **200** で、停止の直前の状態（在庫・受注残・今週の入力）を返す。(c) 他のゲームの書き込みと読み取りは通る。(d) `Ignored` の件数のメトリクスが出る。(e) 画面には「サーバーで問題が発生しました」と相関 ID が出る（[UI 設計](./ui-design.md)。別の担当）。**ポーリングの画面は、読み取りが成功し続けるため、止まったことに気づけない**（気づくのは次に操作した人。画面の課題として別の担当が扱う） |
+| 範囲（N-H8。ユーザーの決定） | **U1〜U3 の間は、実際の研修に使わない（検証・事例用）**。止まったゲームの運用（依頼の文言、紙で続ける手順）は、実際の研修に使う前（U4 以降の判断）に、運営者との合意（未決事項）の上で確定する |
 
 要点は Kotlin 版と同じです。
 
@@ -295,12 +342,35 @@ Kotlin 版の `EventStore.transaction` は、ブロックが `Left` を返した
 
 | 案 | 内容 | 評価 |
 | :--- | :--- | :--- |
-| **A（採用の提案。H4 で書き直した AI の案）** | **公開する実行は `Tx.run(program)` だけ**にする。`Left` のときに `FC.rollback` を発行して `transact` までを 1 つにし、コマンドの `ConnectionIO` 全体（ロック以外の、認証 → 認可の前提検査 → 冪等記録の照合 → `step` → 投影 → 周辺ストア → 通知の収集 → 冪等記録の保存）を **1 回の `Tx.run`** で包む。合成子（`rollbackOnLeft` を内側で使う形）は**公開しない**。`.transact(` の直接の呼び出しは、Scalafix の `DisableSyntax.regex` で禁止し、`Tx` のファイルだけ除外する（[技術スタック](./tech-stack.md) の ST4。除外の方法は未確認） | `Left` が COMMIT されない。1 か所で守れる。ROLLBACK の後に書き込みを続ける書き方を、型の上で作れなくする |
+| **A（採用の提案。H4 で書き直した AI の案）** | **公開する実行は `Tx.run(program)` だけ**にする。`Left` のときに `FC.rollback` を発行して `transact` までを 1 つにし、コマンドの `ConnectionIO` 全体（ロック以外の、認証 → 認可の前提検査 → 冪等記録の照合 → `step` → 投影 → 周辺ストア → 通知の収集 → 冪等記録の保存）を **1 回の `Tx.run`** で包む。合成子（`rollbackOnLeft` を内側で使う形）は**公開しない**。`.transact(` の直接の呼び出しは、Scalafix の `DisableSyntax.regex` で禁止し、入口を 1 つのファイルに集める（下の「`.transact(` の入口」。[技術スタック](./tech-stack.md) の ST4。除外の方法は未確認） | `Left` が COMMIT されない。1 か所で守れる。**`Tx.run` の外で書き込みの `transact` を置くと、Scalafix で落ちる**（型の上で作れなくするのではなく、CI の検査で止める。再レビュー N-H3 で「型で作れなくする」は言いすぎとして直した） |
 | A'（旧案。採らない） | `Tx.rollbackOnLeft: ConnectionIO[Either[E, A]] => ConnectionIO[Either[E, A]]` を合成子として公開し、内側で使えるようにする | **合成子のままだと、`FC.rollback` の後に同じ `ConnectionIO` で書き込みが続いたとき、その書き込みが新しいトランザクションとして COMMIT される**（推論。K5）。たとえば冪等記録の保存を `rollbackOnLeft` の外側に置くと、業務の失敗のあとで記録だけが残りうる。コンパイルは通るため、型では防げない |
 | B | 業務の失敗を `IO.raiseError` にして、doobie の既定の ROLLBACK に任せる | 既定の動作で ROLLBACK される。業務の失敗を `IO` の失敗にするため、ガイド ADR-050 に反する |
 | C | `EitherT[ConnectionIO, AppFailure, A]` の `Left` を ROLLBACK に結びつける | 連鎖が書きやすい。ガイドは `EitherT` を試していない。導入の承認が要る |
 
-B1 の最初のスライドで、(1) `Tx.run` 全体を実 PostgreSQL で（`Left` で行が残らない、成功で残る）、(2) `FC.rollback` の後の書き込みがどうなるか（旧案を避ける根拠の確認）、(3) 「`Tx` を通さない `.transact(` を置くと CI が落ちる」ことを確かめ、**(3) を最初のビルドの受入条件に入れます**（前提が成り立たなければ、設計を見直す）。
+B1 の最初のスライドで、(1) `Tx.run` 全体を実 PostgreSQL で（`Left` で行が残らない、成功で残る）、(2) `FC.rollback` の後の書き込みがどうなるか（旧案を避ける根拠の確認）、(3) 「`Tx` を通さない `.transact(` を置くと CI が落ちる」と、「許す入口は落ちない」ことを確かめ、**(3) を最初のビルドの受入条件に入れます**（前提が成り立たなければ、設計を見直す）。
+
+#### `.transact(` の入口（再レビュー N-H3。AI の案、承認を得ていない）
+
+書き込みの `transact` を `Tx.run` に限ると、読み取り・再構築・LISTEN などの正しいコードも `.transact(` を使うため、**禁止の一覧だけでは正しいコードが落ちる**。そこで、**許す入口を一覧にし、すべて同じファイル（`beergame.adapter.persistence.Transactions`）に置いて、Scalafix の除外を 1 か所**にする。
+
+| 入口 | 用途 | 型・使う人 |
+| :--- | :--- | :--- |
+| `Tx`（`Tx.run`） | 書き込み。`Left` で `FC.rollback` | `application` の `trait Tx`（`Ports.tx`）。実装は `Transactions.scala` |
+| `ReadTx` | 読み取り専用の REPEATABLE READ（`projection_checkpoints` と行を同じスナップショットで読む）。`ReadXa`・`ObserverXa` を受け取る | 問い合わせ（`QueryPorts`） |
+| `ModeTx` | `rebuild-projections`・`verify-projections`・retention・migrate の各モードの実行（1 ゲーム 1 トランザクションなど） | `app` の起動モード |
+| `LISTEN` の専用接続 | プールの外の `LISTEN` の接続（`PHC.pgListen` などを動かす）。K11 は同じ接続だけ確認済みで、専用の接続は**未確認** | `ChangeNotifier` の PostgreSQL 版 |
+
+**Scalafix で禁止するもの**（`Transactions.scala` の外）: `.transact(`、`.transact[`（型引数つき）、`xa.trans`、`FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`（`Tx` の実装の外で、ロールバックやコミットを直接書かせない）。**除外に `scalafix:off` は使わない**（[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の 011 の「無効化コメントを使わない」と矛盾する）。**ファイル単位の除外の方法は未確認**（K15。候補: `scalafix` のファイルの除外設定、`Transactions.scala` だけを別の sbt プロジェクトに置いて、その設定だけ緩める）。
+
+**受入条件は、2 方向の表**にする（B1 の最初のビルド）。
+
+| 方向 | 例 | 期待 |
+| :--- | :--- | :--- |
+| 落ちるべき | `application`・`adapter-http` に `.transact(xa)`、`xa.trans`、`.transact[IO](xa)`（型引数つき）、`FC.rollback` を置く | `scalafix --check` が失敗 |
+| 落ちてはならない | `Transactions.scala` の 4 つの入口の実装。コメントや文字列の中の語は、文字列のパターンの限界として**落ちる可能性がある**（ガイド §9.4）ので、除外の対象の確認も受入に含める | 通る |
+| 落ちてはならない（未確認） | テストのソース（`Test`）の `.transact(`（スタブの `Connection` の検証。K6）。**`Test / scalafix` の対象にするかは未確認**で、K15 は `Compile` だけ確認した | 対象にしない案 |
+
+禁止の穴（別名での呼び出し、`import` の別名）は、文字列のパターンの限界として**残る**。ガイド §9.4 のとおり、レビューで補う。
 
 ### ポートの型に ConnectionIO を使う（設計判断 SBD3）
 
@@ -313,6 +383,15 @@ Kotlin 版は、`Tx` を引数で明示し、ポートの関数は `suspend (Tx,
 | C | ポートは `IO` を返し、トランザクションの合成は `adapter-persistence` の内部に閉じる | `application` が単純。複数のポートの呼び出しを 1 つのトランザクションにまとめられない |
 
 トレードオフ: A は、`application` が `doobie-core` に依存します（`ConnectionIO` の型だけ）。ドメインの純粋性は守られます。A の費用（インメモリ実装にも `Transactor` が要る）と B の費用（自前の `Tx[A]` の保守）の比較は、B1 の最初のスライドで、インメモリ実装を実際に書いて確かめます（AI の案。承認を得ていない）。
+
+#### インメモリ実装の契約（再レビュー M6。AI の案、承認を得ていない）
+
+インメモリ実装は、`ConnectionIO` の中で**可変の状態**（`Ref` や可変の `Map`）を書く。**`FC.rollback` は JDBC の接続のトランザクションを取り消すだけで、可変の状態は取り消さない**ため、「`Left` で書き込みが残らない」を、インメモリ実装のポートの単体では満たせない。次の 2 つで扱う。
+
+1. **契約の条項を 2 つに分ける**。(T) **トランザクションの意味に依存する条項**（`Left` で書き込みが残らない、23505 の後の規則、COMMIT の後にだけ通知が届く、ロックが COMMIT まで続く）と、(N) 依存しない条項（追記の版の一意性の検査、読み出しの順序、`MAX(stream_version)` など）。(N) は 3 つの実装（PostgreSQL 版、H2 版、インメモリ）で同じ内容を実行する。**(T) は、ポート単体でなく `execute` と `Tx.run` を通して**確かめる（M8）。
+2. **インメモリ実装は、試行単位でバッファする**: インメモリの `Tx` の実装は、`run` の前に状態の**スナップショット**を取り、`Left` と失敗のときに**復元**し、`Right` のときだけ確定する。これで (T) の「`Left` で残らない」を、インメモリ実装も `Tx` を通して満たす。**限界**: スナップショットの復元は、同時に複数の書き込みが走ると壊れる（単一の書き込みを前提とする）。同時実行の競合（`ConcurrencyConflict`）の検証は、PostgreSQL の統合テストで行い、インメモリ実装には求めない。可変の状態を使うのは**テスト用のソースだけ**（WartRemover の対象外。K17）。
+
+どちらも**未実装・未検証**で、B1 の最初のスライドで、インメモリ実装を書いて (T) の条項が通ることを確かめる。
 
 ### キャンセル安全性（設計判断 SBD4）
 
@@ -358,7 +437,7 @@ Scala 版の実現として、**用途別に `HikariTransactor`（`Resource`）�
 
 ### 投影の更新と再構築
 
-投影は、`Projection`（純粋。`Event => List[RowChange]`）と、SQL への書き込み（境界）に分けます（[ドメインモデル](./domain-model.md)）。再構築は `rebuild-projections` モードで、**1 ゲームを 1 トランザクション**で、排他のロック（`ProjectionLock.exclusive`）を取って行います。コマンドは共有のロック（`ProjectionLock.shared`）を取るため、再構築と同時には走りません。**ロックは `transact` の外の `Resource[IO, Unit]`**（H5 の案。上の「依存を表す」）で、PostgreSQL 版は、ロックを取る専用の接続で SQL を直接発行します（`fr"select pg_advisory_lock_shared($key)"` など。解放は `pg_advisory_unlock`）。**`ConnectionIO` の中で `pg_advisory_xact_lock(_shared)` を実行できることは確認済み**（K10。2026-11-25）ですが、**トランザクションの外のセッションのロックとして取り、`Resource` の解放で外し、接続が切れたときに解放されることは未確認**で、B1 の最初に確かめます。確かめた結果、`Resource` の形が成り立たなければ、`ConnectionIO` の中で取る形（旧案）に戻し、H2 版のロックの型を合わせ直します。
+投影は、`Projection`（純粋。`Event => List[RowChange]`）と、SQL への書き込み（境界）に分けます（[ドメインモデル](./domain-model.md)）。再構築は `rebuild-projections` モードで、**1 ゲームを 1 トランザクション**で、排他のロック（`ProjectionLock.withExclusive`）を先頭で取って行います。コマンドは共有のロック（`ProjectionLock.withShared`）を取るため、再構築と同時には走りません。**ロックは `ConnectionIO` の変換**（再レビュー N-H2 の案。上の「ProjectionLock の接続の出所」）で、PostgreSQL 版は、トランザクションの先頭で `pg_advisory_xact_lock(_shared)` を実行します（COMMIT・ROLLBACK で自動的に外れる。接続は増えない）。**`ConnectionIO` として `pg_advisory_xact_lock(_shared)` を実行できることは確認済み**（K10。2026-11-25）ですが、**共有と排他の待ち合い、再構築（排他）の実測、`lock_timeout` の効き方は未確認**で、B1 の最初に確かめます。前回の「`transact` の外の `Resource` のセッションのロック」は、接続が 2 本要ることと、解放の失敗が接続に残ることから採りません。
 
 再生に関する 3 つの性質（永続化往復の同値性、計算と事実の一致、投影の整合）と、検証の場は、[ドメインモデル](./domain-model.md) と Kotlin 版のとおりです。
 
@@ -398,7 +477,7 @@ Kotlin 版と同じです。自動確定のための処理はアプリケーシ�
 
 ## 通知（SSE）
 
-仕様は Kotlin 版を引き継ぎます。**版の通知だけ**を送り（`state-version`。ストリームの種別と版）、内容は運びません。再生（`Last-Event-ID`）は行わず、接続の開始と再接続のたびに、クライアントがスナップショットを取得します。発信は、追記と**同じトランザクション**で `ChangeNotifier.enqueue` を呼んで通知を集め（PostgreSQL 版は中で `pg_notify`。コミットされたときだけ届く）、`Tx.run` の後に `ChangeNotifier.deliver` で配信します（H5 の案。`execute` の戻り値の `Committed.notices` が運ぶ。H2 版は `deliver` がプロセス内のイベントへ配る）。
+仕様は Kotlin 版を引き継ぎます。**版の通知だけ**を送り（`state-version`。ストリームの種別と版）、内容は運びません。再生（`Last-Event-ID`）は行わず、接続の開始と再接続のたびに、クライアントがスナップショットを取得します。発信は、追記と**同じトランザクション**で、**`execute` が** `program` の `Right(committed)` のときに `ChangeNotifier.enqueue(committed.notices)` を呼んで通知を集め（PostgreSQL 版は中で `pg_notify`。コミットされたときだけ届く）、`Tx.run` の後に `ChangeNotifier.deliver` で配信します（H5・M4 の案。通知の出所は `execute` の 1 つ。H2 版は `enqueue` が何もせず、`deliver` がプロセス内のイベントへ配る）。
 
 | 項目 | Scala 版の設計（スケッチ。確認状況は [一覧](./tech-stack.md#確認状況の一覧) の K11） |
 | :--- | :--- |
@@ -457,7 +536,7 @@ Kotlin 版の表を引き継ぎます（資格は 256 ビットの乱数とダ�
 
 | ポート | PostgreSQL 版（統合テスト・CI・ステージング・本番） | H2 版（ローカルのみ） | 契約テスト |
 | :--- | :--- | :--- | :--- |
-| `ProjectionLock`（`GameId => Resource[IO, Unit]` の共有・排他） | **`transact` の外の `Resource`**。ロックを取る専用の接続で `pg_advisory_lock(_shared)` を取り、解放で `pg_advisory_unlock`（セッションのロックは**未確認**。K10。確認済みなのは `ConnectionIO` の中の `pg_advisory_xact_lock(_shared)`） | **プロセス内の読み書きロック**を `Resource` に包む（単一プロセスでのみ有効。複数のプロセスでは保証しない） | **同じ型**で、両実装に同じ契約テストを実行する |
+| `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[A] => ConnectionIO[A]` の変換。N-H2） | トランザクションの先頭で `pg_advisory_xact_lock(_shared)`（同じ接続。COMMIT・ROLLBACK で外れる。`ConnectionIO` として実行できることは確認済み。K10。共有と排他の待ち合いは**未確認**） | **プロセス内の読み書きロック**を `ConnectionIO` の `bracket` で包む（単一プロセスでのみ有効。複数のプロセスでは保証しない。**解放は COMMIT の前**で、PostgreSQL 版より弱い） | **同じ型**で、両実装に同じ契約テストを実行する（「COMMIT の後まで直列化する」条項は PostgreSQL 版だけ） |
 | `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`） | `enqueue` は中で `pg_notify`（追記と同じトランザクション）。`deliver` は何もしない（`LISTEN` 専用の接続（プールの外）が受信して配る。K11） | `enqueue` は何もしない。`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効） | **同じ型**で、両実装に同じ契約テストを実行する |
 
 H2 版と PostgreSQL 版が同じ型であること（H5 の案）が、契約テストを同じ内容で流せる条件です。**B1 の最初に、両実装を実際に書いて実測し、型を確定します**（承認を得ていません）。
@@ -465,7 +544,7 @@ H2 版と PostgreSQL 版が同じ型であること（H5 の案）が、契約�
 - **ポートは両実装で維持します。** 動機（PostgreSQL 固有の機能を隠す）と、契約テストの考え方は言語に依存しません。ポートは、関数を持つ `case class` の `IO` / `ConnectionIO` の値で、実装を差し替えます。
 - **テスト用のインメモリ実装との関係**: 既存のテスト用のインメモリ実装（ドメイン・アプリケーションの受け入れで使う関数値の経路）と、H2 版の本体の実装は**別のもの**です。H2 版は、DB（H2）に接続する経路の実装であり、インメモリ実装は DB を使わない。ただし、**ロックと通知のプロセス内の実装は共通の部品を使える**（プロセス内の読み書きロックと `Topic`。共通化するかは B1 で決める）。契約テストは、PostgreSQL 版、H2 版、インメモリ実装の 3 つで同じ内容を実行する。
 - **実行する DB の選択**: 設定 `DB_KIND=postgres|h2`（既定は `postgres`）で選び、`app` が組み立てる（`Transactor`・`ProjectionLock`・`ChangeNotifier` と、マイグレーションの場所）。**H2 版でも `Left` の明示 ROLLBACK（`Tx.run`。SBD2）は同じ**にします（`Tx.run` は DB に依らない見込みですが、H2 での動作は未確認。K21）。
-- **本番・ステージングでの H2 の拒否**（許可リスト方式。`APP_ENV` × `DB_KIND`）: `AppConfig.load` が、**`APP_ENV` が本番・ステージングのとき `DB_KIND=h2` を拒否し、起動に失敗する**（`ValidatedNec` の設定の誤りとして、足りない設定と同じ経路で終了する）。環境ごとの全組み合わせを単体テストで確かめる（[インフラ](./architecture-infrastructure.md)）。**H2 は本番イメージに含めない**ため、H2 のドライバの欠落でも、本番・ステージングでは起動が失敗する（二重の防御）。
+- **本番・ステージングでの H2 の拒否**（許可リスト方式。`APP_ENV` × `DB_KIND`）: `AppConfig.load` が、**`APP_ENV` が本番・ステージングのとき `DB_KIND=h2` を拒否し、起動に失敗する**（`ValidatedNec` の設定の誤りとして、足りない設定と同じ経路で終了する）。**`DB_KIND` だけでなく、JDBC URL の `jdbc:h2:` も検査して拒否する**（設定の組み合わせの誤りで、`DB_KIND=postgres` のまま H2 の URL が渡る場合を止める。L3。[インフラストラクチャ](./architecture-infrastructure.md) の検査と揃える）。E2E のためにレート制限をゆるめる設定（TS 版の `AUTH_RATE_LIMIT_PER_MINUTE` に当たるもの）も、**本番・ステージングでは既定の値以外を拒否する**（SF2 に含める案）。環境ごとの全組み合わせを単体テストで確かめる（[インフラ](./architecture-infrastructure.md)）。**H2 は本番イメージに含めない**ため、H2 のドライバの欠落でも、本番・ステージングでは起動が失敗する（二重の防御）。
 - **乖離への対策**: (a) H2 でしか通らない記述を禁止し、PostgreSQL の統合テストを正とする、(b) ポートの契約テストを両実装で実行する、(c) 受け入れは PostgreSQL で実行する（[データモデル](./data-model.md)「乖離のリスクと対策」、[テスト戦略](./test-strategy.md)）。
 - **ローカルで守られない制約**（H2 版）: `uq_idempotency_create`、追記専用、DB ロールとプールの分離、複数プロセスの直列化と通知、分離レベルによる一貫した読み取り（[データモデル](./data-model.md) の 7 項目）。冪等記録の重複は、H2 版ではアプリ側で挿入前に `(scope, key_digest)` を検索して `ConcurrencyConflict` を返す（Kotlin 版と同じ方針）。
 - **SQLSTATE の写像**: PostgreSQL 版は `PSQLException` から制約名を取る。H2 版は、メッセージ中の制約名（大文字小文字を区別せず）で写し、`AppFailure.Persistence` にメッセージを載せない。**doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認**（B1 で実測）。
@@ -516,7 +595,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | BD1 | 層の依存を Gradle のモジュールと関数型規約の検査で守る | **変更**: sbt のプロジェクトと、WartRemover・Scalafix で守る |
 | BD2 | 依存を関数の束（`typealias`・`data class`）で表す | **引き継ぐ**（関数を持つ `case class`。文脈は `Kleisli`。SBD1） |
 | BD3 | 永続化は JDBC の直接の SQL（ORM なし） | **変更**: doobie の直接の SQL（ORM なし。`ConnectionIO`。SBD3） |
-| BD4 | HTTP の枠組みは Ktor | **変更**: http4s（ユーザーの決定。ST2。SBD6） |
+| BD4 | HTTP の枠組みは Ktor | **変更**: http4s（作成計画の承認から導かれた道具の系列。具体的な版 0.23.39 の選定は AI の案。ST2。SBD6。M16） |
 | BD5 | イベントの JSON 変換は `adapter-persistence` に置き、ドメインに注釈を付けない | **引き継ぐ**（circe の DTO。ドメインに codec を付けない） |
 | BD6 | 同期投影の競合を、ロックの順序の規則で避ける | **引き継ぐ**（`FOR UPDATE` を残すかは、Kotlin 版でも未決） |
 | BD7 | 競合の再試行を `execute` に置く | **引き継ぐ**（コンパイルを確認したスケッチ） |
@@ -533,7 +612,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | ID | 判断 | 記録先 |
 | :--- | :--- | :--- |
 | SBD1 | ポートは関数を持つ `case class`、文脈は `Kleisli`。タグレスファイナルと `IOLocal` は採らない | 上の「依存を表す」 |
-| SBD2 | `Left` を返す経路は ROLLBACK を明示する。公開する実行は `Tx.run` だけで、コマンド全体を 1 回で包む。`.transact(` の直接の呼び出しは Scalafix で禁止（H4。AI の案）。doobie は `Left` でも COMMIT する（確認済み。K5） | 上の「トランザクションと Left の ROLLBACK」 |
+| SBD2 | `Left` を返す経路は ROLLBACK を明示する。公開する書き込みの実行は `Tx.run` だけで、コマンド全体を 1 回で包む。`.transact(` は許す入口の一覧（`Tx`・`ReadTx`・`ModeTx`・`LISTEN` の専用接続）を 1 つのファイルに集め、その外を Scalafix で禁止（H4・N-H3。AI の案）。doobie は `Left` でも COMMIT する（確認済み。K5） | 上の「トランザクションと Left の ROLLBACK」 |
 | SBD3 | ポートの戻り値に `ConnectionIO` を使う。`application` が `doobie-core` に依存する | 上の「ポートの型に ConnectionIO を使う」 |
 | SBD4 | `execute` は `Supervisor` で切り離して起動し、ルートは完了を待つ。シャットダウンで追跡した `Fiber` を待つ | 上の「キャンセル安全性」 |
 | SBD5 | `IO` を実行する場所は `IOApp`（`app`）とテストの境界だけ。それ以外のコードは `IO` の値を組み立てるだけ。後始末は `Resource`（プール、`Supervisor`、サーバー） | 下 |
@@ -561,11 +640,11 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 
 | # | beer-game-kotlin | beer-game-scala | 理由 |
 | :--- | :--- | :--- | :--- |
-| 1 | Ktor | http4s | ユーザーの決定 |
+| 1 | Ktor | http4s | 作成計画の承認（ガイド準拠）から導かれた道具の系列。版の選定は AI の案（M16） |
 | 2 | Gradle のモジュール、detekt・PMD の検査 | sbt のプロジェクト、WartRemover・Scalafix・scalac のオプション | 言語・ツールの違い |
 | 3 | 関数の束（`typealias`・`data class`）、`suspend` が副作用の型 | 関数を持つ `case class`、`IO`・`ConnectionIO` の値、`Kleisli`（SBD1） | 言語の違い |
 | 4 | `Either` と `Raise`、`AppFailure` は `sealed interface` | `Either` と `for`、`AppFailure` は `enum`（`match` の網羅） | 標準で足りる |
-| 5 | ブロックが `Left` を返したら ROLLBACK | `Tx.run` が `FC.rollback` で明示し、コマンド全体を 1 回で包む。`.transact(` の直接の呼び出しは禁止（SBD2。H4） | doobie は `Left` でも COMMIT する（確認済み。K5） |
+| 5 | ブロックが `Left` を返したら ROLLBACK | `Tx.run` が `FC.rollback` で明示し、コマンド全体を 1 回で包む。`.transact(` は許す入口の一覧（`Transactions.scala`）の外で禁止（SBD2。H4・N-H3） | doobie は `Left` でも COMMIT する（確認済み。K5） |
 | 6 | `NonCancellable` と `CancellationException` の再送出 | `Supervisor` で切り離し、ROLLBACK を明示（SBD4） | キャンセルの意味が違う |
 | 7 | `Dispatchers.IO` にブロッキング I/O を閉じ込める | doobie は `IO` の中で JDBC を `blocker` の実行コンテキストで動かす（既定。**詳細は要確認**） | JDBC の扱いが違う |
 | 8 | `SharedFlow` と `Flow` による SSE の配信 | fs2 の `Stream[IO, A]` と `Topic`（SBD9） | 言語の違い |
@@ -574,7 +653,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | 11 | `LogRecord` と Logback | `LogRecord` と `LogSink`（ガイド §7.8）、フレームワークのログは Logback | ガイドに合わせる |
 | 12 | Cucumber-JVM の `acceptanceTest` | `acceptance` プロジェクト（cucumber-scala + 関数値の経路。`sbt test` に載せない） | ST7 |
 | 13 | `Ports` は 1 つのストリームの `store` と 1 つの `Transactor` | `Ports` は `gameStore`・`sessionStore` と書き込みの `Tx`。読み取り・観察者の `Transactor` は `ReadXa`・`ObserverXa` の別の型（M1。AI の案） | `StartGame` と開始後の入れ替えは 2 ストリームに書く。観察者の分離（NF-S18）を型で守る |
-| 14 | `ProjectionLock` は `Tx` の中の呼び出し、`ChangeNotifier.publish` は同じトランザクション内 | `ProjectionLock` は `transact` の外の `Resource`。`ChangeNotifier` は `enqueue`（中）と `deliver`（`Tx.run` の後）（H5。AI の案） | H2 版と PostgreSQL 版を同じ型にし、同じ契約テストを流す |
+| 14 | `ProjectionLock` は `Tx` の中の呼び出し、`ChangeNotifier.publish` は同じトランザクション内 | `ProjectionLock` は `ConnectionIO` の変換（`withShared`・`withExclusive`。PostgreSQL 版は先頭の `pg_advisory_xact_lock(_shared)`、H2 版は `bracket`）。`ChangeNotifier` は `enqueue`（`execute` が中で呼ぶ）と `deliver`（`Tx.run` の後。失敗はログに記録）（H5・N-H2・M4。AI の案。前回の `Resource` 案は不採用） | H2 版と PostgreSQL 版を同じ型にし、同じ契約テストを流す。接続を増やさない |
 | 15 | 一意制約違反の後の扱いは、H2 でも通る書き方がありうる | 23505 の後は同じ `ConnectionIO` で次の文を発行しない（M2。AI の案） | PostgreSQL は 25P02 で中断し、H2 は中断しない |
 | 16 | 不正な遷移は状態を変えず記録して続行 | コマンドの経路で `Ignored` が出たら `Persistence`（500）で止める。**利用者に見える変更**。運用は「コマンド処理の流れ」の「`Ignored` で止めること」（H3。止める設計はユーザーの決定、2026-11-25） | 安全側に倒す。止まるゲームの扱いを運用で定める |
 
@@ -582,12 +661,12 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 
 ## 前提と見直しの条件
 
-- **前提**: (1) doobie 1.0.0-RC12 が、`ConnectionIO` の ROLLBACK（`FC.rollback`）、PostgreSQL のアドバイザリロック（SQL の直接の発行）、`LISTEN/NOTIFY`（`doobie-postgres`）、制約名つきのエラーを扱える（**同じ接続での確認は済み**。K5・K8・K10・K11）。**未確認**: ロックを `transact` の外のセッションのロックとして取ること、専用の接続の `LISTEN`、`HikariTransactor`（K10・K11・K19）。(2) http4s 0.23.39 の ember が SSE を提供し、切断時とシャットダウン時の挙動が設計に合う。(3) `Supervisor` で切り離した `Fiber` が、ルートの取消後も完了する。いずれも B1 で確認する。
+- **前提**: (1) doobie 1.0.0-RC12 が、`ConnectionIO` の ROLLBACK（`FC.rollback`）、PostgreSQL のアドバイザリロック（SQL の直接の発行）、`LISTEN/NOTIFY`（`doobie-postgres`）、制約名つきのエラーを扱える（**同じ接続での確認は済み**。K5・K8・K10・K11）。**未確認**: トランザクションのアドバイザリロックの共有と排他の待ち合い（`lock_timeout` を含む）、専用の接続の `LISTEN`、`HikariTransactor`（K10・K11・K19）。(2) http4s 0.23.39 の ember が SSE を提供し、切断時とシャットダウン時の挙動が設計に合う。(3) `Supervisor` で切り離した `Fiber` が、ルートの取消後も完了する。いずれも B1 で確認する。
 - **見直しの条件**: 上の前提のどれかが成り立たない場合は、SBD2〜SBD4・SBD9、SSE の設計、`ProjectionLock` と `ChangeNotifier` の実装を見直す。1 ストリームの再生が千件を大きく超える場合は、スナップショットを検討する（ADR-003）。
 
 ## 未決事項
 
-1. **doobie の機能の確認**（B1）: `Left` での COMMIT と `FC.rollback` の効果、制約名の取得、`ConnectionIO` の中のアドバイザリロックと同じ接続の `LISTEN/NOTIFY` は確認済み（K5・K8・K10・K11）。**残り**: `FC.rollback` の後の書き込みの扱い、`Tx.run` 全体、セッションのアドバイザリロックの `Resource`、専用の接続の `LISTEN`、キャンセル時の ROLLBACK、`HikariTransactor`、マイグレーション（Flyway）との連携。**`ProjectionLock` と `ChangeNotifier` の型（H5）は、B1 の最初に実測して確定する。**
+1. **doobie の機能の確認**（B1）: `Left` での COMMIT と `FC.rollback` の効果、制約名の取得、`ConnectionIO` の中のアドバイザリロックと同じ接続の `LISTEN/NOTIFY` は確認済み（K5・K8・K10・K11）。**残り**: `FC.rollback` の後の書き込みの扱い、`Tx.run` 全体、トランザクションのアドバイザリロックの共有と排他の待ち合いと `lock_timeout`（N-H2）、専用の接続の `LISTEN`、キャンセル時の ROLLBACK、`HikariTransactor`、マイグレーション（Flyway）との連携。**`ProjectionLock` と `ChangeNotifier` の型（H5・N-H2）は、B1 の最初に実測して確定する。** H2 版の `bracket` の解放が COMMIT の前になる弱さ（上）を許容するかも、そこで決める。
 2. **http4s の ember の確認**: ミドルウェアの名前、SSE の API、切断時のハンドラの取消、シャットダウンの待ち方。
 3. **SBD1〜SBD11 の承認**: 人の承認を得る。特に SBD2（`Left` の ROLLBACK）、SBD3（`application` が `doobie-core` に依存）、SBD4（`Supervisor`）。
 4. **`Supervisor` の使い方**: `await` の指定、タスクの数の上限、待ちの上限（`stopTimeout` より短く）。**値は実測で決める。**
@@ -595,7 +674,7 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 6. **`lock_timeout` の初期値**、**プール取得のタイムアウト**の値、**同時に走るコマンドの数の上限**。
 7. **暗号化と乱数**: 応答の暗号化（AES-256-GCM）に JDK の `javax.crypto` で足りるか。外部ライブラリを足す場合は承認が要る。
 8. **統合のエラー型**（`DomainError`）と `Projection` の `DomainEvent`: B1 の最初のスライドで決める（[ドメインモデル](./domain-model.md) の未決事項 3）。
-9. **依存の検査の方式**: sbt のタスクか、Scalafix の `DisableSyntax.regex` か。`.transact(` の直接の呼び出しを禁止して `Tx` 経由に限る方式（`Tx` のファイルだけ除外）も同じ検査の仕組みで行えるか。**「`Tx` を通さない `.transact(` を置くと CI が落ちる」を、最初のビルドの受入条件にする**（H4。AI の案）。
+9. **依存の検査の方式**: sbt のタスクか、Scalafix の `DisableSyntax.regex` か。`.transact(`・`.transact[`・`xa.trans`・`FC`/`HC` の `commit`・`rollback` の禁止と、`Transactions.scala` だけの除外（`scalafix:off` は使わない）も同じ検査の仕組みで行えるか。**「`Tx` を通さない `.transact(` を置くと CI が落ちる」と「許す入口は落ちない」を、最初のビルドの受入条件にする**（H4・N-H3。AI の案。2 方向の表は SBD2 の節）。
 10. **ログ**: フレームワークのログを JSON にするか。JVM のヒープ・GC の指標の採否。
 11. **Kotlin 版の未決事項の引き継ぎ**: 投影の再構築中のコマンドの応答（短い待ちか、すぐ 503 か）、`FOR UPDATE` の要否、再試行の間の待ち（ジッター）、観察者への開示、SSE の心拍の間隔、`app` のモードの環境変数の名前。いずれも [Kotlin 版の未決事項](../beer-game-kotlin/architecture-backend.md) に追従する。
 
@@ -613,6 +692,25 @@ Kotlin 版と同じ対応です（整合性は版の一意制約と 1 トラン�
 | M2 | 「冪等性と競合の再試行」の「23505 の後の規則」、変更表の 15 | AI の案 |
 | M3 | 「ポートの型に ConnectionIO を使う」（SBD3）の評価表に、案 A・B の費用を追記 | AI の案 |
 | L2・L3 | 層の表の `app` のモード（`verify-projections`）、`PersistenceFailure` を `AppFailure.Persistence` に | 直した |
+
+### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
+
+**ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけ**です。**N-H1・N-H2・N-H3・N-H5 の直し方など、これら以外は AI の案で、承認を得ていません。**
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| N-H2 | 「依存を表す」の `ProjectionLock`（`ConnectionIO` の変換）と新設の「ProjectionLock の接続の出所と見積もり」（`Resource` 案を不採用の比較に）、「コマンド処理の流れ」の図と `execute`、「投影の更新と再構築」、「ローカル開発」の表、変更表の 14、未決事項 1 | AI の案。型検査・実行していない。共有と排他の待ち合いは未確認 |
+| N-H3 | SBD2 の案 A の表現（「型で作れなくする」を「`Tx.run` の外で書き込みの `transact` を置くと Scalafix で落ちる」に）、新設の「`.transact(` の入口」（許す入口の一覧、禁止、2 方向の受入条件）、`Tx` を `application` の trait と `Transactions.scala` の実装に分けた形、変更表の 5、未決事項 9 | AI の案。除外の方法は未確認 |
+| N-H5 | 「本書の位置づけと確認の範囲」に正本の規則 | AI の案 |
+| N-H7 | 「コマンド処理の流れ」の「`Ignored` で止めること」に、止まったゲームでも読み取りは返す要件と B1 の確認項目 | ユーザーの決定（読み取りは返す）。確認は B1 |
+| N-H8 | 同じ表の「範囲」の行（U1〜U3 の間は実際の研修に使わない） | ユーザーの決定 |
+| N-H1 | 防ぐ側の行に、入れ替え・観察者・資格・復帰を含める生成器 | [ドメインモデル](./domain-model.md) に主な記述 |
+| M4 | `execute`（`Right(committed)` のとき `enqueue`。`deliver` は COMMIT の後）、「通知（SSE）」 | AI の案。型検査していない |
+| M6 | SBD3 の後の「インメモリ実装の契約」（条項の分類と、試行単位のスナップショット） | AI の案。未実装 |
+| M16 | BD4 と変更表の 1（http4s は作成計画から導かれた系列。版の選定は AI の案） | 直した |
+| L3 | 「ローカル開発」の H2 の拒否に JDBC URL の `jdbc:h2:` とレート制限の設定 | 直した |
+| L4 | `Ports` の旧形と新形、`Tx` の二重のシグネチャ、`deliver` の失敗をログに記録、`LogSink` を `Ports` に | AI の案 |
+| L9 | `ReadXa`・`ObserverXa` が守るのは取り違えの一部（`SELECT current_user` の配線テストで守る） | 直した |
 
 ## 出典
 
