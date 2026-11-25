@@ -157,7 +157,7 @@ Kotlin 版の構成要素の表（CloudFront、ALB、API サービス、保持�
 
 | 環境 | 用途 | デプロイ | Terraform の状態 |
 | :--- | :--- | :--- | :--- |
-| ローカル | 開発・確認 | バックエンドは sbt で起動、フロントエンドは Vite（`/api` をプロキシ）。**DB は H2 の PostgreSQL モード（Docker 不要。ST9）**。PostgreSQL を使う場合は Docker の PostgreSQL 18 を選べる（`DB_KIND`）。開発環境は `nix develop .#scala` | — |
+| ローカル | 開発・確認 | バックエンドは sbt で起動、フロントエンドは Vite（`/api` をプロキシ）。**DB は H2 の PostgreSQL モード（Docker 不要。ST9）**。PostgreSQL を使う場合は Docker の PostgreSQL 18 を選べる（`DB_KIND=postgres`。`DB_KIND` を持つことは [フロントエンド](./architecture-frontend.md) の未決事項 2 と同じ）。開発環境は `nix develop .#scala` | — |
 | CI | 検証 | GitHub Actions（**PostgreSQL 18** のサービスコンテナと Testcontainers）。統合テストと受け入れ（`@api`）は PostgreSQL で実行 | — |
 | ステージング | 本番前の確認 | main へのマージで自動（ローリング） | 専用 |
 | 本番 | 運用 | 手動の承認後（ブルー/グリーン） | 専用 |
@@ -169,7 +169,8 @@ Kotlin 版の構成要素の表（CloudFront、ALB、API サービス、保持�
 Kotlin 版の「ローカルの開発環境と H2 の拒否」を、Scala 版に読み替えて引き継ぎます（ST9。ユーザーの決定、2026-11-25）。
 
 - **実行する DB は `DB_KIND=postgres|h2`**（既定は `postgres`）で選ぶ。ローカル開発では `h2` を選べる。
-- **本番・ステージングでの H2 の拒否**: `AppConfig.load` が、`APP_ENV` が本番・ステージングのとき `DB_KIND=h2` を**起動前に拒否**し、起動に失敗する（許可リスト方式。足りない設定と同じ終了の経路）。**環境（`local`・`test`・ステージング・本番）× `DB_KIND` の全組み合わせを単体テストで確かめる**。
+- **本番・ステージングでの H2 の拒否**: `AppConfig.load` が、`APP_ENV` が本番・ステージングのとき、**`DB_KIND=h2`、または JDBC の URL（`DB_URL`）が `jdbc:h2:` で始まる設定**を**起動前に拒否**し、起動に失敗する（許可リスト方式。足りない設定と同じ終了の経路。Kotlin 版の同じ検査を引き継ぐ。`DB_KIND` だけの検査では、`DB_KIND=postgres` のまま URL を H2 にした設定を止められない。M4）。**環境（`local`・`test`・ステージング・本番）× `DB_KIND` × URL の種類の全組み合わせを単体テストで確かめる**。Terraform のタスク定義も `DB_KIND=postgres` を固定で渡す案（二重の防御。AWS は未適用）。
+- **H2 は単一プロセスでしか有効でない**（プロセス内のロックと通知。ST9）。**2 つ目のプロセスを拒否する手段**（H2 のファイルのロックなど）を検討する（未決事項 14。M4）。
 - **配布からの H2 の除外**: sbt の H2 の依存（`com.h2database:h2`。必要なら doobie-h2）は、**開発用の構成（sbt の独立した設定、または開発用の起動プロジェクト）だけに置き**、配布物（本番イメージの JAR の集合）に含めない。**構成の具体（sbt の設定名、`sbt run` と `Test` のクラスパスに残す範囲）は B1 で確定する（未確認）**。イメージの `lib` に H2 が無いことを、イメージの検査で確かめる。
 - **H2 のドライバが無い環境で `DB_KIND=h2`** を選んだ場合も、起動に失敗する（本番・ステージングは、拒否の検査とドライバの欠落の二重の防御になる）。
 - 起動の失敗（終了コード 70）や設定の誤り（78）の使い分けは、下の終了コードのとおり。
@@ -257,7 +258,7 @@ Kotlin 版は、SIGTERM でコンテナの終了コードが 143（JVM が停止
 | 警告 | scalac のオプション（`-deprecation -feature -Werror -Wunused:all -Wvalue-discard -Wnonunit-statement`）で、警告をビルドの失敗にする（ST4） |
 | 静的解析 | WartRemover（`Compile` のみ。層ごとに許す Wart を変える）、Scalafix（`DisableSyntax`）、`scalafmtCheckAll` を CI で実行する |
 | テスト | `test`（ユニット、コンポーネント、プロパティ）と、統合テスト（実際の PostgreSQL 18。`events` の追記専用の権限、連鎖削除の網羅、`Left` の ROLLBACK、複数プロセスの競合。Testcontainers）を分ける。sbt の設定で分ける方法は B1 で決める |
-| カバレッジ | sbt-scoverage（文・分岐）。しきい値は暫定（ST4。未実測） |
+| カバレッジ | sbt-scoverage（文・分岐）と、XML の文の行番号から算出した行率（team の行 80% のゲート。案 C。ユーザーの決定、2026-11-25。出せるかは B1 で確認）。文・分岐のしきい値は暫定の追加のゲート（ST4。未実測） |
 | 成果物 | `app` が、起動用の配布物を作る（SI1） |
 | フロントエンド | `apps/beer-game-web` は npm（Node 26）でビルドし、sbt のビルドとは独立。仕様から型を生成する手順を、ビルドの前に置く（[フロントエンド](./architecture-frontend.md)） |
 
@@ -273,7 +274,7 @@ partition "検証（バックエンド: sbt）" {
   :scalafmtCheckAll、scalafixAll --check、\nコンパイル（-Werror、WartRemover）;
   :ユニット・コンポーネント・プロパティテスト（純粋関数、インメモリ）;
   :統合テスト（PostgreSQL 18、Testcontainers、契約テスト）;
-  :scoverage のしきい値;
+  :scoverage のしきい値（行 80% を XML から算出。案 C）;
   :N-1 互換（直前のリリースの読み取り側で、\n現在の書く版の golden を再生）;
   :cucumber-scala（専用のジョブ。sbt test には載せない）;
 }
@@ -312,7 +313,7 @@ stop
 
 | ジョブ（予定） | 内容 | 参考にした既存のジョブ |
 | :--- | :--- | :--- |
-| `check` | `scalafmtCheckAll`、`scalafixAll --check`、コンパイル（`-Werror`、WartRemover）、`test`、`scoverage` のしきい値（文・分岐）。**sbt のキャッシュ**（依存と `target`。キーは `build.sbt`・`project/` のハッシュ）を使う | Rust 版の `check`、Kotlin 版の `test` |
+| `check` | `scalafmtCheckAll`、`scalafixAll --check`、コンパイル（`-Werror`、WartRemover）、`test`、`scoverage` のしきい値（行 80% の算出と、文・分岐の暫定のゲート）。**sbt のキャッシュ**（依存と `target`。キーは `build.sbt`・`project/` のハッシュ）を使う | Rust 版の `check`、Kotlin 版の `test` |
 | `integration` | Testcontainers による統合テスト（PostgreSQL 18）。`Left` の ROLLBACK、キャンセル、競合の再試行、連鎖削除、ロールの権限 | Kotlin 版の `test`（`integrationTest`） |
 | `acceptance` | cucumber-scala の専用ジョブ（日本語 Gherkin。ST7）と、関数値の経路の受入 | Kotlin 版の `test`（`acceptanceTest`） |
 | `contract` | OpenAPI の検証と、型の生成物の差分 0（共有） | Kotlin 版の `contract` |
@@ -373,6 +374,16 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 
 **構成（CloudFront、ECS Fargate、RDS、ECR、観測）、JVM の設定、起動モード、データベースのロール、2 段階のリリースは変えません。**
 
+## 変更の記録（レビュー対応。2026-11-25）
+
+[設計書レビュー](../../review/beer-game-scala/design_review_20261125.md) の指摘への対応です。**ユーザーが決めたのは H3・H6・H7・H9 の方針だけで、他の直し方は AI の案です（承認を得ていません）。** 確認状況の唯一の一覧は [技術スタック](./tech-stack.md#確認状況の一覧) です。
+
+| 指摘 | 変更 | 状態 |
+| :--- | :--- | :--- |
+| M4 | H2 の拒否に、JDBC の URL `jdbc:h2:` の検査を足した（Kotlin 版 173 行に倣う）。H2 で 2 つ目のプロセスを拒否する手段を未決事項に加えた | AI の案 |
+| M17 | `DB_KIND` の記述を、[フロントエンド](./architecture-frontend.md) と揃えた（持つ） | AI の案 |
+| M12 | SIGTERM の終了コードは SI3 のとおり未決のまま。テスト戦略・非機能要件の NF-SC1 の記述を、これに揃えた | AI の案 |
+
 ## 設計判断
 
 **SI1〜SI5 は、AI が起草した案で、ユーザーの承認を得ていません。**
@@ -431,7 +442,7 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 11. **投影の再構築のタスクを、デプロイの標準の手順に含める条件**と、再構築中のコマンドの応答（短い待ちか 503 か。Kotlin 版から継続）。
 12. **業務のスモークテストの範囲**、**秘密が Terraform の状態に入る問題**、**RDS の CA バンドルと `sslmode`**、**CloudFront の CSP と SSE のオリジン待ち時間**（Kotlin 版から継続）。
 13. **設定の環境変数の名前を、Kotlin 版と揃えること**（提案。E2E の案内と手順書の差分が減る）と、設定の誤りの終了コード 78。
-14. **ローカル開発の DB**（ST9）: H2 の採用は決定済み。残る未決は、H2 の依存の導入の承認、sbt の依存の置き場（開発用の構成）の確定、本番イメージに H2 が無いことの検査の方法。
+14. **ローカル開発の DB**（ST9）: H2 の採用は決定済み。残る未決は、H2 の依存の導入の承認、sbt の依存の置き場（開発用の構成）の確定、本番イメージに H2 が無いことの検査の方法、**H2 で 2 つ目のプロセスを拒否する手段**（ファイルのロックなど）。
 
 ## 出典
 

@@ -130,8 +130,35 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T08:00:00Z }
 
 上の表は指摘の重複を除いた統合後の番号で、エージェント別の件数は元の指摘数である。各エージェントの全文はこの文書に転記していない。根拠となる文書名・節・行は、上の表の「理由」と事実確認の結果に残した。
 
+## 対応状況（2026-11-25）
+
+重要度「高」の 10 件を設計文書へ反映した。**ユーザーの決定は 4 件だけ**で、他は AI の案であり承認を得ていない。
+
+| # | 対応 | 決定の区分 | 主な反映先 |
+|---|------|------------|------------|
+| H1 | 確認状況の一覧（K1〜K23）を新設し、各文書の食い違いを事実に直してリンクにした | AI の案 | tech-stack の「確認状況の一覧」、architecture-backend、operation、ADR-001 |
+| H2 | `Started` の自己遷移（`RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`）、`RoleHolderReplaced` は session の `Active`・`Paused` の自己遷移とし、受入テストと性質テストの生成器に入れ替えを加えた | AI の案 | domain-model、test-strategy |
+| H3 | `Ignored` で止める設計を維持。利用者に見える変更として変更表に載せ、障害パターン 17 の初動と新パターン 18、ui-design #15 を足した | **ユーザーの決定** | domain-model、operation、ui-design、ADR-001、index |
+| H4 | `Tx.run` を唯一の公開入口にし、`.transact(` を Scalafix で禁止。旧案の合成子は不採用 | AI の案 | architecture-backend、tech-stack ST4、test-strategy、non-functional |
+| H5 | `ProjectionLock` を `Resource[IO, Unit]`、`ChangeNotifier` を集めて `Tx.run` の後に配信する型に変更 | AI の案（B1 の最初に実測して確定） | architecture-backend、data-model、test-strategy |
+| H6 | 行率を XML から算出する案 C を第一にし、案 A に反例を書いた。文 85%・分岐 75% は暫定の追加ゲート | **ユーザーの決定**（案 C を第一） | tech-stack ST4、test-strategy、non-functional、ADR-001 |
+| H7 | ADR-001 に Intent（案）・成功の測り方（数値は B1 で承認を得る案）・範囲の表を追加。U1〜U3 を約束、U4〜U6・専用 AWS 環境・CI の新設は指標を見て決める | **ユーザーの決定**（範囲）。Intent の文面は案 | ADR-001、index |
+| H8 | 引き継ぎ表を Kotlin ADR 002〜020 の本文で検証した。判定ラベルは 20 行とも変わらず、内容と根拠を直した | AI の案 | ADR-001 |
+| H9 | NF-P2 を p95 4 秒に再定義。NF-P4、NF-O4、監視の閾値（Warning 3 秒・Critical 4 秒）も揃えた。SSE の 2 秒は全実装共通の画面の改善として別扱い | **ユーザーの決定** | non-functional、operation、ui-design、architecture-frontend |
+| H10 | ポーリングの範囲を実際の画面に合わせ、2.86 秒を「Rust 版の推定」に直した | AI の案 | ui-design、architecture-frontend |
+
+あわせて、中・低の一部（M1〜M4、M9〜M15、M17、L1〜L6、L8〜L11）も直した。M5〜M8、M16 の「ストーリー化」、L7 は未対応で、各文書の未決事項に残る。
+
+### 反映後も残る未確認・要判断
+
+- 新しく書いた Scala のコード（`Tx.run`、`Committed`、`Ports` など）は**型検査していない**。`FC.rollback` の後の書き込みの扱い、`transact` の外のアドバイザリロック、専用接続の `LISTEN`、キャンセルと `Supervisor`、`IOApp` の SIGTERM の終了コードは未確認。
+- 日本語見出しのアンカー（`#確認状況の一覧` など）は、`mkdocs.yml` の `toc` が slugify を設定していないため、公開サイトで解決するか未確認。ソース上は見出しと一致している。
+- 行率を scoverage の XML から出せるかは B1 で確かめる。出せなければ、文の率で代替してよいかを人が再度決める。
+- Intent の文面、成功の測り方の数値目標、H1・H2・H4・H5・H8・H10 の直し方は、人の承認が要る。
+- 設計文書への反映後の**再レビュー**は未実施。`verified` の記録と `stable` への昇格は人が行う。
+
 ## 次のステップ
 
-1. 重要度「高」の対応方針（修正する／許容する／保留する）を人が確定する。特に H3（`Ignored` で止めるか）、H6（カバレッジの扱い）、H7（範囲）、H9（NF-P2）は人の決定が要る。
-2. 確定した方針を設計文書に反映する（まず H1 の確認状況の統一、H2・H4・H5 の設計の穴）。
-3. 反映後に再レビューし、人が `verified` を記録して `stable` に昇格する。
+1. 反映した設計文書を人が確認する。
+2. 再レビューを実施する。
+3. 人が `verified` を記録して `stable` に昇格する。

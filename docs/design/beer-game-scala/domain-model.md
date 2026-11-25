@@ -21,7 +21,8 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 
 ### 本書の位置づけと確認の範囲
 
-- **本書で確認したこと**: 3 章の型とコードの断片（`Quantity`、`RoleMap`、`ValidatedNec` による設定の検証、`GameError.code`、Game 集約の `handle`、`Events.apply` と `Evolution`、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、`Events.apply` の `match` で網羅の警告が出ること（`-Werror` で失敗する形）も確認しました。`var` と `head` が WartRemover に拒否されることも確認しました。
+- **本書で確認したこと**: 3 章の型とコードの断片（`Quantity`、`RoleMap`、`ValidatedNec` による設定の検証、`GameError.code`、Game 集約の `handle`、`Events.apply` と `Evolution`、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、`Events.apply` の `match` で網羅の警告が出ること（`-Werror` で失敗する形）も確認しました。`var` と `head` が WartRemover に拒否されることも確認しました。**確認状況の正本は [技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)（K2〜K4）** です。
+- **2026-11-25 のレビュー対応で書き直した部分は、再コンパイルしていません**: `Game.handle` の `AssignRole` の判定順（権限が先。L6）と、`GameEvents.apply` の `Started` の自己遷移（H2）、`GameEvent` に足したイベント。いずれも AI の案で、承認を得ていない。
 - **確認していないこと**: Session 集約、`startGame`、`simulateWeek`、投影、`RetentionSaga` の Scala のコードは、**型検査していない設計のスケッチ**です。`Monoid`・`Functor` の法則のテストは書いていません。
 - **引き継ぐだけで再検討していないこと**: 週次計算の規則（12 ステップ）、観察者の開示の規則、保持削除の細部、エラーコードの一覧、投影の購読表、ユビキタス言語の定義は、Kotlin 版の該当節を正本として参照します。Scala 版で変わるのは表現であり、API の契約（`code`、problem+json）は変えません。
 - **Kotlin 版の実装の経緯（B1〜B13 の注記）は引き継ぎません。** 本書は、Kotlin 版の設計の現在の形を出発点とします。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。
@@ -30,7 +31,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 
 Kotlin 版の前提と原則をそのまま引き継ぎます（学習用シミュレーション、アカウントなし、決定論的な週次計算、役割別の情報制限、ルールは集約が持つ、ドメインは純粋、集約は最小の整合性の範囲、個人情報と秘密はイベントに入れない）。Scala 版で加わる原則は次のとおりです。
 
-- **ドメインのプロジェクトは `cats-core` だけに依存する。** `cats-effect`・`doobie`・`http4s`・`circe` を持たない。時刻・乱数・識別子の生成・永続化は、コマンドの値として渡す（[技術スタック](./tech-stack.md) の ST3、ガイド §4.4、§1.3）。
+- **ドメインのプロジェクトは `cats-core` だけに依存する。** `cats-effect`・`doobie`・`http4s`・`circe` を持たない。時刻・乱数・識別子の生成・永続化は、コマンドの値として渡す（[技術スタック](./tech-stack.md) の ST3、ガイド §4.3、§1.3）。
 - **`var`・`null`・`throw`・`return`・可変コレクション・`head` などの部分関数・`asInstanceOf` を使わない。** WartRemover で守る（ガイド §9.4）。遷移関数は全域で、例外を投げない。
 - **新しい値を作って返す。** `case class` の `copy` と不変の `List`・`Map` だけを使い、共有可変状態は持たない（ガイド第 2 章）。
 
@@ -41,7 +42,7 @@ Kotlin 版の前提と原則をそのまま引き継ぎます（学習用シミ�
 | 概念（Kotlin 版） | Scala 版の名称 | 備考 |
 | :--- | :--- | :--- |
 | `GameState`、`SessionState` | `GameState`、`SessionState`（`enum`） | 状態の違いを列挙子で表す |
-| `decideGame`、`evolveGame` | `Game.handle`、`Events.apply`（`GameEvents`・`SessionEvents` に分ける） | ガイド §7.3・§7.4 の `handle` と `Events.apply` に合わせる |
+| `decideGame`、`evolveGame` | `Game.handle`、`Events.apply`（`GameEvents`・`SessionEvents` に分ける） | ガイド §7.3・§7.4 の `handle` と `Events.apply` に合わせる。**引数の順は、本書は `handle(state, command)`、ガイド §7.6 は `handle(command, state)` で違う**（Kotlin 版の `decide(state, command)` に合わせた。どちらかに揃えるかは B1 で決める） |
 | `decideSession`、`evolveSession` | `Session.handle`、`SessionEvents.apply` | 同上 |
 | `RoleMap<A>` | `RoleMap[A]` | 同じ |
 | `StreamType`（`GAME`、`SESSION`） | `StreamType.Game`、`StreamType.Session` | |
@@ -189,6 +190,8 @@ enum GameEvent:
   case RoleAssigned(participantId: ParticipantId, role: Role)
   case RoleUnassigned(participantId: ParticipantId, role: Role)
   case GameStarted(gameId: GameId)
+  case ParticipantReplaced(participantId: ParticipantId, role: Role, replacedBy: ParticipantId)   // EV-G12。開始後の入れ替え
+  case CredentialRevoked(subject: CredentialSubject)                                              // EV-G08。入れ替えの自動失効にも使う
   // … EV-G01〜G12。Kotlin 版の表のとおり
 
 enum GameCommand:
@@ -203,6 +206,12 @@ enum GameCommand:
 
 ```scala
 object Game:
+  /** 作成前（NotCreated）は、誰も進行役ではない。権限の判定に使う（L6） */
+  private def isFacilitator(state: GameState, actor: Actor): Boolean = state match
+    case GameState.NotCreated         => false
+    case GameState.Preparing(g, _)    => actor == Actor.Facilitator(g)
+    case GameState.Started(g, _)      => actor == Actor.Facilitator(g)
+
   def handle(state: GameState, command: GameCommand): Either[GameError, List[GameEvent]] =
     command match
       case GameCommand.CreateGame(actor, gameId) =>
@@ -211,11 +220,12 @@ object Game:
           _ <- Either.cond(actor == Actor.Anonymous, (), GameError.Forbidden)
         yield List(GameEvent.GameCreated(gameId))
       case GameCommand.AssignRole(actor, pid, role) =>
+        // 判定順: 権限 → 準備中か → 参加者の存在（L6。権限のない人に状態を知らせない。Kotlin 版の原則）
         for
+          _       <- Either.cond(isFacilitator(state, actor), (), GameError.Forbidden)
           data    <- state match
                        case GameState.Preparing(g, ps) => Right((g, ps))
-                       case _                          => Left(GameError.NotPreparing)
-          _       <- Either.cond(actor == Actor.Facilitator(data._1), (), GameError.Forbidden)
+                       case _                          => Left(GameError.NotPreparing)   // 開始後は assignRoleAfterStart（下記）
           current <- data._2.get(pid).toRight(GameError.ParticipantNotFound(pid))
         yield current match
           case Some(r) if r == role => Nil                                        // 変化なし。履歴に足さない
@@ -239,6 +249,13 @@ object GameEvents:
         Evolution.Applied(GameState.Preparing(g, ps.updated(p, None)))
       case (GameState.Preparing(g, ps), GameEvent.GameStarted(_)) =>
         Evolution.Applied(GameState.Started(g, ps))
+      // 開始後の役割の入れ替え（H2。Kotlin 版の変更表 38 に倣う）。Started の自己遷移として受ける
+      case (GameState.Started(g, ps), GameEvent.RoleAssigned(p, r)) =>        // 入れ替えの新担当者
+        Evolution.Applied(GameState.Started(g, ps.updated(p, Some(r))))
+      case (GameState.Started(g, ps), GameEvent.ParticipantReplaced(p, _, _)) =>   // 旧担当者の役割を外す。行は消さない
+        Evolution.Applied(GameState.Started(g, ps.updated(p, None)))
+      case (s @ (GameState.Preparing(_, _) | GameState.Started(_, _)), GameEvent.CredentialRevoked(_)) =>   // 実際は資格の状態を更新する（スケッチは参加者だけ）
+        Evolution.Applied(s)
       case (s @ (GameState.NotCreated | GameState.Preparing(_, _) | GameState.Started(_, _)), _) =>
         Evolution.Ignored(s)
 
@@ -253,6 +270,36 @@ object GameEvents:
 （上のコードの `GameEvents` は、検証した断片では `Events` の名前です。集約ごとに分けるため、本書では `GameEvents` と書きます。）
 
 最後の腕は、**状態の列挙子だけを列挙して**、イベントを `_` で受けます。状態を足すと、この `match` が網羅の警告になり、`-Werror` でビルドが止まります（**本書の断片で、状態を 1 つ足して警告を確認しました**）。イベントを足したときは、有効な組の追加を忘れても `Ignored` になるため、**性質テストで「`handle` が作る列は `Ignored` にならない」を守ります**（ガイド §7.3 の「許す組を足し忘れても、コンパイラは止めない」と同じ注意。Kotlin 版・Rust 版と同じ方針）。再生は `foldLeft` で、`Ignored` の件数を再生側が受け取ります（ガイド §7.4、§6.1）。
+
+#### 開始後の役割の入れ替えと `Started` の自己遷移（H2。AI の案、承認を得ていない）
+
+Kotlin 版は、開始後の入れ替えを `Started` の**自己遷移**として扱います（[Kotlin 版の「役割の入れ替え」](../beer-game-kotlin/domain-model.md) と変更表 37・38）。Scala 版の初稿は、`RoleAssigned` を `Preparing` だけが受け、`ParticipantReplaced` を持たなかったため、**入れ替えたゲームが `Ignored` になり、「止める」設計（ユーザーの決定、2026-11-25）と合わせると、研修中に担当者を入れ替えたゲームが操作不能になる**状態でした。次のとおり直します。
+
+| ストリーム | 状態 | イベント | 遷移 |
+| :--- | :--- | :--- | :--- |
+| `game` | `Started` | `RoleAssigned`（入れ替えの新担当者） | 参加者の役割を付ける（自己遷移） |
+| `game` | `Started` | `ParticipantReplaced`（旧担当者。`replacedBy` を持つ） | 旧担当者の役割を外す。参加者の行・表示名・過去の入力は消さない（自己遷移） |
+| `game` | `Preparing`・`Started` | `CredentialRevoked`（入れ替えの自動失効を含む） | 資格を失効にする（自己遷移） |
+| `session` | `Active`・`Paused` | `RoleHolderReplaced`（`removed`・`added`） | `SessionData.assignments[role]` を更新する（自己遷移）。`NotStarted`・`Ended` は状態を変えない |
+
+```plantuml
+@startuml
+title game ストリームの状態（開始後の入れ替えを含む。Scala 版）
+[*] --> NotCreated
+NotCreated --> Preparing : GameCreated
+Preparing --> Preparing : ParticipantJoined\nRoleAssigned / RoleUnassigned\nObserverInvited / ObserverJoined\nCredentialRevoked / CredentialReissued
+Preparing --> Started : GameStarted
+Started --> Started : ObserverInvited / ObserverJoined\nCredentialRevoked / CredentialReissued\nParticipationRecovered\n役割の入れ替え: ParticipantReplaced\n+ CredentialRevoked + RoleAssigned
+@enduml
+```
+
+**入れ替えは `assignRoleAfterStart`（`game` と `session` の両方を入力に取る関数）が、1 回の追記で返します**。`game` に `ParticipantReplaced`（旧担当者ごとに 1 件）・`CredentialRevoked`・`RoleAssigned`、`session` に `RoleHolderReplaced` を返し、旧担当者の資格の失効と `session` の写しの更新を同じ追記で行います（Kotlin 版と同じ規則。1 人だけ外す案、終了後の扱い、イベント名と形は Kotlin 版のゲート 3.5 の未決事項に追従する）。
+
+**この要件を、テストに必ず入れます**（テスト戦略は別の担当が書くため、ここでは domain-model の要件として書く）。
+
+- **受入テスト**: 「開始後に担当者を入れ替えたゲームで、新担当者が意思決定を保存でき、週を確定できる（再生しても同じ状態が復元される）」。
+- **性質テスト**: 「`handle` が作る列は `Ignored` にならない」の生成器に、**開始後の入れ替え（`assignRoleAfterStart`）を含める**。生成器が入れ替えを作らないと、遷移の腕の漏れを検知できない。
+- **「許さない組の拒否」のテスト**: `Preparing` や `NotCreated` が `ParticipantReplaced` を受けても状態を変えない（`Ignored`）ことを確かめる。
 
 ### Session 集約（進行）
 
@@ -295,13 +342,13 @@ object Session:
 
 **停止中の代理入力**: `SubmitProxyDecision`（進行役）は、`SaveDecision`（参加者）と違い、**一時停止中も受け付けます**（UC-09: 停止 → 代理入力 → 再開）。**進行中で `AUTO` かつ 4 役割が揃えば自動確定し、一時停止中は確定しません**（`SetCommitMode(AUTO)` も同じ。再開時に判定する）。Kotlin 版は初版でここを「進行中のみ」と誤り、レビューで直した経緯があるため、Scala 版は最初から明記します。
 
-**`Ignored` の扱い**: `applyDecided` は、保存直後の状態を求め、`Ignored` が出たら**失敗**にします（`handle` が作る列は `Ignored` にならないはずなので、出た場合は不具合）。**コマンドの経路で、保存済みのイベントの再生中に `Ignored` が出た場合も、状態を信用せず `AppFailure.Persistence`（500・相関 ID）で失敗させます**（[バックエンドアーキテクチャ](./architecture-backend.md)。fail closed）。再生を診断する用途（`verify-projections` など）では、`Ignored` を記録して続けます。
+**`Ignored` の扱い**: `applyDecided` は、保存直後の状態を求め、`Ignored` が出たら**失敗**にします（`handle` が作る列は `Ignored` にならないはずなので、出た場合は不具合）。**コマンドの経路で、保存済みのイベントの再生中に `Ignored` が出た場合も、状態を信用せず `AppFailure.Persistence`（500・相関 ID）で失敗させます**（[バックエンドアーキテクチャ](./architecture-backend.md)。fail closed）。再生を診断する用途（`verify-projections` など）では、`Ignored` を記録して続けます。**コマンドの経路で止める設計は、ユーザーの決定（2026-11-25、H3）で維持します**。ただし、これは Kotlin 版（状態を変えずに記録して続行）からの**利用者に見える変更**です（下の変更表の 10。運用は [バックエンドアーキテクチャ](./architecture-backend.md) の「`Ignored` で止めること」）。
 
 自動確定は、Kotlin 版と同じく **1 回の `handle` が複数のイベントを返す**ことで表します（D6）。`WeekCommitted` は結果と次週の状態を事実として含み、`SessionEvents.apply` はそれを採用するだけで、`simulateWeek` を呼び直しません（D5）。
 
 #### 状態遷移
 
-状態遷移図は [Kotlin 版](../beer-game-kotlin/domain-model.md) の `session ストリームの状態` と同じです（`NotStarted` → `Active` ⇄ `Paused` → `Ended`）。遷移の「許す組」は `match` に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。
+状態遷移図は [Kotlin 版](../beer-game-kotlin/domain-model.md) の `session ストリームの状態` と同じです（`NotStarted` → `Active` ⇄ `Paused` → `Ended`）。**`Active`・`Paused` は `RoleHolderReplaced`（開始後の入れ替え）を自己遷移として受けます**（上の「開始後の役割の入れ替えと `Started` の自己遷移」）。遷移の「許す組」は `match` に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。
 
 ### 2 ストリームにまたがる StartGame
 
@@ -442,6 +489,9 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 | 7 | `Int`、`Money` は最小単位の整数 | `Units`・`Money` は `Long`（SD7） | 桁あふれを避ける |
 | 8 | 型の注釈（`@Term`・`@EventSpec`）から用語集・イベント一覧を生成 | 方式は未決（ADR-001 の 018 は置き換え） | 注釈は Kotlin の機能 |
 | 9 | 代数構造は使わない（Arrow の `Raise` が中心） | `Functor[RoleMap]`・`Monoid[TeamTotals]` を使い、法則をテストする（SD6） | ガイド第 6 章 |
+| 10 | コマンドの経路で不正な遷移（`Ignored` に当たる組）が出ても、状態を変えずに `InvalidTransition` を記録して続行する | **コマンドの経路で `Ignored` が出たら、`AppFailure.Persistence`（500・相関 ID）で処理を止める**（fail closed）。診断の用途だけ、記録して続行する。**利用者に見える変更**: 該当するゲームの保存・確定などが失敗し続け、運用の復旧まで続けられない | 保存済みの事実を無視した状態で `handle` すると不変条件が崩れるため。**止める設計はユーザーの決定（2026-11-25、H3）**。影響と運用（進行役への依頼の文言、研修中の原則）は [バックエンドアーキテクチャ](./architecture-backend.md) の「`Ignored` で止めること」と運用要件に置く |
+| 11 | `evolveGame` の `RoleAssigned` は開始後も役割を付け、`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（Kotlin 版の変更表 38） | **同じ**。`Started` の自己遷移として、`RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`（game）と `RoleHolderReplaced`（session）を受ける。初稿は持っていなかった（H2） | Kotlin 版に追従。`Ignored` で止める設計と合わせると、持たないと入れ替えたゲームが操作不能になる |
+| 12 | 権限を先に判定し、権限のない人に状態を知らせない（Kotlin 版の原則） | `AssignRole` の判定順を、権限 → 準備中か → 参加者の存在にそろえる（L6。本書の初稿は準備中かが先だった）。作成前は `Forbidden` | Kotlin 版の原則に合わせる |
 
 上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。
 
@@ -456,6 +506,21 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 7. **法則のテストの道具**: cats-laws + discipline-munit か、ガイドの全パターンの列挙か（[技術スタック](./tech-stack.md) の ST5）。
 8. **`opaque type` と WartRemover・Scalafix の相性**: 断片では問題なかったが、大きなコードでの確認は B1。
 9. **Kotlin 版の未決事項の引き継ぎ**: 開始後の共同担当の追加と開始後の参加、遅延 0 を許すか、需要の上限、キット準拠の既定の需要系列（JSD の値の確認）、保持の開始の起点、AC1.2.5 の文言の改訂、観察者への入力済みの役割の開示、`InvalidTransition` の通知先、再構築とコマンドの同時実行制御、`WeekCommitted.contributors` の意味。いずれも [Kotlin 版の未決事項](../beer-game-kotlin/domain-model.md) と同じ扱いで、Kotlin 版の決定に追従する。
+
+10. **開始後の入れ替えの型**（H2）: `Started` の自己遷移（`RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`）と `RoleHolderReplaced`、`assignRoleAfterStart` の戻り値（`StartDecision` と同じ形か）を B1 で型検査する。1 人だけ外す案・終了後の扱い・イベント名は Kotlin 版のゲート 3.5 に追従する。
+11. **`handle` の引数の順**: 本書は `handle(state, command)`（Kotlin 版の `decide` と同じ）、ガイド §7.6 は `handle(command, state)`。B1 で揃えるか決める。
+
+## レビュー対応の記録（2026-11-25）
+
+[設計書レビュー](../../review/beer-game-scala/design_review_20261125.md) への対応のうち、本書に関するもの（行番号は編集で動くため、節名で記録します）。**H3 の「止める」設計だけがユーザーの決定で、他の直し方は AI の案で、承認を得ていません。**
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| H2 | 「Game 集約（準備）」の `GameEvent`・`GameEvents.apply`、新設の「開始後の役割の入れ替えと `Started` の自己遷移」、「Session 集約」の状態遷移 | AI の案。再コンパイルしていない |
+| H3 | 「beer-game-kotlin からの変更」の 10、「Session 集約」の `Ignored` の扱い | 止める設計はユーザーの決定。運用は architecture-backend |
+| H1 | 「本書の位置づけと確認の範囲」を [確認状況の一覧](./tech-stack.md#確認状況の一覧) への参照に | AI の案 |
+| L4 | 「設計の前提と原則」のガイドの節（§4.4 を §4.3 に）、「戦略的設計」の `handle` の引数の順の注記 | 直した |
+| L6 | `Game.handle` の `AssignRole`（権限が先。`isFacilitator`）、変更表の 12 | AI の案。再コンパイルしていない |
 
 ## 出典
 

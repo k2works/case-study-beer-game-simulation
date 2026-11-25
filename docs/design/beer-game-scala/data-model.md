@@ -15,11 +15,12 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:30:00Z }
 
 ### 本書の位置づけと確認の範囲
 
+- **確認状況の正本は、[技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)** です（レビュー指摘 H1）。本書の「検証の結果」は、その一覧の K5・K8〜K11・K18 の根拠で、本文は一覧にリンクします。
 - **本書で確認したこと**（2026-11-25。リポジトリの外の使い捨てのプロジェクトで、sbt 1.13.1、Scala 3.7.4、doobie 1.0.0-RC12、testcontainers-scala 0.44.1、ローカルの Docker の `postgres:18.6` を使用）。結果は「検証の結果」の表にまとめました。
   - `events`・`game_roots` を**縮小した DDL**（主キー、名前つきの一意制約 `uq_events_stream_version`、外部キー `ON DELETE CASCADE`、`jsonb`、identity の `seq`）を適用できる。
   - doobie の `transact` は、`ConnectionIO` が例外なく完了すれば、値が `Left` でも **COMMIT する**。`FC.rollback` を挟むと、その書き込みは残らない（[バックエンドアーキテクチャ](./architecture-backend.md) の SBD2 の前提を実 DB で確認）。
   - 一意制約違反は、`attemptSql` で `PSQLException` として取り出せ、SQLSTATE `23505` と制約名（`getServerErrorMessage.getConstraint`）が得られる。
-  - `uuid`・`timestamptz`・`jsonb` の読み書き、アドバイザリロック（`pg_advisory_xact_lock(_shared)`）、`LISTEN/NOTIFY`（`doobie.postgres.hi.connection` の `pgListen`・`pgNotify`・`pgGetNotifications`）が動く。
+  - `uuid`・`timestamptz`・`jsonb` の読み書き、アドバイザリロック（`pg_advisory_xact_lock(_shared)`）、`LISTEN/NOTIFY`（`doobie.postgres.hi.connection` の `pgListen`・`pgNotify`・`pgGetNotifications`。同じ接続）が動く。トランザクションの外のセッションのロック、専用の接続の `LISTEN`、切断後の再購読は**未確認**。
 - **引用したもの**: [Rust 版のデータモデル](../beer-game-rust/data-model.md) が、**`events`・`game_roots` ほかの DDL と DB ロール・GRANT を PostgreSQL 18.6 に適用して実測した結果**（追記専用の拒否、部分一意索引、連鎖削除、制約名）を持ちます。DDL は言語に依存しないため、本書はそれを引用します。**Scala 版では、その全文を再適用していません**（上の縮小した DDL だけ）。ロールと GRANT を doobie の接続から検証することも、未実施です。
 - **確認していないこと**: 投影・周辺ストア・保持削除の他の表の DDL（Kotlin 版の ER 図と実ファイル `V002〜V006` に基づく設計で、Scala 版では**未適用**）、Flyway の実行、`HikariTransactor` と用途別のロール、`SET ROLE`、読み取り専用の `REPEATABLE READ`、circe による `jsonb` の読み書き（`doobie-postgres-circe` は[技術スタック](./tech-stack.md)に載せておらず、未確認）。
 - **引き継ぐだけのもの**: 投影テーブルの定義（購読するイベント、閲覧できる人）、読み取りの規則、設計判断のまとめは、Kotlin 版を正本とします。
@@ -165,7 +166,7 @@ roots ||--o{ idem
 Scala 版での実現（[バックエンドアーキテクチャ](./architecture-backend.md)）:
 
 - 追記は `EventStore.append: (Long, List[E]) => ConnectionIO[Either[AppFailure, Long]]` で、期待する版は **`MAX(stream_version)`**（読み込んだイベントの件数ではない）です。複数のストリーム（`StartGame`）は、同じ `ConnectionIO` の中で追記します。
-- 一意制約の違反は `ConcurrencyConflict`（`Left`）に写し、`execute` が再試行します。**`Left` を返しても doobie は COMMIT する**ため、`Left` の経路は `Tx.rollbackOnLeft` で ROLLBACK を明示します（SBD2。下の検証の 2）。
+- 一意制約の違反は `ConcurrencyConflict`（`Left`）に写し、`execute` が再試行します。**`Left` を返しても doobie は COMMIT する**ため、`Left` の経路は `Tx.run` が ROLLBACK を明示します（SBD2。確認済み。下の検証の 2。[一覧](./tech-stack.md#確認状況の一覧) の K5）。**一意制約違反（23505）の後は、同じ `ConnectionIO` で次の文を発行しません**（`SAVEPOINT` を使う場合を除く。PostgreSQL は 25P02 で中断し、H2 は中断しないため、ローカルでだけ通るコードが書ける。M2。AI の案。25P02 は PostgreSQL の仕様の知識で、doobie では未確認）。
 - `events` の `payload` は `jsonb` で、書き込みは文字列に `::jsonb` を付けます（検証の 3）。ドメインのイベントには codec を付けず、`EventCodec`（circe の DTO）が JSON との相互変換を担います（BD5）。
 
 ```plantuml
@@ -180,7 +181,7 @@ ES -> DB : INSERT INTO events\n（stream_version = expected + 1 ...）
 alt 同じ版が既にある
   DB --> ES : SQLSTATE 23505\nconstraint = uq_events_stream_version
   ES --> X : Left(ConcurrencyConflict)
-  X -> DB : ROLLBACK（Tx.rollbackOnLeft）
+  X -> DB : ROLLBACK（Tx.run が Left で FC.rollback）
   X -> X : 読み直して handle からやり直す（上限つき）
 else 成功
   DB --> ES : OK
@@ -260,7 +261,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 | 2 | `ConnectionIO` が `Left` を返して完了 | **COMMIT された**（行が残る）。`FC.rollback` を挟んだ `Left` の経路は、**書き込みが残らない** |
 | 3 | 型と `jsonb` | `uuid` ← `java.util.UUID`（`doobie.postgres.implicits`）、`timestamptz` → `java.time.OffsetDateTime` と `java.time.Instant`（どちらも読めた）。`jsonb` は、文字列の引数に `::jsonb` を付けて書き、`payload::text` で読める（PostgreSQL が正規化して `{"a": 1}` の形で返す） |
 | 4 | 同じストリームの同じ版への 2 回目の追記 | `attemptSql` で `PSQLException`。**SQLSTATE `23505`、制約名 `uq_events_stream_version`** |
-| 5 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が実行できた |
+| 5 | アドバイザリロック | `sql"select pg_advisory_xact_lock(42)".query[Unit].unique` と `pg_advisory_xact_lock_shared` が `ConnectionIO` として実行できた。**`transact` の外のセッションのロック（`pg_advisory_lock(_shared)`）は未確認**（`ProjectionLock` の `Resource` 版。H5） |
 | 6 | `LISTEN/NOTIFY` | `PHC.pgListen`・`PHC.pgNotify`・`PHC.pgGetNotifications`（`doobie.postgres.hi.connection`）で、同じ接続の通知を受け取れた。**別の接続・専用の接続・切断後の再購読は未確認** |
 | 7 | `game_roots` の 1 行削除 | そのゲームの `events` が連鎖して消えた。**接続ユーザーは `events` の DELETE 権限を持つユーザーで、権限のないロールでの確認ではない**（下の B） |
 
@@ -283,7 +284,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 
 同期投影（追記と同じトランザクションで更新）、`projection_checkpoints`、投影の再構築（ゲームごとに 1 トランザクション、アドバイザリロック。コマンドは共有、再構築は排他）、複数の投影の行を更新する順序（表の順序の固定。表名と主キーの順）、投影テーブルの定義、出力を投影にしない（`export_packages` の廃止。`buildExport` を問い合わせ時に実行）、読み取りの規則（参加者・進行役・観察者の読める範囲）、観察のための `week_team_totals` は、**Kotlin 版と同じ**です。
 
-Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。検証の 5）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
+Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。**`transact` の外の `Resource[IO, Unit]`**。H5 の案で、承認を得ていない。確認済みなのは `ConnectionIO` の中の `pg_advisory_xact_lock(_shared)` で、セッションのロックは未確認。検証の 5、[バックエンドアーキテクチャ](./architecture-backend.md)）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
 
 ## 周辺ストア
 
@@ -362,15 +363,15 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 | 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ。Kotlin 版の実測の引用） | 扱い |
 | :--- | :--- | :--- | :--- |
-| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（Scala 版で確認済み） | 動かない（関数が無い） | ポート `ProjectionLock` の裏に隠す。H2 版は**プロセス内のロック**（単一プロセスでのみ有効） |
-| SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（Scala 版で確認済み） | 動かない（構文エラー） | ポート `ChangeNotifier` の裏に隠す。H2 版は**プロセス内のイベント**（コミット後に配信。単一プロセスでのみ有効） |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版は `transact` の外のセッションのロックで、**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`GameId => Resource[IO, Unit]`）の裏に隠す。H2 版は**プロセス内のロック**を `Resource` に包む（単一プロセスでのみ有効）。**PostgreSQL 版と同じ型**（H5。AI の案） |
+| SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（同じ接続で Scala 版で確認済み。K11） | 動かない（構文エラー） | ポート `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`）の裏に隠す。H2 版は `enqueue` が何もせず、`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効）。PostgreSQL 版は `enqueue` が `pg_notify`。**同じ型**（H5。AI の案） |
 | 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 動かない（構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える（PostgreSQL 専用のマイグレーション） |
 | DB ロールと GRANT、追記専用、`TRUNCATE` の拒否 | あり | 一部動く（`GRANT TRUNCATE` は構文エラー。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。**権限の検証の正は PostgreSQL の統合テスト** |
 | 接続プールの分離（観察者用など） | 用途別の `HikariTransactor` | 単一のプール | H2 版は**省略** |
 | `jsonb` | `events.payload` は `jsonb`（文字列 + `::jsonb`） | 型は通るが挙動が違う（`jsonb` は `json`。`setString` の文字列は JSON の文字列値になる。`FORMAT JSON` で書く） | H2 版は `json` 型、書き込みの SQL を方言で分ける。**doobie の `Put` で同じになるかは未確認** |
 | `timestamptz` | あり | 不明なデータ型（`timestamp with time zone` なら通る） | 共通の DDL は `timestamp with time zone` と書く |
 | 分離レベル（READ COMMITTED、読み取り専用の REPEATABLE READ） | 指定どおり | 設定は通る（動作の同一性は未確認） | H2 では検証しない |
-| SQLSTATE（40001、23505 の制約名） | `PSQLException` の `getServerErrorMessage.getConstraint`（Scala 版で確認済み） | 一意違反は 23505、REPEATABLE READ の同時更新は 40001。**制約名はメッセージ中に大文字で含まれ、専用のフィールドは無い**。メッセージには行の値も含まれる | H2 版の写像: メッセージ中の制約名（大文字小文字を区別せず）で `ConcurrencyConflict` に写す。**`PersistenceFailure` にメッセージを載せない**。**doobie 経由で取れるかは未確認** |
+| SQLSTATE（40001、23505 の制約名） | `PSQLException` の `getServerErrorMessage.getConstraint`（Scala 版で確認済み） | 一意違反は 23505、REPEATABLE READ の同時更新は 40001。**制約名はメッセージ中に大文字で含まれ、専用のフィールドは無い**。メッセージには行の値も含まれる | H2 版の写像: メッセージ中の制約名（大文字小文字を区別せず）で `ConcurrencyConflict` に写す。**`AppFailure.Persistence` にメッセージを載せない**。**doobie 経由で取れるかは未確認** |
 | Flyway の適用 | 共通 + PostgreSQL 専用 | Kotlin 版は共通の V001〜V005 がそのまま適用できた | **Scala 版では未確認**（B1 で確認） |
 
 ### H2 版で省略する制約（ローカルでは守られない）
@@ -407,7 +408,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 | 3 | `${json_type}`、`timestamp with time zone` の書き方、`jsonb` の書き込みを方言ごとに分ける | 同じく方言ごとに分ける（Kotlin 版の実測の引用。Scala 版では未確認） | ST9 |
 | 4 | H2 版で `uq_idempotency_create` を省略し、アプリ側で再照合 | 同じ（PostgreSQL 専用のマイグレーション） | 同上 |
 | 5 | H2 版で省略する制約の一覧 | 同じ 7 項目を引き継ぐ | 同上 |
-| 6 | JDBC の直接の SQL、`Tx` を引数で渡す | doobie の `ConnectionIO`（`ConnectionIO` をポートの戻り値にする。SBD3）。`Left` は `Tx.rollbackOnLeft` で ROLLBACK（SBD2） | Scala の表現。**doobie は `Left` でも COMMIT する**（検証 A の 2） |
+| 6 | JDBC の直接の SQL、`Tx` を引数で渡す | doobie の `ConnectionIO`（`ConnectionIO` をポートの戻り値にする。SBD3）。`Left` は `Tx.run` で ROLLBACK（SBD2。コマンド全体を 1 回で包む） | Scala の表現。**doobie は `Left` でも COMMIT する**（検証 A の 2） |
 | 7 | 制約名は JDBC の例外のメッセージ・`PSQLException` から取る | `attemptSql` と `PSQLException.getServerErrorMessage.getConstraint`（検証 A の 4） | ライブラリの違い |
 | 8 | Kotlin の `kotlinx.serialization` による `payload` | circe の DTO と文字列の `::jsonb`（`doobie-postgres-circe` は未採用） | 技術スタック（ST6） |
 | 9 | 検証は Kotest と Testcontainers の統合テスト | DDL の縮小版を doobie と testcontainers-scala で実測。統合テストは munit と testcontainers-scala | ツールの違い |
@@ -429,6 +430,18 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 11. **`retention_starts_at` の起点**: 暫定で作成時（Kotlin 版・ドメインモデルと共通）。
 12. **`events` の長期の保持と、ゲーム削除前の分析の要否**（beer-game2 から継続）。
 13. **同期投影のトランザクション時間の実測**（Scala の実装で計測し直す）。
+
+## レビュー対応の記録（2026-11-25）
+
+[設計書レビュー](../../review/beer-game-scala/design_review_20261125.md) への対応のうち、本書に関するもの（行番号は編集で動くため、節名で記録します）。**直し方は AI の案で、承認を得ていません。**
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| H1 | 「本書の位置づけと確認の範囲」に [確認状況の一覧](./tech-stack.md#確認状況の一覧) への参照を足し、検証 A の 5、`LISTEN/NOTIFY` の記述にセッションのロック・専用の接続が未確認であることを足した | AI の案。検証の結果の表そのものは変えていない |
+| H4 | 「イベントストア」の `Tx.run`、追記の競合の図、変更表の 6 | AI の案 |
+| H5 | 「投影」のアドバイザリロック、「ローカル開発のデータベース」の方言の差分（`ProjectionLock`・`ChangeNotifier`） | AI の案 |
+| M2 | 「イベントストア」に 23505 の後の規則 | AI の案 |
+| L3 | 方言の差分の `PersistenceFailure` を `AppFailure.Persistence` に | 直した |
 
 ## 出典
 

@@ -21,8 +21,10 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:25:00Z }
   - `package.json` の名前は `@beer-game/web`、`api:lint`・`api:generate` は `../beer-game-contracts/openapi.yaml` を参照する。
   - `vite.config.ts` は `/api` を `http://localhost:${API_PORT}` へプロキシする（`API_PORT` の既定は 3000）。
   - `src/api/client.ts` は、すべての要求に `X-Tab-Id` ヘッダーを付ける。
-  - `src/features/play/PlayPage.tsx` の `PLAY_POLL_MS` は 3000（3 秒）。`src`・`support`・`steps` に `EventSource` は存在しない（**SSE は使っていない**）。
+  - ポーリングは **3 画面**にある: `src/features/play/PlayPage.tsx` の `PLAY_POLL_MS`、`src/features/lobby/LobbyPage.tsx` の `LOBBY_POLL_MS`（準備中のときだけ）、`src/features/observer/ObservationPage.tsx` の `OBSERVATION_POLL_MS`（終了後は止まる）が、**いずれも 3000（3 秒）**（2026-11-25 にソースを読んで確認）。**`src/features/console/`（進行役のコンソール）には `setInterval` がない**。失敗の扱いは、Play と Observation が**黙って無視**、Lobby は **403 だけ表示して取り直しをやめる**。`src`・`support`・`steps` に `EventSource` は存在しない（**SSE は使っていない**）。
   - `support/hooks.mjs` は、バックエンドの未起動時に、**Kotlin 版（`./gradlew :app:run`）と TS 版の起動コマンドを案内する文言**を出して失敗する。Scala 版の案内は無い。
+- **確認状況の唯一の一覧**は [技術スタック](./tech-stack.md#確認状況の一覧) です。
+- **レビュー（2026-11-25）への対応の承認の状況**: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）の 4 件です。**H10・M17・SF2 の記述の直しを含め、他の直し方は AI の案で、承認を得ていません**。
 - **確認していないこと**: Scala のバックエンドに `web/` を向けたときの実際の動作は、**未検証**です（Scala 版のバックエンドがまだ存在しないため）。契約が同じなら動く、という**設計上の見込み**にとどまります。
 - Kotlin 版の実装の経緯（B1〜B15 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。
 
@@ -33,7 +35,7 @@ Rust 版の調査（[Rust 版](../beer-game-rust/architecture-frontend.md)）の
 | # | 結合点 | 現状（上で確認した実体） | Scala 版で必要な対応 |
 | :--- | :--- | :--- | :--- |
 | 1 | 開発時の接続先 | `/api` を `API_PORT` のポートへプロキシする。Kotlin に固有の値はない | **変更なし**。Scala のバックエンドを同じポートで起動すればよい（人の開発サーバーの 3000・5173 は止めない。E2E は専用の 3100・5273） |
-| 2 | E2E のバックエンド起動の案内 | `hooks.mjs` の案内の文言が、Gradle と npm の起動コマンドだけ | **案内の文言を、Scala 版（sbt の起動）にも出せるようにする**（SF2）。Rust 版の RF3（起動コマンドを差し替え可能にする）が先に実施されていれば、その仕組みを使う。**現時点の `hooks.mjs` には、その仕組みは無い**（上で確認） |
+| 2 | E2E のバックエンド起動の案内 | `hooks.mjs` の案内の文言が、Gradle と npm の起動コマンドだけ | **案内の文言を、Scala 版（sbt の起動）にも出せるようにする**（SF2）。Rust 版の RF3（起動コマンドを差し替え可能にする）は、Rust 版では承認済み（2026-11-19）だが、**既存の `hooks.mjs` の編集は実施前に改めて確認する条件つきで、まだ実施されていない**。**現時点の `hooks.mjs` には、その仕組みは無く**、案内の文言は Kotlin 版（`DB_KIND=h2 … ./gradlew :app:run`）と TS 版のものだけである（上で確認）。**Scala 版が先に差し替えの仕組みを足す場合も、Rust 版と同じ 1 回の編集にまとめる**（承認が要る。SF2） |
 | 3 | 契約と受入条件の場所 | `package.json` は `../beer-game-contracts/openapi.yaml`、`cucumber.mjs` は `../beer-game-features/**/*.feature` を参照する（中立のディレクトリへ移動済み） | **共有する**（SF1）。Scala 版の `apps/beer-game-scala/` から、同じ契約と同じフィーチャーファイルを参照する |
 | 4 | パッケージ名 | `@beer-game/web`（中立の名前に変更済み） | 変更なし |
 
@@ -42,7 +44,7 @@ Rust 版の調査（[Rust 版](../beer-game-rust/architecture-frontend.md)）の
 | # | 確認した実装の事実 | Scala のバックエンドへの要求 |
 | :--- | :--- | :--- |
 | a | `api/client.ts` は、すべての要求に `X-Tab-Id` ヘッダーを付ける（タブごとの識別子。ADR-020） | バックエンドは、このヘッダーで資格の Cookie の名前（`bg_session_<id>`・`bg_recovery_<id>`）を決める。**http4s のミドルウェアで Cookie 名を解決する**（ADR-001 の 020 の行）。ヘッダーなしは従来の名前のまま |
-| b | 現在の画面は、`PLAY_POLL_MS`（3 秒）の自動更新と、手動更新、保存・確定の応答の後の取得で更新する。**SSE を使わない** | **Scala 版のバックエンドは、SSE を実装しなくても、既存の画面は動く**。SSE は契約・非機能要件（NF-P2・NF-P4）にあるが、**画面が使い始めるまで優先度を下げられる**（未決）。バックエンドの SSE の設計（fs2 の `Stream`、SBD9）は維持する |
+| b | 現在の画面は、**3 画面（Play・Lobby・Observation）の 3 秒間隔の自動更新**（`PLAY_POLL_MS`・`LOBBY_POLL_MS`・`OBSERVATION_POLL_MS` が各 3000。console にはない）と、手動更新、保存・確定の応答の後の取得で更新する。**SSE を使わない**。取る GET は `/games/{id}/state`・`/sessions/{id}/state`・`/games/{id}/lobby`・`/games/{id}/observation` | **Scala 版のバックエンドは、SSE を実装しなくても、既存の画面は動く**。SSE は契約・非機能要件（NF-P4）にあり、**画面が使い始めるまで優先度を下げられる**（未決）。バックエンドの SSE の設計（fs2 の `Stream`、SBD9）は維持する。**レート制限の対象外にする GET は、この 4 つの経路**（`/state`、`/sessions/*`、`/lobby`、`/observation`。NF-S11 の専用の制限は別） |
 | c | 開発時は、Vite の中継を通すと、バックエンドが見る `Host` と `Origin` が一致せず、変更系の要求が 403 になる | `ALLOWED_ORIGINS=http://localhost:<UI のポート>` を指定する。Scala のバックエンドも、**同じ設定名（`ALLOWED_ORIGINS`）で Origin の許可リストを受け取る**（NF-S8。[インフラ](./architecture-infrastructure.md) の「ローカルの開発環境」で名前を Kotlin 版と揃える提案）。Origin の検査は弱めない |
 | d | エラーの扱いは `problem+json` の `code` を辞書の鍵にする（`api/problems.ts`、`Record<ErrorCode, …>`） | [UI 設計（Scala 版）](./ui-design.md) の影響の表のとおり。**http4s の既定の応答（経路なし、メソッド違い、本文の解析の失敗）を、problem+json に統一する** |
 | e | 型は `openapi-typescript` で生成し、生成物をコミットする。`api:check` が差分 0 を検査する | 仕様を変えるときは、**仕様 → 契約テスト（Scala 側。失敗）→ 実装 → 型の再生成 → 画面**の順（Kotlin 版と同じ） |
@@ -59,7 +61,7 @@ Kotlin 版の決定を**そのまま引き継ぎます**（小規模・`features
 | 開発時の接続先 | `/api` を、Scala のバックエンド（sbt で起動）へプロキシする（`API_PORT`） | プロキシの先が Ktor から http4s になるだけ |
 | E2E のバックエンド | Scala のバックエンドを、専用のポート（3100）で起動して使う（UI は 5273）。起動の案内を Scala 版にも出せるようにする（SF2） | 案内の文言が Gradle 固有 |
 | API の契約 | `apps/beer-game-contracts/openapi.yaml` を**共有する**。契約テストは Scala で書く（http4s のルートを関数として呼ぶ。SBD6） | Kotlin の契約テストの代わりに Scala の契約テスト |
-| リアルタイム更新 | **既存どおり、自動更新（ポーリング）と手動更新**。SSE は使わない | 変更なし |
+| リアルタイム更新 | **既存どおり、3 秒間隔の自動更新（ポーリング。Play・Lobby・Observation の 3 画面）と手動更新**。SSE は使わない。NF-P2 は p95 4 秒（ユーザーの決定、2026-11-25） | 変更なし |
 
 ## 全体構成
 
@@ -120,10 +122,11 @@ Sc ..> Spec : 契約テスト（Scala）
 
 ## リアルタイム更新の方式
 
-**現在の `web/` は、SSE を使いません**（上の確認事項 b）。更新は、`PLAY_POLL_MS`（3 秒）の自動更新、手動更新、保存・確定の応答の後の取得（`catchUp`）です。**Scala 版も同じ**にします。
+**現在の `web/` は、SSE を使いません**（上の確認事項 b）。更新は、**Play・Lobby・Observation の 3 画面の 3 秒間隔の自動更新**（`PLAY_POLL_MS`・`LOBBY_POLL_MS`・`OBSERVATION_POLL_MS`。console にはない。失敗は Play と Observation が黙って無視し、Lobby は 403 だけ表示して取り直しをやめる）、手動更新、保存・確定の応答の後の取得（`catchUp`）です。**Scala 版も同じ**にします。
 
 - **SSE の設計**（`state-version` の通知がストリームの種別と版を運ぶ、ストリームごとの版の比較、`useLiveSnapshot`、切断時のポーリング、`Last-Event-ID` による再生はしない）は、Kotlin 版の設計を維持し、**フロントエンドが SSE を使い始める時点**で実装する。バックエンドの SSE は、[バックエンドアーキテクチャ](./architecture-backend.md)の設計（http4s の `ServerSentEvent` と fs2 の `Stream`。**API は未確認**）に従う。
-- **NF-P2・NF-P4**: 現在の自動更新の間隔（3 秒）での反映の遅れは、Kotlin 版・Rust 版の実測（Rust 版は p95 約 2.86 秒、目標を 4 秒以下に再定義）と同じ前提です。**Scala 版の値は実測していません**（B1 以降。[非機能要件](./non-functional.md) に従う）。
+- **NF-P2・NF-P4**: 現在の自動更新の間隔（3 秒）では、反映の遅れは最大で約 3 秒に GET の所要を足したものです。**NF-P2 は p95 4 秒に再定義した**（ユーザーの決定、2026-11-25。Rust 版が 2026-11-23 に同じ再定義をした）。「p95 約 2.86 秒」は **Rust 版の推定**（GET の実測 + 3 秒間隔からの計算。画面を介した実測ではない。[Rust 版の NFR の検証結果](../../development/beer-game-rust/nfr_results.md)）で、Kotlin 版・Scala 版の実測ではありません。**Scala 版の値は実測していません**（B1 以降。[非機能要件](./non-functional.md) に従う）。
+- **NF-P2 を 2 秒に戻す選択肢（SSE の導入）**: 画面を変えない前提（SF1・SU2）と両立しないため、**全実装共通の画面の改善として別に扱う**（Scala 版だけでは決めない）。
 - 同期投影のため、取得したスナップショットの版は、応答の `versions` 以上であることが保証される（バックエンドの問い合わせの REPEATABLE READ と `projection_checkpoints` の同時読み取り）。この保証を **Scala 版のバックエンドも満たす**（統合テストの「問い合わせの一貫性」）。
 
 ## 品質属性への対応
@@ -153,7 +156,7 @@ Kotlin 版と同じです（アクセシビリティ、堅牢性、セキュリ�
 
 ### SF2: E2E のバックエンドの起動の案内を、Scala 版にも出せるようにする（提案）
 
-`support/hooks.mjs` の案内の文言が、Kotlin 版と TS 版の起動コマンドだけです（上で確認）。**起動コマンドの案内を、環境変数または設定で差し替えられるようにする**（Rust 版の RF3 と同じ。実施済みかは本書で確認していない）。実際の起動の自動化は別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。**既存のファイルの編集で、他の版に影響するため、承認を得てから行います。**
+`support/hooks.mjs` の案内の文言が、Kotlin 版と TS 版の起動コマンドだけです（上で確認）。**起動コマンドの案内を、環境変数または設定で差し替えられるようにする**（Rust 版の RF3 と同じ。**RF3 は Rust 版では承認済みだが、既存の `hooks.mjs` には未実施**（2026-11-25 に確認）。「RF3 が実施されていれば使う」ではなく、**RF3 と同じ 1 回の編集にまとめる**）。実際の起動の自動化は別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。**既存のファイルの編集で、他の版に影響するため、承認を得てから行います。**
 
 ### SF3: Scala のバックエンドの契約上の同等性を、既存の `@ui`・E2E で確かめる（提案）
 
@@ -171,10 +174,21 @@ Kotlin 版と同じです（アクセシビリティ、堅牢性、セキュリ�
 
 **フロントエンドの構成・ルーティング・状態管理・API の契約・版・共同入力・エラーの識別子・アクセシビリティは変えません。**
 
+## 変更の記録（レビュー対応。2026-11-25）
+
+[設計書レビュー](../../review/beer-game-scala/design_review_20261125.md) の指摘への対応です。**ユーザーが決めたのは H3・H6・H7・H9 の方針だけで、他の直し方は AI の案です（承認を得ていません）。**
+
+| 指摘 | 変更 | 状態 |
+| :--- | :--- | :--- |
+| H9 | NF-P2 の選択肢の記述（SSE で 2 秒）を、「画面を変えない前提と両立しないため、全実装共通の画面の改善として別に扱う」に直した。NF-P2 は p95 4 秒 | ユーザーの決定 |
+| H10 | ポーリングの範囲を実際の画面（Play・Lobby・Observation が各 3 秒、console にはない。失敗の扱いの違い）に合わせた。「Kotlin 版・Rust 版の実測（約 2.86 秒）」を「Rust 版の推定」に。レート制限の対象外にする GET の範囲を明記 | AI の案 |
+| M15 | SF2 の自己矛盾（RF3 は承認済みだが `hooks.mjs` は未対応）を直した | AI の案 |
+| M17 | `DB_KIND` の記述をインフラに揃えた（持つ。`postgres\|h2`、既定は `postgres`） | AI の案 |
+
 ## 未決事項
 
 1. **SF1〜SF3 の承認**。SF2 は、`hooks.mjs`（既存のファイル）を編集する前に改めて確認する。
-2. **環境変数の名前の揃え方**: Scala のバックエンドの設定名（`ALLOWED_ORIGINS`・`PORT`・`APP_ENV` など）を、Kotlin 版と揃えるか（提案は揃える。`DB_KIND` は持たない）。
+2. **環境変数の名前の揃え方**: Scala のバックエンドの設定名（`ALLOWED_ORIGINS`・`PORT`・`APP_ENV` など）を、Kotlin 版と揃えるか（提案は揃える。**`DB_KIND`（`postgres|h2`、既定は `postgres`）も含める**。[インフラ](./architecture-infrastructure.md) の「ローカルの開発環境と H2 の拒否」と同じ。`hooks.mjs` の起動案内の文言（Kotlin 版は `DB_KIND=h2`）に直接効く。M17）。
 3. **http4s の既定の応答**（経路なし、メソッド違い、本文の解析の失敗）の形と、problem+json への写像（[UI 設計](./ui-design.md)）。
 4. **SSE の優先度**: 画面が SSE を使い始める時期。バックエンドの SSE の API（http4s の `ServerSentEvent`）の確認。
 5. **Scala 版の CI での `web`・`ui` ジョブの構成**: Kotlin 版・Rust 版のワークフローの同名ジョブとの重複と分担（[インフラ](./architecture-infrastructure.md) の SI5）。
