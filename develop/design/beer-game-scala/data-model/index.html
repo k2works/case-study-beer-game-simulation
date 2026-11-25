@@ -3673,10 +3673,27 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="レビュー対応の記録（2026-11-25）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_22" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再レビュー（設計書の再レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_22" class="md-nav__link">
+  <a href="#_23" class="md-nav__link">
     <span class="md-ellipsis">
       
         出典
@@ -14548,12 +14565,12 @@
 <p>本書は、beer-game-scala のデータモデルを定義します。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の決定により、<strong>スキーマの構造は <a href="../../beer-game-kotlin/data-model/">beer-game-kotlin のデータモデル</a> を正本として引き継ぎ</strong>ます（ES + CQRS、<code>game_roots</code> を根にした連鎖削除、追記専用の <code>events</code>、同期投影、周辺ストア）。本書は、Scala 版で変わる点（マイグレーションの置き方、doobie での型の対応と制約違反の扱い、ローカル開発だけ H2 を使うこと）と、<strong>実際の PostgreSQL 18.6 と doobie で確認した事項</strong>を定めます。<strong><code>docs/</code> を設計の正本</strong>とします。実装コードはまだ存在しません（アプリの置き場は <code>apps/beer-game-scala</code> を予定）。</p>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>確認状況の正本は、<a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a></strong> です（レビュー指摘 H1）。本書の「検証の結果」は、その一覧の K5・K8〜K11・K18 の根拠で、本文は一覧にリンクします。</li>
+<li><strong>確認状況の正本は、<a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a></strong> です（レビュー指摘 H1）。本書の「検証の結果」は、その一覧の K5・K8〜K11・K18 の根拠で、本文は一覧にリンクします。<strong>正本の規則（再レビュー N-H5。AI の案）</strong>: 一覧が正です。一覧の根拠は実測の記録（本書の「検証の結果」、<a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、<strong>一覧を直すときは根拠も直します</strong>（一覧と本書の記述が食い違ったら、両方を見直す）。</li>
 <li><strong>本書で確認したこと</strong>（2026-11-25。リポジトリの外の使い捨てのプロジェクトで、sbt 1.13.1、Scala 3.7.4、doobie 1.0.0-RC12、testcontainers-scala 0.44.1、ローカルの Docker の <code>postgres:18.6</code> を使用）。結果は「検証の結果」の表にまとめました。</li>
 <li><code>events</code>・<code>game_roots</code> を<strong>縮小した DDL</strong>（主キー、名前つきの一意制約 <code>uq_events_stream_version</code>、外部キー <code>ON DELETE CASCADE</code>、<code>jsonb</code>、identity の <code>seq</code>）を適用できる。</li>
 <li>doobie の <code>transact</code> は、<code>ConnectionIO</code> が例外なく完了すれば、値が <code>Left</code> でも <strong>COMMIT する</strong>。<code>FC.rollback</code> を挟むと、その書き込みは残らない（<a href="../architecture-backend/">バックエンドアーキテクチャ</a> の SBD2 の前提を実 DB で確認）。</li>
 <li>一意制約違反は、<code>attemptSql</code> で <code>PSQLException</code> として取り出せ、SQLSTATE <code>23505</code> と制約名（<code>getServerErrorMessage.getConstraint</code>）が得られる。</li>
-<li><code>uuid</code>・<code>timestamptz</code>・<code>jsonb</code> の読み書き、アドバイザリロック（<code>pg_advisory_xact_lock(_shared)</code>）、<code>LISTEN/NOTIFY</code>（<code>doobie.postgres.hi.connection</code> の <code>pgListen</code>・<code>pgNotify</code>・<code>pgGetNotifications</code>。同じ接続）が動く。トランザクションの外のセッションのロック、専用の接続の <code>LISTEN</code>、切断後の再購読は<strong>未確認</strong>。</li>
+<li><code>uuid</code>・<code>timestamptz</code>・<code>jsonb</code> の読み書き、アドバイザリロック（<code>pg_advisory_xact_lock(_shared)</code>）、<code>LISTEN/NOTIFY</code>（<code>doobie.postgres.hi.connection</code> の <code>pgListen</code>・<code>pgNotify</code>・<code>pgGetNotifications</code>。同じ接続）が動く。共有と排他のロックが互いを待つこと、<code>lock_timeout</code>、専用の接続の <code>LISTEN</code>、切断後の再購読は<strong>未確認</strong>（セッションのロック <code>pg_advisory_lock</code> を使う <code>Resource</code> 案は、再レビュー N-H2 で不採用にした）。</li>
 <li><strong>引用したもの</strong>: <a href="../../beer-game-rust/data-model/">Rust 版のデータモデル</a> が、<strong><code>events</code>・<code>game_roots</code> ほかの DDL と DB ロール・GRANT を PostgreSQL 18.6 に適用して実測した結果</strong>（追記専用の拒否、部分一意索引、連鎖削除、制約名）を持ちます。DDL は言語に依存しないため、本書はそれを引用します。<strong>Scala 版では、その全文を再適用していません</strong>（上の縮小した DDL だけ）。ロールと GRANT を doobie の接続から検証することも、未実施です。</li>
 <li><strong>確認していないこと</strong>: 投影・周辺ストア・保持削除の他の表の DDL（Kotlin 版の ER 図と実ファイル <code>V002〜V006</code> に基づく設計で、Scala 版では<strong>未適用</strong>）、Flyway の実行、<code>HikariTransactor</code> と用途別のロール、<code>SET ROLE</code>、読み取り専用の <code>REPEATABLE READ</code>、circe による <code>jsonb</code> の読み書き（<code>doobie-postgres-circe</code> は<a href="../tech-stack/">技術スタック</a>に載せておらず、未確認）。</li>
 <li><strong>引き継ぐだけのもの</strong>: 投影テーブルの定義（購読するイベント、閲覧できる人）、読み取りの規則、設計判断のまとめは、Kotlin 版を正本とします。</li>
@@ -14743,7 +14760,7 @@
 <tr>
 <td style="text-align: left;">5</td>
 <td style="text-align: left;">アドバイザリロック</td>
-<td style="text-align: left;"><code>sql"select pg_advisory_xact_lock(42)".query[Unit].unique</code> と <code>pg_advisory_xact_lock_shared</code> が <code>ConnectionIO</code> として実行できた。<strong><code>transact</code> の外のセッションのロック（<code>pg_advisory_lock(_shared)</code>）は未確認</strong>（<code>ProjectionLock</code> の <code>Resource</code> 版。H5）</td>
+<td style="text-align: left;"><code>sql"select pg_advisory_xact_lock(42)".query[Unit].unique</code> と <code>pg_advisory_xact_lock_shared</code> が <code>ConnectionIO</code> として実行できた。<strong>未確認</strong>: 共有（<code>pg_advisory_xact_lock_shared</code>）と排他（<code>pg_advisory_xact_lock</code>）が互いを待つこと、<code>lock_timeout</code> での 55P03、COMMIT・ROLLBACK で外れること（<code>ProjectionLock</code> の <code>ConnectionIO</code> の変換版。N-H2）。セッションのロック（<code>pg_advisory_lock(_shared)</code>）は、<code>Resource</code> 案を不採用にしたため確かめない</td>
 </tr>
 <tr>
 <td style="text-align: left;">6</td>
@@ -14794,7 +14811,7 @@
 <p><strong>導入しません</strong>（Kotlin 版と同じ）。1 ストリームは千件前後と見積もります。<strong>この見積もりは Kotlin 版の値で、Scala の実装で再計測します</strong>（ADR-003）。再生時間が NFR-03 の予算を圧迫すると実測で分かった場合にだけ、確定ごとのスナップショットを導入します。</p>
 <h2 id="_11">投影<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <p>同期投影（追記と同じトランザクションで更新）、<code>projection_checkpoints</code>、投影の再構築（ゲームごとに 1 トランザクション、アドバイザリロック。コマンドは共有、再構築は排他）、複数の投影の行を更新する順序（表の順序の固定。表名と主キーの順）、投影テーブルの定義、出力を投影にしない（<code>export_packages</code> の廃止。<code>buildExport</code> を問い合わせ時に実行）、読み取りの規則（参加者・進行役・観察者の読める範囲）、観察のための <code>week_team_totals</code> は、<strong>Kotlin 版と同じ</strong>です。</p>
-<p>Scala 版では、投影を <code>Projection = EventEnvelope[DomainEvent] =&gt; List[RowChange]</code>（純粋）と、<code>RowChange</code> を SQL に変える境界に分けます（<a href="../domain-model/">ドメインモデル</a>）。アドバイザリロックは SQL を直接発行します（<code>ProjectionLock</code> のポートの実装。<strong><code>transact</code> の外の <code>Resource[IO, Unit]</code></strong>。H5 の案で、承認を得ていない。確認済みなのは <code>ConnectionIO</code> の中の <code>pg_advisory_xact_lock(_shared)</code> で、セッションのロックは未確認。検証の 5、<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）。観察者の問い合わせの寄与者数による抑止（<code>contributors &lt; 2</code>）は <code>Disclosure</code>（問い合わせの層）で行います。</p>
+<p>Scala 版では、投影を <code>Projection = EventEnvelope[DomainEvent] =&gt; List[RowChange]</code>（純粋）と、<code>RowChange</code> を SQL に変える境界に分けます（<a href="../domain-model/">ドメインモデル</a>）。アドバイザリロックは SQL を直接発行します（<code>ProjectionLock</code> のポートの実装。<strong><code>ConnectionIO</code> の変換で、トランザクションの先頭の <code>pg_advisory_xact_lock(_shared)</code></strong>。H5・N-H2 の案で、承認を得ていない。確認済みなのは <code>ConnectionIO</code> として実行できることだけで、共有と排他の待ち合いは未確認。検証の 5、<a href="../architecture-backend/">バックエンドアーキテクチャ</a>）。観察者の問い合わせの寄与者数による抑止（<code>contributors &lt; 2</code>）は <code>Disclosure</code>（問い合わせの層）で行います。</p>
 <h2 id="_12">周辺ストア<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
 <p><code>display_profiles</code>（表示名。1〜80 文字）、<code>credentials</code>（進行役の資格・復帰資格・観察用の招待のダイジェストと鍵の版、<code>expires_at</code>、<code>revoked_at</code>）、<code>browser_sessions</code>（24 時間。操作の認証はこの表だけを見る。失効は行の削除）、<code>participation_attempts</code> は、<strong>Kotlin 版と同じ</strong>です。<strong>追記と同じトランザクション</strong>で書き、書く内容は、コマンドが運んだ値とイベントの ID だけです（書き込みの内容は純粋関数 <code>peripheralWrites</code> で導出）。</p>
 <ul>
@@ -14949,15 +14966,15 @@
 <tbody>
 <tr>
 <td style="text-align: left;">再構築との直列化（アドバイザリロック）</td>
-<td style="text-align: left;"><code>pg_advisory_xact_lock(_shared)</code>（<code>ConnectionIO</code> の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版は <code>transact</code> の外のセッションのロックで、<strong>未確認</strong></td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock(_shared)</code>（<code>ConnectionIO</code> の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。共有と排他の待ち合いは<strong>未確認</strong></td>
 <td style="text-align: left;">動かない（関数が無い）</td>
-<td style="text-align: left;">ポート <code>ProjectionLock</code>（<code>GameId =&gt; Resource[IO, Unit]</code>）の裏に隠す。H2 版は<strong>プロセス内のロック</strong>を <code>Resource</code> に包む（単一プロセスでのみ有効）。<strong>PostgreSQL 版と同じ型</strong>（H5。AI の案）</td>
+<td style="text-align: left;">ポート <code>ProjectionLock</code>（<code>withShared</code>・<code>withExclusive</code>: <code>ConnectionIO[A] =&gt; ConnectionIO[A]</code>）の裏に隠す。H2 版は<strong>プロセス内のロック</strong>を <code>ConnectionIO</code> の <code>bracket</code> で包む（単一プロセスでのみ有効。解放は COMMIT の前）。<strong>PostgreSQL 版と同じ型</strong>（H5・N-H2。AI の案）</td>
 </tr>
 <tr>
 <td style="text-align: left;">SSE の版の通知（LISTEN/NOTIFY）</td>
 <td style="text-align: left;"><code>pgListen</code>・<code>pgNotify</code>（同じ接続で Scala 版で確認済み。K11）</td>
 <td style="text-align: left;">動かない（構文エラー）</td>
-<td style="text-align: left;">ポート <code>ChangeNotifier</code>（<code>enqueue: ConnectionIO</code>、<code>deliver: IO</code>）の裏に隠す。H2 版は <code>enqueue</code> が何もせず、<code>deliver</code> が<strong>プロセス内のイベント</strong>へ配る（<code>Tx.run</code> の後。単一プロセスでのみ有効）。PostgreSQL 版は <code>enqueue</code> が <code>pg_notify</code>。<strong>同じ型</strong>（H5。AI の案）</td>
+<td style="text-align: left;">ポート <code>ChangeNotifier</code>（<code>enqueue: ConnectionIO</code>、<code>deliver: IO</code>）の裏に隠す。呼ぶのは <code>execute</code> だけ（M4）。H2 版は <code>enqueue</code> が何もせず、<code>deliver</code> が<strong>プロセス内のイベント</strong>へ配る（<code>Tx.run</code> の後。単一プロセスでのみ有効）。PostgreSQL 版は <code>enqueue</code> が <code>pg_notify</code>。<strong>同じ型</strong>（H5。AI の案）</td>
 </tr>
 <tr>
 <td style="text-align: left;">部分一意索引 <code>uq_idempotency_create</code></td>
@@ -15152,7 +15169,30 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_22">出典<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>
+<h3 id="_22">再レビュー（<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h3>
+<p>ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけです。<strong>N-H2・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">直した箇所</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">N-H2</td>
+<td style="text-align: left;">「本書の位置づけと確認の範囲」の未確認の記述、検証 A の 5（未確認の範囲を、共有と排他の待ち合いなどに書き直した。<strong>実測の結果そのものは変えていない</strong>）、「投影」のアドバイザリロック、方言の差分（<code>ProjectionLock</code>・<code>ChangeNotifier</code>）</td>
+<td style="text-align: left;">AI の案。<code>ProjectionLock</code> を <code>ConnectionIO</code> の変換にした。<code>Resource</code> 版は不採用</td>
+</tr>
+<tr>
+<td style="text-align: left;">N-H5</td>
+<td style="text-align: left;">「本書の位置づけと確認の範囲」に正本の規則（一覧が正。根拠は実測の記録。一覧を直すときは根拠も直す）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_23">出典<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Scala 版の確認: sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、doobie-core・doobie-postgres・doobie-hikari 1.0.0-RC12、testcontainers-scala-postgresql・testcontainers-scala-munit 0.44.1、ローカルの Docker の <code>postgres:18.6</code>（使い捨てのコンテナ）、2026-11-25。リポジトリの外の使い捨てのプロジェクトで行い、リポジトリには残していない。</li>
 <li>Rust 版の DDL の検証: ローカルの Docker の <code>postgres:18.6</code>、2026-11-19（<a href="../../beer-game-rust/data-model/">データモデル（Rust 版）</a>）。</li>

@@ -9171,7 +9171,35 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#2026-11-25" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        対応状況（2026-11-25）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="対応状況（2026-11-25）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        反映後も残る未確認・要判断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
     <span class="md-ellipsis">
       
         次のステップ
@@ -14793,11 +14821,83 @@
 </tbody>
 </table>
 <p>上の表は元の指摘数で、本文の統合後の番号とは重複を除く分だけ異なる。各エージェントの全文はこの文書に転記していない。根拠となる文書名・行は、上の表と事実確認の結果に残した。</p>
-<h2 id="_12">次のステップ<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<h2 id="2026-11-25">対応状況（2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
+<p>論点のうち 4 件はユーザーが決めた（N-H4・N-H6・N-H7・N-H8）。N-H1・N-H2・N-H3・N-H5 と、中・低の直し方は AI の案で、承認を得ていない。</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>対応</th>
+<th>決定の区分</th>
+<th>主な反映先</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N-H1</td>
+<td><code>GameEvent</code> を 12 個にし、<code>Started</code>・<code>Preparing</code> が観察者の招待・取り消し・参加、資格の失効・再発行、復帰を受ける。未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>。EV × 状態の「遷移の許す組の表」を規範にして、<code>apply</code>・状態遷移図・生成器・状態遷移テストを導く。受入テストを 4 点足した</td>
+<td>AI の案</td>
+<td>domain-model、test-strategy、ADR-001</td>
+</tr>
+<tr>
+<td>N-H2</td>
+<td><code>ProjectionLock</code> を <code>ConnectionIO</code> の変換（<code>withShared</code>・<code>withExclusive</code>）にした。PostgreSQL 版は <code>pg_advisory_xact_lock(_shared)</code>、H2 版は <code>bracket</code>。接続は増えない。<code>Resource</code> 案は接続 2 本・プール枯渇のため不採用</td>
+<td>AI の案（B1 の最初に実測して確定）</td>
+<td>architecture-backend、data-model、tech-stack、ADR-001</td>
+</tr>
+<tr>
+<td>N-H3</td>
+<td><code>.transact(</code> の入口を <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続に絞って 1 か所（<code>Transactions.scala</code>）に置き、禁止を拡張。受入条件を「落ちるべき」「落ちてはならない」の 2 方向の表にした。「型で作れなくする」は言い換えた</td>
+<td>AI の案</td>
+<td>architecture-backend、tech-stack、test-strategy、non-functional</td>
+</tr>
+<tr>
+<td>N-H4</td>
+<td>検証用の CI（<code>check</code> ジョブ 1 本）は U1 に含める。AWS 環境・デプロイ用ワークフロー・ステージングへの自動反映は後回し。自動反映を持たない間の team 規約の例外は ADR-001 に「案。人の承認が必要」として記録した</td>
+<td><strong>ユーザーの決定</strong>（例外の記録は案）</td>
+<td>ADR-001、index、test-strategy、architecture-infrastructure</td>
+</tr>
+<tr>
+<td>N-H5</td>
+<td>正本の規則を「一覧が正。一覧の根拠は実測の記録で、一覧を直すときは根拠も直す」に統一。<code>index.md</code> の古い記述と旧名を直した</td>
+<td>AI の案</td>
+<td>tech-stack、test-strategy、non-functional、operation、data-model、index</td>
+</tr>
+<tr>
+<td>N-H6</td>
+<td><code>domain</code> の文 97% は目安に統一した。プロジェクトごとのしきい値の設定可否（K16）は未確認で、設定できなければ全体のしきい値だけにする。案 C の算出スクリプトのテスト（M7）も足した</td>
+<td><strong>ユーザーの決定</strong></td>
+<td>tech-stack、test-strategy、non-functional、ADR-001</td>
+</tr>
+<tr>
+<td>N-H7</td>
+<td>止まったゲームでも読み取りは 200 で返すことを要件にし、B1 の確認項目 (a)〜(e) に入れた。パターン 18 の依頼文言に「操作を繰り返さず相関 ID を伝える」「15 分以内に見込み（15 分は AI の案）」「画面の数字を控える」を足し、#15 の画面文言を実物に直した</td>
+<td><strong>ユーザーの決定</strong>（文言は案）</td>
+<td>architecture-backend、operation、ui-design、test-strategy、non-functional</td>
+</tr>
+<tr>
+<td>N-H8</td>
+<td>U1〜U3 の間は実際の研修に使わない（検証・事例用）と、ADR-001・index・各文書の冒頭に明記。ui-design に #16（範囲外の画面）を新設した</td>
+<td><strong>ユーザーの決定</strong></td>
+<td>ADR-001、index、ui-design、operation、architecture-infrastructure、architecture-backend</td>
+</tr>
+</tbody>
+</table>
+<p>あわせて、中・低の一部（M1〜M20 の多く、L1〜L10 の多く）も直した。範囲は各文書の末尾の変更記録に残してある。</p>
+<h3 id="_12">反映後も残る未確認・要判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<ul>
+<li>新しく書いた Scala のコード（<code>Tx.run</code>、<code>withShared</code>、<code>Transactions.scala</code> の入口、<code>Committed</code> など）は<strong>型検査していない</strong>。排他の <code>pg_advisory_xact_lock</code> の待ち合いと <code>lock_timeout</code>、H2 版の <code>bracket</code> が COMMIT の前に解放される弱点（ローカル専用なので許容する案）は未確認。</li>
+<li>「遷移の許す組の表」は Kotlin 版のコードと図から AI が作った案で、人の確認がない。Kotlin 版の <code>revoked</code>・<code>reissued</code>・<code>recovered</code> が未知の主体を無視するかは未確認（domain-model の未決事項 13）。</li>
+<li>規約の例外、依頼文言（15 分を含む）、パターン 18、Intent の文面、成功の指標の数値は、運営者・ユーザーの承認が要る。</li>
+<li>範囲外の画面（#16）の見え方のうち、http4s の「経路なし」の応答の形、Scalafix の除外の書き方、<code>DisableSyntax.regex</code> が文字列の中の語を拾うかは未確認。画面を動かした確認は未実施。</li>
+<li>日本語見出しのアンカー（<code>#確認状況の一覧</code> など）が公開サイトで解決するかは未確認のまま。</li>
+<li>反映後の<strong>再々レビュー</strong>は未実施。<code>verified</code> の記録と <code>stable</code> への昇格は人が行う。</li>
+</ul>
+<h2 id="_13">次のステップ<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
 <ol>
-<li>人が論点 1〜5 を決める。特に N-H4（CI）は B1 の計画より前に必要。</li>
-<li>高 8 件（N-H1〜N-H8）を設計文書へ反映する。N-H1・N-H2・N-H3 は設計の穴なので先に。</li>
-<li>反映後に再々レビューし、人が <code>verified</code> を記録して <code>stable</code> に昇格する。</li>
+<li>反映した設計文書を人が確認する。</li>
+<li>再々レビューを実施する。</li>
+<li>人が <code>verified</code> を記録して <code>stable</code> に昇格する。</li>
 </ol>
 
 

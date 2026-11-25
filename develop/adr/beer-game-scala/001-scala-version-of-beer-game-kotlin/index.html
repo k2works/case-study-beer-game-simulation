@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Scala 3（Cats Effect + http4s + doobie）と既存の React で作り直す。Intent・成功の測り方・範囲（U1〜U3 を約束）、beer-game-kotlin の ADR の引き継ぎ表（本文で検証済み）、Scala 固有の判断、関数型プログラミングガイド（Scala 編）の各章から設計書へのトレース表を含む。">
+        <meta name="description" content="beer-game2 の要件・ストーリー・Unit 定義と beer-game-kotlin の設計を正本として流用し、Scala 3（Cats Effect + http4s + doobie）と既存の React で作り直す。Intent・成功の測り方・範囲（U1〜U3 を約束。検証用の CI は U1 に含め、AWS・デプロイは後回し）、ステージングへの自動反映を持たない間の team 規約の例外（案）、beer-game-kotlin の ADR の引き継ぎ表（AI が本文と照合した。人のレビューは未了）、Scala 固有の判断、関数型プログラミングガイド（Scala 編）の各章から設計書へのトレース表を含む。">
       
       
         <meta name="author" content="k2works">
@@ -11119,6 +11119,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        team 規約の例外（案。人の承認が必要。承認済みではない）
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -14406,34 +14417,60 @@
 <p>提案中（レビュー待ち）</p>
 <p>ユーザーが承認したのは、<strong>作成計画</strong>（beer-game-kotlin の設計書を正本とし、Scala 版の設計書 10 本と本 ADR を作る。スタックはガイド準拠）である。本書の<strong>引き継ぎ表の判定</strong>、<strong>Scala 固有の判断</strong>、<strong>版の選定</strong>、<strong>Intent と成功の測り方</strong>は、AI が beer-game-kotlin の ADR・設計書と Scala 編ガイドを読んで作った案で、<strong>人の承認を得ていない</strong>。承認の記録は、承認を得た時点でこの節に追記する。</p>
 <p><strong>ユーザーの決定（2026-11-25）</strong>: 「ローカル DB は Kotlin と同じく H2 で」。ローカル開発（開発機での起動・動作確認）だけ H2 の PostgreSQL モードを使い、統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18 のままとする（下の 014 の行、<a href="../../../design/beer-game-scala/tech-stack/">技術スタック</a> の ST9）。当初 AI が起草した「ローカルも PostgreSQL 18（Docker）のみ」の提案は、この決定により取り下げた。<strong>この決定が含まないもの</strong>: H2 の導入（依存の追加）そのものの承認、H2 の版の確認結果の承認、H2 の PostgreSQL モードでの動作範囲（B1 の最初に実測して確定する）。これらは Kotlin 版と同様に未了である。</p>
-<p><strong>ユーザーの決定（2026-11-25、<a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a>の指摘への対応）</strong>: 次の 4 件だけである。</p>
+<p><strong>ユーザーの決定（2026-11-25）の一覧</strong>: 次の 8 件だけである。前の 4 件は<a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a>（最初の決定）、後の 4 件は<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>への回答（再レビュー後の決定）である。範囲（H7）は最初の決定で「U1〜U3 を約束し、U4〜U6 は指標を見て決める」まで、再レビュー後の決定（N-H4）で CI と AWS の線引きを確定した。</p>
 <table>
 <thead>
 <tr>
-<th style="text-align: left;">レビューの指摘</th>
+<th style="text-align: left;">時期</th>
+<th style="text-align: left;">指摘</th>
 <th style="text-align: left;">決定</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;">最初の決定</td>
 <td style="text-align: left;">H3 不正な遷移（<code>Ignored</code>）の扱い</td>
 <td style="text-align: left;">止める設計を維持する（Kotlin 版は状態を変えずに検知して続行する。下の「影響」）</td>
 </tr>
 <tr>
+<td style="text-align: left;">最初の決定</td>
 <td style="text-align: left;">H6 カバレッジの floor</td>
 <td style="text-align: left;">行率を算出する案 C を第一とする（scoverage の XML から行率を算出。B1 で確かめる。<a href="../../../design/beer-game-scala/test-strategy/">テスト戦略</a> の STT2）</td>
 </tr>
 <tr>
+<td style="text-align: left;">最初の決定</td>
 <td style="text-align: left;">H7 範囲</td>
-<td style="text-align: left;">U1〜U3 を約束し、U4〜U6 は指標を見て決める（下の「範囲」）</td>
+<td style="text-align: left;">U1〜U3 を約束し、U4〜U6 は指標を見て決める。<strong>この時点の記述は「専用の AWS 環境・CI の新設は後回し」だったが、この決定に CI まで含まれていたかは曖昧だった</strong>（再レビューの指摘。N-H4 で確定）</td>
 </tr>
 <tr>
+<td style="text-align: left;">最初の決定</td>
 <td style="text-align: left;">H9 NF-P2</td>
 <td style="text-align: left;">p95 4 秒に揃える（Rust 版と同じ。<a href="../../../design/beer-game-scala/non-functional/">非機能要件</a> の SN の項）</td>
 </tr>
+<tr>
+<td style="text-align: left;">再レビュー後</td>
+<td style="text-align: left;">N-H4 CI と AWS の線引き</td>
+<td style="text-align: left;">検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。専用 AWS 環境、デプロイ用ワークフロー、ステージングへの自動反映は後回し。自動反映を持たない間の team 規約の例外は、ADR に記録して人が承認する（下の「team 規約の例外」。例外そのものは案で未承認）</td>
+</tr>
+<tr>
+<td style="text-align: left;">再レビュー後</td>
+<td style="text-align: left;">N-H6 <code>domain</code> の文 97%</td>
+<td style="text-align: left;">目安とする。ゲートにするかは B1 の実測（K16 の確認）の後に決める</td>
+</tr>
+<tr>
+<td style="text-align: left;">再レビュー後</td>
+<td style="text-align: left;">N-H7 止まったゲームの読み取り</td>
+<td style="text-align: left;">止まったゲームでも状態の取得（読み取り）は返すことを要件にする（書き込みは止める）</td>
+</tr>
+<tr>
+<td style="text-align: left;">再レビュー後</td>
+<td style="text-align: left;">N-H8 U1〜U3 の用途</td>
+<td style="text-align: left;">U1〜U3 の間は実際の研修に使わない（検証・事例用）</td>
+</tr>
 </tbody>
 </table>
-<p><strong>これら以外の指摘（H1・H2・H4・H5・H8・H10）の直し方は、すべて AI の案で、ユーザーの承認を得ていない</strong>。本書で「H4 案」などと書いたものも同じである。</p>
+<p><strong>これら 8 件以外の指摘（H1・H2・H4・H5・H8・H10、N-H1・N-H2・N-H3・N-H5 ほか）の直し方は、すべて AI の案で、ユーザーの承認を得ていない</strong>。本書で「H4 案」「N-H2 案」などと書いたものも同じである。</p>
+<p><strong>決定と案の区別（再レビュー M16）</strong>: 作成計画の承認（beer-game-kotlin の設計書を正本とし、スタックは関数型プログラミングガイド（Scala 編）準拠）から<strong>導かれたもの</strong>は、Scala 3・sbt・Cats / Cats Effect・http4s・doobie という道具の系列である。ただし、<strong>具体的な版（例: Scala 3.7.4）、circe（ST6）、HikariCP（ST8）、JDK などの個別の選定は AI の案</strong>で、導入時の承認が要る。ガイド準拠から導かれるのは系列までである。</p>
 <h2 id="_2">コンテキスト<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>beer-game2 は要件（BR・FR・NFR）、ユースケース、ストーリー、Unit 定義（U1〜U6）を持つ。beer-game-kotlin は、それを正本として、ES + CQRS と関数型コア（Arrow）で設計した（<a href="../../../design/beer-game-kotlin/">設計書の入口</a>、ADR 001〜020）。beer-game-rust は、その設計を Rust に写した前例である（<a href="../../beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001（Rust 版）</a>）。</p>
 <p>Scala 版は、同じ学習の価値を、<strong>型クラスと <code>IO</code> の値による合成</strong>（Cats、Cats Effect）で提供することを狙う。Scala の <code>enum</code> と <code>case class</code> で状態を型にし、失敗を <code>Either</code> と <code>ValidatedNec</code> で表し、副作用を <code>IO</code> と <code>ConnectionIO</code> の値として組み立てる。実装規約は Scala 編ガイドで、第 3〜9 章がこの設計の根拠になる。</p>
@@ -14467,12 +14504,12 @@
 <tbody>
 <tr>
 <td style="text-align: left;">共有する <code>apps/beer-game-features/</code> のうち、Scala のバックエンドで通るシナリオの割合（<code>@api</code>・<code>@ui</code>）</td>
-<td style="text-align: left;">約束した範囲（U1〜U3）に対応する許可リストの 100%。許可リストの外は通ると数えない（Rust 版は Release 0.1 で許可リストの 100% としている）</td>
+<td style="text-align: left;">約束した範囲（U1〜U3）に対応する許可リストの 100%。<strong>許可リストは、U1〜U3 の Unit 定義の <code>@AC</code> タグから機械的に導く</strong>（手で選ばない）。許可リストの外は通ると数えない（Rust 版は Release 0.1 で許可リストの 100% としている）</td>
 <td style="text-align: left;">B1 の計画で承認を得る</td>
 </tr>
 <tr>
 <td style="text-align: left;">Must のストーリーの受入条件のパリティ（Kotlin 版と同じ受入条件で通る数）</td>
-<td style="text-align: left;">U1〜U3 に含まれる Must のストーリーの全受入条件</td>
+<td style="text-align: left;">U1〜U3 に含まれる Must のストーリーの全受入条件。<strong>U1 の US6.1（CI）は、検証用の <code>check</code> ジョブ 1 本の範囲で含める。US6.2（ステージングまで）は AWS・デプロイが後回しのため、範囲外</strong>（パリティの分母に入れない）</td>
 <td style="text-align: left;">B1 の計画で承認を得る</td>
 </tr>
 <tr>
@@ -14482,12 +14519,12 @@
 </tr>
 <tr>
 <td style="text-align: left;">行カバレッジ</td>
-<td style="text-align: left;">全体の行 80%（team の floor）を、scoverage の XML から算出して確かめる（案 C。H6 のユーザーの決定）。<code>domain</code> の目標（Kotlin 版は行 100% のゲート）は B1 の計画で決める</td>
+<td style="text-align: left;">全体の行 80%（team の floor）を、scoverage の XML から算出して確かめる（案 C。H6 のユーザーの決定）。<code>domain</code> の文 97% は<strong>目安</strong>（N-H6 のユーザーの決定）。ゲートにするかは B1 の実測（プロジェクトごとのしきい値を設定できるか。K16）の後に決める。設定できなかったときの扱いも、その時に決める</td>
 <td style="text-align: left;">B1</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P2（確定から他の参加者への反映）</td>
-<td style="text-align: left;">p95 4 秒（H9 のユーザーの決定）。実測は B1 で行い、結果を記録する</td>
+<td style="text-align: left;">p95 4 秒（H9 のユーザーの決定）。実測は B1 で行い、結果を記録する。<strong>範囲外（U6）の性能を早めに計測するものであって、U6 の性能の約束ではない</strong>（再レビュー M13。画面を通した実測か、GET の実測 + 計算の推定かは、B1 の受入条件で決める）</td>
 <td style="text-align: left;">B1</td>
 </tr>
 <tr>
@@ -14508,22 +14545,76 @@
 <tbody>
 <tr>
 <td style="text-align: left;"><strong>今回の範囲（約束する）</strong></td>
-<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定（<a href="../../../requirements/beer-game-ts/unit_definition/">Unit 定義</a>）</td>
+<td style="text-align: left;">U1 ウォーキングスケルトン、U2 共同担当と進行の継続、U3 カスタム条件と自動確定（<a href="../../../requirements/beer-game-ts/unit_definition/">Unit 定義</a>）。<strong>U1 には検証用の CI（<code>check</code> ジョブ 1 本: formatter・linter・type-check・テスト）を含める</strong>（N-H4 のユーザーの決定）</td>
 </tr>
 <tr>
-<td style="text-align: left;">範囲外・後回し（指標を見て決める）</td>
-<td style="text-align: left;">U4 学習ビュー（役割別の振り返り、観察者、出力）、U5 保持・運用（保持削除、観測の完成、本番のデプロイ、復元の訓練）、U6 仕上げ（ヘルプ、アクセシビリティの手動確認、性能・負荷の確認、受入）、専用の AWS 環境、CI の新設</td>
+<td style="text-align: left;">範囲外・後回し</td>
+<td style="text-align: left;">U4 学習ビュー（役割別の振り返り、観察者、出力）、U5 保持・運用（保持削除、観測の完成、本番のデプロイ、復元の訓練）、U6 仕上げ（ヘルプ、アクセシビリティの手動確認、性能・負荷の確認、受入）、専用の AWS 環境、デプロイ用ワークフロー、ステージングへの自動反映、本番運用・復元訓練。U4〜U6 に進むかは指標を見て決める</td>
 </tr>
 </tbody>
 </table>
-<p>設計書は、Kotlin 版と同じ文書構成で U1〜U6 の全範囲の設計を扱う。<strong>実装として約束するのは U1〜U3 だけ</strong>で、U4 以降に進むかは、上の指標の結果を見て人が決める。次の 2 点は、AI の指摘で、決定ではない。</p>
+<p>決定の履歴（範囲）:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">時期</th>
+<th style="text-align: left;">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">最初の決定（2026-11-25）</td>
+<td style="text-align: left;">U1〜U3 を約束し、U4〜U6 は指標を見て決める。後回しの対象として「専用の AWS 環境、CI の新設」と記録した。この記録が、CI まで後回しにする決定だったのか、AI の要約だったのかは曖昧だった（再レビュー N-H4 の指摘。下の再レビュー後の決定で確定した。確定前の記述は、決定の範囲を AI が広げて書いた可能性がある）</td>
+</tr>
+<tr>
+<td style="text-align: left;">再レビュー後の決定（2026-11-25）</td>
+<td style="text-align: left;">検証用の CI（<code>check</code> ジョブ 1 本）は U1 の約束に含める。AWS 環境、デプロイ用ワークフロー、ステージングへの自動反映は後回し</td>
+</tr>
+</tbody>
+</table>
+<p>設計書は、Kotlin 版と同じ文書構成で U1〜U6 の全範囲の設計を扱う。<strong>実装として約束するのは U1〜U3 だけ</strong>で、U4 以降に進むかは、上の指標の結果を見て人が決める。</p>
+<p><strong>U1〜U3 の間は実際の研修に使わない（検証・事例用）</strong>（N-H8 のユーザーの決定）。理由は 2 つで、いずれも範囲外の機能が欠けるためである。</p>
 <ul>
-<li><strong>学習の価値の完結</strong>: Kotlin 版・Rust 版が最優先とする「役割別の振り返り」（US4.2）は U4 にある。U1〜U3 だけでは、研修として振り返りまで完結しない。U4 に進むかの判断で、この点を材料にする。</li>
-<li><strong>U1 の定義との差</strong>: Unit 定義の U1 は CI/CD と US6.2（ステージングまで）を含む。決定の「専用の AWS 環境・CI の新設は後回し」とは食い違うため、U1 のうちどこまでを約束に含めるかは、B1 の計画で人が決める。</li>
+<li>U5 の US5.1（保持削除。Must）が範囲外で、参加者の表示名が期限後も消えない。</li>
+<li>U4 の US4.2（役割別の振り返り）が範囲外で、研修として完結しない（学習の価値の完結。Kotlin 版・Rust 版が最優先とする機能）。</li>
 </ul>
+<p>U1〜U3 の画面から範囲外の画面（振り返り、観察の一部、保持状態、出力）に進んだときの見え方は、<a href="../../../design/beer-game-scala/ui-design/">UI 設計</a> 側で定める（担当は別。AI の案）。U4 に進むかの判断で、学習の価値の完結を材料にする。</p>
+<p><strong>U1 の定義との差</strong>: Unit 定義の U1 は CI/CD と US6.2（ステージングまで）を含む。N-H4 の決定により、U1 のうち CI は <code>check</code> ジョブ 1 本を約束に含め、US6.2（ステージング）と CD は範囲外とする。</p>
+<h3 id="team">team 規約の例外（案。人の承認が必要。承認済みではない）<a class="headerlink" href="#team" title="Permanent link">&para;</a></h3>
+<p>team の Mandated（project.md「ALWAYS deploy <code>main</code> merges automatically to staging and require manual approval before production deployment」、team.md の Deployment）は、<code>main</code> への merge を staging へ自動反映することを求める。AWS 環境とデプロイ用ワークフローを後回しにする決定（N-H4）の間は、この規約を満たせない。次の例外を、<strong>案として</strong>記録する。<strong>承認はまだ得ていない</strong>。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">例外の内容</td>
+<td style="text-align: left;">U1〜U3 の間、ステージングへの自動反映と production の手動承認デプロイを持たない。formatter・linter・type-check の CI 実行（Mandated の別項目）は例外にせず、U1 の <code>check</code> ジョブで守る</td>
+</tr>
+<tr>
+<td style="text-align: left;">期間</td>
+<td style="text-align: left;">U1〜U3 の約束の範囲の間。U1〜U3 の実装を終え、U4 以降へ進むか、AWS・デプロイを前倒しするかを人が決めるとき（指標の確認時）に、再評価する</td>
+</tr>
+<tr>
+<td style="text-align: left;">解除の条件</td>
+<td style="text-align: left;">(a) 専用の AWS 環境とデプロイ用ワークフローが用意され、<code>main</code> merge の staging への自動反映が動く、または (b) 人が規約自体を改める（team.md・project.md の更新）、のいずれか</td>
+</tr>
+<tr>
+<td style="text-align: left;">例外の間の条件</td>
+<td style="text-align: left;">U1〜U3 の成果物を、実際の研修・本番に使わない（N-H8）。デプロイされないため、規約の趣旨（自動反映で実環境の乖離を早く見つける）の代わりに、Testcontainers の実 DB の統合テストと受け入れテストを CI で実行する</td>
+</tr>
+<tr>
+<td style="text-align: left;">承認</td>
+<td style="text-align: left;">ユーザーが、規約の例外を承認するか、規約に従って AWS・デプロイを U1 に含めるかを決める</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_4">決定<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>機能と振る舞いは、beer-game2 を正本として引き継ぐ。</strong> 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、<code>docs/requirements/beer-game-ts/</code> を参照する。設計の範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）で、実装として約束する範囲は、上の「範囲」のとおり U1〜U3 である。</li>
+<li><strong>機能と振る舞いは、beer-game2 を正本として引き継ぐ。</strong> 要件・ユースケース・ストーリー・Unit 定義は新しく作らず、<code>docs/requirements/beer-game-ts/</code> を参照する。設計の範囲は beer-game2・beer-game-kotlin と同じ（Unit U1〜U6）で、実装として約束する範囲は、上の「範囲」のとおり U1〜U3（U1 の検証用 CI を含む。AWS・デプロイは含まない）である。</li>
 <li><strong>設計の構造は、beer-game-kotlin を正本として引き継ぐ。</strong> ES + CQRS、<code>game</code> と <code>session</code> の 2 ストリーム、状態遷移の純粋関数、投影、保持削除、API の契約（<code>openapi.yaml</code>、<code>code</code>、problem+json）などの構造は変えず、Scala の表現に置き換える。設計書は <code>docs/design/beer-game-scala/</code> に、beer-game-kotlin と同じ文書構成（10 本 + 入口）で作り、各文書に「beer-game-kotlin からの変更」を設ける。言語に依存しない節は、Rust 版の方法に倣い、Kotlin 版の節を参照して継承する。</li>
 <li><strong>技術スタックは、バックエンドを Scala 3（インデント構文）+ sbt + Cats / Cats Effect + http4s + doobie、フロントエンドを既存の React / TypeScript とする。</strong> 版は設計時（2026-11-25）に Maven Central の <code>maven-metadata.xml</code> で確認した値を <a href="../../../design/beer-game-scala/tech-stack/">技術スタック</a> に記録する。確認できなかったものは「要確認」と書き、B1 で確かめる。</li>
 <li><strong>コーディングは、関数型プログラミングガイド（Scala 編）に準拠する。</strong> 型は <code>enum</code> と <code>case class</code>（<code>copy</code>）で表し、<code>val</code> と不変の <code>List</code> だけを使う。業務の失敗は <code>Either[業務の enum, A]</code>、独立な検証は <code>ValidatedNec</code> と <code>mapN</code>、<code>IO</code> の失敗は想定外に限る（ガイド ADR-050）。状態の遷移は <code>handle(state, command): Either[Error, List[Event]]</code> と <code>Events.apply</code> の <code>foldLeft</code> の再生で表し、Kotlin 版の <code>decide</code> / <code>evolve</code> に対応づける。依存は関数を持つ <code>case class</code> で受け取り、文脈は <code>Kleisli</code> で渡す。<code>IO</code> の実行は <code>IOApp</code> とテストの境界に限る。</li>
@@ -14532,7 +14623,7 @@
 <li><strong>判断 ID の接頭辞</strong>: ドメインの Scala 固有の判断は <code>SD1〜</code>、バックエンドは <code>SBD1〜</code>、技術スタックは <code>ST1〜</code>、インフラは <code>SI1〜</code>、フロントエンドは <code>SF1〜</code>、UI 設計は <code>SU1〜</code>、テスト戦略は <code>STT1〜</code>、非機能要件の判断は <code>SN1〜</code>、非機能要件の Scala 固有の追加は <code>NF-SC1〜</code>（Scala・Cats 系）とする。<strong><code>NF-C1〜C9</code> は beer-game-kotlin の非機能要件で「容量・同時実行」として既に使われている</strong>（<a href="../../../design/beer-game-kotlin/non-functional/">非機能要件（Kotlin 版）</a>）ため、<code>NF-C</code> を Cats 系に使うと番号が衝突する。このため <code>NF-SC</code> とした（2026-11-25、起草時の判断。<strong>未承認</strong>。変更するなら人が決める）。<strong>同じ判断を 2 つの ID で持たない</strong>: JSON ライブラリは ST6、接続プールは ST8 を正本とし、バックエンドの SBD7・SBD11 は、ST6・ST8 を適用する記述として参照にとどめる（SBD7・SBD11 は新しい判断ではない。2026-11-25、設計書レビュー L1 への対応。AI の案）。</li>
 </ul>
 <h3 id="beer-game-kotlin-adr">beer-game-kotlin の ADR の引き継ぎ表<a class="headerlink" href="#beer-game-kotlin-adr" title="Permanent link">&para;</a></h3>
-<p>扱いは、beer-game-kotlin の ADR 001〜020 の<strong>本文を読んで検証した</strong>案である（<strong>2026-11-25、本文で検証済み</strong>）。初稿は、Rust 版の ADR-001 の引き継ぎ表と各 ADR のステータス節を根拠にした孫引きだったため、ADR 002〜020 の本文（決定・代替案・影響・コンプライアンス・備考）を読み直し、各行の判定と内容を確かめた。検証の結果、<strong>判定（引き継ぐ／変更／置き換える／見直す）は 20 行すべて変わらなかった</strong>が、007・011・013・014 ほか多くの行で、内容と根拠を直した（下の「変更の記録」）。各行の「本文での根拠」は、読んだ節である。</p>
+<p>扱いは、beer-game-kotlin の ADR 001〜020 の<strong>本文を読んで検証した</strong>案である（<strong>2026-11-25、AI が本文と照合した。人のレビューは未了</strong>。本書で「本文で検証済み」と書いたものは、この意味である。再レビューで、プロダクト視点が Kotlin 版 ADR 7 件（004・007・009・011・014・017・019）の本文と突き合わせ、判定がすべて一致したことを確かめた。これも AI の出力で、人の確認ではない）。初稿は、Rust 版の ADR-001 の引き継ぎ表と各 ADR のステータス節を根拠にした孫引きだったため、ADR 002〜020 の本文（決定・代替案・影響・コンプライアンス・備考）を読み直し、各行の判定と内容を確かめた。検証の結果、<strong>判定（引き継ぐ／変更／置き換える／見直す）は 20 行すべて変わらなかった</strong>が、007・011・013・014 ほか多くの行で、内容と根拠を直した（下の「変更の記録」）。各行の「本文での根拠」は、読んだ節である。</p>
 <p>Kotlin 版でのステータスは 2026-11-25 時点の各 ADR の「ステータス」節による（承認済み: 001・002・012・015〜019。015〜018 は 2026-11-15、019 は 2026-11-16 にユーザーが承認。012 は依存の導入の承認が別。ほかは提案中。014 は H2 を使う範囲だけがユーザーの決定、020 は方式をユーザーが選んだが ADR としては提案）。<strong>本書の「引き継ぐ」は、Scala 版の設計としての案であり、Kotlin 版で未承認の ADR の判断を、Scala 版の承認が暗黙に承認することにはならない</strong>。</p>
 <table>
 <thead>
@@ -14571,7 +14662,7 @@
 <tr>
 <td style="text-align: left;">005 楽観的並行制御と、投影再構築の直列化にアドバイザリロック（提案中。研修中の再構築の運用は暫定）</td>
 <td style="text-align: left;"><strong>引き継ぐ</strong>（実現を変更）</td>
-<td style="text-align: left;">doobie の <code>ConnectionIO</code> で実現する。<strong>コルーチンの取消（<code>NonCancellable</code>）でトランザクションの終わりを閉じる節</strong>は使えず、Cats Effect のキャンセルの扱い（<code>Supervisor</code> による切り離し。<a href="../../../design/beer-game-scala/architecture-backend/">バックエンドアーキテクチャ</a> の SBD4）に書き換える。<strong>doobie は <code>Left</code> を返しても COMMIT する</strong>ため、<code>Left</code> で ROLLBACK する規則を明示する（SBD2）。<strong>AI の案（H4、承認なし）</strong>: <code>Tx.run(program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]</code> を唯一の公開入口にし、コマンドの <code>ConnectionIO</code> 全体を 1 回で包む。<code>.transact(</code> の直接の呼び出しは Scalafix で禁止する。<strong>ロックの方式も変わりうる（H5 案、承認なし）</strong>: Kotlin 版はトランザクションの先頭で <code>pg_advisory_xact_lock_shared</code> を取り、トランザクションの終わりで自動解放する。Scala 版の案は、<code>ProjectionLock</code> を <code>transact</code> の外の <code>Resource[IO, Unit]</code>、<code>ChangeNotifier</code> をトランザクション内で集めて <code>Tx.run</code> の後に配信する形（H2 版でも同じ型にするため）で、B1 の最初に実測して確定する。<strong>Kotlin 版でも未決の項目は未決のまま引き継ぐ</strong>: ロック待ちの上限（<code>lock_timeout</code>）、再構築中のコマンドの応答、研修中の再構築の運用（停止を依頼する。暫定で人の確認が要る）。SQLSTATE 40001・40P01 を <code>ConcurrencyConflict</code> に写す点は、doobie 経由で取れるかを B1 で実測する（<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a>）</td>
+<td style="text-align: left;">doobie の <code>ConnectionIO</code> で実現する。<strong>コルーチンの取消（<code>NonCancellable</code>）でトランザクションの終わりを閉じる節</strong>は使えず、Cats Effect のキャンセルの扱い（<code>Supervisor</code> による切り離し。<a href="../../../design/beer-game-scala/architecture-backend/">バックエンドアーキテクチャ</a> の SBD4）に書き換える。<strong>doobie は <code>Left</code> を返しても COMMIT する</strong>ため、<code>Left</code> で ROLLBACK する規則を明示する（SBD2）。<strong>AI の案（H4、承認なし）</strong>: <code>Tx.run(program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]</code> を唯一の公開入口にし、コマンドの <code>ConnectionIO</code> 全体を 1 回で包む。<code>.transact(</code> の直接の呼び出しは Scalafix で禁止する。<strong>許可する入口は <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続を同じファイルに置いて 1 か所にし、Scalafix の除外もその 1 か所だけにする（N-H3 案。<code>scalafix:off</code> は使わない）</strong>。「型の上で作れなくする」とまでは言えず、静的解析で禁止する範囲である。<strong>ロックの方式も変わりうる（H5 案・N-H2 案、承認なし）</strong>: Kotlin 版はトランザクションの先頭で <code>pg_advisory_xact_lock_shared</code> を取り、トランザクションの終わりで自動解放する。Scala 版の初稿（H5 案）は <code>ProjectionLock</code> を <code>transact</code> の外の <code>Resource[IO, Unit]</code>（セッションのロック）にしたが、<strong>コマンドごとに接続を 2 本使いプールが枯渇しうるため不採用</strong>とした（再レビュー N-H2）。<strong>現在の案（N-H2 案）</strong>: <code>ProjectionLock</code> は <code>ConnectionIO</code> の変換 <code>withShared(gameId)(program)</code>。PostgreSQL 版は先頭で <code>pg_advisory_xact_lock_shared</code>（COMMIT で自動解放、接続は 1 本）、H2 版はプロセス内ロックを <code>bracket</code> する。<code>ChangeNotifier</code> はトランザクション内で集めて <code>Tx.run</code> の後に配信する形。B1 の最初に実測して確定する。<strong>Kotlin 版でも未決の項目は未決のまま引き継ぐ</strong>: ロック待ちの上限（<code>lock_timeout</code>）、再構築中のコマンドの応答、研修中の再構築の運用（停止を依頼する。暫定で人の確認が要る）。SQLSTATE 40001・40P01 を <code>ConcurrencyConflict</code> に写す点は、doobie 経由で取れるかを B1 で実測する（<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a>）</td>
 <td style="text-align: left;">決定（一意制約、再試行、アドバイザリロック、<code>NonCancellable</code>、<code>Left</code> で ROLLBACK）、ネガティブ、未決、コンプライアンス（H7 のトランザクション境界のテスト）</td>
 </tr>
 <tr>
@@ -14607,7 +14698,7 @@
 <tr>
 <td style="text-align: left;">011 厳格な静的解析（detekt、PMD）（提案中。厳格に適用する方針はユーザーの指示）</td>
 <td style="text-align: left;"><strong>置き換える</strong></td>
-<td style="text-align: left;">厳格さの原則（違反 0 件、ベースラインなし、<strong>抑制なし</strong>、緩和は ADR に記録して人が承認、純粋性の静的検査）は引き継ぐ。ツールを scalac のオプション（<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code>）、Scalafmt、WartRemover、Scalafix（<code>DisableSyntax</code>）に置き換える（ガイド第 9 章）。<strong>初稿の「<code>@SuppressWarnings</code> は理由なしに使わない」は、Kotlin 版の決定（<code>@Suppress</code> とルールの無効化コメントを使わない。緩和は層ごとのルールセットで行い、理由を ADR に記録して人が承認する）より緩いため、本文に合わせて直した</strong>。Kotlin 版が B2 で提案した層単位の緩和（アダプターで <code>NoThrow</code> など）は、Kotlin 版でも人の承認が未了のため引き継がない</td>
+<td style="text-align: left;">厳格さの原則（違反 0 件、ベースラインなし、<strong>抑制なし</strong>、緩和は ADR に記録して人が承認、純粋性の静的検査）は引き継ぐ。ツールを scalac のオプション（<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code>）、Scalafmt、WartRemover、Scalafix（<code>DisableSyntax</code>）に置き換える（ガイド第 9 章）。<strong>初稿の「<code>@SuppressWarnings</code> は理由なしに使わない」は、Kotlin 版の決定（<code>@Suppress</code> とルールの無効化コメントを使わない。緩和は層ごとのルールセットで行い、理由を ADR に記録して人が承認する）より緩いため、本文に合わせて直した</strong>。Kotlin 版が B2 で提案した層単位の緩和（アダプターで <code>NoThrow</code> など）は、Kotlin 版でも人の承認が未了のため引き継がない。<strong>ルール自体のテスト</strong>も引き継ぐ（Kotlin 版は PMD のルールを、違反するコードとしないコードを並べた fixture で期待件数と行を確かめ、CI に組み込む）。Scala 版でも、Scalafix・WartRemover のルールを、違反するコードとしないコードを並べた fixture で期待件数を確かめ、CI に入れる（N-H3 の「落ちるべきもの」「落ちてはならないもの」の 2 方向の表と同じ）</td>
 <td style="text-align: left;">決定（厳格さの定義、純粋性の静的検査）、備考（B2 の層ごとのルールセットの緩和は提案・承認待ち）</td>
 </tr>
 <tr>
@@ -14625,7 +14716,7 @@
 <tr>
 <td style="text-align: left;">014 ローカル開発だけ H2（提案中。H2 の範囲と両対応はユーザーの決定、2026-11-14）</td>
 <td style="text-align: left;"><strong>引き継ぐ</strong>（読み替え。Scala 版のユーザーの決定、2026-11-25）</td>
-<td style="text-align: left;">Kotlin 版の ADR-014 と T7 を Scala 版に読み替える。ローカル開発だけ H2 の PostgreSQL モード。PostgreSQL 固有の機能（アドバイザリロック、<code>LISTEN/NOTIFY</code>）はポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の裏に置き、PostgreSQL 版と H2 版を持つ（Kotlin 版の H2 版は <code>StampedLock</code> と <code>MutableSharedFlow</code>。Scala 版は H5 案）。部分一意索引、DB ロール・GRANT、接続プールの分離、<code>jsonb</code> は PostgreSQL の統合テストでだけ検証する。実行する DB は <code>DB_KIND=postgres\|h2</code> で選び、<strong>本番・ステージングでは起動時の検査で H2 を拒否</strong>し、<strong>本番イメージに H2 を含めない</strong>（Kotlin 版は二重の防御: 設定の検査で終了コード 78、配布からの <code>h2-*.jar</code> の除外）。乖離への対策は、(a) H2 でしか通らない記述の禁止、(b) ポートの契約テストを両実装で実行、(c) 受け入れは PostgreSQL。<strong>Scala 固有の論点</strong>: doobie の <code>Transactor</code> は H2 でも使える。<code>Left</code> の明示 ROLLBACK（SBD2）は H2 でも同じ。<strong>Kotlin 版の 29 項目の実測は Kotlin 版の値で、Scala 版（doobie 経由）では取り直す</strong>（確認状況は <a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">一覧</a>）。<strong>Rust 版は「H2 は JVM の DB のため使えない」ことを理由にローカルも PostgreSQL のみとしたが、Scala 版は JVM なので H2 を組み込める</strong>（理由が違う）。<strong>H2 の導入は承認待ち、動作範囲は B1 の最初に実測して確定する</strong></td>
+<td style="text-align: left;">Kotlin 版の ADR-014 と T7 を Scala 版に読み替える。ローカル開発だけ H2 の PostgreSQL モード。PostgreSQL 固有の機能（アドバイザリロック、<code>LISTEN/NOTIFY</code>）はポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> の裏に置き、PostgreSQL 版と H2 版を持つ（Kotlin 版の H2 版は <code>StampedLock</code> と <code>MutableSharedFlow</code>。Scala 版は N-H2 案: <code>ConnectionIO</code> の変換 <code>withShared</code>。H2 版はプロセス内ロックの <code>bracket</code>）。部分一意索引、DB ロール・GRANT、接続プールの分離、<code>jsonb</code> は PostgreSQL の統合テストでだけ検証する。実行する DB は <code>DB_KIND=postgres\|h2</code> で選び、<strong>本番・ステージングでは起動時の検査で H2 を拒否</strong>し、<strong>本番イメージに H2 を含めない</strong>（Kotlin 版は二重の防御: 設定の検査で終了コード 78、配布からの <code>h2-*.jar</code> の除外）。乖離への対策は、(a) H2 でしか通らない記述の禁止、(b) ポートの契約テストを両実装で実行、(c) 受け入れは PostgreSQL。<strong>Scala 固有の論点</strong>: doobie の <code>Transactor</code> は H2 でも使える。<code>Left</code> の明示 ROLLBACK（SBD2）は H2 でも同じ。<strong>Kotlin 版の 29 項目の実測は Kotlin 版の値で、Scala 版（doobie 経由）では取り直す</strong>（確認状況は <a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">一覧</a>）。<strong>Rust 版は「H2 は JVM の DB のため使えない」ことを理由にローカルも PostgreSQL のみとしたが、Scala 版は JVM なので H2 を組み込める</strong>（理由が違う）。<strong>H2 の導入は承認待ち、動作範囲は B1 の最初に実測して確定する</strong></td>
 <td style="text-align: left;">決定、代替案、コンプライアンス（B1 の最初の実測）、備考（B1・B3 の実装の結果）</td>
 </tr>
 <tr>
@@ -14643,7 +14734,7 @@
 <tr>
 <td style="text-align: left;">017 参加・復帰の失敗の窓を DB に持つ（承認済み）</td>
 <td style="text-align: left;"><strong>引き継ぐ</strong></td>
-<td style="text-align: left;">言語に依存しない。窓の鍵は正規化した接続元の鍵付き要約で、生の IP を DB にもログにも残さない。順序は「窓に 1 を足す（別のトランザクション）→ 上限超過なら 429 → 検査・実行 → 認可の失敗でなければ 1 を戻す」。<strong>上限 10 回・窓 10 分は根拠のない仮置きで、Scala 版でも未計測</strong>（運営者との合意と実測が要る）。冪等キーの鍵を流用する点（鍵を替えると窓が切れる）は、専用の鍵を持つかを人が決める</td>
+<td style="text-align: left;">言語に依存しない。窓の鍵は正規化した接続元の鍵付き要約で、生の IP を DB にもログにも残さない。順序は「窓に 1 を足す（別のトランザクション）→ 上限超過なら 429 → 検査・実行 → 認可の失敗でなければ 1 を戻す」。<strong>上限 10 回・窓 10 分は根拠のない仮置きで、Scala 版でも未計測</strong>（運営者との合意と実測が要る）。冪等キーの鍵を流用する点（鍵を替えると窓が切れる）は、専用の鍵を持つかを人が決める。<strong>窓を保存できないときは通さない（閉じる側に倒す）</strong>。<strong>NAT や研修会場の共有 IP では、同じ接続元の別の参加者もその窓の間は参加できない</strong>（Kotlin 版 ADR-017 の影響。研修会場の運用で、上限に達したときの案内が要る）</td>
 <td style="text-align: left;">決定、影響、未確認</td>
 </tr>
 <tr>
@@ -14669,13 +14760,14 @@
 <h4 id="_5">変更の記録<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h4>
 <ul>
 <li>2026-11-25（設計書レビュー H8 への対応。AI の案）: 本文で検証し、20 行の判定ラベルは維持したまま、次の行の内容と根拠を直した。</li>
-<li><strong>005</strong>: ロールの方式が H5 案で変わりうること、未決の項目（<code>lock_timeout</code>、再構築中の応答、研修中の運用）が未決のまま引き継がれることを足した。</li>
+<li><strong>005</strong>: ロックの方式が H5 案で変わりうること（再レビュー後は N-H2 案に改めた）、未決の項目（<code>lock_timeout</code>、再構築中の応答、研修中の運用）が未決のまま引き継がれることを足した。</li>
 <li><strong>007</strong>: <code>InvalidTransition</code> の扱い（Kotlin 版は状態を変えずに続行、Scala 版は止める）を、置き換えでなく意図して変える趣旨として明記した。</li>
 <li><strong>011</strong>: 「<code>@SuppressWarnings</code> は理由なしに使わない」を、本文の「抑制なし」に合わせて直した。層単位の緩和を引き継がないことを足した。</li>
 <li><strong>013</strong>: JVM 共通の部分（JDK、JDBC、HikariCP など）の扱いを足した。初稿は「バックエンド部分」を一括して置き換える書き方だった。</li>
 <li><strong>014</strong>: 読み替えの範囲（Kotlin 版の実測は取り直す、二重の防御）を足した。</li>
 <li><strong>003・004・006・008・009・010・012・015〜020</strong>: 本文から、引き継ぐ内容の具体（共有する契約の移動先、承認の範囲、未計測の値）を足した。</li>
 <li><strong>019</strong>: 方針と値を分けて書いた（方針は引き継ぎ、値は再計測）。</li>
+<li>2026-11-25（再レビュー L5 への対応。AI の案）: Kotlin 版 ADR-011・017 の本文を読み直し、<strong>011</strong> に「ルール自体のテスト（違反するコードとしないコードを並べた fixture で期待件数を確かめ CI に入れる）」、<strong>017</strong> に「窓を保存できないときは通さない」と「NAT や研修会場の共有 IP では別の参加者もその窓の間は参加できない」を足した。いずれも本文（011 の「ルール自体のテスト」、017 の決定と影響）に書かれていた。</li>
 <li>初稿の備考にあった「本文でなく、Rust 版の ADR-001 の引き継ぎ表と各 ADR のステータス節を根拠にした」は、本文での検証により解消した。</li>
 </ul>
 <h3 id="scala">Scala 固有の判断<a class="headerlink" href="#scala" title="Permanent link">&para;</a></h3>
@@ -14721,9 +14813,27 @@
 </tr>
 <tr>
 <td style="text-align: left;"><strong>遷移は <code>Evolution</code> で返し、版は永続化の層が持つ。不正な遷移（<code>Ignored</code>）は止める</strong>（SD2）</td>
-<td style="text-align: left;">Kotlin 版は <code>State.version</code> を持ち、再生側が「版が増えなかった」ことで不正な遷移を検出して続行する。Scala 版は <code>Events.apply</code> が <code>Evolution.Applied / Ignored</code> を返し、版は <code>(state, version)</code> として永続化の層が数える（Rust 版の RD2 と同じ）。<code>Ignored</code> が出たら、保存直後でも再生中でも<strong>失敗させて止める</strong>（500・相関 ID。fail closed）。止める設計の維持はユーザーの決定（2026-11-25）。それ以外（<code>Evolution</code> の型、版の持ち方）は AI の案で承認なし</td>
+<td style="text-align: left;">Kotlin 版は <code>State.version</code> を持ち、再生側が「版が増えなかった」ことで不正な遷移を検出して続行する。Scala 版は <code>Events.apply</code> が <code>Evolution.Applied / Ignored</code> を返し、版は <code>(state, version)</code> として永続化の層が数える（Rust 版の RD2 と同じ）。<code>Ignored</code> が出たら、保存直後でも再生中でも<strong>失敗させて止める</strong>（500・相関 ID。fail closed）。止める設計の維持はユーザーの決定（2026-11-25）。それ以外（<code>Evolution</code> の型、版の持ち方）は AI の案で承認なし。<strong>止めるのは書き込み（コマンド）で、止まったゲームでも状態の取得（読み取り）は返す</strong>（N-H7 のユーザーの決定。要件）</td>
 <td style="text-align: left;">§7.3〜§7.4、§7.6（<code>Versioned</code>）</td>
 <td style="text-align: left;">ドメイン SD2</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>許す組の表を規範にする</strong>（N-H1。AI の案）</td>
+<td style="text-align: left;"><code>Started</code> を含む各状態で受けるイベントを、スケッチでなく<strong>「EV-G01〜G12・EV-S01〜S10 × 状態の許す組の表」</strong>で規範にする。<code>Events.apply</code> の <code>match</code>、状態遷移テスト、性質テストの生成器はこの表から導く。<code>Started</code> は <code>ObserverInvited</code>・<code>ObserverJoined</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code> も受ける（状態遷移図と同じ）。未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>（Kotlin 版の変更表 38）。止める設計では、許す組の漏れがそのまま研修の停止になるため</td>
+<td style="text-align: left;">§7.3〜§7.4</td>
+<td style="text-align: left;">ドメイン（中核担当が記述。本表と矛盾させない）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>ProjectionLock</code> は <code>ConnectionIO</code> の変換</strong>（N-H2。AI の案）</td>
+<td style="text-align: left;"><code>withShared(gameId)(program)</code>。PostgreSQL 版は <code>pg_advisory_xact_lock_shared</code>、H2 版はプロセス内ロックを <code>bracket</code>。<code>Resource</code>（セッションのロック）案は接続 2 本・プール枯渇のため不採用</td>
+<td style="text-align: left;">§7.6</td>
+<td style="text-align: left;">バックエンド・ドメイン・tech-stack（中核担当が記述）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>.transact(</code> の許可する入口の一覧</strong>（N-H3。AI の案）</td>
+<td style="text-align: left;">許可する入口は <code>Tx</code>・<code>ReadTx</code>・<code>ModeTx</code>・<code>LISTEN</code> の専用接続を同じファイルに置き、Scalafix の除外は 1 か所。<code>scalafix:off</code> は使わない（ADR-011 の「無効化コメントを使わない」と矛盾するため）。「型で作れなくする」とは書かず、静的解析で禁止する範囲と書く</td>
+<td style="text-align: left;">§9（静的解析）</td>
+<td style="text-align: left;">バックエンド・test-strategy（中核担当が記述）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>数量・金額の幅は <code>Long</code></strong>（SD7）</td>
@@ -14919,22 +15029,24 @@
 <li>doobie が RC 版で、http4s の安定版が 0.23 系である。更新のたびに破壊的変更の影響を調べる運用が要る。</li>
 <li>ローカル開発の H2 により、ローカルと CI の乖離のリスクを負う。ポートの 2 実装と契約テストの両実行の維持費がかかり、H2 版では省略した制約（追記専用、ロールの分離など）がローカルで守られない。Scala 版では H2 の動作範囲を未実測のため、B1 の最初に確かめる。</li>
 <li><strong>不正な遷移で止めることは、Kotlin 版との、利用者に見える差である。</strong> Kotlin 版は、<code>decide</code> が作らない列が来ても状態を変えず、検知して続行する。Scala 版は、<code>Ignored</code> が出たゲームの操作を止める（500・相関 ID）。正しさを優先する決定（2026-11-25）だが、研修中に止まると、進行役と参加者に見える。止まるのは該当ゲームだけで、研修中の運用（進行役への依頼、DB 全体の復元を研修時間に行わない原則）は、<a href="../../../design/beer-game-scala/operation/">運用要件</a> の障害対応で定める（本書では約束しない）。</li>
-<li>範囲を U1〜U3 に絞ると、役割別の振り返り（US4.2。U4）が無いため、研修として完結しない。範囲の決定の材料にする（上の「範囲」）。</li>
+<li>範囲を U1〜U3 に絞ると、役割別の振り返り（US4.2。U4）が無く、保持削除（US5.1。U5）も無いため、研修として完結せず、表示名が期限後も消えない。<strong>U1〜U3 の間は実際の研修に使わない（検証・事例用。N-H8 のユーザーの決定）</strong>。</li>
+<li>ステージングへの自動反映を持たない間、team 規約（Mandated）の例外が要る（上の「team 規約の例外」。案で未承認）。</li>
+<li><strong>Kotlin 版で内容が変わったときの追従（案。M20 への対応）</strong>: 引き継ぎ表は、Kotlin 版 ADR の記述を時点で写したものであり、Kotlin 版が変わると古くなる。次の仕組みを案とする。(a) Kotlin 版 ADR のステータスが変わったとき（提案中から承認済み、または内容の改訂）に、該当の行を見直す。(b) 各イテレーション（Bolt の区切り）の開始時に、Kotlin 版 ADR の変更履歴（<code>git log -- docs/adr/beer-game-kotlin/</code>）を 1 回確認し、変更があれば本表の該当行に反映する。(c) 見直した日と対象を、変更の記録に残す。担当と頻度は人が決める。</li>
 </ul>
 <h2 id="_10">コンプライアンス<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>契約の流用</strong>: ストーリーの受入条件を Gherkin のシナリオにタグで対応付け、CI で対応表を検査する方針を引き継ぐ。Scala 版での実現はテスト戦略で定める。</li>
 <li><strong>API の契約が変わらないこと</strong>: beer-game-kotlin の E2E のシナリオが Scala 版でそのまま使えるかを、最初の Bolt までに確かめる。変わる場合は設計の矛盾として扱う。</li>
-<li><strong>引き継ぎ表の整合</strong>: 各行は、2026-11-25 に ADR の本文を読んで検証した。人のレビューで確認する。Kotlin 版の ADR が変わったときは、該当の行を見直す。</li>
+<li><strong>引き継ぎ表の整合</strong>: 各行は、2026-11-25 に AI が ADR の本文と照合した。<strong>人のレビューは未了</strong>で、人のレビューで確認する。Kotlin 版の ADR が変わったときは、該当の行を見直す。</li>
 <li><strong>beer-game-kotlin の ADR を変更しないこと</strong>（履歴）。</li>
 <li><strong>版の記録</strong>: 版は確認日と確認の手段を添えて書き、推測の版を事実として書かない。</li>
-<li><strong>確認状況の記載</strong>: 確認した事項・未確認の事項の状態は、<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a> に 1 か所だけ持つ。本書には状態を複製しない。</li>
+<li><strong>確認状況の記載</strong>: 確認した事項・未確認の事項の状態は、<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a> に 1 か所だけ持つ。本書には状態を複製しない。<strong>一覧が正本で、一覧の根拠は実測の記録（data-model の検証、test-strategy の確認した事項）である。一覧を直すときは根拠も直す</strong>（N-H5 案。AI の案）。</li>
 </ul>
 <h2 id="_11">備考<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
 <ul>
 <li>著者: claude-code</li>
 <li>確認済み: Rust 版の ADR-001 と、beer-game-kotlin の設計書（tech-stack、domain-model、architecture-backend）、Scala 編ガイドの全体、beer-game-kotlin の ADR 002〜020 の本文（2026-11-25。引き継ぎ表の検証）を読んだ。014 と 011・012・018 の Scala 版の扱いは、本書の案である。</li>
-<li>確認状況: Scala 版の各ライブラリの機能（doobie の <code>FC.rollback</code> と PostgreSQL の通知、http4s ember の切断時の挙動、cucumber-scala と日本語 Gherkin、scoverage の Scala 3 での分岐の計測、実 DB での動作など）と、設計時に検証した範囲（版、断片のコンパイルとテスト）の状態は、<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a> を唯一の正本とする（設計書レビュー H1。AI の案）。</li>
+<li>確認状況: Scala 版の各ライブラリの機能（doobie の <code>FC.rollback</code> と PostgreSQL の通知、http4s ember の切断時の挙動、cucumber-scala と日本語 Gherkin、scoverage の Scala 3 での分岐の計測、実 DB での動作など）と、設計時に検証した範囲（版、断片のコンパイルとテスト、実 DB と道具での確認 K5・K8〜K17 など）の状態は、<a href="../../../design/beer-game-scala/tech-stack/#確認状況の一覧">確認状況の一覧</a> を正本とする（設計書レビュー H1。AI の案）。本書には状態を書き写さない。一覧の根拠は実測の記録で、一覧を直すときは根拠も直す（N-H5）。</li>
 <li>関連 ADR: beer-game-kotlin の <a href="../../beer-game-kotlin/001-kotlin-version-of-beer-game2/">ADR-001</a>、<a href="../../beer-game-kotlin/002-event-sourcing-and-cqrs/">ADR-002</a>、<a href="../../beer-game-kotlin/007-functional-core-with-arrow/">ADR-007</a>、<a href="../../beer-game-kotlin/014-h2-for-local-development/">ADR-014</a>。Rust 版の <a href="../../beer-game-rust/001-rust-version-of-beer-game-kotlin/">ADR-001</a>。beer-game2 の <a href="../../beer-game-ts/001-rebuild-as-beer-game2/">ADR-001</a></li>
 <li>参照: <a href="../../../design/beer-game-kotlin/">beer-game-kotlin の設計書</a>、<a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Scala%E7%B7%A8/">関数型プログラミングガイド（Scala 編）</a>、<a href="../../../requirements/beer-game-ts/user_story/">ユーザーストーリー</a>、<a href="../../../requirements/beer-game-ts/unit_definition/">Unit 定義</a>、<a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー（2026-11-25）</a>、<a href="../../../development/beer-game-rust/release_plan/">リリース計画（Rust 版）</a></li>
 </ul>

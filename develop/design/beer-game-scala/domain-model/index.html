@@ -3443,10 +3443,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#started-h2ai" class="md-nav__link">
+  <a href="#n-h1ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        開始後の役割の入れ替えと Started の自己遷移（H2。AI の案、承認を得ていない）
+        遷移の許す組の表（規範。再レビュー N-H1。AI の案、承認を得ていない）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#started-h2n-h1ai" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        開始後の役割の入れ替えと Started の自己遷移（H2・N-H1。AI の案、承認を得ていない）
       
     </span>
   </a>
@@ -3655,6 +3666,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="未決事項">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ユーザーストーリー・受入条件への導線（一部）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3666,10 +3694,27 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="レビュー対応の記録（2026-11-25）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再レビュー（設計書の再レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
-  <a href="#_14" class="md-nav__link">
+  <a href="#_16" class="md-nav__link">
     <span class="md-ellipsis">
       
         出典
@@ -14583,7 +14628,8 @@
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>本書で確認したこと</strong>: 3 章の型とコードの断片（<code>Quantity</code>、<code>RoleMap</code>、<code>ValidatedNec</code> による設定の検証、<code>GameError.code</code>、Game 集約の <code>handle</code>、<code>Events.apply</code> と <code>Evolution</code>、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、<code>-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement</code> と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、<code>Events.apply</code> の <code>match</code> で網羅の警告が出ること（<code>-Werror</code> で失敗する形）も確認しました。<code>var</code> と <code>head</code> が WartRemover に拒否されることも確認しました。<strong>確認状況の正本は <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>（K2〜K4）</strong> です。</li>
-<li><strong>2026-11-25 のレビュー対応で書き直した部分は、再コンパイルしていません</strong>: <code>Game.handle</code> の <code>AssignRole</code> の判定順（権限が先。L6）と、<code>GameEvents.apply</code> の <code>Started</code> の自己遷移（H2）、<code>GameEvent</code> に足したイベント。いずれも AI の案で、承認を得ていない。</li>
+<li><strong>2026-11-25 のレビュー対応と再レビュー対応で書き直した部分は、再コンパイルしていません</strong>: <code>Game.handle</code> の <code>AssignRole</code> の判定順（権限が先。L6）、<code>GameEvents.apply</code> の全面の書き直し（H2・再レビュー N-H1。許す組の表に合わせた）、<code>GameEvent</code> の 12 個の列挙子、<code>Evolution</code> を使う遷移の腕。いずれも AI の案で、承認を得ていない。<strong>新しく書いた Scala のコードは、すべて型検査していません。</strong></li>
+<li><strong>確認状況の正本の規則（再レビュー N-H5。AI の案）</strong>: 確認状況の一覧（<a href="../tech-stack/#確認状況の一覧">技術スタック</a>）が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」、<a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、<strong>一覧を直すときは根拠も直します</strong>。</li>
 <li><strong>確認していないこと</strong>: Session 集約、<code>startGame</code>、<code>simulateWeek</code>、投影、<code>RetentionSaga</code> の Scala のコードは、<strong>型検査していない設計のスケッチ</strong>です。<code>Monoid</code>・<code>Functor</code> の法則のテストは書いていません。</li>
 <li><strong>引き継ぐだけで再検討していないこと</strong>: 週次計算の規則（12 ステップ）、観察者の開示の規則、保持削除の細部、エラーコードの一覧、投影の購読表、ユビキタス言語の定義は、Kotlin 版の該当節を正本として参照します。Scala 版で変わるのは表現であり、API の契約（<code>code</code>、problem+json）は変えません。</li>
 <li><strong>Kotlin 版の実装の経緯（B1〜B13 の注記）は引き継ぎません。</strong> 本書は、Kotlin 版の設計の現在の形を出発点とします。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。</li>
@@ -14764,14 +14810,19 @@
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Preparing</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">,</span><span class="w"> </span><span class="n">participants</span><span class="p">:</span><span class="w"> </span><span class="nc">Map</span><span class="p">[</span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="nc">Option</span><span class="p">[</span><span class="nc">Role</span><span class="p">]])</span><span class="w">  </span><span class="c1">// 実際は設定・招待・観察者・資格も持つ</span>
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">Started</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">,</span><span class="w"> </span><span class="n">participants</span><span class="p">:</span><span class="w"> </span><span class="nc">Map</span><span class="p">[</span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="nc">Option</span><span class="p">[</span><span class="nc">Role</span><span class="p">]])</span>
 
-<span class="k">enum</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">:</span>
-<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">GameCreated</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span>
-<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span>
-<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleUnassigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span>
-<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">GameStarted</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span>
-<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">,</span><span class="w"> </span><span class="n">replacedBy</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">)</span><span class="w">   </span><span class="c1">// EV-G12。開始後の入れ替え</span>
+<span class="k">enum</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">:</span><span class="w">   </span><span class="c1">// EV-G01〜G12 の 12 個。ペイロードは簡略化（実際は Kotlin 版の表のとおり）</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">GameCreated</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span><span class="w">                                                                </span><span class="c1">// EV-G01</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ParticipantJoined</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">)</span><span class="w">                                            </span><span class="c1">// EV-G02</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span><span class="w">                                     </span><span class="c1">// EV-G03。準備中の割り当てと、開始後の入れ替えの新担当者</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">RoleUnassigned</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">)</span><span class="w">                                   </span><span class="c1">// EV-G04</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ObserverInvited</span><span class="p">(</span><span class="n">invitationId</span><span class="p">:</span><span class="w"> </span><span class="nc">InvitationId</span><span class="p">)</span><span class="w">                                                </span><span class="c1">// EV-G05</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ObserverInvitationRevoked</span><span class="p">(</span><span class="n">invitationId</span><span class="p">:</span><span class="w"> </span><span class="nc">InvitationId</span><span class="p">)</span><span class="w">                                      </span><span class="c1">// EV-G06</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ObserverJoined</span><span class="p">(</span><span class="n">observerId</span><span class="p">:</span><span class="w"> </span><span class="nc">ObserverId</span><span class="p">,</span><span class="w"> </span><span class="n">invitationId</span><span class="p">:</span><span class="w"> </span><span class="nc">InvitationId</span><span class="p">)</span><span class="w">                         </span><span class="c1">// EV-G07</span>
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">CredentialRevoked</span><span class="p">(</span><span class="n">subject</span><span class="p">:</span><span class="w"> </span><span class="nc">CredentialSubject</span><span class="p">)</span><span class="w">                                              </span><span class="c1">// EV-G08。入れ替えの自動失効にも使う</span>
-<span class="w">  </span><span class="c1">// … EV-G01〜G12。Kotlin 版の表のとおり</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">CredentialReissued</span><span class="p">(</span><span class="n">subject</span><span class="p">:</span><span class="w"> </span><span class="nc">CredentialSubject</span><span class="p">)</span><span class="w">                                             </span><span class="c1">// EV-G09</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ParticipationRecovered</span><span class="p">(</span><span class="n">subject</span><span class="p">:</span><span class="w"> </span><span class="nc">CredentialSubject</span><span class="p">)</span><span class="w">                                         </span><span class="c1">// EV-G10</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">GameStarted</span><span class="p">(</span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span><span class="w">                                                                </span><span class="c1">// EV-G11</span>
+<span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">participantId</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">,</span><span class="w"> </span><span class="n">role</span><span class="p">:</span><span class="w"> </span><span class="nc">Role</span><span class="p">,</span><span class="w"> </span><span class="n">replacedBy</span><span class="p">:</span><span class="w"> </span><span class="nc">ParticipantId</span><span class="p">)</span><span class="w">   </span><span class="c1">// EV-G12。開始後の入れ替え</span>
 
 <span class="k">enum</span><span class="w"> </span><span class="nc">GameCommand</span><span class="p">:</span>
 <span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="nc">CreateGame</span><span class="p">(</span><span class="n">actor</span><span class="p">:</span><span class="w"> </span><span class="nc">Actor</span><span class="p">,</span><span class="w"> </span><span class="n">gameId</span><span class="p">:</span><span class="w"> </span><span class="nc">GameId</span><span class="p">)</span>
@@ -14816,20 +14867,26 @@
 <span class="k">object</span><span class="w"> </span><span class="nc">GameEvents</span><span class="p">:</span>
 <span class="w">  </span><span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="n">state</span><span class="p">:</span><span class="w"> </span><span class="nc">GameState</span><span class="p">,</span><span class="w"> </span><span class="n">event</span><span class="p">:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">):</span><span class="w"> </span><span class="nc">Evolution</span><span class="p">[</span><span class="nc">GameState</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
 <span class="w">    </span><span class="p">(</span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">event</span><span class="p">)</span><span class="w"> </span><span class="k">match</span>
+<span class="w">      </span><span class="c1">// 腕は、下の「遷移の許す組の表」（規範）の ○ の組だけを書く。× の組は最後の腕の Ignored になる</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">NotCreated</span><span class="p">,</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">GameCreated</span><span class="p">(</span><span class="n">g</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="nc">Map</span><span class="p">.</span><span class="n">empty</span><span class="p">))</span>
-<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ParticipantJoined</span><span class="p">(</span><span class="n">p</span><span class="p">))</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">!</span><span class="n">ps</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 同じ参加者の 2 回目は Ignored</span>
+<span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">None</span><span class="p">)))</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">      </span><span class="c1">// 未知の参加者は Ignored</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">r</span><span class="p">))))</span>
-<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleUnassigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleUnassigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">None</span><span class="p">)))</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">GameStarted</span><span class="p">(</span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">))</span>
 <span class="w">      </span><span class="c1">// 開始後の役割の入れ替え（H2。Kotlin 版の変更表 38 に倣う）。Started の自己遷移として受ける</span>
-<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">        </span><span class="c1">// 入れ替えの新担当者</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">RoleAssigned</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">r</span><span class="p">))</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">        </span><span class="c1">// 入れ替えの新担当者</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">r</span><span class="p">))))</span>
-<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 旧担当者の役割を外す。行は消さない</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ParticipantReplaced</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">contains</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 旧担当者の役割を外す。行は消さない。未知の参加者は Ignored</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">ps</span><span class="p">.</span><span class="n">updated</span><span class="p">(</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="nc">None</span><span class="p">)))</span>
-<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">@</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)),</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">CredentialRevoked</span><span class="p">(</span><span class="n">_</span><span class="p">))</span><span class="w"> </span><span class="o">=&gt;</span><span class="w">   </span><span class="c1">// 実際は資格の状態を更新する（スケッチは参加者だけ）</span>
+<span class="w">      </span><span class="c1">// 観察者の招待・参加・招待の取り消し、資格の失効・再発行、復帰は、準備中・開始後の両方で自己遷移（N-H1。実際は招待・観察者・資格の状態を更新する。スケッチは参加者だけ）</span>
+<span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">@</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)),</span>
+<span class="w">            </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ObserverInvited</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ObserverInvitationRevoked</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ObserverJoined</span><span class="w"> </span><span class="o">|</span>
+<span class="w">            </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">CredentialRevoked</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">CredentialReissued</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">_:</span><span class="w"> </span><span class="nc">GameEvent</span><span class="p">.</span><span class="nc">ParticipationRecovered</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Applied</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
 <span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="p">(</span><span class="n">s</span><span class="w"> </span><span class="o">@</span><span class="w"> </span><span class="p">(</span><span class="nc">GameState</span><span class="p">.</span><span class="nc">NotCreated</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Preparing</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nc">GameState</span><span class="p">.</span><span class="nc">Started</span><span class="p">(</span><span class="n">_</span><span class="p">,</span><span class="w"> </span><span class="n">_</span><span class="p">)),</span><span class="w"> </span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span>
 <span class="w">        </span><span class="nc">Evolution</span><span class="p">.</span><span class="nc">Ignored</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
@@ -14843,8 +14900,230 @@
 </code></pre></div>
 <p>（上のコードの <code>GameEvents</code> は、検証した断片では <code>Events</code> の名前です。集約ごとに分けるため、本書では <code>GameEvents</code> と書きます。）</p>
 <p>最後の腕は、<strong>状態の列挙子だけを列挙して</strong>、イベントを <code>_</code> で受けます。状態を足すと、この <code>match</code> が網羅の警告になり、<code>-Werror</code> でビルドが止まります（<strong>本書の断片で、状態を 1 つ足して警告を確認しました</strong>）。イベントを足したときは、有効な組の追加を忘れても <code>Ignored</code> になるため、<strong>性質テストで「<code>handle</code> が作る列は <code>Ignored</code> にならない」を守ります</strong>（ガイド §7.3 の「許す組を足し忘れても、コンパイラは止めない」と同じ注意。Kotlin 版・Rust 版と同じ方針）。再生は <code>foldLeft</code> で、<code>Ignored</code> の件数を再生側が受け取ります（ガイド §7.4、§6.1）。</p>
-<h4 id="started-h2ai">開始後の役割の入れ替えと <code>Started</code> の自己遷移（H2。AI の案、承認を得ていない）<a class="headerlink" href="#started-h2ai" title="Permanent link">&para;</a></h4>
-<p>Kotlin 版は、開始後の入れ替えを <code>Started</code> の<strong>自己遷移</strong>として扱います（<a href="../../beer-game-kotlin/domain-model/">Kotlin 版の「役割の入れ替え」</a> と変更表 37・38）。Scala 版の初稿は、<code>RoleAssigned</code> を <code>Preparing</code> だけが受け、<code>ParticipantReplaced</code> を持たなかったため、<strong>入れ替えたゲームが <code>Ignored</code> になり、「止める」設計（ユーザーの決定、2026-11-25）と合わせると、研修中に担当者を入れ替えたゲームが操作不能になる</strong>状態でした。次のとおり直します。</p>
+<h4 id="n-h1ai">遷移の許す組の表（規範。再レビュー N-H1。AI の案、承認を得ていない）<a class="headerlink" href="#n-h1ai" title="Permanent link">&para;</a></h4>
+<p><strong>「どのイベントを、どの状態が受けるか」を決めるのは、次の 2 つの表（EV-G01〜G12 × <code>game</code> の状態、EV-S01〜S10 × <code>session</code> の状態）です。これが規範</strong>で、<code>GameEvents.apply</code>・<code>SessionEvents.apply</code> の <code>match</code>、状態遷移図、性質テストの生成器（<a href="../test-strategy/">テスト戦略</a> の M9 の <code>collect</code>）、状態遷移テストは、<strong>この表から導きます</strong>（図やスケッチを基準に生成器を作ると、組の漏れを見逃す。前回は <code>Started</code> のスケッチが図より狭く、観察者の招待・資格の再発行・復帰が <code>Ignored</code> になっていた）。止める設計（H3）では、許す組の漏れがそのまま研修中の停止（P1）になります。</p>
+<p>表は、Kotlin 版の <code>evolveGame</code>・<code>evolveSession</code>（<code>Game.kt</code>・<code>SessionEvolve.kt</code>）と、Kotlin 版の状態遷移図（<code>domain-model.md</code> の「game ストリームの状態」「session ストリームの状態」）を<strong>読んで</strong>書きました。次の 2 点が Kotlin 版と違います。(1) Kotlin 版の <code>evolve</code> は、<code>handle</code> が作らない列を「状態を変えずに返す」だけで、Scala 版は同じ組を <code>Ignored</code> にします（検知が目的）。(2) Kotlin 版の <code>evolveSession</code> は、<code>DecisionSaved</code>・<code>WeekCommitted</code> などを <code>Paused</code> でも適用しますが、<code>handle</code> は <code>Paused</code> で作らないため、<strong>Scala 版の表は <code>handle</code> が作る組だけを ○ にします</strong>（<code>Paused</code> の <code>DecisionSaved</code>・<code>WeekCommitted</code> は <code>Ignored</code>。止める設計では、<code>handle</code> が作らない列は不具合）。</p>
+<p><strong><code>game</code> ストリーム</strong>（○ = <code>Applied</code>、× = <code>Ignored</code>）</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ID</th>
+<th style="text-align: left;">イベント</th>
+<th style="text-align: left;"><code>NotCreated</code></th>
+<th style="text-align: left;"><code>Preparing</code></th>
+<th style="text-align: left;"><code>Started</code></th>
+<th style="text-align: left;">備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">EV-G01</td>
+<td style="text-align: left;"><code>GameCreated</code></td>
+<td style="text-align: left;">○（→ <code>Preparing</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G02</td>
+<td style="text-align: left;"><code>ParticipantJoined</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（新しい参加者のみ）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">同じ参加者の 2 回目は ×</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G03</td>
+<td style="text-align: left;"><code>RoleAssigned</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（既知の参加者）</td>
+<td style="text-align: left;">○（既知の参加者。入れ替えの新担当者）</td>
+<td style="text-align: left;">未知の参加者は ×</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G04</td>
+<td style="text-align: left;"><code>RoleUnassigned</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（既知の参加者）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">開始後の外れは <code>ParticipantReplaced</code></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G05</td>
+<td style="text-align: left;"><code>ObserverInvited</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G06</td>
+<td style="text-align: left;"><code>ObserverInvitationRevoked</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">初稿の Scala 版は 0 件だった</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G07</td>
+<td style="text-align: left;"><code>ObserverJoined</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G08</td>
+<td style="text-align: left;"><code>CredentialRevoked</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">入れ替えの自動失効を含む</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G09</td>
+<td style="text-align: left;"><code>CredentialReissued</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G10</td>
+<td style="text-align: left;"><code>ParticipationRecovered</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">開始後の復帰（US3.2）に要る</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G11</td>
+<td style="text-align: left;"><code>GameStarted</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（→ <code>Started</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-G12</td>
+<td style="text-align: left;"><code>ParticipantReplaced</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（既知の参加者）</td>
+<td style="text-align: left;">未知の参加者は ×（Kotlin 版の変更表 38）。<code>Preparing</code>・<code>NotCreated</code> も ×</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>session</code> ストリーム</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ID</th>
+<th style="text-align: left;">イベント</th>
+<th style="text-align: left;"><code>NotStarted</code></th>
+<th style="text-align: left;"><code>Active</code></th>
+<th style="text-align: left;"><code>Paused</code></th>
+<th style="text-align: left;"><code>Ended</code></th>
+<th style="text-align: left;">備考</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">EV-S01</td>
+<td style="text-align: left;"><code>SessionStarted</code></td>
+<td style="text-align: left;">○（→ <code>Active</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S02</td>
+<td style="text-align: left;"><code>SessionPaused</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（→ <code>Paused</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S03</td>
+<td style="text-align: left;"><code>SessionResumed</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（→ <code>Active</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S04</td>
+<td style="text-align: left;"><code>SessionEnded</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（→ <code>Ended</code>）</td>
+<td style="text-align: left;">○（→ <code>Ended</code>）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S05</td>
+<td style="text-align: left;"><code>DecisionSaved</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">停止中の保存は <code>handle</code> が拒否する</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S06</td>
+<td style="text-align: left;"><code>ProxyDecisionSubmitted</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">進行役の代理入力は停止中も受ける（UC-09）。確定はしない</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S07</td>
+<td style="text-align: left;"><code>AutoCommitChanged</code></td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;">-</td>
+<td style="text-align: left;"><strong>Kotlin 版のコード（<code>SessionEvent</code>）に存在しない</strong>。EV-S10 と重複した表の記述（未決事項 12）</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S08</td>
+<td style="text-align: left;"><code>WeekCommitted</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○（最終週なら同じ追記の <code>SessionEnded</code> が続く）</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;"><code>Paused</code> は確定しない。再開で <code>AUTO</code> が揃えば、<code>SessionResumed</code> の後（<code>Active</code>）に続く</td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S09</td>
+<td style="text-align: left;"><code>RoleHolderReplaced</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;"><code>NotStarted</code>・<code>Ended</code> は <strong><code>Ignored</code></strong>。<code>handle</code>（<code>assignRoleAfterStart</code>）が <code>NotActive</code>・<code>AlreadyEnded</code> で拒否するので作られない</td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">EV-S10</td>
+<td style="text-align: left;"><code>CommitModeChanged</code></td>
+<td style="text-align: left;">×</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">○</td>
+<td style="text-align: left;">有効にして 4 役割が揃えば、同じ追記で <code>WeekCommitted</code>（<code>AUTO</code>）が続く（<code>Active</code> のときだけ）</td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+<p><strong>表の使い方（案）</strong>: (1) 表を、テストが読める値（状態の種類 × イベントの種類 → 許す／許さない）として 1 か所に持つ。(2) 状態遷移テストが、<strong>全部の組</strong>（12 × 3 と 9 × 4）を <code>apply</code> に渡し、表の ○ が <code>Applied</code>、× が <code>Ignored</code> になることを確かめる（条件つきの ○ は、条件を満たす例と、満たさない例の両方）。(3) 性質テストの生成器は、<strong>表の ○ の組から</strong>イベントの列を作る（<code>handle</code> を通した列に加えて、<code>assignRoleAfterStart</code>、観察者の招待と参加、資格の失効・再発行・復帰、復帰を含める）。(4) 状態遷移図は、この表から機械的に描ける形にする。<strong>表を変えるときは、図・<code>apply</code>・生成器・テストを同じ変更で直す</strong>。</p>
+<p><strong>この表は、AI が Kotlin 版のコードと図から導いた案</strong>で、人の確認を得ていません。Kotlin 版の <code>GameData.revoked</code>・<code>reissued</code>・<code>recovered</code> が、未知の主体を渡されたときに状態を変えない（<code>null</code> を返す）かは、<strong>読んでいません</strong>（B1 で確認し、変えるなら表に条件を足す）。</p>
+<h4 id="started-h2n-h1ai">開始後の役割の入れ替えと <code>Started</code> の自己遷移（H2・N-H1。AI の案、承認を得ていない）<a class="headerlink" href="#started-h2n-h1ai" title="Permanent link">&para;</a></h4>
+<p>Kotlin 版は、開始後の入れ替えを <code>Started</code> の<strong>自己遷移</strong>として扱います（<a href="../../beer-game-kotlin/domain-model/">Kotlin 版の「役割の入れ替え」</a> と変更表 37・38）。Scala 版の初稿は、<code>RoleAssigned</code> を <code>Preparing</code> だけが受け、<code>ParticipantReplaced</code> を持たなかったため、<strong>入れ替えたゲームが <code>Ignored</code> になり、「止める」設計（ユーザーの決定、2026-11-25）と合わせると、研修中に担当者を入れ替えたゲームが操作不能になる</strong>状態でした。1 回目の直しでも、<code>Started</code> の腕は <code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code> だけで、状態遷移図より狭く、観察者の招待・資格の再発行・復帰を <code>Ignored</code> にしていました（再レビュー N-H1）。上の表のとおり直します。</p>
 <table>
 <thead>
 <tr>
@@ -14859,35 +15138,46 @@
 <td style="text-align: left;"><code>game</code></td>
 <td style="text-align: left;"><code>Started</code></td>
 <td style="text-align: left;"><code>RoleAssigned</code>（入れ替えの新担当者）</td>
-<td style="text-align: left;">参加者の役割を付ける（自己遷移）</td>
+<td style="text-align: left;">参加者の役割を付ける（自己遷移）。未知の参加者は <code>Ignored</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>game</code></td>
 <td style="text-align: left;"><code>Started</code></td>
 <td style="text-align: left;"><code>ParticipantReplaced</code>（旧担当者。<code>replacedBy</code> を持つ）</td>
-<td style="text-align: left;">旧担当者の役割を外す。参加者の行・表示名・過去の入力は消さない（自己遷移）</td>
+<td style="text-align: left;">旧担当者の役割を外す。参加者の行・表示名・過去の入力は消さない（自己遷移）。<strong>未知の参加者は <code>Ignored</code></strong></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>game</code></td>
 <td style="text-align: left;"><code>Preparing</code>・<code>Started</code></td>
-<td style="text-align: left;"><code>CredentialRevoked</code>（入れ替えの自動失効を含む）</td>
-<td style="text-align: left;">資格を失効にする（自己遷移）</td>
+<td style="text-align: left;"><code>ObserverInvited</code>・<code>ObserverInvitationRevoked</code>・<code>ObserverJoined</code>・<code>CredentialRevoked</code>（入れ替えの自動失効を含む）・<code>CredentialReissued</code>・<code>ParticipationRecovered</code></td>
+<td style="text-align: left;">招待・観察者・資格の状態を更新する（自己遷移）</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>session</code></td>
 <td style="text-align: left;"><code>Active</code>・<code>Paused</code></td>
 <td style="text-align: left;"><code>RoleHolderReplaced</code>（<code>removed</code>・<code>added</code>）</td>
-<td style="text-align: left;"><code>SessionData.assignments[role]</code> を更新する（自己遷移）。<code>NotStarted</code>・<code>Ended</code> は状態を変えない</td>
+<td style="text-align: left;"><code>SessionData.assignments[role]</code> を更新する（自己遷移）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>session</code></td>
+<td style="text-align: left;"><code>NotStarted</code>・<code>Ended</code></td>
+<td style="text-align: left;"><code>RoleHolderReplaced</code></td>
+<td style="text-align: left;"><strong><code>Ignored</code></strong>（<code>Applied(s)</code> ではない。Kotlin 版の「状態を変えない」を、Scala 版では <code>Ignored</code> として検知する。<code>handle</code> が作らないので、出たら不具合）</td>
 </tr>
 </tbody>
 </table>
-<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJTVEFURSIgc3R5bGU9IndpZHRoOjQ0NHB4O2hlaWdodDo1MDJweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNDQ0cHgiIGhlaWdodD0iNTAycHgiIHZpZXdCb3g9IjAgMCA0NDQgNTAyIiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjEwIiB5PSIyMi45OTUiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjQxNy4zNzQiIGZvbnQtd2VpZ2h0PSI3MDAiPmdhbWUg44K544OI44Oq44O844Og44Gu54q25oWL77yI6ZaL5aeL5b6M44Gu5YWl44KM5pu/44GI44KS5ZCr44KA44CCU2NhbGEg54mI77yJPC90ZXh0PjwvZz48ZyBjbGFzcz0ic3RhcnRfZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSIuc3RhcnQuIiBpZD0iZW50MDAwMSIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PGVsbGlwc2UgY3g9IjY2Ljc0MSIgY3k9IjUzLjI5NyIgcng9IjEwIiByeT0iMTAiIGZpbGw9IiMyMjIiIHN0eWxlPSJzdHJva2U6IzIyMjtzdHJva2Utd2lkdGg6MTsiLz48L2c+PGcgY2xhc3M9ImVudGl0eSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iTm90Q3JlYXRlZCIgaWQ9ImVudDAwMDIiIGRhdGEtc291cmNlLWxpbmU9IjIiPjxyZWN0IHg9IjE2LjYyMSIgeT0iMTI0LjI5NyIgd2lkdGg9IjEwMC4yNCIgaGVpZ2h0PSI1MCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48bGluZSB4MT0iMTYuNjIxIiB5MT0iMTUwLjU5NCIgeDI9IjExNi44NjIiIHkyPSIxNTAuNTk0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiLz48dGV4dCB4PSIyNi42MjEiIHk9IjE0Mi4yOTIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjgwLjI0Ij5Ob3RDcmVhdGVkPC90ZXh0PjwvZz48ZyBjbGFzcz0iZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSJQcmVwYXJpbmciIGlkPSJlbnQwMDA0IiBkYXRhLXNvdXJjZS1saW5lPSIzIj48cmVjdCB4PSIyMi45MDEiIHk9IjI2Mi4yOTciIHdpZHRoPSI4Ny42ODMiIGhlaWdodD0iNTAiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PGxpbmUgeDE9IjIyLjkwMSIgeTE9IjI4OC41OTQiIHgyPSIxMTAuNTg0IiB5Mj0iMjg4LjU5NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7Ii8+PHRleHQgeD0iMzIuOTAxIiB5PSIyODAuMjkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI2Ny42ODMiPlByZXBhcmluZzwvdGV4dD48L2c+PGcgY2xhc3M9ImVudGl0eSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iU3RhcnRlZCIgaWQ9ImVudDAwMDciIGRhdGEtc291cmNlLWxpbmU9IjUiPjxyZWN0IHg9IjMwLjg5MSIgeT0iNDE4Ljc5NyIgd2lkdGg9IjcxLjciIGhlaWdodD0iNTAiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PGxpbmUgeDE9IjMwLjg5MSIgeTE9IjQ0NS4wOTQiIHgyPSIxMDIuNTkyIiB5Mj0iNDQ1LjA5NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7Ii8+PHRleHQgeD0iNDAuODkxIiB5PSI0MzYuNzkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI1MS43Ij5TdGFydGVkPC90ZXh0PjwvZz48IS0tbGluayAqc3RhcnQqIHRvIE5vdENyZWF0ZWQtLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMSIgZGF0YS1lbnRpdHktMj0iZW50MDAwMiIgaWQ9ImxuazMiIGRhdGEtc291cmNlLWxpbmU9IjIiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNNjYuNzQxLDYzLjY1NyBDNjYuNzQxLDc3LjU4NyA2Ni43NDEsOTkuMjQ3IDY2Ljc0MSwxMTguOTQ3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iKnN0YXJ0Ki10by1Ob3RDcmVhdGVkIi8+PHBvbHlnb24gcG9pbnRzPSI2Ni43NDEsMTIzLjk0Nyw3MC43NDEsMTE0Ljk0Nyw2Ni43NDEsMTE4Ljk0Nyw2Mi43NDEsMTE0Ljk0Nyw2Ni43NDEsMTIzLjk0NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48L2c+PCEtLWxpbmsgTm90Q3JlYXRlZCB0byBQcmVwYXJpbmctLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMiIgZGF0YS1lbnRpdHktMj0iZW50MDAwNCIgaWQ9ImxuazUiIGRhdGEtc291cmNlLWxpbmU9IjMiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNNjYuNzQxLDE3NC42MDcgQzY2Ljc0MSwxOTkuMzY3IDY2Ljc0MSwyMzIuNTE3IDY2Ljc0MSwyNTcuMTk3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iTm90Q3JlYXRlZC10by1QcmVwYXJpbmciLz48cG9seWdvbiBwb2ludHM9IjY2Ljc0MSwyNjIuMTk3LDcwLjc0MSwyNTMuMTk3LDY2Ljc0MSwyNTcuMTk3LDYyLjc0MSwyNTMuMTk3LDY2Ljc0MSwyNjIuMTk3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjx0ZXh0IHg9IjY3Ljc0MSIgeT0iMjE3LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iOTAuNDM1Ij5HYW1lQ3JlYXRlZDwvdGV4dD48L2c+PCEtLWxpbmsgUHJlcGFyaW5nIHRvIFByZXBhcmluZy0tPjxnIGNsYXNzPSJsaW5rIiBkYXRhLWVudGl0eS0xPSJlbnQwMDA0IiBkYXRhLWVudGl0eS0yPSJlbnQwMDA0IiBpZD0ibG5rNiIgZGF0YS1zb3VyY2UtbGluZT0iNCIgZGF0YS1saW5rLXR5cGU9ImRlcGVuZGVuY3kiPjxwYXRoIGQ9Ik0xMTAuOTIxLDI3My40NzcgQzEyOS42NDEsMjcyLjQyNyAxNDUuNTgxLDI3Ny4wMzcgMTQ1LjU4MSwyODcuMjk3IEMxNDUuNTgxLDI5Ny41NTcgMTM0LjYzNCwzMDIuNDQ3IDExNS45MTQsMzAxLjM5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlByZXBhcmluZy10by1QcmVwYXJpbmciLz48cG9seWdvbiBwb2ludHM9IjExMC45MjEsMzAxLjExNywxMTkuNjgzLDMwNS42MTUsMTE1LjkxNCwzMDEuMzk3LDEyMC4xMzEsMjk3LjYyNywxMTAuOTIxLDMwMS4xMTciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PHRleHQgeD0iMjI3LjYzNiIgeT0iMjY5LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMTEwLjA2MiI+UGFydGljaXBhbnRKb2luZWQ8L3RleHQ+PHRleHQgeD0iMTgwLjU0MyIgeT0iMjg0LjQ5NyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjA0LjI0OSI+Um9sZUFzc2lnbmVkIC8gUm9sZVVuYXNzaWduZWQ8L3RleHQ+PHRleHQgeD0iMTc0LjQwMSIgeT0iMjk5LjYyOSIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjE2LjUzMSI+T2JzZXJ2ZXJJbnZpdGVkIC8gT2JzZXJ2ZXJKb2luZWQ8L3RleHQ+PHRleHQgeD0iMTUxLjU4MSIgeT0iMzE0Ljc2MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iMjYyLjE3MSI+Q3JlZGVudGlhbFJldm9rZWQgLyBDcmVkZW50aWFsUmVpc3N1ZWQ8L3RleHQ+PC9nPjwhLS1saW5rIFByZXBhcmluZyB0byBTdGFydGVkLS0+PGcgY2xhc3M9ImxpbmsiIGRhdGEtZW50aXR5LTE9ImVudDAwMDQiIGRhdGEtZW50aXR5LTI9ImVudDAwMDciIGlkPSJsbms4IiBkYXRhLXNvdXJjZS1saW5lPSI1IiBkYXRhLWxpbmstdHlwZT0iZGVwZW5kZW5jeSI+PHBhdGggZD0iTTY2Ljc0MSwzMTIuNzc3IEM2Ni43NDEsMzQxLjcwNyA2Ni43NDEsMzg0LjU0NyA2Ni43NDEsNDEzLjQyNyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlByZXBhcmluZy10by1TdGFydGVkIi8+PHBvbHlnb24gcG9pbnRzPSI2Ni43NDEsNDE4LjQyNyw3MC43NDEsNDA5LjQyNyw2Ni43NDEsNDEzLjQyNyw2Mi43NDEsNDA5LjQyNyw2Ni43NDEsNDE4LjQyNyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48dGV4dCB4PSI2Ny43NDEiIHk9IjM2Ni4zNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9Ijg2LjcwOSI+R2FtZVN0YXJ0ZWQ8L3RleHQ+PC9nPjwhLS1saW5rIFN0YXJ0ZWQgdG8gU3RhcnRlZC0tPjxnIGNsYXNzPSJsaW5rIiBkYXRhLWVudGl0eS0xPSJlbnQwMDA3IiBkYXRhLWVudGl0eS0yPSJlbnQwMDA3IiBpZD0ibG5rOSIgZGF0YS1zb3VyY2UtbGluZT0iNiIgZGF0YS1saW5rLXR5cGU9ImRlcGVuZGVuY3kiPjxwYXRoIGQ9Ik0xMDIuODMxLDQyOC45MTcgQzEyMS4xNjEsNDI2Ljc0NyAxMzcuNTkxLDQzMS43MDcgMTM3LjU5MSw0NDMuNzk3IEMxMzcuNTkxLDQ1NS44ODcgMTI2LjEyNyw0NjEuNDM1IDEwNy43OTcsNDU5LjI2NSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IlN0YXJ0ZWQtdG8tU3RhcnRlZCIvPjxwb2x5Z29uIHBvaW50cz0iMTAyLjgzMSw0NTguNjc3LDExMS4yOTksNDYzLjcwNywxMDcuNzk3LDQ1OS4yNjUsMTEyLjIzOSw0NTUuNzYzLDEwMi44MzEsNDU4LjY3NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48dGV4dCB4PSIxNjYuNDExIiB5PSI0MTguMzY0IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyMTYuNTMxIj5PYnNlcnZlckludml0ZWQgLyBPYnNlcnZlckpvaW5lZDwvdGV4dD48dGV4dCB4PSIxNDMuNTkxIiB5PSI0MzMuNDk3IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNjIuMTcxIj5DcmVkZW50aWFsUmV2b2tlZCAvIENyZWRlbnRpYWxSZWlzc3VlZDwvdGV4dD48dGV4dCB4PSIxOTkuMDk4IiB5PSI0NDguNjI5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxNTEuMTU3Ij5QYXJ0aWNpcGF0aW9uUmVjb3ZlcmVkPC90ZXh0Pjx0ZXh0IHg9IjE1OS43MDUiIHk9IjQ2My43NjIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjIyOS45NDQiPuW9ueWJsuOBruWFpeOCjOabv+OBiDogUGFydGljaXBhbnRSZXBsYWNlZDwvdGV4dD48dGV4dCB4PSIxNTIuMDY1IiB5PSI0NzguODk1IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNDUuMjIzIj4rIENyZWRlbnRpYWxSZXZva2VkICsgUm9sZUFzc2lnbmVkPC90ZXh0PjwvZz48P3BsYW50dW1sLXNyYyBoUDZfSXlEMDVDVnRfMUxsalhIdDFxNFNIMFNqQUt4NnVLbVV1SjNVWFNrUGtLcWU5QVEzRUJZdWs4WVd1RTBXNTVCek91dmhTVWdfdTJLc3pqVmdUa3pwN3p4eHRaajlQTzNXYW9pNGJPbktjZ2RxSFFNYklYekxfc3J3eXA0UDVCQ28teHVsejdFWEZ1UzZ3aTZKSWVRSlhvX0xwckhvZnN6VkxUOUpsUUpoYWUzMERDemNQTXdUUlByM2t4cUJucnBrMm9HSUZNam5oNnl3MGFDWUFGRFgxbXhDLTRQUnk3TWhHdUlhQldxOWFxVVNDbEdTUGxDMHp3QTgtZ1EyUlFaQUtxUmNtNjRkNW42QTZDS1hZd2NpWk9PcTNTbkszdmNhOUIwbnZmVXJpeW5lNTVybFhFZkFheUllbHk3ZGJUTkdMVUVfOFpaaXhfY0lTY1Fab3FzRllrbG5JRVZsUW4tcGlZcVJtdTJ1YlRrMnBNYWpNRHhZM20wMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
+<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIGRhdGEtZGlhZ3JhbS10eXBlPSJTVEFURSIgc3R5bGU9IndpZHRoOjYxMnB4O2hlaWdodDo1NDhweDtiYWNrZ3JvdW5kOiNGRkZGRkY7IiB3aWR0aD0iNjEycHgiIGhlaWdodD0iNTQ4cHgiIHZpZXdCb3g9IjAgMCA2MTIgNTQ4IiB6b29tQW5kUGFuPSJtYWduaWZ5IiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBjb250ZW50U3R5bGVUeXBlPSJ0ZXh0L2NzcyI+PD9wbGFudHVtbCAxLjIwMjYuMTA/PjxkZWZzLz48ZyBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgbGVuZ3RoQWRqdXN0PSJzcGFjaW5nIj48ZyBjbGFzcz0idGl0bGUiIGRhdGEtc291cmNlLWxpbmU9IjEiPjx0ZXh0IHg9IjEwIiB5PSIyMi45OTUiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjU4NS4zNzMiIGZvbnQtd2VpZ2h0PSI3MDAiPmdhbWUg44K544OI44Oq44O844Og44Gu54q25oWL77yI6ZaL5aeL5b6M44Gu5YWl44KM5pu/44GI44KS5ZCr44KA44CCU2NhbGEg54mI44CC5LiK44Gu6Kix44GZ57WE44Gu6KGo44GL44KJ5o+P44GP77yJPC90ZXh0PjwvZz48ZyBjbGFzcz0ic3RhcnRfZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSIuc3RhcnQuIiBpZD0iZW50MDAwMSIgZGF0YS1zb3VyY2UtbGluZT0iMiI+PGVsbGlwc2UgY3g9IjEzNC42MDUiIGN5PSI1My4yOTciIHJ4PSIxMCIgcnk9IjEwIiBmaWxsPSIjMjIyIiBzdHlsZT0ic3Ryb2tlOiMyMjI7c3Ryb2tlLXdpZHRoOjE7Ii8+PC9nPjxnIGNsYXNzPSJlbnRpdHkiIGRhdGEtcXVhbGlmaWVkLW5hbWU9Ik5vdENyZWF0ZWQiIGlkPSJlbnQwMDAyIiBkYXRhLXNvdXJjZS1saW5lPSIyIj48cmVjdCB4PSI4NC40ODUiIHk9IjEyNC4yOTciIHdpZHRoPSIxMDAuMjQiIGhlaWdodD0iNTAiIGZpbGw9IiNGMUYxRjEiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIgcng9IjEyLjUiIHJ5PSIxMi41Ii8+PGxpbmUgeDE9Ijg0LjQ4NSIgeTE9IjE1MC41OTQiIHgyPSIxODQuNzI1IiB5Mj0iMTUwLjU5NCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7Ii8+PHRleHQgeD0iOTQuNDg1IiB5PSIxNDIuMjkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI4MC4yNCI+Tm90Q3JlYXRlZDwvdGV4dD48L2c+PGcgY2xhc3M9ImVudGl0eSIgZGF0YS1xdWFsaWZpZWQtbmFtZT0iUHJlcGFyaW5nIiBpZD0iZW50MDAwNCIgZGF0YS1zb3VyY2UtbGluZT0iMyI+PHJlY3QgeD0iOTAuNzY1IiB5PSIyNzcuMjk3IiB3aWR0aD0iODcuNjgzIiBoZWlnaHQ9IjUwIiBmaWxsPSIjRjFGMUYxIiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiIHJ4PSIxMi41IiByeT0iMTIuNSIvPjxsaW5lIHgxPSI5MC43NjUiIHkxPSIzMDMuNTk0IiB4Mj0iMTc4LjQ0OCIgeTI9IjMwMy41OTQiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MC41OyIvPjx0ZXh0IHg9IjEwMC43NjUiIHk9IjI5NS4yOTIiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjY3LjY4MyI+UHJlcGFyaW5nPC90ZXh0PjwvZz48ZyBjbGFzcz0iZW50aXR5IiBkYXRhLXF1YWxpZmllZC1uYW1lPSJTdGFydGVkIiBpZD0iZW50MDAwNyIgZGF0YS1zb3VyY2UtbGluZT0iNSI+PHJlY3QgeD0iOTguNzU1IiB5PSI0NTYuMjk3IiB3aWR0aD0iNzEuNyIgaGVpZ2h0PSI1MCIgZmlsbD0iI0YxRjFGMSIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDowLjU7IiByeD0iMTIuNSIgcnk9IjEyLjUiLz48bGluZSB4MT0iOTguNzU1IiB5MT0iNDgyLjU5NCIgeDI9IjE3MC40NTUiIHkyPSI0ODIuNTk0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjAuNTsiLz48dGV4dCB4PSIxMDguNzU1IiB5PSI0NzQuMjkyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI1MS43Ij5TdGFydGVkPC90ZXh0PjwvZz48IS0tbGluayAqc3RhcnQqIHRvIE5vdENyZWF0ZWQtLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMSIgZGF0YS1lbnRpdHktMj0iZW50MDAwMiIgaWQ9ImxuazMiIGRhdGEtc291cmNlLWxpbmU9IjIiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNMTM0LjYwNSw2My42NTcgQzEzNC42MDUsNzcuNTg3IDEzNC42MDUsOTkuMjQ3IDEzNC42MDUsMTE4Ljk0NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9IipzdGFydCotdG8tTm90Q3JlYXRlZCIvPjxwb2x5Z29uIHBvaW50cz0iMTM0LjYwNSwxMjMuOTQ3LDEzOC42MDUsMTE0Ljk0NywxMzQuNjA1LDExOC45NDcsMTMwLjYwNSwxMTQuOTQ3LDEzNC42MDUsMTIzLjk0NyIgZmlsbD0iIzE4MTgxOCIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxO3N0cm9rZS1saW5lam9pbjptaXRlcjtzdHJva2UtbWl0ZXJsaW1pdDoxMDsiLz48L2c+PCEtLWxpbmsgTm90Q3JlYXRlZCB0byBQcmVwYXJpbmctLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwMiIgZGF0YS1lbnRpdHktMj0iZW50MDAwNCIgaWQ9ImxuazUiIGRhdGEtc291cmNlLWxpbmU9IjMiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNMTM0LjYwNSwxNzQuNTU3IEMxMzQuNjA1LDIwMi43MzcgMTM0LjYwNSwyNDMuOTQ3IDEzNC42MDUsMjcyLjA5NyIgc3R5bGU9InN0cm9rZTojMTgxODE4O3N0cm9rZS13aWR0aDoxOyIgZmlsbD0ibm9uZSIgaWQ9Ik5vdENyZWF0ZWQtdG8tUHJlcGFyaW5nIi8+PHBvbHlnb24gcG9pbnRzPSIxMzQuNjA1LDI3Ny4wOTcsMTM4LjYwNSwyNjguMDk3LDEzNC42MDUsMjcyLjA5NywxMzAuNjA1LDI2OC4wOTcsMTM0LjYwNSwyNzcuMDk3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjx0ZXh0IHg9IjEzNS42MDUiIHk9IjIxNy4zNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjkwLjQzNSI+R2FtZUNyZWF0ZWQ8L3RleHQ+PC9nPjwhLS1saW5rIFByZXBhcmluZyB0byBQcmVwYXJpbmctLT48ZyBjbGFzcz0ibGluayIgZGF0YS1lbnRpdHktMT0iZW50MDAwNCIgZGF0YS1lbnRpdHktMj0iZW50MDAwNCIgaWQ9ImxuazYiIGRhdGEtc291cmNlLWxpbmU9IjQiIGRhdGEtbGluay10eXBlPSJkZXBlbmRlbmN5Ij48cGF0aCBkPSJNMTc4Ljc4NSwyODUuNjg3IEMxOTcuNTA1LDI4NC40MzcgMjEzLjQ0NSwyODkuOTc3IDIxMy40NDUsMzAyLjI5NyBDMjEzLjQ0NSwzMTQuNjE3IDIwMi40OTQsMzIwLjQ5IDE4My43NzQsMzE5LjI0IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iUHJlcGFyaW5nLXRvLVByZXBhcmluZyIvPjxwb2x5Z29uIHBvaW50cz0iMTc4Ljc4NSwzMTguOTA3LDE4Ny40OTksMzIzLjQ5OCwxODMuNzc0LDMxOS4yNCwxODguMDMyLDMxNS41MTUsMTc4Ljc4NSwzMTguOTA3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjx0ZXh0IHg9IjMxMS42MzUiIHk9IjI2OS4zNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjExMC4wNjIiPlBhcnRpY2lwYW50Sm9pbmVkPC90ZXh0Pjx0ZXh0IHg9IjI2NC41NDIiIHk9IjI4NC40OTciIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjIwNC4yNDkiPlJvbGVBc3NpZ25lZCAvIFJvbGVVbmFzc2lnbmVkPC90ZXh0Pjx0ZXh0IHg9IjIxOS40NDUiIHk9IjI5OS42MjkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjI5NC40NDIiPk9ic2VydmVySW52aXRlZCAvIE9ic2VydmVySW52aXRhdGlvblJldm9rZWQ8L3RleHQ+PHRleHQgeD0iMzE2LjkwNCIgeT0iMzE0Ljc2MiIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iOTkuNTI1Ij5PYnNlcnZlckpvaW5lZDwvdGV4dD48dGV4dCB4PSIyMzUuNTgxIiB5PSIzMjkuODk1IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNjIuMTcxIj5DcmVkZW50aWFsUmV2b2tlZCAvIENyZWRlbnRpYWxSZWlzc3VlZDwvdGV4dD48dGV4dCB4PSIyOTEuMDg4IiB5PSIzNDUuMDI4IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxNTEuMTU3Ij5QYXJ0aWNpcGF0aW9uUmVjb3ZlcmVkPC90ZXh0PjwvZz48IS0tbGluayBQcmVwYXJpbmcgdG8gU3RhcnRlZC0tPjxnIGNsYXNzPSJsaW5rIiBkYXRhLWVudGl0eS0xPSJlbnQwMDA0IiBkYXRhLWVudGl0eS0yPSJlbnQwMDA3IiBpZD0ibG5rOCIgZGF0YS1zb3VyY2UtbGluZT0iNSIgZGF0YS1saW5rLXR5cGU9ImRlcGVuZGVuY3kiPjxwYXRoIGQ9Ik0xMzQuNjA1LDMyNy41MzcgQzEzNC42MDUsMzYxLjMzNyAxMzQuNjA1LDQxNy4yNjcgMTM0LjYwNSw0NTEuMDY3IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iUHJlcGFyaW5nLXRvLVN0YXJ0ZWQiLz48cG9seWdvbiBwb2ludHM9IjEzNC42MDUsNDU2LjA2NywxMzguNjA1LDQ0Ny4wNjcsMTM0LjYwNSw0NTEuMDY3LDEzMC42MDUsNDQ3LjA2NywxMzQuNjA1LDQ1Ni4wNjciIGZpbGw9IiMxODE4MTgiIHN0eWxlPSJzdHJva2U6IzE4MTgxODtzdHJva2Utd2lkdGg6MTtzdHJva2UtbGluZWpvaW46bWl0ZXI7c3Ryb2tlLW1pdGVybGltaXQ6MTA7Ii8+PHRleHQgeD0iMTM1LjYwNSIgeT0iMzk2LjM2NCIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iODYuNzA5Ij5HYW1lU3RhcnRlZDwvdGV4dD48L2c+PCEtLWxpbmsgU3RhcnRlZCB0byBTdGFydGVkLS0+PGcgY2xhc3M9ImxpbmsiIGRhdGEtZW50aXR5LTE9ImVudDAwMDciIGRhdGEtZW50aXR5LTI9ImVudDAwMDciIGlkPSJsbms5IiBkYXRhLXNvdXJjZS1saW5lPSI2IiBkYXRhLWxpbmstdHlwZT0iZGVwZW5kZW5jeSI+PHBhdGggZD0iTTE3MC42OTUsNDY1LjA1NyBDMTg5LjAyNSw0NjIuNjg3IDIwNS40NTUsNDY4LjA5NyAyMDUuNDU1LDQ4MS4yOTcgQzIwNS40NTUsNDk0LjQ5NyAxOTMuOTg0LDUwMC41NDggMTc1LjY1NCw0OTguMTc4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7IiBmaWxsPSJub25lIiBpZD0iU3RhcnRlZC10by1TdGFydGVkIi8+PHBvbHlnb24gcG9pbnRzPSIxNzAuNjk1LDQ5Ny41MzcsMTc5LjEwOCw1MDIuNjU4LDE3NS42NTQsNDk4LjE3OCwxODAuMTM0LDQ5NC43MjQsMTcwLjY5NSw0OTcuNTM3IiBmaWxsPSIjMTgxODE4IiBzdHlsZT0ic3Ryb2tlOiMxODE4MTg7c3Ryb2tlLXdpZHRoOjE7c3Ryb2tlLWxpbmVqb2luOm1pdGVyO3N0cm9rZS1taXRlcmxpbWl0OjEwOyIvPjx0ZXh0IHg9IjIxMS40NTUiIHk9IjQ0OC4zNjQiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjI5NC40NDIiPk9ic2VydmVySW52aXRlZCAvIE9ic2VydmVySW52aXRhdGlvblJldm9rZWQ8L3RleHQ+PHRleHQgeD0iMzA4LjkxNCIgeT0iNDYzLjQ5NyIgZmlsbD0iIzAwMCIgZm9udC1zaXplPSIxMyIgdGV4dExlbmd0aD0iOTkuNTI1Ij5PYnNlcnZlckpvaW5lZDwvdGV4dD48dGV4dCB4PSIyMjcuNTkxIiB5PSI0NzguNjI5IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNjIuMTcxIj5DcmVkZW50aWFsUmV2b2tlZCAvIENyZWRlbnRpYWxSZWlzc3VlZDwvdGV4dD48dGV4dCB4PSIyODMuMDk4IiB5PSI0OTMuNzYyIiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIxNTEuMTU3Ij5QYXJ0aWNpcGF0aW9uUmVjb3ZlcmVkPC90ZXh0Pjx0ZXh0IHg9IjI0My43MDQiIHk9IjUwOC44OTUiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTMiIHRleHRMZW5ndGg9IjIyOS45NDQiPuW9ueWJsuOBruWFpeOCjOabv+OBiDogUGFydGljaXBhbnRSZXBsYWNlZDwvdGV4dD48dGV4dCB4PSIyMzYuMDY1IiB5PSI1MjQuMDI4IiBmaWxsPSIjMDAwIiBmb250LXNpemU9IjEzIiB0ZXh0TGVuZ3RoPSIyNDUuMjIzIj4rIENyZWRlbnRpYWxSZXZva2VkICsgUm9sZUFzc2lnbmVkPC90ZXh0PjwvZz48P3BsYW50dW1sLXNyYyBuUDlGSXlDbTZDUmwtbkd2RXVQdDN1OXU0M3Rld0YxYUZTR2tiNjFESVhqeE5iaTd4SmdPVTEzNFlueDR1SzFHSzFuQ19KMmx3VklxaHMyd0Z3eFRGZTJ0enR0b292RmRKSUFlaTBXb3lHYjE0RkdYWjIxeVc3MDB1R3R1WnlGTVF6ZkNIZUZldnBBSHp1ZHlRMmpIRGt5V1FBVk5kLTE3NDVwOHludTQzTVc0REdEUjYwdFpJRExWUm9yNVZkVVZtQnlRbGZuYnpNcU5fMEkyRUVycW1FLUMxZDdmT0VLR0xJaGhROVVCSk9UV0dVZ2JVSmJVZ0poNG5XdmI5YmYzTW9oWTM5bGhZckdMRXU4UXJDUEN4NzNBSTVyZDZoVjhYa2pJS3RMZTVNTmpGaURKR01UeEhvdm5GRTlpQ3UtQUNMNUdpQTJTUVNKWm50YnV2Z3EyckdhSjU1akpINnRGUXpIckpwRmtCelI0cFUzQU9zY0VjYjJLaWZaQ0VrckFDeEw4XzZEZ2RTZHRsZW9WNXh2MnVVdXJPYmxPb0RXb01ad2paRjlseVdpMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
 <p><strong>入れ替えは <code>assignRoleAfterStart</code>（<code>game</code> と <code>session</code> の両方を入力に取る関数）が、1 回の追記で返します</strong>。<code>game</code> に <code>ParticipantReplaced</code>（旧担当者ごとに 1 件）・<code>CredentialRevoked</code>・<code>RoleAssigned</code>、<code>session</code> に <code>RoleHolderReplaced</code> を返し、旧担当者の資格の失効と <code>session</code> の写しの更新を同じ追記で行います（Kotlin 版と同じ規則。1 人だけ外す案、終了後の扱い、イベント名と形は Kotlin 版のゲート 3.5 の未決事項に追従する）。</p>
 <p><strong>この要件を、テストに必ず入れます</strong>（テスト戦略は別の担当が書くため、ここでは domain-model の要件として書く）。</p>
 <ul>
-<li><strong>受入テスト</strong>: 「開始後に担当者を入れ替えたゲームで、新担当者が意思決定を保存でき、週を確定できる（再生しても同じ状態が復元される）」。</li>
-<li><strong>性質テスト</strong>: 「<code>handle</code> が作る列は <code>Ignored</code> にならない」の生成器に、<strong>開始後の入れ替え（<code>assignRoleAfterStart</code>）を含める</strong>。生成器が入れ替えを作らないと、遷移の腕の漏れを検知できない。</li>
-<li><strong>「許さない組の拒否」のテスト</strong>: <code>Preparing</code> や <code>NotCreated</code> が <code>ParticipantReplaced</code> を受けても状態を変えない（<code>Ignored</code>）ことを確かめる。</li>
+<li><strong>受入テスト（再レビュー N-H1。現場で最も起きやすい流れ）</strong>:</li>
+<li>「開始後に担当者を入れ替えたゲームで、新担当者が意思決定を保存でき、週を確定できる（再生しても同じ状態が復元される）」。</li>
+<li>「<strong>停止中に入れ替え → 進行役が代理入力 → 再開して確定</strong>」。<code>Paused</code> は <code>RoleHolderReplaced</code> と <code>ProxyDecisionSubmitted</code> を受け（上の表）、再開（<code>SessionResumed</code>）の後に週を確定できる。再生しても同じ状態になる。</li>
+<li>「<strong>入れ替え後の再開で、保存できるのは新担当者だけ</strong>」。旧担当者の資格は失効し、保存は 403（<code>app.unauthorized</code> と同じ本文）。新担当者は保存できる。</li>
+<li>「開始後の復帰（<code>ParticipationRecovered</code>）、観察者の招待と参加・招待の取り消し、資格の再発行が、開始後のゲームで <code>Ignored</code> にならず、続けて保存・確定できる」（U2 の約束の範囲）。</li>
+<li>共有の <code>apps/beer-game-features/continuation/credentials.feature</code>（<code>@AC3.2.5</code>）と二重になる部分は、テスト戦略の別の担当が許可リストの形で整理する。</li>
+<li><strong>性質テスト</strong>: 「<code>handle</code> が作る列は <code>Ignored</code> にならない」の生成器に、<strong>開始後の入れ替え（<code>assignRoleAfterStart</code>）、観察者の招待・参加・取り消し、資格の失効・再発行、復帰を含める</strong>。生成器は上の「許す組の表」から作る。生成器が入れ替えなどを作らないと、遷移の腕の漏れを検知できない。</li>
+<li><strong>「許さない組の拒否」のテスト</strong>: 表の × の組を、すべて <code>apply</code> に渡して <code>Ignored</code> になることを確かめる。たとえば <code>Preparing</code> や <code>NotCreated</code> が <code>ParticipantReplaced</code> を受けても状態を変えない（<code>Ignored</code>）、未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>、<code>NotStarted</code>・<code>Ended</code> の <code>RoleHolderReplaced</code> は <code>Ignored</code>。</li>
 </ul>
 <h3 id="session">Session 集約（進行）<a class="headerlink" href="#session" title="Permanent link">&para;</a></h3>
 <p>ストリームは <code>session</code>。責務、State（<code>NotStarted</code>・<code>Active</code>・<code>Paused</code>・<code>Ended</code>）、Command、不変条件（意思決定の条件、保存回数の上限 9 回、共同入力、代理入力、役割の確認、週確定の条件と一回性、自動確定、終了、権限、非負・保存則）、状態遷移は Kotlin 版を引き継ぎます。Scala での形のスケッチ（<strong>型検査していない</strong>）:</p>
@@ -14928,7 +15218,7 @@
 <p><strong><code>Ignored</code> の扱い</strong>: <code>applyDecided</code> は、保存直後の状態を求め、<code>Ignored</code> が出たら<strong>失敗</strong>にします（<code>handle</code> が作る列は <code>Ignored</code> にならないはずなので、出た場合は不具合）。<strong>コマンドの経路で、保存済みのイベントの再生中に <code>Ignored</code> が出た場合も、状態を信用せず <code>AppFailure.Persistence</code>（500・相関 ID）で失敗させます</strong>（<a href="../architecture-backend/">バックエンドアーキテクチャ</a>。fail closed）。再生を診断する用途（<code>verify-projections</code> など）では、<code>Ignored</code> を記録して続けます。<strong>コマンドの経路で止める設計は、ユーザーの決定（2026-11-25、H3）で維持します</strong>。ただし、これは Kotlin 版（状態を変えずに記録して続行）からの<strong>利用者に見える変更</strong>です（下の変更表の 10。運用は <a href="../architecture-backend/">バックエンドアーキテクチャ</a> の「<code>Ignored</code> で止めること」）。</p>
 <p>自動確定は、Kotlin 版と同じく <strong>1 回の <code>handle</code> が複数のイベントを返す</strong>ことで表します（D6）。<code>WeekCommitted</code> は結果と次週の状態を事実として含み、<code>SessionEvents.apply</code> はそれを採用するだけで、<code>simulateWeek</code> を呼び直しません（D5）。</p>
 <h4 id="_9">状態遷移<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h4>
-<p>状態遷移図は <a href="../../beer-game-kotlin/domain-model/">Kotlin 版</a> の <code>session ストリームの状態</code> と同じです（<code>NotStarted</code> → <code>Active</code> ⇄ <code>Paused</code> → <code>Ended</code>）。<strong><code>Active</code>・<code>Paused</code> は <code>RoleHolderReplaced</code>（開始後の入れ替え）を自己遷移として受けます</strong>（上の「開始後の役割の入れ替えと <code>Started</code> の自己遷移」）。遷移の「許す組」は <code>match</code> に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。</p>
+<p>状態遷移図は <a href="../../beer-game-kotlin/domain-model/">Kotlin 版</a> の <code>session ストリームの状態</code> と同じです（<code>NotStarted</code> → <code>Active</code> ⇄ <code>Paused</code> → <code>Ended</code>）。<strong><code>Active</code>・<code>Paused</code> は <code>RoleHolderReplaced</code>（開始後の入れ替え）を自己遷移として受けます</strong>（上の「開始後の役割の入れ替えと <code>Started</code> の自己遷移」）。遷移の「許す組」は、上の「遷移の許す組の表」（規範）から <code>match</code> に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。Kotlin 版の図が <code>Paused</code> の自己遷移に載せているのは <code>AutoCommitChanged</code>・<code>ProxyDecisionSubmitted</code>・<code>RoleHolderReplaced</code> で、Scala 版の表はそれに <code>CommitModeChanged</code>（Kotlin 版のコードの実際のイベント）を合わせます。</p>
 <h3 id="2-startgame">2 ストリームにまたがる StartGame<a class="headerlink" href="#2-startgame" title="Permanent link">&para;</a></h3>
 <p>開始は、<code>game</code> に <code>GameStarted</code>、<code>session</code> に <code>SessionStarted</code> を<strong>同一トランザクションで</strong>追記する唯一のコマンドです（D3）。Scala 版でも、2 ストリームを入力に取る独立の関数にします。</p>
 <div class="highlight"><pre><span></span><code><span class="k">final</span><span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">StartDecision</span><span class="p">(</span><span class="n">game</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">GameEvent</span><span class="p">],</span><span class="w"> </span><span class="n">session</span><span class="p">:</span><span class="w"> </span><span class="nc">List</span><span class="p">[</span><span class="nc">SessionEvent</span><span class="p">])</span>
@@ -15082,7 +15372,7 @@
 </tbody>
 </table>
 <h3 id="scala-sd1sd7">Scala 固有の判断 SD1〜SD7<a class="headerlink" href="#scala-sd1sd7" title="Permanent link">&para;</a></h3>
-<p><strong>SD1〜SD7 は、AI が起草した案で、ユーザーの承認を得ていません。</strong></p>
+<p><strong>SD1〜SD7 は、AI が起草した案で、ユーザーの承認を得ていません。ただし SD2 のうち「コマンドの経路で <code>Ignored</code> が出たら止める（fail closed）」はユーザーの決定（2026-11-25、H3）です</strong>（再レビュー M16 で区別した）。SD2 のほかの部分（<code>Evolution.Applied / Ignored</code> の形、版を永続化の層が持つこと）は AI の案で、承認を得ていません。</p>
 <table>
 <thead>
 <tr>
@@ -15235,15 +15525,27 @@
 </tr>
 <tr>
 <td style="text-align: left;">11</td>
-<td style="text-align: left;"><code>evolveGame</code> の <code>RoleAssigned</code> は開始後も役割を付け、<code>ParticipantReplaced</code> は開始後だけ旧担当者の役割を外す（Kotlin 版の変更表 38）</td>
-<td style="text-align: left;"><strong>同じ</strong>。<code>Started</code> の自己遷移として、<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>（game）と <code>RoleHolderReplaced</code>（session）を受ける。初稿は持っていなかった（H2）</td>
-<td style="text-align: left;">Kotlin 版に追従。<code>Ignored</code> で止める設計と合わせると、持たないと入れ替えたゲームが操作不能になる</td>
+<td style="text-align: left;"><code>evolveGame</code> の <code>RoleAssigned</code> は開始後も役割を付け、<code>ParticipantReplaced</code> は開始後だけ旧担当者の役割を外す（Kotlin 版の変更表 38）。観察者の招待・参加・取り消し、資格の失効・再発行、復帰は準備中・開始後の両方で受ける</td>
+<td style="text-align: left;"><strong>同じ</strong>。<code>Started</code> の自己遷移として、<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>ObserverInvited</code>・<code>ObserverInvitationRevoked</code>・<code>ObserverJoined</code>・<code>CredentialRevoked</code>・<code>CredentialReissued</code>・<code>ParticipationRecovered</code>（game）と <code>RoleHolderReplaced</code>（session）を受ける。未知の参加者への <code>ParticipantReplaced</code> は <code>Ignored</code>。session の <code>NotStarted</code>・<code>Ended</code> の <code>RoleHolderReplaced</code> も <code>Ignored</code>。初稿は <code>RoleAssigned</code> 以外を持たず、1 回目の直しも状態遷移図より狭かった（H2・再レビュー N-H1）</td>
+<td style="text-align: left;">Kotlin 版に追従。<code>Ignored</code> で止める設計と合わせると、持たないと入れ替えたゲームや、復帰・再発行・観察者の招待をしたゲームが操作不能になる</td>
 </tr>
 <tr>
 <td style="text-align: left;">12</td>
 <td style="text-align: left;">権限を先に判定し、権限のない人に状態を知らせない（Kotlin 版の原則）</td>
 <td style="text-align: left;"><code>AssignRole</code> の判定順を、権限 → 準備中か → 参加者の存在にそろえる（L6。本書の初稿は準備中かが先だった）。作成前は <code>Forbidden</code></td>
 <td style="text-align: left;">Kotlin 版の原則に合わせる</td>
+</tr>
+<tr>
+<td style="text-align: left;">13</td>
+<td style="text-align: left;">遷移の「許す組」の正本は、<code>evolve</code> のコードと状態遷移図（どちらも手で書く）</td>
+<td style="text-align: left;"><strong>「許す組の表」（EV × 状態）を規範</strong>にし、<code>apply</code>・図・性質テストの生成器・状態遷移テストをこの表から導く（N-H1。AI の案）</td>
+<td style="text-align: left;">止める設計では、組の漏れが研修の停止になる。スケッチや図を基準にすると漏れを見逃す</td>
+</tr>
+<tr>
+<td style="text-align: left;">14</td>
+<td style="text-align: left;"><code>AutoCommitChanged</code>（EV-S07）と <code>CommitModeChanged</code>（EV-S10）が表に並ぶ。コードにあるのは <code>CommitModeChanged</code> だけ</td>
+<td style="text-align: left;">表（許す組の表）には <code>CommitModeChanged</code> だけを置き、EV-S07 は重複の疑いとして未決事項 12 に置く</td>
+<td style="text-align: left;">Kotlin 版の <code>SessionEvent</code> に <code>AutoCommitChanged</code> が無い（<code>SessionEvolve.kt</code> の <code>when</code> で確認）</td>
 </tr>
 </tbody>
 </table>
@@ -15262,10 +15564,46 @@
 <p><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 開始後の共同担当の追加と開始後の参加、遅延 0 を許すか、需要の上限、キット準拠の既定の需要系列（JSD の値の確認）、保持の開始の起点、AC1.2.5 の文言の改訂、観察者への入力済みの役割の開示、<code>InvalidTransition</code> の通知先、再構築とコマンドの同時実行制御、<code>WeekCommitted.contributors</code> の意味。いずれも <a href="../../beer-game-kotlin/domain-model/">Kotlin 版の未決事項</a> と同じ扱いで、Kotlin 版の決定に追従する。</p>
 </li>
 <li>
-<p><strong>開始後の入れ替えの型</strong>（H2）: <code>Started</code> の自己遷移（<code>RoleAssigned</code>・<code>ParticipantReplaced</code>・<code>CredentialRevoked</code>）と <code>RoleHolderReplaced</code>、<code>assignRoleAfterStart</code> の戻り値（<code>StartDecision</code> と同じ形か）を B1 で型検査する。1 人だけ外す案・終了後の扱い・イベント名は Kotlin 版のゲート 3.5 に追従する。</p>
+<p><strong>開始後の入れ替えの型</strong>（H2）: <code>Started</code> の自己遷移（<code>RoleAssigned</code>・<code>ParticipantReplaced</code> と観察者・資格のイベント）と <code>RoleHolderReplaced</code>、<code>assignRoleAfterStart</code> の戻り値（<code>StartDecision</code> と同じ形か）を B1 で型検査する。1 人だけ外す案・終了後の扱い・イベント名は Kotlin 版のゲート 3.5 に追従する。</p>
 </li>
 <li><strong><code>handle</code> の引数の順</strong>: 本書は <code>handle(state, command)</code>（Kotlin 版の <code>decide</code> と同じ）、ガイド §7.6 は <code>handle(command, state)</code>。B1 で揃えるか決める。</li>
+<li><strong>EV-S07 <code>AutoCommitChanged</code> と EV-S10 <code>CommitModeChanged</code> の重複</strong>（再レビュー M20。前回の M5 が、Scala 版のどの未決事項にも載っていなかった）: Kotlin 版の設計書の表（776・780 行）に並ぶが、Kotlin 版のコード（<code>SessionEvolve.kt</code>）の <code>SessionEvent</code> には <code>CommitModeChanged</code> だけがある。Scala 版の表は <code>CommitModeChanged</code> を採る案。イベント名はペイロードの JSON と投影の契約になるため、<strong>Kotlin 版の正本の整理に追従する</strong>（Scala 版で独自に決めない）。</li>
+<li><strong>「許す組の表」の確認</strong>（N-H1）: 表は Kotlin 版のコードと図から導いた案で、人の確認を得ていない。Kotlin 版の <code>revoked</code>・<code>reissued</code>・<code>recovered</code> が未知の主体で状態を変えないか、<code>RoleAssigned</code> の未知の参加者の扱い、<code>CommitModeChanged</code> の <code>Paused</code> の扱いを、B1 の最初のスライドで型検査とテストで確かめる。</li>
+<li><strong><code>session_overview.week</code> が最終週 + 1 になる問題</strong>（再レビュー M20。前回の M8）: <a href="../data-model/">データモデル</a> の未決事項 7 に載せた（<code>WeekCommitted</code> のペイロードに次の週を持たせる案はドメインのイベントの構造に影響するため、ここでも決める）。</li>
+<li><strong>ユーザーストーリー・受入条件への導線</strong>（再レビュー M20。前回の M7）: 下の導線の表は、本書に書いた範囲だけの一部。全体は、Unit 定義の <code>@AC</code> タグから機械的に導く（<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の許可リスト。別の担当）。</li>
 </ol>
+<h3 id="_14">ユーザーストーリー・受入条件への導線（一部）<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">本書の規則</th>
+<th style="text-align: left;">US・AC・UC</th>
+<th style="text-align: left;">確かめる場所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">設定の誤りを全件返す（<code>ValidatedNec</code>）</td>
+<td style="text-align: left;">AC1.1.2、AC1.1.4</td>
+<td style="text-align: left;">設定の検証の単体テスト</td>
+</tr>
+<tr>
+<td style="text-align: left;">開始後の役割の入れ替え（<code>assignRoleAfterStart</code>）</td>
+<td style="text-align: left;">AC3.2.5（共有の <code>credentials.feature</code> の <code>@AC3.2.5</code>）</td>
+<td style="text-align: left;">入れ替えの受入テスト（上の 1・3）</td>
+</tr>
+<tr>
+<td style="text-align: left;">開始後の復帰（<code>ParticipationRecovered</code>）</td>
+<td style="text-align: left;">US3.2</td>
+<td style="text-align: left;">上の受入テスト 4</td>
+</tr>
+<tr>
+<td style="text-align: left;">停止 → 代理入力 → 再開</td>
+<td style="text-align: left;">UC-09</td>
+<td style="text-align: left;">上の受入テスト 2</td>
+</tr>
+</tbody>
+</table>
 <h2 id="2026-11-25">レビュー対応の記録（2026-11-25）<a class="headerlink" href="#2026-11-25" title="Permanent link">&para;</a></h2>
 <p><a href="../../../review/beer-game-scala/design_review_20261125/">設計書レビュー</a> への対応のうち、本書に関するもの（行番号は編集で動くため、節名で記録します）。<strong>H3 の「止める」設計だけがユーザーの決定で、他の直し方は AI の案で、承認を得ていません。</strong></p>
 <table>
@@ -15304,7 +15642,45 @@
 </tr>
 </tbody>
 </table>
-<h2 id="_14">出典<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<h3 id="_15">再レビュー（<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけ</strong>です。<strong>N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">直した箇所</th>
+<th style="text-align: left;">状況</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">N-H1</td>
+<td style="text-align: left;"><code>GameEvent</code> の 12 個、<code>GameEvents.apply</code> の腕（<code>Started</code> に観察者・資格・復帰を足し、未知の参加者を <code>Ignored</code>）、新設の「遷移の許す組の表」（EV-G01〜G12・EV-S01〜S10 × 状態。規範）、入れ替えの節の受入テストの要件（停止中の入れ替え → 代理入力 → 再開、再開後は新担当者だけが保存）、状態遷移図、変更表の 11・13</td>
+<td style="text-align: left;">AI の案。表は Kotlin 版のコード（<code>Game.kt</code>・<code>SessionEvolve.kt</code>）と図を読んで導いた。再コンパイルしていない</td>
+</tr>
+<tr>
+<td style="text-align: left;">N-H5</td>
+<td style="text-align: left;">「本書の位置づけと確認の範囲」に正本の規則（一覧が正。根拠は実測の記録。一覧を直すときは根拠も直す）</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M16</td>
+<td style="text-align: left;">「SD1〜SD7」の冒頭（SD2 の「止める」はユーザーの決定、ほかは案）</td>
+<td style="text-align: left;">直した</td>
+</tr>
+<tr>
+<td style="text-align: left;">M20</td>
+<td style="text-align: left;">未決事項の 12（EV-S07 と EV-S10 の重複）〜15、ユーザーストーリー・受入条件への導線（一部）の表、変更表の 14</td>
+<td style="text-align: left;">直した（導線は一部。全体は ADR-001 の許可リスト側）</td>
+</tr>
+<tr>
+<td style="text-align: left;">N-H8</td>
+<td style="text-align: left;">本書では扱わない（ADR-001 と運用の別の担当）。ドメインの規則には影響しない</td>
+<td style="text-align: left;">-</td>
+</tr>
+</tbody>
+</table>
+<h2 id="_16">出典<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
 <ul>
 <li>型の断片の検査: sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6、WartRemover 3.6.3、2026-11-25</li>
 <li><a href="../../beer-game-kotlin/domain-model/">ドメインモデル設計（beer-game-kotlin）</a>、<a href="../../beer-game-rust/domain-model/">ドメインモデル設計（Rust 版）</a></li>

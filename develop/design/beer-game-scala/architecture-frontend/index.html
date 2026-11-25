@@ -3593,6 +3593,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="変更の記録（レビュー対応。2026-11-25）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2026-11-25_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        再レビュー（2026-11-25。設計書の再レビュー）への対応
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -14407,6 +14424,7 @@
 <h1 id="-scala">フロントエンドアーキテクチャ - ビールゲームシミュレーション（Scala 版）<a class="headerlink" href="#-scala" title="Permanent link">&para;</a></h1>
 <h2 id="_1">概要<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <p>本書は、beer-game-scala のフロントエンドのアーキテクチャを定めます。<a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001</a> の決定は、フロントエンドを<strong>既存の React / TypeScript のまま踏襲する</strong>ことです。<strong>結論: API の契約（<code>openapi.yaml</code>、エラーの <code>code</code>、problem+json、<code>versions</code> だけの応答、<code>If-Match</code>）が同じなら、フロントエンドはバックエンドの言語に依存しないため、<code>apps/beer-game-web</code> と <code>apps/beer-game-contracts</code> を変更せずに共有できます。</strong> <code>docs/</code> を設計の正本とします。</p>
+<p><strong>範囲（ユーザーの決定、2026-11-25。M19）</strong>: 実装として約束するのは U1〜U3 です。<strong>U1〜U3 の間は、実際の研修には使いません（検証・事例用）。</strong> U1〜U3 では、振り返り・保持状態・結果の出力の API が無く、最終週の後のリンク（<code>/games/{id}/review</code>）から先の画面は失敗します（<a href="../ui-design/">UI 設計</a> の #16）。</p>
 <p>このため、本書は <strong>フロントエンドの設計（構成、ルーティング、状態管理、API の契約の持ち方、版の扱い、共同入力、エラーの識別子、アクセシビリティ）を複製しません。</strong> 正本は <a href="../../beer-game-kotlin/architecture-frontend/">Kotlin 版のフロントエンドアーキテクチャ</a>（beer-game2 を引き継ぎ、ES + CQRS の影響を反映済み）です。Rust 版と同じ方針（<a href="../../beer-game-rust/architecture-frontend/">Rust 版</a>）で、<strong>Scala のバックエンド（http4s）に向けるときの差分</strong>だけを定めます。UI の画面・遷移は <a href="../ui-design/">UI 設計（Scala 版）</a> を経由して Kotlin 版を参照します。</p>
 <h3 id="_2">本書の位置づけと確認の範囲<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
 <ul>
@@ -14414,10 +14432,11 @@
 <li><code>package.json</code> の名前は <code>@beer-game/web</code>、<code>api:lint</code>・<code>api:generate</code> は <code>../beer-game-contracts/openapi.yaml</code> を参照する。</li>
 <li><code>vite.config.ts</code> は <code>/api</code> を <code>http://localhost:${API_PORT}</code> へプロキシする（<code>API_PORT</code> の既定は 3000）。</li>
 <li><code>src/api/client.ts</code> は、すべての要求に <code>X-Tab-Id</code> ヘッダーを付ける。</li>
-<li>ポーリングは <strong>3 画面</strong>にある: <code>src/features/play/PlayPage.tsx</code> の <code>PLAY_POLL_MS</code>、<code>src/features/lobby/LobbyPage.tsx</code> の <code>LOBBY_POLL_MS</code>（準備中のときだけ）、<code>src/features/observer/ObservationPage.tsx</code> の <code>OBSERVATION_POLL_MS</code>（終了後は止まる）が、<strong>いずれも 3000（3 秒）</strong>（2026-11-25 にソースを読んで確認）。<strong><code>src/features/console/</code>（進行役のコンソール）には <code>setInterval</code> がない</strong>。失敗の扱いは、Play と Observation が<strong>黙って無視</strong>、Lobby は <strong>403 だけ表示して取り直しをやめる</strong>。<code>src</code>・<code>support</code>・<code>steps</code> に <code>EventSource</code> は存在しない（<strong>SSE は使っていない</strong>）。</li>
+<li>ポーリングは <strong>3 画面</strong>にある: <code>src/features/play/PlayPage.tsx</code> の <code>PLAY_POLL_MS</code>、<code>src/features/lobby/LobbyPage.tsx</code> の <code>LOBBY_POLL_MS</code>（準備中のときだけ）、<code>src/features/observer/ObservationPage.tsx</code> の <code>OBSERVATION_POLL_MS</code>（終了後は止まる）が、<strong>いずれも 3000（3 秒）</strong>（2026-11-25 にソースを読んで確認）。<strong><code>src/features/console/</code>（進行役のコンソール）には <code>setInterval</code> がない</strong>（自動更新も手動更新のボタンも無い。<strong>全実装共通の画面の課題</strong>。<a href="../ui-design/">UI 設計</a> の未決事項 8）。失敗の扱いは、Play と Observation が<strong>黙って無視</strong>、Lobby は <strong>403 だけ表示して取り直しをやめる</strong>。<code>src</code>・<code>support</code>・<code>steps</code> に <code>EventSource</code> は存在しない（<strong>SSE は使っていない</strong>）。</li>
 <li><code>support/hooks.mjs</code> は、バックエンドの未起動時に、<strong>Kotlin 版（<code>./gradlew :app:run</code>）と TS 版の起動コマンドを案内する文言</strong>を出して失敗する。Scala 版の案内は無い。</li>
 <li><strong>確認状況の唯一の一覧</strong>は <a href="../tech-stack/#確認状況の一覧">技術スタック</a> です。</li>
-<li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）の 4 件です。<strong>H10・M17・SF2 の記述の直しを含め、他の直し方は AI の案で、承認を得ていません</strong>。</li>
+<li><strong>レビュー（2026-11-25）への対応の承認の状況</strong>: ユーザーが決めたのは H3、H6、H7、H9（NF-P2 は p95 4 秒）に加え、再レビューへの対応の次の 4 件です。<strong>N-H4（検証用の CI は U1 の約束に含め、AWS 環境・デプロイ用ワークフローは後回し）、N-H6、N-H7、N-H8（U1〜U3 は実際の研修に使わない）</strong>。<strong>H10・M17・SF2 の記述の直しを含め、これら以外は AI の案で、承認を得ていません</strong>。</li>
+<li><strong>確認状況の正本の規則（N-H5。AI の案で承認を得ていない）</strong>: <a href="../tech-stack/#確認状況の一覧">技術スタックの確認状況の一覧</a>が正です。一覧の根拠は実測の記録（<a href="../data-model/">データモデル</a> の「検証の結果」と <a href="../test-strategy/">テスト戦略</a> の「確認した事項」）で、一覧を直すときは根拠も直します。</li>
 <li><strong>確認していないこと</strong>: Scala のバックエンドに <code>web/</code> を向けたときの実際の動作は、<strong>未検証</strong>です（Scala 版のバックエンドがまだ存在しないため）。契約が同じなら動く、という<strong>設計上の見込み</strong>にとどまります。</li>
 <li>Kotlin 版の実装の経緯（B1〜B15 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
 </ul>
@@ -14477,7 +14496,7 @@
 <tr>
 <td style="text-align: left;">b</td>
 <td style="text-align: left;">現在の画面は、<strong>3 画面（Play・Lobby・Observation）の 3 秒間隔の自動更新</strong>（<code>PLAY_POLL_MS</code>・<code>LOBBY_POLL_MS</code>・<code>OBSERVATION_POLL_MS</code> が各 3000。console にはない）と、手動更新、保存・確定の応答の後の取得で更新する。<strong>SSE を使わない</strong>。取る GET は <code>/games/{id}/state</code>・<code>/sessions/{id}/state</code>・<code>/games/{id}/lobby</code>・<code>/games/{id}/observation</code></td>
-<td style="text-align: left;"><strong>Scala 版のバックエンドは、SSE を実装しなくても、既存の画面は動く</strong>。SSE は契約・非機能要件（NF-P4）にあり、<strong>画面が使い始めるまで優先度を下げられる</strong>（未決）。バックエンドの SSE の設計（fs2 の <code>Stream</code>、SBD9）は維持する。<strong>レート制限の対象外にする GET は、この 4 つの経路</strong>（<code>/state</code>、<code>/sessions/*</code>、<code>/lobby</code>、<code>/observation</code>。NF-S11 の専用の制限は別）</td>
+<td style="text-align: left;"><strong>Scala 版のバックエンドは、SSE を実装しなくても、既存の画面は動く</strong>。SSE は契約・非機能要件（NF-P4）にあり、<strong>画面が使い始めるまで優先度を下げられる</strong>（未決）。バックエンドの SSE の設計（fs2 の <code>Stream</code>、SBD9）は維持する。<strong>レート制限の対象外にする経路は、メソッドつきのこの 4 つ</strong>（<code>GET /games/{id}/state</code>・<code>GET /sessions/{id}/state</code>・<code>GET /games/{id}/lobby</code>・<code>GET /games/{id}/observation</code>。<code>/sessions/*</code> と書くと変更系まで含むと読めるため揃えた。M2。NF-S11 の専用の制限は別）</td>
 </tr>
 <tr>
 <td style="text-align: left;">c</td>
@@ -14640,7 +14659,7 @@
 </table>
 <p>トレードオフ: A は、契約の変更が他の版に波及します。波及を防ぐため、すべての契約テストを CI で通します。将来、版が分かれて進化する場合は B へ移行し、ADR に記録します。</p>
 <h3 id="sf2-e2e-scala">SF2: E2E のバックエンドの起動の案内を、Scala 版にも出せるようにする（提案）<a class="headerlink" href="#sf2-e2e-scala" title="Permanent link">&para;</a></h3>
-<p><code>support/hooks.mjs</code> の案内の文言が、Kotlin 版と TS 版の起動コマンドだけです（上で確認）。<strong>起動コマンドの案内を、環境変数または設定で差し替えられるようにする</strong>（Rust 版の RF3 と同じ。<strong>RF3 は Rust 版では承認済みだが、既存の <code>hooks.mjs</code> には未実施</strong>（2026-11-25 に確認）。「RF3 が実施されていれば使う」ではなく、<strong>RF3 と同じ 1 回の編集にまとめる</strong>）。実際の起動の自動化は別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。<strong>既存のファイルの編集で、他の版に影響するため、承認を得てから行います。</strong></p>
+<p><code>support/hooks.mjs</code> の案内の文言が、Kotlin 版と TS 版の起動コマンドだけです（上で確認）。<strong>起動コマンドの案内を、環境変数または設定で差し替えられるようにする</strong>（Rust 版の RF3 と同じ。<strong>RF3 は Rust 版では承認済みだが、既存の <code>hooks.mjs</code> には未実施</strong>（2026-11-25 に確認）。「RF3 が実施されていれば使う」ではなく、<strong>RF3 と同じ 1 回の編集にまとめる</strong>）。実際の起動の自動化は別の判断で、現在の「起動済みを前提にし、起動していなければ案内して失敗する」方式を維持します（人の開発サーバーを止めない、専用のポートを使う、という既存の運用を守る）。<strong>既存のファイルの編集で、他の版に影響するため、承認を得てから行います。</strong> <strong>E2E 用のレート制限をゆるめる設定（TS 版の <code>AUTH_RATE_LIMIT_PER_MINUTE</code> に当たるもの）の名前も、SF2 の「設定名を揃える」に含める</strong>（L3。E2E が参加・復帰の専用の制限に当たらないようにするため。Origin の検査（<code>ALLOWED_ORIGINS</code>）は弱めない）。</p>
 <h3 id="sf3-scala-uie2e">SF3: Scala のバックエンドの契約上の同等性を、既存の <code>@ui</code>・E2E で確かめる（提案）<a class="headerlink" href="#sf3-scala-uie2e" title="Permanent link">&para;</a></h3>
 <p>既存の画面コードと E2E は、API の契約にだけ依存しています（上の調査）。同じ画面・同じ <code>@ui</code> のシナリオを Scala のバックエンドに向けて通すことは、<strong>契約どおりであることの最も強い検証の 1 つ</strong>です。契約テストが検出できない領域（スキーマで表せない条件、SSE）を、画面を通した確認で補います（Rust 版の RF2 と同じ）。</p>
 <h2 id="beer-game-kotlin">beer-game-kotlin からの変更<a class="headerlink" href="#beer-game-kotlin" title="Permanent link">&para;</a></h2>
@@ -14720,6 +14739,49 @@
 </tr>
 </tbody>
 </table>
+<h3 id="2026-11-25_1">再レビュー（2026-11-25。<a href="../../../review/beer-game-scala/design_rereview_20261125/">設計書の再レビュー</a>）への対応<a class="headerlink" href="#2026-11-25_1" title="Permanent link">&para;</a></h3>
+<p><strong>ユーザーが決めたのは N-H4・N-H6・N-H7・N-H8（U1〜U3 は研修に使わない）の方針だけで、他は AI の案です（承認を得ていません）。</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">指摘</th>
+<th style="text-align: left;">変更</th>
+<th style="text-align: left;">状態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">M2</td>
+<td style="text-align: left;">レート制限の対象外の経路を、メソッドつきの 4 つに揃えた</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">M3</td>
+<td style="text-align: left;">コンソールの自動更新が無いことを、全実装共通の画面の課題として注記</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">L2</td>
+<td style="text-align: left;">出典に <code>LobbyPage.tsx</code>・<code>ObservationPage.tsx</code>・<code>console/</code> を追加</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">L3</td>
+<td style="text-align: left;">SF2 に、E2E 用のレート制限をゆるめる設定の名前を含めた</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+<tr>
+<td style="text-align: left;">N-H8・M19</td>
+<td style="text-align: left;">U1〜U3 は研修に使わず、最終週の後の画面は API が無いことを冒頭に</td>
+<td style="text-align: left;">ユーザーの決定</td>
+</tr>
+<tr>
+<td style="text-align: left;">N-H5</td>
+<td style="text-align: left;">確認状況の正本の規則を追加</td>
+<td style="text-align: left;">AI の案</td>
+</tr>
+</tbody>
+</table>
 <h2 id="_10">未決事項<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>SF1〜SF3 の承認</strong>。SF2 は、<code>hooks.mjs</code>（既存のファイル）を編集する前に改めて確認する。</li>
@@ -14734,7 +14796,7 @@
 <ul>
 <li><a href="../../beer-game-kotlin/architecture-frontend/">フロントエンドアーキテクチャ（beer-game-kotlin）</a>、<a href="../../beer-game-rust/architecture-frontend/">フロントエンドアーキテクチャ（Rust 版）</a>、<a href="../../beer-game-ts/architecture-frontend/">beer-game2 のフロントエンドアーキテクチャ</a></li>
 <li><a href="../../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin/">ADR-001（Scala 版）</a>、<a href="../ui-design/">UI 設計</a>、<a href="../architecture-backend/">バックエンドアーキテクチャ</a>、<a href="../test-strategy/">テスト戦略</a>、<a href="../non-functional/">非機能要件</a>、<a href="../architecture-infrastructure/">インフラストラクチャ</a>、<a href="../tech-stack/">技術スタック</a></li>
-<li>共有の <code>web/</code> の調査（読み取り専用、2026-11-25）: <code>apps/beer-game-web/</code> の <code>package.json</code>、<code>vite.config.ts</code>、<code>support/hooks.mjs</code>、<code>src/api/client.ts</code>、<code>src/features/play/PlayPage.tsx</code></li>
+<li>共有の <code>web/</code> の調査（読み取り専用、2026-11-25）: <code>apps/beer-game-web/</code> の <code>package.json</code>、<code>vite.config.ts</code>、<code>support/hooks.mjs</code>、<code>src/api/client.ts</code>、<code>src/features/play/PlayPage.tsx</code>、<code>src/features/lobby/LobbyPage.tsx</code>、<code>src/features/observer/ObservationPage.tsx</code>、<code>src/features/console/</code>（ポーリングの有無・範囲外の画面のソース。L2）</li>
 <li><a href="../../../reference/%E3%82%A2%E3%83%BC%E3%82%AD%E3%83%86%E3%82%AF%E3%83%81%E3%83%A3%E8%A8%AD%E8%A8%88%E3%82%AC%E3%82%A4%E3%83%89/">アーキテクチャ設計ガイド</a></li>
 <li><a href="../../../reference/%E9%96%A2%E6%95%B0%E5%9E%8B%E3%83%97%E3%83%AD%E3%82%B0%E3%83%A9%E3%83%9F%E3%83%B3%E3%82%B0%E3%82%AC%E3%82%A4%E3%83%89_Scala%E7%B7%A8/">関数型プログラミングガイド（Scala 編）</a> §7.1</li>
 <li><a href="../../../adr/beer-game-ts/006-sse-version-only/">ADR-006</a>、<a href="../../../adr/beer-game-ts/010-url-router-and-features/">ADR-010</a></li>

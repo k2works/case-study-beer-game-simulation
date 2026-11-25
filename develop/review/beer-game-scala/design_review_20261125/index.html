@@ -14844,6 +14844,7 @@
 </tbody>
 </table>
 <p>あわせて、中・低の一部（M1〜M4、M9〜M15、M17、L1〜L6、L8〜L11）も直した。M5〜M8、M16 の「ストーリー化」、L7 は未対応で、各文書の未決事項に残る。</p>
+<p><strong>訂正（再レビューでの指摘）</strong>: 上の記述は不正確だった。M6（SD2・SD7 を ADR-001 の「Scala 固有の判断」表に足す）は実際には対応済みだった。M5（EV-S07 と EV-S10 の重複）と M7（US・AC への導線）は、当時どの未決事項にも載っていなかった。いずれも再レビューの対応（<a href="../design_rereview_20261125/">設計書の再レビュー</a> の M20）で、domain-model の未決事項に載せた。</p>
 <h3 id="_12">反映後も残る未確認・要判断<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
 <ul>
 <li>新しく書いた Scala のコード（<code>Tx.run</code>、<code>Committed</code>、<code>Ports</code> など）は<strong>型検査していない</strong>。<code>FC.rollback</code> の後の書き込みの扱い、<code>transact</code> の外のアドバイザリロック、専用接続の <code>LISTEN</code>、キャンセルと <code>Supervisor</code>、<code>IOApp</code> の SIGTERM の終了コードは未確認。</li>
