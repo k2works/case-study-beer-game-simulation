@@ -292,6 +292,9 @@ nav:
           - 設計書レビュー（2026-11-14）: review/beer-game-kotlin/design_review_20261114.md
       - beer-game-rust:
           - 概要: review/beer-game-rust/index.md
+      - beer-game-scala:
+          - 概要: review/beer-game-scala/index.md
+          - 設計書レビュー（2026-11-25）: review/beer-game-scala/design_review_20261125.md
   - ADR:
       - 概要: adr/index.md
       - beer-game:
