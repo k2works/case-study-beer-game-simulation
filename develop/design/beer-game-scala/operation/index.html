@@ -14915,7 +14915,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">アプリケーション開発環境セットアップ</td>
-<td style="text-align: left;">ローカルの構築（<code>nix develop .#scala</code>、JDK、Docker の PostgreSQL 18、sbt のビルド、マイグレーション）</td>
+<td style="text-align: left;">ローカルの構築（<code>nix develop .#scala</code>、JDK、H2 の PostgreSQL モード（ST9。Docker 不要）、PostgreSQL を使う場合は Docker の PostgreSQL 18、sbt のビルド、マイグレーション）</td>
 <td style="text-align: center;">高</td>
 <td style="text-align: center;">変更</td>
 </tr>
@@ -15073,7 +15073,7 @@
 <tr>
 <td style="text-align: left;">9</td>
 <td style="text-align: left;">ローカルは H2 の PostgreSQL モード</td>
-<td style="text-align: left;">ローカルも PostgreSQL 18（提案。ST9）。<strong>H2 を本番で拒否する検査は要らない</strong></td>
+<td style="text-align: left;">同じ（ローカルは H2、ステージング・本番は PostgreSQL。<strong>本番・ステージングで H2 を起動前に拒否</strong>。ユーザーの決定、2026-11-25。ST9）。本番・ステージングの運用手順に H2 は現れない</td>
 <td style="text-align: left;">ST9</td>
 </tr>
 <tr>

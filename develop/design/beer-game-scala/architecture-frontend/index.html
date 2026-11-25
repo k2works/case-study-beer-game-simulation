@@ -14380,7 +14380,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">開発</td>
-<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Scala のバックエンドへプロキシする（接続先は <code>API_PORT</code>。固定のポートを書かない）。バックエンドは sbt で起動し、データベースは PostgreSQL 18（Docker。提案。ST9）。開発環境は <code>nix develop .#scala</code></td>
+<td style="text-align: left;">Vite の開発サーバーが、<code>/api</code> を Scala のバックエンドへプロキシする（接続先は <code>API_PORT</code>。固定のポートを書かない）。バックエンドは sbt で起動し、データベースは H2 の PostgreSQL モード（ユーザーの決定、2026-11-25。ST9。導入は承認待ち）。E2E は PostgreSQL で実行する。開発環境は <code>nix develop .#scala</code></td>
 </tr>
 <tr>
 <td style="text-align: left;">Origin の検査</td>

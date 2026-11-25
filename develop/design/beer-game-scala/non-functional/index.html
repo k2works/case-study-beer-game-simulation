@@ -14493,7 +14493,7 @@
 <tr>
 <td style="text-align: left;">ローカル開発の DB</td>
 <td style="text-align: left;">H2 を許す</td>
-<td style="text-align: left;">PostgreSQL 18（Docker。<strong>ST9。提案で、人の承認待ち</strong>）</td>
+<td style="text-align: left;"><strong>同じ（H2 の PostgreSQL モードを許す。ST9。ユーザーの決定、2026-11-25。導入は承認待ち）</strong>。本番・ステージングでは拒否。NF-S20・NF-S18 は H2 版では守られず、PostgreSQL の統合テストでだけ検証する</td>
 <td style="text-align: left;">NF-S20、NF-S18 の検証範囲</td>
 </tr>
 </tbody>
@@ -14831,7 +14831,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">NF-S20</td>
-<td style="text-align: left;"><code>events</code> は追記専用（INSERT と SELECT だけ。保持削除は別ロールが <code>game_roots</code> を連鎖削除）。Rust 版が実測済み（<a href="../data-model/">データモデル</a>）。<strong>Scala 版の接続からは未確認</strong></td>
+<td style="text-align: left;"><code>events</code> は追記専用（INSERT と SELECT だけ。保持削除は別ロールが <code>game_roots</code> を連鎖削除）。<strong>ローカルの H2 版では守られない（PostgreSQL の統合テストでだけ検証）</strong>。Rust 版が実測済み（<a href="../data-model/">データモデル</a>）。<strong>Scala 版の接続からは未確認</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-S21</td>
@@ -15241,7 +15241,7 @@
 <li><strong>NF-O7 の基準</strong>（SN3、STT2）: 文を行とみなす仮定と、team の行 80% の floor との整合を人が決める。</li>
 <li><strong>NF-O12 の取得方法</strong>: cats-effect の実行基盤の指標と、<code>HikariTransactor</code> の接続プールの使用率の取り方。</li>
 <li><strong>NF-S13 の依存関係の脆弱性検査の道具</strong>（選定未決。Dependabot か Renovate かも未決）。</li>
-<li><strong>ローカル開発の DB</strong>（ST9。提案）: 承認されれば NF-S20・NF-S18 の検証範囲は全環境で同じになる。</li>
+<li><strong>ローカル開発の DB</strong>（ST9）: H2 の採用は決定済み。NF-S20（追記専用）・NF-S18（観察者の権限）は、<strong>H2 版（ローカル）では守られない</strong>ため、検証範囲は PostgreSQL の統合テストに限る。残る未決は、H2 の導入の承認と、B1 の最初の実測（動作範囲、性能は H2 では計測しない）。</li>
 <li><strong>保存回数の上限</strong>（NF-C8。最大の長さ 2000 件の根拠）、<strong>資格の有効期間の既定値</strong>、<strong>負荷試験の実施環境</strong>、<strong>追記の競合の自動再試行の上限と間隔</strong>（NF-R17。初期値 10 を引き継ぎ、Scala で再計測）、<strong>研修中の再構築の方式</strong>（NF-R15。暫定）、<strong>保持の起点</strong>（NF-S16。暫定）、<strong>出力のキャッシュ</strong>（NF-P9）。いずれも <a href="../../beer-game-kotlin/non-functional/">Kotlin 版の未決事項</a> に追従する。</li>
 <li><strong>コンテナのメモリの割り当て</strong>（NF-P17。JVM のヒープの設定をインフラの設計と合わせて決める）と、<strong>NF-P16 の Fargate での実測</strong>。</li>
 </ol>

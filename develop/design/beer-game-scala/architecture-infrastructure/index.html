@@ -3541,7 +3541,7 @@
   <a href="#h2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ローカルの開発環境（H2 の拒否の節の扱い）
+        ローカルの開発環境と H2 の拒否
       
     </span>
   </a>
@@ -14435,7 +14435,7 @@
 <li><strong>ビルド</strong>: Gradle から <strong>sbt</strong>（マルチプロジェクト）へ。成果物の作り方（配布物）は未決。</li>
 <li><strong>コンテナ</strong>: JRE のイメージは同じ（Temurin 25）。<strong>依存の JAR とアプリの JAR を別の層に分ける方法</strong>が、Gradle の配布から sbt のものに変わる（<code>sbt-native-packager</code> の採否は未決）。</li>
 <li><strong>データベースの接続</strong>: JDBC + HikariCP から <strong>doobie の <code>HikariTransactor</code></strong>（用途別。ST8）へ。ロールを用途別に分けるのは同じ。</li>
-<li><strong>ローカル開発の DB</strong>: H2 を使わず、<strong>PostgreSQL 18（Docker）のみ</strong>（提案。ST9）。<strong>H2 を本番・ステージングで拒否する検査は要らない</strong>。</li>
+<li><strong>ローカル開発の DB</strong>: ローカル開発だけ <strong>H2 の PostgreSQL モード</strong>（ユーザーの決定、2026-11-25。ST9）。<strong>本番・ステージングでは起動時の検査で H2 を拒否</strong>し、<strong>配布（本番イメージ）から H2 を除外</strong>する。H2 の依存の導入は承認待ち。</li>
 <li><strong>CI/CD</strong>: 検証の手順が sbt になる。<strong>Scala 版専用のワークフローを新設する</strong>（team の規約）。デプロイは「設計」のみで、ワークフローはまだ作らない。</li>
 <li><strong>Terraform</strong>: Scala 版専用に複製して出発する案（SI4。提案）。</li>
 </ul>
@@ -14696,7 +14696,7 @@
 <tr>
 <td style="text-align: left;">ローカル</td>
 <td style="text-align: left;">開発・確認</td>
-<td style="text-align: left;">バックエンドは sbt で起動、フロントエンドは Vite（<code>/api</code> をプロキシ）。<strong>DB は PostgreSQL 18（Docker）のみ</strong>（提案。ST9）。開発環境は <code>nix develop .#scala</code></td>
+<td style="text-align: left;">バックエンドは sbt で起動、フロントエンドは Vite（<code>/api</code> をプロキシ）。<strong>DB は H2 の PostgreSQL モード（Docker 不要。ST9）</strong>。PostgreSQL を使う場合は Docker の PostgreSQL 18 を選べる（<code>DB_KIND</code>）。開発環境は <code>nix develop .#scala</code></td>
 <td style="text-align: left;">—</td>
 </tr>
 <tr>
@@ -14720,8 +14720,16 @@
 </tbody>
 </table>
 <p>各環境の Terraform の状態は、暗号化したリモートの保管先（S3 とロック）に、環境ごとに分けて持ちます（Kotlin 版と同じ）。</p>
-<h3 id="h2">ローカルの開発環境（H2 の拒否の節の扱い）<a class="headerlink" href="#h2" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版の「ローカルの開発環境と H2 の拒否」（<code>DB_KIND</code>、本番・ステージングでの H2 の起動前の拒否、環境ごとの全組み合わせの単体テスト、配布からの H2 の除外）は、<strong>Scala 版では要りません</strong>（H2 を使わないため。ST9）。承認されず H2 を採る場合は、Kotlin 版の節を引き継ぐ。<strong>設定の環境変数</strong>（<code>APP_ENV</code>、<code>CREDENTIAL_KEY</code>、<code>IDEMPOTENCY_KEY</code>、<code>RESPONSE_KEY</code>、<code>DB_URL</code>、<code>DB_USER</code>、<code>DB_PASSWORD</code>、<code>PORT</code>、<code>HOST</code>、<code>ALLOWED_ORIGINS</code>、<code>COMMAND_MAX_ATTEMPTS</code>、<code>MIGRATE_ON_START</code>）は、フロントエンドの E2E の案内と手順書の差分を減らすため、<strong>Kotlin 版と名前を揃える</strong>（提案。<code>DB_KIND</code> は持たない）。<code>AppConfig.load</code> が全項目の誤りを <code>ValidatedNec</code> で集め、失敗なら、足りない設定の<strong>名前だけ</strong>をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。</p>
+<h3 id="h2">ローカルの開発環境と H2 の拒否<a class="headerlink" href="#h2" title="Permanent link">&para;</a></h3>
+<p>Kotlin 版の「ローカルの開発環境と H2 の拒否」を、Scala 版に読み替えて引き継ぎます（ST9。ユーザーの決定、2026-11-25）。</p>
+<ul>
+<li><strong>実行する DB は <code>DB_KIND=postgres|h2</code></strong>（既定は <code>postgres</code>）で選ぶ。ローカル開発では <code>h2</code> を選べる。</li>
+<li><strong>本番・ステージングでの H2 の拒否</strong>: <code>AppConfig.load</code> が、<code>APP_ENV</code> が本番・ステージングのとき <code>DB_KIND=h2</code> を<strong>起動前に拒否</strong>し、起動に失敗する（許可リスト方式。足りない設定と同じ終了の経路）。<strong>環境（<code>local</code>・<code>test</code>・ステージング・本番）× <code>DB_KIND</code> の全組み合わせを単体テストで確かめる</strong>。</li>
+<li><strong>配布からの H2 の除外</strong>: sbt の H2 の依存（<code>com.h2database:h2</code>。必要なら doobie-h2）は、<strong>開発用の構成（sbt の独立した設定、または開発用の起動プロジェクト）だけに置き</strong>、配布物（本番イメージの JAR の集合）に含めない。<strong>構成の具体（sbt の設定名、<code>sbt run</code> と <code>Test</code> のクラスパスに残す範囲）は B1 で確定する（未確認）</strong>。イメージの <code>lib</code> に H2 が無いことを、イメージの検査で確かめる。</li>
+<li><strong>H2 のドライバが無い環境で <code>DB_KIND=h2</code></strong> を選んだ場合も、起動に失敗する（本番・ステージングは、拒否の検査とドライバの欠落の二重の防御になる）。</li>
+<li>起動の失敗（終了コード 70）や設定の誤り（78）の使い分けは、下の終了コードのとおり。</li>
+</ul>
+<p><strong>設定の環境変数</strong>（<code>APP_ENV</code>、<code>CREDENTIAL_KEY</code>、<code>IDEMPOTENCY_KEY</code>、<code>RESPONSE_KEY</code>、<code>DB_URL</code>、<code>DB_USER</code>、<code>DB_PASSWORD</code>、<code>PORT</code>、<code>HOST</code>、<code>ALLOWED_ORIGINS</code>、<code>COMMAND_MAX_ATTEMPTS</code>、<code>MIGRATE_ON_START</code>）は、フロントエンドの E2E の案内と手順書の差分を減らすため、<strong>Kotlin 版と名前を揃える</strong>（提案。<code>DB_KIND</code> を含む）。<code>AppConfig.load</code> が全項目の誤りを <code>ValidatedNec</code> で集め、失敗なら、足りない設定の<strong>名前だけ</strong>をログに出して終了する（終了コードは Kotlin 版と同じ 78 を第一候補。未決）。</p>
 <h2 id="jvm">コンテナと JVM<a class="headerlink" href="#jvm" title="Permanent link">&para;</a></h2>
 <h3 id="_9">イメージ<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code>FROM（ビルド）  eclipse-temurin:25-jdk-noble   … sbt でビルド（sbt の版は project/build.properties で固定）
@@ -14734,7 +14742,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 <li>実行は<strong>非 root のユーザー</strong>。ファイルシステムは読み取り専用を目指します。</li>
 <li>イメージのタグは、コミット SHA（ECR の不変のタグ）。</li>
 <li>ベースイメージ（<code>25-jre-noble</code>）の実在とサポート期限は、Kotlin 版の確認値です。<strong>本書では再確認していません</strong>（B1 で <code>docker pull</code> により確かめる）。軽量な派生の採否は、脆弱性の検査の結果とサイズで決めます（未決）。</li>
-<li><strong>H2 の依存関係はそもそも入りません</strong>（ST9）。</li>
+<li><strong>H2 の依存関係は入れません。</strong> 開発用の構成だけに置き、実行イメージ（<code>lib</code>）に含めない（ST9。上の「ローカルの開発環境と H2 の拒否」）。</li>
 </ul>
 <h3 id="si1">配布物の作り方（設計判断 SI1）<a class="headerlink" href="#si1" title="Permanent link">&para;</a></h3>
 <p>依存の JAR とアプリの JAR を別の層にする配布物を、sbt でどう作るかが Gradle の <code>installDist</code> と違います。</p>
@@ -14808,7 +14816,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 </tr>
 </tbody>
 </table>
-<p>終了コードの意味（0 成功、1 一部失敗、64 使い方の誤り、70 起動の失敗、78 設定の誤り）は sysexits の慣例で、Kotlin 版と同じです。起動の失敗（70）は、H2 のドライバの欠落でなく、<strong>接続の失敗など</strong>に読み替えます。<strong>モードを <code>CMD</code> で渡し、上書きできる形</strong>は、Kotlin 版の実装に倣う案で、人の確認が要る（未決）。</p>
+<p>終了コードの意味（0 成功、1 一部失敗、64 使い方の誤り、70 起動の失敗、78 設定の誤り）は sysexits の慣例で、Kotlin 版と同じです。起動の失敗（70）は、H2 のドライバの欠落（<code>DB_KIND=h2</code> のとき）や、<strong>接続の失敗など</strong>に当てます。<strong>モードを <code>CMD</code> で渡し、上書きできる形</strong>は、Kotlin 版の実装に倣う案で、人の確認が要る（未決）。</p>
 <h3 id="jvm_1">JVM の設定（初期案。測定で決める）<a class="headerlink" href="#jvm_1" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版の表を引き継ぎます。</p>
 <table>
@@ -15074,7 +15082,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 <tr>
 <td style="text-align: left;">4</td>
 <td style="text-align: left;">ローカルは H2 の PostgreSQL モード。本番・ステージングで H2 を起動前に拒否。配布から H2 を除外</td>
-<td style="text-align: left;">ローカルも PostgreSQL 18（Docker。提案）。<strong>拒否の検査も除外も要らない</strong></td>
+<td style="text-align: left;">同じ（ユーザーの決定、2026-11-25）。拒否の検査は <code>AppConfig.load</code>、除外は sbt の開発用の構成（B1 で確定）</td>
 <td style="text-align: left;">ST9</td>
 </tr>
 <tr>
@@ -15188,7 +15196,7 @@ FROM（実行）    eclipse-temurin:25-jre-noble   … JRE と、ビルド済み
 <li><strong>投影の再構築のタスクを、デプロイの標準の手順に含める条件</strong>と、再構築中のコマンドの応答（短い待ちか 503 か。Kotlin 版から継続）。</li>
 <li><strong>業務のスモークテストの範囲</strong>、<strong>秘密が Terraform の状態に入る問題</strong>、<strong>RDS の CA バンドルと <code>sslmode</code></strong>、<strong>CloudFront の CSP と SSE のオリジン待ち時間</strong>（Kotlin 版から継続）。</li>
 <li><strong>設定の環境変数の名前を、Kotlin 版と揃えること</strong>（提案。E2E の案内と手順書の差分が減る）と、設定の誤りの終了コード 78。</li>
-<li><strong>ローカル開発の DB</strong>（ST9）の承認。承認されなければ、本書の「ローカルの開発環境」を書き換える。</li>
+<li><strong>ローカル開発の DB</strong>（ST9）: H2 の採用は決定済み。残る未決は、H2 の依存の導入の承認、sbt の依存の置き場（開発用の構成）の確定、本番イメージに H2 が無いことの検査の方法。</li>
 </ol>
 <h2 id="_17">出典<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <ul>

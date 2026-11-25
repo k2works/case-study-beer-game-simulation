@@ -14517,7 +14517,7 @@
 <li><strong>本書で確認したこと</strong>（2026-11-25。リポジトリの外の使い捨てのプロジェクトで、sbt 1.13.1、Scala 3.7.4、JetBrains Runtime 25.0.4.1、ローカルの Docker の <code>postgres:18.6</code> を使用。下の表）。</li>
 <li><strong>確認していないこと</strong>: ScalaCheck の状態に応じた操作列の生成、複数プロジェクトの scoverage の合算（<code>coverageAggregate</code>）と統合テストの計測、<code>HttpRoutes</code> を関数として呼ぶ HTTP のテスト、契約テストのスキーマ検証の道具、Gherkin の別プロジェクトからの実行、テスト用の DB の分離方式、<code>scalafixAll</code>、変異テストの道具。いずれも B1 で確かめます。</li>
 <li><strong>引き継ぐだけのもの</strong>: テスト形状とレベルの責務、層の分担、境界値の一覧、非機能のテストの対応、トレーサビリティの方針、CI の工程の考え方は Kotlin 版を正本とします。</li>
-<li>Kotlin 版の実装の経緯（B1〜B15 の結果の記述）と、H2 に関する記述は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
+<li>Kotlin 版の実装の経緯（B1〜B15 の結果の記述）は引き継ぎません。H2 に関する記述は、ST9（ユーザーの決定、2026-11-25）に従って読み替えて引き継ぎますが、<strong>Scala 版では H2 を実測していません</strong>。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。</li>
 </ul>
 <table>
 <thead>
@@ -14712,7 +14712,30 @@
 </table>
 <p><strong>DB の統合テストは、CI では必ず実行します。</strong> Docker が使えない場合は、スキップでなく失敗にします（環境変数 <code>CI</code> が設定されている場合）。手元では、スキップした件数を明示します。<strong>DB の統合が 1 件も実行されなかった場合は、失敗</strong>とします（実現は未確認。下の未決事項）。</p>
 <h3 id="db">ローカル開発の DB とテストの分担<a class="headerlink" href="#db" title="Permanent link">&para;</a></h3>
-<p>Kotlin 版は、ローカルの H2 と PostgreSQL の乖離への対策（契約テストを両実装で実行など）を持ちます。<strong>Scala 版は、ローカルも PostgreSQL 18（Docker）のみとする提案</strong>（ST9。<strong>人の承認待ち</strong>）で、統合テストとローカルの動作確認が同じ DB になり、乖離の対策は要りません。ポート <code>ProjectionLock</code>・<code>ChangeNotifier</code> は、テスト用のインメモリ実装との差し替えのために残ります。ST9 が承認されず H2 を採る場合は、Kotlin 版の対策（(a) その DB でしか通らない記述の禁止、(b) ポートの契約テストを両実装で実行、(c) 受け入れは PostgreSQL）を引き継ぎます。</p>
+<p>ローカル開発だけ H2 の PostgreSQL モードを使います（ST9。ユーザーの決定、2026-11-25。Kotlin 版の T7 を読み替えたもの。<strong>H2 の導入は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>）。ローカルと CI の乖離に備え、Kotlin 版の対策を引き継ぎます。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">対策</th>
+<th style="text-align: left;">内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">(a) H2 でしか通らない記述の禁止</td>
+<td style="text-align: left;">PostgreSQL の統合テストが正。H2 のために共通の DDL や SQL を曲げない（通らない文は PostgreSQL 側と H2 側に分ける）</td>
+</tr>
+<tr>
+<td style="text-align: left;">(b) ポートの契約テストを両実装で実行</td>
+<td style="text-align: left;"><code>ProjectionLock</code>・<code>ChangeNotifier</code> の契約テストを、<strong>PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト</strong>で実行する。テスト用のインメモリ実装にも同じ契約を実行する。H2 版で保証する範囲は、契約を満たす範囲のすべて</td>
+</tr>
+<tr>
+<td style="text-align: left;">(c) 受け入れは PostgreSQL</td>
+<td style="text-align: left;"><code>@api</code> の受け入れと E2E の CI は PostgreSQL で実行する</td>
+</tr>
+</tbody>
+</table>
+<p><strong>H2 は、統合テストの検証には使いません。</strong> 並行性、権限（ロールと GRANT、追記専用）、部分一意索引、連鎖削除、<code>jsonb</code>、接続プールの分離、分離レベルは、PostgreSQL の統合テストでだけ検証します。H2 版のマイグレーションの適用（Flyway の共通の場所）と、本番・ステージングでの H2 の拒否（環境 × <code>DB_KIND</code> の全組み合わせ）は、ユニットテストで確かめます（<a href="../architecture-infrastructure/">インフラ</a>）。<strong>H2 の PostgreSQL モードでの動作範囲と、doobie 経由の SQLSTATE の取得は未確認</strong>で、B1 の最初に実測します。</p>
 <h3 id="_6">レベル間の重複を避ける方針<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
 <p>Kotlin 版と同じです。規則の分岐は、ドメインのユニットで網羅する。HTTP の統合では、境界の契約だけを確認する。永続化の整合性・並行性・再生・再構築・復元は、DB の統合でだけ検証する。画面の分岐は、コンポーネントで確認する。<strong>受入条件は Gherkin、実装の細部と網羅は munit が担い、同じ振る舞いを二重に書かない。同じシナリオを <code>@api</code> と <code>@ui</code> の両方で実行しない。</strong></p>
 <h2 id="bdd-tdd">開発の進め方（BDD と TDD）<a class="headerlink" href="#bdd-tdd" title="Permanent link">&para;</a></h2>
@@ -15400,7 +15423,7 @@
 <tr>
 <td style="text-align: left;">T-5</td>
 <td style="text-align: left;">ローカルは H2、検証は PostgreSQL。ポート契約を両実装で実行</td>
-<td style="text-align: left;"><strong>見直し</strong>（ST9。ローカルも PostgreSQL 18。提案）</td>
+<td style="text-align: left;"><strong>引き継ぐ</strong>（ST9。ユーザーの決定、2026-11-25。H2 の導入は承認待ち）</td>
 </tr>
 </tbody>
 </table>
@@ -15517,8 +15540,8 @@
 <tr>
 <td style="text-align: left;">12</td>
 <td style="text-align: left;">H2 とポート契約の両実装</td>
-<td style="text-align: left;">なし（ローカルも PostgreSQL 18。ST9 の承認が前提）</td>
-<td style="text-align: left;">H2 を採らない提案</td>
+<td style="text-align: left;">同じ（PostgreSQL 版は統合テスト、H2 版は munit のユニットテスト）</td>
+<td style="text-align: left;">ST9（ユーザーの決定）</td>
 </tr>
 <tr>
 <td style="text-align: left;">13</td>
@@ -15544,7 +15567,7 @@
 <li><strong>契約テストのスキーマ検証の道具</strong>（JVM のライブラリの共有。Scala から呼べるか）、ルートの網羅の検査の方法。</li>
 <li><strong><code>TestControl</code> 相当の仮想時間</strong>の使えるか（<code>Thread.sleep</code> を使わずに時間を扱う）。</li>
 <li><strong>sbt のビルドキャッシュ</strong>と、CI の実行時間の目標の妥当性。依存のロックの方式。</li>
-<li><strong>ローカル開発の DB</strong>（ST9。提案）。承認されなければ、Kotlin 版の対策を引き継ぐ。</li>
+<li><strong>ローカル開発の DB</strong>（ST9）: H2 の採用は決定済み。残る未決は、H2 の導入の承認、B1 の最初の実測（動作範囲、doobie 経由の SQLSTATE）、契約テストを共有する形（PostgreSQL 版・H2 版・インメモリ実装）。</li>
 <li><strong>Kotlin 版の未決事項の引き継ぎ</strong>: 生きたドキュメントの公開ツールと公開先（ADR-001 の 018 の置き換えを含む）、受け入れのシナリオ数の目標、ストーリー ID の整合の検査の厳しさ、実 DB での負荷試験の環境、手動のアクセシビリティの確認の担当者と時期、カバレッジの層ごとの目標の見直し。いずれも <a href="../../beer-game-kotlin/test-strategy/">Kotlin 版の未決事項</a> に追従する。</li>
 </ol>
 <h2 id="_22">出典<a class="headerlink" href="#_22" title="Permanent link">&para;</a></h2>

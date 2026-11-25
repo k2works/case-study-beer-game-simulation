@@ -14261,7 +14261,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">ST1〜ST9</td>
-<td style="text-align: left;">技術スタックの判断（ローカル DB を PostgreSQL のみにする案 ST9、JSON は circe、接続プールは HikariCP など）</td>
+<td style="text-align: left;">技術スタックの判断（ローカル開発だけ H2 の PostgreSQL モードを使う ST9（ユーザーの決定、2026-11-25）、JSON は circe、接続プールは HikariCP など）</td>
 <td style="text-align: left;"><a href="tech-stack/">技術スタック</a></td>
 </tr>
 <tr>
@@ -14310,7 +14310,7 @@
 <ul>
 <li>設計時の検証は、一時プロジェクトでのドメイン断片のコンパイルと munit 2 件までです。実 DB での ROLLBACK、キャンセル、http4s の SSE は<strong>未確認</strong>で、各文書に明記しています。</li>
 <li>ガイドが書く doobie 1.0.0-RC13 は Maven Central の一覧になく、RC12 を設計時の版にしました。</li>
-<li>ローカル開発の DB、scoverage のしきい値（暫定値）、Scala の版（3.7 系に据え置き）は、人の承認待ちです。</li>
+<li>ローカル開発の DB は、H2 の PostgreSQL モードを使うことがユーザーの決定（2026-11-25）です。ただし H2 の依存の導入の承認と、動作範囲の実測（B1 の最初）は残っています。scoverage のしきい値（暫定値）と Scala の版（3.7 系に据え置き）は、人の承認待ちです。</li>
 <li>実装（<code>apps/beer-game-scala/</code>）はまだありません。生成物（<code>generated/</code>）は、コード着手後に方式を決めます。</li>
 </ul>
 <h2 id="_8">補足<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>

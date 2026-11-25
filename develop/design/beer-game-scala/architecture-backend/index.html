@@ -3661,10 +3661,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#kotlin-h2" class="md-nav__link">
+  <a href="#h2-postgresql" class="md-nav__link">
     <span class="md-ellipsis">
       
-        ローカル開発（Kotlin 版の H2 の節の扱い）
+        ローカル開発（H2 の PostgreSQL モード）と実行の選択
       
     </span>
   </a>
@@ -14483,7 +14483,7 @@
 <h2 id="_3">パターンの選択<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>Kotlin 版と同じです。業務領域は中核（週次計算と進行）、<strong>イベントソーシング</strong>（状態はイベントの列。イベントが監査の記録を兼ねる）、<strong>CQRS</strong>（コマンド側は <code>events</code> へ追記、問い合わせ側は投影テーブルを SQL で読む）。構造は「<strong>核の純粋関数 + 外側の薄い副作用の層</strong>」です（ガイド §7.9）。核は、入力の検証、<code>handle</code>、<code>Events.apply</code>、投影、<code>simulateWeek</code>、<code>Disclosure</code> で、副作用は HTTP、データベース、時計、乱数、ログです。副作用は <code>IO</code> と <code>ConnectionIO</code> の<strong>値</strong>として組み立て、実行は <code>IOApp</code> とテストの境界だけです（SBD5）。</p>
 <h2 id="_4">全体構成<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHN0eWxlPSJ3aWR0aDo1MDdweDtoZWlnaHQ6MTY4cHg7YmFja2dyb3VuZDojMDAwMDAwOyIgd2lkdGg9IjUwN3B4IiBoZWlnaHQ9IjE2OHB4IiB2aWV3Qm94PSIwIDAgNTA3IDE2OCIgem9vbUFuZFBhbj0ibWFnbmlmeSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSIgY29udGVudFN0eWxlVHlwZT0idGV4dC9jc3MiPjw/cGxhbnR1bWwgMS4yMDI2LjEwPz48ZGVmcy8+PGcgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGxlbmd0aEFkanVzdD0ic3BhY2luZyI+PHRleHQgeD0iNSIgeT0iMTciIGZpbGw9IiMzM0ZGMDIiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjQ0OC4xMDIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc3R5bGU9Iml0YWxpYyI+UGxhbnRVTUwgdmVyc2lvbiAxLjIwMjYuMTAgLyBhMDBlZGRhIFsyMDI2LTExLTExIDExOjI1OjA5IFVUQ108L3RleHQ+PHJlY3QgeD0iNSIgeT0iMjYuOTY5IiB3aWR0aD0iMjgxLjAwNSIgaGVpZ2h0PSIyMS4yOTciIGZpbGw9IiMzM0ZGMDIiIHN0eWxlPSJzdHJva2U6IzMzRkYwMjtzdHJva2Utd2lkdGg6MTsiLz48dGV4dCB4PSI2IiB5PSI0MS45NjkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjE3MS4yODEiIGZvbnQtd2VpZ2h0PSI3MDAiPltGcm9tIHN0cmluZyAobGluZSA1KSBdPC90ZXh0Pjx0ZXh0IHg9IjUiIHk9IjYyLjI2NiIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjcwMCI+wqA8L3RleHQ+PHRleHQgeD0iNSIgeT0iNzguNTYzIiBmaWxsPSIjMzNGRjAyIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI4MS40MjMiIGZvbnQtd2VpZ2h0PSI3MDAiPkBzdGFydHVtbDwvdGV4dD48dGV4dCB4PSI1IiB5PSI5NC44NTkiIGZpbGw9IiMzM0ZGMDIiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjI2Ni4zIiBmb250LXdlaWdodD0iNzAwIj50aXRsZSDjg5Djg4Pjgq/jgqjjg7Pjg4njga7lsaTmp4vpgKDvvIhTY2FsYSDniYjvvIk8L3RleHQ+PHRleHQgeD0iNSIgeT0iMTExLjE1NiIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjcwMCI+wqA8L3RleHQ+PHRleHQgeD0iNSIgeT0iMTI3LjQ1MyIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjgxLjAwNSIgZm9udC13ZWlnaHQ9IjcwMCI+cGFja2FnZSAiYWRhcHRlci1odHRw77yIaHR0cDRz77yJIiB7PC90ZXh0Pjx0ZXh0IHg9IjUiIHk9IjE0My43NSIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iNDk2LjU3NSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1kZWNvcmF0aW9uPSJ3YXZ5IHVuZGVybGluZSI+W+ODq+ODvOODiO+8iOapn+iDveWIpe+8iVxu5YWl5Yqb5qSc6Ki8IC0+IOOCs+ODnuODs+ODiVxuSHR0cFJvdXRlc1tJT11dIGFzIFJvdXRlczwvdGV4dD48dGV4dCB4PSI5Ljg3NCIgeT0iMTYwLjA0NyIgZmlsbD0iI0YwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMzU2LjQ3NCIgZm9udC13ZWlnaHQ9IjcwMCI+U3ludGF4IEVycm9yPyAoQXNzdW1lZCBkaWFncmFtIHR5cGU6IGNsYXNzKTwvdGV4dD48P3BsYW50dW1sLXNyYyBSTEhSUm5qNTU3eFZOcDdBUXFhR1kwVTRIQU1JZkM0WWdYcmxIT0ppRjRwTVd4a0RUc1NyQ213RDBDZFVKT0VUNWlNV2ZjZjlnTDU5c3BHYmxMNmdHOXRjbm1veGpmX3c1cFdwaS1pdUFmQmJkSkRwUmp6dEJpOExETzlhcjk1SDlDRWRDam9KcVB5b1FpbGNhX1p2UmxCbXNoM25zempVb3RQbTNRRC1rX01zcnhRaTAzaWhrNGhHMUF4V0cxMHNVS2M4MEJKS3ZvQ0VBWEZlTXdpYWV5U293aWE4UjVoOWUtdVdFZWZSei02bnhDVE54eVVSRXlka2RTNVUzcXNVSEpBNGE3VER1QkJfRU5XZnFoZVdsOUpCQm9xWHA5NEhiU2trb1dxU1htemEtNTI2enlmLWRoYkxycVZXQlVjLWJYN3lfWjFYdXpRaHVVckVzUFZIQkdLa1FrWGhVRHpGV09QX1duUkFwVVdHU3ROQ0FYMTE0VjE4UUc4MTZ4VlpRQWxpZG1rMnl6WWpySGIxZHZ2NUhTODN3ZEMyZzA5NmJzbDRFdEVQS24tMFFKLXBaNWFic3Z3NVB3MEJsMG1SbF9JeDFoU2o2QzRVZTdlRnNPSWo0Y09KTnlva21mLTEyTVJNei1GcTFhN0RUUjFtZ015TzdVQ2ZfazUxbHhESHppYUx1VzB2ZHczMV9lNEM2dWhFSXpZbEc1N1hEM1ctNmtwVEtnVGFTcGktVWd3Wko3azBDenhVYWl0cmtERUk4SG5zOEJVNVVHSlB6bF9nOTdWbGUzRGVua0xFWk44MGhPcU1zOWdZX3pUSEhPU3R4b05ScHNKdVN0QXpBUGt4b0M2UzhBVTZFVFRHRElmUks0UTB5WmRZNHVQMXUyMUNDckExRG5WTlNmcE4ySWx4a0dobjBZZzh4d25iNVdMNkJuRDcwUC1kcGVnbzBiMUxTZTRBenNrTkM5cklXSkIxSl81TGVIdnNWU055b25sejV6VGE4bUpvLUFHM0ZYS3NzSnBFVWRDRVVzR2d2VWJ6ZjJJVEM5ekliQS1QWGUxQmcySlg3Qjh1cUtxbHRiNUZ4d3FJNXZXOVBNb2tiR0lOaGJVbE9LNE0yTGFuend2ZGJLdkdHaXhRZXNnbVVQVUJLZjUtT28wbDBHZTM5LWltUE1NTEprZTN4N3BYWVc4WmQwV3U1dWJHejVCVm5iTGlPZ3F3S0YzNmhXcHRQTkhKWGVUd1Q5djI3SE1uckZDMDZ2bnEwa2hCNjNLQ1Z2YV90T3hmajBVNFNTV0h3Z002ZTRCZmlhaW9PYV9naFhZRmR0RzdscnlqLXdPRm1SU1BZTnlGNnlkdzVpbmRfLU13NkhoUkFmYUVYVFRhdnIwc1Zub3l3VWJ3alEwbkh5V050c2RTS0gyWjJJN0s3M0lGdW9xMGtYYV8yX2l0T0EwRlREaS1wbG1pNUM3Rkp0azNEXy1PN0cxeDEwcFpaVnQtR0hsbzc1dl9lVE5FclEtQ3ItWF9FbjdNWXA5a2dtcVEwaUVscjdmSHlWR3NaTHZWbzVfQ2RWemdyQXlWZlduRHFtZm44Nk43UE92YzJpclNwNlZmd0tWNVYwS0JsQXBjUWc5MGtRV29lZVJxV3V5ZGJEQkNQdlBicllBUVhGYXN3c2xpR2F0dmNBWmNUcW5LY3NQQ0w0aUIzOG1kclZVUGE3TnJJRFJqZDRjdzRxVTI3YVU4T25JWHZ4QXBVS2JUY0xWZV9iYVJKS3J6YnhxTTVpVWJYVUF1MTdLdWZRZnU3QnkwSm5nbmZZcUxXMXZtY1B4ME5OZkloaDlkeFNPOF9tNDA/PjwvZz48L3N2Zz4=" class="uml" alt="uml diagram" title="" /></p>
+<p><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHN0eWxlPSJ3aWR0aDo1MDdweDtoZWlnaHQ6MTY4cHg7YmFja2dyb3VuZDojMDAwMDAwOyIgd2lkdGg9IjUwN3B4IiBoZWlnaHQ9IjE2OHB4IiB2aWV3Qm94PSIwIDAgNTA3IDE2OCIgem9vbUFuZFBhbj0ibWFnbmlmeSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSIgY29udGVudFN0eWxlVHlwZT0idGV4dC9jc3MiPjw/cGxhbnR1bWwgMS4yMDI2LjEwPz48ZGVmcy8+PGcgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGxlbmd0aEFkanVzdD0ic3BhY2luZyI+PHRleHQgeD0iNSIgeT0iMTciIGZpbGw9IiMzM0ZGMDIiIGZvbnQtc2l6ZT0iMTIiIHRleHRMZW5ndGg9IjQ0OC4xMDIiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc3R5bGU9Iml0YWxpYyI+UGxhbnRVTUwgdmVyc2lvbiAxLjIwMjYuMTAgLyBhMDBlZGRhIFsyMDI2LTExLTExIDExOjI1OjA5IFVUQ108L3RleHQ+PHJlY3QgeD0iNSIgeT0iMjYuOTY5IiB3aWR0aD0iMjgxLjAwNSIgaGVpZ2h0PSIyMS4yOTciIGZpbGw9IiMzM0ZGMDIiIHN0eWxlPSJzdHJva2U6IzMzRkYwMjtzdHJva2Utd2lkdGg6MTsiLz48dGV4dCB4PSI2IiB5PSI0MS45NjkiIGZpbGw9IiMwMDAiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjE3MS4yODEiIGZvbnQtd2VpZ2h0PSI3MDAiPltGcm9tIHN0cmluZyAobGluZSA1KSBdPC90ZXh0Pjx0ZXh0IHg9IjUiIHk9IjYyLjI2NiIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjcwMCI+wqA8L3RleHQ+PHRleHQgeD0iNSIgeT0iNzguNTYzIiBmaWxsPSIjMzNGRjAyIiBmb250LXNpemU9IjE0IiB0ZXh0TGVuZ3RoPSI4MS40MjMiIGZvbnQtd2VpZ2h0PSI3MDAiPkBzdGFydHVtbDwvdGV4dD48dGV4dCB4PSI1IiB5PSI5NC44NTkiIGZpbGw9IiMzM0ZGMDIiIGZvbnQtc2l6ZT0iMTQiIHRleHRMZW5ndGg9IjI2Ni4zIiBmb250LXdlaWdodD0iNzAwIj50aXRsZSDjg5Djg4Pjgq/jgqjjg7Pjg4njga7lsaTmp4vpgKDvvIhTY2FsYSDniYjvvIk8L3RleHQ+PHRleHQgeD0iNSIgeT0iMTExLjE1NiIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgZm9udC13ZWlnaHQ9IjcwMCI+wqA8L3RleHQ+PHRleHQgeD0iNSIgeT0iMTI3LjQ1MyIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMjgxLjAwNSIgZm9udC13ZWlnaHQ9IjcwMCI+cGFja2FnZSAiYWRhcHRlci1odHRw77yIaHR0cDRz77yJIiB7PC90ZXh0Pjx0ZXh0IHg9IjUiIHk9IjE0My43NSIgZmlsbD0iIzMzRkYwMiIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iNDk2LjU3NSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1kZWNvcmF0aW9uPSJ3YXZ5IHVuZGVybGluZSI+W+ODq+ODvOODiO+8iOapn+iDveWIpe+8iVxu5YWl5Yqb5qSc6Ki8IC0+IOOCs+ODnuODs+ODiVxuSHR0cFJvdXRlc1tJT11dIGFzIFJvdXRlczwvdGV4dD48dGV4dCB4PSI5Ljg3NCIgeT0iMTYwLjA0NyIgZmlsbD0iI0YwMCIgZm9udC1zaXplPSIxNCIgdGV4dExlbmd0aD0iMzU2LjQ3NCIgZm9udC13ZWlnaHQ9IjcwMCI+U3ludGF4IEVycm9yPyAoQXNzdW1lZCBkaWFncmFtIHR5cGU6IGNsYXNzKTwvdGV4dD48P3BsYW50dW1sLXNyYyBSTEhUSm5qNzU3dFZOcDdZRE9NZ0tILWdJOHNLMGc2ZUE4MFQ1TEtzM3lEd3djb21Uck9wT25oS0xoOXRXSGdJMmhTQVFJWGZnNUFJNDJadlFYaEgwazc3SkRPc0pfYUJsTlRjcm9uQTlTaXhULXhDY05sRV9MMlVnWjJZZXZRRThYcS1xLTZzWmx4SXFSOWtGOHJWUkJLVnRwb2ZfX3hraTlidFFPTUlwZEJwdFU2b3VtSktkUUxiSGxmZVlHUUFZVnZoSVdMbTJaeVZJcFpJSHh2cjJaaFFyVDZYWmsxRWlfcmFpbmlUblNzN3UycHd5VUIzVTZNWmxOTWxrdHI4LVl5STdTQUp6LXQzSFZ6cEdDZG5jY0FvQzNlLUZLc2U5RFA0bzRzQzNPMzNIcGZ5aENDN0hOelNVNk5GOXUzTXRacEc0VnAtakNfNnBUU2R3d3NZaHdFeEkyd2djc3RteG9ING10X1c1MWFUQ2EtQ3JBV2VtR2llbTFDeTJHOGloU1ZIUWo2XzUwSU5nTFVmMktPLWxLWG9KMFJTYm1uTzFPQkZMNVpydDdOOVZJMWNTOFE1UzBodl8zMnVHSXYwRVFkX3NqY3FsRkRBQzVlNUxYLUdGMURwSkVJUGh1UmR1Q19JWDZsRXpyYnZXdzNZa0xIdnRCVUFQZElBVnRaS1FJcUxWTlEza0kzRTFUQlRzVERYN1VNeUhscUk5MUxNdFVFWnhsUFROQkxOcmtBWjUtUUxtSWhtWkRUTVRNQ1hSWkxyMjhpRFk2cm9aNDJxZFJ6UnhWbHRvM2FvdjRjdG1ZTUdEZlNjbkpwQV9yaWxlb1R0N2hKTmRrbG12X1FqWGN2aTRQVEFIam1BYlQ5R0RRcG9ZV2k2YWV5bWRtYUFYV0haS0IwSS0zblE2UE1vbmFKSDdvc25RaTBMeXp0dnpDUTR1RFVQWXlKN2sza0JqdTFLY0x0WG9sbFFPeUE0REM2NWFjVnFBbDRnek5uS19qTmpwaWtSa1h3MlVCQlYxS3BhZlhsN1FNc0VxMmVSSTdKd2FBMWIwZk8zQUZjeUJHWk9YNG1vQUk2QXF4RjluZGw3YXRzZDgxS0wyWV9SUlJIV3F3bE1BYkluQVNQY3hSdk5UR2dkQjI1Y1d1VzVEa1A5TFNablJvcGJRTTFYd1FHTFhoVVNtY2ItRzlxbEYzS1hjNkdBclpjY0s1eGt2c2NQc2hWY040WHVWS2s3RXBnd2V5RHpxcGhGODh5ZUJBek1XSGtpSjAzdTVPOVJYUnlTRnJrRUlSUzdKNFk4NFZBNUpMM1lWQ1BaZ1IyZFVLVjV1d1VSdEp5TVl4d2pHeTJzQlY1c2x6dlVNOE4teEJuUWk0c0pUbWdzR2k3UnRqWk5aSC14Um12RGxmZkdjM3RjSy15TFJreUhVbkFVbTN2ZTdDVWhHN0diVlh2c1JhRDN4dmNvdEtybjlkRTB5ekRzenlzX1RXUjA3ODZCeVQ5RVBzeVB1Wm92elQ4U2tySXhhU3RIX3JQWXFQX1dLZks1bV91MVRYVTgwTGw2WUhnMnVnem50RTN4UGhmNjFyVjZodXZVX1dnNnQ3YXhKUGo5U0U0a0poTXFIVzRiLVdLenVHNTQ2MnlqZVlVM1dqM0hrWGE0cEx1bGQ0X0s3LUdidldBb3dtZE5QODRDTkhyRmdIaWRQaEw0NVB0MWRrdEI0RlplYXB1eURGSVB1ellISV9mWFRqWkhjRGQwMlA4blNKUGFKOW5ZNkhDNzhib21JRFhKZ1A1c0pDeXNoUDlRZmlmeFhjYnJVQ1NVWDdmRXJ6UUpHNWFsVERQbWRXbUNWOVR3OXdRb3JjR2tRcTZFcG5uNTdSQ1JXNkdPNnphSTAtRzFvNkc1U0NhQWVMQXRXUjc2Vm0wMD8+PC9nPjwvc3ZnPg==" class="uml" alt="uml diagram" title="" /></p>
 <h3 id="_5">層と依存の向き<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>依存は、外側から内側（ドメイン）への<strong>一方向</strong>です。<code>domain</code> は <code>cats-core</code> だけに依存します（<a href="../domain-model/">ドメインモデル</a> の SD5、<a href="../tech-stack/">技術スタック</a> の ST3）。</p>
 <table>
@@ -14512,7 +14512,7 @@
 </tr>
 <tr>
 <td style="text-align: left;"><code>adapter-persistence</code>（<code>beergame.adapter.persistence</code>）</td>
-<td style="text-align: left;">doobie による <code>EventStore</code>、投影の書き込み、問い合わせ、周辺ストア、冪等記録、<code>ProjectionLock</code> と <code>ChangeNotifier</code>、イベントの JSON 変換（<code>EventCodec</code>）、マイグレーション</td>
+<td style="text-align: left;">doobie による <code>EventStore</code>、投影の書き込み、問い合わせ、周辺ストア、冪等記録、<code>ProjectionLock</code> と <code>ChangeNotifier</code> の <strong>PostgreSQL 版と H2 版</strong>（ST9）、イベントの JSON 変換（<code>EventCodec</code>）、マイグレーション（共通と PostgreSQL 専用の場所）</td>
 <td style="text-align: left;"><code>application</code>、<code>domain</code></td>
 </tr>
 <tr>
@@ -14916,13 +14916,40 @@
 </tr>
 </tbody>
 </table>
-<h2 id="kotlin-h2">ローカル開発（Kotlin 版の H2 の節の扱い）<a class="headerlink" href="#kotlin-h2" title="Permanent link">&para;</a></h2>
-<p>Kotlin 版は、H2 の PostgreSQL モードでのローカル起動を許し、PostgreSQL 固有の機能を <code>ProjectionLock</code> と <code>ChangeNotifier</code> のポートの裏に隠し、2 実装を持ちます（ADR-014）。<strong>Scala 版は H2 を使いません</strong>（<a href="../tech-stack/">技術スタック</a> の ST9。<strong>提案で、人の承認を得る</strong>）。ローカル開発の DB は PostgreSQL 18（Docker）です。</p>
+<h2 id="h2-postgresql">ローカル開発（H2 の PostgreSQL モード）と実行の選択<a class="headerlink" href="#h2-postgresql" title="Permanent link">&para;</a></h2>
+<p>ユーザーの決定（2026-11-25）により、<strong>開発機でのローカル開発（起動と動作確認）だけ</strong>、H2 の PostgreSQL モードで動かせます（<a href="../tech-stack/">技術スタック</a> の ST9。Kotlin 版の T7・ADR-014 を読み替えたもの。<strong>H2 の依存の導入は承認待ち、動作範囲は B1 の最初に実測して確定する</strong>）。PostgreSQL 固有の機能を <code>ProjectionLock</code> と <code>ChangeNotifier</code> のポートの裏に隠し、<strong>PostgreSQL 版と H2 版の 2 実装</strong>を持ちます。統合テスト、CI、受け入れ、ステージング、本番は PostgreSQL 18 のままです。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">ポート</th>
+<th style="text-align: left;">PostgreSQL 版（統合テスト・CI・ステージング・本番）</th>
+<th style="text-align: left;">H2 版（ローカルのみ）</th>
+<th style="text-align: left;">契約テスト</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><code>ProjectionLock</code></td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock(_shared)</code>（<code>ConnectionIO</code> の中で取り、トランザクションの終了で解放）</td>
+<td style="text-align: left;"><strong>プロセス内の読み書きロック</strong>（単一プロセスでのみ有効。複数のプロセスでは保証しない）</td>
+<td style="text-align: left;">両実装で同じ契約を実行する</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>ChangeNotifier</code></td>
+<td style="text-align: left;"><code>pg_notify</code>（追記と同じトランザクション）と、<code>LISTEN</code> 専用の接続（プールの外）</td>
+<td style="text-align: left;"><strong>プロセス内のイベント</strong>（コミット後に配信。単一プロセスでのみ有効）</td>
+<td style="text-align: left;">両実装で同じ契約を実行する</td>
+</tr>
+</tbody>
+</table>
 <ul>
-<li><strong>ポート <code>ProjectionLock</code> と <code>ChangeNotifier</code> は維持します。</strong> 動機（PostgreSQL 固有の機能を隠す）と、契約テストの考え方は言語に依存しません。</li>
-<li>ローカルの DB を PostgreSQL にするため、実装が 1 つになり、ポートは<strong>テスト用のインメモリ実装との差し替え</strong>のためだけに残ります（関数を持つ <code>case class</code> の <code>IO</code> の値を、インメモリの実装に差し替える）。</li>
-<li><strong>本番・ステージングで、想定外の DB 実装が選ばれないようにする起動時の検査</strong>（許可リスト方式。<code>APP_ENV</code> × DB の種別）は、DB が PostgreSQL だけのため要りません。</li>
-<li>承認されず H2 を採る場合は、Kotlin 版の「乖離のリスクと対策」と「本番での拒否の検査」を引き継ぎ、本節を書き換える。</li>
+<li><strong>ポートは両実装で維持します。</strong> 動機（PostgreSQL 固有の機能を隠す）と、契約テストの考え方は言語に依存しません。ポートは、関数を持つ <code>case class</code> の <code>IO</code> / <code>ConnectionIO</code> の値で、実装を差し替えます。</li>
+<li><strong>テスト用のインメモリ実装との関係</strong>: 既存のテスト用のインメモリ実装（ドメイン・アプリケーションの受け入れで使う関数値の経路）と、H2 版の本体の実装は<strong>別のもの</strong>です。H2 版は、DB（H2）に接続する経路の実装であり、インメモリ実装は DB を使わない。ただし、<strong>ロックと通知のプロセス内の実装は共通の部品を使える</strong>（プロセス内の読み書きロックと <code>Topic</code>。共通化するかは B1 で決める）。契約テストは、PostgreSQL 版、H2 版、インメモリ実装の 3 つで同じ内容を実行する。</li>
+<li><strong>実行する DB の選択</strong>: 設定 <code>DB_KIND=postgres|h2</code>（既定は <code>postgres</code>）で選び、<code>app</code> が組み立てる（<code>Transactor</code>・<code>ProjectionLock</code>・<code>ChangeNotifier</code> と、マイグレーションの場所）。<strong>H2 版でも <code>Left</code> の明示 ROLLBACK（SBD2）は同じ</strong>です（doobie の <code>Tx.rollbackOnLeft</code> は DB に依らない）。</li>
+<li><strong>本番・ステージングでの H2 の拒否</strong>（許可リスト方式。<code>APP_ENV</code> × <code>DB_KIND</code>）: <code>AppConfig.load</code> が、<strong><code>APP_ENV</code> が本番・ステージングのとき <code>DB_KIND=h2</code> を拒否し、起動に失敗する</strong>（<code>ValidatedNec</code> の設定の誤りとして、足りない設定と同じ経路で終了する）。環境ごとの全組み合わせを単体テストで確かめる（<a href="../architecture-infrastructure/">インフラ</a>）。<strong>H2 は本番イメージに含めない</strong>ため、H2 のドライバの欠落でも、本番・ステージングでは起動が失敗する（二重の防御）。</li>
+<li><strong>乖離への対策</strong>: (a) H2 でしか通らない記述を禁止し、PostgreSQL の統合テストを正とする、(b) ポートの契約テストを両実装で実行する、(c) 受け入れは PostgreSQL で実行する（<a href="../data-model/">データモデル</a>「乖離のリスクと対策」、<a href="../test-strategy/">テスト戦略</a>）。</li>
+<li><strong>ローカルで守られない制約</strong>（H2 版）: <code>uq_idempotency_create</code>、追記専用、DB ロールとプールの分離、複数プロセスの直列化と通知、分離レベルによる一貫した読み取り（<a href="../data-model/">データモデル</a> の 7 項目）。冪等記録の重複は、H2 版ではアプリ側で挿入前に <code>(scope, key_digest)</code> を検索して <code>ConcurrencyConflict</code> を返す（Kotlin 版と同じ方針）。</li>
+<li><strong>SQLSTATE の写像</strong>: PostgreSQL 版は <code>PSQLException</code> から制約名を取る。H2 版は、メッセージ中の制約名（大文字小文字を区別せず）で写し、<code>PersistenceFailure</code> にメッセージを載せない。<strong>doobie 経由で H2 の SQLSTATE と制約名が取れるかは未確認</strong>（B1 で実測）。</li>
 </ul>
 <h2 id="_17">モジュール構成と依存の検査<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>apps/beer-game-scala/                    （設計上の予定地。今は存在しない）
@@ -15056,7 +15083,7 @@
 <tr>
 <td style="text-align: left;">BD12</td>
 <td style="text-align: left;">ローカル開発の DB と、PostgreSQL 固有機能のポート</td>
-<td style="text-align: left;"><strong>見直す</strong>: ポートは維持。ローカルの DB は PostgreSQL 18（提案。ST9）</td>
+<td style="text-align: left;"><strong>引き継ぐ</strong>: ポートは両実装（PostgreSQL 版・H2 版）で維持。ローカルだけ H2、本番・ステージングで拒否（ST9。ユーザーの決定、2026-11-25）</td>
 </tr>
 </tbody>
 </table>
@@ -15230,7 +15257,7 @@
 <tr>
 <td style="text-align: left;">10</td>
 <td style="text-align: left;">H2 版と PostgreSQL 版の 2 実装、本番での H2 の拒否</td>
-<td style="text-align: left;">ローカルの DB は PostgreSQL 18（提案）。ポートは維持</td>
+<td style="text-align: left;">同じ（2 実装、<code>DB_KIND</code>、本番・ステージングで拒否）。テスト用のインメモリ実装は別に維持</td>
 <td style="text-align: left;">ST9</td>
 </tr>
 <tr>
