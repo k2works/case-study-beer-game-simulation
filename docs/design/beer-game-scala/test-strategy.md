@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:35:00Z }
 
 本書は、beer-game-scala のテスト戦略を定義します。[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の決定により、**受入条件は beer-game2、テストの構造は [beer-game-kotlin のテスト戦略](../beer-game-kotlin/test-strategy.md)、実装規約は [関数型プログラミングガイド（Scala 編）](../../reference/関数型プログラミングガイド_Scala編.md)（以下「ガイド」。テストは第 8 章、静的解析は第 9 章）を正本**として引き継ぎ、本書は Scala での実現方法と、Scala で変わる点だけを定めます。**`docs/` を設計の正本**とします。実装コードはまだ存在しません（アプリの置き場は `apps/beer-game-scala` を予定）。
 
-**範囲の約束（ユーザーの決定、2026-11-25）**: 実装として約束するのは U1〜U3 です。**U1〜U3 の間は、実際の研修には使いません（検証・事例用）。** 検証用の CI（`check` ジョブ 1 本）は U1 に含め、AWS 環境・デプロイ用のワークフロー・本番運用・復元訓練は後回し（U5）です（下の「CI との連携」）。
+**範囲の約束（ユーザーの決定、2026-11-25）**: 実装として約束するのは U1〜U3 です。**U1〜U3 の間は、実際の研修には使いません（検証・事例用）。** 検証用の CI（`check` ジョブ 1 本）は U1 に含め、AWS 環境・デプロイ用のワークフロー・本番運用・復元訓練は後回し（再開するときに Unit を決める。Unit 定義ではステージングは U1 の US6.2 にあり、U5 への付け替えは AI の整理。L2）です（下の「CI との連携」）。**U1 の約束は、ジョブの本数ではなく検証の範囲です**（D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）: 統合テスト（PostgreSQL 18、testcontainers-scala）と `@api` の受け入れテストを CI で実行することを、U1 の約束に含めます。**U1 に入れる US6.1（障害と性能の劣化を検知する）の AC は AC6.1.1（構造化ログ）・AC6.1.2（相関 ID つきの記録）・AC6.1.4（`/ready`）**です（D2。同上。AC6.1.3 メトリクスと AC6.1.5・6.1.6 通知は約束の外）。CI の `check` ジョブは、US の受入条件ではなく範囲の決定（N-H4）です。
 
 ### 本書の位置づけと確認の範囲
 
@@ -23,6 +23,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:35:00Z }
 - Kotlin 版の実装の経緯（B1〜B15 の結果の記述）は引き継ぎません。H2 に関する記述は、ST9（ユーザーの決定、2026-11-25）に従って読み替えて引き継ぎますが、**Scala 版では H2 を実測していません**。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます。
 - **確認状況の正本の規則（N-H5。AI の案で承認を得ていない）**: [技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」と、本書の「確認した事項」1〜11）で、**一覧を直すときは根拠も直します**。
 - **レビュー（2026-11-25）への対応の承認の状況**: ユーザーが決めたのは、H3（不正な遷移 `Ignored` は止める設計を維持）、H6（カバレッジは行率を算出する案 C を第一）、H7（範囲は U1〜U3 を約束し U4〜U6 は指標を見て決める）、H9（NF-P2 は p95 4 秒）に加え、再レビュー（2026-11-25）への対応の次の 4 件です。**N-H4（検証用の CI の `check` ジョブ 1 本は U1 の約束に含める。AWS 環境・デプロイ用ワークフロー・ステージングへの自動反映は後回しで、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認する）、N-H6（`domain` の文 97% は目安。ゲートにするかは B1 の実測後）、N-H7（止まったゲームでも状態取得の読み取りは返すことを要件にする）、N-H8（U1〜U3 の間は実際の研修に使わない）**。**これら以外（N-H1・N-H2・N-H3・N-H5 の直し方など）は AI の案で、承認を得ていません**。本書の N-H1（許す組の表）・N-H2・N-H3 の記述は案です。
+- **再々レビュー（2026-11-25）への対応の区分**: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、AI が推奨案で決めたものがあります（**ユーザー本人が選択肢を選んだ決定ではなく、確認は未了**）。**D1**=統合テスト（PostgreSQL 18）と `@api` の受け入れテストを U1 の約束に含める（R-H2 案 (a)）、**D2**=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4（R-H1）、**D3**=失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ `CredentialRevoked` を出す（R-H3 案 (a)）、**D4**=H2 版の `ProjectionLock` は Kotlin 版と同じ構造（`StampedLock` 系 + 待ちの上限 + トランザクション終了後の後始末。R-H5）、**D5**=team 規約が beer-game-scala に及ぶかの確認と、例外の project.md `## Scope Overrides` への記録は、人の承認の場で行う（M1。AI は project.md を編集しない）。**これら以外の直し方はすべて AI の案で、承認を得ていません。**
 
 | # | 確認した事項 | 結果 |
 | :--- | :--- | :--- |
@@ -100,7 +101,7 @@ UI -[hidden]down-> UNIT
 | 対策 | 内容 |
 | :--- | :--- |
 | (a) H2 でしか通らない記述の禁止 | PostgreSQL の統合テストが正。H2 のために共通の DDL や SQL を曲げない（通らない文は PostgreSQL 側と H2 側に分ける） |
-| (b) ポートの契約テストを両実装で実行 | ポートの型は、H2 版にも合う形にする（**案。H5・N-H2。AI の案で承認を得ていない。B1 の最初に実測して確定する**）。`ProjectionLock` は **`ConnectionIO` の変換 `withShared(gameId)(program)`**（PostgreSQL 版は先頭で `pg_advisory_xact_lock_shared` を発行して同じトランザクションの中で保持し、COMMIT で自動解放する。H2 版はプロセス内の読み書きロックを `bracket` で取る）。接続は 1 本のままで、接続数の見積もりは増えない。`Resource` 案は不採用（コマンドごとに接続が 2 本要るため）。`ChangeNotifier` は**トランザクション内で集め、`Tx.run` の後に `IO` で配信**する（PostgreSQL 版は中で `pg_notify`）。同じ契約テストを、**PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト**で実行し、テスト用のインメモリ実装にも流す。H2 版で保証する範囲は、契約を満たす範囲のすべて |
+| (b) ポートの契約テストを両実装で実行 | ポートの型は、H2 版にも合う形にする（**案。H5・N-H2。AI の案で承認を得ていない。B1 の最初に実測して確定する**）。`ProjectionLock` は **`ConnectionIO` の変換 `withShared(gameId)(program)`**（PostgreSQL 版は先頭で `pg_advisory_xact_lock_shared` を発行して同じトランザクションの中で保持し、COMMIT で自動解放する。**H2 版は Kotlin 版と同じ構造（D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了。R-H5）**: `StampedLock` 系の部品（取得と解放のスレッドが違ってよい。`Fiber` は別スレッドで再開しうるため、所有スレッド固有の `ReentrantReadWriteLock` は使わない）に、**待ちの上限**（超えたら `RetryExhausted`）を置き、解放は **`Tx.run` が COMMIT・ROLLBACK の後に `guaranteeCase` で行う後始末**に登録する（COMMIT の前に解放しない。詳細は [バックエンドアーキテクチャ](./architecture-backend.md) を正本とする）。接続は 1 本のままで、接続数の見積もりは増えない。`Resource` 案は不採用（コマンドごとに接続が 2 本要るため）。`ChangeNotifier` は**トランザクション内で集め、`Tx.run` の後に `IO` で配信**する（PostgreSQL 版は中で `pg_notify`）。同じ契約テストを、**PostgreSQL 版は testcontainers-scala の統合テスト、H2 版は munit のユニットテスト**で実行し、テスト用のインメモリ実装にも流す。H2 版で保証する範囲は、契約を満たす範囲のすべて（**COMMIT の後まで直列化する条項は、H2 版も `Tx.run` の後始末を通して検証する。ロックの取得と解放が別スレッドになる場合を含める**）。通知の出所と契約の分類（(T)(N)）は [バックエンドアーキテクチャ](./architecture-backend.md) を正本とし、本書は写し（食い違えばバックエンドに従う。M13） |
 | (b-2) 契約の条項を分けて列挙する | 契約の条項を「**両実装に共通**」（ロックの排他と共有、コミット後にだけ通知が届く、ロールバックなら届かない（**この 2 つは、ポート単体でなく `execute` と `Tx.run` を通す契約**にする。コミット後にだけ届くことは `execute` が保証し、H2 版は `Committed.notices` から出るため。M8）、`EventStore` の追記の競合を `ConcurrencyConflict` に写す、`payload` の往復）と「**PostgreSQL だけ**」（`LISTEN` の再購読、追記専用の権限、部分一意索引、`jsonb`、複数プロセスの排他）に分けて列挙する。**制約名の取り出しと `json` の書き込みは H2 版独自のコード**のため、H2 版の契約テストに入れる（M11） |
 | (c) 受け入れは PostgreSQL | `@api` の受け入れと E2E の CI は PostgreSQL で実行する |
 
@@ -165,18 +166,26 @@ test("[US2.4/AC2.4.1] 自動確定が有効で3役割が入力済みのとき最
 | 項目 | Scala 版 |
 | :--- | :--- |
 | 不正な遷移（Kotlin 版の `InvalidTransition`） | `Evolution.Ignored` を返し、**例外を投げない**（SD2）。`handle` が作らない列（`SessionStarted` の前の `DecisionSaved` など）を与えると `Ignored` になり、状態が変わらないことを確かめる。**コマンドの経路で `Ignored` が出たら `AppFailure.Persistence`（fail closed）**になることは、アプリケーションのテストで確かめる（**止める設計の維持は、ユーザーの決定、2026-11-25**。利用者に見える変更と運用の扱いは [運用要件](./operation.md) のパターン 18） |
-| **許す組の表（N-H1。案。承認を得ていない）** | **EV-G01〜G12・EV-S01〜S10 × 状態の「許す組の表」を規範**にする（正本は [ドメインモデル](./domain-model.md)。`Started` の自己遷移を、状態遷移図と Kotlin 版の表に揃える。`Started` で受けるのは `RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`・`ObserverInvited`・`ObserverJoined` など。未知の参加者への `ParticipantReplaced` は `Ignored`）。**状態遷移テスト**は、この表から機械的に作る: 許す組（イベント × 状態）はすべて `Applied`、それ以外の組はすべて `Ignored` で、状態が変わらないことを確かめる。**スケッチ（`Events.apply` の `match`）を基準にして表を作らない**（スケッチの漏れを見逃すため。再レビューの N-H1）。止める設計では、許す組の漏れがそのまま研修の停止（P1）になるため、この表と状態遷移テストが安全性の中心になる |
-| 開始後の入れ替え・復帰（H2・N-H1。案） | `Started` で入れ替え（`RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`・`RoleHolderReplaced`）、開始後の復帰（`ParticipationRecovered`。US3.2、U2 の約束）、資格の再発行（`CredentialReissued`）、観察者の招待（`ObserverInvited`・`ObserverJoined`）を**自己遷移として受ける**（`Ignored` にしない）。**受入テスト（2 件を足す）**: (1) **「停止中に入れ替え → 代理入力 → 再開して確定」**（`Paused` の状態での入れ替えのあと、進行役が代理入力し、再開して週が確定する。現場で最も起きやすい流れ）、(2) **「入れ替え後の再開で新担当者だけが保存できる」**（旧担当者の再送は 403、新担当者の保存は成功）。Given は `SessionStarted` の後の入れ替えのイベント列。**入れ替えの受入は、共有の `apps/beer-game-features/continuation/credentials.feature`（`@AC3.2.5`）と二重にしない**: 共有のシナリオを許可リストに載せ、(1)(2) のうち共有側に無い部分だけを munit の `test("…")` で書く（M15。同ファイルの 113〜114 行の古いコメントの鮮度は B1 で確かめる）。**U2 の Bolt で書く**（旧記述の「B5 相当」を改めた） |
+| **許す組の表（N-H1。案。承認を得ていない）** | **EV-G01〜G12・EV-S01〜S10 × 状態の「許す組の表」を規範**にする（正本は [ドメインモデル](./domain-model.md)。`Started` の自己遷移を、状態遷移図と Kotlin 版の表に揃える。`Started` で受けるのは `RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`・`ObserverInvited`・`ObserverJoined` など。未知の参加者への `ParticipantReplaced` は `Ignored`。**表の行の列数（session は `Ended` を含む 7 列）、Kotlin 版の条件（例: `invited` は既知の招待で変えない、`revoked` は未知の主体と失効済みで変えない、`reissued` は失効していない資格で変えない、`recovered` は失効済みで変えない、`withRole` は未知の参加者で変えない）、EV-S04 の `Paused` の扱い（Kotlin 版の `EndReason` は `FINAL_WEEK` だけ）は、[ドメインモデル](./domain-model.md) の表を正本とする。** **D3（ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）: 失効済みの旧担当者の入れ替えでは、未失効の旧担当者にだけ `CredentialRevoked` を出す**ので、「失効 → 入れ替え」の自然な流れが `Ignored` にならない）。**状態遷移テスト**は、この表から機械的に作る**（(c)。次の「3 方向」）**: 許す組（イベント × 状態）はすべて `Applied`、それ以外の組はすべて `Ignored` で、状態が変わらないことを確かめる。**ただし、表から作るテストは、表と `apply` が一致することしか確かめない**（表自体の漏れ、つまり P1 の本当の原因を見逃す）ので、**コマンドから作る生成器 (a) と、表の ○ の出現の検査 (b) を併せて置く**（下の「プロパティベーステスト」の 3 方向。R-H4）。**スケッチ（`Events.apply` の `match`）を基準にして表を作らない**（スケッチの漏れを見逃すため。再レビューの N-H1）。止める設計では、許す組の漏れがそのまま研修の停止（P1）になるため、この表と状態遷移テストが安全性の中心になる |
+| 開始後の入れ替え・復帰（H2・N-H1。案） | `Started`（game）で入れ替え（`RoleAssigned`・`ParticipantReplaced`・`CredentialRevoked`）を受け、**`RoleHolderReplaced` は session のイベントで、受けるのは `Active`・`Paused`（`Started` ではない。L6）**。開始後の復帰（`ParticipationRecovered`。US3.2、U2 の約束）、資格の再発行（`CredentialReissued`）、観察者の招待（`ObserverInvited`・`ObserverJoined`）を**自己遷移として受ける**（`Ignored` にしない）。**受入テスト（4 件。[ドメインモデル](./domain-model.md) と同じ件数。M10・R-H3・R-H4）**: (1) **「停止中に入れ替え → 代理入力 → 再開して確定」**（`Paused` の状態での入れ替えのあと、進行役が代理入力し、再開して週が確定する。現場で最も起きやすい流れ）、(2) **「入れ替え後の再開で新担当者だけが保存できる」**（旧担当者の再送は 403、新担当者の保存は成功）、(3) **「失効 → 入れ替え → 新担当者が保存・確定 → 再生しても同じ状態」**（旧担当者の資格を先に失効させてから入れ替えても `Ignored` にならず、保存済みのイベントを最初から畳み込み直した状態が、途中の状態と一致する。D3 の穴を捕まえる）、(4) **「当週の旧担当者の入力が残り、新担当者に最新値と保存者が見える」**（Kotlin 版の `apps/beer-game-kotlin/app/src/test/kotlin/beergame/app/ContinuationHttpSpec.kt` の 615 行以降「入れ替え（開始後の assignRole）」に当たる。再レビューが挙げた「624 行」はこの付近で、**読んで確認した範囲は、入れ替え前の保存を新担当者が引き継ぐ流れまで**。最新値と保存者の見え方は、Scala 版のテストで新たに確かめる。`ReplaceRoleSpec.kt`（domain）には「失効済みの旧担当者の入れ替え」のテストがない）。Given は `SessionStarted` の後の入れ替えのイベント列。**入れ替えの業務上の出どころ**: AC3.2.5 の本文は「資格の失効と再発行」で、**開始後の入れ替えは Kotlin 版で足した業務ルール**（正本の受入条件に無い）。**共有 `credentials.feature` との分担（案）**: 共有の `@AC3.2.5` のシナリオは許可リストに載せるだけとし、(1)〜(4) は**共有の feature に Scala 専用のシナリオを書き込まず、munit の `test("…")` で書く**（共有ファイルは Kotlin 版・Rust 版に影響するため。M15。同ファイルの 111〜115 行のコメントは Kotlin 版の経緯のままで、「開始後に参加できる人はいない（入れ替えの対象は開始前に参加し、役割を持たなかった参加者だけ）」が (1)〜(4) のテストデータの前提になる）。**U2 の Bolt で書く**（旧記述の「B5 相当」を改めた） |
 | `match` の網羅 | `enum` の `match` の漏れは `-Werror` でコンパイルが失敗する（ガイド §9.2。確認済み）。**`_` で隠れた腕（`Events.apply` の最後の腕）と、文字列から読み戻す境界の `match` は型で止まらない**ため、性質テスト（`handle` が作る列は `Ignored` にならない）と、未知の値が失敗になるテストで守る（SD1、ガイド §9.2、§10.2） |
 | 数値のオーバーフロー | `Units`・`Money` は `Long`（SD7）。上限・下限の境界で、`Quantity` の範囲（0〜1000）と桁あふれが起きないことを確かめる。**`Long` の最大値の近くの境界テスト（`Units`・`Money` の加算・乗算が桁あふれしないか、または失敗として扱うか）を加える**（L8） |
-| golden | 既知の系列と期待値の組。**期待値は、Gherkin のようにデータファイル（JSON など）として置き、Kotlin 版・Rust 版と同じ値を 3 実装で検証する案**（L8。置き場は共有の `apps/beer-game-features/` を想定。承認を得ていない）。**遅延 0 を許すかは未決**（Kotlin 版と同じ）。キット準拠の需要系列は、JSD の値が確定するまで保留し、**カスタムの需要系列で書く** |
+| golden | 既知の系列と期待値の組。**期待値は、Gherkin のようにデータファイル（JSON など）として置き、Kotlin 版・Rust 版と同じ値を 3 実装で検証する案**（L8。置き場は共有の `apps/beer-game-features/` を想定。承認を得ていない）。**遅延 0 を許すかは未決**（Kotlin 版と同じ）。キット準拠の需要系列は、JSD の値が確定するまで保留し、**カスタムの需要系列で書く**。**紙で続けた後の追いつき（R-H9。案）**: 紙で続けた週の各役割の発注数を、復旧後に代理入力と週ごとの確定で入れ直したとき、紙の計算と同じ数字になるかは、golden（既知の系列と期待値）で確かめる候補とする（[運用要件](./operation.md) のパターン 18）。Kotlin 版・Rust 版の運用手順にも、この追いつきは無い |
 | 失敗の型 | 業務の失敗は `Either`、検証は `ValidatedNec`。**テストは `Either` の中身を `assertEquals` で確かめる**（`Left` を例外にしない。ガイド §8.1） |
 
 ## プロパティベーステストと代数構造の法則
 
 ### プロパティベーステスト
 
-munit-scalacheck（ScalaCheck 1.20.0）を使います（ガイド §8.3。ガイドの Zettai 版は ScalaCheck を入れず全パターンの列挙で足りたが、Scala 版は週次計算の不変条件を広い入力で守る必要があるため採る。ST5）。入力は、型（`Quantity`、`Week`、`RoleMap` など）の**有効な値だけを生成する `Gen`・`Arbitrary`** を値オブジェクトごとに用意します。**有効なコマンド列の生成**（状態に応じて、その時点で受理されうるコマンドを選ぶ）も用意します。**生成器は、上の「許す組の表」から導きます**（N-H1。案）。**開始後の復帰（`ParticipationRecovered`）、資格の再発行（`CredentialReissued`）、観察者の招待（`ObserverInvited`・`ObserverJoined`）、入れ替え（`Started` の自己遷移。H2 の案）を含めます**（含めないと、これらの列が `Ignored` にならないことを性質テストが守れない）。表に無い組を生成器が作らないことも、表との突き合わせで確かめます。**ScalaCheck に、状態に応じて操作を選ぶ操作列の機能があるかは確認していません**（なければ `Gen` を合成して自前に書く。確認した事項 2 は単純な `forAll` のみ）。
+munit-scalacheck（ScalaCheck 1.20.0）を使います（ガイド §8.3。ガイドの Zettai 版は ScalaCheck を入れず全パターンの列挙で足りたが、Scala 版は週次計算の不変条件を広い入力で守る必要があるため採る。ST5）。入力は、型（`Quantity`、`Week`、`RoleMap` など）の**有効な値だけを生成する `Gen`・`Arbitrary`** を値オブジェクトごとに用意します。**有効なコマンド列の生成**（状態に応じて、その時点で受理されうるコマンドを選ぶ）も用意します。**「`Ignored` にならない」性質は、表からではなく、コマンドから作る生成器で確かめます**（R-H4。案。承認を得ていない）。表から列を作ると、表と `apply` が一致することしか確かめられず、**表自体の漏れ（P1 の本当の原因）を見逃す**ためです。検査は 3 方向です。
+
+| 方向 | 内容 | 捕まえるもの |
+| :--- | :--- | :--- |
+| (a) コマンドから作る | 状態に応じたコマンド列（`handle`・`assignRoleAfterStart` を通す）を `foldLeft` し、**`Ignored` が 0 件**であること | 表の漏れ（`handle` が出すのに表が受けない組） |
+| (b) 表の ○ の出現 | 表の各 ○ の組が、(a) の列の中で N 回以上現れること（`collect`。N は B1 で決める） | 表が広すぎる（`handle` が決して作らない組を ○ にしている） |
+| (c) 表 × `apply` の全組 | 許す組は `Applied`、それ以外は `Ignored` で状態が変わらない（上の状態遷移テスト） | `apply` の腕の漏れ・余り |
+
+**生成器には、開始後の復帰（`ParticipationRecovered`）、資格の再発行（`CredentialReissued`）、観察者の招待（`ObserverInvited`・`ObserverJoined`）、入れ替え（`Started` の自己遷移。H2 の案）に加え、「失効 → 入れ替え」の流れを明示して含めます**（含めないと、これらの列が `Ignored` にならないことを性質テストが守れない。D3）。**表は、テストが読む値と同じ 1 か所から生成するか、テストで [ドメインモデル](./domain-model.md) の Markdown の表を読んで突き合わせます**（二重管理にしない。置き場は未決事項 16）。**ScalaCheck に、状態に応じて操作を選ぶ操作列の機能があるかは確認していません**（なければ `Gen` を合成して自前に書く。確認した事項 2 は単純な `forAll` のみ）。
 
 性質の一覧は、Kotlin 版と同じです。
 
@@ -215,7 +224,16 @@ munit-scalacheck（ScalaCheck 1.20.0）を使います（ガイド §8.3。ガ�
 
 （1）と（4）の commit・rollback の記録は、スタブの `Connection` で DB なしに書ける見込みです（確認した事項 8 は、旧案の合成子（`Tx.rollbackOnLeft`。不採用）を単体で確かめたもので、`Tx.run` そのものの確認ではありません）。**案（H4・N-H2）では、公開の入口を `Tx.run(program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]` だけにし、コマンドの `ConnectionIO` 全体（認証 → 冪等記録 → step → 投影 → 周辺ストア → 通知 → 冪等記録の保存）を 1 回で包む**。**ロックは `ConnectionIO` の変換（`withShared`）として `program` の中に入り、`transact` の外には出ない**（同じトランザクション内。PostgreSQL 版は `pg_advisory_xact_lock_shared`）。このため、`FC.rollback` の後に同じ `ConnectionIO` で書き込みが続いて新しいトランザクションとして COMMIT される経路がなくなる、と**推論**しています（**この「`FC.rollback` の後の書き込み」の挙動（K5）は未実行**で、B1 の最初のスライドで確かめます。事実として扱いません。M5）。スタブの検証は、呼び出し順の完全一致（`setAutoCommit, rollback, commit`）にせず、**「`Left` の経路で `rollback` が呼ばれ、それより前の書き込みが commit されない」「成功で `rollback` が呼ばれない」**に絞ります（doobie の `Strategy` の内部実装に依存しないため。M13）。
 
-その他のテスト（Kotlin 版と同じ）: 空のイベントは追記しない、結果が変わる場合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は再評価した結果を返す、冪等（同じキー・同じ内容は保存済みの応答、内容が違えば 409）、**処理の順（ロック → 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `handle` → 追記・投影。認可が冪等照合より先）**、失効した資格の再送は 403、冪等記録は成功だけ、制約ごとの再試行・再照合、周辺ストアに書かれイベントに含まれない、永続化の失敗で受理済みと表示しない、ログ・計測のラッパーが結果を変えず、ログに表示名・資格が含まれない（`LogRecord` に項目が無いことの型の検査）。**処理の順の検査**は、呼び出し順を記録するテスト用のポートで行います。
+その他のテスト（Kotlin 版と同じ）: 空のイベントは追記しない、結果が変わる場合（`DecisionConflict`、`WeekAdvanced`、`DecisionsChanged`、`AlreadyStarted`）は再評価した結果を返す、冪等（同じキー・同じ内容は保存済みの応答、内容が違えば 409）、**処理の順（ロック → 認証 → 認可の前提検査 → 冪等記録の照合 → 読み込み → `handle` → 追記・投影。認可が冪等照合より先）**、失効した資格の再送は 403、冪等記録は成功だけ、制約ごとの再試行・再照合、周辺ストアに書かれイベントに含まれない、永続化の失敗で受理済みと表示しない、ログ・計測のラッパーが結果を変えず、ログに表示名・資格が含まれない（`LogRecord` に項目が無いことの型の検査）。**処理の順の検査**は、呼び出し順を記録するテスト用のポートで行います。**処理の順（通知と冪等記録の保存の前後を含む）の正本は [バックエンドアーキテクチャ](./architecture-backend.md) で、本書の並びは写しです。食い違いがあればバックエンドに従う（M13）。**
+
+**`lock_timeout` と SQLSTATE の写像のテスト（R-H6。案。中核の設計は [バックエンドアーキテクチャ](./architecture-backend.md) を正本とする。承認を得ていない）**: `lock_timeout` は**ロックを取る間だけ**設定し（取った後に戻して、投影の行のロック待ちには効かせない）、例外で届く SQLSTATE を次のとおり写す。実 DB の統合テストで確かめる（B1 の最初のスライド）。
+
+| 検証 | 期待 |
+| :--- | :--- |
+| ロック待ちの超過（55P03） | `Left(RetryExhausted)`（503・`app.retry_exhausted`・`Retry-After`）を即返す。**中断したトランザクションで次の文を出さない** |
+| デッドロック（40P01）・直列化の失敗（40001） | `Tx.run` の後の `IO` で `ConcurrencyConflict` に写し、`loop`（再試行）に戻る。上限まで続けば `RetryExhausted` |
+| 投影の行のロック待ち | `lock_timeout` が効かない（ロックを取った後は `'0'` に戻っている）ので、平常時に 503 が出ない |
+| 例外のまま漏れない | 上記以外の例外は `Persistence`（500・相関 ID）。例外のまま画面に届かない |
 
 ### キャンセル安全性のテスト（Scala 固有。設計判断 STT4）
 
@@ -266,7 +284,8 @@ testcontainers-scala の PostgreSQL 18 を使い、**マイグレーションを
 | 型の生成物 | 仕様から生成した TypeScript の型が、コミット済みと一致（差分 0）。typecheck が通る | `openapi-typescript`（既存） |
 | 応答・リクエストの適合 | 実際のルートを呼び、成功の応答と problem+json が仕様のスキーマに適合する。未宣言の項目を検出する | JVM のスキーマ検査ライブラリ（Kotlin 版は `json-schema-validator`）を共有できる見込み。**採否と版は未確認**（[技術スタック](./tech-stack.md)）。Scala から呼べるかも未確認 |
 | エラー `code` の一致 | 仕様に載る `code` の一覧と、実装の `code` の全体を突き合わせる。**欠けても余っても失敗** | `enum` の `values` と、`match` の網羅で付けた `code`（SD4）を列挙して比較する。リフレクションは使わない（設計は未確認） |
-| ルートの網羅 | 実装のルートがすべて仕様にあり、仕様のルートがすべて実装にある | `HttpRoutes` から経路を列挙できるかは**未確認** |
+| ルートの網羅 | 実装のルートがすべて仕様にあり、仕様のルートがすべて実装にある。**ただし、U1〜U3 では実装しない操作の許可リスト（範囲外の操作）を持つ**（M9）: 共有の `openapi.yaml` には、U1〜U3 で実装しない操作がある（`getReview`（`GET /games/{gameId}/review`）・`getExport`（`GET /games/{gameId}/exports`）・`getRetention`（`GET /games/{gameId}/retention`）、観察系の `getObservation`・`inviteObserver`・`revokeObserverInvitation`・`joinAsObserver`。**観察（S07）は ADR-001 の U4 で、U1〜U3 の範囲外（決定済み）**）。許可リストなしでは、U1 の `check` ジョブが「仕様のルートが実装に無い」で落ちる。**許可リストは、U1〜U3 の `@AC`（AC の番号まで確定した一覧。M3）から導く**。範囲外の経路は、許可リストにあるあいだ、**実装されない（経路なし）ことを確かめる**（後で実装したら許可リストから外す） | `HttpRoutes` から経路を列挙できるかは**未確認** |
+| 「経路なし」の応答（M9・L5。案） | 範囲外の経路と、未知の経路・メソッド違いの応答を、**problem+json の `request.not_found`（404）に写すか**を、**同じ箇所（許可リストの検査）で決める**。`request.not_found` は `openapi.yaml` の `ErrorCode` に宣言されている（964 行付近）。**案 (a)**＝写す（`type` つき。画面は `ErrorNotice` で相関 ID を示せる。契約テストは「許可リストの外の経路は 404 の problem+json」を確かめる。AI の推奨）、**案 (b)**＝http4s の既定の応答のまま（JSON でない 404 で、**画面に相関 ID が出ない**。[UI 設計](./ui-design.md) の #16） | 既定の応答の形は**未確認**（[UI 設計](./ui-design.md) の #1） |
 | SSE | 版の通知の形を、仕様の記述と照合する。表せない部分は自前のテストで補う | 同上 |
 
 **契約テストの導入の時期は、Kotlin 版の B1・B2 と同じ**に設計し、「**仕様と実装を意図的にずらすと CI が落ちる**」ことを、最初の実装の受入条件にします（ローカルと GitHub Actions の両方で確認する）。
@@ -294,6 +313,7 @@ team の規約は**行 80% の floor**で、Kotlin 版は行 85%・分岐 75%（
 | テスト | 検証すること |
 | :--- | :--- |
 | 境界値 | 既知の値のフィクスチャ XML で、**79.9% は失敗、80.0% は成功**（例: 1000 行中 799 行・800 行を実行） |
+| 丸め（M15） | **7999/10000 = 79.99% は、表示の丸め（小数 1 桁）で 80.0% になっても失敗**。比較は**表示用の小数でなく、有理数か整数の積**（`実行された行 × 100 ≥ 80 × 計測対象の行`）で行う。800/1000・8000/10000 は成功。表示と判定を分ける |
 | XML が無い | 入力の XML が存在しない、または空のとき、**失敗**（緑にしない） |
 | 文が 0 件 | 計測対象の行が 0 件のとき、0 割りを起こさず、**失敗**（または明示のエラー） |
 | `ignored` | `ignored="true"` の文だけの行が、分母にも分子にも入らない |
@@ -304,7 +324,7 @@ team の規約は**行 80% の floor**で、Kotlin 版は行 85%・分岐 75%（
 
 **`domain` の文 97% は「目安」です（N-H6。ユーザーの決定、2026-11-25。ゲートにするかは B1 の実測後に決める）**。技術スタックの ST4・NF-O7・SN3 も同じ「目安（ゲートにするかは B1 の実測後）」に揃えます。**プロジェクトごとのしきい値を設定できるか（K16）は未確認**で、**設定できなければ、全体のしきい値だけにし、`domain` の 97% は目安のまま**（レポートで推移を見る）にします。
 
-**層ごとの目標（目安。下回っても失敗にしない。推移を見て見直す）**: `domain` は文 97% 以上（目安。上のとおり）、投影は文 100%、`application` は文 95%、`adapter-persistence` は文 90%（DB の統合を合算する前提）、`adapter-http` は文 90%、UI は Vitest で行 85%・分岐 80%（既存）。
+**層ごとの目標（目安。下回っても失敗にしない。推移を見て見直す）**: `domain` は文 97% 以上（目安。上のとおり）、投影は文 100%、`application` は文 95%、`adapter-persistence` は文 90%（DB の統合を合算する前提。**統合テストが U1 の CI の範囲に入る（D1）ことで成り立つ**。入らないと、行 80% が赤のままになりうる）、`adapter-http` は文 90%、UI は Vitest で行 85%・分岐 80%（既存）。
 
 **計測の範囲**: `domain`・`application`・`adapter-*` を対象とし、除外するのは起動部（`app` の `IOApp`）と設定の組み立てだけです。`coverageExcludedPackages` などの除外の指定が、実コードだけに効くかは実装開始時に確認します（**scoverage の生成コード・`enum` の扱いは未確認**）。
 
@@ -320,17 +340,17 @@ JVM に固有の項目（ウォームアップ、ヒープと GC、起動時間�
 
 | ID | Scala 版での検証 | 頻度 |
 | :--- | :--- | :--- |
-| NF-R9 | `ConnectionIO`・`IO` の失敗を返すポートに差し替える。**想定外の失敗が `AppFailure.Persistence` に写ること**、障害の注入。**加えて（N-H7・M14。パターン 18 の回帰）**: (a) **止まったストリームのイベント列をフィクスチャ**にし、遷移の表を直した版で `Applied` になり**操作を再開できる**（回帰テスト）、(b) **`Ignored` の件数のメトリクスが出る**、(c) `Ignored` で止まるとき、**500 に `type` と相関 ID が付き、書き込みが残らない**、(d) **止まったゲームでも、状態取得（GET の投影）は 200 で返る**（読み取りは止めない。B1 の確認項目。返せなければ、設計を見直す） | 毎回 |
+| NF-R9 | `ConnectionIO`・`IO` の失敗を返すポートに差し替える。**想定外の失敗が `AppFailure.Persistence` に写ること**、障害の注入。**加えて（N-H7・M14。パターン 18 の回帰）**: (a) **止まったストリームのイベント列をフィクスチャ**にし、遷移の表を直した版で `Applied` になり**操作を再開できる**（回帰テスト）、(b) **`Ignored` の件数のメトリクスが出る**、(c) `Ignored` で止まるとき、**500 に `type` と相関 ID が付き、書き込みが残らない**、(d) **止まったゲームでも、状態取得（GET の投影）は 200 で返る**（読み取りは止めない。B1 の確認項目。返せなければ、設計を見直す。**対象の経路は、B1 の受入条件の表の「止まったゲームの読み取り」の行のとおり、メソッドつきの 3 経路（観察は U4 で足す）**） | 毎回 |
 | NF-S10 | 境界値と悪意のある入力のテスト。`ValidatedNec` が誤りを全件集めること | 毎回 |
 | NF-S13 | CI の依存関係（**ツールは選定未決**）・秘密情報・静的解析（scalac、WartRemover、Scalafix）の検査 | 毎回 |
 | NF-O7 | scoverage のゲート（STT2）。**行 80%（案 C）が主たるゲート、文 85%・分岐 75% は暫定の追加のゲート、`domain` の文 97% は目安（ゲートにするかは B1 の実測後。N-H6）**。算出スクリプトのテスト（M7。STT2） | 毎回 |
-| NF-P2 | **B1 で、画面を通した実測か、GET の実測 + 3 秒間隔からの計算の推定かを決める**（B1 の受入条件の表の 1 行。M13）。**範囲外（U6）の性能を早めに計測することは約束ではない**。**対象（全ブラウザ）のうち S06（コンソール）は自動更新が無く測れない**（全実装共通の画面の課題。[UI 設計](./ui-design.md) 未決事項 8）ため、測るのは S05・S04・S07（ポーリングのある画面）に限る（NF-P2 の p99 を外したのは AI の解釈） | 実測は B1 以降 |
+| NF-P2 | **B1 で、画面を通した実測か、GET の実測 + 3 秒間隔からの計算の推定かを決める**（B1 の受入条件の表の 1 行。M13）。**範囲外（U6）の性能を早めに計測することは約束ではない**。**対象（全ブラウザ）のうち S06（コンソール）は自動更新が無く測れない**（全実装共通の画面の課題。[UI 設計](./ui-design.md) 未決事項 8）ため、測るのは S05・S07（ポーリングのある画面）に限る（NF-P2 の p99 を外したのは AI の解釈）。**S04（ロビー）は、ポーリングが準備中だけで、週確定の反映の対象ではないので外す**（L4）。**「同一の時計（確定した側のブラウザの時刻）」は、複数端末では成り立たない**ため、B1 では**同じ機械の複数タブ**で測る前提を置く（L4。端末をまたぐ測定は、時計のずれを別に見積もる） | 実測は B1 以降 |
 | NF-P4 | **現行のポーリング（3 秒間隔）で、確定から 4 秒以内に最新の版を表示する**ことを、**分位（p95。AI の案）**を付けて測る。**Play は 1 回に GET を直列で 2 回**取り（`/games/{id}/state` のあとに `/sessions/{id}/state`）、保存中・操作中は取り直しを飛ばし、失敗は黙って無視するため、**6 秒を超える場合がありうる**（構造上、最大でも 4 秒を保証できない）。したがって、NF-P4 は「p95 で 4 秒」を測る目標にとどめ、最大値の保証にしない | 実測は B1 以降 |
 | NF-P7・NF-C1・NF-C3・NF-C5（SSE に依存する部分）| **画面が SSE を使わない**ため、画面を通した E2E では検証できない（M12）。**API 層（HTTP の統合テスト、夜間の負荷試験）での検証に移す、または画面が SSE を使い始めるまで保留**。SSE を使わない範囲（ポーリングの GET の負荷、接続数）は、通常の負荷試験で測る | 保留（API 層で確認） |
 | NF-O8 | scalac のオプション（違反 0）、`scalafmtCheckAll`、WartRemover、Scalafix、ルールの fixture テスト | 毎回 |
 | NF-O12 | JVM と cats-effect の実行環境のメトリクスの契約テスト（取得方法は未確認） | 毎回 |
 | NF-SC1 | 上の「キャンセル安全性のテスト」 | 毎回（統合）、夜間（実測） |
-| NF-SC2 | `execute` の性質（1）〜（4）と、実 DB で `Left` の行が残らないこと。**Scalafix の `DisableSyntax.regex` の 2 方向の検査**（案。N-H3）: 「落ちるべきもの」（`application`・`adapter-persistence` に置いた `.transact(`・`.transact[IO](`・`FC.commit`・`xa.trans`・`scalafix:off`）で CI が落ち、「落ちてはならないもの」（許可した入口 `Tx`・`ReadTx`・`ModeTx`・テストの補助）で落ちないこと（下の「Scalafix の受け入れ条件」）。**加えて（N-H7・M14）: 止まったゲーム（`Ignored`）の書き込みが残らず、500 に `type` と相関 ID が付くこと**（NF-R9 の (c) と同じ検査） | 毎回 |
+| NF-SC2 | `execute` の性質（1）〜（4）と、実 DB で `Left` の行が残らないこと。**Scalafix の `DisableSyntax.regex` の 2 方向の検査**（案。N-H3・R-H7）: 「落ちるべきもの」（**`Transactions.scala` 以外の全 `Compile` のソース**に置いた `.transact(`・`.transact[IO](`・`\.trans\b`・`\.rawTrans\b`・`FC.commit`・`scalafix:off`、**テスト本体の `.transact(`**）で CI が落ち、「落ちてはならないもの」（`Transactions.scala` の入口、`TestTx`、文字列・コメントの中の語）で落ちないこと。**受け入れ条件は 1 つの表にまとめた**（下の「Scalafix の受け入れ条件」。architecture-backend・tech-stack と同じ表）。**加えて（N-H7・M14）: 止まったゲーム（`Ignored`）の書き込みが残らず、500 に `type` と相関 ID が付くこと**（NF-R9 の (c) と同じ検査） | 毎回 |
 | NF-SC3 | CI の依存の検査（`domain` が `cats-core` だけ）と、Scalafix・WartRemover の違反 0 | 毎回 |
 | NF-SC4 | cats-laws の法則のテスト、`empty` を壊した実装が落ちること | 毎回 |
 
@@ -355,12 +375,12 @@ JVM に固有の項目（ウォームアップ、ヒープと GC、起動時間�
 | scalac のオプション | 警告をビルドの失敗にする | `-deprecation -feature -Werror -Wunused:all -Wvalue-discard -Wnonunit-statement`。`enum` の `match` の漏れもここで止まる（確認済み） |
 | Scalafmt 3.11.5 | 整形 | CI で `scalafmtCheckAll`。設定は `.scalafmt.conf` |
 | WartRemover 3.6.3 | 関数型の規約の中心 | ガイド §9.4 の 13 個の Wart。Scala 3.7.4 で `var`・`head` の拒否は確認済み（[技術スタック](./tech-stack.md)） |
-| Scalafix（sbt-scalafix 0.14.10） | 副作用を持つ呼び出しの禁止 | `DisableSyntax.regex`（`println`、`System.currentTimeMillis`・`nanoTime`、`Thread.sleep`、`unsafeRun*`、**`.transact(`・`.transact[`・`xa.trans`・`FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`**。**許可する入口は `Tx`・`ReadTx`・`ModeTx`・`LISTEN` の専用接続で、同じファイルに置き、Scalafix の除外はそのファイルの 1 か所だけ**にする。**`scalafix:off` は使わない**。N-H3・H4 の案で承認を得ていない）。**sbt の `scalafix --check` で、Scala 3 のインデント構文のソースを解析して報告できることを確認した**（確認した事項 9）。`scalafixAll` は未確認 |
+| Scalafix（sbt-scalafix 0.14.10） | 副作用を持つ呼び出しの禁止 | `DisableSyntax.regex`（`println`、`System.currentTimeMillis`・`nanoTime`、`Thread.sleep`、`unsafeRun*`、**`.transact(`・`.transact[`・`\.trans\b`・`\.rawTrans\b`・`FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`**。**パターンはメソッド名で書き、変数名（`xa`・`writeXa`・`transactor` など）に依存しない**。**許可する入口は `Transactions.scala`（`Tx`・`ReadTx`・`ModeTx`）の 1 ファイルで、Scalafix の除外はそのファイルの 1 か所だけ**にする。**`scalafix:off` は使わない**（`DisableSyntax.regex` で検出できるかは未確認の一覧（K15）に足す）。N-H3・H4・R-H7 の案で承認を得ていない）。**sbt の `scalafix --check` で、Scala 3 のインデント構文のソースを解析して報告できることを確認した**（確認した事項 9）。`scalafixAll` は未確認 |
 
 | 規約 | 守り方 |
 | :--- | :--- |
 | `var`・`null`・`throw`・`return`・可変コレクション・`head` などの部分関数・`asInstanceOf` | WartRemover の `Var`・`Null`・`Throw`・`Return`・`MutableDataStructures`・`IterableOps`・`OptionPartial`・`TryPartial`・`EitherProjectionPartial`・`AsInstanceOf`・`IsInstanceOf`・`TripleQuestionMark`・`DefaultArguments` |
-| 副作用・トランザクションの入口 | Scalafix の `DisableSyntax.regex`。**`.transact(` などの直接の呼び出しを、許可した入口のファイルの外で禁止し、書き込みの公開の入口を `Tx.run` だけにする**（H4・N-H3 の案）。「型の上で作れなくする」とは言わない（文字列のパターンで、別名やラッパーの中の呼び出しは見逃す）。`domain` では `Random`・`UUID.randomUUID`・`cats.effect` の `import` も禁止 |
+| 副作用・トランザクションの入口 | Scalafix の `DisableSyntax.regex`。**`.transact(` などの直接の呼び出しを、許可した入口のファイル（`Transactions.scala`）の外で禁止し、書き込みの公開の入口を `Tx.run` だけにする**（H4・N-H3・R-H7 の案）。読み取りの入口 `ReadTx` は `application` の trait で、生の `Transactor` は `application` に置かない（M12。中核の設計は [バックエンドアーキテクチャ](./architecture-backend.md) を正本とする）。「型の上で作れなくする」とは言わない（文字列のパターンで、別名やラッパーの中の呼び出しは見逃す）。`domain` では `Random`・`UUID.randomUUID`・`cats.effect` の `import` も禁止 |
 | 層の依存 | sbt の `dependsOn` と、`domain` の `libraryDependencies` が `cats-core` だけであることの検査（方式は未確認）。`application` は `http4s`・`circe`・`doobie-postgres`・`doobie-hikari` を持たない |
 | `match` の網羅 | `-Werror` が `enum` の漏れを止める。**`_` を使う腕・文字列から読み戻す境界は型で止まらない**ため、性質テストとレビューで守る |
 | `IO` を実行する場所 | **ルールでは表せない**（ガイド §9.4）。レビューで守り、Scalafix の `unsafeRun*` の禁止が補助（文字列のパターンで、別名や間接の呼び出しは見逃す） |
@@ -378,7 +398,7 @@ JVM に固有の項目（ウォームアップ、ヒープと GC、起動時間�
 | `application` | 全ルールを有効 | なし |
 | `adapterHttp`・`adapterPersistence` | 全ルールを有効。境界の都合で必要なものだけ外す | 例: 外部ライブラリの例外（`PSQLException`）の型の判定が `IsInstanceOf`・`AsInstanceOf` に当たる場合に限り、その Wart。外すルールと範囲は ADR に記録（**当たるかは未確認**） |
 | `app` | 境界として扱う | `IOApp` の `run` で `IO` を実行する部分（`unsafeRun*` の禁止は適用外）。`println` は使わない |
-| テスト（ステップ定義を含む） | scalac のオプションと Scalafmt は有効。**WartRemover は適用しない**（ガイド §9.4「テストには適用しない」）。Scalafix の `DisableSyntax` は**テストのソースにも有効**にし、`unsafeRun*` だけテストの境界として許す。**統合テストの準備と検証の SQL は、`.transact(` を直接書かず、テストの補助の入口（`TestTx` など。テストのソースの 1 ファイル）を通す**。除外はこの補助のファイル 1 か所だけで、テストの本体からの `.transact(`・`xa.trans`・`FC.commit` は禁止（`scalafix:off` も使わない。N-H3。案） | **外し方は `Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))`**（`Test / wartremoverErrors := Seq.empty` では外れない。確認した事項 10）。`Thread.sleep` は外さない（`IO.sleep` と `TestControl` 相当の仮想時間を使う。**後者は未確認**） |
+| テスト（ステップ定義を含む） | scalac のオプションと Scalafmt は有効。**WartRemover は適用しない**（ガイド §9.4「テストには適用しない」）。Scalafix の `DisableSyntax` は**テストのソースにも有効**にし、`unsafeRun*` だけテストの境界として許す。**統合テストの準備と検証の SQL は、`.transact(` を直接書かず、テストの補助の入口（`TestTx`。テストのソースの 1 ファイル）を通す**。除外はこの補助のファイル 1 か所だけで、**テスト本体からの `.transact(`・`.trans`・`.rawTrans`・`FC.commit` も落ちる**（`scalafix:off` も使わない。N-H3・R-H7。案） | **外し方は `Test / scalacOptions ~= (_.filterNot(_.startsWith("-P:wartremover")))`**（`Test / wartremoverErrors := Seq.empty` では外れない。確認した事項 10）。`Thread.sleep` は外さない（`IO.sleep` と `TestControl` 相当の仮想時間を使う。**後者は未確認**） |
 
 緩和は**プロジェクト単位**で、`@SuppressWarnings` は使いません。外したルールの新規違反は、その層では検出されなくなります。この粗さは、**人の承認が要ります**（記録は ADR-001 の引き継ぎ表の 011 の行の緩和の記録。Scala 版での承認は未取得）。
 
@@ -392,35 +412,47 @@ JVM に固有の項目（ウォームアップ、ヒープと GC、起動時間�
 - [ ] WartRemover と Scalafix が、全プロジェクトで違反 0、ベースラインなし、`@SuppressWarnings` なしで緑（層単位の緩和は ADR で承認）
 - [ ] `scalafixAll --check` が、全プロジェクトのインデント構文のソースを解析できる（**`Compile/scalafix --check` のみ確認済み**）
 
-**Scalafix の `.transact(` の受け入れ条件（2 方向。N-H3。案。承認を得ていない）**: 「落ちるべきもの」だけを確かめると、読み取り側とテストの正しいコードが落ちる。「落ちてはならないもの」も同じ重さで確かめる。
+**Scalafix の `.transact(` の受け入れ条件（2 方向。N-H3・R-H7。案。承認を得ていない。1 つの表にまとめ、[バックエンドアーキテクチャ](./architecture-backend.md)・[技術スタック](./tech-stack.md) と同じ判定にする）**: 「落ちるべきもの」だけを確かめると、読み取り側とテストの正しいコードが落ちる。「落ちてはならないもの」も同じ重さで確かめる。**規則は、「落ちるべき」ソースを「`Transactions.scala` 以外の全 `Compile` のソース」とする**（`application`・`adapter-http`・`adapter-persistence`・`app` のどこに置いても落ちる）。テストのソースは、`TestTx` の 1 ファイルだけを除いて落ちる。
 
 | 方向 | 置くコード | 期待 | 置き場 |
 | :--- | :--- | :--- | :--- |
-| **落ちるべきもの** | `.transact(xa)` の直接の呼び出し | CI が落ちる | `application` |
-| | `.transact[IO](xa)`（型引数つき） | 落ちる | `application`・`adapter-persistence` |
-| | `xa.trans`・`xa.rawTrans` | 落ちる | `adapter-persistence` |
-| | `FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`（入口の外） | 落ちる | `adapter-persistence` |
-| | `scalafix:off`（無効化コメント） | 落ちる（ADR-001 の 011 の行） | 全プロジェクト |
-| **落ちてはならないもの** | 許可した入口（`Tx`・`ReadTx`・`ModeTx`、`LISTEN` の専用接続）のファイルの `.transact(` | 落ちない | `adapter-persistence` の入口のファイル（除外は 1 か所） |
-| | テストの補助の入口（`TestTx` など）の `.transact(` | 落ちない | テストのソースの補助のファイル（1 か所） |
-| | 入口を呼ぶ側（`Tx.run(program)`、`ReadTx.run(query)`） | 落ちない | `application`・`adapter-persistence` |
-| | 文字列・コメントに含まれる `transact` という語 | 落ちない（規則の適用範囲の確認。**`DisableSyntax.regex` が文字列の中を拾うかは未確認**。拾うなら、ルールの書き方を直す） | 全プロジェクト |
+| **落ちるべきもの** | `.transact(xa)` の直接の呼び出し | CI が落ちる | `Transactions.scala` 以外の全 `Compile` のソース（例: `application`・`adapter-http`・`adapter-persistence`） |
+| | `.transact[IO](xa)`（型引数つき） | 落ちる | 同上 |
+| | `.trans`・`.rawTrans` の呼び出し（**パターンは `\.trans\b`・`\.rawTrans\b`。変数名（`xa`・`writeXa`・`transactor`）に依存しない**） | 落ちる | 同上 |
+| | `FC.commit`・`FC.rollback`・`HC.commit`・`HC.rollback`（入口の外） | 落ちる | 同上 |
+| | `scalafix:off`（無効化コメント） | 落ちる（ADR-001 の 011 の行。**`DisableSyntax.regex` で検出できるかは未確認の一覧（K15）に足す**） | 全プロジェクト |
+| | **テスト本体の `.transact(`** | 落ちる（`TestTx` 以外では使えない） | テストのソース（`TestTx` の 1 ファイルを除く） |
+| **落ちてはならないもの** | 許可した入口（`Tx`・`ReadTx`・`ModeTx`）のファイル `Transactions.scala` の `.transact(` | 落ちない | `adapter-persistence` の入口のファイル（除外は 1 か所） |
+| | テストの補助の入口 `TestTx` の `.transact(` | 落ちない | テストのソースの補助のファイル（1 か所） |
+| | 入口を呼ぶ側（`Tx.run(program)`、`ReadTx` の読み取り） | 落ちない | `application`・`adapter-persistence` |
+| | **文字列・コメントに含まれる `transact`・`trans` という語** | 落ちない（**`DisableSyntax.regex` が文字列の中を拾うかは未確認**。拾うなら、ルールの書き方を直す。期待は「落ちない」） | 全プロジェクト |
+
+**2 方向の検査は、一度きりの確認でなく、違反するコードとしないコードの fixture と期待件数のテストとして `check` に入れる**（M14。回帰テストにする）。fixture の置き場、「Scalafix を fixture に対して実行して違反の件数を数える」方式は B1 で決める（**未確認**）。期待件数がずれる（ルールを緩めた、または fixture を消した）と `check` が落ちる。
 
 テストのソースに `DisableSyntax` を適用する範囲（案）: **テストにも有効**（`println`・`Thread.sleep`・`.transact(` などを禁止）。統合テストの準備と検証の SQL は、テストの補助の入口（1 ファイル）を通す。**除外の設定が書けるか（ファイル単位の除外の書き方。`scalafixAll` を含む）は未確認**で、B1 で確かめる。確かめられなければ、除外ではなく、入口を別の sbt プロジェクトに分ける案へ切り替える（人の承認が要る）。
 
 ## CI との連携
 
-team の規約（`aidlc/active-memory/team.md`）により、**CI と deploy のワークフローは beer-game3 用とは別に新しく作ります**（`.github/workflows/beer-game-scala.yml`。**未作成**）。formatter・linter・type-check を CI で実行し、失敗した変更はマージしません。
+team の規約（`aidlc/active-memory/team.md`）は、beer-game3 について「CI と deploy のワークフローを beer-game3 用に別に新しく作る」と書いています。**この規約が beer-game-scala に及ぶかは、人の承認の場で確認します（M1・D5）。及ぶものとして読み**、Scala 版の CI と deploy のワークフローも**別に新しく作ります**（`.github/workflows/beer-game-scala.yml`。**未作成**）。formatter・linter・type-check を CI で実行し、失敗した変更はマージしません。
 
-**範囲（N-H4。ユーザーの決定、2026-11-25）**: **検証用の CI（`check` ジョブ 1 本。Scalafmt、コンパイル `-Werror`、WartRemover、Scalafix、テスト、カバレッジ）は U1 の約束に含めます。** B1 の受入条件の「CI が落ちる」は、この `check` ジョブで判定します。**AWS 環境と、デプロイ用のワークフロー（インフラの SI5 のうち `deploy` 側）、ステージングへの自動反映は後回し（U5）です。** team の規約は「`main` の merge で staging へ自動反映」を求めるため、**自動反映を持たない間の例外は、ADR に記録して人が承認します**（ADR-001 は別担当。承認を得るまでは規約との衝突が残る）。U1〜U3 の間は実際の研修に使わないため、この例外が研修に影響することはありません。
+**範囲（N-H4。ユーザーの決定、2026-11-25）**: **検証用の CI（`check` ジョブ 1 本。Scalafmt、コンパイル `-Werror`、WartRemover、Scalafix、テスト、カバレッジ）は U1 の約束に含めます。** B1 の受入条件の「CI が落ちる」は、この `check` ジョブで判定します。**AWS 環境と、デプロイ用のワークフロー（インフラの SI5 のうち `deploy` 側）、ステージングへの自動反映は後回し（再開するときに Unit を決める。L2）です。**
+
+**U1 の約束の範囲（R-H2・D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）**: **U1 の約束は、ジョブの本数ではなく検証の範囲**です。**統合テスト（PostgreSQL 18、testcontainers-scala）と `@api` の受け入れテストの CI 実行を、U1 の約束に含めます**（案 (a)。案 (b)＝代わりの条件を `check` の範囲に縮めてリスクを例外の節に書く、は採らない）。理由は 3 つです。(1) ADR-001 の「例外の間の条件」（Testcontainers の統合テストと受け入れテストを CI で実行）を U1 で満たさないと、例外を承認しても趣旨が守られない。(2) team の Testing Posture「主要境界の Integration Test を CI で実行」が、デプロイ以外の例外でカバーされない。(3) `adapter-persistence` の文 90%（層ごとの目標）は DB の統合を合算する前提で、統合が CI に無いと行 80% が赤のままになりうる。**実現の形は 2 案で、人が決める**: **案 X**＝`check` ジョブに統合テストと `@api` の受け入れを含める（ジョブは 1 本のまま。時間が延びる）、**案 Y**＝別ジョブ `integration`・`acceptance` を U1 に足す（[インフラ](./architecture-infrastructure.md) の SI5 の表のとおり。`check` は速く保てる）。**ADR-012 のコンプライアンス（CI で Undefined・Pending があれば失敗）は、`@api` の受け入れが U1 の範囲に入ることで、U1 で果たせます**（旧記述では、`acceptance` ジョブが範囲に入るまで果たせなかった。L3）。下の CI の図の「毎回」は、**U1 で約束する範囲（`check`、統合、`@api` の受け入れ）と、対応する検証が範囲に入る Bolt で足す工程（フロントエンド、`@ui`、e2e、`container`、`n1`、`infra` など）を区別して読みます**（M16）。 team の規約は「`main` の merge で staging へ自動反映」を求めるため、**自動反映を持たない間の例外は、ADR に記録して人が承認します**（ADR-001 は別担当。承認を得るまでは規約との衝突が残る）。U1〜U3 の間は実際の研修に使わないため、この例外が研修に影響することはありません。
 
 ```plantuml
 @startuml
 title CI のテスト実行（Scala 版。提案）
 
 start
-:プルリクエスト / main へのプッシュ;
-partition "毎回" {
+:プルリクエスト / develop・main へのプッシュ;
+note right
+  「毎回」の工程のうち、U1 で約束するのは
+  静的解析・契約・ユニット・統合・カバレッジ・
+  @api の受け入れまで（D1）。
+  フロントエンド以降は、対応する検証が
+  範囲に入る Bolt で足す（M16）
+end note
+partition "毎回（図の全体。U1 で約束するのは上の注のとおり）" {
   :scalafmtCheckAll、コンパイル（-Werror）、WartRemover、scalafixAll --check\n違反 0、ベースラインなし、抑制なし（無効化コメントなし）;
   :静的解析の検査（規約違反のコードで CI が落ちること）;
   :API の契約（仕様の検証 → 型の生成 → 型の検査）;
@@ -453,7 +485,9 @@ stop
 | 失敗の記録 | Playwright のトレースとスクリーンショット、**ScalaCheck の反例**、JUnit XML、scoverage のレポートを保存する |
 | 定期実行の結果 | 負荷試験と計測の結果を保存し、推移を確認する |
 | デプロイ | team の規約: `main` の merge で staging へ自動反映、production は手動承認。**本書では扱わない**（インフラ設計・運用の文書で定める）。**U1〜U3 では、デプロイ用のワークフローと自動反映を持たない**（N-H4。例外は ADR に記録して人が承認） |
-| カバレッジのジョブ | 行率を算出できない間（XML が無い、スクリプトが失敗）は、**ジョブを失敗のまま**にする（M7）。基準を下げて緑にしない |
+| カバレッジのジョブ | 行率を算出できない間（XML が無い、スクリプトが失敗）は、**ジョブを失敗のまま**にする（M7）。基準を下げて緑にしない。**ジョブが赤の間はマージが止まる**（team の規約: 失敗した変更はマージしない）。そのため、**算出スクリプトとそのテストは、B1 の最初のスライドに置く**（赤のまま長く止めないため。M15）。「手元で緑なら CI も緑」とは扱わず、**CI の `check` ジョブの結果を正とする**（N-H4） |
+| U1 の範囲（D1） | `check`・統合・`@api` の受け入れ。実現は案 X（`check` に含める）か案 Y（別ジョブ `integration`・`acceptance` を U1 に足す）で、人が決める。**統合が CI に無い間は、`adapter-persistence` の行率が合算にならず、行 80% が赤のままになりうる** |
+| トリガー（L7） | `pull_request` と、`develop`・`main` へのプッシュ（team の規約: `develop` で統合し、リリース時に `main` へ。[インフラ](./architecture-infrastructure.md) の SI5 と同じ） |
 
 ## トレーサビリティ（ユーザーストーリー → テスト）
 
@@ -461,7 +495,7 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 
 - **Gherkin のシナリオ**: タグ `@US<番号>`・`@AC<番号>` と層のタグから抽出し、cucumber-scala の実行結果と突き合わせる。**実行結果の形式（JSON、JUnit XML など）は、cucumber-core 8.1.0 が出せるものを B1 で確認して選ぶ**。
 - **munit のテスト**: テスト名の `[US…/AC…]`（STT1）を、sbt が出す JUnit XML（確認した事項 1）から抽出する。
-- **許可リストの導き方（M18。案）**: `@api` の許可リストは、**U1〜U3 の Unit 定義の受入条件（`@AC` タグ）から機械的に導く**（手で選ばない）。許可リストの外のシナリオは、通ると数えない（下の価値の指標）。Must のストーリーのパリティの指標では、**U1 の US6.1・US6.2（ステージングまで）は、デプロイ用ワークフローを後回しにする範囲（N-H4）のため、U1〜U3 の約束の外として扱う**（指標の分母から外すか、未達として別枠に出すかは人が決める）。
+- **許可リストの導き方（M18・M3。案）**: `@api` の許可リストは、**U1〜U3 の受入条件（`@AC` タグ）から機械的に導く**（手で選ばない）。**ただし、unit_definition の U1〜U3 には AC の番号まで書かれていない項目がある**（US1.2 共同担当を除く、US6.1 基本、US6.2 ステージングまで、US3.1、US3.2、US2.4）ため、書いたとおりには実行できない。**入力は、B1 の計画で確定する「U1〜U3 の AC の一覧（AC の番号まで。人の承認つき）」**とし、それを入力にして導く。許可リストの外のシナリオは、通ると数えない（下の価値の指標）。**U1 の US6.1 は、AC6.1.1・6.1.2・6.1.4 を約束に入れる**（D2。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了。共有の features に `@AC6.1.1`・`@AC6.1.4` が実在する。**`@AC6.1.2` のシナリオは共有の features に無い**（`apps/beer-game-features` を検索して確認。user_story.md の AC6.1.2 は ✗）ので、AC6.1.2 は munit の `test("[US6.1/AC6.1.2] …")` で保証する。共有の feature に足すかは人が決める）。AC6.1.3（メトリクス）と AC6.1.5・6.1.6（通知）は約束の外。**US6.2（ステージングまで）のうち、デプロイ用ワークフローと自動反映は後回し（N-H4）のため約束の外**で、指標の分母から外すか、未達として別枠に出すかは人が決める（旧記述の「US6.1・US6.2 は約束の外」は、ADR-001 と逆だったため直した。R-H1）。
 - **整合の検査**: ストーリー・受入条件の一覧（[ユーザーストーリー](../../requirements/beer-game-ts/user_story.md)）に存在しない ID、受入条件に対応するシナリオまたはテストが無いものを検出する。厳しさ（警告か失敗か）は未決事項。
 
 ## B1 の受入条件（未確認の前提を、観察できる形にする）
@@ -470,17 +504,22 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 
 | 前提 | 合否の基準（観察できる形） | 成り立たなければ |
 | :--- | :--- | :--- |
-| `Fiber` の取消と ROLLBACK | STT4 の測定: 取消から ROLLBACK までの時間と、その間のロック・接続の状態を記録する。**失敗の経路の明示の ROLLBACK で、ロックと接続が一定時間内に解放される** | SBD2・SBD4 の見直し（明示の ROLLBACK を唯一の手段にする。取消の保険を外す） |
+| `Fiber` の取消と ROLLBACK | STT4 の測定: 取消から ROLLBACK までの時間と、その間のロック・接続の状態を記録する。**失敗の経路の明示の ROLLBACK で、ロックと接続が 2 秒以内に解放される**（案。NF-SC1 と同じ上限。先に置き、測定が合格するよう後から決めない） | SBD2・SBD4 の見直し（明示の ROLLBACK を唯一の手段にする。取消の保険を外す） |
 | 並行時の制約名 | 複数の `Fiber` の同時の追記で、一方だけが成功し、他方が `uq_events_stream_version` の違反から `ConcurrencyConflict` に写る | エラーの SQLSTATE とメッセージから判別する方式へ変更（脆いため ADR で記録） |
 | scoverage | **統合テストの計測が合算される**、**しきい値を割ると失敗する**（後者は確認済み）、`domain` だけ高いしきい値にできる（K16。**設定できなければ全体のしきい値だけにし、`domain` の 97% は目安のまま**。N-H6）、**XML の文の行番号から行率を算出でき、行 80% で失敗にできる**（案 C。算出スクリプトのテスト（M7）が通る） | 層ごとの目標を目安にとどめ、全体だけをゲートにする。**行を出せなければ、文の率での代替を team の「行 80%」とみなしてよいかを、人が再度決める** |
-| ScalaCheck の操作列 | **`Events.apply` の腕を 1 つ消すと、性質テストが落ちる**。生成列の分類（M19）の下限を判定できる | `Gen` の合成で自前に書く |
+| ScalaCheck の操作列 | **(a)** `Events.apply` の**腕を 1 つ消すと、(c)（表 × `apply` の全組）が落ちる**。**(b)** 許す組の**表の ○ を 1 つ × に変えると、(a)（コマンドから作る生成列の `Ignored` が 0 件）が落ちる**（表の漏れを捕まえる。R-H4）。「失効 → 入れ替え」の列が生成され、D3 の穴を入れ戻す（旧担当者の `CredentialRevoked` を無条件に出す）と落ちる。生成列の分類（M19）の下限を判定できる | `Gen` の合成で自前に書く |
+| `lock_timeout` と SQLSTATE の写像（R-H6） | 55P03 は `Left(RetryExhausted)`（503）、40P01・40001 は `Tx.run` の後に `ConcurrencyConflict` へ写って再試行に戻る。**`lock_timeout` はロックを取る間だけ**で、投影の行のロック待ちに効かない。中断したトランザクションで次の文を出さない | `withShared`/`withExclusive` を Kotlin 版と同じ手順に直す（[バックエンドアーキテクチャ](./architecture-backend.md)） |
+| H2 版のロックの直列化（R-H5・D4） | 取得と解放が別スレッドになっても解放できる（`StampedLock` 系）。待ちの上限を超えると `RetryExhausted`。解放は COMMIT・ROLLBACK の後の後始末で、COMMIT の前に解放しない。契約テストを H2 版にも実行する | `FOR UPDATE` のロック行（H2 での動作は未確認）を別案として試す |
+| Scalafix の fixture（M14） | 違反するコードとしないコードの fixture に対し、期待件数が一致することが `check` の中のテストになっている（ルールを緩める・fixture を消すと `check` が落ちる） | fixture 方式が書けなければ、一度きりの確認 + レビューにとどめる（人が決める） |
 | cucumber-scala | `acceptance` プロジェクトから、共有の `.feature` を実行でき、`@api` の許可リストの外を実行しない | 別の起動方式（CLI を直接呼ぶ） |
 | testcontainers | **`postgres:18.6` のタグを固定したコンテナ**を起動し、`CI` 環境変数があり Docker が無いとき失敗する（起動は確認済み） | サービスコンテナの接続先を環境変数で渡す方式 |
 | 静的解析 | 規約違反のコードを実際に置いて、`check` ジョブが落ちる。**`.transact(` の 2 方向の表**（落ちるべきもの・落ちてはならないもの）も通る（STT3 の最初のビルドの受入条件） | 依存の制限とレビュー・性質テストで守る |
 | 契約テストのスキーマ検証 | 応答・リクエストを `openapi.yaml` のスキーマで検査でき、**未宣言の項目を検出できる**。**仕様と実装を意図的にずらすと CI が落ちる** | 別の道具、または自前の検査 |
-| 止まったゲームの読み取り（N-H7） | **`Ignored` で止まったゲームでも、`GET /games/{id}/state`・`GET /sessions/{id}/state` が 200 で投影を返す**（書き込みは 500 で止まる）。画面の在庫・受注残・今週の入力が読める | 読み取りも止まる設計なら、紙で続けるための数字が残らないため、設計を見直す（人が決める） |
+| 止まったゲームの読み取り（N-H7・M7） | **`Ignored` で止まったゲームでも、メソッドつきの 3 経路（`GET /games/{id}/state`・`GET /sessions/{id}/state`・`GET /games/{id}/lobby`）が 200 で投影を返す**（書き込みは 500 で止まる。観察 `GET /games/{id}/observation` は ADR-001 の U4 で U1〜U3 の範囲外（決定済み）。U4 で足すときは 4 経路に拡げる）。確認項目は (a) 3 経路が 200、(b) 書き込みが 500 で止まり残らない（`type` と相関 ID つき）、(c) **他のゲームの読み書きは通る**、(d) **`Ignored` の件数のメトリクスが出る**、(e) 500 の画面文言が [UI 設計](./ui-design.md) #15 の実物（文言は複製せず、#15 を正本として参照する。R-H10）。**返る内容に、紙で続けるための数字が含まれる**: 各役割の今週の入力、当週に処理する入荷（`arrivals`）、受注、**セッションの状態の確定済み週の結果（週ごと・役割ごとの受注・発注・在庫・受注残・出荷。進行役のコンソールの結果表の材料）**。**画面の「入荷予定（輸送中の品）」「上流へ送って未着の発注」は、API の応答にも画面にも項目として無く、結果表の出荷・発注と遅延の週数から復元する**（`ConsolePage.tsx`・`ResultsTable.tsx`・`openapi.yaml` の `RoleStatus` を読んで確認）。復元に足りるかは B1 で確かめる | 読み取りも止まる設計なら、紙で続けるための数字が残らないため、設計を見直す（人が決める） |
 | NF-P2 の実測の方法（M13） | 画面を通した実測にするか、GET の実測 + 3 秒間隔からの計算の推定にするかを決め、記録する。**範囲外（U6）の性能を早めに計測することは、約束ではない** | 推定にとどめ、実測は U6 に回す |
-| `check` ジョブ（N-H4） | 検証用の CI の `check` ジョブ 1 本が、規約違反・`.transact(` の違反・カバレッジの不足で落ち、緑のときだけマージできる | 手元の同じコマンドを正とし、CI の整備を B1 の最初のスライドにする |
+| `check` ジョブ（N-H4） | 検証用の CI の `check` ジョブ 1 本が、規約違反・`.transact(` の違反・カバレッジの不足で落ち、緑のときだけマージできる。**カバレッジの算出スクリプトとそのテスト（丸め・境界値を含む）は、B1 の最初のスライドに置く**（赤の間はマージが止まるため。M15） | CI の整備を B1 の最初のスライドにする。**基準を下げて緑にしない**（旧記述の「手元の同じコマンドを正とし」は N-H4 の決定を弱めるので外した） |
+| U1 の範囲（D1・R-H2） | 統合テスト（PostgreSQL 18）と `@api` の受け入れが CI で実行される（`check` に含める案 X、または別ジョブ `integration`・`acceptance` を U1 に足す案 Y）。**Undefined・Pending で失敗する**（ADR-012 のコンプライアンス） | 約束を `check` の範囲に縮める案 (b) は採らない（リスクを ADR-001 の例外の節に書く場合は、人が決める） |
+| ルートの網羅（M9） | U1〜U3 で実装しない操作の許可リストがあり、`check` が「仕様のルートが実装に無い」で落ちない。許可リスト外の経路・メソッド違いが 404 の problem+json（`request.not_found`）で返る（案 (a)） | 案 (b)（JSON でない 404）にする場合は、画面に相関 ID が出ないことを UI 設計の #16 に残す |
 
 **Scala 版の価値を測る指標**: ADR-001 は価値を「型クラスと `IO` の値による合成」としています。測れる指標として、次を提案します（**数値の目標は B1 の計画で決める**）。(1) 共有する `features/` のうち、Scala のバックエンドで通るシナリオの割合（**許可リストの外は通ると数えない**。ADR-001 に合わせた。許可リストは U1〜U3 の `@AC` タグから導く。M18）。(2) Must のストーリーの受入条件のパリティ。(3) 確認済みの前提の数と、未確認の前提の数の推移（上の表と確認した事項の表）。
 
@@ -561,6 +600,24 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 | M10・L10 | 解放の上限（2 秒、案）、`stopTimeout` を基準に。不安定さの許容（20 回で 0 件）、`maxAttempts` の根拠（Kotlin 版 `Execute.kt`） | AI の案 |
 | M17・M18 | 抑制の行・図、価値の指標、Kotlin 版の M19、ADR-001 の 011 の行への参照、許可リストを `@AC` タグから導く | AI の案 |
 
+### 再々レビュー（2026-11-25。[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
+
+**ユーザー本人が選択肢を選んだ決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したのに基づき、AI が推奨案で決めたもので、確認は未了です。それ以外の直し方はすべて AI の案で、承認を得ていません。**
+
+| 指摘 | 変更 | 状態 |
+| :--- | :--- | :--- |
+| R-H1・D2 | U1 に入れる US6.1 の AC を AC6.1.1・6.1.2・6.1.4 に。旧記述「US6.1・US6.2 は約束の外」を直した。`@AC6.1.2` の共有シナリオが無いことを書いた | D2: 指示に基づき AI が推奨案で決めた（確認未了） |
+| R-H2・D1・L3・M16 | 統合（PostgreSQL 18）と `@api` の受け入れを U1 の約束に含め、実現の形（案 X・Y）を書いた。約束はジョブの本数でなく検証の範囲。ADR-012 のコンプライアンスが U1 で果たせること。CI の図の「毎回」を U1 の範囲と区別 | D1: 指示に基づき AI が推奨案で決めた（確認未了）。X・Y の選択は未決 |
+| R-H3・R-H4・D3・M10・L6 | 許す組の表の条件と列数は domain-model を正本に。性質テストを (a) コマンドから作る・(b) 表の ○ の出現・(c) 表 × `apply` の 3 方向に。B1 の表に、表の ○ を × に変える・`apply` の腕を消す基準。受入テストを 4 件に（失効 → 入れ替え → 保存・確定 → 再生、旧担当者の入力が残る）。入れ替えの出どころ、共有 `credentials.feature` との分担（munit）。`RoleHolderReplaced` は session のイベント | D3: 指示に基づき AI が推奨案で決めた（確認未了）。他は AI の案 |
+| R-H5・R-H6・D4 | H2 版の `ProjectionLock` を `StampedLock` 系 + 待ちの上限 + `Tx.run` の後始末に。`lock_timeout` と SQLSTATE の写像のテスト | D4: 指示に基づき AI が推奨案で決めた（確認未了）。他は AI の案 |
+| R-H7・M14 | `.transact(` の受け入れ条件を 1 つの表に（「`Transactions.scala` 以外の全 `Compile`」、テスト本体も落ちる、文字列・コメントは落ちない、パターンはメソッド名）。fixture と期待件数のテストを `check` に | AI の案 |
+| R-H9 | B1 の確認項目に、返る内容（結果表の出荷・発注、入荷、受注）を加え、入荷予定・未着の発注は項目が無く復元することを書いた。追いつきの golden 候補 | AI の案 |
+| R-H10 | 確認項目 (e) は UI 設計 #15 を正本として参照 | AI の案 |
+| M3・M4・M7 | `@AC` の導出は AC の番号まで確定した一覧が入力。止まったゲームの読み取りは 3 経路（観察は U4）、(c) 他のゲーム、(d) メトリクス | AI の案 |
+| M9・L5 | 契約テストのルートの網羅に、範囲外の操作の許可リストと「経路なし」の応答（案） | AI の案 |
+| M15・M16・L4・L7 | カバレッジのジョブが赤の間のマージ停止、算出スクリプトを B1 の最初に、丸め（整数の積で比較）、「手元の同じコマンドを正とし」を外す、`Fiber` の行を 2 秒に、トリガーを `develop`・`main` に、NF-P2 の測定の対象から S04 を外し同一の時計の前提 | AI の案 |
+| M1・D5 | team 規約が beer-game-scala に及ぶかの確認と、例外の記録先は、人の承認の場で行う（project.md は編集しない）。「beer-game3 用とは別に」の言い換えを注記 | D5: 指示に基づき AI が推奨案で決めた（確認未了） |
+
 ## 未決事項
 
 1. **STT1〜STT4 の承認**: 人の承認を得る。STT2 は方針（行 80% を算出する案 C を第一）をユーザーが決めた（2026-11-25）。残るのは、B1 で行率を出せるかの確認と、出せなかった場合の代替の可否の再決定。
@@ -581,7 +638,12 @@ Kotlin 版の方針と対応の計画（各ストーリーの受入条件を、�
 16. **許す組の表（N-H1）の置き場と、表から状態遷移テストと生成器を導く方法**（正本は [ドメインモデル](./domain-model.md)。別担当が書く表との整合）。
 17. **Scalafix の除外の書き方**（ファイル単位。`scalafixAll` を含む）と、`DisableSyntax.regex` が文字列・コメントの中の語を拾うか（N-H3）。
 18. **U1〜U3 で自動反映を持たない間の team 規約の例外**の ADR への記録と人の承認（N-H4）。
-19. **U1 の US6.1・US6.2 の扱い**（パリティの指標の分母から外すか、未達として別枠に出すか。M18）。
+19. **U1 の US6.2 の扱い**（パリティの指標の分母から外すか、未達として別枠に出すか。M18）。US6.1 は AC6.1.1・6.1.2・6.1.4 を U1 に入れる（D2。確認は未了）。
+20. **D1 の実現の形**: 統合と `@api` の受け入れを `check` に含める（案 X）か、別ジョブ `integration`・`acceptance` を U1 に足す（案 Y）か。人が決める。
+21. **U1〜U3 の AC の一覧（AC の番号まで）**の確定（M3。許可リストと範囲外の操作の許可リストの入力。人の承認つき）。
+22. **「経路なし」の応答を `request.not_found` に写すか**（M9・L5。案 (a)・(b)）。
+23. **`@AC6.1.2` の共有シナリオ**を共有 features に足すか、munit だけで保証するか。
+24. **team 規約が beer-game-scala に及ぶかの確認と、例外の project.md `## Scope Overrides` への記録**（M1・D5。人の承認の場で行う。AI は project.md を編集しない）。「CI との連携」の冒頭の引用（「beer-game3 用とは別に」）は、team.md の原文（beer-game3 用の CI と deploy を新しく作り、AWS 環境も beer-game3 専用に用意する）の意味を、Scala 版にも当てはめた読みに変えている。原文そのままではない。
 
 ## 出典
 

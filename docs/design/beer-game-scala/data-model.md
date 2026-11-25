@@ -249,7 +249,9 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 
 用途別の接続プールは、`HikariTransactor`（`Resource`。api の書き込み・読み取り・観察者、削除は retention のタスク、所有者は migrate のタスク）です（ADR-009、[バックエンドアーキテクチャ](./architecture-backend.md)）。**プールからロールへの結びつけ（メンバーのログインユーザーで接続するか、接続後に `SET ROLE` するか）は、Scala 版では未確認**です。
 
-**ログインユーザーとセッションの設定**: ロールは `NOLOGIN` で、アプリが接続するのは**そのメンバーのログインユーザー**です。**`idle_in_transaction_session_timeout` や `lock_timeout` のようなロールごとの設定は、NOLOGIN ロールに設定してもメンバーのログインユーザーに継承されず、効きません**（Rust 版が PostgreSQL 18.6 で再現して確認した事項。Scala 版では再確認していない）。**ログインユーザー自身**に設定するか、接続文字列の `options`・接続後の `SET` で設定し、統合テストで `SHOW` が期待値になることを確かめます（[運用要件](./operation.md)）。
+**ログインユーザーとセッションの設定**: ロールは `NOLOGIN` で、アプリが接続するのは**そのメンバーのログインユーザー**です。**`idle_in_transaction_session_timeout` や `lock_timeout` のようなロールごとの設定は、NOLOGIN ロールに設定してもメンバーのログインユーザーに継承されず、効きません**（Rust 版が PostgreSQL 18.6 で再現して確認した事項。Scala 版では再確認していない）。**`idle_in_transaction_session_timeout` のような、接続全体に効かせてよい設定**は、**ログインユーザー自身**に設定するか、接続文字列の `options`・接続後の `SET` で設定し、統合テストで `SHOW` が期待値になることを確かめます（[運用要件](./operation.md)）。
+
+**`lock_timeout` は、ログインユーザー・接続の `options`・接続後の `SET` に置きません**（再々レビュー R-H6）。接続全体に設定すると、投影の行のロック待ち（`FOR UPDATE` など）にも効き、**平常時でも 55P03 が出て 503 になります**。Kotlin 版（`ProjectionLocks.kt` の `PostgresProjectionLock`。読んで確認した）と同じく、**ロックを取る間だけ**、`set_config('lock_timeout', '<ms>ms', true)`（`true` = このトランザクションの間だけ）で設定し、**ロックを取った後に `'0'`（無効）に戻します**。この手順の詳細と SQLSTATE の写像は [バックエンドアーキテクチャ](./architecture-backend.md) の「lock_timeout の手順と SQLSTATE の写像」にあります。統合テストで、(1) ロックの待ちの超過が 55P03 になること、(2) ロックを取った後の投影の行のロック待ちは `lock_timeout` で切れないこと（`SHOW lock_timeout` が 0）を確かめます。**Scala 版では未確認**（B1 の最初）。
 
 ### 検証の結果
 
@@ -284,7 +286,7 @@ Scala 版での**違反の判別**は、`attemptSql`（または `exceptSomeSqlS
 
 同期投影（追記と同じトランザクションで更新）、`projection_checkpoints`、投影の再構築（ゲームごとに 1 トランザクション、アドバイザリロック。コマンドは共有、再構築は排他）、複数の投影の行を更新する順序（表の順序の固定。表名と主キーの順）、投影テーブルの定義、出力を投影にしない（`export_packages` の廃止。`buildExport` を問い合わせ時に実行）、読み取りの規則（参加者・進行役・観察者の読める範囲）、観察のための `week_team_totals` は、**Kotlin 版と同じ**です。
 
-Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。**`ConnectionIO` の変換で、トランザクションの先頭の `pg_advisory_xact_lock(_shared)`**。H5・N-H2 の案で、承認を得ていない。確認済みなのは `ConnectionIO` として実行できることだけで、共有と排他の待ち合いは未確認。検証の 5、[バックエンドアーキテクチャ](./architecture-backend.md)）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
+Scala 版では、投影を `Projection = EventEnvelope[DomainEvent] => List[RowChange]`（純粋）と、`RowChange` を SQL に変える境界に分けます（[ドメインモデル](./domain-model.md)）。アドバイザリロックは SQL を直接発行します（`ProjectionLock` のポートの実装。**`ConnectionIO` の変換で、トランザクションの先頭の `pg_advisory_xact_lock(_shared)`。ロックを取る間だけ `lock_timeout` を設定し、取った後に 0 に戻す**（R-H6。上の「ログインユーザーとセッションの設定」）。H5・N-H2 の案で、承認を得ていない。確認済みなのは `ConnectionIO` として実行できることだけで、共有と排他の待ち合いと `lock_timeout` の手順は未確認。検証の 5、[バックエンドアーキテクチャ](./architecture-backend.md)）。観察者の問い合わせの寄与者数による抑止（`contributors < 2`）は `Disclosure`（問い合わせの層）で行います。
 
 ## 周辺ストア
 
@@ -363,7 +365,7 @@ Kotlin 版と同じです（`events` の `(game_id, stream_type, stream_version)
 
 | 項目 | PostgreSQL 18 | H2（PostgreSQL モード。ローカルのみ。Kotlin 版の実測の引用） | 扱い |
 | :--- | :--- | :--- | :--- |
-| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。共有と排他の待ち合いは**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[A] => ConnectionIO[A]`）の裏に隠す。H2 版は**プロセス内のロック**を `ConnectionIO` の `bracket` で包む（単一プロセスでのみ有効。解放は COMMIT の前）。**PostgreSQL 版と同じ型**（H5・N-H2。AI の案） |
+| 再構築との直列化（アドバイザリロック） | `pg_advisory_xact_lock(_shared)`（`ConnectionIO` の中。Scala 版で確認済み。K10）。ポートの PostgreSQL 版も、トランザクションの先頭で同じ関数を呼ぶ（接続は増えない）。`lock_timeout` はロックを取る間だけ設定する（R-H6）。共有と排他の待ち合いは**未確認** | 動かない（関数が無い） | ポート `ProjectionLock`（`withShared`・`withExclusive`: `ConnectionIO[Either[AppFailure, A]]` の変換）の裏に隠す。H2 版は**プロセス内の `StampedLock` 系のロック**（`Fiber` から安全な部品）+ **待ちの上限**（超えたら `RetryExhausted`）+ **トランザクション終了後の後始末**（`AfterEnd`。COMMIT・ROLLBACK の後に解放。Kotlin 版の `LocalProjectionLock` と同じ構造。D4。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）（単一プロセスでのみ有効）。**PostgreSQL 版と同じ型**（H5・N-H2・R-H5。AI の案）。別案の `SELECT … FOR UPDATE` のロック行は不採用の比較（H2 での動作は未確認。[バックエンドアーキテクチャ](./architecture-backend.md)） |
 | SSE の版の通知（LISTEN/NOTIFY） | `pgListen`・`pgNotify`（同じ接続で Scala 版で確認済み。K11） | 動かない（構文エラー） | ポート `ChangeNotifier`（`enqueue: ConnectionIO`、`deliver: IO`）の裏に隠す。呼ぶのは `execute` だけ（M4）。H2 版は `enqueue` が何もせず、`deliver` が**プロセス内のイベント**へ配る（`Tx.run` の後。単一プロセスでのみ有効）。PostgreSQL 版は `enqueue` が `pg_notify`。**同じ型**（H5。AI の案） |
 | 部分一意索引 `uq_idempotency_create` | あり（`WHERE scope = 'create'`） | 動かない（構文エラー。通常の一意制約は動く） | H2 版は**省略**し、アプリケーション側の再照合に置き換える（PostgreSQL 専用のマイグレーション） |
 | DB ロールと GRANT、追記専用、`TRUNCATE` の拒否 | あり | 一部動く（`GRANT TRUNCATE` は構文エラー。表の所有者の扱いは未確認） | H2 版は**省略**（単一の接続ユーザー）。**権限の検証の正は PostgreSQL の統合テスト** |
@@ -419,7 +421,7 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 1. **ローカル開発の DB**（ST9）: H2 の採用は決定済み（2026-11-25）。残る未決は、**H2 の依存の導入の承認**と、**B1 の最初の実測**（上の方言の差分の表。Flyway の H2 への適用、doobie 経由の SQLSTATE と制約名、`jsonb` の書き込み、H2 専用のマイグレーションの要否）。
 2. **V003〜V006 の DDL**: Kotlin 版の実ファイルを元に書き、PostgreSQL で適用して検証する。V001・V002 の全文も、Flyway で適用して確認する。
-3. **ロールと GRANT の Scala からの検証**: 権限のないロールで `events` の UPDATE・DELETE・TRUNCATE が拒否され、`game_roots` の連鎖削除が動くこと。ログインユーザーとプールの結びつけ（メンバーのログインユーザーか `SET ROLE` か）、セッションの設定（`idle_in_transaction_session_timeout`・`lock_timeout`）が効くこと。
+3. **ロールと GRANT の Scala からの検証**: 権限のないロールで `events` の UPDATE・DELETE・TRUNCATE が拒否され、`game_roots` の連鎖削除が動くこと。ログインユーザーとプールの結びつけ（メンバーのログインユーザーか `SET ROLE` か）、セッションの設定（`idle_in_transaction_session_timeout` が効くこと。**`lock_timeout` は接続全体に設定せず**、ロックを取る間だけ `set_config` で設定して取った後に 0 に戻す。R-H6）。
 4. **doobie の残りの確認**: `opaque type` の `Meta`、`Array[Byte]`、`HikariTransactor`、読み取り専用の `REPEATABLE READ`、専用の接続での `LISTEN`・切断後の再購読、`PSQLException` の型の判定と WartRemover（`IsInstanceOf`・`AsInstanceOf`）の相性。
 5. **`jsonb` の読み書きの方式**: 文字列 + `::jsonb` で足りるか、`doobie-postgres-circe` を足すか（足すなら承認が要る）。
 6. **Flyway の確認**: PostgreSQL 用のモジュールの名前、`migrate` のモード、`flyway_schema_history` の権限。
@@ -445,12 +447,21 @@ Kotlin 版の設計判断 1〜9 は**引き継ぎます**（ストリームの�
 
 ### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
 
-ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけです。**N-H2・N-H5 の直し方は AI の案で、承認を得ていません。**
+ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。**N-H2・N-H5 の直し方は AI の案で、承認を得ていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
 | N-H2 | 「本書の位置づけと確認の範囲」の未確認の記述、検証 A の 5（未確認の範囲を、共有と排他の待ち合いなどに書き直した。**実測の結果そのものは変えていない**）、「投影」のアドバイザリロック、方言の差分（`ProjectionLock`・`ChangeNotifier`） | AI の案。`ProjectionLock` を `ConnectionIO` の変換にした。`Resource` 版は不採用 |
 | N-H5 | 「本書の位置づけと確認の範囲」に正本の規則（一覧が正。根拠は実測の記録。一覧を直すときは根拠も直す） | AI の案 |
+
+### 再々レビュー（[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
+
+ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件です。**D4（H2 版の `ProjectionLock` は Kotlin 版と同じ構造）は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了**です。それ以外の直し方は AI の案で、承認を得ていません。
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| R-H6 | 「ログインユーザーとセッションの設定」に、`lock_timeout` を接続・ロールの設定に置かず、ロックを取る間だけ `set_config('lock_timeout', ms, true)` で設定して取った後に 0 に戻す手順（Kotlin 版の `PostgresProjectionLock` を読んで確認した）、「投影」の `ProjectionLock` の記述、方言の差分の PostgreSQL 版、未決事項 3 | AI の案。Scala 版では未確認 |
+| R-H5（D4） | 方言の差分の H2 版の `ProjectionLock`（`bracket` から、`StampedLock` 系 + 待ちの上限 + `AfterEnd` へ）、型を `ConnectionIO[Either[AppFailure, A]]` の変換に | ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。実測は未実施 |
 
 ## 出典
 

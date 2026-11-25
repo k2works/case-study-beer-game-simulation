@@ -1,6 +1,9 @@
 # Docs Update Log
 
 ## 2026-11-25
+* **Update**: [beer-game-scala の設計書](/design/beer-game-scala/index.md) 10 本と [ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を更新（再々レビューの高 10 件の反映。論点 1〜5 は、ユーザーの指示「決定を行い」に基づき AI が推奨案で決めた D1〜D5 で、ユーザー本人の決定ではなく確認は未了。US6.1 の取り違えと B1 確認項目の旧文言の訂正、許す組の表の修正と D3、H2 版ロックの `StampedLock` 系、`lock_timeout` と SQLSTATE の写像、`.transact(` の受入条件の統一、パターン 17・18 の依頼文言と紙で続ける手順。status は draft のまま。claude-code/claude-sonnet-5-5）
+* **Update**: [設計書の再々レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview2_20261125.md) に対応状況を追記（claude-code/claude-sonnet-5-5）
+* **Creation**: [設計書の再々レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview2_20261125.md) を作成（再レビューの高 8 件の反映後の 5 視点の再々レビュー。前回の高は解消 3・一部 5。新たな指摘は高 10・中 17・低 11。事実の誤りは US6.1 の取り違えと B1 確認項目 (e) の旧文言。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）
 * **Update**: [beer-game-scala の設計書](/design/beer-game-scala/index.md) 10 本と [ADR-001](/adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) を更新（再レビューの高 8 件の反映。ユーザーの決定は N-H4 検証用の CI は U1・N-H6 `domain` 97% は目安・N-H7 止まったゲームの読み取りは返す・N-H8 U1〜U3 は研修に使わない。他は AI の案で未承認。遷移の許す組の表、`ProjectionLock` の `ConnectionIO` 変換、`.transact(` の入口の一覧、ui-design #16、team 規約の例外の記録（案）。status は draft のまま。claude-code/claude-sonnet-5-5）
 * **Update**: [設計書の再レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview_20261125.md)・[設計書レビュー](/review/beer-game-scala/design_review_20261125.md) に対応状況を追記・訂正（claude-code/claude-sonnet-5-5）
 * **Creation**: [設計書の再レビュー（beer-game-scala）](/review/beer-game-scala/design_rereview_20261125.md) を作成（高 10 件の反映後の 5 視点の再レビュー。前回の高は解消 2・一部 8。新たな指摘は高 8・中 20・低 11。対応方針は案で未確定。設計書への反映は未実施。claude-code/claude-sonnet-5-5）

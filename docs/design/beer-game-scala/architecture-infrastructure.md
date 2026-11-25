@@ -21,12 +21,12 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:20:00Z }
 - **コンテナ**: JRE のイメージは同じ（Temurin 25）。**依存の JAR とアプリの JAR を別の層に分ける方法**が、Gradle の配布から sbt のものに変わる（`sbt-native-packager` の採否は未決）。
 - **データベースの接続**: JDBC + HikariCP から **doobie の `HikariTransactor`**（用途別。ST8）へ。ロールを用途別に分けるのは同じ。
 - **ローカル開発の DB**: ローカル開発だけ **H2 の PostgreSQL モード**（ユーザーの決定、2026-11-25。ST9）。**本番・ステージングでは起動時の検査で H2 を拒否**し、**配布（本番イメージ）から H2 を除外**する。H2 の依存の導入は承認待ち。
-- **CI/CD**: 検証の手順が sbt になる。**Scala 版専用のワークフローを新設する**（team の規約）。**検証用の CI（`check` ジョブ 1 本）は U1 に含める**（N-H4）。デプロイは「設計」のみで、ワークフローは U5 まで作らない。
+- **CI/CD**: 検証の手順が sbt になる。**Scala 版専用のワークフローを新設する**（team の規約）。**検証用の CI（`check` ジョブ 1 本）は U1 に含める**（N-H4）。**加えて、統合テスト（PostgreSQL 18）と `@api` の受け入れの CI 実行も U1 の約束に含める**（D1。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）。デプロイは「設計」のみで、ワークフローは、再開するときに Unit を決めるまで作らない（L2）。
 - **Terraform**: Scala 版専用に複製して出発する案（SI4。提案）。
 
 アプリは [バックエンド](./architecture-backend.md)、[フロントエンド](./architecture-frontend.md)、運用は [運用要件](./operation.md) を参照してください。
 
-**範囲（ユーザーの決定、2026-11-25。N-H4・N-H8・M19）**: 実装として約束するのは U1〜U3 です。**U1〜U3 の間は、実際の研修には使いません（検証・事例用）。** 本書のうち、**U1 で約束するのは、検証用の CI（`check` ジョブ 1 本）だけ**です。**AWS 環境（Terraform、ECS、RDS、CloudFront など）、デプロイ用のワークフロー（SI5 のうちデプロイとロールバックの側）、ステージングへの自動反映、本番運用、復元訓練は後回し（U5）で、指標を見て決めます。** team の規約は「`main` の merge で staging へ自動反映」を求めるため、**自動反映を持たない間の例外は、ADR に記録して人が承認します**（ADR-001 は別担当。承認を得るまでは、規約との衝突が残る）。以降の AWS・デプロイの記述は、**U5 に着手するときの設計**です。
+**範囲（ユーザーの決定、2026-11-25。N-H4・N-H8・M19）**: 実装として約束するのは U1〜U3 です。**U1〜U3 の間は、実際の研修には使いません（検証・事例用）。** 本書のうち、**U1 で約束するのは、検証用の CI の範囲**です（**ジョブの本数ではなく検証の範囲**。D1）。**`check` ジョブ 1 本（Scalafmt、コンパイル、WartRemover、Scalafix、テスト、カバレッジ）に加え、統合テスト（PostgreSQL 18、Testcontainers）と `@api` の受け入れテストの CI 実行**を含みます（R-H2 の案 (a)。**`check` に含めるか、別ジョブ `integration`・`acceptance` を U1 に足すかは案で、人が決める**。D1 はユーザーの指示に基づき AI が推奨案で決めた。確認は未了）。これにより、ADR-001 の「例外の間の条件」（統合と受け入れを CI で実行）と、ADR-012 のコンプライアンス（CI で Undefined・Pending があれば失敗）が U1 で果たせ、`adapter-persistence` の文 90% の目安（統合を合算する前提）とも整合します。**AWS 環境（Terraform、ECS、RDS、CloudFront など）、デプロイ用のワークフロー（SI5 のうちデプロイとロールバックの側）、ステージングへの自動反映、本番運用、復元訓練は後回し**です。**「後回し（U5）」は AI の整理で、Unit 定義ではステージングは U1（US6.2）にあるため、「後回し（再開するときに Unit を決める）」とします**（L2）。team の規約は「`main` の merge で staging へ自動反映」を求めるため、**自動反映を持たない間の例外は、ADR に記録して人が承認します**（ADR-001 は別担当。承認を得るまでは、規約との衝突が残る。**team 規約が beer-game-scala に及ぶかの確認と、例外の `project.md` の `## Scope Overrides` への記録は、人の承認の場で行う**。M1・D5。AI は `project.md` を編集しない）。以降の AWS・デプロイの記述は、**再開するときの設計**です。**研修に使い始める前提の時期は「U4 と U5 の判断の後」**で、**再開（U5 の着手）の条件として、運営者との合意（依頼文言・15 分・研修中の原則。[運用要件](./operation.md) のパターン 18）を 1 つ置く**案です（M17。承認を得ていない）。
 
 ### 本書の位置づけと確認の範囲
 
@@ -35,6 +35,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:20:00Z }
 - Kotlin 版の実装の経緯（B2・B3・B14 の注記）は引き継ぎません。Kotlin 版の未決事項は、本書の未決事項に引き継ぎます（Rust 版と同じ扱い）。
 - **確認状況の正本の規則（N-H5。AI の案で承認を得ていない）**: [技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」と [テスト戦略](./test-strategy.md) の「確認した事項」）で、一覧を直すときは根拠も直します。
 - **承認の状況**: ユーザーが決めたのは H3・H6・H7・H9 に加え、再レビューへの対応の N-H4（`check` ジョブ 1 本は U1 の約束に含め、AWS 環境・デプロイ用ワークフロー・自動反映は後回し）、N-H6、N-H7、N-H8（U1〜U3 は研修に使わない）です。**N-H2（ロックは接続を増やさない）・N-H3 など、これら以外は AI の案で、承認を得ていません**。
+- **再々レビュー（2026-11-25）への対応の区分**: ユーザーが「決定を行い、高 10 件を設計書に反映」と指示したため、D1〜D5 を AI が推奨案で決めました（**ユーザー本人が選択肢を選んだ決定ではなく、確認は未了**）。D1=統合テスト（PostgreSQL 18）と `@api` の受け入れを U1 の約束に含める（R-H2 案 (a)）、D2=U1 に入れる US6.1 の AC は AC6.1.1・6.1.2・6.1.4、D3=失効済みの旧担当者の入れ替えは未失効にだけ `CredentialRevoked`、D4=H2 版の `ProjectionLock` は Kotlin 版と同じ構造（`StampedLock` 系 + 待ちの上限 + トランザクション終了後の後始末）、D5=team 規約が beer-game-scala に及ぶかの確認と例外の記録は人の承認の場で行う（M1。AI は `project.md` を編集しない）。これら以外の直し方はすべて AI の案で、承認を得ていません。
 
 ## 確認したバージョン
 
@@ -273,7 +274,16 @@ Kotlin 版は、SIGTERM でコンテナの終了コードが 143（JVM が停止
 title CI/CD パイプライン（Scala 版。設計）
 
 start
-:プルリクエスト / main へのプッシュ;
+:プルリクエスト / develop・main へのプッシュ;
+note right
+  U1 で約束するのは、検証の範囲:
+  check（静的解析・テスト・カバレッジ）、
+  統合テスト（PostgreSQL 18）、
+  @api の受け入れ（D1）。
+  それ以外の工程と、デプロイ以降は、
+  対応する検証が範囲に入る Bolt、
+  または再開するときに足す
+end note
 partition "検証（バックエンド: sbt）" {
   :scalafmtCheckAll、scalafixAll --check、\nコンパイル（-Werror、WartRemover）;
   :ユニット・コンポーネント・プロパティテスト（純粋関数、インメモリ）;
@@ -315,13 +325,13 @@ stop
 
 既存の `.github/workflows` には、`beer-game-kotlin.yml`（`contract`・`test`・`detekt`・`pmd`・`web`・`ui`・`container`・`n1`・`deploy-demo` などのジョブ）と、`beer-game-rust.yml`（`check`・`container`・`infra` のジョブ）、それぞれのデプロイとロールバックの 4 本があります（2026-11-25 に確認）。Scala 版は、**これらを変更せず、Scala 版専用のワークフローを新設する設計**とします（ワークフロー自体は、本書の段階では作りません）。トリガーは Rust 版に倣い、`pull_request` と `push`（`develop`・`main`）、`workflow_dispatch` とし、パスは `apps/beer-game-scala/**`、共有の `apps/beer-game-features/**`・`apps/beer-game-web/**`・`apps/beer-game-contracts/**`、`docs/design/beer-game-scala/**`、ワークフロー自身にします（設計書の生成物の検査のパスは、生きたドキュメントの方式（ADR-001 の 018）が決まってから）。
 
-**U1 で約束するのは `check` ジョブ 1 本だけです**（N-H4。ユーザーの決定、2026-11-25）。B1 の受入条件の「CI が落ちる」（規約違反、`.transact(` の違反、カバレッジの不足）は、この `check` ジョブで判定します（[テスト戦略](./test-strategy.md)）。**他のジョブ（`integration`・`acceptance`・`contract`・`web`・`ui`・`container`・`n1`・`infra`）は、対応する検証が範囲に入る Bolt で足します**（時期は未決。人が決める）。**デプロイとロールバックのワークフロー（下の 4 本）、AWS 環境、ステージングへの自動反映は後回し（U5）**で、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認します。
+**U1 の約束の核は `check` ジョブ 1 本です**（N-H4。ユーザーの決定、2026-11-25）。B1 の受入条件の「CI が落ちる」（規約違反、`.transact(` の違反、カバレッジの不足）は、この `check` ジョブで判定します（[テスト戦略](./test-strategy.md)）。**これに加えて、統合テストと `@api` の受け入れの CI 実行も U1 の約束に含めます**（D1・R-H2。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了。**U1 の約束はジョブの本数ではなく検証の範囲**）。**実現の形は案で、人が決める**: **案 X**＝`check` に統合と `@api` の受け入れを含める（ジョブは 1 本のまま。時間が延びる）、**案 Y**＝別ジョブ `integration`・`acceptance` を U1 に足す（`check` を速く保てる）。**案 Y では、下の表の `integration`・`acceptance` の行の「時期は未決」は、U1 になります**。**他のジョブ（`contract`・`web`・`ui`・`container`・`n1`・`infra`）は、対応する検証が範囲に入る Bolt で足します**（時期は未決。人が決める）。**デプロイとロールバックのワークフロー（下の 4 本）、AWS 環境、ステージングへの自動反映は後回し（再開するときに Unit を決める。L2）**で、自動反映を持たない間の team 規約の例外は ADR に記録して人が承認します。
 
 | ジョブ（予定） | 内容 | 参考にした既存のジョブ |
 | :--- | :--- | :--- |
 | `check`（**U1 で約束**） | `scalafmtCheckAll`、`scalafixAll --check`、コンパイル（`-Werror`、WartRemover）、`test`、`scoverage` のしきい値（行 80% の算出と、文・分岐の暫定のゲート。`domain` の文 97% は目安。N-H6。行を出せない間はジョブを失敗のまま）。**sbt のキャッシュ**（依存と `target`。キーは `build.sbt`・`project/` のハッシュ）を使う | Rust 版の `check`、Kotlin 版の `test` |
-| `integration` | Testcontainers による統合テスト（PostgreSQL 18）。`Left` の ROLLBACK、キャンセル、競合の再試行、連鎖削除、ロールの権限 | Kotlin 版の `test`（`integrationTest`） |
-| `acceptance` | cucumber-scala の専用ジョブ（日本語 Gherkin。ST7）と、関数値の経路の受入 | Kotlin 版の `test`（`acceptanceTest`） |
+| `integration`（**U1 の範囲。案 X なら `check` に含める**。D1） | Testcontainers による統合テスト（PostgreSQL 18）。`Left` の ROLLBACK、キャンセル、競合の再試行、連鎖削除、ロールの権限。`adapter-persistence` の行率の合算に必要 | Kotlin 版の `test`（`integrationTest`） |
+| `acceptance`（**U1 の範囲。案 X なら `check` に含める**。D1） | cucumber-scala の専用ジョブ（日本語 Gherkin。ST7。`@api`）と、関数値の経路の受入。**Undefined・Pending があれば失敗**（ADR-012 のコンプライアンス） | Kotlin 版の `test`（`acceptanceTest`） |
 | `contract` | OpenAPI の検証と、型の生成物の差分 0（共有） | Kotlin 版の `contract` |
 | `web`・`ui` | 共有の `apps/beer-game-web` を、Scala のバックエンドに向けて検証する（`@ui`。専用のポート 3100・5273）。**Kotlin 版・Rust 版の同名ジョブと重複するため、実行の分担は未決**（[フロントエンド](./architecture-frontend.md)） | Kotlin 版の `web`・`ui` |
 | `container` | イメージのビルドとスモークテスト（`/api/v1/ready`・`/api/v1/health`・HEALTHCHECK・migrate・終了コード・非 root・SIGTERM） | Kotlin 版・Rust 版の `container` |
@@ -332,7 +342,7 @@ stop
 
 ### デプロイとロールバックのワークフロー（設計）
 
-Kotlin 版・Rust 版と同じ 4 本を、Scala 版専用に新設する設計とします。**ワークフローは作りません。U1〜U3 の約束の外で、U5 に着手するときの設計です**（N-H4）。
+Kotlin 版・Rust 版と同じ 4 本を、Scala 版専用に新設する設計とします。**ワークフローは作りません。U1〜U3 の約束の外で、再開するときの設計です**（N-H4。「U5」とするのは AI の整理で、再開するときに Unit を決める。L2）。**再開（U5 の着手）の条件として、運営者との合意（依頼文言・15 分・研修中の原則）を 1 つ置く**（M17。案）。
 
 | ワークフロー（予定） | 起動 | 内容（Kotlin 版・Rust 版の流れを引き継ぐ） |
 | :--- | :--- | :--- |
@@ -402,6 +412,17 @@ Kotlin 版の表を引き継ぎます（可用性は API 2 タスク以上・RDS
 | L3 | E2E 用のレート制限をゆるめる設定の名前を、設定名を揃える対象（SF2）に含めた | AI の案 |
 | N-H6 | `check` ジョブの記述に、`domain` の文 97% は目安、行を出せない間は失敗のまま | N-H6 はユーザーの決定 |
 | N-H5 | 確認状況の正本の規則を追加 | AI の案 |
+
+### 再々レビュー（2026-11-25。[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
+
+**ユーザー本人が選択肢を選んだ決定は、前回までの 8 件とローカル DB（H2）の 1 件です。D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもので、確認は未了です。他の直し方はすべて AI の案で、承認を得ていません。**
+
+| 指摘 | 変更 | 状態 |
+| :--- | :--- | :--- |
+| R-H2・D1 | U1 の約束に、統合テスト（PostgreSQL 18）と `@api` の受け入れの CI 実行を含めた。実現の形は案 X（`check` に含める）と案 Y（別ジョブ `integration`・`acceptance` を U1 に足す）。約束はジョブの本数でなく検証の範囲。`adapter-persistence` 90% の合算前提、ADR-012 のコンプライアンスと整合 | D1: 指示に基づき AI が推奨案で決めた（確認未了）。X・Y の選択は未決 |
+| M17・L2 | 研修に使い始める前提を「U4 と U5 の判断の後」に、再開の条件に運営者との合意を 1 行。「後回し（U5）」を「後回し（再開するときに Unit を決める）」に | AI の案 |
+| M1・D5 | team 規約が beer-game-scala に及ぶかの確認と、例外の `project.md` への記録は人の承認の場で行う | D5: 指示に基づき AI が推奨案で決めた（確認未了） |
+| L7 | CI の図のトリガーを `develop`・`main` に | AI の案 |
 
 ## 設計判断
 

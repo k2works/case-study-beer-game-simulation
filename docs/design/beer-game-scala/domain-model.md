@@ -22,7 +22,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-25T06:10:00Z }
 ### 本書の位置づけと確認の範囲
 
 - **本書で確認したこと**: 3 章の型とコードの断片（`Quantity`、`RoleMap`、`ValidatedNec` による設定の検証、`GameError.code`、Game 集約の `handle`、`Events.apply` と `Evolution`、再生）は、sbt 1.13.1（JetBrains Runtime 25.0.4.1）、Scala 3.7.4、cats-core 2.13.0、munit 1.3.6 で、`-Werror -Wunused:all -Wvalue-discard -Wnonunit-statement` と WartRemover 3.6.3（ガイド §9.4 の 13 個の Wart）を有効にしてコンパイルし、2 件のテスト（設定の誤りが 3 件集まる、付け替えが 2 イベントになる）が通ることを確認しました（2026-11-25）。状態に列挙子を 1 つ足すと、`Events.apply` の `match` で網羅の警告が出ること（`-Werror` で失敗する形）も確認しました。`var` と `head` が WartRemover に拒否されることも確認しました。**確認状況の正本は [技術スタックの確認状況の一覧](./tech-stack.md#確認状況の一覧)（K2〜K4）** です。
-- **2026-11-25 のレビュー対応と再レビュー対応で書き直した部分は、再コンパイルしていません**: `Game.handle` の `AssignRole` の判定順（権限が先。L6）、`GameEvents.apply` の全面の書き直し（H2・再レビュー N-H1。許す組の表に合わせた）、`GameEvent` の 12 個の列挙子、`Evolution` を使う遷移の腕。いずれも AI の案で、承認を得ていない。**新しく書いた Scala のコードは、すべて型検査していません。**
+- **2026-11-25 のレビュー対応と再レビュー対応で書き直した部分は、再コンパイルしていません**: `Game.handle` の `AssignRole` の判定順（権限が先。L6）、`GameEvents.apply` の全面の書き直し（H2・再レビュー N-H1。許す組の表に合わせた）、`GameEvent` の 12 個の列挙子、`Evolution` を使う遷移の腕。いずれも AI の案で、承認を得ていない。**新しく書いた Scala のコードは、すべて型検査していません。** 再々レビューの対応（R-H3）でも、`GameData` と `GameEvents.apply` の条件つきの腕、`SessionEvents.apply` のスケッチ、`replacementEvents` を書き足しましたが、**再コンパイルしていません**（AI の案）。
 - **確認状況の正本の規則（再レビュー N-H5。AI の案）**: 確認状況の一覧（[技術スタック](./tech-stack.md#確認状況の一覧)）が正です。一覧の根拠は実測の記録（[データモデル](./data-model.md) の「検証の結果」、[テスト戦略](./test-strategy.md) の「確認した事項」）で、**一覧を直すときは根拠も直します**。
 - **確認していないこと**: Session 集約、`startGame`、`simulateWeek`、投影、`RetentionSaga` の Scala のコードは、**型検査していない設計のスケッチ**です。`Monoid`・`Functor` の法則のテストは書いていません。
 - **引き継ぐだけで再検討していないこと**: 週次計算の規則（12 ステップ）、観察者の開示の規則、保持削除の細部、エラーコードの一覧、投影の購読表、ユビキタス言語の定義は、Kotlin 版の該当節を正本として参照します。Scala 版で変わるのは表現であり、API の契約（`code`、problem+json）は変えません。
@@ -181,27 +181,36 @@ enum GameError:
 #### State・Event・Command
 
 ```scala
+/** 参加者・資格・招待・観察者。Kotlin 版の `GameData` に当たる（設定などは省略）。再々レビュー R-H3 で、状態の条件を表せる形に広げた */
+final case class GameData(
+    gameId: GameId,
+    participants: Map[ParticipantId, Option[Role]],
+    credentials: Map[CredentialSubject, CredentialValidity],   // CredentialValidity(expiresAt, revoked)
+    invitations: Map[InvitationId, InvitationEntry],            // InvitationEntry(expiresAt, revoked)
+    observers: Map[ObserverId, InvitationId]
+)
+
 enum GameState:
   case NotCreated
-  case Preparing(gameId: GameId, participants: Map[ParticipantId, Option[Role]])  // 実際は設定・招待・観察者・資格も持つ
-  case Started(gameId: GameId, participants: Map[ParticipantId, Option[Role]])
+  case Preparing(data: GameData)
+  case Started(data: GameData)
 
-enum GameEvent:   // EV-G01〜G12 の 12 個。ペイロードは簡略化（実際は Kotlin 版の表のとおり）
-  case GameCreated(gameId: GameId)                                                                // EV-G01
-  case ParticipantJoined(participantId: ParticipantId)                                            // EV-G02
+enum GameEvent:   // EV-G01〜G12 の 12 個。ペイロードは簡略化（条件に使う項目だけ。実際は Kotlin 版の表のとおり）
+  case GameCreated(gameId: GameId, facilitatorCredentialExpiresAt: Instant)                       // EV-G01。進行役の資格を発行する
+  case ParticipantJoined(participantId: ParticipantId, credentialExpiresAt: Instant)              // EV-G02
   case RoleAssigned(participantId: ParticipantId, role: Role)                                     // EV-G03。準備中の割り当てと、開始後の入れ替えの新担当者
   case RoleUnassigned(participantId: ParticipantId, role: Role)                                   // EV-G04
-  case ObserverInvited(invitationId: InvitationId)                                                // EV-G05
+  case ObserverInvited(invitationId: InvitationId, expiresAt: Instant)                            // EV-G05
   case ObserverInvitationRevoked(invitationId: InvitationId)                                      // EV-G06
-  case ObserverJoined(observerId: ObserverId, invitationId: InvitationId)                         // EV-G07
-  case CredentialRevoked(subject: CredentialSubject)                                              // EV-G08。入れ替えの自動失効にも使う
-  case CredentialReissued(subject: CredentialSubject)                                             // EV-G09
-  case ParticipationRecovered(subject: CredentialSubject)                                         // EV-G10
+  case ObserverJoined(observerId: ObserverId, invitationId: InvitationId, credentialExpiresAt: Instant)   // EV-G07
+  case CredentialRevoked(subject: CredentialSubject)                                              // EV-G08。入れ替えの自動失効にも使う（未失効の旧担当者にだけ。R-H3）
+  case CredentialReissued(subject: CredentialSubject, expiresAt: Instant)                         // EV-G09
+  case ParticipationRecovered(subject: CredentialSubject, credentialExpiresAt: Instant)           // EV-G10
   case GameStarted(gameId: GameId)                                                                // EV-G11
   case ParticipantReplaced(participantId: ParticipantId, role: Role, replacedBy: ParticipantId)   // EV-G12。開始後の入れ替え
 
 enum GameCommand:
-  case CreateGame(actor: Actor, gameId: GameId)
+  case CreateGame(actor: Actor, gameId: GameId, facilitatorCredentialExpiresAt: Instant)
   case AssignRole(actor: Actor, participantId: ParticipantId, role: Role)
   // … JoinGame、UnassignRole、InviteObserver、RevokeCredential など（実際は at も持つ）
 ```
@@ -215,24 +224,24 @@ object Game:
   /** 作成前（NotCreated）は、誰も進行役ではない。権限の判定に使う（L6） */
   private def isFacilitator(state: GameState, actor: Actor): Boolean = state match
     case GameState.NotCreated         => false
-    case GameState.Preparing(g, _)    => actor == Actor.Facilitator(g)
-    case GameState.Started(g, _)      => actor == Actor.Facilitator(g)
+    case GameState.Preparing(d)       => actor == Actor.Facilitator(d.gameId)
+    case GameState.Started(d)         => actor == Actor.Facilitator(d.gameId)
 
   def handle(state: GameState, command: GameCommand): Either[GameError, List[GameEvent]] =
     command match
-      case GameCommand.CreateGame(actor, gameId) =>
+      case GameCommand.CreateGame(actor, gameId, expiresAt) =>
         for
           _ <- Either.cond(state == GameState.NotCreated, (), GameError.AlreadyCreated)
           _ <- Either.cond(actor == Actor.Anonymous, (), GameError.Forbidden)
-        yield List(GameEvent.GameCreated(gameId))
+        yield List(GameEvent.GameCreated(gameId, expiresAt))
       case GameCommand.AssignRole(actor, pid, role) =>
         // 判定順: 権限 → 準備中か → 参加者の存在（L6。権限のない人に状態を知らせない。Kotlin 版の原則）
         for
           _       <- Either.cond(isFacilitator(state, actor), (), GameError.Forbidden)
           data    <- state match
-                       case GameState.Preparing(g, ps) => Right((g, ps))
-                       case _                          => Left(GameError.NotPreparing)   // 開始後は assignRoleAfterStart（下記）
-          current <- data._2.get(pid).toRight(GameError.ParticipantNotFound(pid))
+                       case GameState.Preparing(d) => Right(d)
+                       case _                      => Left(GameError.NotPreparing)   // 開始後は assignRoleAfterStart（下記）
+          current <- data.participants.get(pid).toRight(GameError.ParticipantNotFound(pid))
         yield current match
           case Some(r) if r == role => Nil                                        // 変化なし。履歴に足さない
           case None                 => List(GameEvent.RoleAssigned(pid, role))
@@ -245,30 +254,62 @@ enum Evolution[+S]:
   case Ignored(state: S)
 
 object GameEvents:
+  // 条件を満たさない組は None（= Ignored）。条件は Kotlin 版の GameData の revoked・reissued・recovered・invited・
+  // invitationRevoked・observerJoined・withRole が null を返す条件と同じ（Credential.kt・InvitationEntry.kt・Game.kt を読んだ。R-H3）
+  private def withRole(d: GameData, p: ParticipantId, r: Option[Role]): Option[GameData] =
+    d.participants.get(p).map(_ => d.copy(participants = d.participants.updated(p, r)))            // 未知の参加者は変えない
+  private def revoked(d: GameData, s: CredentialSubject): Option[GameData] =
+    d.credentials.get(s).filter(!_.revoked)                                                       // 未知の主体と失効済みは変えない
+      .map(v => d.copy(credentials = d.credentials.updated(s, v.copy(revoked = true))))
+  private def reissued(d: GameData, s: CredentialSubject, at: Instant): Option[GameData] =
+    d.credentials.get(s).filter(_.revoked)                                                        // 未知の主体と失効していない資格は変えない
+      .map(_ => d.copy(credentials = d.credentials.updated(s, CredentialValidity(at, revoked = false))))
+  private def recovered(d: GameData, s: CredentialSubject, at: Instant): Option[GameData] =
+    d.credentials.get(s).filter(!_.revoked)                                                       // 未知の主体と失効済みは変えない
+      .map(v => d.copy(credentials = d.credentials.updated(s, v.copy(expiresAt = at))))
+  private def invited(d: GameData, i: InvitationId, at: Instant): Option[GameData] =
+    Option.when(!d.invitations.contains(i))(                                                      // 既知の招待は変えない
+      d.copy(invitations = d.invitations.updated(i, InvitationEntry(at, revoked = false))))
+  private def invitationRevoked(d: GameData, i: InvitationId): Option[GameData] =
+    d.invitations.get(i).filter(!_.revoked)                                                       // 未知の招待と失効済みは変えない
+      .map(e => d.copy(invitations = d.invitations.updated(i, e.copy(revoked = true))))
+  private def observerJoined(d: GameData, o: ObserverId, i: InvitationId, at: Instant): Option[GameData] =
+    Option.when(d.invitations.contains(i) && !d.observers.contains(o))(                           // 未知の招待と参加済みは変えない
+      d.copy(
+        observers = d.observers.updated(o, i),
+        credentials = d.credentials.updated(CredentialSubject.Observer(o), CredentialValidity(at, revoked = false))))
+
+  /** Preparing・Started の両方で、データを更新する。条件を満たさなければ Ignored。NotCreated は Ignored */
+  private def update(s: GameState)(f: GameData => Option[GameData]): Evolution[GameState] = s match
+    case GameState.Preparing(d) => f(d).fold(Evolution.Ignored(s))(n => Evolution.Applied(GameState.Preparing(n)))
+    case GameState.Started(d)   => f(d).fold(Evolution.Ignored(s))(n => Evolution.Applied(GameState.Started(n)))
+    case GameState.NotCreated   => Evolution.Ignored(s)
+
   def apply(state: GameState, event: GameEvent): Evolution[GameState] =
     (state, event) match
       // 腕は、下の「遷移の許す組の表」（規範）の ○ の組だけを書く。× の組は最後の腕の Ignored になる
-      case (GameState.NotCreated, GameEvent.GameCreated(g)) =>
-        Evolution.Applied(GameState.Preparing(g, Map.empty))
-      case (GameState.Preparing(g, ps), GameEvent.ParticipantJoined(p)) if !ps.contains(p) =>   // 同じ参加者の 2 回目は Ignored
-        Evolution.Applied(GameState.Preparing(g, ps.updated(p, None)))
-      case (GameState.Preparing(g, ps), GameEvent.RoleAssigned(p, r)) if ps.contains(p) =>      // 未知の参加者は Ignored
-        Evolution.Applied(GameState.Preparing(g, ps.updated(p, Some(r))))
-      case (GameState.Preparing(g, ps), GameEvent.RoleUnassigned(p, _)) if ps.contains(p) =>
-        Evolution.Applied(GameState.Preparing(g, ps.updated(p, None)))
-      case (GameState.Preparing(g, ps), GameEvent.GameStarted(_)) =>
-        Evolution.Applied(GameState.Started(g, ps))
-      // 開始後の役割の入れ替え（H2。Kotlin 版の変更表 38 に倣う）。Started の自己遷移として受ける
-      case (GameState.Started(g, ps), GameEvent.RoleAssigned(p, r)) if ps.contains(p) =>        // 入れ替えの新担当者
-        Evolution.Applied(GameState.Started(g, ps.updated(p, Some(r))))
-      case (GameState.Started(g, ps), GameEvent.ParticipantReplaced(p, _, _)) if ps.contains(p) =>   // 旧担当者の役割を外す。行は消さない。未知の参加者は Ignored
-        Evolution.Applied(GameState.Started(g, ps.updated(p, None)))
-      // 観察者の招待・参加・招待の取り消し、資格の失効・再発行、復帰は、準備中・開始後の両方で自己遷移（N-H1。実際は招待・観察者・資格の状態を更新する。スケッチは参加者だけ）
-      case (s @ (GameState.Preparing(_, _) | GameState.Started(_, _)),
-            _: GameEvent.ObserverInvited | _: GameEvent.ObserverInvitationRevoked | _: GameEvent.ObserverJoined |
-            _: GameEvent.CredentialRevoked | _: GameEvent.CredentialReissued | _: GameEvent.ParticipationRecovered) =>
-        Evolution.Applied(s)
-      case (s @ (GameState.NotCreated | GameState.Preparing(_, _) | GameState.Started(_, _)), _) =>
+      case (GameState.NotCreated, GameEvent.GameCreated(g, at)) =>
+        Evolution.Applied(GameState.Preparing(GameData(g, Map.empty,
+          Map(CredentialSubject.Facilitator(g) -> CredentialValidity(at, revoked = false)), Map.empty, Map.empty)))
+      case (GameState.Preparing(d), GameEvent.ParticipantJoined(p, at)) if !d.participants.contains(p) =>   // 同じ参加者の 2 回目は Ignored
+        Evolution.Applied(GameState.Preparing(d.copy(
+          participants = d.participants.updated(p, None),
+          credentials = d.credentials.updated(CredentialSubject.Participant(p), CredentialValidity(at, revoked = false)))))
+      case (s @ GameState.Preparing(_), GameEvent.RoleAssigned(p, r))   => update(s)(withRole(_, p, Some(r)))   // 未知の参加者は Ignored
+      case (s @ GameState.Preparing(_), GameEvent.RoleUnassigned(p, _)) => update(s)(withRole(_, p, None))
+      case (GameState.Preparing(d), GameEvent.GameStarted(_)) =>
+        Evolution.Applied(GameState.Started(d))
+      // 開始後の役割の入れ替え（H2。Kotlin 版の変更表 38 に倣う）。Started の自己遷移として受ける。未知の参加者は Ignored
+      case (s @ GameState.Started(_), GameEvent.RoleAssigned(p, r))           => update(s)(withRole(_, p, Some(r)))   // 入れ替えの新担当者
+      case (s @ GameState.Started(_), GameEvent.ParticipantReplaced(p, _, _)) => update(s)(withRole(_, p, None))      // 旧担当者の役割を外す。行は消さない
+      // 観察者の招待・参加・招待の取り消し、資格の失効・再発行、復帰は、準備中・開始後の両方で自己遷移。条件つき（R-H3。条件なしの Applied にしない）
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.ObserverInvited(i, at))           => update(s)(invited(_, i, at))
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.ObserverInvitationRevoked(i))     => update(s)(invitationRevoked(_, i))
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.ObserverJoined(o, i, at))         => update(s)(observerJoined(_, o, i, at))
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.CredentialRevoked(sub))           => update(s)(revoked(_, sub))
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.CredentialReissued(sub, at))      => update(s)(reissued(_, sub, at))
+      case (s @ (GameState.Preparing(_) | GameState.Started(_)), GameEvent.ParticipationRecovered(sub, at))  => update(s)(recovered(_, sub, at))
+      case (s @ (GameState.NotCreated | GameState.Preparing(_) | GameState.Started(_)), _) =>
         Evolution.Ignored(s)
 
   def replay(initial: GameState, events: List[GameEvent]): (GameState, Int) =
@@ -281,13 +322,13 @@ object GameEvents:
 
 （上のコードの `GameEvents` は、検証した断片では `Events` の名前です。集約ごとに分けるため、本書では `GameEvents` と書きます。）
 
-最後の腕は、**状態の列挙子だけを列挙して**、イベントを `_` で受けます。状態を足すと、この `match` が網羅の警告になり、`-Werror` でビルドが止まります（**本書の断片で、状態を 1 つ足して警告を確認しました**）。イベントを足したときは、有効な組の追加を忘れても `Ignored` になるため、**性質テストで「`handle` が作る列は `Ignored` にならない」を守ります**（ガイド §7.3 の「許す組を足し忘れても、コンパイラは止めない」と同じ注意。Kotlin 版・Rust 版と同じ方針）。再生は `foldLeft` で、`Ignored` の件数を再生側が受け取ります（ガイド §7.4、§6.1）。
+最後の腕は、**状態の列挙子だけを列挙して**、イベントを `_` で受けます。状態を足すと、この `match` が網羅の警告になり、`-Werror` でビルドが止まります（**本書の断片で、状態を 1 つ足して警告を確認しました**）。イベントを足したときは、有効な組の追加を忘れても `Ignored` になるため、**性質テストで「`handle` が作る列は `Ignored` にならない」を守ります**（生成器は表からでなく**コマンドから**作る。下の「表の使い方」と R-H4。ガイド §7.3 の「許す組を足し忘れても、コンパイラは止めない」と同じ注意。Kotlin 版・Rust 版と同じ方針）。再生は `foldLeft` で、`Ignored` の件数を再生側が受け取ります（ガイド §7.4、§6.1）。
 
 #### 遷移の許す組の表（規範。再レビュー N-H1。AI の案、承認を得ていない）
 
-**「どのイベントを、どの状態が受けるか」を決めるのは、次の 2 つの表（EV-G01〜G12 × `game` の状態、EV-S01〜S10 × `session` の状態）です。これが規範**で、`GameEvents.apply`・`SessionEvents.apply` の `match`、状態遷移図、性質テストの生成器（[テスト戦略](./test-strategy.md) の M9 の `collect`）、状態遷移テストは、**この表から導きます**（図やスケッチを基準に生成器を作ると、組の漏れを見逃す。前回は `Started` のスケッチが図より狭く、観察者の招待・資格の再発行・復帰が `Ignored` になっていた）。止める設計（H3）では、許す組の漏れがそのまま研修中の停止（P1）になります。
+**「どのイベントを、どの状態が受けるか」を決めるのは、次の 2 つの表（EV-G01〜G12 × `game` の状態、EV-S01〜S10 × `session` の状態）です。これが規範**で、`GameEvents.apply`・`SessionEvents.apply` の `match`、状態遷移図、状態遷移テストは、**この表から導きます**。ただし、**「`handle` が作る列は `Ignored` にならない」性質テストの生成器は、表から作りません**（表から列を作ると、表と `apply` が一致することしか確かめられず、表そのものの漏れを見逃す。前回は `Started` のスケッチが図より狭く、観察者の招待・資格の再発行・復帰が `Ignored` になっていた。再々レビュー R-H4）。生成器は**コマンドから**作り、表は照合する側に回します（下の「表の使い方」）。止める設計（H3）では、許す組の漏れがそのまま研修中の停止（P1）になります。
 
-表は、Kotlin 版の `evolveGame`・`evolveSession`（`Game.kt`・`SessionEvolve.kt`）と、Kotlin 版の状態遷移図（`domain-model.md` の「game ストリームの状態」「session ストリームの状態」）を**読んで**書きました。次の 2 点が Kotlin 版と違います。(1) Kotlin 版の `evolve` は、`handle` が作らない列を「状態を変えずに返す」だけで、Scala 版は同じ組を `Ignored` にします（検知が目的）。(2) Kotlin 版の `evolveSession` は、`DecisionSaved`・`WeekCommitted` などを `Paused` でも適用しますが、`handle` は `Paused` で作らないため、**Scala 版の表は `handle` が作る組だけを ○ にします**（`Paused` の `DecisionSaved`・`WeekCommitted` は `Ignored`。止める設計では、`handle` が作らない列は不具合）。
+表は、Kotlin 版の `evolveGame`・`evolveSession`（`Game.kt`・`SessionEvolve.kt`）と、Kotlin 版の状態遷移図（`domain-model.md` の「game ストリームの状態」「session ストリームの状態」）を**読んで**書きました。次の 2 点が Kotlin 版と違います。(1) Kotlin 版の `evolve` は、`handle` が作らない列を「状態を変えずに返す」だけで、Scala 版は同じ組を `Ignored` にします（検知が目的）。(2) Kotlin 版の `evolveSession` は、`DecisionSaved`・`WeekCommitted` などを `Paused` でも適用しますが、`handle` は `Paused` で作らないため、**Scala 版の表は、`handle`・`startGame`・`assignRoleAfterStart` が作る組だけを ○ にします**（`Paused` の `DecisionSaved`・`WeekCommitted`・`SessionEnded` は `Ignored`。止める設計では、これらが作らない列は不具合）。条件つきの ○ の条件は、Kotlin 版のコード（`Game.kt` の `GameData.withRole`、`Credential.kt` の `revoked`・`reissued`・`recovered`、`InvitationEntry.kt` の `invited`・`invitationRevoked`・`observerJoined`、`SessionEvolve.kt`、`Session.kt` の `withHolderReplaced`）を再々レビューの対応で**実際に読んで**書きました。Kotlin 版は、条件を満たさない組で `null` を返し、`evolve` が状態を変えずに返します。Scala 版は同じ組を `None` にし、`Ignored` にします。
 
 **`game` ストリーム**（○ = `Applied`、× = `Ignored`）
 
@@ -297,12 +338,12 @@ object GameEvents:
 | EV-G02 | `ParticipantJoined` | × | ○（新しい参加者のみ） | × | 同じ参加者の 2 回目は × |
 | EV-G03 | `RoleAssigned` | × | ○（既知の参加者） | ○（既知の参加者。入れ替えの新担当者） | 未知の参加者は × |
 | EV-G04 | `RoleUnassigned` | × | ○（既知の参加者） | × | 開始後の外れは `ParticipantReplaced` |
-| EV-G05 | `ObserverInvited` | × | ○ | ○ | |
-| EV-G06 | `ObserverInvitationRevoked` | × | ○ | ○ | 初稿の Scala 版は 0 件だった |
-| EV-G07 | `ObserverJoined` | × | ○ | ○ | |
-| EV-G08 | `CredentialRevoked` | × | ○ | ○ | 入れ替えの自動失効を含む |
-| EV-G09 | `CredentialReissued` | × | ○ | ○ | |
-| EV-G10 | `ParticipationRecovered` | × | ○ | ○ | 開始後の復帰（US3.2）に要る |
+| EV-G05 | `ObserverInvited` | × | ○（未知の招待 ID のみ） | ○（同左） | 既知の招待 ID は変えない（`invited`）= × |
+| EV-G06 | `ObserverInvitationRevoked` | × | ○（既知で失効していない招待のみ） | ○（同左） | 未知の招待と失効済みは変えない（`invitationRevoked`）= ×。初稿の Scala 版は 0 件だった |
+| EV-G07 | `ObserverJoined` | × | ○（既知の招待で、未参加の観察者のみ） | ○（同左） | 未知の招待と参加済みの観察者は変えない（`observerJoined`）= × |
+| EV-G08 | `CredentialRevoked` | × | ○（既知で未失効の主体のみ） | ○（同左） | 未知の主体と**失効済みは変えない**（`revoked`）= ×。入れ替えの自動失効を含み、**`assignRoleAfterStart` は未失効の旧担当者にだけ出す**（D3。R-H3） |
+| EV-G09 | `CredentialReissued` | × | ○（失効済みの資格のみ） | ○（同左） | 未知の主体と失効していない資格は変えない（`reissued`）= × |
+| EV-G10 | `ParticipationRecovered` | × | ○（既知で未失効の主体のみ） | ○（同左） | 未知の主体と失効済みは変えない（`recovered`）= ×。開始後の復帰（US3.2）に要る |
 | EV-G11 | `GameStarted` | × | ○（→ `Started`） | × | |
 | EV-G12 | `ParticipantReplaced` | × | × | ○（既知の参加者） | 未知の参加者は ×（Kotlin 版の変更表 38）。`Preparing`・`NotCreated` も × |
 
@@ -313,17 +354,23 @@ object GameEvents:
 | EV-S01 | `SessionStarted` | ○（→ `Active`） | × | × | × | |
 | EV-S02 | `SessionPaused` | × | ○（→ `Paused`） | × | × | |
 | EV-S03 | `SessionResumed` | × | × | ○（→ `Active`） | × | |
-| EV-S04 | `SessionEnded` | × | ○（→ `Ended`） | ○（→ `Ended`） | × | |
+| EV-S04 | `SessionEnded` | × | ○（→ `Ended`） | **×** | × | **`Paused` は ×**（R-H3 で直した。前の版は ○ で、規則と矛盾していた）。`EndReason` は `FINAL_WEEK` だけで（`Session.kt`）、最終週の `WeekCommitted` と同じ追記（`SessionCommit.kt`。このとき状態は `Active`）でしか作られず、手動の終了は未実装。Kotlin 版の `evolveSession` は `Paused` からも `Ended` にするが、`handle` は作らない。Kotlin 版の設計書の図の「`Paused` → `Ended`」はコードにない |
 | EV-S05 | `DecisionSaved` | × | ○ | × | × | 停止中の保存は `handle` が拒否する |
-| EV-S06 | `ProxyDecisionSubmitted` | × | ○ | ○ | 進行役の代理入力は停止中も受ける（UC-09）。確定はしない |
+| EV-S06 | `ProxyDecisionSubmitted` | × | ○ | ○ | × | 進行役の代理入力は停止中も受ける（UC-09）。確定はしない。`NotStarted`・`Ended` は `handle` が拒否する |
 | EV-S07 | `AutoCommitChanged` | - | - | - | - | **Kotlin 版のコード（`SessionEvent`）に存在しない**。EV-S10 と重複した表の記述（未決事項 12） |
 | EV-S08 | `WeekCommitted` | × | ○（最終週なら同じ追記の `SessionEnded` が続く） | × | × | `Paused` は確定しない。再開で `AUTO` が揃えば、`SessionResumed` の後（`Active`）に続く |
-| EV-S09 | `RoleHolderReplaced` | × | ○ | ○ | `NotStarted`・`Ended` は **`Ignored`**。`handle`（`assignRoleAfterStart`）が `NotActive`・`AlreadyEnded` で拒否するので作られない |
-| EV-S10 | `CommitModeChanged` | × | ○ | ○ | 有効にして 4 役割が揃えば、同じ追記で `WeekCommitted`（`AUTO`）が続く（`Active` のときだけ） |
+| EV-S09 | `RoleHolderReplaced` | × | ○ | ○ | × | `NotStarted`・`Ended` は **`Ignored`**。`handle`（`assignRoleAfterStart`）が `NotActive`・`AlreadyEnded` で拒否するので作られない。条件はない（`withHolderReplaced` は `removed` を外して `added` を足すだけ） |
+| EV-S10 | `CommitModeChanged` | × | ○ | ○ | × | `SetCommitMode` は**停止中も受け付ける**（`openData`）。`NotStarted`・`Ended` は `handle` が拒否する。有効にして 4 役割が揃えば、同じ追記で `WeekCommitted`（`AUTO`）が続く（`Active` のときだけ） |
 
-**表の使い方（案）**: (1) 表を、テストが読める値（状態の種類 × イベントの種類 → 許す／許さない）として 1 か所に持つ。(2) 状態遷移テストが、**全部の組**（12 × 3 と 9 × 4）を `apply` に渡し、表の ○ が `Applied`、× が `Ignored` になることを確かめる（条件つきの ○ は、条件を満たす例と、満たさない例の両方）。(3) 性質テストの生成器は、**表の ○ の組から**イベントの列を作る（`handle` を通した列に加えて、`assignRoleAfterStart`、観察者の招待と参加、資格の失効・再発行・復帰、復帰を含める）。(4) 状態遷移図は、この表から機械的に描ける形にする。**表を変えるときは、図・`apply`・生成器・テストを同じ変更で直す**。
+**表の使い方（案。再々レビュー R-H4 で、生成器の作り方を直した）**: 「`handle` が作る列は `Ignored` にならない」の性質テストが捕まえたいのは、**表と `apply` の食い違いだけでなく、表そのものの漏れ**（P1 の本当の原因。前回の `Started` の表の漏れ）である。表から生成器を作ると、表が漏れていれば生成器も同じ漏れを持ち、見逃す。そこで 3 つの方向で確かめる（いずれもテストのソース。[テスト戦略](./test-strategy.md) は別の担当が同じ名前で書く）。
 
-**この表は、AI が Kotlin 版のコードと図から導いた案**で、人の確認を得ていません。Kotlin 版の `GameData.revoked`・`reissued`・`recovered` が、未知の主体を渡されたときに状態を変えない（`null` を返す）かは、**読んでいません**（B1 で確認し、変えるなら表に条件を足す）。
+1. **(a) コマンドから作る列で `Ignored` が 0 件**（表の漏れを捕まえる）: 状態に応じて**コマンド**を選ぶ生成器（`Game.handle`・`Session.handle`・`startGame`・`assignRoleAfterStart` を通す）で列を作り、`foldLeft` で `apply` に渡して、`Ignored` が 0 件であることを確かめる。生成器の入力に使うのは**コマンドの種類と状態だけ**で、表は読まない。コマンドの種類に、準備中の割り当てと付け替え、観察者の招待・参加・取り消し、資格の失効・再発行・復帰、開始、保存・代理入力・確定・一時停止・再開・確定方式の変更、**開始後の入れ替え**（`assignRoleAfterStart`）を含める。**「資格の失効 → 同じ参加者が担当する役割への入れ替え」を、固定の流れとして必ず含める**（次の「開始後の役割の入れ替え」の D3 の穴。ここで落ちるのが、表と `handle` のずれの典型）。
+2. **(b) 表の各 ○ の組が (a) の列の中で N 回以上現れる**（表が広すぎないかを捕まえる）: (a) の列で実際に `Applied` になった（状態の種類, イベントの種類）の組を `collect` で数え、表の ○ の組それぞれが N 回以上（N は B1 で決める。案: 100 件の列で 1 回以上）現れることを確かめる。現れない ○ は、`handle` が作らない組（表が広い）か、生成器が届かない組。**× の組は (a) で 0 件**（`Ignored` が 0 件であることと同じ）。
+3. **(c) 表 × `apply` の全組の状態遷移テスト**（`apply` の腕の消し忘れ・足し忘れを捕まえる）: **全部の組**（12 × 3 と 9 × 4）を `apply` に渡し、表の ○ が `Applied`、× が `Ignored` になることを確かめる。条件つきの ○ は、条件を満たす例と、満たさない例の両方（上の表の条件の列）。
+
+**表と値の 1 か所化**: 表は、テストが読む値（状態の種類 × イベントの種類 → 許す／許さない／条件）として**テストのソースの 1 か所**に持つ。この文書の表と食い違わないよう、**(i) その値から Markdown の表を生成するか、(ii) テストがこの文書の Markdown の表を読んで値と突き合わせる**のどちらかにする（どちらかは [テスト戦略](./test-strategy.md) の側で決める。AI の案）。状態遷移図は、この表から機械的に描ける形にする。**表を変えるときは、図・`apply`・テストの値を同じ変更で直す**。**合格の基準（B1 の表に入れる）**: 表の ○ を 1 つ × に変えると (a) が落ち、`apply` の腕を 1 つ消すと (c) が落ちること。
+
+**この表の確認状況**: 表は、AI が Kotlin 版のコードと図から導いた案で、人の確認を得ていません。**再々レビューの対応で、条件つきの ○ の条件を Kotlin 版のコードで確かめました**（`revoked` は未知の主体と失効済みで変えない、`reissued` は未知の主体と失効していない資格で変えない、`recovered` は未知の主体と失効済みで変えない、`invited` は既知の招待で変えない、`invitationRevoked` は未知の招待と失効済みで変えない、`observerJoined` は未知の招待と参加済みで変えない、`withRole` は未知の参加者で変えない、`SetCommitMode` は停止中も受け付ける、`EndReason` は `FINAL_WEEK` だけ）。`decide` 側は、`decideRevoke`（未失効のみ）・`decideReissue`（失効済みのみ）・`decideRecover`（有効のみ）・`decideRevokeInvitation`（既知で未失効のみ）・`decideJoinAsObserver`（使える招待のみ）が、`evolve` の条件と同じ前提を検査していることも読んだ。**読んでいないもの**: `decideInvite` は招待 ID の重複を検査しない（ID は生成器が作る前提。重複すると Scala 版は `Ignored`）、`startGame` と各コマンドの全分岐が (a) の生成器で網羅されるか（B1 で (b) の `collect` で確かめる）。**Kotlin 版の潜在不具合**（`assignRoleAfterStart` の `ReplaceDecision.kt` が、失効済みの旧担当者にも `CredentialRevoked` を出す）は、下の「開始後の役割の入れ替え」と未決事項 16 に書いた。
 
 #### 開始後の役割の入れ替えと `Started` の自己遷移（H2・N-H1。AI の案、承認を得ていない）
 
@@ -333,7 +380,7 @@ Kotlin 版は、開始後の入れ替えを `Started` の**自己遷移**とし�
 | :--- | :--- | :--- | :--- |
 | `game` | `Started` | `RoleAssigned`（入れ替えの新担当者） | 参加者の役割を付ける（自己遷移）。未知の参加者は `Ignored` |
 | `game` | `Started` | `ParticipantReplaced`（旧担当者。`replacedBy` を持つ） | 旧担当者の役割を外す。参加者の行・表示名・過去の入力は消さない（自己遷移）。**未知の参加者は `Ignored`** |
-| `game` | `Preparing`・`Started` | `ObserverInvited`・`ObserverInvitationRevoked`・`ObserverJoined`・`CredentialRevoked`（入れ替えの自動失効を含む）・`CredentialReissued`・`ParticipationRecovered` | 招待・観察者・資格の状態を更新する（自己遷移） |
+| `game` | `Preparing`・`Started` | `ObserverInvited`・`ObserverInvitationRevoked`・`ObserverJoined`・`CredentialRevoked`（入れ替えの自動失効を含む）・`CredentialReissued`・`ParticipationRecovered` | 招待・観察者・資格の状態を更新する（自己遷移）。**条件つき**（上の表の条件の列。条件を満たさなければ `Ignored`。R-H3） |
 | `session` | `Active`・`Paused` | `RoleHolderReplaced`（`removed`・`added`） | `SessionData.assignments[role]` を更新する（自己遷移） |
 | `session` | `NotStarted`・`Ended` | `RoleHolderReplaced` | **`Ignored`**（`Applied(s)` ではない。Kotlin 版の「状態を変えない」を、Scala 版では `Ignored` として検知する。`handle` が作らないので、出たら不具合） |
 
@@ -350,6 +397,23 @@ Started --> Started : ObserverInvited / ObserverInvitationRevoked\nObserverJoine
 
 **入れ替えは `assignRoleAfterStart`（`game` と `session` の両方を入力に取る関数）が、1 回の追記で返します**。`game` に `ParticipantReplaced`（旧担当者ごとに 1 件）・`CredentialRevoked`・`RoleAssigned`、`session` に `RoleHolderReplaced` を返し、旧担当者の資格の失効と `session` の写しの更新を同じ追記で行います（Kotlin 版と同じ規則。1 人だけ外す案、終了後の扱い、イベント名と形は Kotlin 版のゲート 3.5 の未決事項に追従する）。
 
+**失効済みの旧担当者の扱い（再々レビュー R-H3 (d)。D3。ユーザーの指示に基づき AI が推奨案で決めた。確認は未了）**: Kotlin 版の `assignRoleAfterStart`（`ReplaceDecision.kt`）は、旧担当者の**全員に `CredentialRevoked` を無条件に出します**。一方 `evolveGame` の `revoked()` は、失効済みの資格には `null` を返し、状態を変えません。Kotlin 版は `null` を黙って受けるので動きますが、Scala 版の `apply` は同じ組を `Ignored` にし、**コマンドの経路では止める**ため、次の流れでゲームが止まります: 進行役が参加者 P1（役割 R の担当）の資格を失効させる（`CredentialRevoked(P1)`）→ 進行役が別の参加者 P2 を R に割り当てて入れ替える → `ReplaceDecision` が P1 に再び `CredentialRevoked` を出す → `Ignored` → 500。「失効 → 入れ替え」は自然な流れ（資格を失効させてから担当を替える）で、Kotlin 版でも `replayGame` が `InvalidTransition` として記録する（Kotlin 版のテスト `ReplaceRoleSpec.kt` にこの組はない）。
+
+案は 2 つ: (a) **旧担当者のうち、資格が未失効の人にだけ `CredentialRevoked` を出す**（採用。`assignRoleAfterStart` の側を直す。`apply` と表は変えない）、(b) EV-G08 を失効済みの主体にも届く冪等な ○ にする（表と `apply` を広げる。`revoked()` の「失効済みは変えない」という Kotlin 版の条件から外れる）。**(a) に決めた理由**: 失効済みの資格をもう一度失効させる事実は、何も変えないのにイベントの列に残り、再生の `Ignored` の検査を弱める。表を狭いまま保つほうが、P1 の検知（(a) の生成器）が効く。
+
+```scala
+// assignRoleAfterStart の game 側のイベントの導出（スケッチ。型検査していない）
+def replacementEvents(d: GameData, incoming: ParticipantId, role: Role): List[GameEvent] =
+  val outgoing = d.participants.collect { case (p, Some(`role`)) => p }.toList.sortBy(_.value)
+  outgoing.flatMap { p =>
+    val sub = CredentialSubject.Participant(p)
+    GameEvent.ParticipantReplaced(p, role, incoming) ::
+      Option.when(d.credentials.get(sub).exists(!_.revoked))(GameEvent.CredentialRevoked(sub)).toList   // 未失効だけ（D3）
+  } :+ GameEvent.RoleAssigned(incoming, role)
+```
+
+新しい担当者の資格が失効済みなら、Kotlin 版と同じく `CredentialAlreadyRevoked` で拒否する（`data.credentials[subject]?.revoked == false` の検査。再生では新しい担当者の資格が未失効である前提）。Kotlin 版の `ReplaceDecision.kt` は変えない（Scala 版の設計書の範囲外）。**正本側の整理が要る**（未決事項 16）。
+
 **この要件を、テストに必ず入れます**（テスト戦略は別の担当が書くため、ここでは domain-model の要件として書く）。
 
 - **受入テスト（再レビュー N-H1。現場で最も起きやすい流れ）**:
@@ -357,8 +421,9 @@ Started --> Started : ObserverInvited / ObserverInvitationRevoked\nObserverJoine
   2. 「**停止中に入れ替え → 進行役が代理入力 → 再開して確定**」。`Paused` は `RoleHolderReplaced` と `ProxyDecisionSubmitted` を受け（上の表）、再開（`SessionResumed`）の後に週を確定できる。再生しても同じ状態になる。
   3. 「**入れ替え後の再開で、保存できるのは新担当者だけ**」。旧担当者の資格は失効し、保存は 403（`app.unauthorized` と同じ本文）。新担当者は保存できる。
   4. 「開始後の復帰（`ParticipationRecovered`）、観察者の招待と参加・招待の取り消し、資格の再発行が、開始後のゲームで `Ignored` にならず、続けて保存・確定できる」（U2 の約束の範囲）。
+  5. 「**失効 → 入れ替え → 新担当者が保存・確定 → 再生しても同じ状態**」（再々レビュー R-H3 (d)。D3）。進行役が参加者 P1（役割 R の担当）の資格を失効させ、続けて P2 を R に入れ替える。`CredentialRevoked` が P1 に**重ねて出ない**（出るとゲームが止まる）こと、新担当者 P2 が保存でき、週を確定できること、イベントの列を再生すると `Ignored` が 0 件で同じ状態になることを確かめる。入れ替え前に資格が未失効の旧担当者には `CredentialRevoked` が 1 件出ることも、別の例で確かめる（件数の確認）。
   - 共有の `apps/beer-game-features/continuation/credentials.feature`（`@AC3.2.5`）と二重になる部分は、テスト戦略の別の担当が許可リストの形で整理する。
-- **性質テスト**: 「`handle` が作る列は `Ignored` にならない」の生成器に、**開始後の入れ替え（`assignRoleAfterStart`）、観察者の招待・参加・取り消し、資格の失効・再発行、復帰を含める**。生成器は上の「許す組の表」から作る。生成器が入れ替えなどを作らないと、遷移の腕の漏れを検知できない。
+- **性質テスト**: 「`handle` が作る列は `Ignored` にならない」の生成器に、**開始後の入れ替え（`assignRoleAfterStart`）、観察者の招待・参加・取り消し、資格の失効・再発行、復帰を含める**。生成器は、**上の「許す組の表」からではなく、コマンドから作る**（再々レビュー R-H4。「表の使い方」の (a)(b)(c) の 3 方向）。「失効 → 入れ替え」の流れを固定の流れとして入れる。生成器が入れ替えなどを作らないと、遷移の腕の漏れを検知できない。
 - **「許さない組の拒否」のテスト**: 表の × の組を、すべて `apply` に渡して `Ignored` になることを確かめる。たとえば `Preparing` や `NotCreated` が `ParticipantReplaced` を受けても状態を変えない（`Ignored`）、未知の参加者への `ParticipantReplaced` は `Ignored`、`NotStarted`・`Ended` の `RoleHolderReplaced` は `Ignored`。
 
 ### Session 集約（進行）
@@ -408,7 +473,43 @@ object Session:
 
 #### 状態遷移
 
-状態遷移図は [Kotlin 版](../beer-game-kotlin/domain-model.md) の `session ストリームの状態` と同じです（`NotStarted` → `Active` ⇄ `Paused` → `Ended`）。**`Active`・`Paused` は `RoleHolderReplaced`（開始後の入れ替え）を自己遷移として受けます**（上の「開始後の役割の入れ替えと `Started` の自己遷移」）。遷移の「許す組」は、上の「遷移の許す組の表」（規範）から `match` に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。Kotlin 版の図が `Paused` の自己遷移に載せているのは `AutoCommitChanged`・`ProxyDecisionSubmitted`・`RoleHolderReplaced` で、Scala 版の表はそれに `CommitModeChanged`（Kotlin 版のコードの実際のイベント）を合わせます。
+状態遷移図は [Kotlin 版](../beer-game-kotlin/domain-model.md) の `session ストリームの状態` と同じです（`NotStarted` → `Active` ⇄ `Paused` → `Ended`）。**`Active`・`Paused` は `RoleHolderReplaced`（開始後の入れ替え）を自己遷移として受けます**（上の「開始後の役割の入れ替えと `Started` の自己遷移」）。遷移の「許す組」は、上の「遷移の許す組の表」（規範）から `match` に列挙し、許さない組の拒否はテストで確かめます（ガイド §7.3、§10.2）。Kotlin 版の図が `Paused` の自己遷移に載せているのは `AutoCommitChanged`・`ProxyDecisionSubmitted`・`RoleHolderReplaced` で、Scala 版の表はそれに `CommitModeChanged`（Kotlin 版のコードの実際のイベント）を合わせます。**ただし、Kotlin 版の図の「`Paused` → `Ended`」と「進行役の終了」は、Kotlin 版のコードにありません**（`EndReason` は `FINAL_WEEK` だけで、`SessionEnded` は最終週の `WeekCommitted` と同じ追記でだけ作られる。手動の終了は未実装）。Scala 版の表は `Paused` の `SessionEnded` を × にします（R-H3）。
+
+#### `SessionEvents.apply` のスケッチ（R-H3 (e)。型検査していない。AI の案）
+
+`game` 側（`GameEvents.apply`）と同じ形で、表の ○ の組だけを腕にします。上の表にない組は、最後の腕の `Ignored` です。Kotlin 版の `evolveSession`（`SessionEvolve.kt`）は、`DecisionSaved`・`WeekCommitted`・`SessionEnded` を `Paused` でも適用しますが、Scala 版は `handle` が作る組（`Active`）だけを受けます。
+
+```scala
+object SessionEvents:
+  /** Active・Paused のときだけデータを更新する（種類は変えない）。NotStarted・Ended は Ignored */
+  private def updateOpen(s: SessionState)(f: SessionData => SessionData): Evolution[SessionState] = s match
+    case SessionState.Active(d) => Evolution.Applied(SessionState.Active(f(d)))
+    case SessionState.Paused(d) => Evolution.Applied(SessionState.Paused(f(d)))
+    case other                  => Evolution.Ignored(other)
+
+  def apply(state: SessionState, event: SessionEvent): Evolution[SessionState] =
+    (state, event) match
+      // 腕は、上の「遷移の許す組の表」（session）の ○ の組だけ
+      case (SessionState.NotStarted, e: SessionEvent.SessionStarted) =>                       // EV-S01
+        Evolution.Applied(SessionState.Active(SessionData.initial(e)))                         // 設定・割り当て・初期状態・確定方式の写し（D4）
+      case (SessionState.Active(d), SessionEvent.SessionPaused)      => Evolution.Applied(SessionState.Paused(d))    // EV-S02
+      case (SessionState.Paused(d), SessionEvent.SessionResumed)     => Evolution.Applied(SessionState.Active(d))    // EV-S03
+      case (SessionState.Active(d), _: SessionEvent.SessionEnded)    => Evolution.Applied(SessionState.Ended(d))     // EV-S04。Paused は Ignored
+      case (SessionState.Active(d), e: SessionEvent.DecisionSaved)   =>                                              // EV-S05。Paused は Ignored
+        Evolution.Applied(SessionState.Active(d.withDecision(e.role, DecisionEntry(e.quantity, e.decisionVersion, e.editor))))
+      case (s @ (SessionState.Active(_) | SessionState.Paused(_)), e: SessionEvent.ProxyDecisionSubmitted) =>        // EV-S06。停止中も受ける
+        updateOpen(s)(_.withDecision(e.role, DecisionEntry(e.quantity, e.decisionVersion, e.editor)))
+      case (SessionState.Active(d), e: SessionEvent.WeekCommitted)   =>                                              // EV-S08。結果と次週の状態を採用するだけ（D5）
+        Evolution.Applied(SessionState.Active(d.afterCommit(e)))
+      case (s @ (SessionState.Active(_) | SessionState.Paused(_)), e: SessionEvent.RoleHolderReplaced) =>            // EV-S09。条件なし
+        updateOpen(s)(_.withHolderReplaced(e.role, e.removed, e.added))
+      case (s @ (SessionState.Active(_) | SessionState.Paused(_)), e: SessionEvent.CommitModeChanged) =>             // EV-S10。停止中も受ける
+        updateOpen(s)(_.copy(commitMode = e.commitMode))
+      case (s @ (SessionState.NotStarted | SessionState.Active(_) | SessionState.Paused(_) | SessionState.Ended(_)), _) =>
+        Evolution.Ignored(s)
+```
+
+`game` と違い、session の条件つきの ○ は無く、状態の種類で決まります（`withHolderReplaced` は `removed` を外して `added` を足すだけで、条件を持たない。`NotStarted` が受けるのは `SessionStarted` だけで、`Ended` はどのイベントも受けない）。**型検査していません**。
 
 ### 2 ストリームにまたがる StartGame
 
@@ -552,8 +653,11 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 | 10 | コマンドの経路で不正な遷移（`Ignored` に当たる組）が出ても、状態を変えずに `InvalidTransition` を記録して続行する | **コマンドの経路で `Ignored` が出たら、`AppFailure.Persistence`（500・相関 ID）で処理を止める**（fail closed）。診断の用途だけ、記録して続行する。**利用者に見える変更**: 該当するゲームの保存・確定などが失敗し続け、運用の復旧まで続けられない | 保存済みの事実を無視した状態で `handle` すると不変条件が崩れるため。**止める設計はユーザーの決定（2026-11-25、H3）**。影響と運用（進行役への依頼の文言、研修中の原則）は [バックエンドアーキテクチャ](./architecture-backend.md) の「`Ignored` で止めること」と運用要件に置く |
 | 11 | `evolveGame` の `RoleAssigned` は開始後も役割を付け、`ParticipantReplaced` は開始後だけ旧担当者の役割を外す（Kotlin 版の変更表 38）。観察者の招待・参加・取り消し、資格の失効・再発行、復帰は準備中・開始後の両方で受ける | **同じ**。`Started` の自己遷移として、`RoleAssigned`・`ParticipantReplaced`・`ObserverInvited`・`ObserverInvitationRevoked`・`ObserverJoined`・`CredentialRevoked`・`CredentialReissued`・`ParticipationRecovered`（game）と `RoleHolderReplaced`（session）を受ける。未知の参加者への `ParticipantReplaced` は `Ignored`。session の `NotStarted`・`Ended` の `RoleHolderReplaced` も `Ignored`。初稿は `RoleAssigned` 以外を持たず、1 回目の直しも状態遷移図より狭かった（H2・再レビュー N-H1） | Kotlin 版に追従。`Ignored` で止める設計と合わせると、持たないと入れ替えたゲームや、復帰・再発行・観察者の招待をしたゲームが操作不能になる |
 | 12 | 権限を先に判定し、権限のない人に状態を知らせない（Kotlin 版の原則） | `AssignRole` の判定順を、権限 → 準備中か → 参加者の存在にそろえる（L6。本書の初稿は準備中かが先だった）。作成前は `Forbidden` | Kotlin 版の原則に合わせる |
-| 13 | 遷移の「許す組」の正本は、`evolve` のコードと状態遷移図（どちらも手で書く） | **「許す組の表」（EV × 状態）を規範**にし、`apply`・図・性質テストの生成器・状態遷移テストをこの表から導く（N-H1。AI の案） | 止める設計では、組の漏れが研修の停止になる。スケッチや図を基準にすると漏れを見逃す |
+| 13 | 遷移の「許す組」の正本は、`evolve` のコードと状態遷移図（どちらも手で書く） | **「許す組の表」（EV × 状態）を規範**にし、`apply`・図・状態遷移テストをこの表から導く。**性質テストの生成器は、表からでなくコマンドから作る**（N-H1・R-H4。AI の案） | 止める設計では、組の漏れが研修の停止になる。スケッチや図を基準にすると漏れを見逃す |
 | 14 | `AutoCommitChanged`（EV-S07）と `CommitModeChanged`（EV-S10）が表に並ぶ。コードにあるのは `CommitModeChanged` だけ | 表（許す組の表）には `CommitModeChanged` だけを置き、EV-S07 は重複の疑いとして未決事項 12 に置く | Kotlin 版の `SessionEvent` に `AutoCommitChanged` が無い（`SessionEvolve.kt` の `when` で確認） |
+
+| 15 | `assignRoleAfterStart` は旧担当者の全員に `CredentialRevoked` を出す。`evolve` は失効済みで状態を変えず、記録して続行する | **未失効の旧担当者にだけ `CredentialRevoked` を出す**（D3。R-H3）。失効済みの旧担当者には `ParticipantReplaced` だけ | `Ignored` で止める設計（変更表 10）と合わせると、「失効 → 入れ替え」でゲームが止まるため。ユーザーの指示に基づき AI が推奨案で決めた（確認は未了） |
+| 16 | `evolveSession` は `Paused` でも `DecisionSaved`・`WeekCommitted`・`SessionEnded` を適用する | `SessionEvents.apply` は `Active` だけが受ける（`handle` が作る組だけ ○）。`ProxyDecisionSubmitted`・`RoleHolderReplaced`・`CommitModeChanged` は `Paused` も受ける | `handle` が作らない列を `Ignored` として検知する（変更表 10・13） |
 
 上記以外（ストリームの構造、イベントの名称と意味、投影、週次計算の規則、エラーコード、開示の規則）は変えません。
 
@@ -572,9 +676,10 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 10. **開始後の入れ替えの型**（H2）: `Started` の自己遷移（`RoleAssigned`・`ParticipantReplaced` と観察者・資格のイベント）と `RoleHolderReplaced`、`assignRoleAfterStart` の戻り値（`StartDecision` と同じ形か）を B1 で型検査する。1 人だけ外す案・終了後の扱い・イベント名は Kotlin 版のゲート 3.5 に追従する。
 11. **`handle` の引数の順**: 本書は `handle(state, command)`（Kotlin 版の `decide` と同じ）、ガイド §7.6 は `handle(command, state)`。B1 で揃えるか決める。
 12. **EV-S07 `AutoCommitChanged` と EV-S10 `CommitModeChanged` の重複**（再レビュー M20。前回の M5 が、Scala 版のどの未決事項にも載っていなかった）: Kotlin 版の設計書の表（776・780 行）に並ぶが、Kotlin 版のコード（`SessionEvolve.kt`）の `SessionEvent` には `CommitModeChanged` だけがある。Scala 版の表は `CommitModeChanged` を採る案。イベント名はペイロードの JSON と投影の契約になるため、**Kotlin 版の正本の整理に追従する**（Scala 版で独自に決めない）。
-13. **「許す組の表」の確認**（N-H1）: 表は Kotlin 版のコードと図から導いた案で、人の確認を得ていない。Kotlin 版の `revoked`・`reissued`・`recovered` が未知の主体で状態を変えないか、`RoleAssigned` の未知の参加者の扱い、`CommitModeChanged` の `Paused` の扱いを、B1 の最初のスライドで型検査とテストで確かめる。
+13. **「許す組の表」の確認**（N-H1。再々レビュー R-H3・L11 で、読んで確認できた分を閉じた）: **閉じた**（Kotlin 版のコードを読んで確認した）: `revoked`・`reissued`・`recovered` は未知の主体で状態を変えない（失効の有無の条件も）、`invited`・`invitationRevoked`・`observerJoined` の条件、`withRole`（`RoleAssigned`・`ParticipantReplaced`）は未知の参加者で変えない、`SetCommitMode` は停止中も受け付ける、`EndReason` は `FINAL_WEEK` だけ。**残る未確認**: (1) 表は AI が導いた案で、人の確認を得ていない。(2) 表と `apply` を型検査していない（B1 の最初のスライドで、(a)(b)(c) の 3 方向のテストで確かめる）。(3) `decideInvite` が招待 ID の重複を検査しない前提（ID は生成器が作る）。(4) `startGame` と全コマンドが (a) の生成器で網羅されるか（(b) の `collect` で確かめる）。
 14. **`session_overview.week` が最終週 + 1 になる問題**（再レビュー M20。前回の M8）: [データモデル](./data-model.md) の未決事項 7 に載せた（`WeekCommitted` のペイロードに次の週を持たせる案はドメインのイベントの構造に影響するため、ここでも決める）。
 15. **ユーザーストーリー・受入条件への導線**（再レビュー M20。前回の M7）: 下の導線の表は、本書に書いた範囲だけの一部。全体は、Unit 定義の `@AC` タグから機械的に導く（[ADR-001](../../adr/beer-game-scala/001-scala-version-of-beer-game-kotlin.md) の許可リスト。別の担当）。
+16. **Kotlin 版の潜在不具合: 失効済みの旧担当者への `CredentialRevoked`**（再々レビュー R-H3 (d)。**正本側の整理が要る**）: Kotlin 版の `ReplaceDecision.kt`（`assignRoleAfterStart`）は、旧担当者の全員に `CredentialRevoked` を出し、`GameData.revoked()` は失効済みで `null` を返す。このため、失効済みの旧担当者がいる入れ替えで、`replayGame` が `InvalidTransition` を記録する（`ReplaceRoleSpec.kt` にこの組のテストがない）。Scala 版は D3（未失効にだけ出す）で避ける。**Kotlin 版・Rust 版の側で直すかは、各版の正本の判断**（Scala 版は変えない）。Scala 版の `Ignored` で止める設計（H3）は、同じ穴を Kotlin 版より早く、500 として表に出す。D3 は、ユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。
 
 ### ユーザーストーリー・受入条件への導線（一部）
 
@@ -599,7 +704,7 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 
 ### 再レビュー（[設計書の再レビュー](../../review/beer-game-scala/design_rereview_20261125.md)）への対応
 
-**ユーザーの決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件だけ**です。**N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。**
+**ユーザー本人が選んだ決定は、前回の H3・H6・H7・H9 と、再レビューの N-H4・N-H6・N-H7・N-H8 の 8 件（ほかにローカル DB の H2 の 1 件）**です。再々レビューの D1〜D5 は、ユーザーの指示に基づき AI が推奨案で決めたもの（確認は未了）で、ユーザーの決定ではありません。**N-H1・N-H2・N-H3・N-H5 の直し方は AI の案で、承認を得ていません。**
 
 | 指摘 | 直した箇所 | 状況 |
 | :--- | :--- | :--- |
@@ -608,6 +713,15 @@ SD3（`ValidatedNec`）は上の「検証の誤りと業務ルールの失敗」
 | M16 | 「SD1〜SD7」の冒頭（SD2 の「止める」はユーザーの決定、ほかは案） | 直した |
 | M20 | 未決事項の 12（EV-S07 と EV-S10 の重複）〜15、ユーザーストーリー・受入条件への導線（一部）の表、変更表の 14 | 直した（導線は一部。全体は ADR-001 の許可リスト側） |
 | N-H8 | 本書では扱わない（ADR-001 と運用の別の担当）。ドメインの規則には影響しない | - |
+
+### 再々レビュー（[設計書の再々レビュー](../../review/beer-game-scala/design_rereview2_20261125.md)）への対応
+
+**ユーザーの決定は、前回までの H3・H6・H7・H9・N-H4・N-H6・N-H7・N-H8 の 8 件と、ローカル DB（H2）の 1 件**です。**D1〜D5 は、ユーザーの「決定を行い、高 10 件を設計書に反映」という指示に基づき、AI が推奨案で決めたもの（2026-11-25。ユーザー本人が選択肢を選んだ決定ではなく、確認は未了）**です。それ以外の直し方は AI の案で、承認を得ていません。
+
+| 指摘 | 直した箇所 | 状況 |
+| :--- | :--- | :--- |
+| R-H3 | 「許す組の表」の session の表を全行 7 列に（EV-S06・S09・S10 の `Ended` の列）、EV-S04 の `Paused` を ×、規則の文言（`handle`・`startGame`・`assignRoleAfterStart` が作る組）、Kotlin 版のコードで確かめた条件を game の表の備考に、`GameData` と `GameEvents.apply` の条件つきの腕（6 イベントを条件なしの `Applied` にしていた箇所）、`SessionEvents.apply` のスケッチ、D3（`replacementEvents`。失効済みの旧担当者には `CredentialRevoked` を出さない）、受入テスト 5（失効 → 入れ替え → 保存・確定 → 再生）、未決事項 13 の縮小（L11）と 16（Kotlin 版の潜在不具合）、変更表 15・16 | D3 はユーザーの指示に基づき AI が推奨案で決めた（確認は未了）。表と条件は Kotlin 版のコードを読んで確認。Scala のコードは型検査していない |
+| R-H4 | 「表の使い方」を、コマンドから作る 3 方向（(a) `Ignored` が 0 件、(b) 表の ○ が N 回以上現れる、(c) 表 × `apply` の全組）に。表は 1 か所の値から生成するか、Markdown の表を読んで突き合わせる。合格の基準（○ を × にすると (a) が落ちる、腕を消すと (c) が落ちる） | AI の案。B1 で実装して確かめる |
 
 ## 出典
 
