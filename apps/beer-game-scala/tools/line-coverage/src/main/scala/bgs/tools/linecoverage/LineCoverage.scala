@@ -24,10 +24,16 @@ object LineCoverage:
   private def attribute(node: scala.xml.Node, name: String): String =
     node.attribute(name).fold("")(_.text.trim)
 
-  def fromXml(xml: Elem): Result =
+  /** `project` を指定すると、その sbt プロジェクトのソース（`/<project>/src/`）の行だけを数える。 */
+  def fromXml(xml: Elem): Result = fromXml(xml, None)
+
+  def fromXml(xml: Elem, project: Option[String]): Result =
     val lineCovered: Map[(String, Int), Boolean] =
       (xml \\ "statement").toList
         .filter(statement => attribute(statement, "ignored") != "true")
+        .filter(statement =>
+          project.forall(name => attribute(statement, "source").contains(s"/$name/src/"))
+        )
         .flatMap { statement =>
           val source = attribute(statement, "source")
           val invoked = attribute(statement, "invocation-count").toIntOption.exists(_ > 0)

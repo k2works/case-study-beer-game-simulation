@@ -73,3 +73,20 @@ class LineCoverageSpec extends FunSuite:
     assertEquals(LineCoverage.Result(2, 3).display, "66.6% (2/3)")
     assertEquals(LineCoverage.Result(0, 0).display, "n/a (0/0)")
   }
+
+  test("[Given 2 つのプロジェクトのソース, When プロジェクトを指定, Then そのプロジェクトの行だけを数える]") {
+    val xml = report(
+      statement("/w/domain/src/main/scala/A.scala", 1, 1),
+      statement("/w/domain/src/main/scala/A.scala", 2, 1),
+      statement("/w/app/src/main/scala/B.scala", 1, 0)
+    )
+    assertEquals(
+      LineCoverage.fromXml(xml, Some("domain")),
+      LineCoverage.Result(coveredLines = 2, totalLines = 2)
+    )
+    assertEquals(
+      LineCoverage.fromXml(xml, Some("app")),
+      LineCoverage.Result(coveredLines = 0, totalLines = 1)
+    )
+    assertEquals(LineCoverage.fromXml(xml), LineCoverage.Result(coveredLines = 2, totalLines = 3))
+  }

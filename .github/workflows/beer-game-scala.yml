@@ -86,7 +86,7 @@ jobs:
             beer-game-scala-${{ runner.os }}-
       # PostgreSQL 18.6（タグ固定）を Testcontainers で起動する。Docker が無ければ失敗する（CI では必須）
       - name: 統合テスト（実 PostgreSQL 18）と行カバレッジのゲート（行 80%）
-        run: ./scripts/coverage.sh 80
+        run: ./scripts/coverage.sh 80 domain=90 application=85
 
   acceptance:
     runs-on: ubuntu-latest
