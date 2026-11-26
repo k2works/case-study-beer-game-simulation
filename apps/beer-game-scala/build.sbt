@@ -78,7 +78,13 @@ lazy val adapterPersistence = (project in file("adapter-persistence"))
   .settings(
     // トランザクションの入口を書いてよい唯一のファイル。Scalafix の検査から、このファイルだけを除く（scalafix:off は使わない）。
     Compile / scalafix / unmanagedSources :=
-      (Compile / unmanagedSources).value.filterNot(_.getName == "Transactions.scala")
+      (Compile / unmanagedSources).value.filterNot(_.getName == "Transactions.scala"),
+    // `check` ジョブは、Docker を要する統合テスト（タグ Integration）を除外する。`integration` ジョブが実行する。
+    Test / testOptions ++= {
+      if (sys.env.contains("BGS_SKIP_INTEGRATION"))
+        Seq(Tests.Argument(TestFrameworks.MUnit, "--exclude-tags=Integration"))
+      else Nil
+    }
   )
   .settings(
     libraryDependencies ++= Seq(

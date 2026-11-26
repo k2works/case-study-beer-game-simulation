@@ -12,6 +12,10 @@ import scala.concurrent.duration.*
 /** PostgreSQL 18（Testcontainers。タグを固定）での契約テスト。受け入れの正は PostgreSQL。 */
 class PostgresEventStoreSpec extends EventStoreContract with TestContainerForAll:
 
+  /** `check` ジョブは Docker を要する統合テストを除外し、`integration` ジョブが実行する（案 Y）。 */
+  override def munitTests(): Seq[Test] =
+    super.munitTests().map(_.tag(new munit.Tag("Integration")))
+
   override val containerDef: PostgreSQLContainer.Def =
     PostgreSQLContainer.Def(DockerImageName.parse("postgres:18.6"))
 

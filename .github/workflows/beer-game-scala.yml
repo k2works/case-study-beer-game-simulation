@@ -1,0 +1,114 @@
+name: beer-game-scala
+
+# beer-game-scala の CI（検証のみ。デプロイはしない）。案 Y（2026-11-26 にユーザーが選択）: 検証を 3 ジョブに分ける。
+# 設計: docs/design/beer-game-scala/test-strategy.md、docs/development/beer-game-scala/development_strategy.md「CI の 3 ジョブ」
+#
+#   check       … Scalafmt・scalac の -Werror・WartRemover・Scalafix・単体・性質テスト・規則の fixture・層の依存（速く保つ）
+#   integration … Testcontainers の実 PostgreSQL 18 の統合テスト + 行カバレッジのゲート（行 80%。案 C）
+#   acceptance  … 共有の日本語 Gherkin の許可リスト（Undefined・Pending で失敗）
+#
+# team 規約の例外（ステージング自動反映・production の手動承認デプロイを持たない）は、ADR-001 に記録（2026-11-26 承認）。
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-scala/**'
+      - 'apps/beer-game-features/**'
+      - 'apps/beer-game-contracts/**'
+      - '.github/workflows/beer-game-scala.yml'
+  push:
+    branches: [develop, main]
+    paths:
+      - 'apps/beer-game-scala/**'
+      - 'apps/beer-game-features/**'
+      - 'apps/beer-game-contracts/**'
+      - '.github/workflows/beer-game-scala.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beer-game-scala-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game-scala
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: sbt/setup-sbt@v1
+      - name: キャッシュ（coursier・sbt）
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+            ~/.ivy2/cache
+          key: beer-game-scala-${{ runner.os }}-${{ hashFiles('apps/beer-game-scala/build.sbt', 'apps/beer-game-scala/project/**') }}
+          restore-keys: |
+            beer-game-scala-${{ runner.os }}-
+      - name: 検査（整形・静的解析・単体テスト・規則の fixture・層の依存）
+        run: ./scripts/check.sh
+        env:
+          # Docker を要する統合テストは integration ジョブで実行する
+          BGS_SKIP_INTEGRATION: '1'
+
+  integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game-scala
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: sbt/setup-sbt@v1
+      - name: キャッシュ（coursier・sbt）
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+            ~/.ivy2/cache
+          key: beer-game-scala-${{ runner.os }}-${{ hashFiles('apps/beer-game-scala/build.sbt', 'apps/beer-game-scala/project/**') }}
+          restore-keys: |
+            beer-game-scala-${{ runner.os }}-
+      # PostgreSQL 18.6（タグ固定）を Testcontainers で起動する。Docker が無ければ失敗する（CI では必須）
+      - name: 統合テスト（実 PostgreSQL 18）と行カバレッジのゲート（行 80%）
+        run: ./scripts/coverage.sh 80
+
+  acceptance:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/beer-game-scala
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: sbt/setup-sbt@v1
+      - name: キャッシュ（coursier・sbt）
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/.sbt
+            ~/.ivy2/cache
+          key: beer-game-scala-${{ runner.os }}-${{ hashFiles('apps/beer-game-scala/build.sbt', 'apps/beer-game-scala/project/**') }}
+          restore-keys: |
+            beer-game-scala-${{ runner.os }}-
+      - name: 受け入れ（共有 features の許可リスト。Undefined・Pending で失敗）
+        run: ./scripts/acceptance.sh
