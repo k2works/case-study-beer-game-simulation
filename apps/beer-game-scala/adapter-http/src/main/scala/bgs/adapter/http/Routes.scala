@@ -61,7 +61,11 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         .map(_.value)
         .filter(value => Either.catchNonFatal(UUID.fromString(value)).isRight)
         .getOrElse(generated.toString)
-      token = req.cookies.find(_.name == cookieName(req)).map(_.content)
+      // タブ名の Cookie を優先し、無ければ従来名（タブの識別子なしの呼び出し元が発行した資格）を使う（ADR-020）
+      token = req.cookies
+        .find(_.name == cookieName(req))
+        .orElse(req.cookies.find(_.name == SessionCookie))
+        .map(_.content)
       caller <- Api.authenticate(env)(token)
     yield Ctx(correlation, caller)
 
