@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 fail() { echo "NG: $1" >&2; exit 1; }
 
 deps() {
-  sbt -batch "show $1/libraryDependencies" 2>&1 | grep -E "^\[info\] \* |List\(" | tr ',' '\n' \
+  sbt -Dsbt.color=false -batch "show $1/libraryDependencies" 2>&1 | grep -E "^\[info\] \* |List\(" | tr ',' '\n' \
     | grep -oE "[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9_.+-]+(:[a-z]+)?" || true
 }
 
