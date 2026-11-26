@@ -14926,18 +14926,18 @@
 <tr>
 <td style="text-align: center;">B1</td>
 <td style="text-align: left;">U1</td>
-<td style="text-align: left;"><strong>基盤と縦の最小</strong>: 最初に H2（PostgreSQL モード）の動作範囲を実測し、テスト戦略の「B1 の受入条件」の未確認の前提を確かめる。sbt のマルチモジュール、<code>events</code> ほかの最小スキーマ、<code>decide</code>/<code>evolve</code>/<code>simulateWeek</code> の最小、http4s API、共有 <code>web</code> の接続。ゲームを作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで通す（H2 と PostgreSQL）。U1〜U6 の AC の一覧の確定と許可リストの導出。行率の算出スクリプトとそのテスト（最初のスライド）。NF-P2 の実測</td>
-<td style="text-align: left;">Scala 3 と Cats Effect・doobie・http4s の組み合わせは動くか。H2 は PostgreSQL の代わりにどこまで使えるか。インメモリの状態を <code>ConnectionIO</code> から読み書く方法は成り立つか。AI の出力の質は、どの密度のゲートが要るか</td>
-<td style="text-align: left;">ローカル（H2）で E2E が通り、PostgreSQL（Testcontainers）でも同じシナリオが通る。Undefined・Pending が 0。B1 の受入条件の表の全行が成立・不成立の記録つき。golden テスト。依存関係の承認の記録</td>
-<td style="text-align: center;">2 日（初期 5）</td>
+<td style="text-align: left;"><strong>基盤と縦の最小</strong>: 最初に H2（PostgreSQL モード）の動作範囲を実測し、テスト戦略の「B1 の受入条件」の未確認の前提を確かめる。<strong>静的解析の設定（ガイド第 9 章。scalac オプション、全 Wart、Scalafmt、Scalafix、層ごとのルールセット、fixture による確認）を最初のコードより前に行い、以降は違反 0 件・ベースラインなしで書く</strong>（<a href="../development_strategy/">開発戦略</a>）。sbt のマルチモジュール、<code>events</code> ほかの最小スキーマ、<code>decide</code>/<code>evolve</code>/<code>simulateWeek</code> の最小、http4s API、共有 <code>web</code> の接続。ゲームを作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態の表示まで通す（H2 と PostgreSQL）。U1〜U6 の AC の一覧の確定と許可リストの導出。行率の算出スクリプトとそのテスト（最初のスライド）。NF-P2 の実測</td>
+<td style="text-align: left;">Scala 3 と Cats Effect・doobie・http4s の組み合わせは動くか。<strong>ガイドの静的解析の設定（Scala CLI で確認）は、sbt と使う版（Scala 3.7.4・WartRemover 3.6.3・Scalafix 0.14.10）で期待どおりに動くか。</strong>H2 は PostgreSQL の代わりにどこまで使えるか。インメモリの状態を <code>ConnectionIO</code> から読み書く方法は成り立つか。AI の出力の質は、どの密度のゲートが要るか</td>
+<td style="text-align: left;">ローカル（H2）で E2E が通り、PostgreSQL（Testcontainers）でも同じシナリオが通る。Undefined・Pending が 0。<strong>静的解析: ガイドの確認用コードと fixture の期待件数が使う版で一致し、全コードが違反 0 件・ベースラインなし・抑制なしで緑。違反コードを置くとローカルで失敗する。</strong>B1 の受入条件の表の全行が成立・不成立の記録つき。golden テスト。依存関係の承認の記録</td>
+<td style="text-align: center;">2.5 日（初期 5）</td>
 </tr>
 <tr>
 <td style="text-align: center;">B2</td>
 <td style="text-align: left;">U1</td>
-<td style="text-align: left;"><strong>規約検査・CI・テスト基盤</strong>: 静的解析の厳格な適用、<code>.transact(</code> の許可する入口の検査、scoverage、<strong>CI の 3 ジョブ（<code>check</code>・<code>integration</code>・<code>acceptance</code>）</strong>、追記専用権限の否定テスト、API の契約テストの CI 組み込み</td>
+<td style="text-align: left;"><strong>CI・テスト基盤</strong>: B1 で設定した静的解析を CI の <code>check</code> ジョブに載せる、<code>.transact(</code> の許可する入口の検査、scoverage、<strong>CI の 3 ジョブ（<code>check</code>・<code>integration</code>・<code>acceptance</code>）</strong>、追記専用権限の否定テスト、API の契約テストの CI 組み込み</td>
 <td style="text-align: left;">規約違反コードで CI が落ちるか。scoverage でプロジェクトごとのしきい値を設定できるか（できなければ全体のしきい値だけにする）。契約テストが成り立つか</td>
-<td style="text-align: left;">違反コードを 1 つ置くと CI が失敗する。3 ジョブが GitHub Actions で緑。仕様と実装を意図的にずらすと契約テストが落ちる。行 80% のゲートが有効</td>
-<td style="text-align: center;">1.5 日（初期 4）</td>
+<td style="text-align: left;">違反コードを 1 つ置くと CI が失敗する（B1 の検査を <code>check</code> ジョブで確認）。3 ジョブが GitHub Actions で緑。仕様と実装を意図的にずらすと契約テストが落ちる。行 80% のゲートが有効</td>
+<td style="text-align: center;">1 日（初期 4）</td>
 </tr>
 <tr>
 <td style="text-align: center;">B3</td>
@@ -15096,8 +15096,8 @@
     dateFormat  YYYY-MM-DD
     excludes    weekends
     section Release 0.1
-    B1 基盤と縦の最小           :crit, b1, 2026-11-30, 2d
-    B2 規約検査・CI・テスト基盤  :crit, b2, after b1, 2d
+    B1 基盤・静的解析・縦の最小  :crit, b1, 2026-11-30, 3d
+    B2 CI・テスト基盤           :crit, b2, after b1, 1d
     B3 入力と週確定の完成・観測  :b3, after b2, 1d
     Release 0.1                :milestone, m1, after b3, 0d
     section Release 0.2
