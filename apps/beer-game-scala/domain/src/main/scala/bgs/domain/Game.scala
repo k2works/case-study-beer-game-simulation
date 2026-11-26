@@ -60,7 +60,9 @@ final case class GameData(
     settings: GameSettings,
     participants: Map[ParticipantId, Option[Role]],
     /** 資格の有効期限（進行役は作成時、参加者は参加時に発行する。失効・再発行・復帰は B4）。 */
-    credentials: Map[CredentialSubject, Instant]
+    credentials: Map[CredentialSubject, Instant],
+    /** 進行役が失効させた参加者（再発行で外れる。AC3.2.5）。 */
+    revoked: Set[ParticipantId]
 ):
   /** 役割ごとの参加者（開始時に、Session へ写しとして渡す）。 */
   def roleAssignments: RoleMap[Set[ParticipantId]] =
@@ -125,6 +127,18 @@ object GameCommand:
   final case class AssignRole(actor: Actor, at: Instant, participantId: ParticipantId, role: Role)
       extends GameCommand
 
+  /** 進行役が、漏れた参加者の資格を失効させる（準備中・開始後の両方）。 */
+  final case class RevokeCredential(actor: Actor, at: Instant, participantId: ParticipantId)
+      extends GameCommand
+
+  /** 失効した資格を再発行する（新しい有効期限）。失効していなければ拒否する。 */
+  final case class ReissueCredential(
+      actor: Actor,
+      at: Instant,
+      participantId: ParticipantId,
+      credentialExpiresAt: Instant
+  ) extends GameCommand
+
 enum GameEvent:
   /** CreateGame。ストリームが空。 */
   case GameCreated(
@@ -147,12 +161,20 @@ enum GameEvent:
   /** StartGame。進行役、準備中、各役割に 1 人以上。 */
   case GameStarted(gameId: GameId)
 
+  /** RevokeCredential。参加者の資格を失効させた。 */
+  case CredentialRevoked(participantId: ParticipantId)
+
+  /** ReissueCredential。失効した資格を再発行した（新しい有効期限）。 */
+  case CredentialReissued(participantId: ParticipantId, credentialExpiresAt: Instant)
+
   def name: String = this match
     case GameEvent.GameCreated(_, _, _, _, _) => "GameCreated"
     case GameEvent.ParticipantJoined(_, _)    => "ParticipantJoined"
     case GameEvent.RoleAssigned(_, _)         => "RoleAssigned"
     case GameEvent.RoleUnassigned(_, _)       => "RoleUnassigned"
     case GameEvent.GameStarted(_)             => "GameStarted"
+    case GameEvent.CredentialRevoked(_)       => "CredentialRevoked"
+    case GameEvent.CredentialReissued(_, _)   => "CredentialReissued"
 
 enum GameError(val code: String, val category: ErrorCategory) extends DomainError:
   case AlreadyCreated extends GameError("game.already_created", ErrorCategory.InvalidState)
@@ -163,6 +185,10 @@ enum GameError(val code: String, val category: ErrorCategory) extends DomainErro
 
   /** 参加コードが無効（不明、または形式が不正）。区別せず、同じ応答にする（列挙の防止。AC1.2.2）。 */
   case InvitationInvalid extends GameError("game.invitation_invalid", ErrorCategory.Forbidden)
+  case CredentialAlreadyRevoked
+      extends GameError("game.credential_already_revoked", ErrorCategory.InvalidState)
+  case CredentialNotRevoked
+      extends GameError("game.credential_not_revoked", ErrorCategory.InvalidState)
   case ParticipantNotFound(participantId: ParticipantId)
       extends GameError("game.participant_not_found", ErrorCategory.NotFound)
 
@@ -176,13 +202,40 @@ object Game:
     case GameState.Preparing(data, _)                   => Right(data)
     case GameState.NotCreated | GameState.Started(_, _) => Left(GameError.NotPreparing)
 
-  /** 準備中の割り当て。同じ役割への再割り当ては変化なし（履歴に足さない。D9）、別の役割へは付け替え（2 イベント）。 */
+  private def anyData(state: GameState): Either[GameError, GameData] = state match
+    case GameState.Preparing(data, _) => Right(data)
+    case GameState.Started(data, _)   => Right(data)
+    case GameState.NotCreated         => Left(GameError.NotPreparing)
+
+  /** 失効・再発行の共通の確認: 進行役であること、対象の参加者がいること。準備中と開始後の両方で受け付ける。 */
+  private def credentialTarget(
+      state: GameState,
+      actor: Actor,
+      participantId: ParticipantId
+  ): Either[GameError, GameData] =
+    for
+      data <- anyData(state)
+      _ <- Either.cond(
+        actor.isFacilitatorOf(data.gameId),
+        (),
+        GameError.Forbidden("資格の失効・再発行は進行役だけができる")
+      )
+      _ <- Either.cond(
+        data.participants.contains(participantId),
+        (),
+        GameError.ParticipantNotFound(participantId)
+      )
+    yield data
+
+  /** 割り当て。準備中は、同じ役割への再割り当ては変化なし（履歴に足さない。D9）、別の役割へは付け替え（2 イベント）。
+    * 開始後は、役割を持たない参加者を、担当のいる役割へ入れ替える（担当者全員の資格を失効させ、新担当者が引き継ぐ。D3）。
+    */
   private def decideAssign(
       state: GameState,
       command: GameCommand.AssignRole
   ): Either[GameError, List[GameEvent]] =
     for
-      data <- preparingData(state)
+      data <- anyData(state)
       _ <- Either.cond(
         command.actor.isFacilitatorOf(data.gameId),
         (),
@@ -191,14 +244,31 @@ object Game:
       previous <- data.participants
         .get(command.participantId)
         .toRight(GameError.ParticipantNotFound(command.participantId))
-    yield previous match
-      case Some(current) if current == command.role => Nil
-      case None          => List(GameEvent.RoleAssigned(command.participantId, command.role))
-      case Some(current) =>
-        List(
-          GameEvent.RoleUnassigned(command.participantId, current),
-          GameEvent.RoleAssigned(command.participantId, command.role)
-        )
+      started = state match
+        case GameState.Started(_, _)                          => true
+        case GameState.Preparing(_, _) | GameState.NotCreated => false
+      events <- previous match
+        case Some(current) if current == command.role => Right(Nil)
+        case Some(_) if started                       => Left(GameError.NotPreparing)
+        case Some(current)                            =>
+          Right(
+            List(
+              GameEvent.RoleUnassigned(command.participantId, current),
+              GameEvent.RoleAssigned(command.participantId, command.role)
+            )
+          )
+        case None if started =>
+          Either.cond(
+            !data.revoked.contains(command.participantId),
+            data.roleAssignments(command.role).toList.sortBy(_.value.toString).flatMap { old =>
+              (if data.revoked.contains(old) then Nil
+               else List(GameEvent.CredentialRevoked(old))) :+
+                GameEvent.RoleUnassigned(old, command.role)
+            } :+ GameEvent.RoleAssigned(command.participantId, command.role),
+            GameError.CredentialAlreadyRevoked
+          )
+        case None => Right(List(GameEvent.RoleAssigned(command.participantId, command.role)))
+    yield events
 
   /** 作成・参加・役割の割り当ての規則は、すべてここに集まる（evolve は事実を採用するだけで、規則を持たない）。 */
   def handle(state: GameState, command: GameCommand): Either[GameError, List[GameEvent]] =
@@ -224,7 +294,23 @@ object Game:
         preparingData(state).map(_ =>
           List(GameEvent.ParticipantJoined(c.participantId, c.credentialExpiresAt))
         )
-      case c: GameCommand.AssignRole => decideAssign(state, c)
+      case c: GameCommand.AssignRole       => decideAssign(state, c)
+      case c: GameCommand.RevokeCredential =>
+        credentialTarget(state, c.actor, c.participantId).flatMap { data =>
+          Either.cond(
+            !data.revoked.contains(c.participantId),
+            List(GameEvent.CredentialRevoked(c.participantId)),
+            GameError.CredentialAlreadyRevoked
+          )
+        }
+      case c: GameCommand.ReissueCredential =>
+        credentialTarget(state, c.actor, c.participantId).flatMap { data =>
+          Either.cond(
+            data.revoked.contains(c.participantId),
+            List(GameEvent.CredentialReissued(c.participantId, c.credentialExpiresAt)),
+            GameError.CredentialNotRevoked
+          )
+        }
 
 object GameEvents:
 
@@ -255,7 +341,8 @@ object GameEvents:
             joinCode,
             settings,
             Map.empty,
-            Map(CredentialSubject.Facilitator(gameId) -> facilitatorExpiresAt)
+            Map(CredentialSubject.Facilitator(gameId) -> facilitatorExpiresAt),
+            Set.empty
           )
           GameState.Preparing(data, state.version.next)
         case GameState.Preparing(_, _) | GameState.Started(_, _) => state
@@ -274,7 +361,25 @@ object GameEvents:
     case GameEvent.RoleAssigned(participantId, role) =>
       updateData(state)(_.withRole(participantId, Some(role)))
     case GameEvent.RoleUnassigned(participantId, _) =>
-      updatePreparing(state)(_.withRole(participantId, None))
+      updateData(state)(_.withRole(participantId, None))
+    case GameEvent.CredentialRevoked(participantId) =>
+      updateData(state)(data =>
+        Some(data)
+          .filter(_.participants.contains(participantId))
+          .map(d => d.copy(revoked = d.revoked + participantId))
+      )
+    case GameEvent.CredentialReissued(participantId, expiresAt) =>
+      updateData(state)(data =>
+        Some(data)
+          .filter(_.participants.contains(participantId))
+          .map(d =>
+            d.copy(
+              revoked = d.revoked - participantId,
+              credentials =
+                d.credentials.updated(CredentialSubject.Participant(participantId), expiresAt)
+            )
+          )
+      )
     case GameEvent.GameStarted(_) =>
       state match
         case GameState.Preparing(data, version)             => GameState.Started(data, version.next)

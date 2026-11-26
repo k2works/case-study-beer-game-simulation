@@ -1,6 +1,7 @@
 package bgs.acceptance
 
 import io.circe.Json
+import cats.effect.unsafe.implicits.global
 import io.circe.parser.parse
 import io.cucumber.scala.{EN, ScalaDsl}
 import org.typelevel.ci.CIString
@@ -44,6 +45,11 @@ class Steps extends ScalaDsl with EN:
     val reply = client.call(org.http4s.Method.POST, "/api/v1/games", Some(body), None, Some(key))
     if reply.status == 201 then
       client.facilitator = reply.cookie
+      client.recoveries = client.recoveries.updated(
+        "FACILITATOR",
+        reply.cookieNamed("bg_recovery").getOrElse("")
+      )
+      client.recoveryCode = reply.json.hcursor.get[String]("recoveryCode").getOrElse("")
       client.gameId = reply.location.map(_.split("/").reverse.drop(1).headOption.getOrElse(""))
     reply
 
@@ -76,6 +82,8 @@ class Steps extends ScalaDsl with EN:
         state.json.hcursor.get[String]("participantId").getOrElse(sys.error("participantId が無い"))
       )
       client.participantCookies = client.participantCookies.updated(name, cookie.getOrElse(""))
+      client.participantRecoveries = client.participantRecoveries
+        .updated(name, reply.cookieNamed("bg_recovery").getOrElse(""))
     reply
 
   private def assignRole(client: GameClient, name: String, apiRole: String): Reply =
@@ -91,6 +99,8 @@ class Steps extends ScalaDsl with EN:
     if reply.status == 200 then
       client.players =
         client.players.updated(apiRole, client.participantCookies.getOrElse(name, ""))
+      client.recoveries =
+        client.recoveries.updated(apiRole, client.participantRecoveries.getOrElse(name, ""))
     reply
 
   private def assignedPlayers(client: GameClient, labels: List[String]): Unit =
@@ -779,7 +789,6 @@ class Steps extends ScalaDsl with EN:
 
   private def auditedEvents(client: GameClient): List[bgs.domain.SessionEvent] =
     val id = bgs.domain.GameId(java.util.UUID.fromString(client.gameId.getOrElse("")))
-    import cats.effect.unsafe.implicits.global
     client.env.ports.tx
       .run[Nothing, List[bgs.domain.SessionEvent]](
         client.env.ports.sessionStore.read(id).map(r => Right(r.events))
@@ -820,4 +829,565 @@ class Steps extends ScalaDsl with EN:
 
   Then("""^保存回数の上限に達しているという理由で拒否される$""") { () =>
     require(world.last.code.contains("session.save_limit_reached"), s"理由が違う: ${world.last.text}")
+  }
+
+  // ---- 復帰（US3.2。B4: AC3.2.1〜3.2.4） ----
+
+  private def recoverReply(
+      client: GameClient,
+      cookie: Option[String],
+      code: Option[String]
+  ): Reply =
+    val gameId = client.gameId.getOrElse(sys.error("ゲームが無い"))
+    val body = Json.fromFields(
+      List("gameId" -> Json.fromString(gameId)) ++
+        code.map(c => "recoveryCode" -> Json.fromString(c))
+    )
+    client.post("/api/v1/participations/recover", body, cookie)
+
+  private def recoverAs(label: String): Reply =
+    val reply = recoverReply(world.game, world.game.recoveries.get(label), None)
+    reply.cookieNamed("bg_session").foreach { c =>
+      if label == "FACILITATOR" then world.game.facilitator = Some(c)
+      else world.game.players = world.game.players.updated(label, c)
+    }
+    reply
+
+  Given("""^(.+)の参加者のブラウザセッションが失われている$""") { (label: String) =>
+    world.game.players = world.game.players - role(label)
+  }
+
+  Given("""^進行役のブラウザセッションが失われている$""") { () => world.game.facilitator = None }
+
+  Given("""^進行役のブラウザセッションと復帰資格が失われている$""") { () =>
+    world.game.facilitator = None
+    world.game.recoveries = world.game.recoveries - "FACILITATOR"
+  }
+
+  When("""^(.+)の参加者が、復帰資格で再接続(する|しようとする)$""") { (label: String, _: String) =>
+    world.lastRole = role(label)
+    world.last = recoverAs(role(label))
+  }
+
+  When("""^進行役が、復帰資格で再接続する$""") { () => world.last = recoverAs("FACILITATOR") }
+
+  When("""^進行役が、作成時に控えた復帰コードで再接続する$""") { () =>
+    world.last = recoverReply(world.game, None, Some(world.game.recoveryCode))
+    world.last.cookieNamed("bg_session").foreach(c => world.game.facilitator = Some(c))
+  }
+
+  Then("""^同じゲームの(.+)として復帰する$""") { (label: String) =>
+    require(world.last.status == 200, s"復帰できない: ${world.last.text}")
+    val c = world.last.json.hcursor
+    require(c.get[String]("gameId").contains(world.game.gameId.getOrElse("")), "ゲームが違う")
+    require(c.get[String]("kind").contains("PARTICIPANT"), "参加者でない")
+    require(c.get[String]("role").contains(role(label)), s"役割が違う: ${world.last.text}")
+  }
+
+  Then("""^最新の状況に、保存済みの入力 (\d+) が含まれる$""") { (quantity: Int) =>
+    val state = stateAs(world.game, world.lastRole, "")
+    require(
+      state.json.hcursor.downField("roleStatus").get[Int]("decision").contains(quantity),
+      s"入力が違う: ${state.text}"
+    )
+  }
+
+  /** Cookie（`名前=値`）の値の、鍵付きダイジェスト。 */
+  private def tokenDigestOf(client: GameClient, cookie: Option[String]): String =
+    bgs.application.Api
+      .tokenDigest(client.env)(cookie.getOrElse("").dropWhile(_ != '=').drop(1))
+      .unsafeRunSync()
+      .getOrElse("")
+
+  private def forceRecovery(label: String, sql: String => doobie.ConnectionIO[Int]): Unit =
+    val digest = tokenDigestOf(world.game, world.game.recoveries.get(label))
+    world.game.env.ports.tx
+      .run[Nothing, Int](sql(digest).map(Right(_)))
+      .unsafeRunSync()
+      .fold(_ => (), updated => require(updated > 0, "復帰資格の行が更新されない"))
+
+  Given("""^(.+)の参加者の復帰資格が「(不明|失効|期限切れ)」になっている$""") { (label: String, state: String) =>
+    import doobie.implicits.*
+    val apiRole = role(label)
+    world.lastRole = apiRole
+    state match
+      case "不明" =>
+        world.game.recoveries = world.game.recoveries.updated(apiRole, "bg_recovery=unknown-token")
+      case "失効" =>
+        val reply = revokeAs(world.game, world.game.participants.getOrElse(s"参加者の$label", ""))
+        require(reply.status == 200, s"失効できない: ${reply.text}")
+      case _ =>
+        forceRecovery(
+          apiRole,
+          d =>
+            sql"update recovery_credentials set expires_at = timestamp '2000-01-01 00:00:00+00' where token_digest = $d".update.run
+        )
+  }
+
+  Then("""^復帰は拒否される$""") { () =>
+    require(world.last.status == 403, s"拒否されていない: ${world.last.status}")
+  }
+
+  Then("""^拒否の応答は、不明な復帰資格のときと同じである$""") { () =>
+    val unknown = recoverReply(world.game, Some("bg_recovery=unknown-other"), None)
+    def shape(r: Reply) = r.json.hcursor.downField("correlationId").delete.top.map(_.noSpaces)
+    require(shape(unknown) == shape(world.last), s"応答が違う: ${unknown.text} / ${world.last.text}")
+  }
+
+  Then("""^新しいブラウザセッションは発行されない$""") { () =>
+    require(world.last.cookieNamed("bg_session").isEmpty, "ブラウザセッションが発行された")
+  }
+
+  Given("""^(.+)の参加者が、2 つのタブで第 (\d+) 週の画面を開いている$""") { (_: String, _: Int) =>
+    () // 2 つのタブは、同じ資格（Cookie）を使う。古い画面の保存は、版（requestedWeek）で拒否される
+  }
+
+  When("""^(.+)の参加者の古いタブが、第 (\d+) 週の数量として (\d+) を保存しようとする$""") {
+    (label: String, week: Int, quantity: Int) =>
+      world.last = saveAt(world.game, role(label), week, quantity)
+      world.lastRole = role(label)
+  }
+
+  Then("""^古いタブの保存は、第 (\d+) 週はすでに確定されているという理由で拒否される$""") { (_: Int) =>
+    require(world.last.code.contains("session.week_advanced"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^(.+)の参加者のもう一方のタブは、最新の状況として第 (\d+) 週を表示する$""") { (label: String, week: Int) =>
+    val state = stateAs(world.game, role(label), "")
+    require(state.json.hcursor.get[Int]("week").contains(week), s"週が違う: ${state.text}")
+  }
+
+  When("""^進行役が、画面を再読み込みする$""") { () =>
+    world.last = world.game.get(sessionPath(world.game, "/state"), world.game.facilitator)
+  }
+
+  Then("""^同じゲームの進行コンソールが表示される$""") { () =>
+    require(world.last.status == 200, s"表示できない: ${world.last.text}")
+    val c = world.last.json.hcursor
+    val sameGame = c.get[String]("gameId").orElse(c.get[String]("sessionId"))
+    require(sameGame.contains(world.game.gameId.getOrElse("")), "ゲームが違う")
+    require(c.get[String]("kind").forall(_ == "FACILITATOR"), "進行役でない")
+  }
+
+  private def revokeAs(client: GameClient, participantId: String): Reply =
+    client.post(
+      gamePath(client, "/credentials/revoke"),
+      Json.obj(
+        "subject" -> Json.obj(
+          "kind" -> Json.fromString("PARTICIPANT"),
+          "id" -> Json.fromString(participantId)
+        )
+      ),
+      client.facilitator
+    )
+
+  // ---- 資格の失効・再発行（AC3.2.5） ----
+
+  /** 準備中でも取れる、参加者の画面の状態（ゲームの状態）。 */
+  private def gameStateAs(client: GameClient, apiRole: String): Reply =
+    client.get(gamePath(client, "/state"), client.players.get(apiRole))
+
+  private def participantIdOf(client: GameClient, label: String): String =
+    client.participants.getOrElse(s"参加者の$label", sys.error(s"未参加: $label"))
+
+  private def revokeWith(
+      client: GameClient,
+      gameId: String,
+      participantId: String,
+      cookie: Option[String]
+  ): Reply =
+    client.post(
+      s"/api/v1/games/$gameId/credentials/revoke",
+      Json.obj(
+        "subject" -> Json.obj(
+          "kind" -> Json.fromString("PARTICIPANT"),
+          "id" -> Json.fromString(participantId)
+        )
+      ),
+      cookie
+    )
+
+  private def reissueAs(client: GameClient, participantId: String): Reply =
+    client.post(
+      gamePath(client, "/credentials/reissue"),
+      Json.obj(
+        "subject" -> Json.obj(
+          "kind" -> Json.fromString("PARTICIPANT"),
+          "id" -> Json.fromString(participantId)
+        )
+      ),
+      client.facilitator
+    )
+
+  private var reissuedCode = ""
+
+  Then("""^応答に、参加したゲームの ID が含まれる$""") { () =>
+    require(
+      world.last.json.hcursor.get[String]("gameId").contains(world.game.gameId.getOrElse("")),
+      s"ゲームの ID が無い: ${world.last.text}"
+    )
+  }
+
+  When("""^進行役が、(.+)の参加者の資格を失効させ(?:る|ようとする)$""") { (label: String) =>
+    world.lastRole = role(label)
+    world.last = revokeAs(world.game, participantIdOf(world.game, label))
+  }
+
+  Given("""^進行役が、(.+)の参加者の資格を失効させている$""") { (label: String) =>
+    world.last = revokeAs(world.game, participantIdOf(world.game, label))
+    require(world.last.status == 200, s"失効できない: ${world.last.text}")
+  }
+
+  Then("""^失効が受け付けられる$""") { () =>
+    require(world.last.status == 200, s"失効できていない: ${world.last.text}")
+  }
+
+  Then("""^(.+)の参加者は、復帰資格で復帰できない$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 403, "復帰できてしまう")
+  }
+
+  Then("""^(.+)の参加者は、以前のブラウザセッションでも状況を取得できない$""") { (label: String) =>
+    require(gameStateAs(world.game, role(label)).status == 403, "状況を取得できてしまう")
+  }
+
+  Then("""^(.+)の参加者の資格には影響しない$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 200, "影響している（復帰）")
+    require(gameStateAs(world.game, role(label)).status == 200, "影響している（状況）")
+  }
+
+  When("""^進行役が、(.+)の参加者の資格を再発行する$""") { (label: String) =>
+    world.last = reissueAs(world.game, participantIdOf(world.game, label))
+    reissuedCode = world.last.json.hcursor.get[String]("recoveryCode").getOrElse("")
+  }
+
+  Given("""^進行役が、(.+)の参加者の資格を再発行している$""") { (label: String) =>
+    world.last = reissueAs(world.game, participantIdOf(world.game, label))
+    require(world.last.status == 200, s"再発行できない: ${world.last.text}")
+    reissuedCode = world.last.json.hcursor.get[String]("recoveryCode").getOrElse("")
+  }
+
+  Then("""^再発行が受け付けられる$""") { () =>
+    require(world.last.status == 200, s"再発行できていない: ${world.last.text}")
+  }
+
+  Then("""^新しい復帰コードと、現在より後の有効期限が示される$""") { () =>
+    val c = world.last.json.hcursor
+    require(c.get[String]("recoveryCode").exists(_.nonEmpty), "復帰コードが無い")
+    require(
+      c.get[String]("expiresAt")
+        .toOption
+        .exists(t => java.time.Instant.parse(t).isAfter(java.time.Instant.now)),
+      "有効期限が現在より後でない"
+    )
+  }
+
+  private def recoverWithCode(label: String): Reply =
+    val reply = recoverReply(world.game, None, Some(reissuedCode))
+    reply.cookieNamed("bg_session").foreach { c =>
+      world.game.players = world.game.players.updated(role(label), c)
+    }
+    reply
+
+  Then("""^(.+)の参加者は、新しい復帰コードで同じゲームの(.+)として復帰できる$""") { (label: String, _: String) =>
+    val reply = recoverWithCode(label)
+    require(reply.status == 200, s"復帰できない: ${reply.text}")
+    require(reply.json.hcursor.get[String]("role").contains(role(label)), "役割が違う")
+  }
+
+  Then("""^(.+)の参加者は、失効した古い復帰資格では復帰できない$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 403, "古い復帰資格で復帰できてしまう")
+  }
+
+  Given("""^ゲームは「(準備中|開始後)」である$""") { (phase: String) =>
+    if phase == "開始後" then require(startGame(world.game).status == 200, "開始できない")
+  }
+
+  When("""^(.+)の参加者が、新しい復帰コードで復帰する$""") { (label: String) =>
+    world.last = recoverWithCode(label)
+  }
+
+  Then("""^資格はすでに失効しているという理由で拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(
+      world.last.code.contains("game.credential_already_revoked"),
+      s"理由が違う: ${world.last.text}"
+    )
+  }
+
+  When("""^(.+)の参加者が、(.+)の参加者の資格を失効させようとする$""") { (actor: String, target: String) =>
+    world.last = revokeWith(
+      world.game,
+      world.game.gameId.getOrElse(""),
+      participantIdOf(world.game, target),
+      world.game.players.get(role(actor))
+    )
+  }
+
+  Then("""^(.+)の参加者の資格は、?(?:有効なままである|失効していない)$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 200, "失効している（復帰）")
+    require(gameStateAs(world.game, role(label)).status == 200, "失効している（状況）")
+  }
+
+  private var otherGame: Option[GameClient] = None
+
+  Given("""^別のゲームの進行役がいる$""") { () =>
+    val other = new GameClient(
+      world.game.app,
+      world.game.env,
+      world.game.logs,
+      world.game.databaseDown
+    )
+    require(createGame(other).status == 201, "別のゲームを作成できない")
+    otherGame = Some(other)
+  }
+
+  When("""^別のゲームの進行役が、(.+)の参加者の資格を失効させようとする$""") { (label: String) =>
+    world.last = revokeWith(
+      world.game,
+      world.game.gameId.getOrElse(""),
+      participantIdOf(world.game, label),
+      otherGame.flatMap(_.facilitator)
+    )
+  }
+
+  Given("""^(.+)の参加者のブラウザセッションの有効期限が切れている$""") { (label: String) =>
+    import doobie.implicits.*
+    val d = tokenDigestOf(world.game, world.game.players.get(role(label)))
+    world.game.env.ports.tx
+      .run[Nothing, Int](
+        sql"update browser_sessions set expires_at = timestamp '2000-01-01 00:00:00+00' where token_digest = $d".update.run
+          .map(Right(_))
+      )
+      .unsafeRunSync()
+      .fold(_ => (), n => require(n > 0, "ブラウザセッションの行が更新されない"))
+  }
+
+  When("""^(.+)の参加者が、期限が切れた資格で状況を取得しようとする$""") { (label: String) =>
+    world.last = gameStateAs(world.game, role(label))
+  }
+
+  // 冪等キー付きの保存（ADR-004: 認可は冪等記録の照合より前）
+  private var keyedSave: Option[(String, Json, Option[String], String)] = None
+
+  private def sendKeyedSave(): Reply =
+    val (path, body, cookie, key) = keyedSave.getOrElse(sys.error("保存の要求が無い"))
+    world.game.callWith(org.http4s.Method.PUT, path, Some(body), cookie, Some(key), Nil)
+
+  private def keyedSaveOf(label: String, week: Int, quantity: Int): Reply =
+    val body = Json.obj("week" -> Json.fromInt(week), "quantity" -> Json.fromInt(quantity))
+    keyedSave = Some(
+      (
+        sessionPath(world.game, "/decisions"),
+        body,
+        world.game.players.get(role(label)),
+        java.util.UUID.randomUUID.toString
+      )
+    )
+    sendKeyedSave()
+
+  Given("""^(.+)の参加者が、(?:冪等キー付きで|識別子つきで)第 (\d+) 週の数量(?:として)? (\d+) を保存している$""") {
+    (label: String, week: Int, quantity: Int) =>
+      val reply = keyedSaveOf(label, week, quantity)
+      require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  When("""^(.+)の参加者が、以前に成功した保存の要求を、同じキーでもう一度送る$""") { (_: String) =>
+    world.last = sendKeyedSave()
+  }
+
+  Then("""^保存済みの応答は返らない$""") { () =>
+    require(world.last.json.hcursor.downField("versions").focus.isEmpty, "保存済みの応答が返った")
+  }
+
+  private var keyedRecover: Option[(Json, Option[String], String)] = None
+
+  private def sendKeyedRecover(): Reply =
+    val (body, cookie, key) = keyedRecover.getOrElse(sys.error("復帰の要求が無い"))
+    world.game.callWith(
+      org.http4s.Method.POST,
+      "/api/v1/participations/recover",
+      Some(body),
+      cookie,
+      Some(key),
+      Nil
+    )
+
+  Given("""^(.+)の参加者が、冪等キー付きで復帰資格で再接続している$""") { (label: String) =>
+    keyedRecover = Some(
+      (
+        Json.obj("gameId" -> Json.fromString(world.game.gameId.getOrElse(""))),
+        world.game.recoveries.get(role(label)),
+        java.util.UUID.randomUUID.toString
+      )
+    )
+    val reply = sendKeyedRecover()
+    require(reply.status == 200, s"復帰できない: ${reply.text}")
+  }
+
+  Given("""^(.+)の参加者が、復帰資格で再接続している$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 200, "復帰できない")
+  }
+
+  When("""^(.+)の参加者が、以前に成功した復帰の要求を、同じキーでもう一度送る$""") { (_: String) =>
+    world.last = sendKeyedRecover()
+  }
+
+  // ---- 鍵のローテーション（NF-S4） ----
+
+  private def rotateKey(): Unit =
+    world.game.env.keyRing
+      .update(_.rotate(java.util.UUID.randomUUID.toString))
+      .unsafeRunSync()
+
+  When("""^運営者が、資格の署名鍵を新しい版へ更新する$""") { () => rotateKey() }
+
+  Given("""^運営者が、資格の署名鍵を新しい版へ更新している$""") { () => rotateKey() }
+
+  Then("""^(.+)の参加者は、更新前に発行した復帰資格で復帰できる$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 200, "復帰できない")
+  }
+
+  Then("""^更新前に発行した(.+)の参加者のブラウザセッションで、状況を取得できる$""") { (label: String) =>
+    require(gameStateAs(world.game, role(label)).status == 200, "状況を取得できない")
+  }
+
+  When("""^運営者が、旧版の鍵を設定から外す$""") { () =>
+    world.game.env.keyRing.update(_.retire(1)).unsafeRunSync()
+  }
+
+  Then("""^更新前に発行した(.+)の参加者の資格は、復帰もブラウザセッションも権限エラーになる$""") { (label: String) =>
+    require(recoverAs(role(label)).status == 403, "復帰できてしまう")
+    require(gameStateAs(world.game, role(label)).status == 403, "状況を取得できてしまう")
+  }
+
+  Then("""^別のゲームの進行役の資格は、まだ使える$""") { () =>
+    val other = otherGame.getOrElse(sys.error("別のゲームが無い"))
+    require(
+      other.get(gamePath(other, "/state"), other.facilitator).status == 200,
+      "別のゲームの進行役が使えない"
+    )
+  }
+
+  // ---- 役割の入れ替え（H4。開始後。AC3.2.5） ----
+
+  /** 入れ替え前の担当者の資格（ブラウザセッションの Cookie と、復帰資格の Cookie）。 */
+  private var replaced: List[(String, String)] = Nil
+
+  private def snapshotHolders(apiRole: String): Unit =
+    replaced = List(
+      (
+        world.game.players.getOrElse(apiRole, ""),
+        world.game.recoveries.getOrElse(apiRole, "")
+      )
+    )
+
+  Given("""^参加者「(.+)」が、役割なしで参加している$""") { (name: String) =>
+    val client = world.game
+    require(joinWith(client, joinCodeOf(client), name).status == 200, "参加できない")
+  }
+
+  When("""^進行役が、(.+)の担当を(.+)に入れ替え(?:る|ようとする)$""") { (label: String, name: String) =>
+    snapshotHolders(role(label))
+    world.lastRole = role(label)
+    world.last = assignRole(world.game, name, role(label))
+  }
+
+  Then("""^(.+)が(.+)の担当になる$""") { (name: String, label: String) =>
+    require(world.last.status == 200, s"入れ替えられていない: ${world.last.text}")
+    require(
+      lobbyRoles(world.game)
+        .get(world.game.participants.getOrElse(name, ""))
+        .flatten
+        .contains(role(label)),
+      "担当になっていない"
+    )
+  }
+
+  private def credentialsDead(cookie: String, recovery: String): Unit =
+    val state =
+      world.game.get(gamePath(world.game, "/state"), Some(cookie).filter(_.nonEmpty))
+    require(state.status == 403, s"ブラウザセッションが使える: ${state.status}")
+    val reply = recoverReply(world.game, Some(recovery).filter(_.nonEmpty), None)
+    require(reply.status == 403, s"復帰資格が使える: ${reply.status}")
+
+  Then("""^以前の(.+)の参加者の資格は、自動で失効している$""") { (_: String) =>
+    replaced.foreach((cookie, recovery) => credentialsDead(cookie, recovery))
+  }
+
+  Then("""^共同担当だった(.+)の資格も、自動で失効している$""") { (name: String) =>
+    credentialsDead(
+      world.game.participantCookies.getOrElse(name, ""),
+      world.game.participantRecoveries.getOrElse(name, "")
+    )
+  }
+
+  Then("""^(.+)は、第 (\d+) 週の数量として (\d+) を保存できる$""") { (_: String, week: Int, quantity: Int) =>
+    val reply = saveAt(world.game, world.lastRole, week, quantity)
+    require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  Then("""^小売店の入力 (\d+) の入力者は、以前の小売店の参加者として残っている$""") { (_: Int) =>
+    val editor = world.game
+      .get(sessionPath(world.game, "/state"), world.game.facilitator)
+      .json
+      .hcursor
+      .downField("roles")
+      .downField("RETAILER")
+      .downField("decisionEditor")
+    require(editor.get[String]("displayName").contains("参加者の小売店"), s"入力者のラベルが違う: ${editor.focus}")
+  }
+
+  private def gameVersion(client: GameClient): Long =
+    client
+      .get(gamePath(client, "/state"), client.facilitator)
+      .json
+      .hcursor
+      .downField("versions")
+      .get[Long]("game")
+      .getOrElse(0L)
+
+  private var versionBefore = 0L
+
+  When("""^進行役が、小売店の参加者を小売店に割り当て直す$""") { () =>
+    versionBefore = gameVersion(world.game)
+    world.last = assignRole(world.game, "参加者の小売店", "RETAILER")
+  }
+
+  Then("""^割り当ては受け付けられるが、履歴に何も足されない$""") { () =>
+    require(world.last.status == 200, s"受け付けられない: ${world.last.text}")
+    require(gameVersion(world.game) == versionBefore, "履歴が足された")
+  }
+
+  When("""^(.+)の参加者が、(.+)の担当を(.+)に入れ替えようとする$""") { (actor: String, label: String, name: String) =>
+    world.last = world.game.put(
+      gamePath(
+        world.game,
+        s"/participants/${world.game.participants.getOrElse(name, "")}/role"
+      ),
+      Json.obj("role" -> Json.fromString(role(label))),
+      world.game.players.get(role(actor)),
+      None
+    )
+  }
+
+  Then("""^権限エラーになる$""") { () =>
+    require(world.last.status == 403, s"権限エラーでない: ${world.last.status}")
+  }
+
+  When("""^進行役が、(.+)の参加者を(.+)に割り当てようとする$""") { (from: String, label: String) =>
+    world.last = assignRole(world.game, s"参加者の$from", role(label))
+  }
+
+  Then("""^準備中でないという理由で、割り当ては拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(world.last.code.contains("game.not_preparing"), s"理由が違う: ${world.last.text}")
+  }
+
+  Given("""^進行役が、([^の]+)の資格を失効させている$""") { (name: String) =>
+    world.last = revokeAs(world.game, world.game.participants.getOrElse(name, ""))
+    require(world.last.status == 200, s"失効できない: ${world.last.text}")
+  }
+
+  Then("""^以前の(.+)の参加者が、同じ識別子で同じ保存を再送すると、権限エラーになる$""") { (_: String) =>
+    require(sendKeyedSave().status == 403, "再送が通ってしまう")
   }

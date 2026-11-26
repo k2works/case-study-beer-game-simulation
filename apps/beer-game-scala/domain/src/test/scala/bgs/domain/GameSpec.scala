@@ -111,3 +111,43 @@ class GameSpec extends FunSuite:
     GameEvent.GameCreated(gameId, joinCode, settings(), retention, expiresAt)
 
   extension [A](a: A) private def pipe[B](f: A => B): B = f(a)
+
+  // ---- B4: 資格の失効・再発行（AC3.2.5） ----
+
+  private def revoke(state: GameState, id: ParticipantId, actor: Actor = facilitator) =
+    handle(state, GameCommand.RevokeCredential(actor, at, id))
+
+  private def reissue(state: GameState, id: ParticipantId, actor: Actor = facilitator) =
+    handle(state, GameCommand.ReissueCredential(actor, at, id, expiresAt))
+
+  private def applied(state: GameState, result: Either[GameError, List[GameEvent]]) =
+    result.fold(e => fail(e.toString), _.foldLeft(state)(GameEvents.apply))
+
+  test("[AC3.2.5] 進行役が失効させると CredentialRevoked が作られ、同じ資格をもう一度は失効できない") {
+    val who = holder(Role.Retailer)
+    assertEquals(revoke(fullGame, who), Right(List(GameEvent.CredentialRevoked(who))))
+    val revoked = applied(fullGame, revoke(fullGame, who))
+    assertEquals(revoke(revoked, who), Left(GameError.CredentialAlreadyRevoked))
+    assertEquals(GameError.CredentialAlreadyRevoked.code, "game.credential_already_revoked")
+  }
+
+  test("[AC3.2.5] 進行役でない人は失効も再発行もできず、未知の参加者は見つからない") {
+    val who = holder(Role.Retailer)
+    val other = Actor.Participant(holder(Role.Wholesaler))
+    assert(revoke(fullGame, who, other).isLeft)
+    assert(reissue(fullGame, who, other).isLeft)
+    assertEquals(
+      revoke(fullGame, participantId(99)),
+      Left(GameError.ParticipantNotFound(participantId(99)))
+    )
+  }
+
+  test("[AC3.2.5] 失効していない資格は再発行できない。失効後の再発行で、再び有効になる") {
+    val who = holder(Role.Retailer)
+    assertEquals(reissue(fullGame, who), Left(GameError.CredentialNotRevoked))
+    val revoked = applied(fullGame, revoke(fullGame, who))
+    assertEquals(reissue(revoked, who), Right(List(GameEvent.CredentialReissued(who, expiresAt))))
+    val again = applied(revoked, reissue(revoked, who))
+    assertEquals(again.dataOrNone.map(_.revoked), Some(Set.empty[ParticipantId]))
+    assertEquals(revoked.dataOrNone.map(_.revoked), Some(Set(who)))
+  }

@@ -14,3 +14,7 @@ operations/observability.feature
 
 # B4: 進行の継続（US3.1。AC3.1.*）
 continuation/pause-resume.feature
+
+continuation/recovery.feature
+
+continuation/credentials.feature

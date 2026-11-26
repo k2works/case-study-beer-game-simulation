@@ -1,7 +1,7 @@
 package bgs.application
 
 import bgs.domain.*
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.syntax.all.*
 import doobie.ConnectionIO
 
@@ -34,7 +34,15 @@ final case class PeripheralStore(
     issueSession: (String, GameId, CredentialSubject, Instant) => ConnectionIO[Unit],
     resolveSession: (String, Instant) => ConnectionIO[Option[(GameId, CredentialSubject)]],
     findIdempotent: (String, String) => ConnectionIO[Option[IdempotentRecord]],
-    storeIdempotent: IdempotentRecord => ConnectionIO[Unit]
+    storeIdempotent: IdempotentRecord => ConnectionIO[Unit],
+    /** 復帰資格を発行する（ダイジェスト、ゲーム、対象、有効期限）。 */
+    issueRecovery: (String, GameId, CredentialSubject, Instant) => ConnectionIO[Unit],
+    /** 有効（失効していない・期限内）な復帰資格の対象。 */
+    resolveRecovery: (String, Instant) => ConnectionIO[Option[(GameId, CredentialSubject)]],
+    /** 復帰資格の有効期限を更新する。 */
+    refreshRecovery: (String, Instant) => ConnectionIO[Unit],
+    /** 対象の復帰資格とブラウザセッションを、すべて使えなくする。 */
+    revokeSubject: (GameId, CredentialSubject) => ConnectionIO[Unit]
 )
 
 /** 時刻・識別子・乱数の出所（ドメインは時計と乱数を持たない）。 */
@@ -56,22 +64,52 @@ final case class LogSink(write: LogRecord => IO[Unit])
 object LogSink:
   val discard: LogSink = LogSink(_ => IO.unit)
 
+/** 資格の署名鍵（版つき）。資格は、発行時の鍵の版を持つ（`v<版>.<乱数>`）。更新後も旧版の資格は使え、旧版を外すと使えなくなる（NF-S4）。 */
+final case class KeyRing(current: Int, keys: Map[Int, String]):
+  /** 新しい版の鍵を足し、現在の版にする。 */
+  def rotate(secret: String): KeyRing = KeyRing(current + 1, keys.updated(current + 1, secret))
+
+  /** 旧版の鍵を設定から外す。 */
+  def retire(version: Int): KeyRing = copy(keys = keys - version)
+
+object KeyRing:
+  def initial(secret: String): KeyRing = KeyRing(1, Map(1 -> secret))
+
 final case class Env(
     ports: Ports,
     peripheral: PeripheralStore,
     gen: Generators,
     sessionTtl: Duration,
-    log: LogSink
+    log: LogSink,
+    keyRing: Ref[IO, KeyRing]
 )
 
 final case class Versions(game: Option[Long], session: Option[Long])
 
 final case class CreateGameInput(finalWeek: Int, demand: List[Int], retentionDays: Option[Int])
-final case class Created(gameId: GameId, facilitatorToken: String, versions: Versions)
+final case class Created(
+    gameId: GameId,
+    facilitatorToken: String,
+    recoveryToken: String,
+    versions: Versions
+)
 final case class Joined(
     gameId: GameId,
     participantId: ParticipantId,
     participantToken: String,
+    recoveryToken: String,
+    versions: Versions
+)
+
+/** 再発行の結果（新しい復帰コードは、この応答で一度だけ示す）。 */
+final case class Reissued(recoveryCode: String, expiresAt: Instant, versions: Versions)
+
+/** 復帰の結果。新しいブラウザセッションの資格を返す。 */
+final case class Recovered(
+    gameId: GameId,
+    facilitator: Boolean,
+    role: Option[Role],
+    sessionToken: String,
     versions: Versions
 )
 
@@ -156,6 +194,34 @@ object Api:
       .map(b => f"${b & 0xff}%02x")
       .mkString
 
+  private def hmacHex(secret: String, value: String): String =
+    val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+    mac.init(
+      new javax.crypto.spec.SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256")
+    )
+    mac.doFinal(value.getBytes(StandardCharsets.UTF_8)).map(b => f"${b & 0xff}%02x").mkString
+
+  private val TokenPattern = "^v([0-9]+)\\..+$".r
+
+  /** 現在の鍵の版つきの、新しい資格（ブラウザセッション・復帰資格）。 */
+  def issueToken(env: Env): IO[String] =
+    for
+      raw <- env.gen.token
+      ring <- env.keyRing.get
+    yield s"v${ring.current}.$raw"
+
+  /** 資格の鍵付きダイジェスト。鍵の版が不明・外されているときは None（使えない資格）。 */
+  def tokenDigest(env: Env)(token: String): IO[Option[String]] =
+    env.keyRing.get.map { ring =>
+      token match
+        case TokenPattern(version) =>
+          version.toIntOption.flatMap(ring.keys.get).map(secret => hmacHex(secret, token))
+        case _ => None
+    }
+
+  private def digestOrBlank(env: Env)(token: String): IO[String] =
+    tokenDigest(env)(token).map(_.getOrElse(""))
+
   private def readOnly[A](env: Env)(program: ConnectionIO[A]): IO[A] =
     env.ports.tx.run(program.map(a => Right[Nothing, A](a))).map(_.merge)
 
@@ -164,13 +230,16 @@ object Api:
     token match
       case None        => IO.pure(Caller.Anonymous)
       case Some(value) =>
-        env.gen.now.flatMap { now =>
-          readOnly(env)(env.peripheral.resolveSession(digest(value), now)).map {
-            case Some((gameId, CredentialSubject.Facilitator(_)))  => Caller.Facilitator(gameId)
-            case Some((gameId, CredentialSubject.Participant(id))) => Caller.Participant(gameId, id)
-            case None                                              => Caller.Anonymous
-          }
-        }
+        for
+          now <- env.gen.now
+          hashed <- tokenDigest(env)(value)
+          resolved <- hashed.fold(IO.pure(Option.empty[(GameId, CredentialSubject)]))(d =>
+            readOnly(env)(env.peripheral.resolveSession(d, now))
+          )
+        yield resolved match
+          case Some((gameId, CredentialSubject.Facilitator(_)))  => Caller.Facilitator(gameId)
+          case Some((gameId, CredentialSubject.Participant(id))) => Caller.Participant(gameId, id)
+          case None                                              => Caller.Anonymous
 
   private def actorFor(caller: Caller, gameId: GameId): Either[AppFailure, Actor] = caller match
     case Caller.Facilitator(g) if g == gameId    => Right(Actor.Facilitator(gameId))
@@ -192,7 +261,10 @@ object Api:
       now <- env.gen.now
       gameUuid <- env.gen.uuid
       codeRaw <- env.gen.joinCode
-      token <- env.gen.token
+      token <- issueToken(env)
+      recovery <- issueToken(env)
+      tokenHash <- digestOrBlank(env)(token)
+      recoveryHash <- digestOrBlank(env)(recovery)
       result <- validateCreate(input, codeRaw) match
         case Left(failure)                          => IO.pure(Left(failure))
         case Right((settings, joinCode, retention)) =>
@@ -211,7 +283,13 @@ object Api:
             .handleGameWith(env.ports)(gameId, command)(
               env.peripheral.registerJoinCode(joinCode, gameId) *>
                 env.peripheral.issueSession(
-                  digest(token),
+                  tokenHash,
+                  gameId,
+                  CredentialSubject.Facilitator(gameId),
+                  expires
+                ) *>
+                env.peripheral.issueRecovery(
+                  recoveryHash,
                   gameId,
                   CredentialSubject.Facilitator(gameId),
                   expires
@@ -219,7 +297,8 @@ object Api:
             )
             .flatMap {
               case Left(failure) => IO.pure(Left(failure))
-              case Right(_)      => versions(env)(gameId).map(v => Right(Created(gameId, token, v)))
+              case Right(_)      =>
+                versions(env)(gameId).map(v => Right(Created(gameId, token, recovery, v)))
             }
     yield result
 
@@ -261,7 +340,10 @@ object Api:
     for
       now <- env.gen.now
       participantUuid <- env.gen.uuid
-      token <- env.gen.token
+      token <- issueToken(env)
+      recovery <- issueToken(env)
+      tokenHash <- digestOrBlank(env)(token)
+      recoveryHash <- digestOrBlank(env)(recovery)
       participantId = ParticipantId(participantUuid)
       expires = now.plus(env.sessionTtl)
       command = GameCommand.JoinGame(Actor.Anonymous, now, participantId, displayName, expires)
@@ -269,7 +351,13 @@ object Api:
         .handleGameWith(env.ports)(gameId, command)(
           env.peripheral.saveDisplayName(gameId, participantId, displayName) *>
             env.peripheral.issueSession(
-              digest(token),
+              tokenHash,
+              gameId,
+              CredentialSubject.Participant(participantId),
+              expires
+            ) *>
+            env.peripheral.issueRecovery(
+              recoveryHash,
               gameId,
               CredentialSubject.Participant(participantId),
               expires
@@ -278,7 +366,7 @@ object Api:
         .flatMap {
           case Left(failure) => IO.pure(Left(failure))
           case Right(_)      =>
-            versions(env)(gameId).map(v => Right(Joined(gameId, participantId, token, v)))
+            versions(env)(gameId).map(v => Right(Joined(gameId, participantId, token, recovery, v)))
         }
     yield result
 
@@ -289,10 +377,10 @@ object Api:
       role: Role
   ): IO[Either[AppFailure, Versions]] =
     withActor(env)(caller, gameId) { (actor, now) =>
-      Application.handleGame(env.ports)(
+      Application.assignRole(env.ports)(
         gameId,
         GameCommand.AssignRole(actor, now, participantId, role)
-      )
+      )(old => env.peripheral.revokeSubject(gameId, CredentialSubject.Participant(old)))
     }
 
   def startGame(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, Versions]] =
@@ -346,6 +434,93 @@ object Api:
             SessionCommand.CommitWeek(actor, now, week, basis.map((_, v) => DecisionVersion.of(v)))
           )
         }
+
+  /** 参加者の資格を失効させる。復帰資格とブラウザセッションを、同じトランザクションで使えなくする（AC3.2.5）。 */
+  def revokeCredential(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      participantId: ParticipantId
+  ): IO[Either[AppFailure, Versions]] =
+    withActor(env)(caller, gameId) { (actor, now) =>
+      Application.handleGameWith(env.ports)(
+        gameId,
+        GameCommand.RevokeCredential(actor, now, participantId)
+      )(env.peripheral.revokeSubject(gameId, CredentialSubject.Participant(participantId)))
+    }
+
+  /** 失効した資格を再発行する。新しい復帰コードを一度だけ返す（保存はダイジェストだけ）。 */
+  def reissueCredential(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      participantId: ParticipantId
+  ): IO[Either[AppFailure, Reissued]] =
+    for
+      recovery <- issueToken(env)
+      recoveryHash <- digestOrBlank(env)(recovery)
+      now <- env.gen.now
+      expires = now.plus(env.sessionTtl)
+      done <- withActor(env)(caller, gameId) { (actor, at) =>
+        Application.handleGameWith(env.ports)(
+          gameId,
+          GameCommand.ReissueCredential(actor, at, participantId, expires)
+        )(
+          env.peripheral.issueRecovery(
+            recoveryHash,
+            gameId,
+            CredentialSubject.Participant(participantId),
+            expires
+          )
+        )
+      }
+      result <- done match
+        case Left(failure) => IO.pure(Left(failure))
+        case Right(v)      => IO.pure(Right(Reissued(recovery, expires, v)))
+    yield result
+
+  /** 復帰資格（復帰コードか Cookie の値）で、新しいブラウザセッションを発行する。無効（不明・失効・期限切れ・別のゲーム）は区別しない。 */
+  def recover(env: Env)(
+      gameId: GameId,
+      recoveryToken: Option[String]
+  ): IO[Either[AppFailure, Recovered]] =
+    recoveryToken match
+      case None        => IO.pure(Left(AppFailure.Unauthorized))
+      case Some(value) =>
+        for
+          now <- env.gen.now
+          hashed <- tokenDigest(env)(value)
+          resolved <- hashed.fold(IO.pure(Option.empty[(GameId, CredentialSubject)]))(d =>
+            readOnly(env)(env.peripheral.resolveRecovery(d, now))
+          )
+          result <- resolved match
+            case Some((g, subject)) if g == gameId =>
+              issueRecovered(env)(gameId, subject, value, now)
+            case _ => IO.pure(Left(AppFailure.Unauthorized))
+        yield result
+
+  private def issueRecovered(env: Env)(
+      gameId: GameId,
+      subject: CredentialSubject,
+      recoveryToken: String,
+      now: Instant
+  ): IO[Either[AppFailure, Recovered]] =
+    for
+      token <- issueToken(env)
+      sessionDigest <- digestOrBlank(env)(token)
+      recoveryDigest <- digestOrBlank(env)(recoveryToken)
+      expires = now.plus(env.sessionTtl)
+      stored <- env.ports.tx.run[AppFailure, Unit](
+        (env.peripheral.issueSession(sessionDigest, gameId, subject, expires) *>
+          env.peripheral.refreshRecovery(recoveryDigest, expires)).map(Right(_))
+      )
+      game <- Application.gameState(env.ports)(gameId)
+      v <- versions(env)(gameId)
+    yield stored.map { _ =>
+      val (isFacilitator, role) = subject match
+        case CredentialSubject.Participant(id) =>
+          (false, game.dataOrNone.flatMap(_.participants.get(id)).flatten)
+        case CredentialSubject.Facilitator(_) => (true, None)
+      Recovered(gameId, isFacilitator, role, token, v)
+    }
 
   def pauseSession(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, Versions]] =
     withActor(env)(caller, gameId) { (actor, now) =>

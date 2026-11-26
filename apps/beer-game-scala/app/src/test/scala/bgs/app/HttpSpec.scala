@@ -33,7 +33,8 @@ class HttpSpec extends CatsEffectSuite:
         DoobiePeripheralStore(),
         SystemGenerators.system,
         Duration.ofHours(24),
-        LogSink.discard
+        LogSink.discard,
+        cats.effect.Ref.unsafe[IO, KeyRing](KeyRing.initial("test-secret"))
       )
     }
 
@@ -589,5 +590,204 @@ class HttpSpec extends CatsEffectSuite:
           )
         }
       }
+    }
+  }
+
+  // ---- B4: 停止・再開・代理入力、資格の失効・再発行・復帰、役割の入れ替え ----
+
+  private def sessionPath(gameId: String, suffix: String) = s"/api/v1/sessions/$gameId$suffix"
+
+  test("[AC3.1.1〜3.1.3] 停止中は保存を session.paused で拒否し、代理入力は受け付け、再開で保存できる") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, players) <- started(app)
+        retailer = players.getOrElse("RETAILER", fail("小売店が無い"))
+        paused <- post(app, sessionPath(gameId, "/pause"), Json.obj(), Some(facilitator))
+        again <- post(app, sessionPath(gameId, "/pause"), Json.obj(), Some(facilitator))
+        saved <- put(
+          app,
+          sessionPath(gameId, "/decisions"),
+          Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+          Some(retailer)
+        )
+        proxy <- put(
+          app,
+          sessionPath(gameId, "/proxy-decisions/FACTORY"),
+          Json.obj("requestedWeek" -> Json.fromInt(1), "quantity" -> Json.fromInt(6)),
+          Some(facilitator)
+        )
+        state <- call(app, Method.GET, sessionPath(gameId, "/state"), cookie = Some(facilitator))
+        resumed <- post(app, sessionPath(gameId, "/resume"), Json.obj(), Some(facilitator))
+        notPaused <- post(app, sessionPath(gameId, "/resume"), Json.obj(), Some(facilitator))
+        badRole <- put(
+          app,
+          sessionPath(gameId, "/proxy-decisions/NOBODY"),
+          Json.obj("requestedWeek" -> Json.fromInt(1), "quantity" -> Json.fromInt(6)),
+          Some(facilitator)
+        )
+        badBody <- put(
+          app,
+          sessionPath(gameId, "/proxy-decisions/FACTORY"),
+          Json.obj(),
+          Some(facilitator)
+        )
+      yield
+        assertEquals(paused.status, 200)
+        assertEquals((again.status, again.code), (409, Some("session.paused")))
+        assertEquals((saved.status, saved.code), (409, Some("session.paused")))
+        assertEquals(proxy.status, 200)
+        assertEquals(state.str("status"), Some("PAUSED"))
+        assertEquals(resumed.status, 200)
+        assertEquals((notPaused.status, notPaused.code), (409, Some("session.not_paused")))
+        assert(badRole.status >= 400)
+        assert(badBody.status >= 400)
+    }
+  }
+
+  test("[AC3.2.* 復帰] 進行役の復帰コードで復帰でき、不明・別ゲーム・形式不正は区別せず拒否される") {
+    freshApp.flatMap { app =>
+      for
+        created <- post(app, "/api/v1/games", kitBody(), None)
+        code = created.str("recoveryCode").getOrElse(fail("recoveryCode が無い"))
+        gameId = created.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        recovered <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json.obj("gameId" -> Json.fromString(gameId), "recoveryCode" -> Json.fromString(code)),
+          None
+        )
+        unknown <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json
+            .obj("gameId" -> Json.fromString(gameId), "recoveryCode" -> Json.fromString("v1.nope")),
+          None
+        )
+        noCode <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json.obj("gameId" -> Json.fromString(gameId)),
+          None
+        )
+        badGame <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json.obj("gameId" -> Json.fromString("not-a-uuid")),
+          None
+        )
+      yield
+        assertEquals(recovered.status, 200)
+        assertEquals(recovered.str("kind"), Some("FACILITATOR"))
+        assert(recovered.cookie.exists(_.startsWith("bg_session=")))
+        assertEquals(unknown.status, 403)
+        assertEquals(noCode.status, 403)
+        assert(badGame.status >= 400)
+    }
+  }
+
+  test("[AC3.2.5] 失効 → 再発行 → 復帰。失効済みの再失効・未失効の再発行は 409。不正な本文は拒否") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, code) <- create(app)
+        (participant, participantId) <- join(app, code, "田中")
+        subject = Json.obj(
+          "subject" -> Json.obj(
+            "kind" -> Json.fromString("PARTICIPANT"),
+            "id" -> Json.fromString(participantId)
+          )
+        )
+        notRevoked <- post(
+          app,
+          s"/api/v1/games/$gameId/credentials/reissue",
+          subject,
+          Some(facilitator)
+        )
+        revoked <- post(
+          app,
+          s"/api/v1/games/$gameId/credentials/revoke",
+          subject,
+          Some(facilitator)
+        )
+        twice <- post(app, s"/api/v1/games/$gameId/credentials/revoke", subject, Some(facilitator))
+        stale <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(participant))
+        reissued <- post(
+          app,
+          s"/api/v1/games/$gameId/credentials/reissue",
+          subject,
+          Some(facilitator)
+        )
+        back <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json.obj(
+            "gameId" -> Json.fromString(gameId),
+            "recoveryCode" -> Json.fromString(reissued.str("recoveryCode").getOrElse(""))
+          ),
+          None
+        )
+        badSubject <- post(
+          app,
+          s"/api/v1/games/$gameId/credentials/revoke",
+          Json.obj(),
+          Some(facilitator)
+        )
+      yield
+        assertEquals(
+          (notRevoked.status, notRevoked.code),
+          (409, Some("game.credential_not_revoked"))
+        )
+        assertEquals(revoked.status, 200)
+        assertEquals((twice.status, twice.code), (409, Some("game.credential_already_revoked")))
+        assertEquals(stale.status, 403)
+        assertEquals(reissued.status, 200)
+        assertEquals(back.status, 200)
+        assertEquals(back.str("kind"), Some("PARTICIPANT"))
+        assert(badSubject.status >= 400)
+    }
+  }
+
+  test("[AC3.2.5] 開始後に、役割なしの参加者を入れ替えると、旧担当者の資格は失効し、新担当者が保存できる") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, code) <- create(app)
+        joined <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            ).map(_ => role -> cookie)
+          }
+        }
+        players = joined.toMap
+        (newCookie, newId) <- join(app, code, "佐藤")
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        replaced <- put(
+          app,
+          s"/api/v1/games/$gameId/participants/$newId/role",
+          Json.obj("role" -> Json.fromString("RETAILER")),
+          Some(facilitator)
+        )
+        old <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/state",
+          cookie = players.get("RETAILER")
+        )
+        saved <- put(
+          app,
+          sessionPath(gameId, "/decisions"),
+          Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(5)),
+          Some(newCookie)
+        )
+      yield
+        assertEquals(replaced.status, 200)
+        assertEquals(old.status, 403)
+        assertEquals(saved.status, 200)
     }
   }

@@ -1,8 +1,8 @@
 package bgs.app
 
 import bgs.adapter.persistence.{DoobieEventStore, DoobiePeripheralStore, Migrations, Transactions}
-import bgs.application.{Env, LogRecord, LogSink, Ports, SystemGenerators, Tx}
-import cats.effect.IO
+import bgs.application.{Env, KeyRing, LogRecord, LogSink, Ports, SystemGenerators, Tx}
+import cats.effect.{IO, Ref}
 import doobie.Transactor
 import io.circe.Json
 
@@ -14,6 +14,10 @@ object Wiring:
 
   private val MaxAttempts = 20
   private val SessionTtl = Duration.ofHours(24)
+
+  /** 資格の署名鍵（版 1）。本番は環境変数（秘密情報の管理から渡す）。ローカルは、起動ごとの乱数。 */
+  private def credentialSecret: String =
+    sys.env.getOrElse("BGS_CREDENTIAL_KEY", UUID.randomUUID.toString + UUID.randomUUID.toString)
 
   /** 構造化ログを、1 行の JSON として標準出力へ出す。 */
   val stdoutLog: LogSink =
@@ -42,7 +46,8 @@ object Wiring:
       DoobiePeripheralStore(),
       SystemGenerators.system,
       SessionTtl,
-      log
+      log,
+      Ref.unsafe[IO, KeyRing](KeyRing.initial(credentialSecret))
     )
 
   def env(xa: Transactor[IO]): Env = env(xa, stdoutLog, identity)

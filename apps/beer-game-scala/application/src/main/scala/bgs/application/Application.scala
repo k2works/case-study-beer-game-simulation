@@ -123,6 +123,42 @@ object Application:
       yield ()).value
     )
 
+  /** 役割の割り当て。準備中は `game` だけ、開始後（入れ替え）は `game` と `session` へ同一トランザクションで追記する。 失効した資格（入れ替えられた担当者）ごとに、
+    * [[onRevoked]] を同じトランザクションで実行する（ブラウザセッション・復帰資格の失効）。
+    */
+  def assignRole(
+      ports: Ports
+  )(gameId: GameId, command: GameCommand.AssignRole)(
+      onRevoked: ParticipantId => ConnectionIO[Unit]
+  ): IO[Either[AppFailure, Unit]] =
+    retrying(ports)(
+      (for
+        gameRead <- EitherT.right[AppFailure](ports.gameStore.read(gameId))
+        sessionRead <- EitherT.right[AppFailure](ports.sessionStore.read(gameId))
+        decision <- EitherT.fromEither[ConnectionIO](
+          for
+            game <- runningGame(gameRead)
+            session <- runningSession(sessionRead)
+            decided <- Replace.decide(game, session, command).leftMap(AppFailure.Domain(_))
+          yield decided
+        )
+        _ <- EitherT(ports.gameStore.append(gameId, gameRead.version, decision.game, command.at))
+        _ <-
+          if decision.session.isEmpty then EitherT.rightT[ConnectionIO, AppFailure](())
+          else
+            EitherT(
+              ports.sessionStore
+                .append(gameId, sessionRead.version, decision.session, command.at)
+                .map(_.void)
+            )
+        _ <- EitherT.right[AppFailure](
+          decision.game
+            .collect { case GameEvent.CredentialRevoked(id) => id }
+            .traverse_(onRevoked)
+        )
+      yield ()).value
+    )
+
   /** 現在の `game` の状態（イベントの再生で復元する）。 */
   def gameState(ports: Ports)(gameId: GameId): IO[GameState] =
     ports.tx

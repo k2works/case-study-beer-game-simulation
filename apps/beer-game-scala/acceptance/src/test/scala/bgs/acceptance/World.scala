@@ -21,6 +21,15 @@ final case class Reply(status: Int, json: Json, headers: Headers):
       .get(CIString("Set-Cookie"))
       .flatMap(_.toList.headOption)
       .map(_.value.takeWhile(_ != ';'))
+
+  /** Set-Cookie のうち、名前が [[name]] で始まるものの `name=value`。 */
+  def cookieNamed(name: String): Option[String] =
+    headers
+      .get(CIString("Set-Cookie"))
+      .toList
+      .flatMap(_.toList)
+      .map(_.value.takeWhile(_ != ';'))
+      .find(_.startsWith(s"$name="))
   def location: Option[String] =
     headers.get(CIString("Location")).flatMap(_.toList.headOption).map(_.value)
   def code: Option[String] = json.hcursor.get[String]("code").toOption
@@ -40,6 +49,9 @@ final class GameClient(
   var players: Map[String, String] = Map.empty
   var participants: Map[String, String] = Map.empty // 表示名 → participantId
   var participantCookies: Map[String, String] = Map.empty // 表示名 → 資格
+  var participantRecoveries: Map[String, String] = Map.empty // 表示名 → 復帰資格の Cookie
+  var recoveries: Map[String, String] = Map.empty // 役割名（または FACILITATOR）→ 復帰資格の Cookie
+  var recoveryCode: String = "" // 進行役が作成時に控えた復帰コード
   var lastCreateKey: String = ""
   var lastCreateBody: Json = Json.Null
 

@@ -172,6 +172,9 @@ enum SessionEvent:
   case SessionPaused
   case SessionResumed
 
+  /** 開始後の役割の入れ替え。役割ごとの担当者の全体を置き換える（D4: session は開始時の写しを持つ）。 */
+  case AssignmentsReplaced(assignments: RoleMap[Set[ParticipantId]])
+
   def name: String = this match
     case SessionEvent.SessionStarted(_, _, _, _, _)   => "SessionStarted"
     case SessionEvent.DecisionSaved(_, _, _, _, _, _) => "DecisionSaved"
@@ -179,6 +182,7 @@ enum SessionEvent:
     case SessionEvent.SessionEnded(_)                 => "SessionEnded"
     case SessionEvent.SessionPaused                   => "SessionPaused"
     case SessionEvent.SessionResumed                  => "SessionResumed"
+    case SessionEvent.AssignmentsReplaced(_)          => "AssignmentsReplaced"
 
 enum SessionError(val code: String, val category: ErrorCategory) extends DomainError:
   /** セッションが始まっていない（未開始）。 */
@@ -405,6 +409,8 @@ object SessionEvents:
       updateData(state)(_.withDecision(role, DecisionEntry(quantity, version, editor)))
     case SessionEvent.WeekCommitted(_, _, _, _, nextStates, _) =>
       updateData(state)(_.afterCommit(nextStates))
+    case SessionEvent.AssignmentsReplaced(assignments) =>
+      updateData(state)(_.copy(assignments = assignments))
     case SessionEvent.SessionPaused   => updateData(state)(_.copy(paused = true))
     case SessionEvent.SessionResumed  => updateData(state)(_.copy(paused = false))
     case SessionEvent.SessionEnded(_) =>

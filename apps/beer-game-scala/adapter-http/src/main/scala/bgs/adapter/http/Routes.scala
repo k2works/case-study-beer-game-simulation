@@ -7,7 +7,7 @@ import cats.effect.IO
 import cats.syntax.all.*
 import doobie.implicits.*
 import io.circe.parser.parse
-import io.circe.Json
+import io.circe.{Json, JsonObject}
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
@@ -173,14 +173,16 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             p(Status.UnprocessableContent, error.code, detailOf(error.code), extra)
 
   private def detailOf(code: String): String = code match
-    case "game.not_preparing"           => "参加の受付を終了しています。"
-    case "session.week_advanced"        => "この週はすでに確定されています。"
-    case "game.start_condition_not_met" => "4 つの役割のそれぞれに、参加者が必要です。"
-    case "session.incomplete_decisions" => "4 つの役割の入力がそろっていません。"
-    case "session.paused"               => "停止中です。進行役の再開を待ってください。"
-    case "session.not_paused"           => "停止中ではありません。"
-    case "session.save_limit_reached"   => "この週の保存回数の上限に達しています。"
-    case other                          => other
+    case "game.not_preparing"              => "参加の受付を終了しています。"
+    case "session.week_advanced"           => "この週はすでに確定されています。"
+    case "game.start_condition_not_met"    => "4 つの役割のそれぞれに、参加者が必要です。"
+    case "session.incomplete_decisions"    => "4 つの役割の入力がそろっていません。"
+    case "game.credential_already_revoked" => "資格はすでに失効しています。"
+    case "game.credential_not_revoked"     => "失効していない資格は、再発行できません。"
+    case "session.paused"                  => "停止中です。進行役の再開を待ってください。"
+    case "session.not_paused"              => "停止中ではありません。"
+    case "session.save_limit_reached"      => "この週の保存回数の上限に達しています。"
+    case other                             => other
 
   private def badRequest(correlation: String, detail: String): Outcome =
     problem(Status.BadRequest, "validation.invalid_input", correlation, detail, Nil, None)
@@ -221,8 +223,31 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
           case Right(json) => run(json, text)
     }
 
-  /** 変更系は Idempotency-Key が必須。同じキーと同じ要求の再送には、最初の応答を返す。 */
+  /** 匿名の呼び出しを認める経路（作成・参加）用。 */
   private def idempotent(req: Request[IO], ctx: Ctx, bodyText: String)(
+      run: IO[Outcome]
+  ): IO[Outcome] = idempotentWith(req, ctx, bodyText, IO.pure(true))(run)
+
+  /** 資格のある呼び出しだけが、保存済みの応答を受け取れる（ADR-004。認可を冪等記録の照合より先に置く）。 */
+  private def idempotentAuth(req: Request[IO], ctx: Ctx, bodyText: String)(
+      run: IO[Outcome]
+  ): IO[Outcome] = idempotentWith(req, ctx, bodyText, IO.pure(ctx.caller != Caller.Anonymous))(run)
+
+  /** 変更系は Idempotency-Key が必須。同じキーと同じ要求の再送には、最初の応答を返す。 [[authorized]] が偽なら、照合の前に 403。 */
+  private def idempotentWith(
+      req: Request[IO],
+      ctx: Ctx,
+      bodyText: String,
+      authorized: IO[Boolean]
+  )(
+      run: IO[Outcome]
+  ): IO[Outcome] =
+    authorized.flatMap { allowed =>
+      if allowed then idempotentCore(req, ctx, bodyText)(run)
+      else IO.pure(failureOutcome(AppFailure.Unauthorized, ctx.correlation))
+    }
+
+  private def idempotentCore(req: Request[IO], ctx: Ctx, bodyText: String)(
       run: IO[Outcome]
   ): IO[Outcome] =
     req.headers.get(CIString("Idempotency-Key")).flatMap(_.toList.headOption).map(_.value) match
@@ -267,7 +292,8 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                             Json
                               .obj(
                                 "location" -> outcome.location.fold(Json.Null)(Json.fromString),
-                                "payload" -> outcome.payload
+                                // 復帰コードは一度だけ示す。冪等記録には残さない
+                                "payload" -> outcome.payload.mapObject(_.remove("recoveryCode"))
                               )
                               .noSpaces
                           )
@@ -301,6 +327,39 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         httpOnly = true
       )
     )
+
+  private def parseUuid(raw: String): Option[UUID] =
+    Either.catchNonFatal(UUID.fromString(raw)).toOption
+
+  private val RecoveryCookie = "bg_recovery"
+
+  private def recoveryCookieName(req: Request[IO]): String =
+    cookieName(req).replaceFirst(SessionCookie, RecoveryCookie)
+
+  /** 復帰資格の Cookie（復帰の経路だけが読む。ブラウザを閉じても残す）。 */
+  private def recoveryCookies(req: Request[IO], token: String): List[ResponseCookie] =
+    List(
+      ResponseCookie(
+        recoveryCookieName(req),
+        token,
+        maxAge = Some(env.sessionTtl.getSeconds),
+        path = Some("/api/v1/participations/recover"),
+        sameSite = Some(SameSite.Strict),
+        httpOnly = true
+      )
+    )
+
+  private def recoveryTokenOf(req: Request[IO], body: Json): Option[String] =
+    body.hcursor
+      .get[String]("recoveryCode")
+      .toOption
+      .filter(_.nonEmpty)
+      .orElse(
+        req.cookies
+          .find(_.name == recoveryCookieName(req))
+          .orElse(req.cookies.find(_.name == RecoveryCookie))
+          .map(_.content)
+      )
 
   // ---- 経路 ----
 
@@ -351,9 +410,14 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                         case Right(created) =>
                           Outcome(
                             Status.Created,
-                            JsonViews.commandResponse(created.versions),
+                            JsonViews
+                              .commandResponse(created.versions)
+                              .mapObject(
+                                _.add("recoveryCode", Json.fromString(created.recoveryToken))
+                              ),
                             Some(s"/api/v1/games/${created.gameId.value}/state"),
-                            sessionCookies(req, created.facilitatorToken),
+                            sessionCookies(req, created.facilitatorToken) ++
+                              recoveryCookies(req, created.recoveryToken),
                             None,
                             problem = false
                           )
@@ -387,7 +451,8 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                             "gameId" -> Json.fromString(joined.gameId.value.toString)
                           ),
                           None,
-                          sessionCookies(req, joined.participantToken),
+                          sessionCookies(req, joined.participantToken) ++
+                            recoveryCookies(req, joined.recoveryToken),
                           None,
                           problem = false
                         )
@@ -433,7 +498,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (json, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 json.hcursor.get[String]("role").toOption.flatMap(JsonViews.parseRole) match
                   case None =>
                     IO.pure(
@@ -463,7 +528,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (_, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 Api
                   .startGame(env)(ctx.caller, GameId(gameUuid))
                   .map(versionsOutcome(_, ctx.correlation))
@@ -478,7 +543,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (json, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 val c = json.hcursor
                 val expected = req.headers
                   .get(CIString("If-Match"))
@@ -509,7 +574,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (json, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 val c = json.hcursor
                 val basis = c.downField("basis")
                 val versions = Role.values.toList.traverse(role =>
@@ -550,7 +615,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (_, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 val run =
                   if action == "pause" then Api.pauseSession(env) else Api.resumeSession(env)
                 run(ctx.caller, GameId(sessionUuid)).map(versionsOutcome(_, ctx.correlation))
@@ -567,7 +632,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (json, text) =>
-              idempotent(req, ctx, text) {
+              idempotentAuth(req, ctx, text) {
                 val c = json.hcursor
                 (
                   JsonViews.parseRole(roleRaw),
@@ -592,6 +657,111 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                         ctx.correlation,
                         "requestedWeek",
                         "requestedWeek と quantity は整数で指定してください。"
+                      )
+                    )
+              }
+            }
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "participations" / "recover" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (json, text) =>
+              json.hcursor.get[String]("gameId").toOption.flatMap(parseUuid) match
+                case None =>
+                  IO.pure(shapeError(ctx.correlation, "gameId", "gameId は UUID で指定してください。"))
+                case Some(gameUuid) =>
+                  val token = recoveryTokenOf(req, json)
+                  // 復帰資格の有効性が認可。照合の前に確かめる（失効した資格の再送に、保存済みの応答を返さない）
+                  val valid = token.fold(IO.pure(false))(value =>
+                    for
+                      now <- env.gen.now
+                      hashed <- Api.tokenDigest(env)(value)
+                      found <- hashed.fold(IO.pure(false))(d =>
+                        env.ports.tx
+                          .run(
+                            env.peripheral
+                              .resolveRecovery(d, now)
+                              .map(r => Right[Nothing, Boolean](r.exists(_._1 == GameId(gameUuid))))
+                          )
+                          .map(_.merge)
+                      )
+                    yield found
+                  )
+                  idempotentWith(req, ctx, text, valid) {
+                    Api.recover(env)(GameId(gameUuid), token).map {
+                      case Left(failure)    => failureOutcome(failure, ctx.correlation)
+                      case Right(recovered) =>
+                        Outcome(
+                          Status.Ok,
+                          JsonViews
+                            .commandResponse(recovered.versions)
+                            .mapObject(
+                              _.add("gameId", Json.fromString(recovered.gameId.value.toString))
+                                .add(
+                                  "kind",
+                                  Json.fromString(
+                                    if recovered.facilitator then "FACILITATOR" else "PARTICIPANT"
+                                  )
+                                )
+                                .deepMerge(
+                                  recovered.role.fold(JsonObject.empty)(r =>
+                                    JsonObject("role" -> Json.fromString(JsonViews.roleName(r)))
+                                  )
+                                )
+                            ),
+                          None,
+                          sessionCookies(req, recovered.sessionToken),
+                          None,
+                          problem = false
+                        )
+                    }
+                  }
+            }
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "credentials" / action
+          if action == "revoke" || action == "reissue" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (json, text) =>
+              idempotentAuth(req, ctx, text) {
+                val subject = json.hcursor.downField("subject")
+                (
+                  subject.get[String]("kind"),
+                  subject.get[String]("id").toOption.flatMap(parseUuid)
+                ) match
+                  case (Right("PARTICIPANT"), Some(participantUuid)) =>
+                    val participant = ParticipantId(participantUuid)
+                    if action == "revoke" then
+                      Api
+                        .revokeCredential(env)(ctx.caller, GameId(gameUuid), participant)
+                        .map(versionsOutcome(_, ctx.correlation))
+                    else
+                      Api.reissueCredential(env)(ctx.caller, GameId(gameUuid), participant).map {
+                        case Left(failure)   => failureOutcome(failure, ctx.correlation)
+                        case Right(reissued) =>
+                          ok(
+                            JsonViews
+                              .commandResponse(reissued.versions)
+                              .mapObject(
+                                _.add("recoveryCode", Json.fromString(reissued.recoveryCode))
+                                  .add("expiresAt", Json.fromString(reissued.expiresAt.toString))
+                              )
+                          )
+                      }
+                  case _ =>
+                    IO.pure(
+                      shapeError(
+                        ctx.correlation,
+                        "subject",
+                        "subject は kind が PARTICIPANT で、id が UUID のオブジェクトで指定してください。"
                       )
                     )
               }
