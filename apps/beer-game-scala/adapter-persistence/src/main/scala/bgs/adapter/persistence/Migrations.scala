@@ -16,7 +16,9 @@ object Migrations:
         .migrate()
     }.void
 
-  /** 指定のスキーマ（なければ作る）へ適用する。統合テストで、テストごとに空の状態を作るために使う。 */
+  /** PostgreSQL へ、指定のスキーマ（なければ作る）に適用する。共通の DDL に、PostgreSQL 専用（ロールと権限）を足す。
+    * 統合テストで、テストごとに空の状態を作るために使う。
+    */
   def migrateInSchema(url: String, user: String, password: String, schema: String): IO[Unit] =
     IO.blocking {
       Flyway
@@ -25,7 +27,7 @@ object Migrations:
         .schemas(schema)
         .defaultSchema(schema)
         .createSchemas(true)
-        .locations("classpath:db/migration")
+        .locations("classpath:db/migration", "classpath:db/migration-postgres")
         .load()
         .migrate()
     }.void

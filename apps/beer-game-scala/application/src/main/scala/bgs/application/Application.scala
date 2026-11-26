@@ -26,6 +26,26 @@ object Application:
   private def sessionStateOf(read: StreamRead[SessionEvent]): SessionState =
     read.events.foldLeft[SessionState](SessionState.NotStarted)(SessionEvents.apply)
 
+  /** decide が作らない列（不正な遷移）を含むストリームは、止まったゲーム（N-H7）。**書き込みは拒否し**（`Persistence`。 HTTP は 500 と相関
+    * ID）、状態の取得（読み取り）は、そのまま返す。ほかのゲームは影響を受けない。
+    */
+  private def stopped(invalid: List[InvalidTransition]): Either[AppFailure, Unit] =
+    Either.cond(
+      invalid.isEmpty,
+      (),
+      AppFailure.Persistence(
+        s"不正な遷移を含むストリーム: ${invalid.map(i => s"${i.stateName}/${i.eventType}").mkString(",")}"
+      )
+    )
+
+  private def runningGame(read: StreamRead[GameEvent]): Either[AppFailure, GameState] =
+    val replayed = Replay.game(read.events)
+    stopped(replayed.invalid).map(_ => replayed.state)
+
+  private def runningSession(read: StreamRead[SessionEvent]): Either[AppFailure, SessionState] =
+    val replayed = Replay.session(read.events)
+    stopped(replayed.invalid).map(_ => replayed.state)
+
   /** 追記の競合（`ConcurrencyConflict`）は、読み直して再実行する。上限に達したら `RetryExhausted`。 */
   private def retrying[A](ports: Ports)(
       program: ConnectionIO[Either[AppFailure, A]]
@@ -60,7 +80,7 @@ object Application:
       (for
         read <- EitherT.right[AppFailure](ports.gameStore.read(gameId))
         events <- EitherT.fromEither[ConnectionIO](
-          Game.handle(gameStateOf(read), command).leftMap(AppFailure.Domain(_))
+          runningGame(read).flatMap(Game.handle(_, command).leftMap(AppFailure.Domain(_)))
         )
         _ <- EitherT(ports.gameStore.append(gameId, read.version, events, command.at))
         _ <- EitherT.right[AppFailure](extra)
@@ -75,7 +95,7 @@ object Application:
       (for
         read <- EitherT.right[AppFailure](ports.sessionStore.read(gameId))
         events <- EitherT.fromEither[ConnectionIO](
-          Session.handle(sessionStateOf(read), command).leftMap(AppFailure.Domain(_))
+          runningSession(read).flatMap(Session.handle(_, command).leftMap(AppFailure.Domain(_)))
         )
         _ <- EitherT(ports.sessionStore.append(gameId, read.version, events, command.at))
       yield ()).value
@@ -90,9 +110,11 @@ object Application:
         gameRead <- EitherT.right[AppFailure](ports.gameStore.read(gameId))
         sessionRead <- EitherT.right[AppFailure](ports.sessionStore.read(gameId))
         decision <- EitherT.fromEither[ConnectionIO](
-          Start
-            .decide(gameStateOf(gameRead), sessionStateOf(sessionRead), command)
-            .leftMap(AppFailure.Domain(_))
+          for
+            game <- runningGame(gameRead)
+            session <- runningSession(sessionRead)
+            decided <- Start.decide(game, session, command).leftMap(AppFailure.Domain(_))
+          yield decided
         )
         _ <- EitherT(ports.gameStore.append(gameId, gameRead.version, decision.game, command.at))
         _ <- EitherT(

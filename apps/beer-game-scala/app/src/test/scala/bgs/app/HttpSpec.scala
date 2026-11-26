@@ -3,6 +3,7 @@ package bgs.app
 import bgs.adapter.http.Routes
 import bgs.adapter.persistence.{DoobieEventStore, DoobiePeripheralStore, Migrations, Transactions}
 import bgs.application.*
+import bgs.domain.{GameEvent, GameId, ParticipantId, StreamVersion}
 import cats.effect.IO
 import cats.syntax.all.*
 import doobie.Transactor
@@ -22,20 +23,21 @@ class HttpSpec extends CatsEffectSuite:
 
   private val roles = List("FACTORY", "DISTRIBUTOR", "WHOLESALER", "RETAILER")
 
-  private def freshApp: IO[HttpApp[IO]] =
+  private def freshEnv: IO[Env] =
     val url =
       s"jdbc:h2:mem:${UUID.randomUUID.toString};MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
     Migrations.migrate(url, "sa", "").map { _ =>
       val xa = Transactor.fromDriverManager[IO]("org.h2.Driver", url, "sa", "", None)
-      val env = Env(
+      Env(
         Ports(DoobieEventStore.game, DoobieEventStore.session, Transactions.writeTx(xa), 20),
         DoobiePeripheralStore(),
         SystemGenerators.system,
         Duration.ofHours(24),
         LogSink.discard
       )
-      Routes.httpApp(env)
     }
+
+  private def freshApp: IO[HttpApp[IO]] = freshEnv.map(Routes.httpApp)
 
   private final case class Reply(status: Int, json: Json, headers: Headers):
     def cookie: Option[String] =
@@ -483,6 +485,58 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(replay.status, 200) // 同じ要求の再送は、最初の応答をそのまま返す
         assertEquals(again.status, 409)
         assertEquals(again.code, Some("session.week_advanced"))
+    }
+  }
+
+  test("[N-H7] 不正な遷移で止まったゲームは、状態の取得は 200、書き込みは 500。他のゲームは動く") {
+    freshEnv.flatMap { env =>
+      val app = Routes.httpApp(env)
+      for
+        (facilitator, gameId, code) <- create(app)
+        (otherFacilitator, otherGameId, otherCode) <- create(app)
+        // decide が作らない列（同じ参加者の二重の参加）を、イベントストアへ直接足して、ゲームを止める
+        (_, participantId) <- join(app, code, "田中")
+        read <- env.ports.tx.run(
+          env.ports.gameStore
+            .read(GameId(UUID.fromString(gameId)))
+            .map(r => Right[AppFailure, StreamRead[GameEvent]](r))
+        )
+        _ <- env.ports.tx.run(
+          env.ports.gameStore.append(
+            GameId(UUID.fromString(gameId)),
+            read.map(_.version).getOrElse(StreamVersion.Zero),
+            List(
+              GameEvent.ParticipantJoined(
+                ParticipantId(UUID.fromString(participantId)),
+                java.time.Instant.now()
+              )
+            ),
+            java.time.Instant.now()
+          )
+        )
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(facilitator))
+        lobby <- call(app, Method.GET, s"/api/v1/games/$gameId/lobby", cookie = Some(facilitator))
+        write <- post(
+          app,
+          "/api/v1/participations/join",
+          Json.obj("joinCode" -> Json.fromString(code), "displayName" -> Json.fromString("鈴木")),
+          None
+        )
+        other <- post(
+          app,
+          "/api/v1/participations/join",
+          Json
+            .obj("joinCode" -> Json.fromString(otherCode), "displayName" -> Json.fromString("佐藤")),
+          None
+        )
+      yield
+        assertEquals(state.status, 200)
+        assertEquals(lobby.status, 200)
+        assertEquals(write.status, 500)
+        assertEquals(write.code, Some("app.internal"))
+        assert(write.json.hcursor.get[String]("correlationId").isRight)
+        assertEquals(other.status, 200)
+        assert(otherFacilitator.nonEmpty && otherGameId.nonEmpty)
     }
   }
 
