@@ -7618,6 +7618,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Step 1: 未確認の前提の実測（🔵。使い捨て。リポジトリの外）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-2026-11-26ai-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 の実測結果（2026-11-26。AI の実施。ゲート 1 は未承認）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -15021,6 +15038,107 @@
 <li>結果が不成立なら、<strong>以降のステップを止め、設計の見直しを人に提示する</strong>。</li>
 <li><strong>ゲート 1</strong>: 実測の結果表（成立・不成立）と、不成立の項目の扱い。</li>
 </ul>
+<h4 id="step-1-2026-11-26ai-1">Step 1 の実測結果（2026-11-26。AI の実施。<strong>ゲート 1 は未承認</strong>）<a class="headerlink" href="#step-1-2026-11-26ai-1" title="Permanent link">&para;</a></h4>
+<p>使い捨てのプロジェクト（リポジトリの外。sbt 1.13.1、JBR 25.0.4.1、Scala 3.7.4、doobie 1.0.0-RC12、H2 2.5.252、PostgreSQL 18.6（Testcontainers）で実行した。<strong>依存関係はすべて解決し、コンパイルとテストが通った</strong>（仮説 1: 成立）。</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">前提</th>
+<th style="text-align: left;">結果</th>
+<th style="text-align: left;">判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">並行時の制約名（K8）</td>
+<td style="text-align: left;">8 本の同時の追記で、成功 1・失敗 7。失敗はすべて SQLSTATE <code>23505</code> と制約名 <code>uq_events_stream_version</code></td>
+<td style="text-align: left;"><strong>成立</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>FC.rollback</code> と <code>Left</code>（K5）</td>
+<td style="text-align: left;"><code>Left</code> を返しても COMMIT される。<code>FC.rollback</code> は直前の書き込みを消し、<strong>同じ <code>ConnectionIO</code> の以降の書き込みは新しいトランザクションとして COMMIT される</strong>（推論が実測で確認された）。H2 でも同じ</td>
+<td style="text-align: left;"><strong>成立</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>Fiber</code> の取消と ROLLBACK（K7）</td>
+<td style="text-align: left;"><strong>実行中の SQL 文</strong>（<code>pg_sleep</code>）を持つトランザクションの <code>Fiber</code> を取消すと、<strong>42ms で取消が完了し、ロックは 124ms 以内に解放</strong>された（基準は 2 秒以内）。実行中の文は残らない</td>
+<td style="text-align: left;"><strong>成立</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;">取消の落とし穴</td>
+<td style="text-align: left;"><code>FC.delay</code> の中の <strong>ブロッキングの <code>Thread.sleep</code> は中断できず</strong>、取消は 29 秒かかった</td>
+<td style="text-align: left;"><strong>注意</strong>: H2 版 <code>ProjectionLock</code> の待ちは、中断できる形（<code>interruptible</code>）で書く（D4。Step 7 で確認）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>lock_timeout</code> の写像（R-H6）</td>
+<td style="text-align: left;">排他 vs 排他、共有 vs 排他のどちらも SQLSTATE <code>55P03</code>（<code>set_config('lock_timeout', …, true)</code> で設定）</td>
+<td style="text-align: left;"><strong>成立</strong>（40P01・40001 の写像は未実測）</td>
+</tr>
+<tr>
+<td style="text-align: left;">アドバイザリロック（K10）</td>
+<td style="text-align: left;"><code>pg_advisory_xact_lock</code>・<code>_shared</code> が <code>ConnectionIO</code> として実行できた</td>
+<td style="text-align: left;"><strong>成立</strong>（共有と排他の相互の待ち、再構築用の排他の本実装は Step 7）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>H2 の PostgreSQL モードの動作範囲（K21。2.5.252。<code>MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE</code>）</strong></p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">機能</th>
+<th style="text-align: left;">結果</th>
+<th style="text-align: left;">Scala 版での扱い</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">一意制約違反の SQLSTATE と制約名</td>
+<td style="text-align: left;"><code>23505</code>。メッセージに <code>uq_events_stream_version</code> を含む（<code>getServerErrorMessage</code> は無いため、<strong>H2 ではメッセージから制約名を取り出す</strong>）</td>
+<td style="text-align: left;">H2 用の判別を別に持つ</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>jsonb</code> 型、<code>cast(… as jsonb)</code>、<code>format json</code></td>
+<td style="text-align: left;">動く（<code>bigserial</code>・<code>uuid</code> も動く）</td>
+<td style="text-align: left;">そのまま</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>timestamptz</code></td>
+<td style="text-align: left;"><strong>キーワードが無い</strong>（<code>timestamp with time zone</code> は動く）</td>
+<td style="text-align: left;">DDL は <code>timestamp with time zone</code> に統一するか、H2 用の DDL を分ける</td>
+</tr>
+<tr>
+<td style="text-align: left;">部分一意索引（<code>where</code>）</td>
+<td style="text-align: left;"><strong>構文エラー</strong>（42000）。生成列（<code>generated always as (case …)</code>）+ 一意制約は動く</td>
+<td style="text-align: left;">H2 では生成列で代替（Kotlin 版と同じ方針か確認）</td>
+</tr>
+<tr>
+<td style="text-align: left;">アドバイザリロック（<code>pg_advisory_xact_lock</code>）</td>
+<td style="text-align: left;"><strong>関数が無い</strong>（90022）</td>
+<td style="text-align: left;"><strong>H2 では使えない。プロセス内のロック（D4）で代替</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>set_config('lock_timeout', …)</code></td>
+<td style="text-align: left;">呼べるが、<strong>ロック待ちの上限としては効かない</strong>（H2 にはその機能が無い）</td>
+<td style="text-align: left;">H2 の待ちの上限は D4 のロックの実装で持つ</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>LISTEN</code>/<code>NOTIFY</code></td>
+<td style="text-align: left;"><strong>構文エラー</strong></td>
+<td style="text-align: left;">H2 では使わない（プロセス内の通知）</td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>CREATE ROLE … NOLOGIN</code></td>
+<td style="text-align: left;"><strong>構文エラー</strong>（<code>CREATE USER</code> と <code>GRANT</code> は動く）</td>
+<td style="text-align: left;"><strong>ロールを使う追記専用権限の否定テストは PostgreSQL だけで実行する</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><code>REVOKE</code>、<code>current_user</code></td>
+<td style="text-align: left;">動く（H2 では権限は強制されない見込み。要確認）</td>
+<td style="text-align: left;">否定テストは PostgreSQL</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Step 1 の未実測</strong>: H2 版 <code>ProjectionLock</code> の動作（Step 7）、40P01・40001 の写像、http4s 0.23.39 のルート・ミドルウェア・SSE（Step 9）、Flyway の H2 への適用（Step 7）。</p>
 <h3 id="step-2">Step 2: リポジトリの土台と静的解析（🔵）<a class="headerlink" href="#step-2" title="Permanent link">&para;</a></h3>
 <ol>
 <li><code>apps/beer-game-scala/</code> を作成する（sbt のマルチプロジェクト: <code>domain</code>・<code>application</code>・<code>adapterHttp</code>・<code>adapterPersistence</code>・<code>app</code>・<code>acceptance</code>。層の依存は <code>dependsOn</code> で守る）。</li>
