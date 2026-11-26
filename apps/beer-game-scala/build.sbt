@@ -96,9 +96,20 @@ lazy val adapterPersistence = (project in file("adapter-persistence"))
     )
   )
 
+val http4sVersion = "0.23.39"
+
 lazy val adapterHttp = (project in file("adapter-http"))
   .dependsOn(application)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.http4s" %% "http4s-dsl" % http4sVersion,
+      "org.http4s" %% "http4s-circe" % http4sVersion,
+      "org.http4s" %% "http4s-ember-server" % http4sVersion,
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion
+    )
+  )
 
 lazy val app = (project in file("app"))
   .dependsOn(adapterHttp, adapterPersistence, domain % "test->test")

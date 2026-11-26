@@ -56,6 +56,7 @@ enum CredentialSubject:
 
 final case class GameData(
     gameId: GameId,
+    joinCode: JoinCode,
     settings: GameSettings,
     participants: Map[ParticipantId, Option[Role]],
     /** 資格の有効期限（進行役は作成時、参加者は参加時に発行する。失効・再発行・復帰は B4）。 */
@@ -159,6 +160,9 @@ enum GameError(val code: String, val category: ErrorCategory) extends DomainErro
   /** 準備中でない（未作成、または開始済み）。 */
   case NotPreparing extends GameError("game.not_preparing", ErrorCategory.InvalidState)
   case Forbidden(reason: String) extends GameError("game.forbidden", ErrorCategory.Forbidden)
+
+  /** 参加コードが無効（不明、または形式が不正）。区別せず、同じ応答にする（列挙の防止。AC1.2.2）。 */
+  case InvitationInvalid extends GameError("game.invitation_invalid", ErrorCategory.Forbidden)
   case ParticipantNotFound(participantId: ParticipantId)
       extends GameError("game.participant_not_found", ErrorCategory.NotFound)
 
@@ -243,11 +247,12 @@ object GameEvents:
   /** イベントを状態へ畳み込む。全域（例外を投げない。強制キャストを使わない）。 decide が作らない列は、状態を変えずに返す（版も増えない。検知は [[Replay.game]]）。
     */
   def apply(state: GameState, event: GameEvent): GameState = event match
-    case GameEvent.GameCreated(gameId, _, settings, _, facilitatorExpiresAt) =>
+    case GameEvent.GameCreated(gameId, joinCode, settings, _, facilitatorExpiresAt) =>
       state match
         case GameState.NotCreated =>
           val data = GameData(
             gameId,
+            joinCode,
             settings,
             Map.empty,
             Map(CredentialSubject.Facilitator(gameId) -> facilitatorExpiresAt)

@@ -1,6 +1,6 @@
 package bgs.application
 
-import bgs.domain.{DomainError, GameId, StreamVersion}
+import bgs.domain.{DomainError, GameId, StreamVersion, ValidationError}
 import cats.effect.IO
 import doobie.ConnectionIO
 
@@ -19,6 +19,9 @@ enum AppFailure:
 
   /** 資格が無い・無効。`app.unauthorized`（403）。 */
   case Unauthorized
+
+  /** 入力の形の誤り。境界で集めた、項目ごとの誤り（422）。 */
+  case Invalid(errors: List[ValidationError])
 
   /** 想定外の失敗（500 と相関 ID）。 */
   case Persistence(message: String)

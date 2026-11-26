@@ -46,6 +46,16 @@ object Application:
   def handleGame(
       ports: Ports
   )(gameId: GameId, command: GameCommand): IO[Either[AppFailure, Unit]] =
+    handleGameWith(ports)(gameId, command)(().pure[ConnectionIO])
+
+  /** `game` ストリームのコマンドに、周辺ストアへの書き込み（参加コードの索引・表示名・資格など）を同じトランザクションで足す。 追記が成功したときだけ [[extra]]
+    * を実行し、競合で再試行するときは、その回の書き込みごと巻き戻る。
+    */
+  def handleGameWith(
+      ports: Ports
+  )(gameId: GameId, command: GameCommand)(
+      extra: ConnectionIO[Unit]
+  ): IO[Either[AppFailure, Unit]] =
     retrying(ports)(
       (for
         read <- EitherT.right[AppFailure](ports.gameStore.read(gameId))
@@ -53,6 +63,7 @@ object Application:
           Game.handle(gameStateOf(read), command).leftMap(AppFailure.Domain(_))
         )
         _ <- EitherT(ports.gameStore.append(gameId, read.version, events, command.at))
+        _ <- EitherT.right[AppFailure](extra)
       yield ()).value
     )
 
