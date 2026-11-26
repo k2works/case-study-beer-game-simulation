@@ -31,7 +31,8 @@ class HttpSpec extends CatsEffectSuite:
         Ports(DoobieEventStore.game, DoobieEventStore.session, Transactions.writeTx(xa), 20),
         DoobiePeripheralStore(),
         SystemGenerators.system,
-        Duration.ofHours(24)
+        Duration.ofHours(24),
+        LogSink.discard
       )
       Routes.httpApp(env)
     }

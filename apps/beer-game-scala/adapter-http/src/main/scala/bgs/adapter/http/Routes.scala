@@ -2,8 +2,10 @@ package bgs.adapter.http
 
 import bgs.application.*
 import bgs.domain.*
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all.*
+import doobie.implicits.*
 import io.circe.parser.parse
 import io.circe.Json
 import org.http4s.*
@@ -295,7 +297,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
 
   // ---- 経路 ----
 
-  val app: HttpApp[IO] = HttpRoutes
+  private val routes: HttpApp[IO] = HttpRoutes
     .of[IO] {
       case GET -> Root / "api" / "v1" / "health" =>
         IO.pure(render(ok(Json.obj("status" -> Json.fromString("ok"))), "-"))
@@ -303,7 +305,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
       case GET -> Root / "api" / "v1" / "ready" =>
         context(Request[IO]()).flatMap { ctx =>
           env.ports.tx
-            .run(doobie.FC.unit.map(_ => Right[Nothing, Unit](())))
+            .run(sql"select 1".query[Int].unique.map(_ => Right[Nothing, Unit](())))
             .attempt
             .map {
               case Right(_) =>
@@ -558,3 +560,26 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         }
     }
     .orNotFound
+
+  private val UuidPattern =
+    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
+  /** 要求ごとに構造化ログを 1 件出す（AC6.1.1）。相関 ID・操作・結果の状態・所要時間だけを持つ。 資格・表示名・参加コード・非公開の値は含めない（操作は、経路の識別子を
+    * `{id}` に落とす）。
+    */
+  val app: HttpApp[IO] = Kleisli { (req: Request[IO]) =>
+    for
+      start <- IO.monotonic
+      response <- routes.run(req)
+      end <- IO.monotonic
+      operation = s"${req.method.name} ${req.uri.path.renderString.replaceAll(UuidPattern, "{id}")}"
+      correlation = response.headers
+        .get(CIString("x-correlation-id"))
+        .flatMap(_.toList.headOption)
+        .map(_.value)
+        .getOrElse("-")
+      _ <- env.log.write(
+        LogRecord(correlation, operation, response.status.code, (end - start).toMillis)
+      )
+    yield response
+  }

@@ -3,6 +3,9 @@ package bgs.acceptance
 import io.circe.Json
 import io.circe.parser.parse
 import io.cucumber.scala.{EN, ScalaDsl}
+import org.typelevel.ci.CIString
+
+import scala.jdk.CollectionConverters.*
 
 /** 共有の日本語 Gherkin（apps/beer-game-features/）のステップ定義。薄く保ち、業務の規則は持たない。
   * HTTP（in-process）を呼び、応答を確かめる。アプリケーション・永続化は、実際のものを使う（H2）。
@@ -438,6 +441,66 @@ class Steps extends ScalaDsl with EN:
   Then("""^数量の保存は(受け付けられる|拒否される)$""") { (outcome: String) =>
     val accepted = world.last.status == 200
     require(accepted == (outcome == "受け付けられる"), s"結果が違う: ${world.last.status}")
+  }
+
+  // ---- 観測（US6.1。D2: AC6.1.1・6.1.2・6.1.4） ----
+
+  Given("""^参加者が表示名「(.+)」でゲームに参加している$""") { (name: String) =>
+    world.games = List(GameClient.fresh())
+    require(createGame(world.game).status == 201, "作成できない")
+    require(joinWith(world.game, joinCodeOf(world.game), name).status == 200, "参加できない")
+  }
+
+  When("""^状況を取得する要求を処理する$""") { () =>
+    val client = world.game
+    val cookie = client.participantCookies.values.headOption
+    world.last = client.get(gamePath(client, "/state"), cookie)
+  }
+
+  private def lastLog(client: GameClient): bgs.application.LogRecord =
+    client.logs.asScala.toList.lastOption.getOrElse(sys.error("ログが出ていない"))
+
+  Then("""^相関 ID、操作、結果、所要時間を含む構造化ログが出力される$""") { () =>
+    val record = lastLog(world.game)
+    require(record.correlationId.nonEmpty && record.correlationId != "-", "相関 ID が無い")
+    require(record.operation.startsWith("GET "), s"操作が違う: ${record.operation}")
+    require(record.status == 200, s"結果が違う: ${record.status}")
+    require(record.durationMs >= 0L, "所要時間が無い")
+    require(
+      world.last.headers
+        .get(CIString("x-correlation-id"))
+        .exists(_.head.value == record.correlationId),
+      "応答の相関 ID と違う"
+    )
+  }
+
+  Then("""^そのログに、資格、表示名「(.+)」、非公開の値は含まれない$""") { (name: String) =>
+    val client = world.game
+    val text = client.logs.asScala.toList.map(_.toString).mkString("\n")
+    val token =
+      client.participantCookies.values.headOption.getOrElse("").dropWhile(_ != '=').drop(1)
+    require(token.nonEmpty && !text.contains(token), "資格がログに含まれている")
+    require(!text.contains(name), "表示名がログに含まれている")
+    require(!text.contains(joinCodeOf(client)), "参加コードがログに含まれている")
+  }
+
+  Given("""^アプリケーションが準備できている$""") { () =>
+    world.games = List(GameClient.fresh())
+    require(world.game.get("/api/v1/ready", None).status == 200, "準備できていない")
+  }
+
+  When("""^データベースに接続できなくなる$""") { () => world.game.databaseDown.set(true) }
+
+  Then("""^準備のヘルスチェックは準備できていないことを示す$""") { () =>
+    val ready = world.game.get("/api/v1/ready", None)
+    require(
+      ready.status == 503 && ready.code.contains("app.not_ready"),
+      s"準備できていないことを示していない: ${ready.text}"
+    )
+  }
+
+  Then("""^生存のヘルスチェックは成功のままである$""") { () =>
+    require(world.game.get("/api/v1/health", None).status == 200, "生存が失敗している")
   }
 
   // ---- 週の確定（US2.3） ----

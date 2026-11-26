@@ -8,3 +8,6 @@ game-setup/joining.feature
 weekly-play/situation.feature
 weekly-play/decision.feature
 weekly-play/week-commit.feature
+
+# B3: 観測（US6.1。D2: AC6.1.1・6.1.2・6.1.4）
+operations/observability.feature

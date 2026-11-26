@@ -2,7 +2,9 @@ package bgs.acceptance
 
 import bgs.app.Wiring
 import bgs.adapter.http.Routes
+import bgs.application.{LogRecord, LogSink, Tx}
 import cats.effect.IO
+import doobie.ConnectionIO
 import cats.effect.unsafe.implicits.global
 import io.circe.Json
 import io.circe.parser.parse
@@ -25,7 +27,11 @@ final case class Reply(status: Int, json: Json, headers: Headers):
   def text: String = json.noSpaces
 
 /** 1 つのゲームの操作の入口（進行役の資格と参加者の資格を持つ）。 */
-final class GameClient(val app: HttpApp[IO]):
+final class GameClient(
+    val app: HttpApp[IO],
+    val logs: java.util.concurrent.ConcurrentLinkedQueue[LogRecord],
+    val databaseDown: java.util.concurrent.atomic.AtomicBoolean
+):
   var facilitator: Option[String] = None
   var gameId: Option[String] = None
 
@@ -66,8 +72,19 @@ final class GameClient(val app: HttpApp[IO]):
 
 object GameClient:
   def fresh(): GameClient =
-    val env = Wiring.inMemoryH2.unsafeRunSync()
-    new GameClient(Routes.httpApp(env))
+    val logs = new java.util.concurrent.ConcurrentLinkedQueue[LogRecord]()
+    val down = new java.util.concurrent.atomic.AtomicBoolean(false)
+    // データベースに接続できない状態を模擬する（書き込み・読み取りの実行が失敗する）
+    val wrap: Tx => Tx = underlying =>
+      new Tx:
+        def run[E, A](program: ConnectionIO[Either[E, A]]): IO[Either[E, A]] =
+          IO.delay(down.get).flatMap { isDown =>
+            if isDown then IO.raiseError(new java.sql.SQLException("接続できない"))
+            else underlying.run(program)
+          }
+    val env =
+      Wiring.inMemoryH2(LogSink(record => IO.delay(logs.add(record)).void), wrap).unsafeRunSync()
+    new GameClient(Routes.httpApp(env), logs, down)
 
 /** シナリオごとの状態。シナリオが終わると、新しいインスタンスに替わる。 */
 final class World:
