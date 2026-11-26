@@ -24,7 +24,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-26T08:10:00Z }
 | 追記専用権限の否定テスト | 達成（PostgreSQL 専用 V003。UPDATE・DELETE・TRUNCATE は 42501） |
 | 仕様と実装をずらすと契約テストが落ちる | **未了**（OpenAPI の契約テストは新しい依存関係を要し、承認が先） |
 | scoverage のプロジェクトごとのしきい値（SR3） | 達成（自作ツールで、`source` のパスから算出。全体 80%・domain 90%（実測 94.7%）・application 85%（実測 93.3%）。domain 97% は目安のまま） |
-| 依存関係・秘密情報の検査を CI に含める（SR13） | **未了** |
+| 依存関係・秘密情報の検査を CI に含める（SR13） | 秘密情報は達成（`scripts/check-secrets.sh`。自己テストつき。`check.sh` 経由で CI の `check` ジョブが実行）。**依存関係の脆弱性検査は未了**（外部ツールの導入が要り、承認が先） |
 
 ## 人の判断が要る項目
 

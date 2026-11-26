@@ -5,10 +5,12 @@
 #   3. テスト
 #   4. 規則そのものの確認（fixture の期待件数）
 #   5. 層の依存
+#   6. 秘密情報の形の文字列
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 sbt -batch scalafmtCheckAll scalafmtSbtCheck "scalafixAll --check" test
 ./scripts/check-rules.sh
 ./scripts/check-deps.sh
+./scripts/check-secrets.sh
 echo "OK: すべての検査が通った"
