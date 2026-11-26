@@ -19,7 +19,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-26T00:00:00Z }
 | ゲート密度 | **密**（ステップごとに、人が検証する） |
 | アプローチ | アウトサイドイン（[開発戦略](./development_strategy.md) の序盤）。**受け入れのシナリオと API の仕様が先** |
 | テスト戦略 | Comprehensive（`simulateWeek`、集約、イベントストア）、Standard（その他） |
-| 状態 | **計画は草案のまま、人の承認なし。** 2026-11-26 にユーザーが `/goal orchestrating-development U1` を指示したため、AI が B1 を自律実行中（**`/goal` の指示は、各ゲート・依存関係・マイグレーションの承認の記録ではない。実施した未承認の判断は、終了報告に列挙する**）。実施済み: Step 1（実測。結果は下記）、Step 2（土台と静的解析。`apps/beer-game-scala/scripts/check.sh` が緑）、Step 4（値と週次計算）、Step 5・6（Game と Session の集約、`startGame`、設定の検証、再生。domain 61 件）、Step 7（Flyway V001、circe、イベントストア、`Tx.run`。**契約テスト 12 件が H2・PostgreSQL で緑**。`.transact(` の入口を `Transactions.scala` に限る検査を fixture つきで追加）、Step 8（アプリケーション層。再試行、2 ストリームの開始。app 6 件が緑）。**未実施の判断（未承認）: マイグレーション V001、依存関係の導入（circe・Flyway・H2・scala-xml ほか）。簡略化: 投影の表は作らず、状態はイベントの再生で復元（Step 7 の投影は未実施）。** **未着手: Step 3 の AC 一覧・許可リスト・cucumber の入口、Step 9〜12（HTTP と認可・冪等・problem+json、共有 UI の接続、受け入れ、検証）。** 各ゲート 1〜12 は未承認 |
+| 状態 | **計画は草案のまま、人の承認なし。** 2026-11-26 にユーザーが `/goal orchestrating-development U1` を指示したため、AI が B1〜B3 を自律実行した（**`/goal` の指示は、各ゲート・依存関係・マイグレーションの承認の記録ではない**）。**Step 1〜12 の実装と記録は完了**（Step 10: 共有 Web の AC2.3.1 が緑、Step 3・11: 許可リスト 27 シナリオ・155 ステップが緑、CI 3 ジョブ緑、行率 86.7%）。結果は [B1 終了報告](./bolt_1_report.md)（B2・B3 は別報告）。**未承認の判断（V001〜V003、依存関係、簡略化）と、各ゲート 1〜12 の承認は未記録** |
 
 > **承認の状態について**: リリース計画・開発戦略・本書は、いずれも AI の草案で、ユーザーの承認を得ていません。承認の記録は、ユーザーが指示した範囲だけを追記します。
 
