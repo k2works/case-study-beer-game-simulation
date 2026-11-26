@@ -101,8 +101,11 @@ lazy val adapterHttp = (project in file("adapter-http"))
   .settings(commonSettings)
 
 lazy val app = (project in file("app"))
-  .dependsOn(adapterHttp, adapterPersistence)
+  .dependsOn(adapterHttp, adapterPersistence, domain % "test->test")
   .settings(commonSettings)
+  .settings(
+    libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test
+  )
 
 lazy val acceptance = (project in file("acceptance"))
   .dependsOn(app)
