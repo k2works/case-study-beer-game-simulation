@@ -256,6 +256,7 @@ nav:
           - 概要: development/beer-game-scala/index.md
           - リリース計画: development/beer-game-scala/release_plan.md
           - 開発戦略: development/beer-game-scala/development_strategy.md
+          - Bolt 1 計画: development/beer-game-scala/bolt_1_plan.md
           - 守りの導入計画: development/beer-game-rust/guard_plan.md
   - 運用:
       - 概要: operation/index.md
