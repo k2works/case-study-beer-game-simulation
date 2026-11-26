@@ -35,8 +35,8 @@ final case class EventStore[E](
     ]
 )
 
-/** 書き込みの実行。`Transactor` を直接渡さない（公開する書き込みの実行は `run` だけ）。 `Left` なら ROLLBACK してから終える（K5: doobie
-  * は `Left` でも COMMIT するため）。実装は `Transactions.scala`。
+/** 書き込みの実行。`Transactor` を直接渡さない（公開する書き込みの実行は `run` だけ）。 `Left` なら ROLLBACK してから終える（K5: doobie は
+  * `Left` でも COMMIT するため）。実装は `Transactions.scala`。
   */
 trait Tx:
   def run[E, A](program: ConnectionIO[Either[E, A]]): IO[Either[E, A]]

@@ -6,8 +6,8 @@ import cats.syntax.all.*
 import doobie.*
 import doobie.implicits.*
 
-/** トランザクションの実行。**トランザクションの入口を書いてよいのは、このファイルだけ**（静的解析で守る）。 公開する書き込みの実行は [[Tx.run]]
-  * だけで、`Transactor` は渡さない。
+/** トランザクションの実行。**トランザクションの入口を書いてよいのは、このファイルだけ**（静的解析で守る）。 公開する書き込みの実行は [[Tx.run]] だけで、`Transactor`
+  * は渡さない。
   */
 object Transactions:
 
