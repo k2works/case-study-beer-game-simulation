@@ -7,6 +7,7 @@ import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
 
+import java.time.Instant
 import java.util.UUID
 
 /** 周辺ストアの doobie 実装（H2 と PostgreSQL で共通）。資格の値は持たず、ダイジェストだけを保存する。 */
@@ -94,4 +95,12 @@ object DoobiePeripheralStore:
               where game_id = ${gameId.value} and subject_kind = $kind and subject_id = $subjectId""".update.run *>
           sql"""delete from browser_sessions
                 where game_id = ${gameId.value} and subject_kind = $kind and subject_id = $subjectId""".update.run.void
+      ,
+      recordFailure = (source, at) =>
+        sql"insert into attempt_failures (source_digest, occurred_at) values ($source, $at)".update.run.void,
+      failuresSince = (source, since) =>
+        sql"""select count(*), min(occurred_at) from attempt_failures
+              where source_digest = $source and occurred_at > $since"""
+          .query[(Int, Option[Instant])]
+          .unique
     )

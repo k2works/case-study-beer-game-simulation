@@ -838,3 +838,93 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(stale.status, 409)
     }
   }
+
+  test("[NF-S11] 参加コードの失敗が上限（10 回）に達した接続元は、正しい参加コードでも 429。成功と形の誤りは数えない") {
+    freshApp.flatMap { app =>
+      def joinBody(code: String, name: String) =
+        Json.obj("joinCode" -> Json.fromString(code), "displayName" -> Json.fromString(name))
+      for
+        (_, _, code) <- create(app)
+        okJoins <- (1 to 12).toList.traverse(n =>
+          post(app, "/api/v1/participations/join", joinBody(code, s"参加$n"), None)
+        )
+        shape <- (1 to 12).toList.traverse(_ =>
+          post(
+            app,
+            "/api/v1/participations/join",
+            Json.obj("joinCode" -> Json.fromString(code)),
+            None
+          )
+        )
+        fails <- (1 to 10).toList.traverse(n =>
+          post(app, "/api/v1/participations/join", joinBody("ZZZZZZZZ", s"失敗$n"), None)
+        )
+        blocked <- post(app, "/api/v1/participations/join", joinBody(code, "田中"), None)
+        recoverFails <- (1 to 10).toList.traverse(_ =>
+          post(
+            app,
+            "/api/v1/participations/recover",
+            Json.obj(
+              "gameId" -> Json.fromString(java.util.UUID.randomUUID.toString),
+              "recoveryCode" -> Json.fromString("v1.x")
+            ),
+            None
+          )
+        )
+        recoverBlocked <- post(
+          app,
+          "/api/v1/participations/recover",
+          Json.obj(
+            "gameId" -> Json.fromString(java.util.UUID.randomUUID.toString),
+            "recoveryCode" -> Json.fromString("v1.x")
+          ),
+          None
+        )
+      yield
+        assert(okJoins.forall(_.status == 200))
+        assert(shape.forall(r => r.status >= 400 && r.status != 429))
+        assert(fails.forall(_.status == 403))
+        assertEquals((blocked.status, blocked.code), (429, Some("app.rate_limited")))
+        assert(blocked.headers.get(CIString("Retry-After")).isDefined)
+        assert(recoverFails.forall(_.status == 403))
+        assertEquals(recoverBlocked.status, 429)
+    }
+  }
+
+  test("[AC2.2.3 並行] 同じ版から 2 人が同時に保存しても、更新は失われない（1 人が成功し、もう 1 人は競合）") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, code) <- create(app)
+        joined <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            ).map(_ => role -> cookie)
+          }
+        }
+        retailer = joined.toMap.getOrElse("RETAILER", fail("小売店が無い"))
+        (coCookie, coId) <- join(app, code, "鈴木")
+        _ <- put(
+          app,
+          s"/api/v1/games/$gameId/participants/$coId/role",
+          Json.obj("role" -> Json.fromString("RETAILER")),
+          Some(facilitator)
+        )
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        body = (q: Int) => Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(q))
+        both <- IO.both(
+          put(app, sessionPath(gameId, "/decisions"), body(5), Some(retailer)),
+          put(app, sessionPath(gameId, "/decisions"), body(77), Some(coCookie))
+        )
+        state <- call(app, Method.GET, sessionPath(gameId, "/state"), cookie = Some(facilitator))
+      yield
+        val statuses = List(both._1.status, both._2.status).sorted
+        assertEquals(statuses, List(200, 409))
+        val retailerStatus = state.json.hcursor.downField("roles").downField("RETAILER")
+        assertEquals(retailerStatus.get[Long]("decisionVersion").toOption, Some(1L))
+        assert(retailerStatus.get[Int]("decision").toOption.exists(Set(5, 77)))
+    }
+  }

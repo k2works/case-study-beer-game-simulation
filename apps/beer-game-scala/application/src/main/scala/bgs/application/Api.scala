@@ -42,7 +42,11 @@ final case class PeripheralStore(
     /** 復帰資格の有効期限を更新する。 */
     refreshRecovery: (String, Instant) => ConnectionIO[Unit],
     /** 対象の復帰資格とブラウザセッションを、すべて使えなくする。 */
-    revokeSubject: (GameId, CredentialSubject) => ConnectionIO[Unit]
+    revokeSubject: (GameId, CredentialSubject) => ConnectionIO[Unit],
+    /** 失敗を記録する（接続元の要約、時刻）。 */
+    recordFailure: (String, Instant) => ConnectionIO[Unit],
+    /** 窓（[[Instant]] 以降）の失敗の回数と、最も古い失敗の時刻。 */
+    failuresSince: (String, Instant) => ConnectionIO[(Int, Option[Instant])]
 )
 
 /** 時刻・識別子・乱数の出所（ドメインは時計と乱数を持たない）。 */
@@ -234,6 +238,40 @@ object Api:
 
   private def digestOrBlank(env: Env)(token: String): IO[String] =
     tokenDigest(env)(token).map(_.getOrElse(""))
+
+  /** 接続元ごとの失敗の窓（仮置き。未計測。設定値にする）。 */
+  private val AttemptLimit = 10
+  private val AttemptWindow = Duration.ofMinutes(10)
+
+  private def sourceDigest(scope: String, source: String): String = digest(s"$scope:$source")
+
+  /** 窓の失敗が上限に達していれば、再試行までの秒数（NF-S11）。 */
+  def attemptBlocked(env: Env)(scope: String, source: String): IO[Option[Long]] =
+    for
+      now <- env.gen.now
+      (count, oldest) <- readOnly(env)(
+        env.peripheral.failuresSince(sourceDigest(scope, source), now.minus(AttemptWindow))
+      )
+    yield
+      if count < AttemptLimit then None
+      else
+        Some(
+          oldest
+            .map(t => Duration.between(now, t.plus(AttemptWindow)).getSeconds)
+            .fold(1L)(_.max(1L))
+        )
+
+  /** 失敗を窓に数える（成功と、形式が不正な本文は数えない）。 */
+  def recordAttemptFailure(env: Env)(scope: String, source: String): IO[Unit] =
+    env.gen.now.flatMap(now =>
+      env.ports.tx
+        .run(
+          env.peripheral
+            .recordFailure(sourceDigest(scope, source), now)
+            .map(_ => Right[Nothing, Unit](()))
+        )
+        .void
+    )
 
   private def readOnly[A](env: Env)(program: ConnectionIO[A]): IO[A] =
     env.ports.tx.run(program.map(a => Right[Nothing, A](a))).map(_.merge)

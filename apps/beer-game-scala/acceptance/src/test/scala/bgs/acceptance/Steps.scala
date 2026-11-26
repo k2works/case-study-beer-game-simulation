@@ -1618,3 +1618,54 @@ class Steps extends ScalaDsl with EN:
   Then("""^確定の根拠が変わったという理由ではない$""") { () =>
     require(!world.last.code.contains("session.decisions_changed"), "根拠の変化として拒否された")
   }
+
+  // ---- 試行の窓（NF-S11・NF-S19。上限 10 回、窓 10 分は、未計測の仮置き） ----
+
+  private val attemptLimit = 10
+
+  Given("""^同じ接続元が、存在しない参加コードで、上限の回数まで参加に失敗している$""") { () =>
+    (1 to attemptLimit).foreach { n =>
+      val reply = joinWith(world.game, "ZZZZZZZZ", s"失敗$n")
+      require(reply.status == 403, s"失敗として数えられていない: ${reply.status}")
+    }
+  }
+
+  Then("""^参加は、試行が多すぎるという理由で拒否される$""") { () =>
+    require(world.last.status == 429, s"429 でない: ${world.last.status}")
+    require(world.last.code.contains("app.rate_limited"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^再試行までの待ち時間が示される$""") { () =>
+    val seconds = world.last.headers
+      .get(CIString("Retry-After"))
+      .flatMap(_.toList.headOption)
+      .flatMap(_.value.toIntOption)
+    require(seconds.exists(_ > 0), s"待ち時間が無い: $seconds")
+  }
+
+  private var bulkJoins: List[Reply] = Nil
+
+  When("""^同じ接続元から、表示名の違う参加者が、上限を超える人数、有効な参加コードで参加する$""") { () =>
+    val code = joinCodeOf(world.game)
+    bulkJoins = (1 to attemptLimit + 2).toList.map(n => joinWith(world.game, code, s"参加者$n"))
+  }
+
+  Then("""^どの参加も受け付けられる$""") { () =>
+    require(bulkJoins.forall(_.status == 200), s"拒否された参加がある: ${bulkJoins.map(_.status)}")
+  }
+
+  Given("""^同じ接続元が、表示名の無い参加を、上限を超える回数送っている$""") { () =>
+    val code = joinCodeOf(world.game)
+    (1 to attemptLimit + 2).foreach { _ =>
+      val reply = world.game.post(
+        "/api/v1/participations/join",
+        Json.obj("joinCode" -> Json.fromString(code)),
+        None
+      )
+      require(reply.status >= 400 && reply.status != 429, s"形の誤りでない: ${reply.status}")
+    }
+  }
+
+  Then("""^参加は受け付けられる$""") { () =>
+    require(world.last.status == 200, s"受け付けられていない: ${world.last.text}")
+  }

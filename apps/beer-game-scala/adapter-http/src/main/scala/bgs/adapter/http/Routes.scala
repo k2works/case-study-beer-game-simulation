@@ -146,6 +146,15 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
           Nil,
           Some(1)
         )
+      case AppFailure.RateLimited(retryAfter) =>
+        problem(
+          Status.TooManyRequests,
+          "app.rate_limited",
+          correlation,
+          "試行が多すぎます。しばらく待ってからもう一度お試しください。",
+          Nil,
+          Some(retryAfter.toInt)
+        )
       case AppFailure.Conflict(error, entries) =>
         val extra = error match
           case SessionError.DecisionConflict(role, _) =>
@@ -344,6 +353,23 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
       )
     )
 
+  /** 接続元（ALB の `X-Forwarded-For` の先頭、無ければ接続の相手）。無ければ "local"（同一プロセスの呼び出し）。 */
+  private def sourceOf(req: Request[IO]): String =
+    req.headers
+      .get(CIString("X-Forwarded-For"))
+      .flatMap(_.toList.headOption)
+      .map(_.value.takeWhile(_ != ',').trim)
+      .filter(_.nonEmpty)
+      .orElse(req.remoteAddr.map(_.toString))
+      .getOrElse("local")
+
+  /** 窓の上限に達していれば、429 を返す。達していなければ [[run]]。 */
+  private def gated(req: Request[IO], ctx: Ctx, scope: String)(run: IO[Outcome]): IO[Outcome] =
+    Api.attemptBlocked(env)(scope, sourceOf(req)).flatMap {
+      case Some(retry) => IO.pure(failureOutcome(AppFailure.RateLimited(retry), ctx.correlation))
+      case None        => run
+    }
+
   private def parseUuid(raw: String): Option[UUID] =
     Either.catchNonFatal(UUID.fromString(raw)).toOption
 
@@ -453,28 +479,37 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
             req,
             ctx,
             withJson(req, ctx) { (json, text) =>
-              idempotent(req, ctx, text) {
-                val c = json.hcursor
-                (c.get[String]("joinCode"), c.get[String]("displayName")) match
-                  case (Right(code), Right(name)) =>
-                    Api.joinGame(env)(code, name).map {
-                      case Left(failure) => failureOutcome(failure, ctx.correlation)
-                      case Right(joined) =>
-                        Outcome(
-                          Status.Ok,
-                          Json.obj(
-                            "versions" -> JsonViews.versions(joined.versions),
-                            "gameId" -> Json.fromString(joined.gameId.value.toString)
-                          ),
-                          None,
-                          sessionCookies(req, joined.participantToken) ++
-                            recoveryCookies(req, joined.recoveryToken),
-                          None,
-                          problem = false
-                        )
-                    }
-                  case _ =>
-                    IO.pure(shapeError(ctx.correlation, "joinCode", "参加コードと表示名は文字列で指定してください。"))
+              gated(req, ctx, "join") {
+                idempotent(req, ctx, text) {
+                  val c = json.hcursor
+                  (c.get[String]("joinCode"), c.get[String]("displayName")) match
+                    case (Right(code), Right(name)) =>
+                      Api
+                        .joinGame(env)(code, name)
+                        .flatTap {
+                          case Left(AppFailure.Domain(GameError.InvitationInvalid)) =>
+                            Api.recordAttemptFailure(env)("join", sourceOf(req))
+                          case _ => IO.unit
+                        }
+                        .map {
+                          case Left(failure) => failureOutcome(failure, ctx.correlation)
+                          case Right(joined) =>
+                            Outcome(
+                              Status.Ok,
+                              Json.obj(
+                                "versions" -> JsonViews.versions(joined.versions),
+                                "gameId" -> Json.fromString(joined.gameId.value.toString)
+                              ),
+                              None,
+                              sessionCookies(req, joined.participantToken) ++
+                                recoveryCookies(req, joined.recoveryToken),
+                              None,
+                              problem = false
+                            )
+                        }
+                    case _ =>
+                      IO.pure(shapeError(ctx.correlation, "joinCode", "参加コードと表示名は文字列で指定してください。"))
+                }
               }
             }
           )
@@ -707,33 +742,38 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                       )
                     yield found
                   )
-                  idempotentWith(req, ctx, text, valid) {
-                    Api.recover(env)(GameId(gameUuid), token).map {
-                      case Left(failure)    => failureOutcome(failure, ctx.correlation)
-                      case Right(recovered) =>
-                        Outcome(
-                          Status.Ok,
-                          JsonViews
-                            .commandResponse(recovered.versions)
-                            .mapObject(
-                              _.add("gameId", Json.fromString(recovered.gameId.value.toString))
-                                .add(
-                                  "kind",
-                                  Json.fromString(
-                                    if recovered.facilitator then "FACILITATOR" else "PARTICIPANT"
+                  val checked = valid.flatTap(ok =>
+                    if ok then IO.unit else Api.recordAttemptFailure(env)("recover", sourceOf(req))
+                  )
+                  gated(req, ctx, "recover") {
+                    idempotentWith(req, ctx, text, checked) {
+                      Api.recover(env)(GameId(gameUuid), token).map {
+                        case Left(failure)    => failureOutcome(failure, ctx.correlation)
+                        case Right(recovered) =>
+                          Outcome(
+                            Status.Ok,
+                            JsonViews
+                              .commandResponse(recovered.versions)
+                              .mapObject(
+                                _.add("gameId", Json.fromString(recovered.gameId.value.toString))
+                                  .add(
+                                    "kind",
+                                    Json.fromString(
+                                      if recovered.facilitator then "FACILITATOR" else "PARTICIPANT"
+                                    )
                                   )
-                                )
-                                .deepMerge(
-                                  recovered.role.fold(JsonObject.empty)(r =>
-                                    JsonObject("role" -> Json.fromString(JsonViews.roleName(r)))
+                                  .deepMerge(
+                                    recovered.role.fold(JsonObject.empty)(r =>
+                                      JsonObject("role" -> Json.fromString(JsonViews.roleName(r)))
+                                    )
                                   )
-                                )
-                            ),
-                          None,
-                          sessionCookies(req, recovered.sessionToken),
-                          None,
-                          problem = false
-                        )
+                              ),
+                            None,
+                            sessionCookies(req, recovered.sessionToken),
+                            None,
+                            problem = false
+                          )
+                      }
                     }
                   }
             }

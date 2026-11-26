@@ -23,6 +23,9 @@ enum AppFailure:
   /** 入力の形の誤り。境界で集めた、項目ごとの誤り（422）。 */
   case Invalid(errors: List[ValidationError])
 
+  /** 接続元ごとの失敗の窓の上限（429）。再試行までの秒数を持つ。 */
+  case RateLimited(retryAfterSeconds: Long)
+
   /** 入力の競合・確定の根拠の変化。応答に添える、現在の役割ごとの入力（保存者・時刻つき）を持つ。 */
   case Conflict(error: SessionError, entries: Map[Role, DecisionEntryView])
 
