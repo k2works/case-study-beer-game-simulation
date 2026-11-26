@@ -125,7 +125,7 @@ team の Mandated（project.md「ALWAYS deploy `main` merges automatically to st
 | 期間 | U1〜U3 の約束の範囲の間。U1〜U3 の実装を終え、U4 以降へ進むか、AWS・デプロイを前倒しするかを人が決めるとき（指標の確認時）に、再評価する |
 | 解除の条件 | (a) 専用の AWS 環境とデプロイ用ワークフローが用意され、`main` merge の staging への自動反映が動く、または (b) 人が規約自体を改める（team.md・project.md の更新）、のいずれか |
 | 例外の間の条件 | U1〜U3 の成果物を、実際の研修・本番に使わない（N-H8）。デプロイされないため、規約の趣旨（自動反映で実環境の乖離を早く見つける）の代わりに、Testcontainers の実 DB の統合テストと受け入れテストを CI で実行する。**この条件は D1 により U1 の約束に含めた**（AI が推奨案で決め、ユーザーが承認した。2026-11-25）。team.md の Testing Posture「主要境界の Integration Test を CI で実行」も、この約束で満たす。約束に入っていなければ例外を承認しても趣旨が守られない、という再々レビューの指摘（R-H2）への対応である。**残るリスク**: 統合・受け入れの CI は実 DB（PostgreSQL 18）を使うが、実環境（AWS）との乖離は見つけられない。それは AWS の環境を作るまで残る |
-| 承認 | ユーザーが、規約の例外を承認するか、規約に従って AWS・デプロイを U1 に含めるかを決める |
+| 承認 | **ユーザーが規約の例外を承認した（2026-11-26）。** project.md `## Scope Overrides` への記録は、learnings の手続きで人の承認の場で行う（未実施。AI は project.md を編集しない）。あわせて、案 Y（別ジョブ `integration`・`acceptance` を U1 に足す）をユーザーが選んだ（2026-11-26） |
 | 規約の対象範囲の確認と記録（D5。M1） | team.md の Way of Working・Deployment は beer-game3 を対象に書かれている（Kotlin 版・Rust 版・Scala 版にも当てはめて運用されている）。規約が beer-game-scala に及ぶかの確認と、承認した例外の project.md `## Scope Overrides`（現在は空）への learnings の手続きによる記録は、**人の承認の場で行う**（この手順は D5 としてユーザーが承認した。2026-11-25。**規約の例外そのものの承認と、project.md への記録は未実施**）。**AI は project.md を編集しない** |
 
 ## 決定
