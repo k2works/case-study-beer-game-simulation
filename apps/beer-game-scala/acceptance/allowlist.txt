@@ -1,0 +1,10 @@
+# Scala 側で実行する共有 features（apps/beer-game-features/。Kotlin 版・Rust 版と共有。変更しない）の許可リスト。Bolt ごとに広げる。
+# 許可したシナリオに Undefined・Pending があれば失敗。許可の外の @api は、実行しない（「未対応」として数えない）。
+# 形式: `<機能領域>/<ファイル>.feature`（そのファイルの @api の全シナリオ）、または `... :: <シナリオ名>`。
+
+# B1: ウォーキングスケルトン（作成 → 参加 → 割り当て → 開始 → 入力 → 確定 → 状態）
+game-setup/game-creation.feature
+game-setup/joining.feature
+weekly-play/situation.feature
+weekly-play/decision.feature
+weekly-play/week-commit.feature

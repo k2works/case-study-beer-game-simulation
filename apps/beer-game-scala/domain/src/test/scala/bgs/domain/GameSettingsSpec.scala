@@ -19,7 +19,7 @@ class GameSettingsSpec extends FunSuite:
     val errors = GameSettings
       .kit(12, List(4, 4, 4, 4, 1001, 4, 4, 4, 4, 4, 4, 4), CommitMode.Manual)
       .fold(_.toNonEmptyList.toList, _ => Nil)
-    assertEquals(errors, List(ValidationError.DemandSeriesInvalid(5, "需要は 0〜1000 の整数")))
+    assertEquals(errors, List(ValidationError.DemandSeriesInvalid(5, "需要は 0 以上 1000 以下の整数にしてください")))
   }
 
   test("[AC1.1.2] 複数の誤りは、1 つで止めずにすべて集める（第 2 週が負、第 5 週が 1001）") {
@@ -29,8 +29,8 @@ class GameSettingsSpec extends FunSuite:
     assertEquals(
       errors,
       List(
-        ValidationError.DemandSeriesInvalid(2, "需要は 0〜1000 の整数"),
-        ValidationError.DemandSeriesInvalid(5, "需要は 0〜1000 の整数")
+        ValidationError.DemandSeriesInvalid(2, "需要は 0 以上 1000 以下の整数にしてください"),
+        ValidationError.DemandSeriesInvalid(5, "需要は 0 以上 1000 以下の整数にしてください")
       )
     )
   }
@@ -43,7 +43,7 @@ class GameSettingsSpec extends FunSuite:
       errors,
       List(
         ValidationError.WeekOutOfRange(51, 50),
-        ValidationError.DemandSeriesInvalid(1, "需要は 0〜1000 の整数")
+        ValidationError.DemandSeriesInvalid(1, "需要は 0 以上 1000 以下の整数にしてください")
       )
     )
   }

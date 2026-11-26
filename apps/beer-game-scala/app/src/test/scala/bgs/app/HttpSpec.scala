@@ -189,7 +189,7 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(r.code, Some("validation.invalid_input"))
         val errors = r.json.hcursor.downField("errors").values.map(_.toList).getOrElse(Nil)
         assertEquals(errors.flatMap(_.hcursor.get[Int]("week").toOption), List(5))
-        assert(errors.exists(_.hcursor.get[String]("message").exists(_.contains("0〜1000"))))
+        assert(errors.exists(_.hcursor.get[String]("message").exists(_.contains("0 以上 1000 以下"))))
       }
     }
   }

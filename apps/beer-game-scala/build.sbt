@@ -121,6 +121,17 @@ lazy val app = (project in file("app"))
 lazy val acceptance = (project in file("acceptance"))
   .dependsOn(app)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.cucumber" %% "cucumber-scala" % "9.3.0" % Test,
+      "org.http4s" %% "http4s-circe" % http4sVersion % Test,
+      "io.circe" %% "circe-parser" % circeVersion % Test
+    ),
+    // 境界（IO を実行するステップ定義と実行器）は、unsafeRun の禁止だけを外した設定を使う。
+    scalafixConfig := Some(file(".scalafix-boundary.conf")),
+    // 受け入れは `sbt test` に載せず、専用のコマンド（scripts/acceptance.sh）で実行する（ST7）。
+    Test / test := {}
+  )
 
 // 規則の確認用（ルートの集約に含めない）。違反するコードを置き、期待件数を scripts/check-rules.sh で確かめる。
 lazy val rulesFixtureWarts = (project in file("rules-fixture-warts"))

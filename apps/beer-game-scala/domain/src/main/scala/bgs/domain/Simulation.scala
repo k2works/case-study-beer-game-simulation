@@ -57,7 +57,7 @@ final case class DemandSeries(values: Vector[Quantity]):
   def after(week: Week): Units = week.next.fold(Units.Zero)(at)
 
 object DemandSeries:
-  private val RangeReason = "需要は 0〜1000 の整数"
+  private val RangeReason = "需要は 0 以上 1000 以下の整数にしてください"
 
   /** 各週の需要は 0〜1000、長さは [[finalWeek]] 以上（AC1.1.2）。 範囲外の誤りは対象週（1 始まり）ごとにすべて集める。各週が正しい場合だけ、長さを検査する。
     */
