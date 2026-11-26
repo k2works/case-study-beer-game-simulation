@@ -129,6 +129,35 @@ CI の `check`・`integration`・`acceptance` の 3 ジョブ化、契約テス�
 - 結果が不成立なら、**以降のステップを止め、設計の見直しを人に提示する**。
 - **ゲート 1**: 実測の結果表（成立・不成立）と、不成立の項目の扱い。
 
+#### Step 1 の実測結果（2026-11-26。AI の実施。**ゲート 1 は未承認**）
+
+使い捨てのプロジェクト（リポジトリの外。sbt 1.13.1、JBR 25.0.4.1、Scala 3.7.4、doobie 1.0.0-RC12、H2 2.5.252、PostgreSQL 18.6（Testcontainers）で実行した。**依存関係はすべて解決し、コンパイルとテストが通った**（仮説 1: 成立）。
+
+| 前提 | 結果 | 判定 |
+| :--- | :--- | :--- |
+| 並行時の制約名（K8） | 8 本の同時の追記で、成功 1・失敗 7。失敗はすべて SQLSTATE `23505` と制約名 `uq_events_stream_version` | **成立** |
+| `FC.rollback` と `Left`（K5） | `Left` を返しても COMMIT される。`FC.rollback` は直前の書き込みを消し、**同じ `ConnectionIO` の以降の書き込みは新しいトランザクションとして COMMIT される**（推論が実測で確認された）。H2 でも同じ | **成立** |
+| `Fiber` の取消と ROLLBACK（K7） | **実行中の SQL 文**（`pg_sleep`）を持つトランザクションの `Fiber` を取消すと、**42ms で取消が完了し、ロックは 124ms 以内に解放**された（基準は 2 秒以内）。実行中の文は残らない | **成立** |
+| 取消の落とし穴 | `FC.delay` の中の **ブロッキングの `Thread.sleep` は中断できず**、取消は 29 秒かかった | **注意**: H2 版 `ProjectionLock` の待ちは、中断できる形（`interruptible`）で書く（D4。Step 7 で確認） |
+| `lock_timeout` の写像（R-H6） | 排他 vs 排他、共有 vs 排他のどちらも SQLSTATE `55P03`（`set_config('lock_timeout', …, true)` で設定） | **成立**（40P01・40001 の写像は未実測） |
+| アドバイザリロック（K10） | `pg_advisory_xact_lock`・`_shared` が `ConnectionIO` として実行できた | **成立**（共有と排他の相互の待ち、再構築用の排他の本実装は Step 7） |
+
+**H2 の PostgreSQL モードの動作範囲（K21。2.5.252。`MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE`）**
+
+| 機能 | 結果 | Scala 版での扱い |
+| :--- | :--- | :--- |
+| 一意制約違反の SQLSTATE と制約名 | `23505`。メッセージに `uq_events_stream_version` を含む（`getServerErrorMessage` は無いため、**H2 ではメッセージから制約名を取り出す**） | H2 用の判別を別に持つ |
+| `jsonb` 型、`cast(… as jsonb)`、`format json` | 動く（`bigserial`・`uuid` も動く） | そのまま |
+| `timestamptz` | **キーワードが無い**（`timestamp with time zone` は動く） | DDL は `timestamp with time zone` に統一するか、H2 用の DDL を分ける |
+| 部分一意索引（`where`） | **構文エラー**（42000）。生成列（`generated always as (case …)`）+ 一意制約は動く | H2 では生成列で代替（Kotlin 版と同じ方針か確認） |
+| アドバイザリロック（`pg_advisory_xact_lock`） | **関数が無い**（90022） | **H2 では使えない。プロセス内のロック（D4）で代替** |
+| `set_config('lock_timeout', …)` | 呼べるが、**ロック待ちの上限としては効かない**（H2 にはその機能が無い） | H2 の待ちの上限は D4 のロックの実装で持つ |
+| `LISTEN`/`NOTIFY` | **構文エラー** | H2 では使わない（プロセス内の通知） |
+| `CREATE ROLE … NOLOGIN` | **構文エラー**（`CREATE USER` と `GRANT` は動く） | **ロールを使う追記専用権限の否定テストは PostgreSQL だけで実行する** |
+| `REVOKE`、`current_user` | 動く（H2 では権限は強制されない見込み。要確認） | 否定テストは PostgreSQL |
+
+**Step 1 の未実測**: H2 版 `ProjectionLock` の動作（Step 7）、40P01・40001 の写像、http4s 0.23.39 のルート・ミドルウェア・SSE（Step 9）、Flyway の H2 への適用（Step 7）。
+
 ### Step 2: リポジトリの土台と静的解析（🔵）
 
 1. `apps/beer-game-scala/` を作成する（sbt のマルチプロジェクト: `domain`・`application`・`adapterHttp`・`adapterPersistence`・`app`・`acceptance`。層の依存は `dependsOn` で守る）。
