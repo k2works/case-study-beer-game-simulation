@@ -1,5 +1,8 @@
 package bgs.domain
 
+import cats.data.ValidatedNec
+import cats.syntax.all.*
+
 /** 待ち行列。まだ届かない品物（または注文）を、届く順に並べる。長さは `遅延 - 1`（キットの 2 週遅延なら 1 段）。 */
 final case class Pipeline(weeks: List[Units]):
 
@@ -52,6 +55,27 @@ final case class CostPolicy(holding: Money, backlog: Money)
 final case class DemandSeries(values: Vector[Quantity]):
   def at(week: Week): Units = values.lift(week.value - 1).fold(Units.Zero)(_.toUnits)
   def after(week: Week): Units = week.next.fold(Units.Zero)(at)
+
+object DemandSeries:
+  private val RangeReason = "需要は 0〜1000 の整数"
+
+  /** 各週の需要は 0〜1000、長さは [[finalWeek]] 以上（AC1.1.2）。 範囲外の誤りは対象週（1 始まり）ごとにすべて集める。各週が正しい場合だけ、長さを検査する。
+    */
+  def of(values: List[Int], finalWeek: Week): ValidatedNec[ValidationError, DemandSeries] =
+    values.zipWithIndex
+      .traverse { (n, index) =>
+        Quantity
+          .of(n)
+          .leftMap(_ => ValidationError.DemandSeriesInvalid(index + 1, RangeReason))
+          .toValidatedNec
+      }
+      .andThen { quantities =>
+        if quantities.size < finalWeek.value then
+          ValidationError
+            .DemandSeriesInvalid(quantities.size + 1, s"需要系列が最終週（${finalWeek.value}）に届かない")
+            .invalidNec
+        else DemandSeries(quantities.toVector).validNec
+      }
 
 /** 週次計算の設定。遅延の週数は、状態の待ち行列の長さで表す。 */
 final case class SimulationSettings(finalWeek: Week, demand: DemandSeries, costPolicy: CostPolicy)

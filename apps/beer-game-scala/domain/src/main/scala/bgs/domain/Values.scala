@@ -7,6 +7,18 @@ enum ValidationError:
   case UnitsNegative(actual: Long)
   case MoneyNegative(actual: Long)
 
+  /** 前後の空白を除いた長さ（コードポイント数）が 1〜80 でない。 */
+  case DisplayNameInvalid(length: Int)
+
+  /** 参加コードが 8 文字に満たない。 */
+  case JoinCodeInvalid(length: Int)
+
+  /** 保持日数が 1〜3650 でない。 */
+  case RetentionOutOfRange(actual: Int)
+
+  /** 需要系列の誤り。[[weekIndex]] は対象の週（1 始まり）で、利用者に修正すべき週を示す（AC1.1.2）。 */
+  case DemandSeriesInvalid(weekIndex: Int, reason: String)
+
 // opaque type は同じファイルのトップレベルでは中身が見える。ゼロコストで型を区別し、
 // コンパニオンの `of` で生成時に検証する（不正な値は存在できない）。
 
