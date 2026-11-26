@@ -28,6 +28,7 @@ object JsonViews:
   private def statusName(status: GameStatus): String = status match
     case GameStatus.Preparing => "PREPARING"
     case GameStatus.Started   => "STARTED"
+    case GameStatus.Paused    => "STARTED"
     case GameStatus.Ended     => "ENDED"
 
   private def commitModeName(mode: CommitMode): String = mode match
@@ -106,8 +107,9 @@ object JsonViews:
     obj(
       "sessionId" -> Some(Json.fromString(view.gameId.value.toString)),
       "status" -> Some(Json.fromString(view.status match
-        case GameStatus.Ended => "ENDED"
-        case _                => "ACTIVE")),
+        case GameStatus.Ended  => "ENDED"
+        case GameStatus.Paused => "PAUSED"
+        case _                 => "ACTIVE")),
       "week" -> Some(Json.fromInt(view.week)),
       "submittedRoleCount" -> Some(Json.fromInt(view.submittedRoleCount)),
       "participantId" -> view.participantId.map(id => Json.fromString(id.value.toString)),

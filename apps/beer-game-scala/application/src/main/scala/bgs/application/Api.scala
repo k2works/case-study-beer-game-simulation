@@ -76,7 +76,7 @@ final case class Joined(
 )
 
 enum GameStatus:
-  case Preparing, Started, Ended
+  case Preparing, Started, Paused, Ended
 
 final case class GameStateView(
     gameId: GameId,
@@ -347,6 +347,35 @@ object Api:
           )
         }
 
+  def pauseSession(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, Versions]] =
+    withActor(env)(caller, gameId) { (actor, now) =>
+      Application.handleSession(env.ports)(gameId, SessionCommand.PauseSession(actor, now))
+    }
+
+  def resumeSession(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, Versions]] =
+    withActor(env)(caller, gameId) { (actor, now) =>
+      Application.handleSession(env.ports)(gameId, SessionCommand.ResumeSession(actor, now))
+    }
+
+  /** 進行役の代理入力。意思決定の版は要求しない。 */
+  def submitProxyDecision(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      role: Role,
+      requestedWeek: Int,
+      quantity: Int
+  ): IO[Either[AppFailure, Versions]] =
+    (Week.of(requestedWeek).toValidatedNec, Quantity.of(quantity).toValidatedNec).tupled.toEither
+      .leftMap(errors => AppFailure.Invalid(errors.toNonEmptyList.toList)) match
+      case Left(failure) => IO.pure(Left(failure))
+      case Right((w, q)) =>
+        withActor(env)(caller, gameId) { (actor, now) =>
+          Application.handleSession(env.ports)(
+            gameId,
+            SessionCommand.SubmitProxyDecision(actor, now, role, w, q)
+          )
+        }
+
   /** 呼び出した人を確認し、現在の時刻でコマンドを実行して、追記後の版を返す。 */
   private def withActor(env: Env)(caller: Caller, gameId: GameId)(
       run: (Actor, Instant) => IO[Either[AppFailure, Unit]]
@@ -362,10 +391,11 @@ object Api:
         }
 
   private def statusOf(game: GameState, session: SessionState): GameStatus = (game, session) match
-    case (_, SessionState.Ended(_, _))  => GameStatus.Ended
-    case (GameState.Started(_, _), _)   => GameStatus.Started
-    case (GameState.Preparing(_, _), _) => GameStatus.Preparing
-    case (GameState.NotCreated, _)      => GameStatus.Preparing
+    case (_, SessionState.Ended(_, _))                    => GameStatus.Ended
+    case (_, SessionState.Active(data, _)) if data.paused => GameStatus.Paused
+    case (GameState.Started(_, _), _)                     => GameStatus.Started
+    case (GameState.Preparing(_, _), _)                   => GameStatus.Preparing
+    case (GameState.NotCreated, _)                        => GameStatus.Preparing
 
   /** ゲームの状態。呼び出した人ごとの投影（進行役は参加コードと最終週、参加者は自分の ID と役割）。 */
   def gameStateView(

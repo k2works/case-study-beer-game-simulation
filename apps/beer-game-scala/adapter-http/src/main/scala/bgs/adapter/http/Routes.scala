@@ -177,6 +177,9 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
     case "session.week_advanced"        => "この週はすでに確定されています。"
     case "game.start_condition_not_met" => "4 つの役割のそれぞれに、参加者が必要です。"
     case "session.incomplete_decisions" => "4 つの役割の入力がそろっていません。"
+    case "session.paused"               => "停止中です。進行役の再開を待ってください。"
+    case "session.not_paused"           => "停止中ではありません。"
+    case "session.save_limit_reached"   => "この週の保存回数の上限に達しています。"
     case other                          => other
 
   private def badRequest(correlation: String, detail: String): Outcome =
@@ -533,6 +536,62 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                         ctx.correlation,
                         "basis",
                         "requestedWeek と、役割ごとの basis（版）を整数で指定してください。"
+                      )
+                    )
+              }
+            }
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "sessions" / UuidVar(sessionUuid) / action
+          if action == "pause" || action == "resume" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (_, text) =>
+              idempotent(req, ctx, text) {
+                val run =
+                  if action == "pause" then Api.pauseSession(env) else Api.resumeSession(env)
+                run(ctx.caller, GameId(sessionUuid)).map(versionsOutcome(_, ctx.correlation))
+              }
+            }
+          )
+        }
+
+      case req @ PUT -> Root / "api" / "v1" / "sessions" / UuidVar(
+            sessionUuid
+          ) / "proxy-decisions" / roleRaw =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (json, text) =>
+              idempotent(req, ctx, text) {
+                val c = json.hcursor
+                (
+                  JsonViews.parseRole(roleRaw),
+                  c.get[Int]("requestedWeek"),
+                  c.get[Int]("quantity")
+                ) match
+                  case (Some(role), Right(week), Right(quantity)) =>
+                    Api
+                      .submitProxyDecision(env)(
+                        ctx.caller,
+                        GameId(sessionUuid),
+                        role,
+                        week,
+                        quantity
+                      )
+                      .map(versionsOutcome(_, ctx.correlation))
+                  case (None, _, _) =>
+                    IO.pure(shapeError(ctx.correlation, "role", "役割は 4 つの値のいずれかで指定してください。"))
+                  case _ =>
+                    IO.pure(
+                      shapeError(
+                        ctx.correlation,
+                        "requestedWeek",
+                        "requestedWeek と quantity は整数で指定してください。"
                       )
                     )
               }

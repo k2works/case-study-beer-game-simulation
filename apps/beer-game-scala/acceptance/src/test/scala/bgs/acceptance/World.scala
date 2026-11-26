@@ -29,6 +29,7 @@ final case class Reply(status: Int, json: Json, headers: Headers):
 /** 1 つのゲームの操作の入口（進行役の資格と参加者の資格を持つ）。 */
 final class GameClient(
     val app: HttpApp[IO],
+    val env: bgs.application.Env,
     val logs: java.util.concurrent.ConcurrentLinkedQueue[LogRecord],
     val databaseDown: java.util.concurrent.atomic.AtomicBoolean
 ):
@@ -48,8 +49,17 @@ final class GameClient(
       body: Option[Json],
       cookie: Option[String],
       key: Option[String]
+  ): Reply = callWith(method, path, body, cookie, key, Nil)
+
+  def callWith(
+      method: Method,
+      path: String,
+      body: Option[Json],
+      cookie: Option[String],
+      key: Option[String],
+      extra: List[Header.ToRaw]
   ): Reply =
-    val base = Request[IO](method, Uri.unsafeFromString(path))
+    val base = Request[IO](method, Uri.unsafeFromString(path)).putHeaders(extra*)
     val withBody = body.fold(base)(b => base.withEntity(b)(using jsonEncoderOf[IO, Json]))
     val withCookie =
       cookie.fold(withBody)(c => withBody.putHeaders(Header.Raw(CIString("Cookie"), c)))
@@ -84,7 +94,7 @@ object GameClient:
           }
     val env =
       Wiring.inMemoryH2(LogSink(record => IO.delay(logs.add(record)).void), wrap).unsafeRunSync()
-    new GameClient(Routes.httpApp(env), logs, down)
+    new GameClient(Routes.httpApp(env), env, logs, down)
 
 /** シナリオごとの状態。シナリオが終わると、新しいインスタンスに替わる。 */
 final class World:

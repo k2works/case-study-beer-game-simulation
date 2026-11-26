@@ -48,7 +48,8 @@ final case class SessionData(
     roleStates: RoleMap[RoleState],
     decisions: Map[Role, DecisionEntry],
     decisionVersions: RoleMap[DecisionVersion],
-    commitMode: CommitMode
+    commitMode: CommitMode,
+    paused: Boolean
 ):
   /** まだ入力されていない役割（上流から下流の順）。 */
   def missingRoles: List[Role] = Role.values.toList.filterNot(decisions.contains)
@@ -104,6 +105,21 @@ sealed trait SessionCommand:
   def at: Instant
 
 object SessionCommand:
+  /** 進行役の一時停止（AC3.1.1）。 */
+  final case class PauseSession(actor: Actor, at: Instant) extends SessionCommand
+
+  /** 進行役の再開（AC3.1.3）。 */
+  final case class ResumeSession(actor: Actor, at: Instant) extends SessionCommand
+
+  /** 進行役の代理入力（AC3.1.2）。意思決定の版は要求しない。本文の週で、古い画面からの入力を区別する。 */
+  final case class SubmitProxyDecision(
+      actor: Actor,
+      at: Instant,
+      role: Role,
+      requestedWeek: Week,
+      quantity: Quantity
+  ) extends SessionCommand
+
   /** 画面が表示している週 [[requestedWeek]] と、期待する意思決定の版を持つ。 */
   final case class SaveDecision(
       actor: Actor,
@@ -153,11 +169,16 @@ enum SessionEvent:
 
   case SessionEnded(reason: EndReason)
 
+  case SessionPaused
+  case SessionResumed
+
   def name: String = this match
     case SessionEvent.SessionStarted(_, _, _, _, _)   => "SessionStarted"
     case SessionEvent.DecisionSaved(_, _, _, _, _, _) => "DecisionSaved"
     case SessionEvent.WeekCommitted(_, _, _, _, _, _) => "WeekCommitted"
     case SessionEvent.SessionEnded(_)                 => "SessionEnded"
+    case SessionEvent.SessionPaused                   => "SessionPaused"
+    case SessionEvent.SessionResumed                  => "SessionResumed"
 
 enum SessionError(val code: String, val category: ErrorCategory) extends DomainError:
   /** セッションが始まっていない（未開始）。 */
@@ -166,6 +187,10 @@ enum SessionError(val code: String, val category: ErrorCategory) extends DomainE
   /** 1 役割・1 週あたりの保存回数の上限（[[SaveLimitPerRoleWeek]] 回）に達した。 */
   case SaveLimitReached
       extends SessionError("session.save_limit_reached", ErrorCategory.InvalidState)
+
+  /** 停止中（参加者の保存と週の確定を拒否する。まだ始まっていない [[NotActive]] とは別）。 */
+  case Paused extends SessionError("session.paused", ErrorCategory.InvalidState)
+  case NotPaused extends SessionError("session.not_paused", ErrorCategory.InvalidState)
   case AlreadyEnded extends SessionError("session.already_ended", ErrorCategory.InvalidState)
   case AlreadyStarted extends SessionError("session.already_started", ErrorCategory.InvalidState)
   case Forbidden(reason: String) extends SessionError("session.forbidden", ErrorCategory.Forbidden)
@@ -203,12 +228,63 @@ object Session:
     case Actor.Participant(id) if assignments(role).contains(id) => Right(Editor.ByParticipant(id))
     case _ => Left(SessionError.Forbidden("その役割の参加者だけが入力できる"))
 
+  private def facilitatorOnly(
+      actor: Actor,
+      data: SessionData,
+      what: String
+  ): Either[SessionError, Unit] =
+    Either.cond(actor.isFacilitatorOf(data.gameId), (), SessionError.Forbidden(s"$what は進行役だけができる"))
+
+  private def pauseEvents(
+      data: SessionData,
+      command: SessionCommand.PauseSession
+  ): Either[SessionError, List[SessionEvent]] =
+    for
+      _ <- facilitatorOnly(command.actor, data, "停止")
+      _ <- Either.cond(!data.paused, (), SessionError.Paused)
+    yield List(SessionEvent.SessionPaused)
+
+  private def resumeEvents(
+      data: SessionData,
+      command: SessionCommand.ResumeSession
+  ): Either[SessionError, List[SessionEvent]] =
+    for
+      _ <- facilitatorOnly(command.actor, data, "再開")
+      _ <- Either.cond(data.paused, (), SessionError.NotPaused)
+    yield List(SessionEvent.SessionResumed)
+
+  /** 代理入力は、進行中と停止中の両方で受け付け、週は確定しない。版は 1 増える（保存回数に数える）。 */
+  private def proxyEvents(
+      data: SessionData,
+      command: SessionCommand.SubmitProxyDecision
+  ): Either[SessionError, List[SessionEvent]] =
+    val current = data.decisionVersions(command.role)
+    for
+      _ <- facilitatorOnly(command.actor, data, "代理入力")
+      _ <- Either.cond(
+        command.requestedWeek == data.week,
+        (),
+        SessionError.WeekAdvanced(command.requestedWeek, data.week)
+      )
+      _ <- Either.cond(data.hasSaveCapacity(command.role), (), SessionError.SaveLimitReached)
+    yield List(
+      SessionEvent.DecisionSaved(
+        data.week,
+        command.role,
+        command.quantity,
+        current.next,
+        Editor.ByFacilitator(data.gameId),
+        (data.decisions.keySet + command.role).size
+      )
+    )
+
   private def saveDecisionEvents(
       data: SessionData,
       command: SessionCommand.SaveDecision
   ): Either[SessionError, List[SessionEvent]] =
     val current = data.decisionVersions(command.role)
     for
+      _ <- Either.cond(!data.paused, (), SessionError.Paused)
       editor <- editorOf(command.actor, command.role, data.assignments)
       _ <- Either.cond(
         command.requestedWeek == data.week,
@@ -263,6 +339,7 @@ object Session:
         (),
         SessionError.Forbidden("確定は進行役だけができる")
       )
+      _ <- Either.cond(!data.paused, (), SessionError.Paused)
       // 判定順 1: 週が違えば WeekAdvanced
       _ <- Either.cond(
         command.requestedWeek == data.week,
@@ -287,8 +364,11 @@ object Session:
   ): Either[SessionError, List[SessionEvent]] =
     activeData(state).flatMap { data =>
       command match
-        case c: SessionCommand.SaveDecision => saveDecisionEvents(data, c)
-        case c: SessionCommand.CommitWeek   => commitWeekEvents(data, c)
+        case c: SessionCommand.SaveDecision        => saveDecisionEvents(data, c)
+        case c: SessionCommand.CommitWeek          => commitWeekEvents(data, c)
+        case c: SessionCommand.PauseSession        => pauseEvents(data, c)
+        case c: SessionCommand.ResumeSession       => resumeEvents(data, c)
+        case c: SessionCommand.SubmitProxyDecision => proxyEvents(data, c)
     }
 
 object SessionEvents:
@@ -315,7 +395,8 @@ object SessionEvents:
               roleStates = initialStates,
               decisions = Map.empty,
               decisionVersions = RoleMap.all(DecisionVersion.Zero),
-              commitMode = commitMode
+              commitMode = commitMode,
+              paused = false
             ),
             state.version.next
           )
@@ -324,6 +405,8 @@ object SessionEvents:
       updateData(state)(_.withDecision(role, DecisionEntry(quantity, version, editor)))
     case SessionEvent.WeekCommitted(_, _, _, _, nextStates, _) =>
       updateData(state)(_.afterCommit(nextStates))
+    case SessionEvent.SessionPaused   => updateData(state)(_.copy(paused = true))
+    case SessionEvent.SessionResumed  => updateData(state)(_.copy(paused = false))
     case SessionEvent.SessionEnded(_) =>
       state match
         case SessionState.Active(data, version) => SessionState.Ended(data, version.next)

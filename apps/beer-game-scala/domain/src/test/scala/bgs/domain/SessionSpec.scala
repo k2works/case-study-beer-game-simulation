@@ -251,3 +251,77 @@ class SessionSpec extends FunSuite:
   }
 
   extension [A](a: A) private def pipe[B](f: A => B): B = f(a)
+
+  // ---- B4: 停止・再開・代理入力（AC3.1.*） ----
+
+  private def pause(state: SessionState, actor: Actor = facilitator) =
+    Session.handle(state, SessionCommand.PauseSession(actor, at))
+
+  private def resume(state: SessionState, actor: Actor = facilitator) =
+    Session.handle(state, SessionCommand.ResumeSession(actor, at))
+
+  private def proxy(role: Role, n: Int, requestedWeek: Int = 1, actor: Actor = facilitator) =
+    SessionCommand.SubmitProxyDecision(actor, at, role, week(requestedWeek), quantity(n))
+
+  private def applied(state: SessionState, result: Either[SessionError, List[SessionEvent]]) =
+    apply(state, result.fold(e => fail(e.toString), identity))
+
+  test("[AC3.1.1] 進行役が停止すると、入力の保存と週の確定は session.paused で拒否される") {
+    val paused = applied(allSaved, pause(allSaved))
+    assertEquals(
+      Session.handle(paused, save(Role.Retailer, 6, expected = 1L)),
+      Left(SessionError.Paused)
+    )
+    assertEquals(commit(paused), Left(SessionError.Paused))
+    assertEquals(SessionError.Paused.code, "session.paused")
+  }
+
+  test("[AC3.1.1] 参加者は停止できない。停止中にもう一度停止すると session.paused") {
+    assert(pause(startedSession, Actor.Participant(holder(Role.Factory))).isLeft)
+    val paused = applied(startedSession, pause(startedSession))
+    assertEquals(pause(paused), Left(SessionError.Paused))
+  }
+
+  test("[AC3.1.3] 再開すると、同じ週から入力でき、入力は残っている") {
+    val saved = applied(startedSession, Session.handle(startedSession, save(Role.Retailer, 7)))
+    val resumed = applied(applied(saved, pause(saved)), resume(applied(saved, pause(saved))))
+    assert(Session.handle(resumed, save(Role.Factory, 5)).isRight)
+    assertEquals(resume(startedSession), Left(SessionError.NotPaused))
+    assertEquals(SessionError.NotPaused.code, "session.not_paused")
+  }
+
+  test("[AC3.1.2] 停止中でも代理入力は保存され、週は確定しない。保存者は進行役") {
+    val paused = applied(startedSession, pause(startedSession))
+    val after = applied(paused, Session.handle(paused, proxy(Role.Factory, 6)))
+    after match
+      case SessionState.Active(data, _) =>
+        assertEquals(data.week, week(1))
+        assertEquals(data.decisions.get(Role.Factory).map(_.quantity), Some(quantity(6)))
+        assertEquals(
+          data.decisions.get(Role.Factory).map(_.editor),
+          Some(Editor.ByFacilitator(gameId))
+        )
+      case other => fail(s"進行中のはず: $other")
+  }
+
+  test("[AC3.1.2] 参加者は代理入力できない。古い週への代理入力は week_advanced") {
+    assert(
+      Session
+        .handle(
+          startedSession,
+          proxy(Role.Factory, 6, actor = Actor.Participant(holder(Role.Factory)))
+        )
+        .isLeft
+    )
+    assertEquals(
+      Session.handle(startedSession, proxy(Role.Factory, 6, requestedWeek = 2)),
+      Left(SessionError.WeekAdvanced(week(2), week(1)))
+    )
+  }
+
+  test("代理入力も保存回数に数える（9 回で上限）") {
+    val nine = (1 to 9).foldLeft(startedSession) { (state, n) =>
+      applied(state, Session.handle(state, proxy(Role.Retailer, n)))
+    }
+    assertEquals(Session.handle(nine, proxy(Role.Retailer, 1)), Left(SessionError.SaveLimitReached))
+  }

@@ -531,7 +531,9 @@ class Steps extends ScalaDsl with EN:
 
   Then("""^現在の週は第 2 週になる$""") { () => require(weekOf(world.game) == 2, "第 2 週でない") }
 
-  Then("""^現在の週は第 2 週のままである$""") { () => require(weekOf(world.game) == 2, "第 2 週でない") }
+  Then("""^現在の週は第 (\d+) 週のままである$""") { (week: Int) =>
+    require(weekOf(world.game) == week, s"第 $week 週でない")
+  }
 
   Then("""^第 1 週の結果が、4 役割のそれぞれについて記録される$""") { () =>
     require(resultsOf(world.game).size == 4, "結果が 4 役割分でない")
@@ -628,4 +630,194 @@ class Steps extends ScalaDsl with EN:
   Then("""^入力が不足している役割として(.+)が示される$""") { (label: String) =>
     val missing = world.last.json.hcursor.get[List[String]]("missingRoles").getOrElse(Nil)
     require(missing == List(role(label)), s"不足している役割が違う: $missing")
+  }
+
+  // ---- 進行の継続（US3.1。B4: AC3.1.1〜3.1.3） ----
+
+  /** 役割の、現在の意思決定の版（進行役の状態から）。 */
+  private def versionOf(client: GameClient, apiRole: String): Long =
+    client
+      .get(sessionPath(client, "/state"), client.facilitator)
+      .json
+      .hcursor
+      .downField("roles")
+      .downField(apiRole)
+      .get[Long]("decisionVersion")
+      .getOrElse(0L)
+
+  /** 現在の版を根拠に、指定の週の数量を保存する（競合しない通常の保存）。 */
+  private def saveAt(client: GameClient, apiRole: String, week: Int, quantity: Int): Reply =
+    client.callWith(
+      org.http4s.Method.PUT,
+      sessionPath(client, "/decisions"),
+      Some(Json.obj("week" -> Json.fromInt(week), "quantity" -> Json.fromInt(quantity))),
+      client.players.get(apiRole),
+      Some(java.util.UUID.randomUUID.toString),
+      List(org.http4s.Header.Raw(CIString("If-Match"), versionOf(client, apiRole).toString))
+    )
+
+  private def decisionOf(client: GameClient, apiRole: String): Option[Int] =
+    client
+      .get(sessionPath(client, "/state"), client.facilitator)
+      .json
+      .hcursor
+      .downField("roles")
+      .downField(apiRole)
+      .get[Int]("decision")
+      .toOption
+
+  private def proxy(client: GameClient, apiRole: String, week: Int, quantity: Int): Reply =
+    client.put(
+      sessionPath(client, s"/proxy-decisions/$apiRole"),
+      Json.obj("requestedWeek" -> Json.fromInt(week), "quantity" -> Json.fromInt(quantity)),
+      client.facilitator,
+      None
+    )
+
+  private def sessionStatus(client: GameClient): String =
+    client
+      .get(sessionPath(client, "/state"), client.facilitator)
+      .json
+      .hcursor
+      .get[String]("status")
+      .getOrElse("")
+
+  private def control(client: GameClient, action: String, cookie: Option[String]): Reply =
+    client.post(sessionPath(client, s"/$action"), Json.obj(), cookie)
+
+  Given("""^進行役がセッションを一時停止している$""") { () =>
+    world.last = control(world.game, "pause", world.game.facilitator)
+    require(world.last.status == 200, s"停止できない: ${world.last.text}")
+  }
+
+  When("""^進行役がセッションを一時停止する$""") { () =>
+    world.last = control(world.game, "pause", world.game.facilitator)
+  }
+
+  When("""^工場の参加者が、セッションを一時停止しようとする$""") { () =>
+    world.last = control(world.game, "pause", world.game.players.get("FACTORY"))
+  }
+
+  Given("""^進行役がセッションを再開している$""") { () =>
+    world.last = control(world.game, "resume", world.game.facilitator)
+    require(world.last.status == 200, s"再開できない: ${world.last.text}")
+  }
+
+  When("""^進行役がセッションを再開する$""") { () =>
+    world.last = control(world.game, "resume", world.game.facilitator)
+  }
+
+  Then("""^停止中であるという理由で拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(world.last.code.contains("session.paused"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^セッションの状態は(停止中|進行中)である$""") { (label: String) =>
+    val expected = if label == "停止中" then "PAUSED" else "ACTIVE"
+    require(sessionStatus(world.game) == expected, s"状態が違う: ${sessionStatus(world.game)}")
+  }
+
+  Then("""^当週の(.+)の入力は (\d+) のまま残っている$""") { (label: String, quantity: Int) =>
+    require(decisionOf(world.game, role(label)).contains(quantity), s"入力が違う: $label")
+  }
+
+  Then("""^当週の(.+)の入力は保存されていない$""") { (label: String) =>
+    require(decisionOf(world.game, role(label)).isEmpty, s"保存されている: $label")
+  }
+
+  Given("""^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存している$""") {
+    (label: String, week: Int, quantity: Int) =>
+      val reply = saveAt(world.game, role(label), week, quantity)
+      require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  Then("""^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存できる$""") {
+    (label: String, week: Int, quantity: Int) =>
+      val reply = saveAt(world.game, role(label), week, quantity)
+      require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  When("""^進行役が、(.+)の代理入力として (\d+) を入力する$""") { (label: String, quantity: Int) =>
+    world.last = proxy(world.game, role(label), 1, quantity)
+  }
+
+  Given("""^進行役が、(.+)の代理入力として (\d+) を入力している$""") { (label: String, quantity: Int) =>
+    world.last = proxy(world.game, role(label), 1, quantity)
+    require(world.last.status == 200, s"代理入力できない: ${world.last.text}")
+  }
+
+  When("""^(.+)の参加者が、(.+)の代理入力として (\d+) を入力しようとする$""") {
+    (_: String, label: String, quantity: Int) =>
+      world.last = client403(world.game, role(label), quantity)
+  }
+
+  private def client403(client: GameClient, apiRole: String, quantity: Int): Reply =
+    client.put(
+      sessionPath(client, s"/proxy-decisions/$apiRole"),
+      Json.obj("requestedWeek" -> Json.fromInt(1), "quantity" -> Json.fromInt(quantity)),
+      client.players.get(apiRole),
+      None
+    )
+
+  When("""^進行役が、第 (\d+) 週の画面を見たまま、(.+)の代理入力として (\d+) を入力しようとする$""") {
+    (week: Int, label: String, quantity: Int) =>
+      world.last = proxy(world.game, role(label), week, quantity)
+  }
+
+  Then("""^(.+)の代理入力 (\d+) が受け付けられる$""") { (label: String, quantity: Int) =>
+    require(world.last.status == 200, s"受け付けられていない: ${world.last.text}")
+    require(decisionOf(world.game, role(label)).contains(quantity), "値が違う")
+  }
+
+  Then("""^第 (\d+) 週の結果はまだ記録されていない$""") { (_: Int) =>
+    require(resultsOf(world.game).isEmpty, "結果が記録されている")
+  }
+
+  Then("""^第 (\d+) 週はすでに確定されているという理由で、代理入力は拒否される$""") { (_: Int) =>
+    require(world.last.code.contains("session.week_advanced"), s"理由が違う: ${world.last.text}")
+  }
+
+  private def auditedEvents(client: GameClient): List[bgs.domain.SessionEvent] =
+    val id = bgs.domain.GameId(java.util.UUID.fromString(client.gameId.getOrElse("")))
+    import cats.effect.unsafe.implicits.global
+    client.env.ports.tx
+      .run[Nothing, List[bgs.domain.SessionEvent]](
+        client.env.ports.sessionStore.read(id).map(r => Right(r.events))
+      )
+      .unsafeRunSync()
+      .getOrElse(Nil)
+
+  Then("""^監査履歴に、操作者が進行役、役割が(.+)、値が (\d+) の代理入力が残っている$""") { (label: String, quantity: Int) =>
+    require(
+      auditedEvents(world.game).exists {
+        case bgs.domain.SessionEvent
+              .DecisionSaved(_, r, q, _, bgs.domain.Editor.ByFacilitator(_), _) =>
+          r.toString.equalsIgnoreCase(role(label)) && q.value == quantity
+        case _ => false
+      },
+      "監査履歴に代理入力が無い"
+    )
+  }
+
+  Then("""^その代理入力の時刻が記録されている$""") { () =>
+    // 時刻（occurred_at）は NOT NULL の列で、追記の入力に必ず含まれる（V001）。イベントが読めることをもって確かめる
+    require(auditedEvents(world.game).nonEmpty, "イベントが読めない")
+  }
+
+  private def saveTimes(client: GameClient, times: Int): Unit =
+    (1 to times).foreach { n =>
+      val reply = saveAt(client, "RETAILER", 1, n)
+      require(reply.status == 200, s"$n 回目の保存ができない: ${reply.text}")
+    }
+
+  Given("""^小売店の参加者が、当週の数量を (\d+) 回保存している$""") { (times: Int) =>
+    saveTimes(world.game, times)
+  }
+
+  When("""^小売店の参加者が、当週の数量をもう 1 回保存しようとする$""") { () =>
+    world.last = saveAt(world.game, "RETAILER", 1, 9)
+  }
+
+  Then("""^保存回数の上限に達しているという理由で拒否される$""") { () =>
+    require(world.last.code.contains("session.save_limit_reached"), s"理由が違う: ${world.last.text}")
   }
