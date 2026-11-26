@@ -49,7 +49,13 @@ lazy val commonSettings = Seq(
 lazy val domain = (project in file("domain"))
   .settings(commonSettings)
   .settings(
-    libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
+    libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion,
+    libraryDependencies ++= Seq(
+      "org.scalameta" %% "munit-scalacheck" % "1.3.1" % Test,
+      "org.scalacheck" %% "scalacheck" % "1.20.0" % Test,
+      "org.typelevel" %% "cats-laws" % catsVersion % Test,
+      "org.typelevel" %% "discipline-munit" % "2.0.0" % Test
+    )
   )
 
 lazy val application = (project in file("application"))
