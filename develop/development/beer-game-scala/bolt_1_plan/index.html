@@ -14788,7 +14788,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">状態</td>
-<td style="text-align: left;"><strong>計画は草案のまま、人の承認なし。</strong> 2026-11-26 にユーザーが <code>/goal orchestrating-development U1</code> を指示したため、AI が B1 を自律実行中（<strong><code>/goal</code> の指示は、各ゲート・依存関係・マイグレーションの承認の記録ではない。実施した未承認の判断は、終了報告に列挙する</strong>）。実施済み: Step 1（実測。結果は下記）、Step 2（土台と静的解析。<code>apps/beer-game-scala/scripts/check.sh</code> が緑）、Step 4（値と週次計算）、Step 5・6（Game と Session の集約、<code>startGame</code>、設定の検証、再生。<strong>domain 61 件・行率ツール 10 件が緑</strong>）。<strong>未着手: Step 3 の AC 一覧・許可リスト・cucumber の入口、Step 7〜12（イベントストア・マイグレーション V001・アプリケーション・HTTP・UI・受け入れ）。</strong> 各ゲート 1〜12 は未承認</td>
+<td style="text-align: left;"><strong>計画は草案のまま、人の承認なし。</strong> 2026-11-26 にユーザーが <code>/goal orchestrating-development U1</code> を指示したため、AI が B1 を自律実行中（<strong><code>/goal</code> の指示は、各ゲート・依存関係・マイグレーションの承認の記録ではない。実施した未承認の判断は、終了報告に列挙する</strong>）。実施済み: Step 1（実測。結果は下記）、Step 2（土台と静的解析。<code>apps/beer-game-scala/scripts/check.sh</code> が緑）、Step 4（値と週次計算）、Step 5・6（Game と Session の集約、<code>startGame</code>、設定の検証、再生。domain 61 件）、Step 7（Flyway V001、circe、イベントストア、<code>Tx.run</code>。<strong>契約テスト 12 件が H2・PostgreSQL で緑</strong>。<code>.transact(</code> の入口を <code>Transactions.scala</code> に限る検査を fixture つきで追加）、Step 8（アプリケーション層。再試行、2 ストリームの開始。app 6 件が緑）。<strong>未実施の判断（未承認）: マイグレーション V001、依存関係の導入（circe・Flyway・H2・scala-xml ほか）。簡略化: 投影の表は作らず、状態はイベントの再生で復元（Step 7 の投影は未実施）。</strong> <strong>未着手: Step 3 の AC 一覧・許可リスト・cucumber の入口、Step 9〜12（HTTP と認可・冪等・problem+json、共有 UI の接続、受け入れ、検証）。</strong> 各ゲート 1〜12 は未承認</td>
 </tr>
 </tbody>
 </table>
