@@ -21,10 +21,11 @@ echo "OK: WartRemover と scalac の fixture（14 件）"
 # 2. Scalafix の DisableSyntax.regex: println 1・clock 2・threadSleep 1・unsafeRun 1 = 5 件
 sf=$(sbt -batch "rulesFixtureScalafix/scalafix --check" 2>&1 || true)
 count=$(echo "$sf" | grep -c "error: \[DisableSyntax\." || true)
-[ "$count" = "5" ] || fail "Scalafix の fixture は 5 件を報告するはず（実際: ${count}）"
-for id in println clock threadSleep unsafeRun; do
+[ "$count" = "7" ] || fail "Scalafix の fixture は 7 件を報告するはず（実際: ${count}）"
+for id in println clock threadSleep unsafeRun transact txControl; do
   echo "$sf" | grep -q "\[DisableSyntax.$id\]" || fail "DisableSyntax.$id が報告されていない"
 done
 echo "$sf" | grep -q "def ok" && fail "違反の無いコード（ok）が報告された" || true
 echo "$sf" | grep -q "sayOk" && fail "IO.println 相当（FakeIO.println）が誤検出された" || true
-echo "OK: Scalafix の fixture（5 件）"
+echo "$sf" | grep -q "txOk" && fail "Transactions.writeTx が誤検出された（落ちてはならない方向）" || true
+echo "OK: Scalafix の fixture（7 件）"

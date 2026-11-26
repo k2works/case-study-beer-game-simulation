@@ -51,6 +51,9 @@ opaque type StreamVersion = Long
 object StreamVersion:
   val Zero: StreamVersion = 0L
 
+  /** 永続化から読んだ値、または境界で検証済みの値から作る。負数は 0 に丸める（版は 0 以上）。 */
+  def of(n: Long): StreamVersion = math.max(0L, n)
+
   extension (v: StreamVersion)
     def value: Long = v
     def next: StreamVersion = v + 1L

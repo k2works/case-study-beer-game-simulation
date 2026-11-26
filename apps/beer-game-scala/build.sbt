@@ -58,13 +58,43 @@ lazy val domain = (project in file("domain"))
     )
   )
 
+val doobieVersion = "1.0.0-RC12"
+val circeVersion = "0.14.17"
+val flywayVersion = "13.12.2"
+
 lazy val application = (project in file("application"))
   .dependsOn(domain)
   .settings(commonSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-effect" % "3.7.1",
+      "org.tpolecat" %% "doobie-core" % doobieVersion
+    )
+  )
 
 lazy val adapterPersistence = (project in file("adapter-persistence"))
-  .dependsOn(application)
+  .dependsOn(application, domain % "test->test")
   .settings(commonSettings)
+  .settings(
+    // トランザクションの入口を書いてよい唯一のファイル。Scalafix の検査から、このファイルだけを除く（scalafix:off は使わない）。
+    Compile / scalafix / unmanagedSources :=
+      (Compile / unmanagedSources).value.filterNot(_.getName == "Transactions.scala")
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.tpolecat" %% "doobie-postgres" % doobieVersion,
+      "org.postgresql" % "postgresql" % "42.7.15",
+      "com.h2database" % "h2" % "2.5.252",
+      "org.flywaydb" % "flyway-core" % flywayVersion,
+      "org.flywaydb" % "flyway-database-postgresql" % flywayVersion,
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
+      "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test,
+      "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.44.1" % Test,
+      "com.dimafeng" %% "testcontainers-scala-munit" % "0.44.1" % Test
+    )
+  )
 
 lazy val adapterHttp = (project in file("adapter-http"))
   .dependsOn(application)
