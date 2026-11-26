@@ -44,16 +44,20 @@ object DoobieEventStore:
       .unique
 
   private def read[E: Decoder](stream: String, gameId: GameId): ConnectionIO[StreamRead[E]] =
-    sql"""select stream_version, payload from events
+    sql"""select stream_version, payload, occurred_at from events
           where game_id = ${gameId.value} and stream_type = $stream order by stream_version"""
-      .query[(Long, String)]
+      .query[(Long, String, Instant)]
       .to[List]
       .flatMap { rows =>
-        rows.traverse((_, payload) =>
+        rows.traverse((_, payload, _) =>
           decode[E](payload).leftMap(e => new IllegalStateException(e.getMessage))
         ) match
           case Right(events) =>
-            StreamRead(events, StreamVersion.of(rows.lastOption.fold(0L)(_._1))).pure[ConnectionIO]
+            StreamRead(
+              events,
+              StreamVersion.of(rows.lastOption.fold(0L)(_._1)),
+              rows.map(_._3)
+            ).pure[ConnectionIO]
           case Left(error) => FC.raiseError[StreamRead[E]](error)
       }
 

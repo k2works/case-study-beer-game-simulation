@@ -18,3 +18,7 @@ continuation/pause-resume.feature
 continuation/recovery.feature
 
 continuation/credentials.feature
+
+# B5: 共同担当と共同入力（AC1.2.4・AC2.1.4・AC2.2.3・AC2.2.4）
+game-setup/co-assignment.feature
+weekly-play/co-input.feature

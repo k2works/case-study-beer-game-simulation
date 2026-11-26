@@ -97,10 +97,12 @@ class Steps extends ScalaDsl with EN:
       None
     )
     if reply.status == 200 then
-      client.players =
-        client.players.updated(apiRole, client.participantCookies.getOrElse(name, ""))
-      client.recoveries =
-        client.recoveries.updated(apiRole, client.participantRecoveries.getOrElse(name, ""))
+      // 共同担当の 2 人目以降は、役割の代表（最初の担当者）の資格を上書きしない。入れ替えは、別のステップで差し替える
+      if !client.players.contains(apiRole) then
+        client.players =
+          client.players.updated(apiRole, client.participantCookies.getOrElse(name, ""))
+        client.recoveries =
+          client.recoveries.updated(apiRole, client.participantRecoveries.getOrElse(name, ""))
     reply
 
   private def assignedPlayers(client: GameClient, labels: List[String]): Unit =
@@ -307,10 +309,10 @@ class Steps extends ScalaDsl with EN:
     require(missing == List(role(label)), s"不足している役割が違う: $missing")
   }
 
-  Given("""^参加者「(.+)」が小売店に割り当てられている$""") { (name: String) =>
+  Given("""^参加者「(.+)」が(小売店|二次卸)に割り当てられている$""") { (name: String, label: String) =>
     val client = world.game
     require(joinWith(client, joinCodeOf(client), name).status == 200, "参加できない")
-    require(assignRole(client, name, "RETAILER").status == 200, "割り当てられない")
+    require(assignRole(client, name, role(label)).status == 200, "割り当てられない")
   }
 
   When("""^進行役が、(.+)を(.+)に割り当てる$""") { (name: String, label: String) =>
@@ -333,7 +335,7 @@ class Steps extends ScalaDsl with EN:
       }
       .toMap
 
-  Then("""^(.+)は(二次卸)に割り当てられている$""") { (name: String, label: String) =>
+  Then("""^(.+)は(小売店|二次卸)に割り当てられている$""") { (name: String, label: String) =>
     val client = world.game
     require(
       lobbyRoles(client).get(client.participants.getOrElse(name, "")).flatten.contains(role(label)),
@@ -645,7 +647,7 @@ class Steps extends ScalaDsl with EN:
   // ---- 進行の継続（US3.1。B4: AC3.1.1〜3.1.3） ----
 
   /** 役割の、現在の意思決定の版（進行役の状態から）。 */
-  private def versionOf(client: GameClient, apiRole: String): Long =
+  def versionOf(client: GameClient, apiRole: String): Long =
     client
       .get(sessionPath(client, "/state"), client.facilitator)
       .json
@@ -1290,6 +1292,15 @@ class Steps extends ScalaDsl with EN:
     snapshotHolders(role(label))
     world.lastRole = role(label)
     world.last = assignRole(world.game, name, role(label))
+    if world.last.status == 200 then
+      world.game.players = world.game.players.updated(
+        role(label),
+        world.game.participantCookies.getOrElse(name, "")
+      )
+      world.game.recoveries = world.game.recoveries.updated(
+        role(label),
+        world.game.participantRecoveries.getOrElse(name, "")
+      )
   }
 
   Then("""^(.+)が(.+)の担当になる$""") { (name: String, label: String) =>
@@ -1390,4 +1401,220 @@ class Steps extends ScalaDsl with EN:
 
   Then("""^以前の(.+)の参加者が、同じ識別子で同じ保存を再送すると、権限エラーになる$""") { (_: String) =>
     require(sendKeyedSave().status == 403, "再送が通ってしまう")
+  }
+
+  // ---- 共同担当と共同入力（B5: AC1.2.4・AC2.1.4・AC2.2.3・AC2.2.4） ----
+
+  Then("""^小売店に (\d+) 人の参加者が割り当てられている$""") { (count: Int) =>
+    require(lobbyRoles(world.game).values.flatten.count(_ == "RETAILER") == count, "人数が違う")
+  }
+
+  When("""^進行役がゲームを開始する$""") { () => world.last = startGame(world.game) }
+
+  Then("""^ゲームは開始されている$""") { () =>
+    require(world.last.status == 200, s"開始されていない: ${world.last.text}")
+  }
+
+  /** 「小売店の参加者」と共同担当の名前から、その人の資格（Cookie）。 */
+  private def cookieOfPerson(person: String): Option[String] =
+    if person == "小売店の参加者" then world.game.players.get("RETAILER")
+    else world.game.participantCookies.get(person)
+
+  private def stateWith(cookie: Option[String]): Reply =
+    world.game.get(sessionPath(world.game, "/state"), cookie)
+
+  private def saveWith(cookie: Option[String], week: Int, quantity: Int, version: Long): Reply =
+    world.game.callWith(
+      org.http4s.Method.PUT,
+      sessionPath(world.game, "/decisions"),
+      Some(Json.obj("week" -> Json.fromInt(week), "quantity" -> Json.fromInt(quantity))),
+      cookie,
+      Some(java.util.UUID.randomUUID.toString),
+      List(org.http4s.Header.Raw(CIString("If-Match"), version.toString))
+    )
+
+  private def retailerVersion: Long = versionOf(world.game, "RETAILER")
+
+  private var viewedVersion = 0L
+  private var viewedBasis: Json = Json.Null
+
+  private def roleStatusOf(reply: Reply) = reply.json.hcursor.downField("roleStatus")
+
+  When("""^共同担当の鈴木が、自分の役割の状況を取得する$""") { () =>
+    world.last = stateWith(cookieOfPerson("鈴木"))
+  }
+
+  Then("""^鈴木が見る入力値は (\d+)、版は (\d+) である$""") { (quantity: Int, version: Int) =>
+    val status = roleStatusOf(world.last)
+    require(status.get[Int]("decision").contains(quantity), s"入力値が違う: ${world.last.text}")
+    require(status.get[Int]("decisionVersion").contains(version), "版が違う")
+  }
+
+  /** 保存者の「自分か」だけを除いた、役割の状況。 */
+  private def comparable(reply: Reply): Option[Json] =
+    roleStatusOf(reply).focus.map(_.mapObject(_.remove("decisionEditor")))
+
+  Then("""^鈴木が見る状況は、小売店の参加者が見る状況と同じである$""") { () =>
+    val own = comparable(stateWith(cookieOfPerson("鈴木")))
+    val other = comparable(stateWith(cookieOfPerson("小売店の参加者")))
+    require(own.isDefined && own == other, s"状況が違う: $own / $other")
+  }
+
+  Then("""^同じ役割の共同担当として、小売店の参加者と鈴木が示される$""") { () =>
+    val names = world.last.json.hcursor
+      .downField("coHolders")
+      .values
+      .map(_.toList.flatMap(_.hcursor.get[String]("displayName").toOption))
+      .getOrElse(Nil)
+    require(names.toSet == Set("参加者の小売店", "鈴木"), s"共同担当が違う: $names")
+  }
+
+  Then("""^鈴木が見る最後の保存者は、(小売店の参加者|自分自身)である$""") { (who: String) =>
+    val editor = roleStatusOf(stateWith(cookieOfPerson("鈴木"))).downField("decisionEditor")
+    if who == "自分自身" then require(editor.get[Boolean]("isSelf").contains(true), "自分でない")
+    else
+      require(editor.get[String]("displayName").contains("参加者の小売店"), s"保存者が違う: ${editor.focus}")
+      require(editor.get[Boolean]("isSelf").contains(false), "自分になっている")
+  }
+
+  Then("""^他の役割の担当者の表示名・ID は、どの項目にも含まれない$""") { () =>
+    val text = world.last.text
+    val ids = world.game.participants.collect {
+      case (name, id) if name == "参加者の小売店" || name == "鈴木" => id
+    }
+    List("参加者の小売店", "鈴木").foreach(n => require(!text.contains(n), s"表示名 $n が含まれる"))
+    ids.foreach(id => require(!text.contains(id), "ID が含まれる"))
+  }
+
+  Then("""^入力値・版は、自分の役割のもの（入力なし、版 (\d+)）である$""") { (version: Int) =>
+    val status = roleStatusOf(world.last)
+    require(status.get[Option[Int]]("decision").contains(None), "入力がある")
+    require(status.get[Int]("decisionVersion").contains(version), "版が違う")
+  }
+
+  Given("""^小売店の参加者と鈴木が、同じ版の画面を見ている$""") { () => viewedVersion = retailerVersion }
+
+  Given("""^小売店の参加者が、見ていた版のまま、数量 (\d+) を保存している$""") { (quantity: Int) =>
+    val reply = saveWith(cookieOfPerson("小売店の参加者"), 1, quantity, viewedVersion)
+    require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  When("""^鈴木が、見ていた版のまま、数量 (\d+) を保存しようとする$""") { (quantity: Int) =>
+    world.last = saveWith(cookieOfPerson("鈴木"), 1, quantity, viewedVersion)
+  }
+
+  Given("""^鈴木が、見ていた版のまま、数量 (\d+) を保存しようとして、競合している$""") { (quantity: Int) =>
+    world.last = saveWith(cookieOfPerson("鈴木"), 1, quantity, viewedVersion)
+    require(world.last.status == 409, s"競合していない: ${world.last.status}")
+  }
+
+  Then("""^保存は競合として拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(world.last.code.contains("session.decision_conflict"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^競合の応答に、最新の入力 (\d+)、版 (\d+) が含まれる$""") { (quantity: Int, version: Int) =>
+    val latest = world.last.json.hcursor.downField("latest")
+    require(latest.get[Int]("quantity").contains(quantity), s"最新の入力が違う: ${world.last.text}")
+    require(latest.get[Int]("version").contains(version), "版が違う")
+  }
+
+  Then("""^最後の保存者として小売店の参加者が、保存の時刻とともに示される$""") { () =>
+    val latest = world.last.json.hcursor.downField("latest")
+    require(
+      latest.downField("editor").get[String]("displayName").contains("参加者の小売店"),
+      "保存者が違う"
+    )
+    require(latest.get[String]("savedAt").exists(_.nonEmpty), "保存の時刻が無い")
+  }
+
+  Then("""^競合した入力 (\d+) は、応答に含まれない$""") { (quantity: Int) =>
+    val numbers = world.last.json.foldWith(new io.circe.Json.Folder[List[Long]]:
+      def onNull = Nil
+      def onBoolean(value: Boolean) = Nil
+      def onNumber(value: io.circe.JsonNumber) = value.toLong.toList
+      def onString(value: String) = Nil
+      def onArray(value: Vector[Json]) = value.toList.flatMap(_.foldWith(this))
+      def onObject(value: io.circe.JsonObject) = value.values.toList.flatMap(_.foldWith(this)))
+    require(!numbers.contains(quantity.toLong), "競合した入力が含まれる")
+  }
+
+  Then("""^当週の小売店の入力は (\d+)、版は (\d+) である$""") { (quantity: Int, version: Int) =>
+    require(decisionOf(world.game, "RETAILER").contains(quantity), "入力が違う")
+    require(versionOf(world.game, "RETAILER") == version.toLong, "版が違う")
+  }
+
+  When("""^鈴木が、最新の版を指定して、数量 (\d+) を保存し直す$""") { (quantity: Int) =>
+    world.last = saveWith(cookieOfPerson("鈴木"), 1, quantity, retailerVersion)
+  }
+
+  Then("""^保存が受け付けられる$""") { () =>
+    require(world.last.status == 200, s"受け付けられていない: ${world.last.text}")
+  }
+
+  Then("""^最後の保存者は、進行役の代理入力として示される$""") { () =>
+    require(
+      world.last.json.hcursor
+        .downField("latest")
+        .downField("editor")
+        .get[String]("kind")
+        .contains("FACILITATOR_PROXY"),
+      "保存者が代理入力でない"
+    )
+  }
+
+  Then("""^共同担当の鈴木が取得した状況は、入力値 (\d+)、版 (\d+) になる$""") { (quantity: Int, version: Int) =>
+    val status = roleStatusOf(stateWith(cookieOfPerson("鈴木")))
+    require(status.get[Int]("decision").contains(quantity), "入力値が違う")
+    require(status.get[Int]("decisionVersion").contains(version), "版が違う")
+  }
+
+  private def saveTimesAs(person: String, times: Int): Unit =
+    (1 to times).foreach { n =>
+      val reply = saveWith(cookieOfPerson(person), 1, n, retailerVersion)
+      require(reply.status == 200, s"$n 回目の保存ができない: ${reply.text}")
+    }
+
+  Given("""^共同担当の鈴木が、当週の数量をさらに (\d+) 回保存している$""") { (times: Int) => saveTimesAs("鈴木", times) }
+
+  Given("""^小売店の参加者が、当週の数量をあと (\d+) 回保存している$""") { (times: Int) =>
+    saveTimesAs("小売店の参加者", times)
+  }
+
+  When("""^共同担当の鈴木が、当週の数量をもう 1 回保存しようとする$""") { () =>
+    world.last = saveWith(cookieOfPerson("鈴木"), 1, 9, retailerVersion)
+  }
+
+  Given("""^進行役が、確定の確認画面を開いて、各役割の入力の版を控えている$""") { () =>
+    viewedBasis = decisionVersions(world.game)
+  }
+
+  Given("""^共同担当の鈴木が、当週の数量を (\d+) に保存し直している$""") { (quantity: Int) =>
+    val reply = saveWith(cookieOfPerson("鈴木"), 1, quantity, retailerVersion)
+    require(reply.status == 200, s"保存できない: ${reply.text}")
+  }
+
+  When("""^進行役が、控えた版のまま第 (\d+) 週を確定しようとする$""") { (week: Int) =>
+    world.last = world.game.call(
+      org.http4s.Method.POST,
+      sessionPath(world.game, s"/weeks/$week/commit"),
+      Some(Json.obj("requestedWeek" -> Json.fromInt(week), "basis" -> viewedBasis)),
+      world.game.facilitator,
+      Some(java.util.UUID.randomUUID.toString)
+    )
+  }
+
+  Then("""^確定の根拠にした入力が変わったという理由で拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(world.last.code.contains("session.decisions_changed"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^現在の入力として、小売店の (\d+)（保存者: (.+)）が示される$""") { (quantity: Int, name: String) =>
+    val retailer = world.last.json.hcursor.downField("current").downField("RETAILER")
+    require(retailer.get[Int]("quantity").contains(quantity), s"入力が違う: ${world.last.text}")
+    require(retailer.downField("editor").get[String]("displayName").contains(name), "保存者が違う")
+  }
+
+  Then("""^確定の根拠が変わったという理由ではない$""") { () =>
+    require(!world.last.code.contains("session.decisions_changed"), "根拠の変化として拒否された")
   }

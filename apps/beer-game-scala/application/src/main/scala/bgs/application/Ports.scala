@@ -1,6 +1,6 @@
 package bgs.application
 
-import bgs.domain.{DomainError, GameId, StreamVersion, ValidationError}
+import bgs.domain.{DomainError, GameId, Role, SessionError, StreamVersion, ValidationError}
 import cats.effect.IO
 import doobie.ConnectionIO
 
@@ -23,10 +23,14 @@ enum AppFailure:
   /** 入力の形の誤り。境界で集めた、項目ごとの誤り（422）。 */
   case Invalid(errors: List[ValidationError])
 
+  /** 入力の競合・確定の根拠の変化。応答に添える、現在の役割ごとの入力（保存者・時刻つき）を持つ。 */
+  case Conflict(error: SessionError, entries: Map[Role, DecisionEntryView])
+
   /** 想定外の失敗（500 と相関 ID）。 */
   case Persistence(message: String)
 
-final case class StreamRead[E](events: List[E], version: StreamVersion)
+/** [[occurredAt]] は、[[events]] と同じ順の、追記の時刻。 */
+final case class StreamRead[E](events: List[E], version: StreamVersion, occurredAt: List[Instant])
 
 /** 1 本のイベントのストリーム（`game` または `session`）。実装は adapter-persistence。 `append` は、期待する版（読んだ時点の版）が現在の版と違えば
   * `Left(ConcurrencyConflict)` を返す（楽観的並行制御）。

@@ -87,7 +87,15 @@ object JsonViews:
       "decision" -> Some(orNull(view.decision.map(Json.fromInt))),
       "decisionVersion" -> Some(Json.fromLong(view.decisionVersion)),
       "decisionEditor" -> Some(orNull(view.decisionEditor.map(editor))),
-      "decisionSavedAt" -> Some(Json.Null)
+      "decisionSavedAt" -> Some(orNull(view.decisionSavedAt.map(t => Json.fromString(t.toString))))
+    )
+
+  def decisionEntry(view: DecisionEntryView): Json =
+    Json.obj(
+      "quantity" -> Json.fromInt(view.quantity),
+      "version" -> Json.fromLong(view.version),
+      "editor" -> editor(view.editor),
+      "savedAt" -> orNull(view.savedAt.map(t => Json.fromString(t.toString)))
     )
 
   private def result(view: RoleResultView): Json =
@@ -116,6 +124,16 @@ object JsonViews:
       "role" -> view.role.map(r => Json.fromString(roleName(r))),
       "finalWeek" -> view.finalWeek.map(Json.fromInt),
       "roleStatus" -> view.roleStatus.map(roleStatus),
+      "coHolders" -> view.coHolders.map(list =>
+        Json.fromValues(
+          list.map(c =>
+            Json.obj(
+              "displayName" -> orNull(c.displayName.map(Json.fromString)),
+              "isSelf" -> Json.fromBoolean(c.isSelf)
+            )
+          )
+        )
+      ),
       "roles" -> view.roles.map(roles =>
         Json.fromFields(
           Role.values.toList.flatMap(r => roles.get(r).map(s => roleName(r) -> roleStatus(s)))

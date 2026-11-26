@@ -791,3 +791,50 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(saved.status, 200)
     }
   }
+
+  test("[AC2.2.3・2.1.4] 同じ版からの 2 回目の保存は競合し、最新の入力・保存者・時刻を返す。共同担当の一覧も返る") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, code) <- create(app)
+        joined <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            ).map(_ => role -> cookie)
+          }
+        }
+        players = joined.toMap
+        retailer = players.getOrElse("RETAILER", fail("小売店が無い"))
+        (coCookie, coId) <- join(app, code, "鈴木")
+        _ <- put(
+          app,
+          s"/api/v1/games/$gameId/participants/$coId/role",
+          Json.obj("role" -> Json.fromString("RETAILER")),
+          Some(facilitator)
+        )
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        body = (q: Int) => Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(q))
+        first <- put(app, sessionPath(gameId, "/decisions"), body(5), Some(retailer))
+        second <- put(app, sessionPath(gameId, "/decisions"), body(77), Some(coCookie))
+        coState <- call(app, Method.GET, sessionPath(gameId, "/state"), cookie = Some(coCookie))
+        basis = Json.fromFields(roles.map(_ -> Json.fromLong(0L)))
+        stale <- post(
+          app,
+          sessionPath(gameId, "/weeks/1/commit"),
+          Json.obj("requestedWeek" -> Json.fromInt(1), "basis" -> basis),
+          Some(facilitator)
+        )
+      yield
+        assertEquals(first.status, 200)
+        assertEquals((second.status, second.code), (409, Some("session.decision_conflict")))
+        assertEquals(second.json.hcursor.downField("latest").get[Int]("quantity").toOption, Some(5))
+        assert(second.json.hcursor.downField("latest").get[String]("savedAt").isRight)
+        val coHolders = coState.json.hcursor.downField("coHolders").values.map(_.size)
+        assertEquals(coHolders, Some(2))
+        assert(coState.json.hcursor.downField("roleStatus").get[String]("decisionSavedAt").isRight)
+        assertEquals(stale.status, 409)
+    }
+  }

@@ -146,6 +146,22 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
           Nil,
           Some(1)
         )
+      case AppFailure.Conflict(error, entries) =>
+        val extra = error match
+          case SessionError.DecisionConflict(role, _) =>
+            List("role" -> Json.fromString(JsonViews.roleName(role))) ++
+              entries.get(role).map(e => "latest" -> JsonViews.decisionEntry(e)).toList
+          case SessionError.DecisionsChanged(week, _) =>
+            List(
+              "week" -> Json.fromInt(week.value),
+              "current" -> Json.fromFields(
+                Role.values.toList.flatMap(r =>
+                  entries.get(r).map(e => JsonViews.roleName(r) -> JsonViews.decisionEntry(e))
+                )
+              )
+            )
+          case _ => Nil
+        p(Status.Conflict, error.code, detailOf(error.code), extra)
       case AppFailure.Persistence(_) =>
         p(Status.InternalServerError, "app.internal", "内部の誤りが起きました。", Nil)
       case AppFailure.Domain(error) =>

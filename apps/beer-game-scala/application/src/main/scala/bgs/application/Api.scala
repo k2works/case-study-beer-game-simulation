@@ -153,7 +153,19 @@ final case class RoleStatusView(
     customerDemand: Option[Long],
     decision: Option[Int],
     decisionVersion: Long,
-    decisionEditor: Option[EditorView]
+    decisionEditor: Option[EditorView],
+    decisionSavedAt: Option[Instant]
+)
+
+/** 同じ役割の共同担当（表示名は同じ役割の参加者にだけ示す。ID は含めない）。 */
+final case class CoHolderView(displayName: Option[String], isSelf: Boolean)
+
+/** 競合・確定の根拠の変化の応答に添える、役割ごとの現在の入力。 */
+final case class DecisionEntryView(
+    quantity: Int,
+    version: Long,
+    editor: EditorView,
+    savedAt: Option[Instant]
 )
 
 final case class RoleResultView(
@@ -177,6 +189,7 @@ final case class SessionStateView(
     role: Option[Role],
     finalWeek: Option[Int],
     roleStatus: Option[RoleStatusView],
+    coHolders: Option[List[CoHolderView]],
     roles: Option[Map[Role, RoleStatusView]],
     results: Option[List[RoleResultView]],
     versions: Versions
@@ -415,7 +428,7 @@ object Api:
                       SessionCommand
                         .SaveDecision(actor, now, r, w, q, DecisionVersion.of(expectedVersion))
                     )
-                  }
+                  }.flatMap(withConflictDetail(env)(caller, gameId))
             }
           case _ => IO.pure(Left(AppFailure.Unauthorized))
 
@@ -433,7 +446,7 @@ object Api:
             gameId,
             SessionCommand.CommitWeek(actor, now, week, basis.map((_, v) => DecisionVersion.of(v)))
           )
-        }
+        }.flatMap(withConflictDetail(env)(caller, gameId))
 
   /** 参加者の資格を失効させる。復帰資格とブラウザセッションを、同じトランザクションで使えなくする（AC3.2.5）。 */
   def revokeCredential(env: Env)(
@@ -629,12 +642,68 @@ object Api:
             )
       case _ => IO.pure(Left(AppFailure.Unauthorized))
 
+  /** 当週の、役割ごとの最後の保存の時刻（追記の時刻。確定で空に戻る）。 */
+  private def savedTimes(read: StreamRead[SessionEvent]): Map[Role, Instant] =
+    read.events.zip(read.occurredAt).foldLeft(Map.empty[Role, Instant]) {
+      case (times, (SessionEvent.DecisionSaved(_, role, _, _, _, _), at)) =>
+        times.updated(role, at)
+      case (_, (SessionEvent.WeekCommitted(_, _, _, _, _, _), _)) => Map.empty
+      case (times, _)                                             => times
+    }
+
+  /** 競合の応答に添える、現在の役割ごとの入力（保存者・時刻つき。表示名は共同担当と進行役にだけ見せる）。 */
+  private def conflictDetail(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      error: SessionError
+  ): IO[AppFailure] =
+    for
+      sessionRead <- readOnly(env)(env.ports.sessionStore.read(gameId))
+      names <- readOnly(env)(env.peripheral.displayNames(gameId))
+    yield
+      val self = caller match
+        case Caller.Participant(_, p) => Some(p)
+        case _                        => None
+      val saved = savedTimes(sessionRead)
+      val data = sessionRead.events.foldLeft[SessionState](SessionState.NotStarted)(
+        SessionEvents.apply
+      ) match
+        case SessionState.Active(d, _) => Some(d)
+        case SessionState.Ended(d, _)  => Some(d)
+        case SessionState.NotStarted   => None
+      val entries = data.fold(Map.empty[Role, DecisionEntryView])(d =>
+        d.decisions.map { (role, e) =>
+          role -> DecisionEntryView(
+            e.quantity.value,
+            e.version.value,
+            e.editor match
+              case Editor.ByParticipant(id) =>
+                EditorView("PARTICIPANT", names.get(id), self.contains(id))
+              case Editor.ByFacilitator(_) => EditorView("FACILITATOR_PROXY", None, false),
+            saved.get(role)
+          )
+        }
+      )
+      AppFailure.Conflict(error, entries)
+
+  /** 入力の競合・確定の根拠の変化は、現在の入力を添えた失敗にする。 */
+  private def withConflictDetail(env: Env)(caller: Caller, gameId: GameId)(
+      result: Either[AppFailure, Versions]
+  ): IO[Either[AppFailure, Versions]] =
+    result match
+      case Left(AppFailure.Domain(e: SessionError.DecisionConflict)) =>
+        conflictDetail(env)(caller, gameId, e).map(Left(_))
+      case Left(AppFailure.Domain(e: SessionError.DecisionsChanged)) =>
+        conflictDetail(env)(caller, gameId, e).map(Left(_))
+      case other => IO.pure(other)
+
   private def roleStatus(
       data: SessionData,
       role: Role,
       names: Map[ParticipantId, String],
       showNames: Boolean,
-      self: Option[ParticipantId]
+      self: Option[ParticipantId],
+      savedAt: Map[Role, Instant]
   ): RoleStatusView =
     val state = data.roleStates(role)
     val entry = data.decisions.get(role)
@@ -655,7 +724,8 @@ object Api:
               self.contains(id)
             )
           case Editor.ByFacilitator(_) => EditorView("FACILITATOR_PROXY", None, false)
-      }
+      },
+      decisionSavedAt = entry.flatMap(_ => savedAt.get(role))
     )
 
   /** セッションの状態。参加者は自分の役割だけ、進行役は全役割と確定した週の結果。 */
@@ -704,6 +774,7 @@ object Api:
                 }
               val submitted = d.decisions.size
               val status = statusOf(game, session)
+              val savedAt = savedTimes(sessionRead)
               caller match
                 case Caller.Facilitator(_) =>
                   Right(
@@ -716,8 +787,11 @@ object Api:
                       None,
                       Some(d.settings.finalWeek.value),
                       None,
+                      None,
                       Some(
-                        Role.values.toList.map(r => r -> roleStatus(d, r, names, true, None)).toMap
+                        Role.values.toList
+                          .map(r => r -> roleStatus(d, r, names, true, None, savedAt))
+                          .toMap
                       ),
                       Some(results),
                       v
@@ -739,7 +813,12 @@ object Api:
                           Some(p),
                           Some(role),
                           None,
-                          Some(roleStatus(d, role, names, false, Some(p))),
+                          Some(roleStatus(d, role, names, true, Some(p), savedAt)),
+                          Some(
+                            d.assignments(role).toList.sortBy(_.value.toString).map { id =>
+                              CoHolderView(names.get(id), id == p)
+                            }
+                          ),
                           None,
                           None,
                           v
