@@ -1,6 +1,7 @@
 package bgs.app
 
 import bgs.adapter.persistence.{DoobieEventStore, DoobiePeripheralStore, Migrations, Transactions}
+import bgs.adapter.http.Emf
 import bgs.application.{Env, KeyRing, LogRecord, LogSink, Ports, SystemGenerators, Tx}
 import cats.effect.{IO, Ref}
 import doobie.Transactor
@@ -22,16 +23,18 @@ object Wiring:
   /** 構造化ログを、1 行の JSON として標準出力へ出す。 */
   val stdoutLog: LogSink =
     LogSink { (record: LogRecord) =>
-      IO.println(
-        Json
-          .obj(
-            "correlationId" -> Json.fromString(record.correlationId),
-            "operation" -> Json.fromString(record.operation),
-            "status" -> Json.fromInt(record.status),
-            "durationMs" -> Json.fromLong(record.durationMs)
-          )
-          .noSpaces
-      )
+      // 1 件の要求につき、構造化ログ 1 行と、EMF のメトリクス 1 行（CloudWatch がメトリクスにする。B13）
+      IO.realTimeInstant.flatMap(at => IO.println(Emf.line(record, at).noSpaces)) *>
+        IO.println(
+          Json
+            .obj(
+              "correlationId" -> Json.fromString(record.correlationId),
+              "operation" -> Json.fromString(record.operation),
+              "status" -> Json.fromInt(record.status),
+              "durationMs" -> Json.fromLong(record.durationMs)
+            )
+            .noSpaces
+        )
     }
 
   /** ポートと周辺ストア、時計・乱数をつないだ環境。書き込みの実行は、[[wrapTx]] で包める（障害の模擬など）。 */

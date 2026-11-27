@@ -1136,7 +1136,13 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         .map(_.value)
         .getOrElse("-")
       _ <- env.log.write(
-        LogRecord(correlation, operation, response.status.code, (end - start).toMillis)
+        LogRecord(
+          correlation,
+          operation,
+          response.status.code,
+          (end - start).toMillis,
+          OperationIds.of(req.method.name, req.uri.path.renderString)
+        )
       )
     yield response
   }

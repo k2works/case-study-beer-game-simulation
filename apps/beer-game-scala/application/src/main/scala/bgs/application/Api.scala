@@ -89,7 +89,13 @@ final case class Generators(
 /** 要求ごとの構造化ログ（AC6.1.1）。**資格・表示名・参加コード・非公開の値を含めない**（識別子の値もパスから落とす）。 [[operation]] は、メソッドと、識別子を
   * `{id}` に置き換えた経路（例: `GET /api/v1/sessions/{id}/state`）。
   */
-final case class LogRecord(correlationId: String, operation: String, status: Int, durationMs: Long)
+final case class LogRecord(
+    correlationId: String,
+    operation: String,
+    status: Int,
+    durationMs: Long,
+    operationId: String
+)
 
 /** ログの出力先（実装は境界。ドメインは持たない）。 */
 final case class LogSink(write: LogRecord => IO[Unit])

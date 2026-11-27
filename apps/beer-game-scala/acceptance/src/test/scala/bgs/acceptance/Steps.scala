@@ -2640,3 +2640,125 @@ class Steps extends ScalaDsl with EN:
     val leftovers = tablesWithGameId().filter(rowsFor(_) > 0L)
     require(leftovers.isEmpty, s"行が残る表: $leftovers")
   }
+
+  // ---- メトリクス（EMF）とアラームの訓練（B13: AC6.1.3・AC6.1.5） ----
+
+  private def emfOf(operationId: String): io.circe.Json =
+    val record = world.game.logs.asScala.toList
+      .filter(_.operationId == operationId)
+      .lastOption
+      .getOrElse(sys.error(s"$operationId の記録が無い"))
+    bgs.adapter.http.Emf.line(record, java.time.Instant.now)
+
+  Then("""^操作「(.+)」の応答時間と要求数のメトリクスが EMF の行として出力される$""") { (operation: String) =>
+    val c = emfOf(operation).hcursor
+    require(c.get[String]("Operation").contains(operation), "操作名が違う")
+    require(c.get[Long]("ResponseTime").exists(_ >= 0L), "応答時間が無い")
+    require(c.get[Int]("RequestCount").contains(1), "要求数が無い")
+    require(c.downField("_aws").downField("CloudWatchMetrics").focus.isDefined, "EMF の定義が無い")
+  }
+
+  Then("""^メトリクスの出力に、資格、表示名「(.+)」、非公開の値は含まれない$""") { (name: String) =>
+    val text = emfOf("getGameState").noSpaces
+    require(!text.contains(name), "表示名が含まれる")
+    world.game.participantCookies.values.foreach(cookie =>
+      require(!text.contains(cookie.dropWhile(_ != '=').drop(1)), "資格が含まれる")
+    )
+    List("token", "cookie", "joinCode", "decision").foreach(k =>
+      require(!text.contains(k), s"$k が含まれる")
+    )
+  }
+
+  Then("""^操作「(.+)」の 5xx のエラー率のメトリクスが (\d+) として出力される$""") { (operation: String, rate: Int) =>
+    require(emfOf(operation).hcursor.get[Int]("Http5xxRate").contains(rate), "エラー率が違う")
+  }
+
+  import bgs.application.Alarms
+
+  private var training = true
+  private var mainSeries: List[Alarms.Sample] = Nil
+  private var syntheticSeries: List[Alarms.Sample] = Nil
+  private var stoppedAt = 0
+  private var evaluatedUntil = 0
+  private var alarmSamples: List[Alarms.Sample] = Nil
+
+  private def everyFive(from: Int, until: Int): List[Alarms.Sample] =
+    (from until until by 5).toList.map(Alarms.Sample(_, 1.0))
+
+  private def everyMinute(from: Int, until: Int, value: Double): List[Alarms.Sample] =
+    (from until until by 60).toList.map(Alarms.Sample(_, value))
+
+  private def alarmNamed(name: String): Alarms.AlarmDefinition =
+    Alarms.all.find(_.name == name).getOrElse(sys.error(s"未知のアラーム: $name"))
+
+  Given("""^研修中で、主要な操作が 5 秒ごとに成功している$""") { () => training = true }
+
+  Given("""^研修中ではなく、主要な操作が 5 秒ごとに成功している$""") { () => training = false }
+
+  Given("""^合成監視が 60 秒ごとに成功している$""") { () => training = true }
+
+  When("""^時刻 (\d+) 秒にアプリケーションが停止する$""") { (at: Int) =>
+    stoppedAt = at
+    evaluatedUntil = at + 600
+    mainSeries = everyFive(0, at)
+    syntheticSeries = everyMinute(0, at, 1.0) ++ everyMinute(at, evaluatedUntil, 0.0)
+  }
+
+  When("""^時刻 (\d+) 秒から (\d+) 秒だけ、主要な操作が成功しなくなる$""") { (at: Int, gap: Int) =>
+    stoppedAt = at
+    evaluatedUntil = at + 480
+    mainSeries = everyFive(0, at) ++ everyFive(at + gap, evaluatedUntil)
+  }
+
+  private def firing(name: String): Option[Int] =
+    val series = if name == "synthetic-failure" then syntheticSeries else mainSeries
+    Alarms.firstFiring(alarmNamed(name), series, training, evaluatedUntil)
+
+  Then("""^停止から (\d+) 秒以内に、重大のアラーム「(.+)」が発報する$""") { (seconds: Int, name: String) =>
+    val fired = firing(name)
+    require(alarmNamed(name).severity == Alarms.Severity.Critical, "重大でない")
+    require(fired.exists(t => t - stoppedAt <= seconds && t >= stoppedAt), s"発報が遅い・無い: $fired")
+  }
+
+  Then("""^アラーム「(.+)」は発報しない$""") { (name: String) =>
+    require(firing(name).isEmpty, s"発報した: ${firing(name)}")
+  }
+
+  Then("""^停止から (\d+) 秒が過ぎても、アラーム「(.+)」は発報しない$""") { (_: Int, name: String) =>
+    require(firing(name).isEmpty, s"発報した: ${firing(name)}")
+  }
+
+  Given("""^コマンドの追記の競合率が平常（(\d+)%）である$""") { (percent: Int) =>
+    alarmSamples = (0 until 300 by 10).toList.map(Alarms.Sample(_, percent.toDouble))
+  }
+
+  When("""^時刻 (\d+) 秒から、追記の競合率が (\d+)% に急増する$""") { (at: Int, percent: Int) =>
+    evaluatedUntil = at + 600
+    alarmSamples =
+      alarmSamples ++ (at until evaluatedUntil by 10).toList.map(Alarms.Sample(_, percent.toDouble))
+  }
+
+  Then("""^警告のアラーム「(.+)」と重大のアラーム「(.+)」が発報する$""") { (warning: String, critical: String) =>
+    val w = Alarms.firstFiring(alarmNamed(warning), alarmSamples, true, evaluatedUntil)
+    val c = Alarms.firstFiring(alarmNamed(critical), alarmSamples, true, evaluatedUntil)
+    require(alarmNamed(warning).severity == Alarms.Severity.Warning, "警告でない")
+    require(alarmNamed(critical).severity == Alarms.Severity.Critical, "重大でない")
+    require(w.isDefined && c.isDefined && w.exists(x => c.exists(x <= _)), s"発報が違う: $w / $c")
+  }
+
+  Given("""^JVM のヒープの使用率が平常（(\d+)%）である$""") { (percent: Int) =>
+    alarmSamples = (0 until 60 by 10).toList.map(Alarms.Sample(_, percent.toDouble))
+  }
+
+  When("""^時刻 (\d+) 秒から、ヒープの使用率が (\d+)% で (\d+) 分続く$""") { (at: Int, percent: Int, minutes: Int) =>
+    evaluatedUntil = at + minutes * 60
+    alarmSamples = (at until evaluatedUntil by 10).toList.map(Alarms.Sample(_, percent.toDouble))
+  }
+
+  Then("""^重大のアラーム「(.+)」が発報する$""") { (name: String) =>
+    require(alarmNamed(name).severity == Alarms.Severity.Critical, "重大でない")
+    require(
+      Alarms.firstFiring(alarmNamed(name), alarmSamples, true, evaluatedUntil).isDefined,
+      "発報しない"
+    )
+  }
