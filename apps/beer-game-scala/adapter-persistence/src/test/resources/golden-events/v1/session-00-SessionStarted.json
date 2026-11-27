@@ -1,0 +1,134 @@
+{
+  "SessionStarted" : {
+    "gameId" : "00000000-0000-0000-0000-000000000001",
+    "settings" : {
+      "finalWeek" : 12,
+      "demand" : {
+        "values" : [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "costPolicy" : {
+        "holding" : 50,
+        "backlog" : 100
+      },
+      "commitMode" : "Manual",
+      "initial" : {
+        "inventory" : {
+          "factory" : 12,
+          "distributor" : 12,
+          "wholesaler" : 12,
+          "retailer" : 12
+        },
+        "flow" : 4
+      },
+      "delays" : {
+        "order" : {
+          "weeks" : 2
+        },
+        "shipment" : {
+          "weeks" : 2
+        },
+        "production" : {
+          "weeks" : 2
+        }
+      },
+      "disclosure" : "TeamTotal"
+    },
+    "assignments" : {
+      "factory" : [
+        "00000000-0000-0000-0000-000000000101"
+      ],
+      "distributor" : [
+        "00000000-0000-0000-0000-000000000102"
+      ],
+      "wholesaler" : [
+        "00000000-0000-0000-0000-000000000103"
+      ],
+      "retailer" : [
+        "00000000-0000-0000-0000-000000000104"
+      ]
+    },
+    "initialStates" : {
+      "factory" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 0,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "distributor" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 0,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "wholesaler" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 0,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "retailer" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 0,
+        "arrivals" : 4,
+        "orders" : 4
+      }
+    },
+    "commitMode" : "Manual"
+  }
+}

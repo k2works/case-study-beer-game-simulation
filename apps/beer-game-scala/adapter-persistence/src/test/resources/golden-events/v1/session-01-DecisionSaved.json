@@ -1,0 +1,14 @@
+{
+  "DecisionSaved" : {
+    "week" : 1,
+    "role" : "Retailer",
+    "quantity" : 4,
+    "decisionVersion" : 1,
+    "editor" : {
+      "ByParticipant" : {
+        "id" : "00000000-0000-0000-0000-000000000101"
+      }
+    },
+    "submittedRoleCount" : 1
+  }
+}

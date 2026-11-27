@@ -32,8 +32,13 @@ enum AppFailure:
   /** 想定外の失敗（500 と相関 ID）。 */
   case Persistence(message: String)
 
-/** [[occurredAt]] は、[[events]] と同じ順の、追記の時刻。 */
-final case class StreamRead[E](events: List[E], version: StreamVersion, occurredAt: List[Instant])
+/** [[occurredAt]]・[[streamVersions]] は、[[events]] と同じ順の、追記の時刻とストリームの版。 */
+final case class StreamRead[E](
+    events: List[E],
+    version: StreamVersion,
+    occurredAt: List[Instant],
+    streamVersions: List[Long]
+)
 
 /** 1 本のイベントのストリーム（`game` または `session`）。実装は adapter-persistence。 `append` は、期待する版（読んだ時点の版）が現在の版と違えば
   * `Left(ConcurrencyConflict)` を返す（楽観的並行制御）。

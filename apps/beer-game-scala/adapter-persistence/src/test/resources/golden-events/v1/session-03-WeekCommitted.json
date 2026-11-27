@@ -1,0 +1,120 @@
+{
+  "WeekCommitted" : {
+    "week" : 1,
+    "commitKind" : "Manual",
+    "decisions" : {
+      "factory" : 4,
+      "distributor" : 4,
+      "wholesaler" : 4,
+      "retailer" : 4
+    },
+    "results" : {
+      "factory" : {
+        "orders" : 4,
+        "shipped" : 4,
+        "ordered" : 4,
+        "endingInventory" : 12,
+        "endingBacklog" : 0,
+        "weeklyCost" : 600,
+        "cumulativeCost" : 600
+      },
+      "distributor" : {
+        "orders" : 4,
+        "shipped" : 4,
+        "ordered" : 4,
+        "endingInventory" : 12,
+        "endingBacklog" : 0,
+        "weeklyCost" : 600,
+        "cumulativeCost" : 600
+      },
+      "wholesaler" : {
+        "orders" : 4,
+        "shipped" : 4,
+        "ordered" : 4,
+        "endingInventory" : 12,
+        "endingBacklog" : 0,
+        "weeklyCost" : 600,
+        "cumulativeCost" : 600
+      },
+      "retailer" : {
+        "orders" : 4,
+        "shipped" : 4,
+        "ordered" : 4,
+        "endingInventory" : 12,
+        "endingBacklog" : 0,
+        "weeklyCost" : 600,
+        "cumulativeCost" : 600
+      }
+    },
+    "nextStates" : {
+      "factory" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 600,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "distributor" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 600,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "wholesaler" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 600,
+        "arrivals" : 4,
+        "orders" : 4
+      },
+      "retailer" : {
+        "inventory" : 12,
+        "backlog" : 0,
+        "orderPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "deliveryPipeline" : {
+          "weeks" : [
+            4
+          ]
+        },
+        "cumulativeCost" : 600,
+        "arrivals" : 4,
+        "orders" : 4
+      }
+    },
+    "contributors" : 4
+  }
+}

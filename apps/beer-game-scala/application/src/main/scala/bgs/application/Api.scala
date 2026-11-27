@@ -54,6 +54,8 @@ final case class PeripheralStore(
     recordRetentionFailure: (GameId, Int, Option[Instant], String, Boolean) => ConnectionIO[Unit],
     /** ゲームの全データを削除し、受領記録（ゲームの ID を含まない）を足す。 */
     deleteGame: (GameId, Instant) => ConnectionIO[Unit],
+    /** すべてのゲーム（整合の検査用。読み取りだけ）。 */
+    allGames: ConnectionIO[List[GameId]],
     /** 観察用の招待コードのダイジェストを登録する（ゲーム、招待の ID）。 */
     registerInvitation: (String, GameId, InvitationId) => ConnectionIO[Unit],
     /** 招待コードのダイジェストから、ゲームと招待の ID。 */

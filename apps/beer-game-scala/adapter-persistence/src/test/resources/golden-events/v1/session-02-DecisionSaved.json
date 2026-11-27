@@ -1,0 +1,14 @@
+{
+  "DecisionSaved" : {
+    "week" : 1,
+    "role" : "Factory",
+    "quantity" : 6,
+    "decisionVersion" : 1,
+    "editor" : {
+      "ByFacilitator" : {
+        "gameId" : "00000000-0000-0000-0000-000000000001"
+      }
+    },
+    "submittedRoleCount" : 2
+  }
+}

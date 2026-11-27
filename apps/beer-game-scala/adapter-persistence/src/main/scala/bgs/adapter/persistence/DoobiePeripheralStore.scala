@@ -135,6 +135,10 @@ object DoobiePeripheralStore:
               where game_id = ${gameId.value}""".update.run.void
       ,
       deleteGame = (gameId, now) => deleteAll(gameId, now),
+      allGames = sql"select game_id from game_roots order by created_at"
+        .query[UUID]
+        .to[List]
+        .map(_.map(GameId(_))),
       registerInvitation = (codeDigest, gameId, invitationId) =>
         sql"""insert into observer_invitations (code_digest, game_id, invitation_id)
               values ($codeDigest, ${gameId.value}, ${invitationId.value})""".update.run.void,

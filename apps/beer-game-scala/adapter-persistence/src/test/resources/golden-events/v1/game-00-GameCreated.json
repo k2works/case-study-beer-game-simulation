@@ -1,0 +1,53 @@
+{
+  "GameCreated" : {
+    "gameId" : "00000000-0000-0000-0000-000000000001",
+    "joinCode" : "ABCD2345",
+    "settings" : {
+      "finalWeek" : 12,
+      "demand" : {
+        "values" : [
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4,
+          4
+        ]
+      },
+      "costPolicy" : {
+        "holding" : 50,
+        "backlog" : 100
+      },
+      "commitMode" : "Manual",
+      "initial" : {
+        "inventory" : {
+          "factory" : 12,
+          "distributor" : 12,
+          "wholesaler" : 12,
+          "retailer" : 12
+        },
+        "flow" : 4
+      },
+      "delays" : {
+        "order" : {
+          "weeks" : 2
+        },
+        "shipment" : {
+          "weeks" : 2
+        },
+        "production" : {
+          "weeks" : 2
+        }
+      },
+      "disclosure" : "TeamTotal"
+    },
+    "retentionDays" : 30,
+    "facilitatorCredentialExpiresAt" : "2026-12-02T00:00:00Z"
+  }
+}

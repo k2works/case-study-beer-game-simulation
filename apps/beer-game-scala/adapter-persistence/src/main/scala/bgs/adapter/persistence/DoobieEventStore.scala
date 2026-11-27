@@ -7,7 +7,6 @@ import cats.syntax.all.*
 import doobie.*
 import doobie.implicits.*
 import doobie.postgres.implicits.*
-import io.circe.parser.decode
 import io.circe.syntax.*
 import io.circe.{Decoder, Encoder}
 
@@ -44,19 +43,23 @@ object DoobieEventStore:
       .unique
 
   private def read[E: Decoder](stream: String, gameId: GameId): ConnectionIO[StreamRead[E]] =
-    sql"""select stream_version, payload, occurred_at from events
+    sql"""select stream_version, schema_version, event_type, payload, occurred_at from events
           where game_id = ${gameId.value} and stream_type = $stream order by stream_version"""
-      .query[(Long, String, Instant)]
+      .query[(Long, Int, String, String, Instant)]
       .to[List]
       .flatMap { rows =>
-        rows.traverse((_, payload, _) =>
-          decode[E](payload).leftMap(e => new IllegalStateException(e.getMessage))
+        rows.traverse((_, schemaVersion, eventType, payload, _) =>
+          Upcasters
+            .upcast(eventType, schemaVersion, payload)
+            .flatMap(json => json.as[E].leftMap(_.getMessage))
+            .leftMap(message => new IllegalStateException(message))
         ) match
           case Right(events) =>
             StreamRead(
               events,
               StreamVersion.of(rows.lastOption.fold(0L)(_._1)),
-              rows.map(_._3)
+              rows.map(_._5),
+              rows.map(_._1)
             ).pure[ConnectionIO]
           case Left(error) => FC.raiseError[StreamRead[E]](error)
       }
