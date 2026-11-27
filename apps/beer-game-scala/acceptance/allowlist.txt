@@ -37,3 +37,7 @@ review/retrospective.feature
 observation/observer-invitation.feature
 observation/observation.feature
 observation/observation-disclosure.feature
+
+# B10: 出力（AC4.3.*）
+export/export.feature
+export/export-custom.feature

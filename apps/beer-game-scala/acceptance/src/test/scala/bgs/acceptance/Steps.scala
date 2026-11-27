@@ -2228,3 +2228,179 @@ class Steps extends ScalaDsl with EN:
   }
 
   When("""^観察者が振り返りを取得(?:する|しようとする)$""") { () => world.last = reviewAs(observerCookie) }
+
+  // ---- 結果の出力（B10: AC4.3.*） ----
+
+  private var csvReply: Reply = world.last
+  private var jsonReply: Reply = world.last
+
+  private def exportWith(cookie: Option[String], format: Option[String]): Reply =
+    world.game.get(
+      gamePath(world.game, "/exports" + format.fold("")(f => s"?format=$f")),
+      cookie
+    )
+
+  When("""^進行役が結果を CSV で出力(?:する|しようとする)$""") { () =>
+    csvReply = exportWith(world.game.facilitator, Some("csv"))
+    world.last = csvReply
+  }
+
+  When("""^進行役が結果を JSON で(?:も)?出力する$""") { () =>
+    jsonReply = exportWith(world.game.facilitator, Some("json"))
+    world.last = jsonReply
+  }
+
+  When("""^(.+)の参加者が結果を CSV で出力しようとする$""") { (label: String) =>
+    world.last = exportWith(world.game.players.get(role(label)), Some("csv"))
+  }
+
+  When("""^資格の無い人が結果を CSV で出力しようとする$""") { () =>
+    world.last = exportWith(None, Some("csv"))
+  }
+
+  When("""^進行役が、形式を指定せずに結果を出力しようとする$""") { () =>
+    world.last = exportWith(world.game.facilitator, None)
+  }
+
+  When("""^進行役が、形式「(.+)」で結果を出力しようとする$""") { (format: String) =>
+    world.last = exportWith(world.game.facilitator, Some(format))
+  }
+
+  private def requireDownload(reply: Reply, mediaType: String): Unit =
+    require(reply.status == 200, s"出力できない: ${reply.status} ${reply.text}")
+    require(
+      reply.header("Content-Type").exists(_.startsWith(mediaType)),
+      s"種別が違う: ${reply.header("Content-Type")}"
+    )
+    require(
+      reply
+        .header("Content-Disposition")
+        .exists(h => h.startsWith("attachment") && h.contains("filename=")),
+      "ダウンロードの名前が無い"
+    )
+
+  Then("""^出力は CSV として返り、ダウンロードの名前が付く$""") { () => requireDownload(csvReply, "text/csv") }
+
+  Then("""^出力は JSON として返り、ダウンロードの名前が付く$""") { () =>
+    requireDownload(jsonReply, "application/json")
+  }
+
+  private def csvRecords(reply: Reply): List[Map[String, String]] =
+    val lines = reply.body.split("\r\n").toList
+    val header = lines.headOption.getOrElse("").split(",").toList
+    lines.drop(1).map(l => header.zip(l.split(",", -1).toList).toMap)
+
+  private def jsonRecords(reply: Reply): List[io.circe.ACursor] =
+    reply.json.hcursor.downField("records").values.map(_.toList.map(_.hcursor)).getOrElse(Nil)
+
+  Then("""^CSV に、設定の種別「(キット準拠|カスタム)」と、(\d+) 役割のそれぞれについて (\d+) 週分の受注・出荷・発注・在庫・受注残・費用が含まれる$""") {
+    (kind: String, roles: Int, weeks: Int) =>
+      val rows = csvRecords(csvReply)
+      require(rows.size == roles * weeks, s"行数が違う: ${rows.size}")
+      require(
+        rows.forall(_.get("settings_kind").contains(if kind == "カスタム" then "CUSTOM" else "KIT")),
+        "種別が違う"
+      )
+      allRoles.foreach { apiRole =>
+        require(rows.count(_.get("role").contains(apiRole)) == weeks, s"$apiRole の週数が違う")
+      }
+      List(
+        "orders",
+        "shipped",
+        "ordered",
+        "ending_inventory",
+        "ending_backlog",
+        "weekly_cost_minor"
+      ).foreach(k => require(rows.forall(_.get(k).exists(_.nonEmpty)), s"$k が無い"))
+  }
+
+  Then("""^JSON に、設定の種別「(キット準拠|カスタム)」と、(\d+) 役割のそれぞれについて (\d+) 週分の受注・出荷・発注・在庫・受注残・費用が含まれる$""") {
+    (kind: String, roles: Int, weeks: Int) =>
+      val rows = jsonRecords(jsonReply)
+      require(rows.size == roles * weeks, s"行数が違う: ${rows.size}")
+      require(
+        jsonReply.json.hcursor
+          .downField("settings")
+          .get[String]("kind")
+          .contains(if kind == "カスタム" then "CUSTOM" else "KIT"),
+        "種別が違う"
+      )
+      List("orders", "shipped", "ordered", "endingInventory", "endingBacklog", "weeklyCostMinor")
+        .foreach(k => require(rows.forall(_.downField(k).focus.isDefined), s"$k が無い"))
+  }
+
+  Then("""^2 つの形式の数量と費用が、週と役割ごとにすべて一致する$""") { () =>
+    val csv = csvRecords(csvReply)
+    val json = jsonRecords(jsonReply)
+    require(csv.size == json.size && csv.nonEmpty, "件数が違う")
+    csv.zip(json).foreach { (c, j) =>
+      require(c.get("week") == j.get[Int]("week").toOption.map(_.toString), "週が違う")
+      require(c.get("role") == j.get[String]("role").toOption, "役割が違う")
+      List(
+        "orders" -> "orders",
+        "shipped" -> "shipped",
+        "ordered" -> "ordered",
+        "ending_inventory" -> "endingInventory",
+        "ending_backlog" -> "endingBacklog",
+        "weekly_cost_minor" -> "weeklyCostMinor",
+        "cumulative_cost_minor" -> "cumulativeCostMinor"
+      ).foreach((cn, jn) =>
+        require(c.get(cn) == j.get[Long](jn).toOption.map(_.toString), s"$cn が一致しない")
+      )
+    }
+  }
+
+  Then("""^2 つの形式に、同じスキーマ版が記録される$""") { () =>
+    val csvVersions = csvRecords(csvReply).flatMap(_.get("schema_version")).distinct
+    val jsonVersion = jsonReply.json.hcursor.get[String]("schemaVersion").toOption
+    require(
+      csvVersions.size == 1 && jsonVersion.contains(csvVersions.headOption.getOrElse("")),
+      "スキーマ版が違う"
+    )
+    require(csvReply.header("X-Export-Schema-Version") == jsonVersion, "ヘッダーのスキーマ版が違う")
+  }
+
+  Then("""^出力の本文の SHA-256 が、チェックサムのヘッダーと一致する$""") { () =>
+    List(csvReply, jsonReply).foreach { reply =>
+      val digest = java.security.MessageDigest
+        .getInstance("SHA-256")
+        .digest(reply.body.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+        .map(b => f"${b & 0xff}%02x")
+        .mkString
+      require(reply.header("X-Export-Checksum").contains(s"sha256-$digest"), "チェックサムが違う")
+    }
+  }
+
+  Then("""^出力に、参加者の表示名と参加コードは含まれない$""") { () =>
+    val bodies = csvReply.body + jsonReply.body
+    world.game.participants.keys.foreach(name =>
+      require(!bodies.contains(name), s"表示名 $name が含まれる")
+    )
+    require(!bodies.contains(joinCodeOf(world.game)), "参加コードが含まれる")
+  }
+
+  Then("""^出力の本文は返らない$""") { () =>
+    require(world.last.status >= 400, s"出力された: ${world.last.status}")
+    require(
+      !world.last.body.contains("schema_version") && !world.last.body.contains("schemaVersion"),
+      "本文が返った"
+    )
+  }
+
+  Then("""^形式の誤りとして拒否される$""") { () =>
+    require(world.last.status == 422, s"422 でない: ${world.last.status}")
+    require(errorsOf(world.last).exists(_.get[String]("field").contains("format")), "format の誤りでない")
+  }
+
+  Then("""^JSON に、設定の種別「(カスタム)」と、変更した項目(「.+」)が含まれる$""") { (_: String, items: String) =>
+    val settings = jsonReply.json.hcursor.downField("settings")
+    require(settings.get[String]("kind").contains("CUSTOM"), "種別が違う")
+    require(
+      settings
+        .get[List[String]]("changes")
+        .contains(
+          items.split("」「").toList.map(_.stripPrefix("「").stripSuffix("」")).map(fieldLabels)
+        ),
+      s"変更した項目が違う: ${settings.focus}"
+    )
+  }

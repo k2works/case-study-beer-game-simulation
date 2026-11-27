@@ -1311,3 +1311,104 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(stillObserving.status, 200)
     }
   }
+
+  test("[AC4.3.*] 出力は、進行役だけ・終了後だけ。CSV・JSON のヘッダー（名前・チェックサム・スキーマ版）。形式の誤りは 422") {
+    freshApp.flatMap { app =>
+      for
+        created <- createWith(app, kitBody(1))
+        facilitator = created.cookie.getOrElse(fail("Cookie が無い"))
+        gameId = created.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(facilitator))
+        code = state.str("joinCode").getOrElse(fail("joinCode"))
+        players <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            )
+              .map(_ => role -> cookie)
+          }
+        }
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        early <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/exports?format=csv",
+          cookie = Some(facilitator)
+        )
+        _ <- players.traverse { (_, cookie) =>
+          put(
+            app,
+            sessionPath(gameId, "/decisions"),
+            Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+            Some(cookie)
+          )
+        }
+        _ <- post(
+          app,
+          sessionPath(gameId, "/weeks/1/commit"),
+          Json.obj(
+            "requestedWeek" -> Json.fromInt(1),
+            "basis" -> Json.fromFields(roles.map(_ -> Json.fromLong(1L)))
+          ),
+          Some(facilitator)
+        )
+        csv <- app.run(
+          Request[IO](Method.GET, Uri.unsafeFromString(s"/api/v1/games/$gameId/exports?format=csv"))
+            .putHeaders(Header.Raw(CIString("Cookie"), facilitator))
+        )
+        csvBody <- csv.bodyText.compile.string
+        json <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/exports?format=json",
+          cookie = Some(facilitator)
+        )
+        noFormat <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/exports",
+          cookie = Some(facilitator)
+        )
+        unknown <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/exports?format=xml",
+          cookie = Some(facilitator)
+        )
+        byPlayer <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/exports?format=csv",
+          cookie = players.headOption.map(_._2)
+        )
+        anonymous <- call(app, Method.GET, s"/api/v1/games/$gameId/exports?format=csv")
+      yield
+        assertEquals((early.status, early.code), (409, Some("game.not_ended")))
+        assertEquals(csv.status.code, 200)
+        def header(r: Response[IO], n: String) =
+          r.headers.get(CIString(n)).flatMap(_.toList.headOption).map(_.value)
+        assert(header(csv, "Content-Disposition").exists(_.contains(s"beer-game-$gameId.csv")))
+        assertEquals(
+          header(csv, "X-Export-Checksum"),
+          Some(bgs.adapter.http.ExportBuilder.checksum(csvBody))
+        )
+        assertEquals(
+          header(csv, "X-Export-Schema-Version"),
+          Some(bgs.adapter.http.ExportBuilder.SchemaVersion)
+        )
+        assert(csvBody.startsWith("schema_version,game_id"))
+        assertEquals(json.status, 200)
+        assertEquals(json.str("schemaVersion"), Some(bgs.adapter.http.ExportBuilder.SchemaVersion))
+        assertEquals(noFormat.status, 422)
+        assertEquals(unknown.status, 422)
+        assertEquals(byPlayer.status, 403)
+        assertEquals(anonymous.status, 403)
+    }
+  }

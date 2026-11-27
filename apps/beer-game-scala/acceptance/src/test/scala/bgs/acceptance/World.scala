@@ -15,7 +15,7 @@ import org.typelevel.ci.CIString
 import java.util.UUID
 
 /** HTTP の応答。 */
-final case class Reply(status: Int, json: Json, headers: Headers):
+final case class Reply(status: Int, json: Json, headers: Headers, body: String):
   def cookie: Option[String] =
     headers
       .get(CIString("Set-Cookie"))
@@ -33,7 +33,9 @@ final case class Reply(status: Int, json: Json, headers: Headers):
   def location: Option[String] =
     headers.get(CIString("Location")).flatMap(_.toList.headOption).map(_.value)
   def code: Option[String] = json.hcursor.get[String]("code").toOption
-  def text: String = json.noSpaces
+  def header(name: String): Option[String] =
+    headers.get(CIString(name)).flatMap(_.toList.headOption).map(_.value)
+  def text: String = if json == Json.Null then body else json.noSpaces
 
 /** 1 つのゲームの操作の入口（進行役の資格と参加者の資格を持つ）。 */
 final class GameClient(
@@ -81,7 +83,7 @@ final class GameClient(
       .run(withKey)
       .flatMap { response =>
         response.bodyText.compile.string.map { text =>
-          Reply(response.status.code, parse(text).getOrElse(Json.Null), response.headers)
+          Reply(response.status.code, parse(text).getOrElse(Json.Null), response.headers, text)
         }
       }
       .unsafeRunSync()
@@ -111,7 +113,7 @@ object GameClient:
 /** シナリオごとの状態。シナリオが終わると、新しいインスタンスに替わる。 */
 final class World:
   var games: List[GameClient] = Nil
-  var last: Reply = Reply(0, Json.Null, Headers.empty)
+  var last: Reply = Reply(0, Json.Null, Headers.empty, "")
   var lastRole: String = ""
 
   def game: GameClient = games.headOption.getOrElse(sys.error("ゲームが作られていない"))

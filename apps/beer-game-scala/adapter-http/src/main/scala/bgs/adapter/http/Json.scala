@@ -41,11 +41,11 @@ object JsonViews:
     case GameStatus.Paused    => "STARTED"
     case GameStatus.Ended     => "ENDED"
 
-  private def kindName(kind: SettingsKind): String = kind match
+  def kindName(kind: SettingsKind): String = kind match
     case SettingsKind.Kit    => "KIT"
     case SettingsKind.Custom => "CUSTOM"
 
-  private def fieldName(field: SettingsField): Json = Json.fromString(field match
+  def fieldName(field: SettingsField): Json = Json.fromString(field match
     case SettingsField.InitialInventory => "INITIAL_INVENTORY"
     case SettingsField.InitialFlow      => "INITIAL_FLOW"
     case SettingsField.OrderDelay       => "ORDER_DELAY"
@@ -55,7 +55,7 @@ object JsonViews:
     case SettingsField.BacklogCost      => "BACKLOG_COST"
     case SettingsField.Disclosure       => "DISCLOSURE")
 
-  private def commitModeName(mode: CommitMode): String = mode match
+  def commitModeName(mode: CommitMode): String = mode match
     case CommitMode.Manual => "MANUAL"
     case CommitMode.Auto   => "AUTO"
 

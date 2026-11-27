@@ -996,6 +996,12 @@ object Api:
             )
           case _ => Left(AppFailure.Domain(GameError.NotEnded))
 
+  /** 結果の出力の元になる記録。**進行役だけ**（参加者・観察者・資格なしは、区別しない 403）。終了前は開示しない（AC4.3.1）。 */
+  def exportView(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, ReviewView]] =
+    caller match
+      case Caller.Facilitator(g) if g == gameId => reviewView(env)(caller, gameId)
+      case _                                    => IO.pure(Left(AppFailure.Unauthorized))
+
   /** 当週の、役割ごとの最後の保存の時刻（追記の時刻。確定で空に戻る）。 */
   private def savedTimes(read: StreamRead[SessionEvent]): Map[Role, Instant] =
     read.events.zip(read.occurredAt).foldLeft(Map.empty[Role, Instant]) {

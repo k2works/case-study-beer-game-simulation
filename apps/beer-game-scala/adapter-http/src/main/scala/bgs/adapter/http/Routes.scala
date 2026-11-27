@@ -92,6 +92,30 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
     )
     outcome.cookies.foldLeft(withRetry)((response, cookie) => response.addCookie(cookie))
 
+  /** 出力の応答（ダウンロード）。本文は全体を組み立ててから 1 回で返す。チェックサムとスキーマ版をヘッダーに付ける。 */
+  private def exportResponse(
+      ctx: Ctx,
+      gameId: GameId,
+      extension: String,
+      contentType: String,
+      body: String
+  ): Response[IO] =
+    Response[IO](Status.Ok)
+      .withEntity(body)
+      .withContentType(`Content-Type`(MediaType.unsafeParse(contentType.takeWhile(_ != ';'))))
+      .putHeaders(
+        Header.Raw(CIString("Content-Type"), contentType),
+        Header.Raw(
+          CIString("Content-Disposition"),
+          s"""attachment; filename="beer-game-${gameId.value}.$extension""""
+        ),
+        Header.Raw(CIString("X-Export-Checksum"), ExportBuilder.checksum(body)),
+        Header.Raw(CIString("X-Export-Schema-Version"), ExportBuilder.SchemaVersion),
+        Header.Raw(CIString("x-correlation-id"), ctx.correlation),
+        Header.Raw(CIString("X-Content-Type-Options"), "nosniff"),
+        Header.Raw(CIString("Cache-Control"), "no-store")
+      )
+
   private def ok(payload: Json): Outcome =
     Outcome(Status.Ok, payload, None, Nil, None, problem = false)
 
@@ -600,6 +624,38 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
               .reviewView(env)(ctx.caller, GameId(gameUuid))
               .map(_.fold(failureOutcome(_, ctx.correlation), v => ok(JsonViews.review(v))))
           )
+        }
+
+      case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "exports" =>
+        context(req).flatMap { ctx =>
+          val gameId = GameId(gameUuid)
+          // 判定順: 認可（進行役だけ）→ 形式 → 終了後だけ。組み立てられなければ本文は返さない
+          Api.exportView(env)(ctx.caller, gameId).map {
+            case Left(failure) => render(failureOutcome(failure, ctx.correlation), ctx.correlation)
+            case Right(view)   =>
+              req.params.get("format") match
+                case Some("csv") =>
+                  exportResponse(
+                    ctx,
+                    gameId,
+                    "csv",
+                    "text/csv; charset=UTF-8",
+                    ExportBuilder.csv(view)
+                  )
+                case Some("json") =>
+                  exportResponse(
+                    ctx,
+                    gameId,
+                    "json",
+                    "application/json",
+                    ExportBuilder.json(view).noSpaces
+                  )
+                case _ =>
+                  render(
+                    shapeError(ctx.correlation, "format", "format は csv か json で指定してください。"),
+                    ctx.correlation
+                  )
+          }
         }
 
       case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "observation" =>
