@@ -1,0 +1,60 @@
+# beer-game-scala の開発環境タスク。`just` で一覧を表示する。
+# 実行は apps/beer-game-scala で行う（リポジトリのルートからは `just -f apps/beer-game-scala/justfile <タスク>`）。
+
+# 開発用のポート。vite.config.ts の既定（UI 5173、API 3000）と合わせる。
+# 専用のポートで動かすときは環境変数で上書きする（例: API_PORT=3100 UI_PORT=5273 just dev）。
+api_port := env("API_PORT", "3000")
+ui_port := env("UI_PORT", "5173")
+
+default:
+    @just --list
+
+# ---- バックエンド（Scala / http4s）----
+
+# バックエンドを起動する（ローカル用の H2（メモリ）。DB 不要）
+backend:
+    PORT={{ api_port }} sbt "app/runMain bgs.app.Main"
+
+# バックエンドのテスト（PostgreSQL の統合テストは Docker を使う。除くときは BGS_SKIP_INTEGRATION=1）
+backend-test:
+    sbt test
+
+# バックエンドの全検査（整形・静的解析・テスト・fixture・層の依存・秘密情報）。CI の check ジョブと同じ
+backend-check:
+    ./scripts/check.sh
+
+# 整形を直す（Scalafmt）
+backend-fmt:
+    sbt scalafmtAll scalafmtSbt
+
+# 行カバレッジのゲート（全体 80%・domain 90%・application 85%。CI と同じ）
+backend-coverage:
+    ./scripts/coverage.sh 80 domain=90 application=85
+
+# 共有の Gherkin（許可リスト）の受け入れテスト（in-process・H2）
+backend-acceptance:
+    ./scripts/acceptance.sh
+
+# 共有 Web の画面の受け入れ（@ui。専用ポート API 3100・UI 5273。人の開発サーバーは止めない）
+backend-ui-acceptance:
+    ./scripts/ui-acceptance.sh
+
+# ---- フロントエンド（React + Vite。共有の apps/beer-game-web）----
+
+# フロントエンドの依存を入れる
+web-install:
+    cd ../beer-game-web && npm ci
+
+# フロントエンドの開発サーバーを起動する（/api は API_PORT へ中継）
+web:
+    cd ../beer-game-web && UI_PORT={{ ui_port }} API_PORT={{ api_port }} npm run dev
+
+# フロントエンドの検証（format・lint・typecheck・test・build）
+web-verify:
+    cd ../beer-game-web && npm run verify
+
+# ---- 両方 ----
+
+# バックエンドとフロントエンドを同時に起動する（Ctrl-C で両方止まる）
+dev:
+    bash -c "trap 'kill 0' EXIT; just backend & just web & wait"
