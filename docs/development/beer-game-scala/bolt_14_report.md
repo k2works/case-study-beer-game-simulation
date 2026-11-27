@@ -29,7 +29,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-27T12:00:00Z }
 | アラームの表と Terraform の一致 | 達成 | `AlarmTerraformSpec`（閾値・期間・評価の回数・重大度・指標を検査。**Terraform の閾値を壊すと落ちることを確認**） |
 | 運用手順書 | 達成（定義のみ） | `docs/operation/beer-game-scala/`（デプロイ・本番・ロールバック・復元・観測）、`scripts/restore-pitr.sh`（既定はドライラン） |
 | RPO・RTO の机上の確認 | 実施（机上） | 復元の手順書。**訓練は未実施。値は未確認** |
-| CI 緑 | push 後に記録 | |
+| CI 緑 | 確認済み | B14 のコミット `d14e560f` で 3 ジョブ緑（B11〜B14 を含む） |
 
 ## 新しい依存関係・設計判断（**未承認。人の判断が要る**）
 

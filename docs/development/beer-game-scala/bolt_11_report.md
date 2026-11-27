@@ -27,7 +27,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-27T13:00:00Z }
 | AC5.1.4（削除後に `game_id` を持つ全表に行が残らない） | 達成 | `information_schema` で `game_id` の列を持つ表を列挙して検査（表を足すと検査に入る） |
 | AC5.1.5（バックアップに残る期間 7 日を示す） | 達成 | 保持状態の `backupRetentionDays` |
 | 画面（`retention-ui.feature`） | 達成 | Scala のバックエンドで緑（既定の画面受け入れに追加） |
-| CI 緑 | push 後に記録 | |
+| CI 緑 | 確認済み | B14 のコミット `d14e560f` で 3 ジョブ緑（B11〜B14 を含む） |
 
 行カバレッジ: 全体 90.4%、domain 97.7%、application 92.0%。PostgreSQL 18 で V007 が適用できることを確認した。
 
