@@ -2648,7 +2648,7 @@ class Steps extends ScalaDsl with EN:
       .filter(_.operationId == operationId)
       .lastOption
       .getOrElse(sys.error(s"$operationId の記録が無い"))
-    bgs.adapter.http.Emf.line(record, java.time.Instant.now)
+    bgs.adapter.http.Emf.line(record, java.time.Instant.now, "local")
 
   Then("""^操作「(.+)」の応答時間と要求数のメトリクスが EMF の行として出力される$""") { (operation: String) =>
     val c = emfOf(operation).hcursor

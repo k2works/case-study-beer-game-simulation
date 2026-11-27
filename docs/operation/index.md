@@ -9,6 +9,7 @@
 | [beer-game](./beer-game/index.md) | 改訂版ビールゲームを再現し、サプライチェーンの動的挙動を学習するシミュレーション | 未着手 |
 | [beer-game-ts](./beer-game-ts/index.md) | beer-game の知見をもとに、要件と設計を改訂して作り直す v2。共同担当、カスタム条件、観察者、自動確定を含む | 未着手 |
 | [beer-game-kotlin](./beer-game-kotlin/index.md) | beer-game-kotlin の運用手順（デプロイ・ロールバック・スモークテスト。AWS には未適用） | 未着手 |
+| [beer-game-scala](./beer-game-scala/index.md) | beer-game-kotlin の Scala 版の運用手順（デプロイ・本番・復元・ロールバック・観測。AWS には未適用） | 定義のみ |
 | [beer-game-rust](./beer-game-rust/index.md) | beer-game-kotlin の Rust 版。axum + sqlx、ES + CQRS | 未着手 |
 
 ## 共通の運用コマンド

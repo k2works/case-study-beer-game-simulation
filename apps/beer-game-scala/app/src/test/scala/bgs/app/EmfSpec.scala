@@ -32,7 +32,11 @@ class EmfSpec extends FunSuite:
 
   test("[AC6.1.3] EMF の行は、応答時間・要求数・5xx のエラー率を、操作ごとに持つ") {
     val line =
-      Emf.line(LogRecord("c-1", "GET /api/v1/games/{id}/state", 200, 12L, "getGameState"), at)
+      Emf.line(
+        LogRecord("c-1", "GET /api/v1/games/{id}/state", 200, 12L, "getGameState"),
+        at,
+        "test"
+      )
     val c = line.hcursor
     assertEquals(c.get[String]("Operation").toOption, Some("getGameState"))
     assertEquals(c.get[Long]("ResponseTime").toOption, Some(12L))
@@ -50,10 +54,40 @@ class EmfSpec extends FunSuite:
     assertEquals(c.downField("_aws").get[Long]("Timestamp").toOption, Some(at.toEpochMilli))
   }
 
+  test("[AC6.1.3] EMF の次元は、環境と操作（と、環境だけの合計）。環境の値が行に入る") {
+    val line = Emf.line(LogRecord("c", "GET /api/v1/ready", 200, 5, "getReady"), at, "production")
+    assertEquals(line.hcursor.get[String]("Environment").toOption, Some("production"))
+    val dims = line.hcursor
+      .downField("_aws")
+      .downField("CloudWatchMetrics")
+      .downArray
+      .downField("Dimensions")
+    assertEquals(
+      dims.as[List[List[String]]].toOption,
+      Some(List(List("Environment", "Operation"), List("Environment")))
+    )
+  }
+
+  test("[B13] 定期のタスクの結果の指標は、環境だけの次元の EMF の行") {
+    val line = Emf.gauge("RetentionAbandonedGames", 2L, at, "production")
+    assertEquals(line.hcursor.get[Long]("RetentionAbandonedGames").toOption, Some(2L))
+    assertEquals(line.hcursor.get[String]("Environment").toOption, Some("production"))
+    assertEquals(
+      line.hcursor
+        .downField("_aws")
+        .downField("CloudWatchMetrics")
+        .downArray
+        .downField("Dimensions")
+        .as[List[List[String]]]
+        .toOption,
+      Some(List(List("Environment")))
+    )
+  }
+
   test("[AC6.1.3] 5xx は、エラー率 1 として出る。4xx は 0") {
     assertEquals(
       Emf
-        .line(LogRecord("c", "GET /api/v1/ready", 503, 5, "getReady"), at)
+        .line(LogRecord("c", "GET /api/v1/ready", 503, 5, "getReady"), at, "test")
         .hcursor
         .get[Int]("Http5xxRate")
         .toOption,
@@ -61,7 +95,7 @@ class EmfSpec extends FunSuite:
     )
     assertEquals(
       Emf
-        .line(LogRecord("c", "GET /api/v1/games/{id}/state", 403, 5, "getGameState"), at)
+        .line(LogRecord("c", "GET /api/v1/games/{id}/state", 403, 5, "getGameState"), at, "test")
         .hcursor
         .get[Int]("Http5xxRate")
         .toOption,
@@ -70,7 +104,8 @@ class EmfSpec extends FunSuite:
   }
 
   test("[AC6.1.3] EMF の行に、相関 ID・資格・表示名の項目は含まれない") {
-    val text = Emf.line(LogRecord("secret-correlation", "GET /x", 200, 1, "getHealth"), at).noSpaces
+    val text =
+      Emf.line(LogRecord("secret-correlation", "GET /x", 200, 1, "getHealth"), at, "test").noSpaces
     assert(!text.contains("secret-correlation"))
     List("token", "cookie", "displayName", "joinCode").foreach(k =>
       assert(!text.toLowerCase.contains(k.toLowerCase), k)

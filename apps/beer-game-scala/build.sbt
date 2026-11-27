@@ -28,6 +28,8 @@ val strictWarts = Seq(
 )
 
 lazy val commonSettings = Seq(
+  // 依存するプロジェクトも JAR としてクラスパスに載せる（コンテナの配布物 `dist` が、JAR だけを集めるため。B14）
+  exportJars := true,
   scalacOptions ++= Seq(
     "-deprecation",
     "-feature",
@@ -121,7 +123,23 @@ lazy val app = (project in file("app"))
   .dependsOn(adapterHttp, adapterPersistence, domain % "test->test")
   .settings(commonSettings)
   .settings(
-    libraryDependencies += "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test
+    libraryDependencies ++= Seq(
+      // 本番の PostgreSQL の接続プール（B14）。新しい依存関係（未承認。報告に記録）
+      "org.tpolecat" %% "doobie-hikari" % doobieVersion,
+      "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test
+    )
+  )
+  // コンテナの配布物（B14）: 依存の JAR をすべて target/dist/lib に集める（新しいプラグインを足さない）
+  .settings(
+    TaskKey[Unit]("dist") := {
+      val libDir = target.value / "dist" / "lib"
+      IO.delete(libDir)
+      IO.createDirectory(libDir)
+      val jars = (Runtime / fullClasspath).value
+        .map(_.data)
+        .filter(f => f.isFile && f.getName.endsWith(".jar"))
+      jars.foreach(jar => IO.copyFile(jar, libDir / jar.getName))
+    }
   )
 
 lazy val acceptance = (project in file("acceptance"))

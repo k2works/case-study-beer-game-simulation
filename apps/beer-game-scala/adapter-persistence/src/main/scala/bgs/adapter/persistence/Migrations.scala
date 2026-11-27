@@ -16,6 +16,17 @@ object Migrations:
         .migrate()
     }.void
 
+  /** 本番の PostgreSQL へ、共通の DDL と PostgreSQL 専用（ロールと権限）の両方を適用する（`migrate` モード。B14）。 */
+  def migratePostgres(url: String, user: String, password: String): IO[Unit] =
+    IO.blocking {
+      Flyway
+        .configure()
+        .dataSource(url, user, password)
+        .locations("classpath:db/migration", "classpath:db/migration-postgres")
+        .load()
+        .migrate()
+    }.void
+
   /** PostgreSQL へ、指定のスキーマ（なければ作る）に適用する。共通の DDL に、PostgreSQL 専用（ロールと権限）を足す。
     * 統合テストで、テストごとに空の状態を作るために使う。
     */

@@ -257,6 +257,32 @@ nav:
           - リリース計画: development/beer-game-scala/release_plan.md
           - 開発戦略: development/beer-game-scala/development_strategy.md
           - Bolt 1 計画: development/beer-game-scala/bolt_1_plan.md
+          - Bolt 1 終了報告: development/beer-game-scala/bolt_1_report.md
+          - Bolt 2 計画: development/beer-game-scala/bolt_2_plan.md
+          - Bolt 2 終了報告: development/beer-game-scala/bolt_2_report.md
+          - Bolt 3 計画: development/beer-game-scala/bolt_3_plan.md
+          - Bolt 3 終了報告: development/beer-game-scala/bolt_3_report.md
+          - Bolt 4 計画: development/beer-game-scala/bolt_4_plan.md
+          - Bolt 4 終了報告: development/beer-game-scala/bolt_4_report.md
+          - Bolt 5 計画: development/beer-game-scala/bolt_5_plan.md
+          - Bolt 5 終了報告: development/beer-game-scala/bolt_5_report.md
+          - Bolt 6 計画: development/beer-game-scala/bolt_6_plan.md
+          - Bolt 6 終了報告: development/beer-game-scala/bolt_6_report.md
+          - Bolt 7 計画: development/beer-game-scala/bolt_7_plan.md
+          - Bolt 7 終了報告: development/beer-game-scala/bolt_7_report.md
+          - Bolt 8 計画: development/beer-game-scala/bolt_8_plan.md
+          - Bolt 8 終了報告: development/beer-game-scala/bolt_8_report.md
+          - Bolt 9 計画: development/beer-game-scala/bolt_9_plan.md
+          - Bolt 9 終了報告: development/beer-game-scala/bolt_9_report.md
+          - Bolt 10 計画: development/beer-game-scala/bolt_10_plan.md
+          - Bolt 10 終了報告: development/beer-game-scala/bolt_10_report.md
+          - Bolt 11 計画: development/beer-game-scala/bolt_11_plan.md
+          - Bolt 11 終了報告: development/beer-game-scala/bolt_11_report.md
+          - Bolt 12 計画: development/beer-game-scala/bolt_12_plan.md
+          - Bolt 12 終了報告: development/beer-game-scala/bolt_12_report.md
+          - Bolt 13 計画: development/beer-game-scala/bolt_13_plan.md
+          - Bolt 13 終了報告: development/beer-game-scala/bolt_13_report.md
+          - Bolt 14 計画: development/beer-game-scala/bolt_14_plan.md
           - 守りの導入計画: development/beer-game-rust/guard_plan.md
   - 運用:
       - 概要: operation/index.md
@@ -276,6 +302,13 @@ nav:
           - 本番: operation/beer-game-kotlin/production.md
           - 復元: operation/beer-game-kotlin/restore.md
           - デモ環境（Heroku）: operation/beer-game-kotlin/demo.md
+      - beer-game-scala:
+          - 概要: operation/beer-game-scala/index.md
+          - デプロイ: operation/beer-game-scala/deploy.md
+          - ロールバック: operation/beer-game-scala/rollback.md
+          - 観測: operation/beer-game-scala/observability.md
+          - 本番: operation/beer-game-scala/production.md
+          - 復元: operation/beer-game-scala/restore.md
       - beer-game3:
           - リリース前の確認票: operation/beer-game3/release-checklist.md
           - 必須のチェックの設定: operation/beer-game3/required-check.md
