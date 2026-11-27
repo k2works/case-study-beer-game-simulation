@@ -27,7 +27,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-27T10:00:00Z }
 | 他の役割の値・将来の需要・参加コードが取得できない | 達成 | 観察の内容は専用の型（役割別の項目を持たない）。否定テスト（受け入れ・`HttpSpec`） |
 | 画面（`observer-ui.feature`） | 達成 | AC1.3.1・AC1.3.4 の 2 シナリオが Scala のバックエンドで緑 |
 | `current_user` の検査・DB ロール／接続プールの分離 | **未実装** | 下記「判断項目」 |
-| CI 緑 | push 後に記録 | |
+| CI 緑 | 確認済み | B10 のコミット `f79440be` で 3 ジョブ緑（B8・B9 を含む） |
 
 行カバレッジ: 全体 90.3%、domain 97.7%、application 92.8%。PostgreSQL 18 の統合テストで V006 が通ることを確認した。
 

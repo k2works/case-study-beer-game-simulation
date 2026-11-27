@@ -24,7 +24,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-27T08:30:00Z }
 | AC4.2.1（終了後、進行役・参加者が全役割の全週の結果を取得） | 達成 | `review/retrospective.feature`（許可リスト 116 シナリオ・761 ステップが緑） |
 | AC4.2.2（終了前は開示しない。資格なしは 403） | 達成 | `game.not_ended`（409）。応答に結果の一覧を含めない。`HttpSpec` の否定テストあり |
 | 画面（AC4.2.1・4.2.4） | 達成 | `retrospective-ui.feature` が Scala のバックエンドで緑（既定の画面受け入れに追加） |
-| CI 緑 | push 後に記録 | |
+| CI 緑 | 確認済み | B10 のコミット `f79440be` で 3 ジョブ緑（B8・B9 を含む） |
 
 行カバレッジ: 全体 90.5%、domain 97.4%、application 94.6%。
 
