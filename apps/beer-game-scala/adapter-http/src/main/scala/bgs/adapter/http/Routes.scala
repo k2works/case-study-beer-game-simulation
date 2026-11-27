@@ -202,6 +202,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
     case "session.week_advanced"           => "この週はすでに確定されています。"
     case "game.start_condition_not_met"    => "4 つの役割のそれぞれに、参加者が必要です。"
     case "session.incomplete_decisions"    => "4 つの役割の入力がそろっていません。"
+    case "game.not_ended"                  => "ゲームがまだ終了していません。"
     case "game.credential_already_revoked" => "資格はすでに失効しています。"
     case "game.credential_not_revoked"     => "失効していない資格は、再発行できません。"
     case "session.paused"                  => "停止中です。進行役の再開を待ってください。"
@@ -587,6 +588,17 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
               .map(
                 _.fold(failureOutcome(_, ctx.correlation), v => ok(JsonViews.lobby(v)))
               )
+          )
+        }
+
+      case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "review" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            Api
+              .reviewView(env)(ctx.caller, GameId(gameUuid))
+              .map(_.fold(failureOutcome(_, ctx.correlation), v => ok(JsonViews.review(v))))
           )
         }
 

@@ -1913,3 +1913,68 @@ class Steps extends ScalaDsl with EN:
       s"修正内容が違う: ${world.last.text}"
     )
   }
+
+  // ---- 役割別の振り返り（B8: AC4.2.1・AC4.2.2） ----
+
+  Given("""^進行役が、最終週 (\d+) のキット準拠のゲームを作成している$""") { (finalWeek: Int) =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(world.game, demandBody(finalWeek, Map.empty))
+    require(world.last.status == 201, s"作成できない: ${world.last.text}")
+  }
+
+  /** 第 [[week]] 週を、各役割 [[quantity]] の入力で確定する。 */
+  private def playWeek(week: Int, quantity: Int): Unit =
+    allRoles.foreach { apiRole =>
+      val saved = saveAt(world.game, apiRole, week, quantity)
+      require(saved.status == 200, s"第 $week 週の保存ができない: ${saved.text}")
+    }
+    val committed = commit(world.game, week, java.util.UUID.randomUUID.toString)
+    require(committed.status == 200, s"第 $week 週を確定できない: ${committed.text}")
+
+  Given("""^全 (\d+) 週が、各役割 (\d+) の入力で確定され、ゲームが終了している$""") { (weeks: Int, quantity: Int) =>
+    (1 to weeks).foreach(playWeek(_, quantity))
+  }
+
+  Given("""^第 (\d+) 週が、各役割 (\d+) の入力で確定されている$""") { (week: Int, quantity: Int) =>
+    playWeek(week, quantity)
+  }
+
+  private def reviewAs(cookie: Option[String]): Reply =
+    world.game.get(gamePath(world.game, "/review"), cookie)
+
+  When("""^進行役が振り返りを取得(?:する|しようとする)$""") { () =>
+    world.last = reviewAs(world.game.facilitator)
+  }
+
+  When("""^(.+)の参加者が振り返りを取得(?:する|しようとする)$""") { (label: String) =>
+    world.last = reviewAs(world.game.players.get(role(label)))
+  }
+
+  When("""^資格の無い人が振り返りを取得しようとする$""") { () => world.last = reviewAs(None) }
+
+  Then("""^振り返りに、(\d+) 役割のそれぞれについて (\d+) 週分の注文・在庫・受注残・出荷・費用が含まれる$""") { (roles: Int, weeks: Int) =>
+    require(world.last.status == 200, s"取得できない: ${world.last.text}")
+    val rows = world.last.json.hcursor.downField("results").values.map(_.toList).getOrElse(Nil)
+    require(rows.size == roles * weeks, s"行数が違う: ${rows.size}")
+    allRoles.foreach { apiRole =>
+      val own = rows.filter(_.hcursor.get[String]("role").contains(apiRole))
+      require(
+        own.flatMap(_.hcursor.get[Int]("week").toOption) == (1 to weeks).toList,
+        s"$apiRole の週が違う"
+      )
+      own.foreach(r =>
+        List("orders", "order", "inventory", "backlog", "shipment", "cost").foreach(k =>
+          require(r.hcursor.downField(k).focus.isDefined, s"$k が無い")
+        )
+      )
+    }
+  }
+
+  Then("""^ゲームがまだ終了していないという理由で拒否される$""") { () =>
+    require(world.last.status == 409, s"409 でない: ${world.last.status}")
+    require(world.last.code.contains("game.not_ended"), s"理由が違う: ${world.last.text}")
+  }
+
+  Then("""^結果の一覧は含まれない$""") { () =>
+    require(world.last.json.hcursor.downField("results").focus.isEmpty, "結果の一覧が含まれる")
+  }

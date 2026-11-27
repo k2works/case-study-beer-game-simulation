@@ -1123,3 +1123,68 @@ class HttpSpec extends CatsEffectSuite:
         assert(both._1.status == 200 || both._2.status == 200)
     }
   }
+
+  test("[AC4.2.1・4.2.2] 振り返りは、終了前は 409 game.not_ended（結果なし）、終了後は全役割の結果。資格なしは 403") {
+    freshApp.flatMap { app =>
+      for
+        created <- createWith(app, kitBody(1))
+        facilitator = created.cookie.getOrElse(fail("Cookie が無い"))
+        gameId = created.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(facilitator))
+        code = state.str("joinCode").getOrElse(fail("joinCode"))
+        players <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            )
+              .map(_ => role -> cookie)
+          }
+        }
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        early <- call(app, Method.GET, s"/api/v1/games/$gameId/review", cookie = Some(facilitator))
+        _ <- players.traverse { (_, cookie) =>
+          put(
+            app,
+            sessionPath(gameId, "/decisions"),
+            Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+            Some(cookie)
+          )
+        }
+        _ <- post(
+          app,
+          sessionPath(gameId, "/weeks/1/commit"),
+          Json.obj(
+            "requestedWeek" -> Json.fromInt(1),
+            "basis" -> Json.fromFields(roles.map(_ -> Json.fromLong(1L)))
+          ),
+          Some(facilitator)
+        )
+        byFacilitator <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/review",
+          cookie = Some(facilitator)
+        )
+        byPlayer <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/review",
+          cookie = players.headOption.map(_._2)
+        )
+        anonymous <- call(app, Method.GET, s"/api/v1/games/$gameId/review")
+      yield
+        assertEquals((early.status, early.code), (409, Some("game.not_ended")))
+        assertEquals(early.json.hcursor.downField("results").focus, None)
+        assertEquals(byFacilitator.status, 200)
+        assertEquals(byFacilitator.json.hcursor.downField("results").values.map(_.size), Some(4))
+        assertEquals(byPlayer.status, 200)
+        assertEquals(anonymous.status, 403)
+    }
+  }

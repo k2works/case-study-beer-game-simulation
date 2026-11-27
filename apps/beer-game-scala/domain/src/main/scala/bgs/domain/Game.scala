@@ -279,6 +279,9 @@ enum GameError(val code: String, val category: ErrorCategory) extends DomainErro
 
   /** 参加コードが無効（不明、または形式が不正）。区別せず、同じ応答にする（列挙の防止。AC1.2.2）。 */
   case InvitationInvalid extends GameError("game.invitation_invalid", ErrorCategory.Forbidden)
+
+  /** まだ終了していないゲームの振り返りは開示しない（AC4.2.2）。 */
+  case NotEnded extends GameError("game.not_ended", ErrorCategory.InvalidState)
   case CredentialAlreadyRevoked
       extends GameError("game.credential_already_revoked", ErrorCategory.InvalidState)
   case CredentialNotRevoked

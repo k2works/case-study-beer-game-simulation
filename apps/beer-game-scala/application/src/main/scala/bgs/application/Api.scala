@@ -161,6 +161,16 @@ final case class LobbyView(
     versions: Versions
 )
 
+final case class ReviewView(
+    gameId: GameId,
+    finalWeek: Int,
+    settingsKind: SettingsKind,
+    changedSettings: List[SettingsField],
+    commitMode: CommitMode,
+    results: List[RoleResultView],
+    versions: Versions
+)
+
 final case class EditorView(kind: String, displayName: Option[String], isSelf: Boolean)
 
 final case class RoleStatusView(
@@ -731,6 +741,52 @@ object Api:
             )
       case _ => IO.pure(Left(AppFailure.Unauthorized))
 
+  /** 確定した週の、役割別の結果（週・役割の順）。 */
+  private def weekResults(sessionRead: StreamRead[SessionEvent]): List[RoleResultView] =
+    sessionRead.events.collect { case e: SessionEvent.WeekCommitted => e }.flatMap { e =>
+      Role.values.toList.map { role =>
+        val r = e.results(role)
+        RoleResultView(
+          role,
+          e.week.value,
+          r.orders.value,
+          r.ordered.value,
+          r.endingInventory.value,
+          r.endingBacklog.value,
+          r.shipped.value,
+          r.weeklyCost.minor,
+          r.cumulativeCost.minor
+        )
+      }
+    }
+
+  /** 終了後の振り返り。進行役と、このゲームの参加者だけ。終了前は開示しない（AC4.2.2）。 */
+  def reviewView(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, ReviewView]] =
+    actorFor(caller, gameId) match
+      case Left(failure) => IO.pure(Left(failure))
+      case Right(_)      =>
+        for
+          game <- Application.gameState(env.ports)(gameId)
+          sessionRead <- readOnly(env)(env.ports.sessionStore.read(gameId))
+          v <- versions(env)(gameId)
+        yield
+          val session =
+            sessionRead.events.foldLeft[SessionState](SessionState.NotStarted)(SessionEvents.apply)
+          (session, game.dataOrNone) match
+            case (SessionState.Ended(d, _), Some(data)) =>
+              Right(
+                ReviewView(
+                  gameId,
+                  d.settings.finalWeek.value,
+                  data.settings.kind,
+                  data.settings.changedFields,
+                  d.commitMode,
+                  weekResults(sessionRead),
+                  v
+                )
+              )
+            case _ => Left(AppFailure.Domain(GameError.NotEnded))
+
   /** 当週の、役割ごとの最後の保存の時刻（追記の時刻。確定で空に戻る）。 */
   private def savedTimes(read: StreamRead[SessionEvent]): Map[Role, Instant] =
     read.events.zip(read.occurredAt).foldLeft(Map.empty[Role, Instant]) {
@@ -843,24 +899,7 @@ object Api:
           data match
             case None    => Left(AppFailure.Domain(SessionError.NotActive))
             case Some(d) =>
-              val results =
-                sessionRead.events.collect { case e: SessionEvent.WeekCommitted => e }.flatMap {
-                  e =>
-                    Role.values.toList.map { role =>
-                      val r = e.results(role)
-                      RoleResultView(
-                        role,
-                        e.week.value,
-                        r.orders.value,
-                        r.ordered.value,
-                        r.endingInventory.value,
-                        r.endingBacklog.value,
-                        r.shipped.value,
-                        r.weeklyCost.minor,
-                        r.cumulativeCost.minor
-                      )
-                    }
-                }
+              val results = weekResults(sessionRead)
               val submitted = d.decisions.size
               val status = statusOf(game, session)
               val savedAt = savedTimes(sessionRead)

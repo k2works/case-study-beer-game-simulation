@@ -74,6 +74,17 @@ object JsonViews:
       "versions" -> Some(versions(view.versions))
     )
 
+  def review(view: ReviewView): Json =
+    Json.obj(
+      "gameId" -> Json.fromString(view.gameId.value.toString),
+      "finalWeek" -> Json.fromInt(view.finalWeek),
+      "settingsKind" -> Json.fromString(kindName(view.settingsKind)),
+      "changedSettings" -> Json.fromValues(view.changedSettings.map(fieldName)),
+      "commitMode" -> Json.fromString(commitModeName(view.commitMode)),
+      "results" -> Json.fromValues(view.results.map(result)),
+      "versions" -> versions(view.versions)
+    )
+
   def lobby(view: LobbyView): Json =
     Json.obj(
       "gameId" -> Json.fromString(view.gameId.value.toString),

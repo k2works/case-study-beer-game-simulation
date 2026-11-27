@@ -29,3 +29,6 @@ game-setup/join-rate-limit.feature
 # B6: カスタム条件（AC1.1.3〜1.1.5）、B7: 自動確定（AC1.1.6・AC2.4.*）
 game-setup/custom-conditions.feature
 weekly-play/auto-commit.feature
+
+# B8: 役割別の振り返り（AC4.2.1・AC4.2.2）
+review/retrospective.feature
