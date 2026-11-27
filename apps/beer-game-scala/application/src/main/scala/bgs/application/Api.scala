@@ -45,6 +45,15 @@ final case class PeripheralStore(
     refreshRecovery: (String, Instant) => ConnectionIO[Unit],
     /** 対象の復帰資格とブラウザセッションを、すべて使えなくする。 */
     revokeSubject: (GameId, CredentialSubject) => ConnectionIO[Unit],
+    /** 保持を登録する（ゲーム、保持日数、開始、削除予定）。作成と同じトランザクションで呼ぶ。 */
+    registerRetention: (GameId, Int, Instant, Instant) => ConnectionIO[Unit],
+    retentionOf: GameId => ConnectionIO[Option[RetentionRow]],
+    /** 期限に達し、まだ削除していない（予定、または再試行の時刻に達した）ゲーム。 */
+    dueRetention: Instant => ConnectionIO[List[GameId]],
+    /** 失敗を記録する（試行の回数、次の試行の時刻、失敗の分類、再試行をやめたか）。 */
+    recordRetentionFailure: (GameId, Int, Option[Instant], String, Boolean) => ConnectionIO[Unit],
+    /** ゲームの全データを削除し、受領記録（ゲームの ID を含まない）を足す。 */
+    deleteGame: (GameId, Instant) => ConnectionIO[Unit],
     /** 観察用の招待コードのダイジェストを登録する（ゲーム、招待の ID）。 */
     registerInvitation: (String, GameId, InvitationId) => ConnectionIO[Unit],
     /** 招待コードのダイジェストから、ゲームと招待の ID。 */
@@ -53,6 +62,18 @@ final case class PeripheralStore(
     recordFailure: (String, Instant) => ConnectionIO[Unit],
     /** 窓（[[Instant]] 以降）の失敗の回数と、最も古い失敗の時刻。 */
     failuresSince: (String, Instant) => ConnectionIO[(Int, Option[Instant])]
+)
+
+/** 保持の状態（B11）。 */
+final case class RetentionRow(
+    gameId: GameId,
+    retentionDays: Int,
+    startsAt: Instant,
+    deleteAfter: Instant,
+    status: String,
+    attempt: Int,
+    nextAttemptAt: Option[Instant],
+    lastFailureCode: Option[String]
 )
 
 /** 時刻・識別子・乱数の出所（ドメインは時計と乱数を持たない）。 */
@@ -212,6 +233,18 @@ final case class LobbyView(
     invitations: List[LobbyInvitationView],
     observers: List[LobbyObserverView],
     versions: Versions
+)
+
+/** 保持状態（進行役だけ。AC5.1.1）。 */
+final case class RetentionView(
+    retentionDays: Int,
+    startsAt: Instant,
+    deleteAfter: Instant,
+    status: String,
+    attempt: Int,
+    nextAttemptAt: Option[Instant],
+    lastFailureCode: Option[String],
+    backupRetentionDays: Int
 )
 
 final case class ReviewView(
@@ -411,6 +444,12 @@ object Api:
           Application
             .handleGameWith(env.ports)(gameId, command)(
               env.peripheral.registerJoinCode(joinCode, gameId) *>
+                env.peripheral.registerRetention(
+                  gameId,
+                  retention.value,
+                  now,
+                  now.plus(Duration.ofDays(retention.value.toLong))
+                ) *>
                 env.peripheral.issueSession(
                   tokenHash,
                   gameId,
@@ -995,6 +1034,33 @@ object Api:
               )
             )
           case _ => Left(AppFailure.Domain(GameError.NotEnded))
+
+  /** 削除の後も、自動バックアップに削除前のデータが残る最大の日数（AC5.1.5）。 */
+  private val BackupRetentionDays = 7
+
+  /** 保持状態。**進行役だけ**（それ以外は、区別しない 403）。 */
+  def retentionView(
+      env: Env
+  )(caller: Caller, gameId: GameId): IO[Either[AppFailure, RetentionView]] =
+    caller match
+      case Caller.Facilitator(g) if g == gameId =>
+        readOnly(env)(env.peripheral.retentionOf(gameId)).map {
+          case None      => Left(AppFailure.Unauthorized)
+          case Some(row) =>
+            Right(
+              RetentionView(
+                row.retentionDays,
+                row.startsAt,
+                row.deleteAfter,
+                row.status,
+                row.attempt,
+                row.nextAttemptAt,
+                row.lastFailureCode,
+                BackupRetentionDays
+              )
+            )
+        }
+      case _ => IO.pure(Left(AppFailure.Unauthorized))
 
   /** 結果の出力の元になる記録。**進行役だけ**（参加者・観察者・資格なしは、区別しない 403）。終了前は開示しない（AC4.3.1）。 */
   def exportView(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, ReviewView]] =

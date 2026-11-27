@@ -116,6 +116,18 @@ object JsonViews:
       "versions" -> Some(versions(view.versions))
     )
 
+  def retention(view: RetentionView): Json =
+    Json.obj(
+      "retentionDays" -> Json.fromInt(view.retentionDays),
+      "startsAt" -> Json.fromString(view.startsAt.toString),
+      "deleteAfter" -> Json.fromString(view.deleteAfter.toString),
+      "status" -> Json.fromString(view.status),
+      "attempt" -> Json.fromInt(view.attempt),
+      "nextAttemptAt" -> orNull(view.nextAttemptAt.map(t => Json.fromString(t.toString))),
+      "lastFailureCode" -> orNull(view.lastFailureCode.map(Json.fromString)),
+      "backupRetentionDays" -> Json.fromInt(view.backupRetentionDays)
+    )
+
   def review(view: ReviewView): Json =
     Json.obj(
       "gameId" -> Json.fromString(view.gameId.value.toString),

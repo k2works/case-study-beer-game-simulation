@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 画面の受け入れ（@ui。Cucumber-JS + Playwright）。Scala のバックエンドを専用ポート（API 3100、UI 5273）で起動して実行する。
 # 人の開発サーバー（3000・5173）は止めない。B1〜B7 の範囲は AC2.3.1（ウォーキングスケルトン）・AC1.1.3（カスタム条件）・AC2.4.1（自動確定）（範囲を広げるときは引数でタグ式を渡す）。
-# 使い方: ./scripts/ui-acceptance.sh ["タグ式。既定は @ui and (@AC2.3.1 or @AC1.1.3 or @AC2.4.1 or @AC4.2.1 or @AC1.3.1 or @AC1.3.4 or @AC4.3.1)"]
+# 使い方: ./scripts/ui-acceptance.sh ["タグ式。既定は @ui and (@AC2.3.1 or @AC1.1.3 or @AC2.4.1 or @AC4.2.1 or @AC1.3.1 or @AC1.3.4 or @AC4.3.1 or @AC5.1.1)"]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,7 +12,7 @@ if [ -s "$HOME/.nvm/nvm.sh" ]; then
   nvm use 26 >/dev/null
 fi
 
-tags="${1:-@ui and (@AC2.3.1 or @AC1.1.3 or @AC2.4.1 or @AC4.2.1 or @AC1.3.1 or @AC1.3.4 or @AC4.3.1)}"
+tags="${1:-@ui and (@AC2.3.1 or @AC1.1.3 or @AC2.4.1 or @AC4.2.1 or @AC1.3.1 or @AC1.3.4 or @AC4.3.1 or @AC5.1.1)}"
 log="${BGS_UI_LOG:-$(mktemp)}"
 
 PORT=3100 sbt -batch "app/runMain bgs.app.Main" >"$log" 2>&1 &

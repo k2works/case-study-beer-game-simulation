@@ -626,6 +626,17 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
           )
         }
 
+      case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "retention" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            Api
+              .retentionView(env)(ctx.caller, GameId(gameUuid))
+              .map(_.fold(failureOutcome(_, ctx.correlation), v => ok(JsonViews.retention(v))))
+          )
+        }
+
       case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "exports" =>
         context(req).flatMap { ctx =>
           val gameId = GameId(gameUuid)

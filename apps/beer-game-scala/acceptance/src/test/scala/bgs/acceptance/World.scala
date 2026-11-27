@@ -42,8 +42,18 @@ final class GameClient(
     val app: HttpApp[IO],
     val env: bgs.application.Env,
     val logs: java.util.concurrent.ConcurrentLinkedQueue[LogRecord],
-    val databaseDown: java.util.concurrent.atomic.AtomicBoolean
+    val databaseDown: java.util.concurrent.atomic.AtomicBoolean,
+    /** 試験用の時計の進み（保持期限の試験。B11）。 */
+    val clockOffset: java.util.concurrent.atomic.AtomicReference[java.time.Duration],
+    /** 削除の処理を、あと何回失敗させるか。 */
+    val deletionFailures: java.util.concurrent.atomic.AtomicInteger,
+    /** 再試行をやめたと通知されたゲーム。 */
+    val abandoned: java.util.concurrent.ConcurrentLinkedQueue[bgs.domain.GameId]
 ):
+  /** 同じサーバー（DB・時計・障害）を共有する、別のゲームの操作の入口。 */
+  def sibling(): GameClient =
+    new GameClient(app, env, logs, databaseDown, clockOffset, deletionFailures, abandoned)
+
   var facilitator: Option[String] = None
   var gameId: Option[String] = None
 
@@ -106,9 +116,31 @@ object GameClient:
             if isDown then IO.raiseError(new java.sql.SQLException("接続できない"))
             else underlying.run(program)
           }
-    val env =
+    val offset = new java.util.concurrent.atomic.AtomicReference(java.time.Duration.ZERO)
+    val failures = new java.util.concurrent.atomic.AtomicInteger(0)
+    val base =
       Wiring.inMemoryH2(LogSink(record => IO.delay(logs.add(record)).void), wrap).unsafeRunSync()
-    new GameClient(Routes.httpApp(env), env, logs, down)
+    // 時計を進められるようにし、削除の処理を指定の回数だけ失敗させる（保持と削除の試験）
+    val env = base.copy(
+      // 保持期限（数日〜）まで時計を進めても、ブラウザセッションが期限切れにならないようにする（本番は 24 時間。失効後は復帰コードで戻る）
+      sessionTtl = java.time.Duration.ofDays(365),
+      gen = base.gen.copy(now = IO.delay(java.time.Instant.now.plus(offset.get))),
+      peripheral = base.peripheral.copy(deleteGame =
+        (id, now) =>
+          if failures.getAndUpdate(n => math.max(0, n - 1)) > 0 then
+            doobie.free.connection.raiseError(new java.sql.SQLException("削除の失敗"))
+          else base.peripheral.deleteGame(id, now)
+      )
+    )
+    new GameClient(
+      Routes.httpApp(env),
+      env,
+      logs,
+      down,
+      offset,
+      failures,
+      new java.util.concurrent.ConcurrentLinkedQueue[bgs.domain.GameId]()
+    )
 
 /** シナリオごとの状態。シナリオが終わると、新しいインスタンスに替わる。 */
 final class World:

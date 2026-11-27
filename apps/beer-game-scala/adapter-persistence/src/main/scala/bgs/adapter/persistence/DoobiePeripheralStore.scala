@@ -1,6 +1,6 @@
 package bgs.adapter.persistence
 
-import bgs.application.{IdempotentRecord, PeripheralStore}
+import bgs.application.{IdempotentRecord, PeripheralStore, RetentionRow}
 import bgs.domain.*
 import cats.syntax.all.*
 import doobie.*
@@ -34,6 +34,23 @@ object DoobiePeripheralStore:
     else if kind == ObserverKind then
       Some(GameId(gameId) -> CredentialSubject.Observer(ObserverId(subjectId)))
     else None
+
+  /** ゲームの全データを、子の表から順に削除する（1 つのトランザクション。失敗したら全体を巻き戻す）。受領記録にゲームの ID は入れない。 */
+  private def deleteAll(gameId: GameId, now: Instant): ConnectionIO[Unit] =
+    val id = gameId.value
+    val scope = s"%$id%"
+    for
+      _ <- sql"delete from recovery_credentials where game_id = $id".update.run
+      _ <- sql"delete from browser_sessions where game_id = $id".update.run
+      _ <- sql"delete from display_profiles where game_id = $id".update.run
+      _ <- sql"delete from game_join_codes where game_id = $id".update.run
+      _ <- sql"delete from observer_invitations where game_id = $id".update.run
+      _ <- sql"delete from events where game_id = $id".update.run
+      _ <- sql"delete from game_retention where game_id = $id".update.run
+      _ <- sql"delete from idempotency_records where scope like $scope".update.run
+      _ <- sql"delete from game_roots where game_id = $id".update.run
+      _ <- sql"insert into deletion_receipts (deleted_at) values ($now)".update.run
+    yield ()
 
   def apply(): PeripheralStore =
     PeripheralStore(
@@ -92,6 +109,32 @@ object DoobiePeripheralStore:
           sql"""delete from browser_sessions
                 where game_id = ${gameId.value} and subject_kind = $kind and subject_id = $subjectId""".update.run.void
       ,
+      registerRetention = (gameId, days, startsAt, deleteAfter) =>
+        sql"""insert into game_retention (game_id, retention_days, starts_at, delete_after)
+              values (${gameId.value}, $days, $startsAt, $deleteAfter)""".update.run.void,
+      retentionOf = gameId =>
+        sql"""select retention_days, starts_at, delete_after, status, attempt, next_attempt_at, last_failure_code
+              from game_retention where game_id = ${gameId.value}"""
+          .query[(Int, Instant, Instant, String, Int, Option[Instant], Option[String])]
+          .option
+          .map(_.map { (days, starts, after, status, attempt, next, failure) =>
+            RetentionRow(gameId, days, starts, after, status, attempt, next, failure)
+          }),
+      dueRetention = now =>
+        sql"""select game_id from game_retention
+              where (status = 'SCHEDULED' and delete_after <= $now)
+                 or (status = 'RETRY_PENDING' and next_attempt_at <= $now)
+              order by delete_after"""
+          .query[UUID]
+          .to[List]
+          .map(_.map(GameId(_))),
+      recordRetentionFailure = (gameId, attempt, next, code, abandoned) =>
+        val status = if abandoned then "ABANDONED" else "RETRY_PENDING"
+        sql"""update game_retention
+              set status = $status, attempt = $attempt, next_attempt_at = $next, last_failure_code = $code
+              where game_id = ${gameId.value}""".update.run.void
+      ,
+      deleteGame = (gameId, now) => deleteAll(gameId, now),
       registerInvitation = (codeDigest, gameId, invitationId) =>
         sql"""insert into observer_invitations (code_digest, game_id, invitation_id)
               values ($codeDigest, ${gameId.value}, ${invitationId.value})""".update.run.void,

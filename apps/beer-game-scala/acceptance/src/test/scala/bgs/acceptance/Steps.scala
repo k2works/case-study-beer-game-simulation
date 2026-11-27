@@ -1133,12 +1133,7 @@ class Steps extends ScalaDsl with EN:
   private var otherGame: Option[GameClient] = None
 
   Given("""^別のゲームの進行役がいる$""") { () =>
-    val other = new GameClient(
-      world.game.app,
-      world.game.env,
-      world.game.logs,
-      world.game.databaseDown
-    )
+    val other = world.game.sibling()
     require(createGame(other).status == 201, "別のゲームを作成できない")
     otherGame = Some(other)
   }
@@ -2403,4 +2398,245 @@ class Steps extends ScalaDsl with EN:
         ),
       s"変更した項目が違う: ${settings.focus}"
     )
+  }
+
+  // ---- 保持と削除（B11: AC5.1.*） ----
+
+  private def createWithRetention(finalWeek: Int, days: Option[Int]): Reply =
+    val body = demandBody(finalWeek, Map.empty).mapObject(o =>
+      days.fold(o)(d => o.add("retentionDays", Json.fromInt(d)))
+    )
+    createWith(world.game, body)
+
+  Given("""^進行役が、保持期間を指定せずにキット準拠のゲームを作成している$""") { () =>
+    world.games = List(GameClient.fresh())
+    require(createWithRetention(12, None).status == 201, "作成できない")
+  }
+
+  Given("""^進行役が、保持期間 (\d+) 日でキット準拠のゲームを作成している$""") { (days: Int) =>
+    world.games = List(GameClient.fresh())
+    require(createWithRetention(12, Some(days)).status == 201, "作成できない")
+  }
+
+  Given("""^進行役が、最終週 (\d+) のキット準拠のゲームを保持期間 (\d+) 日で作成している$""") { (finalWeek: Int, days: Int) =>
+    world.games = List(GameClient.fresh())
+    require(createWithRetention(finalWeek, Some(days)).status == 201, "作成できない")
+  }
+
+  Given("""^もう 1 つ、保持期間 (\d+) 日のキット準拠のゲームが作成されている$""") { (days: Int) =>
+    val other = world.game.sibling()
+    require(
+      createWith(
+        other,
+        demandBody(12, Map.empty).mapObject(_.add("retentionDays", Json.fromInt(days)))
+      ).status == 201,
+      "作成できない"
+    )
+    otherGame = Some(other)
+  }
+
+  Given("""^参加者が参加している$""") { () =>
+    require(joinWith(world.game, joinCodeOf(world.game), "参加者").status == 200, "参加できない")
+  }
+
+  When("""^進行役が保持状態を取得する$""") { () =>
+    world.last = world.game.get(gamePath(world.game, "/retention"), world.game.facilitator)
+  }
+
+  When("""^参加者が保持状態を取得しようとする$""") { () =>
+    world.last =
+      world.game.get(gamePath(world.game, "/retention"), world.game.participantCookies.get("参加者"))
+  }
+
+  When("""^資格の無い人が保持状態を取得しようとする$""") { () =>
+    world.last = world.game.get(gamePath(world.game, "/retention"), None)
+  }
+
+  private def instantOf(field: String): java.time.Instant =
+    java.time.Instant.parse(world.last.json.hcursor.get[String](field).getOrElse(""))
+
+  Then("""^保持期間は (\d+) 日で、削除予定日は作成の (\d+) 日後である$""") { (days: Int, after: Int) =>
+    require(world.last.json.hcursor.get[Int]("retentionDays").contains(days), "保持期間が違う")
+    require(
+      java.time.Duration.between(
+        instantOf("startsAt"),
+        instantOf("deleteAfter")
+      ) == java.time.Duration.ofDays(after.toLong),
+      "削除予定日が違う"
+    )
+  }
+
+  private val statusLabels = Map(
+    "予定" -> "SCHEDULED",
+    "再試行待ち" -> "RETRY_PENDING",
+    "再試行の上限に達した" -> "ABANDONED"
+  )
+
+  Then("""^保持状態は「(予定)」である$""") { (label: String) =>
+    require(
+      world.last.json.hcursor.get[String]("status").contains(statusLabels(label)),
+      s"状態が違う: ${world.last.text}"
+    )
+  }
+
+  Then("""^保持状態は「(再試行待ち|再試行の上限に達した)」で、試行は (\d+) 回目である$""") { (label: String, attempt: Int) =>
+    val status = world.game.get(gamePath(world.game, "/retention"), world.game.facilitator)
+    require(
+      status.json.hcursor.get[String]("status").contains(statusLabels(label)),
+      s"状態が違う: ${status.text}"
+    )
+    require(status.json.hcursor.get[Int]("attempt").contains(attempt), s"試行が違う: ${status.text}")
+  }
+
+  Then("""^バックアップに削除後も (\d+) 日残ることが示される$""") { (days: Int) =>
+    require(world.last.json.hcursor.get[Int]("backupRetentionDays").contains(days), "バックアップの期間が違う")
+  }
+
+  private var deletedCount = 0
+  private var receiptsBefore = 0L
+
+  private def receipts(): Long =
+    import doobie.implicits.*
+    world.game.env.ports.tx
+      .run[Nothing, Long](
+        sql"select count(*) from deletion_receipts".query[Long].unique.map(Right(_))
+      )
+      .unsafeRunSync()
+      .getOrElse(0L)
+
+  private def runRetention(): Unit =
+    receiptsBefore = receipts()
+    deletedCount = bgs.application.RetentionJob
+      .runOnce(world.game.env)(id => cats.effect.IO.delay(world.game.abandoned.add(id)).void)
+      .unsafeRunSync()
+
+  private def advance(duration: java.time.Duration): Unit =
+    world.game.clockOffset.updateAndGet(_.plus(duration))
+    ()
+
+  When("""^時計が (\d+) 日進み、削除処理が行われる$""") { (days: Int) =>
+    advance(java.time.Duration.ofDays(days.toLong))
+    runRetention()
+  }
+
+  When("""^時計が (\d+) 分進み、削除処理が行われる$""") { (minutes: Int) =>
+    advance(java.time.Duration.ofMinutes(minutes.toLong))
+    runRetention()
+  }
+
+  When("""^時計が (\d+) 日進み、削除処理を、再試行の時刻ごとに (\d+) 回行う$""") { (days: Int, times: Int) =>
+    advance(java.time.Duration.ofDays(days.toLong))
+    (1 to times).foreach { _ =>
+      runRetention()
+      advance(java.time.Duration.ofDays(1))
+    }
+  }
+
+  Given("""^削除の処理が、最初の 1 回だけ失敗する$""") { () => world.game.deletionFailures.set(1) }
+
+  Given("""^削除の処理が、(\d+) 回続けて失敗する$""") { (times: Int) => world.game.deletionFailures.set(times) }
+
+  Then("""^削除は (\d+) 件完了している$""") { (count: Int) =>
+    require(deletedCount == count, s"削除の件数が違う: $deletedCount")
+  }
+
+  Then("""^進行役の資格(?:では|で)、このゲームの状態を(取得できない|取得できる)$""") { (outcome: String) =>
+    val status = world.game.get(gamePath(world.game, "/state"), world.game.facilitator).status
+    require((status == 200) == (outcome == "取得できる"), s"状態の取得が違う: $status")
+  }
+
+  Then("""^参加者の資格では、このゲームの状態を取得できない$""") { () =>
+    require(
+      world.game
+        .get(gamePath(world.game, "/state"), world.game.participantCookies.get("参加者"))
+        .status == 403,
+      "取得できてしまう"
+    )
+  }
+
+  Then("""^参加コードで、このゲームに参加できない$""") { () =>
+    val code = world.game.get(gamePath(world.game, "/state"), None)
+    val reply = joinWith(world.game, savedJoinCode, "新しい人")
+    require(reply.status == 403, s"参加できてしまう: ${reply.status} / ${code.status}")
+  }
+
+  Then("""^2 つ目のゲームの進行役の資格で、そのゲームの状態を取得できる$""") { () =>
+    val other = otherGame.getOrElse(sys.error("2 つ目のゲームが無い"))
+    require(other.get(gamePath(other, "/state"), other.facilitator).status == 200, "取得できない")
+  }
+
+  Then("""^削除の受領記録が (\d+) 件増え、ゲームの ID を含まない$""") { (n: Int) =>
+    require(receipts() - receiptsBefore == n.toLong, s"受領記録の増加が違う: ${receipts() - receiptsBefore}")
+    import doobie.implicits.*
+    val columns = world.game.env.ports.tx
+      .run[Nothing, List[String]](
+        sql"select column_name from information_schema.columns where table_name = 'deletion_receipts'"
+          .query[String]
+          .to[List]
+          .map(Right(_))
+      )
+      .unsafeRunSync()
+      .getOrElse(Nil)
+    require(!columns.exists(_.contains("game")), s"受領記録にゲームの ID の列がある: $columns")
+  }
+
+  Then("""^削除の受領記録は増えない$""") { () =>
+    require(receipts() == receiptsBefore, "受領記録が増えた")
+  }
+
+  Then("""^削除をやめたゲームが (\d+) 件通知される$""") { (count: Int) =>
+    require(world.game.abandoned.size == count, s"通知の件数が違う: ${world.game.abandoned.size}")
+  }
+
+  private var savedJoinCode = ""
+
+  private val gameTables = List(
+    "game_roots",
+    "events",
+    "game_join_codes",
+    "display_profiles",
+    "browser_sessions",
+    "recovery_credentials",
+    "observer_invitations",
+    "game_retention"
+  )
+
+  /** `game_id` の列を持つ表の名前（information_schema。表を足したときも検査に入る）。 */
+  private def tablesWithGameId(): List[String] =
+    import doobie.implicits.*
+    world.game.env.ports.tx
+      .run[Nothing, List[String]](
+        sql"""select distinct table_name from information_schema.columns
+              where column_name = 'game_id' and lower(table_schema) in ('public')"""
+          .query[String]
+          .to[List]
+          .map(Right(_))
+      )
+      .unsafeRunSync()
+      .getOrElse(Nil)
+
+  private def rowsFor(table: String): Long =
+    import doobie.implicits.*
+    import doobie.postgres.implicits.*
+    val id = java.util.UUID.fromString(world.game.gameId.getOrElse(""))
+    world.game.env.ports.tx
+      .run[Nothing, Long](
+        (doobie.Fragment.const(s"select count(*) from $table where game_id = ") ++ fr"$id")
+          .query[Long]
+          .unique
+          .map(Right(_))
+      )
+      .unsafeRunSync()
+      .getOrElse(0L)
+
+  Given("""^ゲームの記録・履歴・資格の表に、このゲームの行がある$""") { () =>
+    savedJoinCode = joinCodeOf(world.game)
+    val tables = tablesWithGameId()
+    require(gameTables.forall(tables.contains), s"想定の表が無い: $tables")
+    require(gameTables.forall(rowsFor(_) > 0L), s"行が無い表がある: ${gameTables.filter(rowsFor(_) == 0L)}")
+  }
+
+  Then("""^ゲームの ID を持つ表のどれにも、このゲームの行が残らない$""") { () =>
+    val leftovers = tablesWithGameId().filter(rowsFor(_) > 0L)
+    require(leftovers.isEmpty, s"行が残る表: $leftovers")
   }

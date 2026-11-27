@@ -41,3 +41,6 @@ observation/observation-disclosure.feature
 # B10: 出力（AC4.3.*）
 export/export.feature
 export/export-custom.feature
+
+# B11: 保持と削除（AC5.1.*）
+retention/retention.feature
