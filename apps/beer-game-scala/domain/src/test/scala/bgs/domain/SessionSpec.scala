@@ -325,3 +325,71 @@ class SessionSpec extends FunSuite:
     }
     assertEquals(Session.handle(nine, proxy(Role.Retailer, 1)), Left(SessionError.SaveLimitReached))
   }
+
+  // ---- B7: 自動確定（AC2.4.*） ----
+
+  private def autoSession: SessionState =
+    startedSession match
+      case SessionState.Active(data, v) =>
+        SessionState.Active(data.copy(commitMode = CommitMode.Auto), v)
+      case other => fail(s"進行中のはず: $other")
+
+  private def savedAll(state: SessionState, roles: List[Role]): SessionState =
+    roles.foldLeft(state) { (s, role) =>
+      applied(s, Session.handle(s, save(role, 4)))
+    }
+
+  test("[AC2.4.1] 自動確定: 4 役割目の保存と同じ追記で、週が一度だけ確定される") {
+    val three = savedAll(autoSession, List(Role.Retailer, Role.Wholesaler, Role.Distributor))
+    val events = Session.handle(three, save(Role.Factory, 4)).fold(e => fail(e.toString), identity)
+    assertEquals(events.map(_.name), List("DecisionSaved", "WeekCommitted"))
+    events.collectFirst { case e: SessionEvent.WeekCommitted => e.commitKind } match
+      case Some(kind) => assertEquals(kind, CommitKind.Auto)
+      case None       => fail("WeekCommitted が無い")
+  }
+
+  test("[AC2.4.2] 手動確定のゲームでは、入力がそろっても確定されない") {
+    val three = savedAll(startedSession, List(Role.Retailer, Role.Wholesaler, Role.Distributor))
+    val events = Session.handle(three, save(Role.Factory, 4)).fold(e => fail(e.toString), identity)
+    assertEquals(events.map(_.name), List("DecisionSaved"))
+  }
+
+  test("[AC2.4.1] 進行役の代理入力でそろった場合も、自動で確定される") {
+    val three = savedAll(autoSession, List(Role.Retailer, Role.Wholesaler, Role.Distributor))
+    val events = Session.handle(three, proxy(Role.Factory, 4)).fold(e => fail(e.toString), identity)
+    assertEquals(events.map(_.name), List("DecisionSaved", "WeekCommitted"))
+  }
+
+  test("[AC2.4.3] 停止中の代理入力ではそろっても確定せず、再開で確定する") {
+    val three = savedAll(autoSession, List(Role.Retailer, Role.Wholesaler, Role.Distributor))
+    val paused = applied(three, pause(three))
+    val proxied =
+      Session.handle(paused, proxy(Role.Factory, 4)).fold(e => fail(e.toString), identity)
+    assertEquals(proxied.map(_.name), List("DecisionSaved"))
+    val ready = apply(paused, proxied)
+    assertEquals(resume(ready).map(_.map(_.name)), Right(List("SessionResumed", "WeekCommitted")))
+  }
+
+  test("[AC2.4.3] 入力がそろっていない再開では、確定しない") {
+    val paused = applied(autoSession, pause(autoSession))
+    assertEquals(resume(paused).map(_.map(_.name)), Right(List("SessionResumed")))
+  }
+
+  test("[AC2.4.5] 進行役は確定方式を変えられる。参加者は変えられない。自動にした時点で入力がそろっていれば確定") {
+    def setMode(state: SessionState, mode: CommitMode, actor: Actor = facilitator) =
+      Session.handle(state, SessionCommand.SetCommitMode(actor, at, mode))
+    assert(setMode(startedSession, CommitMode.Auto, Actor.Participant(holder(Role.Factory))).isLeft)
+    assertEquals(
+      setMode(startedSession, CommitMode.Auto).map(_.map(_.name)),
+      Right(List("CommitModeChanged"))
+    )
+    val ready = savedAll(startedSession, Role.values.toList)
+    assertEquals(
+      setMode(ready, CommitMode.Auto).map(_.map(_.name)),
+      Right(List("CommitModeChanged", "WeekCommitted"))
+    )
+    val changed = applied(startedSession, setMode(startedSession, CommitMode.Auto))
+    changed match
+      case SessionState.Active(data, _) => assertEquals(data.commitMode, CommitMode.Auto)
+      case other                        => fail(s"進行中のはず: $other")
+  }

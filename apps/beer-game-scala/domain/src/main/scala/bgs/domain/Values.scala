@@ -19,6 +19,10 @@ enum ValidationError:
   /** 需要系列の誤り。[[weekIndex]] は対象の週（1 始まり）で、利用者に修正すべき週を示す（AC1.1.2）。 */
   case DemandSeriesInvalid(weekIndex: Int, reason: String)
 
+  /** カスタム条件の範囲外（B6）。[[field]] は対象の項目名（`initialInventory`・`shipmentDelayWeeks` など）、[[reason]] は修正内容。
+    */
+  case ConditionOutOfRange(field: String, reason: String)
+
 // opaque type は同じファイルのトップレベルでは中身が見える。ゼロコストで型を区別し、
 // コンパニオンの `of` で生成時に検証する（不正な値は存在できない）。
 

@@ -108,6 +108,9 @@ object SessionCommand:
   /** 進行役の一時停止（AC3.1.1）。 */
   final case class PauseSession(actor: Actor, at: Instant) extends SessionCommand
 
+  /** 進行役が確定方式を変える（AC2.4.5）。自動にした時点で入力がそろっていれば、同じ追記で確定する。 */
+  final case class SetCommitMode(actor: Actor, at: Instant, mode: CommitMode) extends SessionCommand
+
   /** 進行役の再開（AC3.1.3）。 */
   final case class ResumeSession(actor: Actor, at: Instant) extends SessionCommand
 
@@ -172,6 +175,9 @@ enum SessionEvent:
   case SessionPaused
   case SessionResumed
 
+  /** 確定方式の変更（AC2.4.5）。 */
+  case CommitModeChanged(mode: CommitMode)
+
   /** 開始後の役割の入れ替え。役割ごとの担当者の全体を置き換える（D4: session は開始時の写しを持つ）。 */
   case AssignmentsReplaced(assignments: RoleMap[Set[ParticipantId]])
 
@@ -182,6 +188,7 @@ enum SessionEvent:
     case SessionEvent.SessionEnded(_)                 => "SessionEnded"
     case SessionEvent.SessionPaused                   => "SessionPaused"
     case SessionEvent.SessionResumed                  => "SessionResumed"
+    case SessionEvent.CommitModeChanged(_)            => "CommitModeChanged"
     case SessionEvent.AssignmentsReplaced(_)          => "AssignmentsReplaced"
 
 enum SessionError(val code: String, val category: ErrorCategory) extends DomainError:
@@ -239,6 +246,27 @@ object Session:
   ): Either[SessionError, Unit] =
     Either.cond(actor.isFacilitatorOf(data.gameId), (), SessionError.Forbidden(s"$what は進行役だけができる"))
 
+  /** 自動確定。確定方式が自動で、停止中でなく、4 役割の入力がそろっているときだけ、確定のイベントを作る（AC2.4.1・2.4.3）。 [[after]]
+    * は、直前の変化を採用した後のデータ。
+    */
+  private def autoCommitEvents(after: SessionData): List[SessionEvent] =
+    if after.commitMode == CommitMode.Auto && !after.paused then
+      after.completeDecisions.fold(List.empty[SessionEvent])(decisions =>
+        weekCommitEvents(after, decisions, CommitKind.Auto)
+      )
+    else Nil
+
+  private def setCommitModeEvents(
+      data: SessionData,
+      command: SessionCommand.SetCommitMode
+  ): Either[SessionError, List[SessionEvent]] =
+    facilitatorOnly(command.actor, data, "確定方式の変更").map { _ =>
+      if data.commitMode == command.mode then Nil
+      else
+        SessionEvent.CommitModeChanged(command.mode) ::
+          autoCommitEvents(data.copy(commitMode = command.mode))
+    }
+
   private def pauseEvents(
       data: SessionData,
       command: SessionCommand.PauseSession
@@ -255,7 +283,7 @@ object Session:
     for
       _ <- facilitatorOnly(command.actor, data, "再開")
       _ <- Either.cond(data.paused, (), SessionError.NotPaused)
-    yield List(SessionEvent.SessionResumed)
+    yield SessionEvent.SessionResumed :: autoCommitEvents(data.copy(paused = false))
 
   /** 代理入力は、進行中と停止中の両方で受け付け、週は確定しない。版は 1 増える（保存回数に数える）。 */
   private def proxyEvents(
@@ -271,16 +299,19 @@ object Session:
         SessionError.WeekAdvanced(command.requestedWeek, data.week)
       )
       _ <- Either.cond(data.hasSaveCapacity(command.role), (), SessionError.SaveLimitReached)
-    yield List(
-      SessionEvent.DecisionSaved(
+    yield
+      val editor = Editor.ByFacilitator(data.gameId)
+      val saved = SessionEvent.DecisionSaved(
         data.week,
         command.role,
         command.quantity,
         current.next,
-        Editor.ByFacilitator(data.gameId),
+        editor,
         (data.decisions.keySet + command.role).size
       )
-    )
+      saved :: autoCommitEvents(
+        data.withDecision(command.role, DecisionEntry(command.quantity, current.next, editor))
+      )
 
   private def saveDecisionEvents(
       data: SessionData,
@@ -303,15 +334,16 @@ object Session:
       _ <- Either.cond(data.hasSaveCapacity(command.role), (), SessionError.SaveLimitReached)
     yield
       val submitted = (data.decisions.keySet + command.role).size
-      List(
-        SessionEvent.DecisionSaved(
-          data.week,
-          command.role,
-          command.quantity,
-          current.next,
-          editor,
-          submitted
-        )
+      val saved = SessionEvent.DecisionSaved(
+        data.week,
+        command.role,
+        command.quantity,
+        current.next,
+        editor,
+        submitted
+      )
+      saved :: autoCommitEvents(
+        data.withDecision(command.role, DecisionEntry(command.quantity, current.next, editor))
       )
 
   /** 4 役割の入力から、週の確定のイベントを作る。最終週なら `SessionEnded` も返す。 */
@@ -370,6 +402,7 @@ object Session:
       command match
         case c: SessionCommand.SaveDecision        => saveDecisionEvents(data, c)
         case c: SessionCommand.CommitWeek          => commitWeekEvents(data, c)
+        case c: SessionCommand.SetCommitMode       => setCommitModeEvents(data, c)
         case c: SessionCommand.PauseSession        => pauseEvents(data, c)
         case c: SessionCommand.ResumeSession       => resumeEvents(data, c)
         case c: SessionCommand.SubmitProxyDecision => proxyEvents(data, c)
@@ -411,9 +444,10 @@ object SessionEvents:
       updateData(state)(_.afterCommit(nextStates))
     case SessionEvent.AssignmentsReplaced(assignments) =>
       updateData(state)(_.copy(assignments = assignments))
-    case SessionEvent.SessionPaused   => updateData(state)(_.copy(paused = true))
-    case SessionEvent.SessionResumed  => updateData(state)(_.copy(paused = false))
-    case SessionEvent.SessionEnded(_) =>
+    case SessionEvent.CommitModeChanged(mode) => updateData(state)(_.copy(commitMode = mode))
+    case SessionEvent.SessionPaused           => updateData(state)(_.copy(paused = true))
+    case SessionEvent.SessionResumed          => updateData(state)(_.copy(paused = false))
+    case SessionEvent.SessionEnded(_)         =>
       state match
         case SessionState.Active(data, version) => SessionState.Ended(data, version.next)
         case SessionState.NotStarted | SessionState.Ended(_, _) => state

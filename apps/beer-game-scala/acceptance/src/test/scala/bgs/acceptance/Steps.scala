@@ -1669,3 +1669,247 @@ class Steps extends ScalaDsl with EN:
   Then("""^参加は受け付けられる$""") { () =>
     require(world.last.status == 200, s"受け付けられていない: ${world.last.text}")
   }
+
+  // ---- カスタム条件（B6: AC1.1.3〜1.1.5）と確定方式（B7: AC1.1.6・AC2.4.*） ----
+
+  private def createBody(
+      kind: String,
+      conditions: Option[Json],
+      commitMode: Option[String]
+  ): Json =
+    demandBody(12, Map.empty).mapObject(obj =>
+      obj
+        .add("kind", Json.fromString(kind))
+        .deepMerge(
+          io.circe.JsonObject.fromIterable(
+            conditions.map("conditions" -> _).toList ++
+              commitMode.map(m => "commitMode" -> Json.fromString(m)).toList
+          )
+        )
+    )
+
+  private def createWith(client: GameClient, body: Json): Reply =
+    val key = java.util.UUID.randomUUID.toString
+    val reply = client.call(org.http4s.Method.POST, "/api/v1/games", Some(body), None, Some(key))
+    if reply.status == 201 then
+      client.facilitator = reply.cookie
+      client.gameId = reply.location.map(_.split("/").reverse.drop(1).headOption.getOrElse(""))
+      client.recoveries =
+        client.recoveries.updated("FACILITATOR", reply.cookieNamed("bg_recovery").getOrElse(""))
+      client.recoveryCode = reply.json.hcursor.get[String]("recoveryCode").getOrElse("")
+    reply
+
+  private val fieldLabels: Map[String, String] = Map(
+    "初期在庫" -> "INITIAL_INVENTORY",
+    "初期の流れ" -> "INITIAL_FLOW",
+    "注文の遅延" -> "ORDER_DELAY",
+    "配送の遅延" -> "SHIPMENT_DELAY",
+    "生産の遅延" -> "PRODUCTION_DELAY",
+    "在庫の単価" -> "HOLDING_COST",
+    "受注残の単価" -> "BACKLOG_COST",
+    "公開範囲" -> "DISCLOSURE"
+  )
+
+  /** 「小売店の初期在庫を 20、配送の遅延を 3 週」のような列を、conditions の本文にする。 */
+  private def conditionsOf(text: String): Json =
+    val items = text.split("、").toList.map(_.trim).filter(_.nonEmpty)
+    val fields = items.map { item =>
+      val (label, raw) = item.split("を", 2) match
+        case Array(l, v) => (l, v.trim.stripSuffix("週").trim.stripPrefix("「").stripSuffix("」"))
+        case _           => sys.error(s"読めない条件: $item")
+      def int = Json.fromInt(raw.toInt)
+      label match
+        case "小売店の初期在庫" => "initialInventory" -> Json.obj("RETAILER" -> int)
+        case "配送の遅延"    => "shipmentDelayWeeks" -> int
+        case "注文の遅延"    => "orderDelayWeeks" -> int
+        case "在庫の単価"    => "holdingCostMinor" -> int
+        case "受注残の単価"   => "backlogCostMinor" -> int
+        case "公開範囲"     =>
+          "disclosurePolicy" -> Json.fromString(if raw == "なし" then "NONE" else raw)
+        case other => sys.error(s"未知の条件: $other")
+    }
+    Json.fromFields(fields)
+
+  private def customCreate(text: String): Reply =
+    world.games = List(GameClient.fresh())
+    createWith(world.game, createBody("CUSTOM", Some(conditionsOf(text)), None))
+
+  When("""^進行役が、(.+?) ?に変えて、ゲームを(?:作成する|作成しようとする)$""") { (text: String) =>
+    world.last = customCreate(text)
+  }
+
+  Given("""^進行役が、(.+?) ?に変えて、ゲームを作成している$""") { (text: String) =>
+    world.last = customCreate(text)
+    require(world.last.status == 201, s"作成できない: ${world.last.text}")
+  }
+
+  Then("""^ゲームが作成される$""") { () =>
+    require(world.last.status == 201, s"作成されていない: ${world.last.status} ${world.last.text}")
+  }
+
+  private def settingsOf(client: GameClient): (String, List[String]) =
+    val c = client.get(gamePath(client, "/state"), client.facilitator).json.hcursor
+    (
+      c.get[String]("settingsKind").getOrElse(""),
+      c.get[List[String]]("changedSettings").getOrElse(Nil)
+    )
+
+  private def requireSettings(kind: String, expected: List[String]): Unit =
+    val (actualKind, changed) = settingsOf(world.game)
+    require(actualKind == (if kind == "カスタム" then "CUSTOM" else "KIT"), s"種別が違う: $actualKind")
+    require(changed == expected, s"変更した項目が違う: $changed / $expected")
+
+  Then("""^ゲームの設定の種別は「(カスタム|キット準拠)」で、変更した項目は無い$""") { (kind: String) =>
+    requireSettings(kind, Nil)
+  }
+
+  Then("""^ゲームの設定の種別は「(カスタム|キット準拠)」で、変更した項目は(「.+」)である$""") { (kind: String, items: String) =>
+    requireSettings(
+      kind,
+      items.split("」「").toList.map(_.stripPrefix("「").stripSuffix("」")).map(fieldLabels)
+    )
+  }
+
+  When("""^進行役が、キットの値のままの条件を指定して、ゲームをカスタムで作成する$""") { () =>
+    world.games = List(GameClient.fresh())
+    val kit = Json.obj(
+      "initialInventory" -> Json.fromFields(allRoles.map(_ -> Json.fromInt(12))),
+      "initialFlow" -> Json.fromInt(4),
+      "orderDelayWeeks" -> Json.fromInt(2),
+      "shipmentDelayWeeks" -> Json.fromInt(2),
+      "productionDelayWeeks" -> Json.fromInt(2),
+      "holdingCostMinor" -> Json.fromInt(50),
+      "backlogCostMinor" -> Json.fromInt(100),
+      "disclosurePolicy" -> Json.fromString("TEAM_TOTAL")
+    )
+    world.last = createWith(world.game, createBody("CUSTOM", Some(kit), None))
+  }
+
+  When("""^進行役が、キット準拠の作成に、配送の遅延 3 週の条件を付けて作成しようとする$""") { () =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(
+      world.game,
+      createBody("KIT", Some(Json.obj("shipmentDelayWeeks" -> Json.fromInt(3))), None)
+    )
+  }
+
+  private def errorsOf(reply: Reply): List[io.circe.ACursor] =
+    reply.json.hcursor
+      .downField("errors")
+      .values
+      .map(_.toList.map(_.hcursor))
+      .getOrElse(Nil)
+
+  Then("""^誤りの対象は「条件」であり、カスタムで作成するという修正内容が示される$""") { () =>
+    require(world.last.status == 422, s"422 でない: ${world.last.status}")
+    require(
+      errorsOf(world.last).exists(e =>
+        e.get[String]("field").contains("conditions") &&
+          e.get[String]("message").exists(_.contains("カスタム"))
+      ),
+      s"誤りが違う: ${world.last.text}"
+    )
+  }
+
+  Then("""^小売店の第 1 週の在庫は (\d+) である$""") { (inventory: Int) =>
+    val roles = world.game
+      .get(sessionPath(world.game, "/state"), world.game.facilitator)
+      .json
+      .hcursor
+      .downField("roles")
+    require(roles.downField("RETAILER").get[Int]("inventory").contains(inventory), "在庫が違う")
+  }
+
+  Then("""^誤りの対象は「(.+)」であり、「(.+)」にするという修正内容が示される$""") { (target: String, fix: String) =>
+    require(world.last.status == 422, s"422 でない: ${world.last.status}")
+    require(
+      errorsOf(world.last).exists(e =>
+        e.get[String]("field").exists(f => f == target || f.endsWith(s".$target")) &&
+          e.get[String]("message").exists(_.contains(fix))
+      ),
+      s"誤りが違う: ${world.last.text}"
+    )
+  }
+
+  Then("""^誤りの対象として「(.+)」と「(.+)」の両方が示される$""") { (a: String, b: String) =>
+    val fields = errorsOf(world.last).flatMap(_.get[String]("field").toOption)
+    require(fields.exists(_.endsWith(a)) && fields.exists(_.endsWith(b)), s"対象が足りない: $fields")
+  }
+
+  // 確定方式
+  private def commitModeOf(client: GameClient): String =
+    client
+      .get(gamePath(client, "/state"), client.facilitator)
+      .json
+      .hcursor
+      .get[String]("commitMode")
+      .getOrElse("")
+
+  Then("""^ゲームの確定方式は「(手動確定|自動確定)」である$""") { (label: String) =>
+    require(
+      commitModeOf(world.game) == (if label == "自動確定" then "AUTO" else "MANUAL"),
+      s"確定方式が違う: ${commitModeOf(world.game)}"
+    )
+  }
+
+  When("""^進行役が、自動確定を有効にして、ゲームを作成する$""") { () =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(world.game, createBody("KIT", None, Some("AUTO")))
+  }
+
+  Given("""^進行役が、自動確定を有効にして、ゲームを作成している$""") { () =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(world.game, createBody("KIT", None, Some("AUTO")))
+    require(world.last.status == 201, s"作成できない: ${world.last.text}")
+  }
+
+  When("""^進行役が、確定方式「(.+)」で、ゲームを作成しようとする$""") { (mode: String) =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(world.game, createBody("KIT", None, Some(mode)))
+  }
+
+  Then("""^誤りの対象は「commitMode」であり、MANUAL か AUTO にするという修正内容が示される$""") { () =>
+    require(world.last.status == 422, s"422 でない: ${world.last.status}")
+    require(
+      errorsOf(world.last).exists(e =>
+        e.get[String]("field").contains("commitMode") &&
+          e.get[String]("message").exists(_.contains("MANUAL か AUTO"))
+      ),
+      s"誤りが違う: ${world.last.text}"
+    )
+  }
+
+  private def setMode(cookie: Option[String], mode: String): Reply =
+    world.game.put(
+      sessionPath(world.game, "/commit-mode"),
+      Json.obj("commitMode" -> Json.fromString(mode)),
+      cookie,
+      None
+    )
+
+  When("""^進行役が、自動確定を(有効|無効)にする$""") { (label: String) =>
+    world.last = setMode(world.game.facilitator, if label == "有効" then "AUTO" else "MANUAL")
+    require(world.last.status == 200, s"変更できない: ${world.last.text}")
+  }
+
+  When("""^(.+)の参加者が、自動確定を無効にしようとする$""") { (label: String) =>
+    world.last = setMode(world.game.players.get(role(label)), "MANUAL")
+  }
+
+  When("""^(.+)の参加者が、第 (\d+) 週の数量として (\d+) を保存する$""") { (label: String, week: Int, quantity: Int) =>
+    world.last = saveAt(world.game, role(label), week, quantity)
+    require(world.last.status == 200, s"保存できない: ${world.last.text}")
+  }
+
+  When("""^進行役が、最終週 (\d+) の設定でゲームを作成しようとする$""") { (finalWeek: Int) =>
+    world.games = List(GameClient.fresh())
+    world.last = createWith(world.game, demandBody(finalWeek, Map.empty))
+  }
+
+  Then("""^最終週は (\d+) 以上 (\d+) 以下の整数にするという修正内容が示される$""") { (min: Int, max: Int) =>
+    require(world.last.status == 422, s"422 でない: ${world.last.status}")
+    require(
+      errorsOf(world.last).exists(_.get[String]("message").exists(_.contains(s"$min 以上 $max 以下"))),
+      s"修正内容が違う: ${world.last.text}"
+    )
+  }

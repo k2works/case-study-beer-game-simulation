@@ -110,3 +110,48 @@ class SimulateWeekSpec extends ScalaCheckSuite:
       }
     }
   }
+
+  // ---- B6: 可変の遅延（1〜8 週）でも、計算の性質が保たれる ----
+
+  private val genDelay: Gen[Int] = Gen.choose(1, 8)
+
+  private def stateWith(order: Int, shipment: Int, production: Int, inventory: Int) =
+    KitPreset.initialStates(
+      demand,
+      InitialConditions(RoleMap.all(Units.trusted(inventory)), Units.trusted(4)),
+      Delays(Delay(order), Delay(shipment), Delay(production))
+    )
+
+  private def unitsInPipelines(states: RoleMap[RoleState]): Long =
+    states.values.map(s => (s.orderPipeline.weeks ++ s.deliveryPipeline.weeks).map(_.value).sum).sum
+
+  property("[B6 遅延] どの遅延でも、待ち行列の長さは週を通して変わらない（遅延 - 1 段）") {
+    forAll(genDelay, genDelay, genDelay, genDecisions) { (order, shipment, production, ds) =>
+      val before = stateWith(order, shipment, production, 12)
+      val after = simulateWeek(settings, week(1), before, ds).nextStates
+      Role.values.toList.forall { role =>
+        before(role).orderPipeline.weeks.size == after(role).orderPipeline.weeks.size &&
+        before(role).deliveryPipeline.weeks.size == after(role).deliveryPipeline.weeks.size
+      }
+    }
+  }
+
+  property("[B6 遅延] どの遅延・初期在庫でも、在庫・受注残は負にならず、同時に正にもならない") {
+    forAll(genDelay, genDelay, genDelay, Gen.choose(0, 1000), genDecisions) {
+      (order, shipment, production, inventory, ds) =>
+        val outcome =
+          simulateWeek(settings, week(1), stateWith(order, shipment, production, inventory), ds)
+        outcome.results.values.forall(r =>
+          r.endingInventory.value >= 0L && r.endingBacklog.value >= 0L &&
+            (r.endingInventory.value == 0L || r.endingBacklog.value == 0L)
+        )
+    }
+  }
+
+  test("[B6 遅延] 配送の遅延が 1 週なら、当週の出荷は次週に下流の入荷になる") {
+    val states = stateWith(2, 1, 2, 12)
+    val outcome = simulateWeek(settings, week(1), states, decisions(4, 4, 4, 4))
+    // 一次卸の出荷（4）は、遅延 1 週で、二次卸の次週の入荷になる
+    assertEquals(outcome.nextStates(Role.Wholesaler).arrivals.value, 4L)
+    assert(unitsInPipelines(outcome.nextStates) >= 0L)
+  }

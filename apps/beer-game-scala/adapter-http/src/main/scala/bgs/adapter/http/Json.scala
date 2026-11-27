@@ -23,6 +23,16 @@ object JsonViews:
       "session" -> orNull(v.session.map(Json.fromLong))
     )
 
+  def parseCommitMode(raw: String): Option[CommitMode] = raw match
+    case "MANUAL" => Some(CommitMode.Manual)
+    case "AUTO"   => Some(CommitMode.Auto)
+    case _        => None
+
+  def parseDisclosure(raw: String): Option[DisclosurePolicy] = raw match
+    case "TEAM_TOTAL" => Some(DisclosurePolicy.TeamTotal)
+    case "NONE"       => Some(DisclosurePolicy.None)
+    case _            => None
+
   def commandResponse(v: Versions): Json = Json.obj("versions" -> versions(v))
 
   private def statusName(status: GameStatus): String = status match
@@ -30,6 +40,20 @@ object JsonViews:
     case GameStatus.Started   => "STARTED"
     case GameStatus.Paused    => "STARTED"
     case GameStatus.Ended     => "ENDED"
+
+  private def kindName(kind: SettingsKind): String = kind match
+    case SettingsKind.Kit    => "KIT"
+    case SettingsKind.Custom => "CUSTOM"
+
+  private def fieldName(field: SettingsField): Json = Json.fromString(field match
+    case SettingsField.InitialInventory => "INITIAL_INVENTORY"
+    case SettingsField.InitialFlow      => "INITIAL_FLOW"
+    case SettingsField.OrderDelay       => "ORDER_DELAY"
+    case SettingsField.ShipmentDelay    => "SHIPMENT_DELAY"
+    case SettingsField.ProductionDelay  => "PRODUCTION_DELAY"
+    case SettingsField.HoldingCost      => "HOLDING_COST"
+    case SettingsField.BacklogCost      => "BACKLOG_COST"
+    case SettingsField.Disclosure       => "DISCLOSURE")
 
   private def commitModeName(mode: CommitMode): String = mode match
     case CommitMode.Manual => "MANUAL"
@@ -40,8 +64,8 @@ object JsonViews:
       "gameId" -> Some(Json.fromString(view.gameId.value.toString)),
       "sessionId" -> Some(orNull(view.sessionId.map(id => Json.fromString(id.value.toString)))),
       "status" -> Some(Json.fromString(statusName(view.status))),
-      "settingsKind" -> Some(Json.fromString("KIT")),
-      "changedSettings" -> Some(Json.arr()),
+      "settingsKind" -> Some(Json.fromString(kindName(view.settingsKind))),
+      "changedSettings" -> Some(Json.fromValues(view.changedSettings.map(fieldName))),
       "commitMode" -> Some(Json.fromString(commitModeName(view.commitMode))),
       "joinCode" -> view.joinCode.map(Json.fromString),
       "finalWeek" -> view.finalWeek.map(Json.fromInt),
@@ -55,8 +79,8 @@ object JsonViews:
       "gameId" -> Json.fromString(view.gameId.value.toString),
       "status" -> Json.fromString(statusName(view.status)),
       "joinCode" -> Json.fromString(view.joinCode),
-      "settingsKind" -> Json.fromString("KIT"),
-      "changedSettings" -> Json.arr(),
+      "settingsKind" -> Json.fromString(kindName(view.settingsKind)),
+      "changedSettings" -> Json.fromValues(view.changedSettings.map(fieldName)),
       "commitMode" -> Json.fromString(commitModeName(view.commitMode)),
       "participants" -> Json.fromValues(view.participants.map { p =>
         Json.obj(
@@ -171,6 +195,14 @@ object JsonViews:
         obj(
           "field" -> Some(Json.fromString("retentionDays")),
           "message" -> Some(Json.fromString("保持日数は 1 以上 3650 以下で指定してください。"))
+        )
+      case ValidationError.ConditionOutOfRange(field, reason) =>
+        obj(
+          "field" -> Some(
+            Json.fromString(if field == "conditions" || field == "commitMode" then field
+            else s"conditions.$field")
+          ),
+          "message" -> Some(Json.fromString(reason))
         )
       case other =>
         obj(

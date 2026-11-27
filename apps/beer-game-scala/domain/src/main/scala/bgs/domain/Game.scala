@@ -14,17 +14,58 @@ import java.time.Instant
 enum CommitMode:
   case Manual, Auto
 
-/** ゲーム設定。B1 はキット準拠（初期条件・遅延・費用方針は [[KitPreset]] の値）だけを作る。カスタム条件は B6。 */
+/** プレイ中に観察者へ見せる範囲（B6 は設定として保存するだけ。実際の開示は B9）。 */
+enum DisclosurePolicy:
+  case TeamTotal, None
+
+/** 設定の種別。キットの値と同じなら [[Kit]]、違えば [[Custom]]（確定方式・最終週・需要系列は、判定に含めない）。 */
+enum SettingsKind:
+  case Kit, Custom
+
+/** キットの値から変えた項目（AC1.1.3）。宣言の順が、表示の順。 */
+enum SettingsField:
+  case InitialInventory, InitialFlow, OrderDelay, ShipmentDelay, ProductionDelay, HoldingCost,
+    BacklogCost, Disclosure
+
+/** カスタム条件の入力（省略した項目は、キットの値）。範囲の検証は [[GameSettings.custom]]。 */
+final case class CustomConditions(
+    initialInventory: Map[Role, Int],
+    initialFlow: Option[Int],
+    orderDelayWeeks: Option[Int],
+    shipmentDelayWeeks: Option[Int],
+    productionDelayWeeks: Option[Int],
+    holdingCostMinor: Option[Int],
+    backlogCostMinor: Option[Int],
+    disclosurePolicy: Option[DisclosurePolicy]
+)
+
+/** ゲーム設定。キット準拠（[[KitPreset]]）か、カスタム条件（B6）。 */
 final case class GameSettings(
     finalWeek: Week,
     demand: DemandSeries,
     costPolicy: CostPolicy,
     commitMode: CommitMode,
     initial: InitialConditions,
-    delays: Delays
+    delays: Delays,
+    disclosure: DisclosurePolicy
 ):
   /** 週次計算に渡す最小の設定。 */
   def simulation: SimulationSettings = SimulationSettings(finalWeek, demand, costPolicy)
+
+  /** キットの値から変えた項目（確定方式・最終週・需要系列は含めない）。 */
+  def changedFields: List[SettingsField] =
+    List(
+      SettingsField.InitialInventory -> (initial.inventory != KitPreset.initialConditions.inventory),
+      SettingsField.InitialFlow -> (initial.flow != KitPreset.initialConditions.flow),
+      SettingsField.OrderDelay -> (delays.order != KitPreset.delays.order),
+      SettingsField.ShipmentDelay -> (delays.shipment != KitPreset.delays.shipment),
+      SettingsField.ProductionDelay -> (delays.production != KitPreset.delays.production),
+      SettingsField.HoldingCost -> (costPolicy.holding != KitPreset.costPolicy.holding),
+      SettingsField.BacklogCost -> (costPolicy.backlog != KitPreset.costPolicy.backlog),
+      SettingsField.Disclosure -> (disclosure != DisclosurePolicy.TeamTotal)
+    ).collect { case (field, true) => field }
+
+  def kind: SettingsKind = if changedFields.isEmpty then SettingsKind.Kit else SettingsKind.Custom
 
 object GameSettings:
 
@@ -36,16 +77,69 @@ object GameSettings:
       demand: List[Int],
       commitMode: CommitMode
   ): ValidatedNec[ValidationError, GameSettings] =
+    custom(
+      finalWeek,
+      demand,
+      commitMode,
+      CustomConditions(Map.empty, None, None, None, None, None, None, None)
+    )
+
+  private def bounded(
+      field: String,
+      value: Int,
+      min: Int,
+      max: Int
+  ): ValidatedNec[ValidationError, Int] =
+    if value >= min && value <= max then value.validNec
+    else
+      ValidationError
+        .ConditionOutOfRange(field, s"$min 以上 $max 以下の整数にしてください")
+        .invalidNec
+
+  /** カスタム条件つきの設定。範囲外の値は、対象の項目ごとにすべて集める（AC1.1.4）。省略した項目は、キットの値。 */
+  def custom(
+      finalWeek: Int,
+      demand: List[Int],
+      commitMode: CommitMode,
+      conditions: CustomConditions
+  ): ValidatedNec[ValidationError, GameSettings] =
     val week = Week.of(finalWeek).toValidatedNec
     val series = DemandSeries.of(demand, Week.of(finalWeek).getOrElse(Week.first))
-    (week, series).mapN { (w, s) =>
+    val kitInitial = KitPreset.initialConditions
+    val inventories = Role.values.toList.traverse(role =>
+      conditions.initialInventory
+        .get(role)
+        .fold(kitInitial.inventory(role).validNec[ValidationError])(n =>
+          bounded("initialInventory", n, 0, 1000).map(Units.trusted(_))
+        )
+    )
+    val flow = conditions.initialFlow.fold(kitInitial.flow.validNec[ValidationError])(n =>
+      bounded("initialFlow", n, 0, 1000).map(Units.trusted(_))
+    )
+    def delay(field: String, value: Option[Int], kit: Delay) =
+      value.fold(kit.validNec[ValidationError])(n => bounded(field, n, 1, 8).map(Delay(_)))
+    def cost(field: String, value: Option[Int], kit: Money) =
+      value.fold(kit.validNec[ValidationError])(n =>
+        bounded(field, n, 0, 100000).map(Money.trusted(_))
+      )
+    val delays = (
+      delay("orderDelayWeeks", conditions.orderDelayWeeks, KitPreset.delays.order),
+      delay("shipmentDelayWeeks", conditions.shipmentDelayWeeks, KitPreset.delays.shipment),
+      delay("productionDelayWeeks", conditions.productionDelayWeeks, KitPreset.delays.production)
+    ).mapN(Delays.apply)
+    val costs = (
+      cost("holdingCostMinor", conditions.holdingCostMinor, KitPreset.costPolicy.holding),
+      cost("backlogCostMinor", conditions.backlogCostMinor, KitPreset.costPolicy.backlog)
+    ).mapN(CostPolicy.apply)
+    (week, series, inventories, flow, delays, costs).mapN { (w, s, inv, f, d, c) =>
       GameSettings(
         w,
         s,
-        KitPreset.costPolicy,
+        c,
         commitMode,
-        KitPreset.initialConditions,
-        KitPreset.delays
+        InitialConditions(RoleMap.of(role => inv(role.ordinal)), f),
+        d,
+        conditions.disclosurePolicy.getOrElse(DisclosurePolicy.TeamTotal)
       )
     }
 

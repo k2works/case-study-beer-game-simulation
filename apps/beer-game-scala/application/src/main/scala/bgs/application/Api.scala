@@ -1,6 +1,7 @@
 package bgs.application
 
 import bgs.domain.*
+import cats.data.ValidatedNec
 import cats.effect.{IO, Ref}
 import cats.syntax.all.*
 import doobie.ConnectionIO
@@ -90,7 +91,16 @@ final case class Env(
 
 final case class Versions(game: Option[Long], session: Option[Long])
 
-final case class CreateGameInput(finalWeek: Int, demand: List[Int], retentionDays: Option[Int])
+/** ゲームの作成の入力。[[custom]] は種別 `CUSTOM`。[[formErrors]] は、境界で読めなかった項目（役割名・公開範囲・確定方式の値）の誤り。 */
+final case class CreateGameInput(
+    finalWeek: Int,
+    demand: List[Int],
+    retentionDays: Option[Int],
+    custom: Boolean,
+    conditions: Option[CustomConditions],
+    commitMode: CommitMode,
+    formErrors: List[ValidationError]
+)
 final case class Created(
     gameId: GameId,
     facilitatorToken: String,
@@ -125,6 +135,8 @@ final case class GameStateView(
     sessionId: Option[GameId],
     status: GameStatus,
     commitMode: CommitMode,
+    settingsKind: SettingsKind,
+    changedSettings: List[SettingsField],
     joinCode: Option[String],
     finalWeek: Option[Int],
     participantId: Option[ParticipantId],
@@ -143,6 +155,8 @@ final case class LobbyView(
     status: GameStatus,
     joinCode: String,
     commitMode: CommitMode,
+    settingsKind: SettingsKind,
+    changedSettings: List[SettingsField],
     participants: List[LobbyParticipantView],
     versions: Versions
 )
@@ -357,11 +371,28 @@ object Api:
       input: CreateGameInput,
       codeRaw: String
   ): Either[AppFailure, (GameSettings, JoinCode, RetentionDays)] =
-    val settings = GameSettings.kit(input.finalWeek, input.demand, CommitMode.Manual)
+    val conditionsForKit: ValidatedNec[ValidationError, Unit] =
+      if !input.custom && input.conditions.isDefined then
+        ValidationError
+          .ConditionOutOfRange("conditions", "条件を変えるときは、カスタムで作成してください")
+          .invalidNec
+      else ().validNec
+    val form: ValidatedNec[ValidationError, Unit] =
+      input.formErrors.traverse_(e => e.invalidNec[Unit])
+    val settings = GameSettings.custom(
+      input.finalWeek,
+      input.demand,
+      input.commitMode,
+      input.conditions.getOrElse(
+        CustomConditions(Map.empty, None, None, None, None, None, None, None)
+      )
+    )
     val retention = RetentionDays
       .of(input.retentionDays.getOrElse(DefaultRetentionDays))
       .toValidatedNec
-    (settings, retention).tupled.toEither
+    (form, conditionsForKit, settings, retention).tupled
+      .map((_, _, s, r) => (s, r))
+      .toEither
       .leftMap(errors => AppFailure.Invalid(errors.toNonEmptyList.toList))
       .flatMap { (s, r) =>
         JoinCode
@@ -573,6 +604,16 @@ object Api:
       Recovered(gameId, isFacilitator, role, token, v)
     }
 
+  /** 確定方式を変える（進行役だけ。AC2.4.5）。自動にした時点で入力がそろっていれば、同じ追記で確定する。 */
+  def setCommitMode(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      mode: CommitMode
+  ): IO[Either[AppFailure, Versions]] =
+    withActor(env)(caller, gameId) { (actor, now) =>
+      Application.handleSession(env.ports)(gameId, SessionCommand.SetCommitMode(actor, now, mode))
+    }
+
   def pauseSession(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, Versions]] =
     withActor(env)(caller, gameId) { (actor, now) =>
       Application.handleSession(env.ports)(gameId, SessionCommand.PauseSession(actor, now))
@@ -623,6 +664,12 @@ object Api:
     case (GameState.Preparing(_, _), _)                   => GameStatus.Preparing
     case (GameState.NotCreated, _)                        => GameStatus.Preparing
 
+  /** 現在の確定方式。開始後は session が持つ（進行役が変えられる。AC2.4.5）。開始前は作成時の設定。 */
+  private def currentCommitMode(data: GameData, session: SessionState): CommitMode = session match
+    case SessionState.Active(d, _) => d.commitMode
+    case SessionState.Ended(d, _)  => d.commitMode
+    case SessionState.NotStarted   => data.settings.commitMode
+
   /** ゲームの状態。呼び出した人ごとの投影（進行役は参加コードと最終週、参加者は自分の ID と役割）。 */
   def gameStateView(
       env: Env
@@ -645,7 +692,9 @@ object Api:
                 gameId = gameId,
                 sessionId = Some(gameId).filter(_ => session != SessionState.NotStarted),
                 status = statusOf(game, session),
-                commitMode = data.settings.commitMode,
+                commitMode = currentCommitMode(data, session),
+                settingsKind = data.settings.kind,
+                changedSettings = data.settings.changedFields,
                 joinCode = Some(data.joinCode.value).filter(_ => own.isEmpty),
                 finalWeek = Some(data.settings.finalWeek.value).filter(_ => own.isEmpty),
                 participantId = own,
@@ -671,7 +720,9 @@ object Api:
                 gameId,
                 statusOf(game, session),
                 data.joinCode.value,
-                data.settings.commitMode,
+                currentCommitMode(data, session),
+                data.settings.kind,
+                data.settings.changedFields,
                 data.participants.toList.map((id, role) =>
                   LobbyParticipantView(id, names.get(id), role)
                 ),

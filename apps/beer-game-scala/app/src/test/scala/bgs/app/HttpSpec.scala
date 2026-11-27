@@ -928,3 +928,198 @@ class HttpSpec extends CatsEffectSuite:
         assert(retailerStatus.get[Int]("decision").toOption.exists(Set(5, 77)))
     }
   }
+
+  private def createWith(app: HttpApp[IO], body: Json) = post(app, "/api/v1/games", body, None)
+
+  test("[AC1.1.3・1.1.4] カスタム条件で作成すると、状態に種別と変更した項目が示され、範囲外・KIT への条件は 422") {
+    freshApp.flatMap { app =>
+      val base = kitBody()
+      def withFields(kind: String, conditions: Json, extra: (String, Json)*) =
+        base.mapObject(
+          _.add("kind", Json.fromString(kind))
+            .add("conditions", conditions)
+            .deepMerge(io.circe.JsonObject.fromIterable(extra))
+        )
+      for
+        ok <- createWith(
+          app,
+          withFields(
+            "CUSTOM",
+            Json.obj(
+              "initialInventory" -> Json.obj("RETAILER" -> Json.fromInt(20)),
+              "shipmentDelayWeeks" -> Json.fromInt(3),
+              "disclosurePolicy" -> Json.fromString("NONE")
+            )
+          )
+        )
+        gameId = ok.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = ok.cookie)
+        lobby <- call(app, Method.GET, s"/api/v1/games/$gameId/lobby", cookie = ok.cookie)
+        outOfRange <- createWith(
+          app,
+          withFields(
+            "CUSTOM",
+            Json.obj(
+              "shipmentDelayWeeks" -> Json.fromInt(0),
+              "initialFlow" -> Json.fromString("many"),
+              "initialInventory" -> Json.obj("NOBODY" -> Json.fromInt(1)),
+              "disclosurePolicy" -> Json.fromString("ALL")
+            ),
+            "commitMode" -> Json.fromString("SOMETIMES")
+          )
+        )
+        kitWithConditions <- createWith(
+          app,
+          withFields("KIT", Json.obj("shipmentDelayWeeks" -> Json.fromInt(3)))
+        )
+      yield
+        assertEquals(ok.status, 201)
+        assertEquals(state.str("settingsKind"), Some("CUSTOM"))
+        assertEquals(
+          state.json.hcursor.get[List[String]]("changedSettings").toOption,
+          Some(List("INITIAL_INVENTORY", "SHIPMENT_DELAY", "DISCLOSURE"))
+        )
+        assertEquals(lobby.str("settingsKind"), Some("CUSTOM"))
+        assertEquals(outOfRange.status, 422)
+        val fields = outOfRange.json.hcursor
+          .downField("errors")
+          .values
+          .map(_.toList.flatMap(_.hcursor.get[String]("field").toOption))
+          .getOrElse(Nil)
+        assert(fields.contains("conditions.shipmentDelayWeeks"), fields.toString)
+        assert(fields.contains("commitMode"), fields.toString)
+        assertEquals(kitWithConditions.status, 422)
+    }
+  }
+
+  test("[AC2.4.*] 確定方式を変える（形の誤りは拒否）。自動のゲームは、最後の保存で確定し、手動の確定は週の進行で拒否される") {
+    freshApp.flatMap { app =>
+      for
+        created <- createWith(
+          app,
+          kitBody().mapObject(_.add("commitMode", Json.fromString("AUTO")))
+        )
+        facilitator = created.cookie.getOrElse(fail("Cookie が無い"))
+        gameId = created.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(facilitator))
+        code = state.str("joinCode").getOrElse(fail("joinCode"))
+        players <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            )
+              .map(_ => role -> cookie)
+          }
+        }
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        saves <- players.traverse { (_, cookie) =>
+          put(
+            app,
+            sessionPath(gameId, "/decisions"),
+            Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+            Some(cookie)
+          )
+        }
+        after <- call(app, Method.GET, sessionPath(gameId, "/state"), cookie = Some(facilitator))
+        manual <- post(
+          app,
+          sessionPath(gameId, "/weeks/1/commit"),
+          Json.obj(
+            "requestedWeek" -> Json.fromInt(1),
+            "basis" -> Json.fromFields(roles.map(_ -> Json.fromLong(1L)))
+          ),
+          Some(facilitator)
+        )
+        bad <- put(
+          app,
+          sessionPath(gameId, "/commit-mode"),
+          Json.obj("commitMode" -> Json.fromString("X")),
+          Some(facilitator)
+        )
+        off <- put(
+          app,
+          sessionPath(gameId, "/commit-mode"),
+          Json.obj("commitMode" -> Json.fromString("MANUAL")),
+          Some(facilitator)
+        )
+      yield
+        assert(saves.forall(_.status == 200))
+        assertEquals(after.json.hcursor.get[Int]("week").toOption, Some(2))
+        assertEquals((manual.status, manual.code), (409, Some("session.week_advanced")))
+        assert(bad.status >= 400)
+        assertEquals(off.status, 200)
+    }
+  }
+
+  test("[AC2.4.4 並行] 最後の入力の自動確定と、進行役の手動の確定が同時でも、週は一度だけ確定される") {
+    freshApp.flatMap { app =>
+      for
+        created <- createWith(
+          app,
+          kitBody().mapObject(_.add("commitMode", Json.fromString("AUTO")))
+        )
+        facilitator = created.cookie.getOrElse(fail("Cookie が無い"))
+        gameId = created.headers
+          .get(CIString("Location"))
+          .flatMap(_.toList.headOption)
+          .map(_.value.split("/").reverse.drop(1).headOption.getOrElse(""))
+          .getOrElse("")
+        state <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(facilitator))
+        code = state.str("joinCode").getOrElse(fail("joinCode"))
+        players <- roles.zipWithIndex.traverse { (role, i) =>
+          join(app, code, s"参加者$i").flatMap { (cookie, id) =>
+            put(
+              app,
+              s"/api/v1/games/$gameId/participants/$id/role",
+              Json.obj("role" -> Json.fromString(role)),
+              Some(facilitator)
+            )
+              .map(_ => role -> cookie)
+          }
+        }
+        _ <- post(app, s"/api/v1/games/$gameId/start", Json.obj(), Some(facilitator))
+        _ <- players.take(3).traverse { (_, cookie) =>
+          put(
+            app,
+            sessionPath(gameId, "/decisions"),
+            Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+            Some(cookie)
+          )
+        }
+        last = players.drop(3).map(_._2).headOption.getOrElse(fail("4 人目が無い"))
+        both <- IO.both(
+          put(
+            app,
+            sessionPath(gameId, "/decisions"),
+            Json.obj("week" -> Json.fromInt(1), "quantity" -> Json.fromInt(4)),
+            Some(last)
+          ),
+          post(
+            app,
+            sessionPath(gameId, "/weeks/1/commit"),
+            Json.obj(
+              "requestedWeek" -> Json.fromInt(1),
+              "basis" -> Json.fromFields(roles.map(_ -> Json.fromLong(1L)))
+            ),
+            Some(facilitator)
+          )
+        )
+        after <- call(app, Method.GET, sessionPath(gameId, "/state"), cookie = Some(facilitator))
+      yield
+        val results = after.json.hcursor.downField("results").values.map(_.size).getOrElse(0)
+        assertEquals(results, 4) // 1 週 × 4 役割。二重に計上されない
+        assertEquals(after.json.hcursor.get[Int]("week").toOption, Some(2))
+        assert(both._1.status == 200 || both._2.status == 200)
+    }
+  }

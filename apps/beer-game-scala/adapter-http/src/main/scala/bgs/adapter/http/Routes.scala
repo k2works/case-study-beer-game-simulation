@@ -370,6 +370,68 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
       case None        => run
     }
 
+  /** 作成の本文を、入力へ読む。読めない項目（整数でない値・不明な役割名・不明な公開範囲・確定方式）は、項目ごとの誤りとして集める。 */
+  private def createInput(json: Json, finalWeek: Int, demand: List[Int]): CreateGameInput =
+    val c = json.hcursor
+    val cond = c.downField("conditions")
+    val present = cond.focus.exists(!_.isNull)
+    def intField(name: String): (Option[Int], List[ValidationError]) =
+      cond.downField(name).focus.filterNot(_.isNull) match
+        case None        => (None, Nil)
+        case Some(value) =>
+          value.asNumber.flatMap(_.toInt) match
+            case Some(n) => (Some(n), Nil)
+            case None    =>
+              (None, List(ValidationError.ConditionOutOfRange(name, "整数で指定してください")))
+    val inventoryEntries =
+      cond.downField("initialInventory").focus.flatMap(_.asObject).map(_.toList).getOrElse(Nil)
+    val inventory = inventoryEntries.map { (key, value) =>
+      (JsonViews.parseRole(key), value.asNumber.flatMap(_.toInt)) match
+        case (Some(role), Some(n)) => Right(role -> n)
+        case _                     =>
+          Left(
+            ValidationError.ConditionOutOfRange("initialInventory", "役割ごとの整数で指定してください")
+          )
+    }
+    val (flow, e1) = intField("initialFlow")
+    val (order, e2) = intField("orderDelayWeeks")
+    val (shipment, e3) = intField("shipmentDelayWeeks")
+    val (production, e4) = intField("productionDelayWeeks")
+    val (holding, e5) = intField("holdingCostMinor")
+    val (backlog, e6) = intField("backlogCostMinor")
+    val disclosureRaw = cond.downField("disclosurePolicy").focus.filterNot(_.isNull)
+    val disclosure = disclosureRaw.map(v => v.asString.flatMap(JsonViews.parseDisclosure))
+    val e7 = disclosure.collect { case None =>
+      ValidationError.ConditionOutOfRange("disclosurePolicy", "TEAM_TOTAL か NONE にしてください")
+    }.toList
+    val modeRaw = c.downField("commitMode").focus.filterNot(_.isNull)
+    val mode = modeRaw.map(v => v.asString.flatMap(JsonViews.parseCommitMode))
+    val e8 = mode.collect { case None =>
+      ValidationError.ConditionOutOfRange("commitMode", "MANUAL か AUTO にしてください")
+    }.toList
+    CreateGameInput(
+      finalWeek,
+      demand,
+      c.get[Int]("retentionDays").toOption,
+      custom = c.get[String]("kind").contains("CUSTOM"),
+      conditions = Some(
+        CustomConditions(
+          inventory.collect { case Right(entry) => entry }.toMap,
+          flow,
+          order,
+          shipment,
+          production,
+          holding,
+          backlog,
+          disclosure.flatten
+        )
+      ).filter(_ => present),
+      commitMode = mode.flatten.getOrElse(CommitMode.Manual),
+      formErrors = inventory.collect { case Left(e) =>
+        e
+      } ++ e1 ++ e2 ++ e3 ++ e4 ++ e5 ++ e6 ++ e7 ++ e8
+    )
+
   private def parseUuid(raw: String): Option[UUID] =
     Either.catchNonFatal(UUID.fromString(raw)).toOption
 
@@ -445,7 +507,7 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                   case (Right(finalWeek), Right(demand)) =>
                     Api
                       .createGame(env)(
-                        CreateGameInput(finalWeek, demand, c.get[Int]("retentionDays").toOption)
+                        createInput(json, finalWeek, demand)
                       )
                       .map {
                         case Left(failure)  => failureOutcome(failure, ctx.correlation)
@@ -820,6 +882,28 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
                         "subject は kind が PARTICIPANT で、id が UUID のオブジェクトで指定してください。"
                       )
                     )
+              }
+            }
+          )
+        }
+
+      case req @ PUT -> Root / "api" / "v1" / "sessions" / UuidVar(sessionUuid) / "commit-mode" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (json, text) =>
+              idempotentAuth(req, ctx, text) {
+                json.hcursor
+                  .get[String]("commitMode")
+                  .toOption
+                  .flatMap(JsonViews.parseCommitMode) match
+                  case Some(mode) =>
+                    Api
+                      .setCommitMode(env)(ctx.caller, GameId(sessionUuid), mode)
+                      .map(versionsOutcome(_, ctx.correlation))
+                  case None =>
+                    IO.pure(shapeError(ctx.correlation, "commitMode", "MANUAL か AUTO にしてください。"))
               }
             }
           )

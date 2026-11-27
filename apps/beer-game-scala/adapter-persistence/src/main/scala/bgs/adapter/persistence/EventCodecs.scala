@@ -40,6 +40,7 @@ object EventCodecs:
   given Codec[CommitMode] = enumCodec(CommitMode.values, _.toString)
   given Codec[CommitKind] = enumCodec(CommitKind.values, _.toString)
   given Codec[EndReason] = enumCodec(EndReason.values, _.toString)
+  given Codec[DisclosurePolicy] = enumCodec(DisclosurePolicy.values, _.toString)
 
   given [A: Encoder: Decoder]: Codec[RoleMap[A]] = deriveCodec
   given Codec[Pipeline] = deriveCodec
