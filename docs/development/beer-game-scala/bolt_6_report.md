@@ -24,7 +24,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-27T05:30:00Z }
 | AC1.1.3〜1.1.5（カスタム条件・範囲外の検証・最終週） | 達成 | `game-setup/custom-conditions.feature` の全シナリオ（例の展開を含む） |
 | プロパティテスト（遅延が可変でも性質が保たれる） | 達成 | `SimulateWeekSpec`: 遅延 1〜8 週・初期在庫 0〜1000 で、待ち行列の長さ不変、在庫・受注残は負にならず同時に正にならない。遅延の下限は 1 のため「遅延 0」は範囲外（検証のテストで確認） |
 | 画面（AC1.1.3） | 達成 | `custom-conditions-ui.feature` が Scala のバックエンドで緑 |
-| CI 緑 | 確認待ち（push 後に記録） | |
+| CI 緑 | 確認済み | `8ada2728` で 3 ジョブ緑 |
 
 ## 仮説の検証結果
 
