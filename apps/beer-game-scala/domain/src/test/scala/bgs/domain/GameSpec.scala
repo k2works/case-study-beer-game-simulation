@@ -151,3 +151,76 @@ class GameSpec extends FunSuite:
     assertEquals(again.dataOrNone.map(_.revoked), Some(Set.empty[ParticipantId]))
     assertEquals(revoked.dataOrNone.map(_.revoked), Some(Set(who)))
   }
+
+  // ---- B9: 観察用の招待・観察者の参加（AC1.3.*） ----
+
+  private val invitation = InvitationId(
+    java.util.UUID.fromString("00000000-0000-0000-0000-0000000000a1")
+  )
+  private val observer = ObserverId(
+    java.util.UUID.fromString("00000000-0000-0000-0000-0000000000b1")
+  )
+  private val inviteExpiry = java.time.Instant.parse("2026-12-08T00:00:00Z")
+
+  private def invite(state: GameState, actor: Actor = facilitator) =
+    handle(state, GameCommand.InviteObserver(actor, at, invitation, inviteExpiry))
+
+  private def revokeInvitation(
+      state: GameState,
+      actor: Actor = facilitator,
+      id: InvitationId = invitation
+  ) =
+    handle(state, GameCommand.RevokeObserverInvitation(actor, at, id))
+
+  private def joinObserver(
+      state: GameState,
+      now: java.time.Instant = at,
+      id: InvitationId = invitation
+  ) =
+    handle(state, GameCommand.JoinAsObserver(Actor.Anonymous, now, id, observer))
+
+  test("[AC1.3.1・1.3.2] 進行役だけが招待を発行でき、準備中・開始後の両方で受け付ける") {
+    assertEquals(invite(fullGame), Right(List(GameEvent.ObserverInvited(invitation, inviteExpiry))))
+    assert(invite(fullGame, Actor.Participant(holder(Role.Retailer))).isLeft)
+    assert(invite(fullGame, Actor.Anonymous).isLeft)
+    val started = GameEvents.apply(fullGame, GameEvent.GameStarted(gameId))
+    assert(invite(started).isRight)
+  }
+
+  test("[AC1.3.3] 有効な招待で観察者が参加できる。参加者の一覧には載らない") {
+    val invited = applied(fullGame, invite(fullGame))
+    assertEquals(joinObserver(invited), Right(List(GameEvent.ObserverJoined(observer, invitation))))
+    val joined = applied(invited, joinObserver(invited))
+    assertEquals(joined.dataOrNone.map(_.observers), Some(Set(observer)))
+    assertEquals(
+      joined.dataOrNone.map(_.participants.size),
+      fullGame.dataOrNone.map(_.participants.size)
+    )
+  }
+
+  test("[AC1.3.4] 不明・失効・期限切れの招待は、区別せず game.invitation_invalid") {
+    val invited = applied(fullGame, invite(fullGame))
+    assertEquals(
+      joinObserver(invited, id = InvitationId(java.util.UUID.randomUUID)),
+      Left(GameError.InvitationInvalid)
+    )
+    assertEquals(
+      joinObserver(invited, now = inviteExpiry.plusSeconds(1)),
+      Left(GameError.InvitationInvalid)
+    )
+    val revoked = applied(invited, revokeInvitation(invited))
+    assertEquals(joinObserver(revoked), Left(GameError.InvitationInvalid))
+  }
+
+  test("[AC1.3.4] 失効は進行役だけ。すでに失効なら 409、無い招待は見つからない。参加済みの観察者は残る") {
+    val invited = applied(fullGame, invite(fullGame))
+    val joined = applied(invited, joinObserver(invited))
+    assert(revokeInvitation(joined, Actor.Participant(holder(Role.Retailer))).isLeft)
+    assertEquals(
+      revokeInvitation(joined, id = InvitationId(java.util.UUID.randomUUID)).left.map(_.code),
+      Left("game.invitation_not_found")
+    )
+    val revoked = applied(joined, revokeInvitation(joined))
+    assertEquals(revokeInvitation(revoked), Left(GameError.CredentialAlreadyRevoked))
+    assertEquals(revoked.dataOrNone.map(_.observers), Some(Set(observer)))
+  }

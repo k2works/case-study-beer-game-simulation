@@ -147,6 +147,10 @@ object GameSettings:
 enum CredentialSubject:
   case Facilitator(gameId: GameId)
   case Participant(id: ParticipantId)
+  case Observer(id: ObserverId)
+
+/** 観察用の招待（コードの値は持たない。ダイジェストは周辺ストア）。 */
+final case class ObserverInvitation(expiresAt: Instant, revoked: Boolean)
 
 final case class GameData(
     gameId: GameId,
@@ -156,7 +160,11 @@ final case class GameData(
     /** 資格の有効期限（進行役は作成時、参加者は参加時に発行する。失効・再発行・復帰は B4）。 */
     credentials: Map[CredentialSubject, Instant],
     /** 進行役が失効させた参加者（再発行で外れる。AC3.2.5）。 */
-    revoked: Set[ParticipantId]
+    revoked: Set[ParticipantId],
+    /** 観察用の招待（B9）。 */
+    invitations: Map[InvitationId, ObserverInvitation],
+    /** 参加した観察者（役割を持たない。参加者の一覧には含めない）。 */
+    observers: Set[ObserverId]
 ):
   /** 役割ごとの参加者（開始時に、Session へ写しとして渡す）。 */
   def roleAssignments: RoleMap[Set[ParticipantId]] =
@@ -225,6 +233,26 @@ object GameCommand:
   final case class RevokeCredential(actor: Actor, at: Instant, participantId: ParticipantId)
       extends GameCommand
 
+  /** 進行役が、観察用の招待を発行する（準備中・開始後の両方）。招待コードの値はイベントに入れない。 */
+  final case class InviteObserver(
+      actor: Actor,
+      at: Instant,
+      invitationId: InvitationId,
+      expiresAt: Instant
+  ) extends GameCommand
+
+  /** 進行役が、観察用の招待を失効させる。参加済みの観察者は、観察を続けられる。 */
+  final case class RevokeObserverInvitation(actor: Actor, at: Instant, invitationId: InvitationId)
+      extends GameCommand
+
+  /** 招待コードで、観察者として参加する（匿名）。不明・失効・期限切れは区別しない。 */
+  final case class JoinAsObserver(
+      actor: Actor,
+      at: Instant,
+      invitationId: InvitationId,
+      observerId: ObserverId
+  ) extends GameCommand
+
   /** 失効した資格を再発行する（新しい有効期限）。失効していなければ拒否する。 */
   final case class ReissueCredential(
       actor: Actor,
@@ -255,6 +283,15 @@ enum GameEvent:
   /** StartGame。進行役、準備中、各役割に 1 人以上。 */
   case GameStarted(gameId: GameId)
 
+  /** InviteObserver。 */
+  case ObserverInvited(invitationId: InvitationId, expiresAt: Instant)
+
+  /** RevokeObserverInvitation。 */
+  case InvitationRevoked(invitationId: InvitationId)
+
+  /** JoinAsObserver。 */
+  case ObserverJoined(observerId: ObserverId, invitationId: InvitationId)
+
   /** RevokeCredential。参加者の資格を失効させた。 */
   case CredentialRevoked(participantId: ParticipantId)
 
@@ -267,6 +304,9 @@ enum GameEvent:
     case GameEvent.RoleAssigned(_, _)         => "RoleAssigned"
     case GameEvent.RoleUnassigned(_, _)       => "RoleUnassigned"
     case GameEvent.GameStarted(_)             => "GameStarted"
+    case GameEvent.ObserverInvited(_, _)      => "ObserverInvited"
+    case GameEvent.InvitationRevoked(_)       => "InvitationRevoked"
+    case GameEvent.ObserverJoined(_, _)       => "ObserverJoined"
     case GameEvent.CredentialRevoked(_)       => "CredentialRevoked"
     case GameEvent.CredentialReissued(_, _)   => "CredentialReissued"
 
@@ -282,6 +322,7 @@ enum GameError(val code: String, val category: ErrorCategory) extends DomainErro
 
   /** まだ終了していないゲームの振り返りは開示しない（AC4.2.2）。 */
   case NotEnded extends GameError("game.not_ended", ErrorCategory.InvalidState)
+  case InvitationNotFound extends GameError("game.invitation_not_found", ErrorCategory.NotFound)
   case CredentialAlreadyRevoked
       extends GameError("game.credential_already_revoked", ErrorCategory.InvalidState)
   case CredentialNotRevoked
@@ -391,7 +432,37 @@ object Game:
         preparingData(state).map(_ =>
           List(GameEvent.ParticipantJoined(c.participantId, c.credentialExpiresAt))
         )
-      case c: GameCommand.AssignRole       => decideAssign(state, c)
+      case c: GameCommand.AssignRole     => decideAssign(state, c)
+      case c: GameCommand.InviteObserver =>
+        for
+          data <- anyData(state)
+          _ <- Either.cond(
+            c.actor.isFacilitatorOf(data.gameId),
+            (),
+            GameError.Forbidden("観察用の招待は進行役だけが発行できる")
+          )
+        yield List(GameEvent.ObserverInvited(c.invitationId, c.expiresAt))
+      case c: GameCommand.RevokeObserverInvitation =>
+        for
+          data <- anyData(state)
+          _ <- Either.cond(
+            c.actor.isFacilitatorOf(data.gameId),
+            (),
+            GameError.Forbidden("観察用の招待の失効は進行役だけができる")
+          )
+          invitation <- data.invitations.get(c.invitationId).toRight(GameError.InvitationNotFound)
+          _ <- Either.cond(!invitation.revoked, (), GameError.CredentialAlreadyRevoked)
+        yield List(GameEvent.InvitationRevoked(c.invitationId))
+      case c: GameCommand.JoinAsObserver =>
+        for
+          data <- anyData(state)
+          invitation <- data.invitations.get(c.invitationId).toRight(GameError.InvitationInvalid)
+          _ <- Either.cond(
+            !invitation.revoked && c.at.isBefore(invitation.expiresAt),
+            (),
+            GameError.InvitationInvalid
+          )
+        yield List(GameEvent.ObserverJoined(c.observerId, c.invitationId))
       case c: GameCommand.RevokeCredential =>
         credentialTarget(state, c.actor, c.participantId).flatMap { data =>
           Either.cond(
@@ -439,6 +510,8 @@ object GameEvents:
             settings,
             Map.empty,
             Map(CredentialSubject.Facilitator(gameId) -> facilitatorExpiresAt),
+            Set.empty,
+            Map.empty,
             Set.empty
           )
           GameState.Preparing(data, state.version.next)
@@ -459,6 +532,28 @@ object GameEvents:
       updateData(state)(_.withRole(participantId, Some(role)))
     case GameEvent.RoleUnassigned(participantId, _) =>
       updateData(state)(_.withRole(participantId, None))
+    case GameEvent.ObserverInvited(id, expiresAt) =>
+      updateData(state)(data =>
+        Some(
+          data.copy(invitations =
+            data.invitations.updated(id, ObserverInvitation(expiresAt, false))
+          )
+        )
+      )
+    case GameEvent.InvitationRevoked(id) =>
+      updateData(state)(data =>
+        data.invitations
+          .get(id)
+          .map(inv =>
+            data.copy(invitations = data.invitations.updated(id, inv.copy(revoked = true)))
+          )
+      )
+    case GameEvent.ObserverJoined(observerId, invitationId) =>
+      updateData(state)(data =>
+        Some(data)
+          .filter(_.invitations.contains(invitationId))
+          .map(d => d.copy(observers = d.observers + observerId))
+      )
     case GameEvent.CredentialRevoked(participantId) =>
       updateData(state)(data =>
         Some(data)

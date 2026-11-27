@@ -602,6 +602,111 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
           )
         }
 
+      case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "observation" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            Api
+              .observationView(env)(ctx.caller, GameId(gameUuid))
+              .map(_.fold(failureOutcome(_, ctx.correlation), v => ok(JsonViews.observation(v))))
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "games" / UuidVar(
+            gameUuid
+          ) / "observer-invitations" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (_, text) =>
+              idempotentAuth(req, ctx, text) {
+                Api.inviteObserver(env)(ctx.caller, GameId(gameUuid)).map {
+                  case Left(failure) => failureOutcome(failure, ctx.correlation)
+                  case Right(issued) =>
+                    ok(
+                      JsonViews
+                        .commandResponse(issued.versions)
+                        .mapObject(
+                          _.add("invitationId", Json.fromString(issued.invitationId.value.toString))
+                            .add("invitationCode", Json.fromString(issued.invitationCode))
+                            .add("expiresAt", Json.fromString(issued.expiresAt.toString))
+                        )
+                    )
+                }
+              }
+            }
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "games" / UuidVar(
+            gameUuid
+          ) / "observer-invitations" /
+          UuidVar(invitationUuid) / "revoke" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (_, text) =>
+              idempotentAuth(req, ctx, text) {
+                Api
+                  .revokeObserverInvitation(env)(
+                    ctx.caller,
+                    GameId(gameUuid),
+                    InvitationId(invitationUuid)
+                  )
+                  .map(versionsOutcome(_, ctx.correlation))
+              }
+            }
+          )
+        }
+
+      case req @ POST -> Root / "api" / "v1" / "participations" / "observe" =>
+        context(req).flatMap { ctx =>
+          respond(
+            req,
+            ctx,
+            withJson(req, ctx) { (json, text) =>
+              gated(req, ctx, "join") {
+                idempotent(req, ctx, text) {
+                  val c = json.hcursor
+                  (c.get[String]("invitationCode"), c.get[String]("displayName")) match
+                    case (Right(code), Right(name)) =>
+                      Api
+                        .joinAsObserver(env)(code, name)
+                        .flatTap {
+                          case Left(AppFailure.Domain(GameError.InvitationInvalid)) =>
+                            Api.recordAttemptFailure(env)("join", sourceOf(req))
+                          case _ => IO.unit
+                        }
+                        .map {
+                          case Left(failure) => failureOutcome(failure, ctx.correlation)
+                          case Right(joined) =>
+                            Outcome(
+                              Status.Ok,
+                              JsonViews
+                                .commandResponse(joined.versions)
+                                .mapObject(
+                                  _.add("gameId", Json.fromString(joined.gameId.value.toString))
+                                    .add("kind", Json.fromString("OBSERVER"))
+                                ),
+                              None,
+                              sessionCookies(req, joined.sessionToken),
+                              None,
+                              problem = false
+                            )
+                        }
+                    case _ =>
+                      IO.pure(
+                        shapeError(ctx.correlation, "invitationCode", "招待コードと表示名は文字列で指定してください。")
+                      )
+                }
+              }
+            }
+          )
+        }
+
       case req @ GET -> Root / "api" / "v1" / "games" / UuidVar(gameUuid) / "state" =>
         context(req).flatMap { ctx =>
           respond(

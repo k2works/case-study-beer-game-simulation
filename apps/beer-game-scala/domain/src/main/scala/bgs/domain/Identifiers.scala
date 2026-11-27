@@ -7,6 +7,12 @@ final case class GameId(value: UUID)
 
 final case class ParticipantId(value: UUID)
 
+/** 観察用の招待の識別子（招待コードの値とは別。イベントには ID と期限だけを入れる）。 */
+final case class InvitationId(value: UUID)
+
+/** 観察者の識別子（役割を持たない）。 */
+final case class ObserverId(value: UUID)
+
 /** 表示名。前後の空白を除いて 1〜80 文字（コードポイント数）。イベントには入れない（NF-S14）。 */
 opaque type DisplayName = String
 

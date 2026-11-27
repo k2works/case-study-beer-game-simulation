@@ -74,6 +74,48 @@ object JsonViews:
       "versions" -> Some(versions(view.versions))
     )
 
+  def observation(view: ObservationView): Json =
+    obj(
+      "gameId" -> Some(Json.fromString(view.gameId.value.toString)),
+      "status" -> Some(Json.fromString(statusName(view.status))),
+      "finalWeek" -> Some(Json.fromInt(view.finalWeek)),
+      "sessionStatus" -> view.sessionStatus.map(st =>
+        Json.fromString(st match
+          case GameStatus.Ended  => "ENDED"
+          case GameStatus.Paused => "PAUSED"
+          case _                 => "ACTIVE")
+      ),
+      "week" -> view.week.map(Json.fromInt),
+      "submittedRoleCount" -> view.submittedRoleCount.map(Json.fromInt),
+      "totals" -> Some(
+        obj(
+          "policy" -> Some(
+            Json.fromString(view.policy match
+              case DisclosurePolicy.TeamTotal => "TEAM_TOTAL"
+              case DisclosurePolicy.None      => "NONE")
+          ),
+          "hiddenReason" -> Some(Json.fromString("DISCLOSURE_NONE")).filter(_ =>
+            view.policy == DisclosurePolicy.None
+          ),
+          "weeks" -> Some(
+            Json.fromValues(view.weeks.map { w =>
+              obj(
+                "week" -> Some(Json.fromInt(w.week)),
+                "order" -> w.order.map(Json.fromLong),
+                "inventory" -> w.inventory.map(Json.fromLong),
+                "backlog" -> w.backlog.map(Json.fromLong),
+                "hidden" -> Some(Json.fromBoolean(w.hidden)).filter(_ => w.hidden),
+                "reason" -> Some(Json.fromString("CONTRIBUTORS_BELOW_MINIMUM")).filter(_ =>
+                  w.hidden
+                )
+              )
+            })
+          )
+        )
+      ),
+      "versions" -> Some(versions(view.versions))
+    )
+
   def review(view: ReviewView): Json =
     Json.obj(
       "gameId" -> Json.fromString(view.gameId.value.toString),
@@ -100,8 +142,21 @@ object JsonViews:
           "role" -> orNull(p.role.map(r => Json.fromString(roleName(r))))
         )
       }),
-      "invitations" -> Json.arr(),
-      "observers" -> Json.arr(),
+      "invitations" -> Json.fromValues(view.invitations.map { i =>
+        Json.obj(
+          "invitationId" -> Json.fromString(i.invitationId.value.toString),
+          "expiresAt" -> Json.fromString(i.expiresAt.toString),
+          "revoked" -> Json.fromBoolean(i.revoked),
+          "createdAt" -> Json.fromString(i.createdAt.toString)
+        )
+      }),
+      "observers" -> Json.fromValues(view.observers.map { o =>
+        Json.obj(
+          "observerId" -> Json.fromString(o.observerId.value.toString),
+          "displayName" -> orNull(o.displayName.map(Json.fromString)),
+          "joinedAt" -> Json.fromString(o.joinedAt.toString)
+        )
+      }),
       "versions" -> versions(view.versions)
     )
 

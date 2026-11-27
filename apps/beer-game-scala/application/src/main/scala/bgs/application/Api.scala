@@ -16,6 +16,7 @@ enum Caller:
   case Anonymous
   case Facilitator(gameId: GameId)
   case Participant(gameId: GameId, participantId: ParticipantId)
+  case Observer(gameId: GameId, observerId: ObserverId)
 
 /** 冪等記録。同じキーと同じ要求の再送には、最初の応答を返す。 */
 final case class IdempotentRecord(
@@ -44,6 +45,10 @@ final case class PeripheralStore(
     refreshRecovery: (String, Instant) => ConnectionIO[Unit],
     /** 対象の復帰資格とブラウザセッションを、すべて使えなくする。 */
     revokeSubject: (GameId, CredentialSubject) => ConnectionIO[Unit],
+    /** 観察用の招待コードのダイジェストを登録する（ゲーム、招待の ID）。 */
+    registerInvitation: (String, GameId, InvitationId) => ConnectionIO[Unit],
+    /** 招待コードのダイジェストから、ゲームと招待の ID。 */
+    findInvitation: String => ConnectionIO[Option[(GameId, InvitationId)]],
     /** 失敗を記録する（接続元の要約、時刻）。 */
     recordFailure: (String, Instant) => ConnectionIO[Unit],
     /** 窓（[[Instant]] 以降）の失敗の回数と、最も古い失敗の時刻。 */
@@ -150,6 +155,52 @@ final case class LobbyParticipantView(
     role: Option[Role]
 )
 
+final case class LobbyInvitationView(
+    invitationId: InvitationId,
+    expiresAt: Instant,
+    revoked: Boolean,
+    createdAt: Instant
+)
+
+final case class LobbyObserverView(
+    observerId: ObserverId,
+    displayName: Option[String],
+    joinedAt: Instant
+)
+
+/** 観察用の招待の発行の結果。招待コードは、この応答で一度だけ示す（保存はダイジェストだけ）。 */
+final case class InviteIssued(
+    invitationId: InvitationId,
+    invitationCode: String,
+    expiresAt: Instant,
+    versions: Versions
+)
+
+/** 観察者の参加の結果。ブラウザセッションだけを発行する（復帰資格は発行しない）。 */
+final case class ObserverJoinedResult(gameId: GameId, sessionToken: String, versions: Versions)
+
+/** 確定した 1 週のチーム合計。寄与者が最小に満たない週は、値を持たない。 */
+final case class ObservationWeekView(
+    week: Int,
+    order: Option[Long],
+    inventory: Option[Long],
+    backlog: Option[Long],
+    hidden: Boolean
+)
+
+/** 観察の内容（現在週・完了状況・チーム合計だけ。役割別の値・将来の需要・参加コード・入力者を含めない）。 */
+final case class ObservationView(
+    gameId: GameId,
+    status: GameStatus,
+    finalWeek: Int,
+    sessionStatus: Option[GameStatus],
+    week: Option[Int],
+    submittedRoleCount: Option[Int],
+    policy: DisclosurePolicy,
+    weeks: List[ObservationWeekView],
+    versions: Versions
+)
+
 final case class LobbyView(
     gameId: GameId,
     status: GameStatus,
@@ -158,6 +209,8 @@ final case class LobbyView(
     settingsKind: SettingsKind,
     changedSettings: List[SettingsField],
     participants: List[LobbyParticipantView],
+    invitations: List[LobbyInvitationView],
+    observers: List[LobbyObserverView],
     versions: Versions
 )
 
@@ -314,6 +367,7 @@ object Api:
         yield resolved match
           case Some((gameId, CredentialSubject.Facilitator(_)))  => Caller.Facilitator(gameId)
           case Some((gameId, CredentialSubject.Participant(id))) => Caller.Participant(gameId, id)
+          case Some((gameId, CredentialSubject.Observer(id)))    => Caller.Observer(gameId, id)
           case None                                              => Caller.Anonymous
 
   private def actorFor(caller: Caller, gameId: GameId): Either[AppFailure, Actor] = caller match
@@ -611,8 +665,144 @@ object Api:
         case CredentialSubject.Participant(id) =>
           (false, game.dataOrNone.flatMap(_.participants.get(id)).flatten)
         case CredentialSubject.Facilitator(_) => (true, None)
+        case CredentialSubject.Observer(_)    => (false, None)
       Recovered(gameId, isFacilitator, role, token, v)
     }
+
+  private val InvitationTtl = Duration.ofDays(7)
+
+  /** 観察用の招待を発行する（進行役だけ）。招待コードは参加コードとは別の値で、この応答で一度だけ示す。 */
+  def inviteObserver(
+      env: Env
+  )(caller: Caller, gameId: GameId): IO[Either[AppFailure, InviteIssued]] =
+    for
+      invitationUuid <- env.gen.uuid
+      code <- issueToken(env)
+      codeHash <- digestOrBlank(env)(code)
+      now <- env.gen.now
+      expires = now.plus(InvitationTtl)
+      invitationId = InvitationId(invitationUuid)
+      done <- withActor(env)(caller, gameId) { (actor, at) =>
+        Application.handleGameWith(env.ports)(
+          gameId,
+          GameCommand.InviteObserver(actor, at, invitationId, expires)
+        )(env.peripheral.registerInvitation(codeHash, gameId, invitationId))
+      }
+    yield done.map(v => InviteIssued(invitationId, code, expires, v))
+
+  def revokeObserverInvitation(env: Env)(
+      caller: Caller,
+      gameId: GameId,
+      invitationId: InvitationId
+  ): IO[Either[AppFailure, Versions]] =
+    withActor(env)(caller, gameId) { (actor, now) =>
+      Application.handleGame(env.ports)(
+        gameId,
+        GameCommand.RevokeObserverInvitation(actor, now, invitationId)
+      )
+    }
+
+  /** 招待コードで、観察者として参加する。不明・失効・期限切れ・形式不正は、区別せず `game.invitation_invalid`。 */
+  def joinAsObserver(
+      env: Env
+  )(codeRaw: String, displayNameRaw: String): IO[Either[AppFailure, ObserverJoinedResult]] =
+    DisplayName.of(displayNameRaw) match
+      case Left(error)        => IO.pure(Left(AppFailure.Invalid(List(error))))
+      case Right(displayName) =>
+        for
+          hashed <- tokenDigest(env)(codeRaw)
+          found <- hashed.fold(IO.pure(Option.empty[(GameId, InvitationId)]))(d =>
+            readOnly(env)(env.peripheral.findInvitation(d))
+          )
+          result <- found match
+            case None => IO.pure(Left(AppFailure.Domain(GameError.InvitationInvalid)))
+            case Some((gameId, invitationId)) =>
+              doJoinObserver(env)(gameId, invitationId, displayName)
+        yield result
+
+  private def doJoinObserver(env: Env)(
+      gameId: GameId,
+      invitationId: InvitationId,
+      displayName: DisplayName
+  ): IO[Either[AppFailure, ObserverJoinedResult]] =
+    for
+      now <- env.gen.now
+      observerUuid <- env.gen.uuid
+      token <- issueToken(env)
+      tokenHash <- digestOrBlank(env)(token)
+      observerId = ObserverId(observerUuid)
+      expires = now.plus(env.sessionTtl)
+      done <- Application.handleGameWith(env.ports)(
+        gameId,
+        GameCommand.JoinAsObserver(Actor.Anonymous, now, invitationId, observerId)
+      )(
+        // 観察者の表示名は、参加者と同じ周辺ストアに、観察者の ID をキーにして保存する
+        env.peripheral.saveDisplayName(gameId, ParticipantId(observerId.value), displayName) *>
+          env.peripheral
+            .issueSession(tokenHash, gameId, CredentialSubject.Observer(observerId), expires)
+      )
+      v <- versions(env)(gameId)
+    yield done.map(_ => ObserverJoinedResult(gameId, token, v))
+
+  /** 観察の内容。観察者と進行役だけ（AC4.1.4）。役割別の値・将来の需要・参加コードは、型に持たない。 */
+  def observationView(env: Env)(
+      caller: Caller,
+      gameId: GameId
+  ): IO[Either[AppFailure, ObservationView]] =
+    val allowed = caller match
+      case Caller.Facilitator(g) => g == gameId
+      case Caller.Observer(g, _) => g == gameId
+      case _                     => false
+    if !allowed then IO.pure(Left(AppFailure.Unauthorized))
+    else
+      for
+        game <- Application.gameState(env.ports)(gameId)
+        sessionRead <- readOnly(env)(env.ports.sessionStore.read(gameId))
+        v <- versions(env)(gameId)
+      yield
+        val session =
+          sessionRead.events.foldLeft[SessionState](SessionState.NotStarted)(SessionEvents.apply)
+        game.dataOrNone match
+          case None       => Left(AppFailure.Unauthorized)
+          case Some(data) =>
+            val policy = data.settings.disclosure
+            val weeks =
+              if policy == DisclosurePolicy.None then Nil
+              else
+                sessionRead.events.collect { case e: SessionEvent.WeekCommitted => e }.map { e =>
+                  if e.contributors < MinContributors then
+                    ObservationWeekView(e.week.value, None, None, None, hidden = true)
+                  else
+                    ObservationWeekView(
+                      e.week.value,
+                      Some(e.results.values.map(_.orders.value).sum),
+                      Some(e.results.values.map(_.endingInventory.value).sum),
+                      Some(e.results.values.map(_.endingBacklog.value).sum),
+                      hidden = false
+                    )
+                }
+            val sessionData = session match
+              case SessionState.Active(d, _) => Some(d)
+              case SessionState.Ended(d, _)  => Some(d)
+              case SessionState.NotStarted   => None
+            Right(
+              ObservationView(
+                gameId,
+                statusOf(game, session) match
+                  case GameStatus.Paused => GameStatus.Started
+                  case other             => other,
+                data.settings.finalWeek.value,
+                sessionData.map(_ => statusOf(game, session)),
+                sessionData.map(_.week.value),
+                sessionData.map(_.decisions.size),
+                policy,
+                weeks,
+                v
+              )
+            )
+
+  /** 寄与者が、この数に満たない週は、チーム合計を出さない（個別の値の逆算の防止。AC4.1.3）。 */
+  private val MinContributors = 2
 
   /** 確定方式を変える（進行役だけ。AC2.4.5）。自動にした時点で入力がそろっていれば、同じ追記で確定する。 */
   def setCommitMode(env: Env)(
@@ -719,12 +909,25 @@ object Api:
       case Caller.Facilitator(g) if g == gameId =>
         for
           game <- Application.gameState(env.ports)(gameId)
+          gameRead <- readOnly(env)(env.ports.gameStore.read(gameId))
           session <- Application.sessionState(env.ports)(gameId)
           names <- readOnly(env)(env.peripheral.displayNames(gameId))
           v <- versions(env)(gameId)
         yield game.dataOrNone match
           case None       => Left(AppFailure.Unauthorized)
           case Some(data) =>
+            val timed = gameRead.events.zip(gameRead.occurredAt)
+            val invitations = timed.collect { case (GameEvent.ObserverInvited(id, expires), at) =>
+              LobbyInvitationView(
+                id,
+                expires,
+                data.invitations.get(id).exists(_.revoked),
+                at
+              )
+            }
+            val observers = timed.collect { case (GameEvent.ObserverJoined(id, _), at) =>
+              LobbyObserverView(id, names.get(ParticipantId(id.value)), at)
+            }
             Right(
               LobbyView(
                 gameId,
@@ -736,6 +939,8 @@ object Api:
                 data.participants.toList.map((id, role) =>
                   LobbyParticipantView(id, names.get(id), role)
                 ),
+                invitations,
+                observers,
                 v
               )
             )
@@ -762,30 +967,34 @@ object Api:
 
   /** 終了後の振り返り。進行役と、このゲームの参加者だけ。終了前は開示しない（AC4.2.2）。 */
   def reviewView(env: Env)(caller: Caller, gameId: GameId): IO[Either[AppFailure, ReviewView]] =
-    actorFor(caller, gameId) match
-      case Left(failure) => IO.pure(Left(failure))
-      case Right(_)      =>
-        for
-          game <- Application.gameState(env.ports)(gameId)
-          sessionRead <- readOnly(env)(env.ports.sessionStore.read(gameId))
-          v <- versions(env)(gameId)
-        yield
-          val session =
-            sessionRead.events.foldLeft[SessionState](SessionState.NotStarted)(SessionEvents.apply)
-          (session, game.dataOrNone) match
-            case (SessionState.Ended(d, _), Some(data)) =>
-              Right(
-                ReviewView(
-                  gameId,
-                  d.settings.finalWeek.value,
-                  data.settings.kind,
-                  data.settings.changedFields,
-                  d.commitMode,
-                  weekResults(sessionRead),
-                  v
-                )
+    val allowed = caller match
+      case Caller.Facilitator(g)    => g == gameId
+      case Caller.Participant(g, _) => g == gameId
+      case Caller.Observer(g, _)    => g == gameId
+      case Caller.Anonymous         => false
+    if !allowed then IO.pure(Left(AppFailure.Unauthorized))
+    else
+      for
+        game <- Application.gameState(env.ports)(gameId)
+        sessionRead <- readOnly(env)(env.ports.sessionStore.read(gameId))
+        v <- versions(env)(gameId)
+      yield
+        val session =
+          sessionRead.events.foldLeft[SessionState](SessionState.NotStarted)(SessionEvents.apply)
+        (session, game.dataOrNone) match
+          case (SessionState.Ended(d, _), Some(data)) =>
+            Right(
+              ReviewView(
+                gameId,
+                d.settings.finalWeek.value,
+                data.settings.kind,
+                data.settings.changedFields,
+                d.commitMode,
+                weekResults(sessionRead),
+                v
               )
-            case _ => Left(AppFailure.Domain(GameError.NotEnded))
+            )
+          case _ => Left(AppFailure.Domain(GameError.NotEnded))
 
   /** 当週の、役割ごとの最後の保存の時刻（追記の時刻。確定で空に戻る）。 */
   private def savedTimes(read: StreamRead[SessionEvent]): Map[Role, Instant] =
@@ -952,4 +1161,4 @@ object Api:
                           v
                         )
                       )
-                case Caller.Anonymous => Left(AppFailure.Unauthorized)
+                case Caller.Anonymous | Caller.Observer(_, _) => Left(AppFailure.Unauthorized)

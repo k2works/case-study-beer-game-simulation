@@ -1978,3 +1978,253 @@ class Steps extends ScalaDsl with EN:
   Then("""^結果の一覧は含まれない$""") { () =>
     require(world.last.json.hcursor.downField("results").focus.isEmpty, "結果の一覧が含まれる")
   }
+
+  // ---- 観察者（B9: AC1.3.*・AC4.1.*） ----
+
+  private var observerCookie: Option[String] = None
+  private var invitationId = ""
+  private var invitationCode = ""
+
+  private def invite(cookie: Option[String]): Reply =
+    world.game.post(gamePath(world.game, "/observer-invitations"), Json.obj(), cookie)
+
+  Given("""^進行役が観察用の招待を発行している$""") { () =>
+    world.last = invite(world.game.facilitator)
+    require(world.last.status == 200, s"発行できない: ${world.last.text}")
+    invitationId = world.last.json.hcursor.get[String]("invitationId").getOrElse("")
+    invitationCode = world.last.json.hcursor.get[String]("invitationCode").getOrElse("")
+  }
+
+  When("""^進行役が観察用の招待を求める$""") { () =>
+    world.last = invite(world.game.facilitator)
+    invitationId = world.last.json.hcursor.get[String]("invitationId").getOrElse("")
+    invitationCode = world.last.json.hcursor.get[String]("invitationCode").getOrElse("")
+  }
+
+  When("""^小売店の参加者が観察用の招待を求める$""") { () =>
+    world.last = invite(world.game.players.get("RETAILER"))
+  }
+
+  When("""^資格の無い人が観察用の招待を求める$""") { () => world.last = invite(None) }
+
+  When("""^観察者が、観察用の招待を求める$""") { () => world.last = invite(observerCookie) }
+
+  Then("""^観察用の招待コードが発行される$""") { () =>
+    require(world.last.status == 200, s"発行されていない: ${world.last.text}")
+    require(invitationCode.nonEmpty, "招待コードが無い")
+  }
+
+  Then("""^招待コードは参加コードと異なる$""") { () =>
+    require(invitationCode != joinCodeOf(world.game), "参加コードと同じ")
+  }
+
+  When("""^招待コードを参加コードとして使って、参加者が参加しようとする$""") { () =>
+    world.last = joinWith(world.game, invitationCode, "見学者")
+  }
+
+  Then("""^招待コードは含まれない$""") { () =>
+    require(world.last.json.hcursor.downField("invitationCode").focus.isEmpty, "招待コードが含まれる")
+  }
+
+  private def joinObserver(name: String, code: String): Reply =
+    val reply = world.game.post(
+      "/api/v1/participations/observe",
+      Json.obj("invitationCode" -> Json.fromString(code), "displayName" -> Json.fromString(name)),
+      None
+    )
+    if reply.status == 200 then observerCookie = reply.cookie
+    reply
+
+  Given("""^観察者「(.+)」が、招待コードで参加している$""") { (name: String) =>
+    world.last = joinObserver(name, invitationCode)
+    require(world.last.status == 200, s"参加できない: ${world.last.text}")
+  }
+
+  When("""^観察者「(.+)」が、招待コードで参加(?:する|しようとする)$""") { (name: String) =>
+    world.last = joinObserver(name, invitationCode)
+  }
+
+  Then("""^観察者として参加できる$""") { () =>
+    require(world.last.status == 200, s"参加できていない: ${world.last.text}")
+    require(world.last.json.hcursor.get[String]("kind").contains("OBSERVER"), "観察者でない")
+  }
+
+  private def lobbyJson(): io.circe.ACursor =
+    world.game.get(gamePath(world.game, "/lobby"), world.game.facilitator).json.hcursor
+
+  Then("""^進行役のロビーに、観察者「(.+)」が役割なしで載る$""") { (name: String) =>
+    val observers = lobbyJson().downField("observers").values.map(_.toList).getOrElse(Nil)
+    require(
+      observers.exists(o =>
+        o.hcursor
+          .get[String]("displayName")
+          .contains(name) && o.hcursor.downField("role").focus.isEmpty
+      ),
+      s"観察者が載っていない: $observers"
+    )
+  }
+
+  Then("""^参加者の一覧に、観察者は含まれない$""") { () =>
+    val names = lobbyJson()
+      .downField("participants")
+      .values
+      .map(_.toList.flatMap(_.hcursor.get[String]("displayName").toOption))
+      .getOrElse(Nil)
+    require(!names.contains("見学者"), s"参加者に含まれる: $names")
+  }
+
+  private def revokeInvitationAs(cookie: Option[String]): Reply =
+    world.game.post(
+      gamePath(world.game, s"/observer-invitations/$invitationId/revoke"),
+      Json.obj(),
+      cookie
+    )
+
+  Given("""^進行役が、その観察用の招待を失効させている$""") { () =>
+    world.last = revokeInvitationAs(world.game.facilitator)
+    require(world.last.status == 200, s"失効できない: ${world.last.text}")
+  }
+
+  When("""^小売店の参加者が、その観察用の招待を失効させようとする$""") { () =>
+    world.last = revokeInvitationAs(world.game.players.get("RETAILER"))
+  }
+
+  Then("""^招待が無効という理由で拒否される$""") { () =>
+    require(world.last.status == 403, s"403 でない: ${world.last.status}")
+    require(world.last.code.contains("game.invitation_invalid"), s"理由が違う: ${world.last.text}")
+  }
+
+  private def observationAs(cookie: Option[String]): Reply =
+    world.game.get(gamePath(world.game, "/observation"), cookie)
+
+  When("""^観察者が観察画面を開く$""") { () => world.last = observationAs(observerCookie) }
+
+  When("""^資格の無い人が観察画面を開こうとする$""") { () => world.last = observationAs(None) }
+
+  When("""^小売店の参加者が観察画面を開こうとする$""") { () =>
+    world.last = observationAs(world.game.players.get("RETAILER"))
+  }
+
+  When("""^進行役が観察画面を開く$""") { () => world.last = observationAs(world.game.facilitator) }
+
+  Then("""^観察画面の内容が返る$""") { () =>
+    require(world.last.status == 200, s"返っていない: ${world.last.text}")
+  }
+
+  Then("""^観察画面の現在週は (\d+) である$""") { (week: Int) =>
+    require(world.last.json.hcursor.get[Int]("week").contains(week), s"週が違う: ${world.last.text}")
+  }
+
+  Then("""^観察画面の入力済みの役割数は (\d+) である$""") { (count: Int) =>
+    require(world.last.json.hcursor.get[Int]("submittedRoleCount").contains(count), "役割数が違う")
+  }
+
+  Given("""^小売店と工場の参加者が、第 (\d+) 週の入力を保存している$""") { (week: Int) =>
+    List("RETAILER", "FACTORY").foreach { apiRole =>
+      require(saveAt(world.game, apiRole, week, 4).status == 200, s"$apiRole の保存ができない")
+    }
+  }
+
+  Then("""^観察画面に、第 (\d+) 週のチーム合計として、注文 (\d+)・在庫・受注残が含まれる$""") { (week: Int, order: Int) =>
+    val weeks = world.last.json.hcursor
+      .downField("totals")
+      .downField("weeks")
+      .values
+      .map(_.toList)
+      .getOrElse(Nil)
+    val row =
+      weeks.find(_.hcursor.get[Int]("week").contains(week)).getOrElse(sys.error(s"週が無い: $weeks"))
+    require(row.hcursor.get[Int]("order").contains(order), s"注文が違う: $row")
+    require(
+      row.hcursor
+        .downField("inventory")
+        .focus
+        .isDefined && row.hcursor.downField("backlog").focus.isDefined,
+      "在庫・受注残が無い"
+    )
+  }
+
+  Then("""^観察画面に、役割別の項目は含まれない$""") { () =>
+    val text = world.last.text
+    List(
+      "roles",
+      "roleStatus",
+      "RETAILER",
+      "WHOLESALER",
+      "DISTRIBUTOR",
+      "FACTORY",
+      "decision",
+      "results"
+    ).foreach(k => require(!text.contains(k), s"役割別の項目 $k が含まれる"))
+  }
+
+  Then("""^将来の需要は含まれない$""") { () =>
+    val text = world.last.text.toLowerCase
+    require(!text.contains("demand"), "需要の項目が含まれる")
+  }
+
+  Then("""^参加コードは含まれない$""") { () =>
+    require(!world.last.text.contains("joinCode"), "参加コードが含まれる")
+    require(!world.last.text.contains(joinCodeOf(world.game)), "参加コードの値が含まれる")
+  }
+
+  Then("""^観察画面にチーム合計は含まれず、公開されていないという理由が示される$""") { () =>
+    val totals = world.last.json.hcursor.downField("totals")
+    require(
+      totals.get[String]("hiddenReason").contains("DISCLOSURE_NONE"),
+      s"理由が違う: ${world.last.text}"
+    )
+    require(totals.downField("weeks").values.exists(_.isEmpty), "合計が含まれる")
+  }
+
+  When("""^観察者が、小売店の状況を取得しようとする$""") { () =>
+    world.last = world.game.get(sessionPath(world.game, "/state?role=RETAILER"), observerCookie)
+  }
+
+  When("""^観察者が、ゲームの状態を取得しようとする$""") { () =>
+    world.last = world.game.get(gamePath(world.game, "/state"), observerCookie)
+  }
+
+  When("""^観察者が、ロビーを取得しようとする$""") { () =>
+    world.last = world.game.get(gamePath(world.game, "/lobby"), observerCookie)
+  }
+
+  When("""^観察者が、小売店の入力として (\d+) を保存しようとする$""") { (quantity: Int) =>
+    world.last = saveWith(observerCookie, 1, quantity, 0L)
+  }
+
+  When("""^観察者が、第 (\d+) 週を確定しようとする$""") { (week: Int) =>
+    world.last = world.game.call(
+      org.http4s.Method.POST,
+      sessionPath(world.game, s"/weeks/$week/commit"),
+      Some(
+        Json.obj("requestedWeek" -> Json.fromInt(week), "basis" -> decisionVersions(world.game))
+      ),
+      observerCookie,
+      Some(java.util.UUID.randomUUID.toString)
+    )
+  }
+
+  When("""^観察者が、ゲームを一時停止しようとする$""") { () =>
+    world.last = control(world.game, "pause", observerCookie)
+  }
+
+  When("""^観察者が、小売店の参加者の資格を失効させようとする$""") { () =>
+    world.last = revokeWith(
+      world.game,
+      world.game.gameId.getOrElse(""),
+      participantIdOf(world.game, "小売店"),
+      observerCookie
+    )
+  }
+
+  When("""^観察者が、自分に小売店の役割を割り当てようとする$""") { () =>
+    world.last = world.game.put(
+      gamePath(world.game, s"/participants/${java.util.UUID.randomUUID}/role"),
+      Json.obj("role" -> Json.fromString("RETAILER")),
+      observerCookie,
+      None
+    )
+  }
+
+  When("""^観察者が振り返りを取得(?:する|しようとする)$""") { () => world.last = reviewAs(observerCookie) }

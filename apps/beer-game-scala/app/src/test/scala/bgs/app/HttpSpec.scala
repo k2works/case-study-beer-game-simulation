@@ -1188,3 +1188,126 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(anonymous.status, 403)
     }
   }
+
+  test("[AC1.3.*・4.1.*] 観察用の招待 → 観察者の参加 → 観察。役割別の値は返さず、失効後の新規参加は 403、参加済みは継続") {
+    freshApp.flatMap { app =>
+      for
+        (facilitator, gameId, code) <- create(app)
+        invited <- post(
+          app,
+          s"/api/v1/games/$gameId/observer-invitations",
+          Json.obj(),
+          Some(facilitator)
+        )
+        invitationCode = invited.str("invitationCode").getOrElse(fail("招待コードが無い"))
+        invitationId = invited.str("invitationId").getOrElse(fail("招待 ID が無い"))
+        byOther <- post(app, s"/api/v1/games/$gameId/observer-invitations", Json.obj(), None)
+        joined <- post(
+          app,
+          "/api/v1/participations/observe",
+          Json.obj(
+            "invitationCode" -> Json.fromString(invitationCode),
+            "displayName" -> Json.fromString("見学者")
+          ),
+          None
+        )
+        observer = joined.cookie.getOrElse(fail("Cookie が無い"))
+        asJoinCode <- post(
+          app,
+          "/api/v1/participations/join",
+          Json.obj(
+            "joinCode" -> Json.fromString(invitationCode),
+            "displayName" -> Json.fromString("x")
+          ),
+          None
+        )
+        bad <- post(
+          app,
+          "/api/v1/participations/observe",
+          Json.obj(
+            "invitationCode" -> Json.fromString("v1.nope"),
+            "displayName" -> Json.fromString("x")
+          ),
+          None
+        )
+        shape <- post(
+          app,
+          "/api/v1/participations/observe",
+          Json.obj("invitationCode" -> Json.fromString(invitationCode)),
+          None
+        )
+        lobby <- call(app, Method.GET, s"/api/v1/games/$gameId/lobby", cookie = Some(facilitator))
+        observation <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/observation",
+          cookie = Some(observer)
+        )
+        denied <- call(app, Method.GET, s"/api/v1/games/$gameId/state", cookie = Some(observer))
+        noReview <- call(app, Method.GET, s"/api/v1/games/$gameId/review", cookie = Some(observer))
+        (playerCookie, _) <- join(app, code, "参加者")
+        byPlayer <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/observation",
+          cookie = Some(playerCookie)
+        )
+        revoked <- post(
+          app,
+          s"/api/v1/games/$gameId/observer-invitations/$invitationId/revoke",
+          Json.obj(),
+          Some(facilitator)
+        )
+        revokedTwice <- post(
+          app,
+          s"/api/v1/games/$gameId/observer-invitations/$invitationId/revoke",
+          Json.obj(),
+          Some(facilitator)
+        )
+        unknown <- post(
+          app,
+          s"/api/v1/games/$gameId/observer-invitations/${java.util.UUID.randomUUID}/revoke",
+          Json.obj(),
+          Some(facilitator)
+        )
+        afterRevoke <- post(
+          app,
+          "/api/v1/participations/observe",
+          Json.obj(
+            "invitationCode" -> Json.fromString(invitationCode),
+            "displayName" -> Json.fromString("遅れた人")
+          ),
+          None
+        )
+        stillObserving <- call(
+          app,
+          Method.GET,
+          s"/api/v1/games/$gameId/observation",
+          cookie = Some(observer)
+        )
+      yield
+        assertEquals(invited.status, 200)
+        assertEquals(byOther.status, 403)
+        assertEquals(joined.status, 200)
+        assertEquals(joined.str("kind"), Some("OBSERVER"))
+        assertEquals((asJoinCode.status, asJoinCode.code), (403, Some("game.invitation_invalid")))
+        assertEquals(bad.status, 403)
+        assert(shape.status >= 400)
+        assertEquals(lobby.json.hcursor.downField("observers").values.map(_.size), Some(1))
+        assertEquals(lobby.json.hcursor.downField("invitations").values.map(_.size), Some(1))
+        assertEquals(observation.status, 200)
+        assertEquals(observation.str("totals", "policy"), Some("TEAM_TOTAL"))
+        assert(!observation.json.noSpaces.contains("joinCode"))
+        assertEquals(denied.status, 403)
+        assertEquals((noReview.status, noReview.code), (409, Some("game.not_ended")))
+        assertEquals(byPlayer.status, 403)
+        assertEquals(revoked.status, 200)
+        assertEquals(
+          (revokedTwice.status, revokedTwice.code),
+          (409, Some("game.credential_already_revoked"))
+        )
+        assertEquals((unknown.status, unknown.code), (404, Some("game.invitation_not_found")))
+        assertEquals((afterRevoke.status, afterRevoke.code), (403, Some("game.invitation_invalid")))
+        assertEquals(stillObserving.status, 200)
+    }
+  }

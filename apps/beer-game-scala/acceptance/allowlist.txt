@@ -32,3 +32,8 @@ weekly-play/auto-commit.feature
 
 # B8: 役割別の振り返り（AC4.2.1・AC4.2.2）
 review/retrospective.feature
+
+# B9: 観察者（AC1.3.*・AC4.1.*）
+observation/observer-invitation.feature
+observation/observation.feature
+observation/observation-disclosure.feature

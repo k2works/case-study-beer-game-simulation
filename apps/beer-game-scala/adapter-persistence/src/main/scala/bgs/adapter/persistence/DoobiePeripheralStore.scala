@@ -15,10 +15,12 @@ object DoobiePeripheralStore:
 
   private val FacilitatorKind = "facilitator"
   private val ParticipantKind = "participant"
+  private val ObserverKind = "observer"
 
   private def kindAndId(subject: CredentialSubject): (String, UUID) = subject match
     case CredentialSubject.Facilitator(id) => (FacilitatorKind, id.value)
     case CredentialSubject.Participant(id) => (ParticipantKind, id.value)
+    case CredentialSubject.Observer(id)    => (ObserverKind, id.value)
 
   private def subjectOf(
       gameId: UUID,
@@ -29,6 +31,8 @@ object DoobiePeripheralStore:
       Some(GameId(gameId) -> CredentialSubject.Facilitator(GameId(gameId)))
     else if kind == ParticipantKind then
       Some(GameId(gameId) -> CredentialSubject.Participant(ParticipantId(subjectId)))
+    else if kind == ObserverKind then
+      Some(GameId(gameId) -> CredentialSubject.Observer(ObserverId(subjectId)))
     else None
 
   def apply(): PeripheralStore =
@@ -49,9 +53,7 @@ object DoobiePeripheralStore:
           .to[List]
           .map(_.map((id, name) => ParticipantId(id) -> name).toMap),
       issueSession = (digest, gameId, subject, expiresAt) =>
-        val (kind, subjectId) = subject match
-          case CredentialSubject.Facilitator(id) => (FacilitatorKind, id.value)
-          case CredentialSubject.Participant(id) => (ParticipantKind, id.value)
+        val (kind, subjectId) = kindAndId(subject)
         sql"""insert into browser_sessions (token_digest, game_id, subject_kind, subject_id, expires_at)
               values ($digest, ${gameId.value}, $kind, $subjectId, $expiresAt)""".update.run.void
       ,
@@ -60,13 +62,7 @@ object DoobiePeripheralStore:
               where token_digest = $digest and expires_at > $now"""
           .query[(UUID, String, UUID)]
           .option
-          .map(_.flatMap { (gameId, kind, subjectId) =>
-            if kind == FacilitatorKind then
-              Some(GameId(gameId) -> CredentialSubject.Facilitator(GameId(gameId)))
-            else if kind == ParticipantKind then
-              Some(GameId(gameId) -> CredentialSubject.Participant(ParticipantId(subjectId)))
-            else None
-          }),
+          .map(_.flatMap(subjectOf)),
       findIdempotent = (scope, key) =>
         sql"""select scope, idempotency_key, request_digest, status, body from idempotency_records
               where scope = $scope and idempotency_key = $key"""
@@ -96,6 +92,14 @@ object DoobiePeripheralStore:
           sql"""delete from browser_sessions
                 where game_id = ${gameId.value} and subject_kind = $kind and subject_id = $subjectId""".update.run.void
       ,
+      registerInvitation = (codeDigest, gameId, invitationId) =>
+        sql"""insert into observer_invitations (code_digest, game_id, invitation_id)
+              values ($codeDigest, ${gameId.value}, ${invitationId.value})""".update.run.void,
+      findInvitation = codeDigest =>
+        sql"select game_id, invitation_id from observer_invitations where code_digest = $codeDigest"
+          .query[(UUID, UUID)]
+          .option
+          .map(_.map((game, invitation) => GameId(game) -> InvitationId(invitation))),
       recordFailure = (source, at) =>
         sql"insert into attempt_failures (source_digest, occurred_at) values ($source, $at)".update.run.void,
       failuresSince = (source, since) =>

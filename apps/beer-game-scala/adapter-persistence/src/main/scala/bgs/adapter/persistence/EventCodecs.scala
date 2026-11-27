@@ -22,6 +22,10 @@ object EventCodecs:
   given Codec[GameId] = Codec.from(Decoder[UUID].map(GameId(_)), Encoder[UUID].contramap(_.value))
   given Codec[ParticipantId] =
     Codec.from(Decoder[UUID].map(ParticipantId(_)), Encoder[UUID].contramap(_.value))
+  given Codec[InvitationId] =
+    Codec.from(Decoder[UUID].map(InvitationId(_)), Encoder[UUID].contramap(_.value))
+  given Codec[ObserverId] =
+    Codec.from(Decoder[UUID].map(ObserverId(_)), Encoder[UUID].contramap(_.value))
   given Codec[JoinCode] =
     Codec.from(validated(Decoder[String])(JoinCode.of), Encoder[String].contramap(_.value))
   given Codec[RetentionDays] =
