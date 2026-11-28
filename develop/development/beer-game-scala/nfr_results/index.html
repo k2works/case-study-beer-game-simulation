@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../bolt_15_report/">
+        <link rel="prev" href="../bolt_16_report/">
       
       
         <link rel="next" href="../release_readiness/">
@@ -8460,6 +8460,76 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_16_plan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 16 計画
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../bolt_16_report/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bolt 16 終了報告
+  
+
+    
+  </span>
+  
+  
+    
+  
+  
+    <span class="md-status md-status--draft"></span>
+  
+
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -15889,7 +15959,7 @@
 
 
 <h1 id="nfr-b15">NFR 検証表の結果（B15）<a class="headerlink" href="#nfr-b15" title="Permanent link">&para;</a></h1>
-<p>非機能要件（<a href="../../../design/beer-game-scala/non-functional/">non-functional.md</a>）の NF-C（9）・NF-O（13）・NF-P（20）・NF-R（17）・NF-S（25）の、計 84 件の、B15 時点の結果です。<strong>数値は実測だけを書き、測っていないものは「未測定」「未実施」と書いています。設計書は変更していません。人の承認は得ていません。</strong></p>
+<p>非機能要件（<a href="../../../design/beer-game-scala/non-functional/">non-functional.md</a>）の NF-C（9）・NF-O（13）・NF-P（20）・NF-R（17）・NF-S（25）の、計 84 件の、B15 時点の結果です（B16（U7）で NF-S8・NF-S2 を達成に、NF-P12 を一部に更新。件数は更新後）。<strong>数値は実測だけを書き、測っていないものは「未測定」「未実施」と書いています。設計書は変更していません。人の承認は得ていません。</strong></p>
 <h2 id="_1">結果の語<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -15940,7 +16010,7 @@
 <tbody>
 <tr>
 <td style="text-align: left;">達成</td>
-<td style="text-align: right;">23</td>
+<td style="text-align: right;">25</td>
 </tr>
 <tr>
 <td style="text-align: left;">一部</td>
@@ -15948,7 +16018,7 @@
 </tr>
 <tr>
 <td style="text-align: left;">未達</td>
-<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
 </tr>
 <tr>
 <td style="text-align: left;">定義のみ</td>
@@ -16262,7 +16332,7 @@
 <td style="text-align: left;">NF-P12</td>
 <td style="text-align: left;">1 リクエストの上限（数量 0〜1000、リクエスト 64 KB）</td>
 <td style="text-align: left;"><strong>一部</strong></td>
-<td style="text-align: left;">数量の範囲は検証（受け入れ）。<strong>64 KB の本文の上限は未実装</strong></td>
+<td style="text-align: left;">数量の範囲は検証（受け入れ）。<strong>B16（U7）で、<code>Content-Length</code> が 64 KB を超える要求は 413 <code>app.payload_too_large</code></strong>（<code>HttpSpec</code>）。<code>Transfer-Encoding: chunked</code> の本文は上限を掛けていない（未対応）</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-P13</td>
@@ -16473,8 +16543,8 @@
 <tr>
 <td style="text-align: left;">NF-S2</td>
 <td style="text-align: left;">資格は HttpOnly・Secure・SameSite=Strict の Cookie だけ。URL・ログ・イベント・出力に含めない</td>
-<td style="text-align: left;"><strong>一部</strong></td>
-<td style="text-align: left;">HttpOnly・SameSite=Strict は実装。<strong>Secure 属性は付けていない</strong>（ローカルの HTTP のため。本番は TLS 終端の後ろ）。ログ・イベント・出力には含まない（X-3・黄金のデータ・出力の型）</td>
+<td style="text-align: left;"><strong>達成</strong></td>
+<td style="text-align: left;"><strong>B16（U7）で、staging・production は Cookie に <code>Secure</code> を付ける</strong>（<code>HttpPolicy.secureCookies</code>。<code>AppConfigSpec</code>・<code>HttpSpec</code>）。ローカル・テストは HTTP の開発のため付けない。ログ・イベント・出力には含まない（X-3・黄金のデータ・出力の型）。実際の HTTPS 下の確認は AWS 未適用のため未実施</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-S3</td>
@@ -16509,8 +16579,8 @@
 <tr>
 <td style="text-align: left;">NF-S8</td>
 <td style="text-align: left;">変更系は Origin（または Referer）を検査し、版と冪等キーを要求</td>
-<td style="text-align: left;"><strong>未達</strong></td>
-<td style="text-align: left;">版（If-Match・basis）と冪等キーは要求する。<strong>Origin・Referer の検査は未実装</strong></td>
+<td style="text-align: left;"><strong>達成</strong></td>
+<td style="text-align: left;"><strong>B16（U7）で実装</strong>: 変更系は、<code>ALLOWED_ORIGINS</code> の許可か <code>Host</code> と同一の Origin だけ通し、それ以外は 403 <code>app.origin_not_allowed</code>（<code>HttpSpec</code>）。Origin・Referer のどちらも無い要求は通す（ブラウザ以外の呼び出し。判断項目）。@ui は <code>ALLOWED_ORIGINS</code> を設定して 27/27 緑</td>
 </tr>
 <tr>
 <td style="text-align: left;">NF-S9</td>
@@ -16601,10 +16671,6 @@
 </tr>
 </thead>
 <tbody>
-<tr>
-<td style="text-align: left;">NF-S8</td>
-<td style="text-align: left;">変更系は Origin（または Referer）を検査し、版と冪等キーを要求（版（If-Match・basis）と冪等キーは要求する。<strong>Origin・Referer の検査は未実装</strong>）</td>
-</tr>
 <tr>
 <td style="text-align: left;">NF-S18</td>
 <td style="text-align: left;">観察者は読み取り専用で、3 表だけ。<code>game_join_codes</code> に DB の権限でも到達できない（アプリケーション層の型と認可で読み取り専用・参加コードを返さない（受け入れ）。<strong>DB のロール・接続プールの分離は未実装</strong>（B9。投影表が無い））</td>
