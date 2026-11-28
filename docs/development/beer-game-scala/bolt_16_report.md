@@ -36,3 +36,7 @@ U7 の定義そのもの、Origin・Referer が無い要求を通す点、chunke
 ## Living Documentation
 
 NFR の判定は [nfr_results.md](./nfr_results.md) を更新した。設計書は変更していない。コードと文書の複製はなし。
+
+## 検証
+
+CI: コミット `c558ddc7` で 3 ジョブ（check・integration・acceptance）緑。行カバレッジは全体 89.4%・domain 98.1%・application 92.9%。
