@@ -52,4 +52,4 @@ NFR の定義は設計書、計測の手順はテストが正で、報告書へ�
 
 ## 検証
 
-CI: （コミット後に記入）
+CI: コミット `b8cbe8c6` で 3 ジョブ（check・integration・acceptance）緑。
