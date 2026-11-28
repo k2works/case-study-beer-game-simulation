@@ -1121,13 +1121,22 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
   private val UuidPattern =
     "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
 
+  /** すべての応答（成功・拒否・存在しない経路）に付けるセキュリティヘッダー（NF-S9・X-5）。API は JSON だけを返すので、CSP は何も許さない。 */
+  private val securityHeaders: List[Header.ToRaw] = List(
+    Header.Raw(CIString("Content-Security-Policy"), "default-src 'none'; frame-ancestors 'none'"),
+    Header.Raw(CIString("Strict-Transport-Security"), "max-age=31536000; includeSubDomains"),
+    Header.Raw(CIString("X-Content-Type-Options"), "nosniff"),
+    Header.Raw(CIString("Referrer-Policy"), "no-referrer"),
+    Header.Raw(CIString("Cache-Control"), "no-store")
+  )
+
   /** 要求ごとに構造化ログを 1 件出す（AC6.1.1）。相関 ID・操作・結果の状態・所要時間だけを持つ。 資格・表示名・参加コード・非公開の値は含めない（操作は、経路の識別子を
     * `{id}` に落とす）。
     */
   val app: HttpApp[IO] = Kleisli { (req: Request[IO]) =>
     for
       start <- IO.monotonic
-      response <- routes.run(req)
+      response <- routes.run(req).map(_.putHeaders(securityHeaders*))
       end <- IO.monotonic
       operation = s"${req.method.name} ${req.uri.path.renderString.replaceAll(UuidPattern, "{id}")}"
       correlation = response.headers

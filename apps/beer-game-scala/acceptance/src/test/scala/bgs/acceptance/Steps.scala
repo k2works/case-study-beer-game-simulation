@@ -2762,3 +2762,52 @@ class Steps extends ScalaDsl with EN:
       "発報しない"
     )
   }
+
+  // ---- 横断のセキュリティ（B15: X-3・X-5） ----
+
+  Then("""^構造化ログの全体に、資格・参加コード・復帰コード・参加者の表示名は含まれない$""") { () =>
+    val client = world.game
+    // 構造化ログの 1 行と、EMF の 1 行（標準出力へ出る内容）の全体
+    val text = client.logs.asScala.toList
+      .map(r => r.toString + bgs.adapter.http.Emf.line(r, java.time.Instant.now, "local").noSpaces)
+      .mkString("\n")
+    require(text.nonEmpty, "ログが出ていない")
+    val secrets =
+      client.participantCookies.values.toList ++ client.participantRecoveries.values.toList ++
+        client.facilitator.toList ++ client.recoveries.values.toList ++ List(
+          client.recoveryCode,
+          joinCodeOf(client)
+        ) ++
+        client.participants.keys.toList
+    secrets
+      .map(_.dropWhile(_ != '=').drop(1).replaceAll("^$", "unused-empty"))
+      .filter(_.length >= 4)
+      .foreach(v => require(!text.contains(v), s"ログに秘密・表示名が含まれる: ${v.take(6)}…"))
+  }
+
+  private var headerReplies: List[Reply] = Nil
+
+  When("""^進行役の状況の取得、資格の無い状況の取得、存在しない経路の要求を、それぞれ送る$""") { () =>
+    headerReplies = List(
+      world.game.get(sessionPath(world.game, "/state"), world.game.facilitator),
+      world.game.get(sessionPath(world.game, "/state"), None),
+      world.game.get("/api/v1/no-such-route", None)
+    )
+    require(
+      headerReplies.map(_.status) == List(200, 403, 404),
+      s"状態が違う: ${headerReplies.map(_.status)}"
+    )
+  }
+
+  Then("""^どの応答にも、CSP・HSTS・nosniff・Referrer-Policy・キャッシュ無効のヘッダーが付く$""") { () =>
+    headerReplies.foreach { reply =>
+      require(
+        reply.header("Content-Security-Policy").exists(_.contains("default-src 'none'")),
+        "CSP が無い"
+      )
+      require(reply.header("Strict-Transport-Security").exists(_.contains("max-age=")), "HSTS が無い")
+      require(reply.header("X-Content-Type-Options").contains("nosniff"), "nosniff が無い")
+      require(reply.header("Referrer-Policy").contains("no-referrer"), "Referrer-Policy が無い")
+      require(reply.header("Cache-Control").contains("no-store"), "キャッシュ無効が無い")
+    }
+  }

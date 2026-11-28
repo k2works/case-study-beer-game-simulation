@@ -54,3 +54,6 @@ operations/metrics-and-alarms.feature :: 研修中でないときは、操作が
 operations/metrics-and-alarms.feature :: 合成監視（1 分ごと）の失敗は、最悪でも 2 分以内に発報する
 operations/metrics-and-alarms.feature :: 追記の競合率が急増すると、警告に続いて重大のアラームが発報する
 operations/metrics-and-alarms.feature :: JVM のヒープの使用率が 90% で続くと、重大のアラームが発報する
+
+# B15: 横断のセキュリティ（X-3・X-5）
+cross-cutting/security-baseline.feature

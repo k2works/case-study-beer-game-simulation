@@ -126,8 +126,18 @@ lazy val app = (project in file("app"))
     libraryDependencies ++= Seq(
       // 本番の PostgreSQL の接続プール（B14）。新しい依存関係（未承認。報告に記録）
       "org.tpolecat" %% "doobie-hikari" % doobieVersion,
-      "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test
+      "org.typelevel" %% "munit-cats-effect" % "2.2.1" % Test,
+      // 実 PostgreSQL での性能の計測（B15）。adapter-persistence の統合テストと同じ版（新しい依存関係ではない）
+      "com.dimafeng" %% "testcontainers-scala-postgresql" % "0.44.1" % Test
     )
+  )
+  // `check` ジョブは、Docker を要する統合テスト（タグ Integration。実 PostgreSQL の性能の計測）を除外する（B15）
+  .settings(
+    Test / testOptions ++= {
+      if (sys.env.contains("BGS_SKIP_INTEGRATION"))
+        Seq(Tests.Argument(TestFrameworks.MUnit, "--exclude-tags=Integration"))
+      else Nil
+    }
   )
   // コンテナの配布物（B14）: 依存の JAR をすべて target/dist/lib に集める（新しいプラグインを足さない）
   .settings(

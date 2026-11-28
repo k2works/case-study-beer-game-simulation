@@ -1412,3 +1412,27 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(anonymous.status, 403)
     }
   }
+
+  test("[NF-S9・X-5] 成功・拒否・存在しない経路のどれにも、セキュリティヘッダーが付く") {
+    freshApp.flatMap { app =>
+      for
+        created <- post(app, "/api/v1/games", kitBody(), None)
+        denied <- call(app, Method.GET, "/api/v1/games/00000000-0000-0000-0000-000000000000/state")
+        missing <- call(app, Method.GET, "/no/such/route")
+      yield List(created, denied, missing).foreach { reply =>
+        def header(name: String) =
+          reply.headers.get(CIString(name)).flatMap(_.toList.headOption).map(_.value)
+        assertEquals(
+          header("Content-Security-Policy"),
+          Some("default-src 'none'; frame-ancestors 'none'")
+        )
+        assertEquals(
+          header("Strict-Transport-Security"),
+          Some("max-age=31536000; includeSubDomains")
+        )
+        assertEquals(header("X-Content-Type-Options"), Some("nosniff"))
+        assertEquals(header("Referrer-Policy"), Some("no-referrer"))
+        assertEquals(header("Cache-Control"), Some("no-store"))
+      }
+    }
+  }
