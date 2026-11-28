@@ -8615,6 +8615,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        検証
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -15945,6 +15956,8 @@
 <p>U7 の定義そのもの、Origin・Referer が無い要求を通す点、chunked の本文の上限、本番の <code>ALLOWED_ORIGINS</code> の設定（<code>infra/</code>）。ほかは <a href="../release_readiness/">release_readiness.md</a> のとおり。</p>
 <h2 id="living-documentation">Living Documentation<a class="headerlink" href="#living-documentation" title="Permanent link">&para;</a></h2>
 <p>NFR の判定は <a href="../nfr_results/">nfr_results.md</a> を更新した。設計書は変更していない。コードと文書の複製はなし。</p>
+<h2 id="_4">検証<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>CI: コミット <code>c558ddc7</code> で 3 ジョブ（check・integration・acceptance）緑。行カバレッジは全体 89.4%・domain 98.1%・application 92.9%。</p>
 
 
 
