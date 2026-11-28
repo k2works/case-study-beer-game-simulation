@@ -15,7 +15,7 @@ fi
 tags="${1:-@ui}"
 log="${BGS_UI_LOG:-$(mktemp)}"
 
-PORT=3100 sbt -batch "app/runMain bgs.app.Main" >"$log" 2>&1 &
+ALLOWED_ORIGINS=http://localhost:5273,http://127.0.0.1:5273 PORT=3100 sbt -batch "app/runMain bgs.app.Main" >"$log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true; pkill -f "bgs.app.Main" 2>/dev/null || true' EXIT
 

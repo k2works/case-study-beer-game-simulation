@@ -20,7 +20,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 | 画面（`@ui`） | 27 シナリオ・183 ステップが Chromium・Firefox・WebKit で緑 |
 | ブラウザ行列 | Edge・実機の Safari・スクリーンリーダー・色覚の確認は**未実施** |
 | 計測 | 実 PostgreSQL 18.6 の手元計測のみ。AWS の値は**未測定**（[nfr_results.md](./nfr_results.md)） |
-| NFR 検証表 | 84 件に判定あり。**未達 4 件**（NF-S8 Origin 検査、NF-S18 観察者の DB ロール分離、NF-O12、NF-O13）ほか |
+| NFR 検証表 | 84 件に判定あり。**未達 3 件**（NF-S18 観察者の DB ロール分離、NF-O12、NF-O13）ほか。B16（U7）で NF-S8・NF-S2 を解消 |
 
 ## 2. 人の判断が要る項目（すべて未承認）
 
@@ -34,7 +34,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 | 6 | Terraform は Kotlin 版の複製 | 共有モジュールにしていない。`apply` は未実行 |
 | 7 | エクスポートのスキーマ版名 | 名前を AI が決めた |
 | 8 | 観察者の DB ロール分離（NF-S18） | 未実装。設計判断が要る |
-| 9 | Origin 検査（NF-S8） | 未実装。Cookie に `Secure` 属性が無い・本文 64 KB 制限が無い点も同じ扱い |
+| 9 | Origin 検査（NF-S8）・Cookie の `Secure`・本文 64 KB | **B16（U7）で実装**（未承認）。Origin・Referer が無い要求を通す点、chunked の本文に上限を掛けていない点は判断項目 |
 | 10 | 依存関係の脆弱性検査・OpenAPI 契約テスト | 外部ツールの導入が要る（確認必須）。未実施 |
 | 11 | リトライのジッタ・領収の 1 年保持 | 未実装 |
 | 12 | 計画書・各 Bolt の承認 | B1〜B15 の計画・ゲートの承認は未記録 |

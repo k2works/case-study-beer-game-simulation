@@ -286,6 +286,8 @@ nav:
           - Bolt 14 終了報告: development/beer-game-scala/bolt_14_report.md
           - Bolt 15 計画: development/beer-game-scala/bolt_15_plan.md
           - Bolt 15 終了報告: development/beer-game-scala/bolt_15_report.md
+          - Bolt 16 計画: development/beer-game-scala/bolt_16_plan.md
+          - Bolt 16 終了報告: development/beer-game-scala/bolt_16_report.md
           - NFR 検証表の結果: development/beer-game-scala/nfr_results.md
           - Release 1.0 の準備状況: development/beer-game-scala/release_readiness.md
           - 守りの導入計画: development/beer-game-rust/guard_plan.md

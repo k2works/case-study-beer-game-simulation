@@ -9,7 +9,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 
 # NFR 検証表の結果（B15）
 
-非機能要件（[non-functional.md](../../design/beer-game-scala/non-functional.md)）の NF-C（9）・NF-O（13）・NF-P（20）・NF-R（17）・NF-S（25）の、計 84 件の、B15 時点の結果です。**数値は実測だけを書き、測っていないものは「未測定」「未実施」と書いています。設計書は変更していません。人の承認は得ていません。**
+非機能要件（[non-functional.md](../../design/beer-game-scala/non-functional.md)）の NF-C（9）・NF-O（13）・NF-P（20）・NF-R（17）・NF-S（25）の、計 84 件の、B15 時点の結果です（B16（U7）で NF-S8・NF-S2 を達成に、NF-P12 を一部に更新。件数は更新後）。**数値は実測だけを書き、測っていないものは「未測定」「未実施」と書いています。設計書は変更していません。人の承認は得ていません。**
 
 ## 結果の語
 
@@ -27,9 +27,9 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 
 | 判定 | 件数 |
 | :--- | ---: |
-| 達成 | 23 |
+| 達成 | 25 |
 | 一部 | 35 |
-| 未達 | 4 |
+| 未達 | 3 |
 | 定義のみ | 8 |
 | 未測定 | 8 |
 | 未実施 | 2 |
@@ -104,7 +104,7 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 | NF-P9 | エクスポート CSV・JSON を 30 秒以内（p95） | **達成** | 実測: 最終週 50（最大のゲーム）で CSV 138 ms・JSON 130 ms（逐次）、並行で p95 344 ms・301 ms。**30 秒に対し約 2 桁の余裕**（手元・PostgreSQL 18.6） |
 | NF-P10 | 保持状態の取得 p95 ≤ 1 秒 | **未測定** | 機能は受け入れで確認。応答時間は測っていない（読み取り 1 行） |
 | NF-P11 | 期限後の削除の 99% を 24 時間以内に完了 | **一部** | 定期タスクの定義（既定 10 分ごと）と、時計を進める試験は緑。**実運用での完了率は未測定** |
-| NF-P12 | 1 リクエストの上限（数量 0〜1000、リクエスト 64 KB） | **一部** | 数量の範囲は検証（受け入れ）。**64 KB の本文の上限は未実装** |
+| NF-P12 | 1 リクエストの上限（数量 0〜1000、リクエスト 64 KB） | **一部** | 数量の範囲は検証（受け入れ）。**B16（U7）で、`Content-Length` が 64 KB を超える要求は 413 `app.payload_too_large`**（`HttpSpec`）。`Transfer-Encoding: chunked` の本文は上限を掛けていない（未対応） |
 | NF-P13 | 共同入力の保存（競合の検出・再試行を含む）p95 ≤ 1 秒 | **一部** | 並行の保存のテスト（200 と 409 が 1 件ずつ）は緑。応答時間は `saveDecision` の並行 p95 856 ms を参考に（共同担当の競合の負荷での測定は未実施） |
 | NF-P14 | 自動確定の完了 p95 ≤ 1 秒（1 回の追記） | **未測定** | 同じ追記で確定する実装と受け入れは緑。応答時間は測っていない |
 | NF-P15 | 再生（読み込み込み）1000 件で p95 ≤ 100 ms。再生だけ p95 ≤ 20 ms | **一部** | メモリ上の再生: 652 件で中央値 約 1〜3 ms（`ReplayTimingSpec`）。HTTP 経由の状態取得は最終週 50 で p95 332 ms（DB 読み出し・復号・表示の組み立てを含む。内訳は未測定）。**100 ms（読み込み込み）の達成は未確認** |
@@ -145,13 +145,13 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 | NF-SC3 | domain の外部依存は cats-core だけ。静的解析の違反 0 | **達成** | `check-deps.sh`・WartRemover・Scalafix（CI の `check`）。fixture で違反を検出できることを確認 |
 | NF-SC4 | 代数構造の法則（`Monoid`・`Functor[RoleMap]`） | **一部** | `RoleSpec` に法則のテスト。**cats-laws・discipline の網羅・「法則を破る実装を見分ける」確認は未確認** |
 | NF-S1 | 資格は 128 ビット以上の暗号論的乱数（SecureRandom） | **達成** | `SystemGenerators`（`SecureRandom`）。生の値は発行時に一度だけ返す（作成・再発行・招待） |
-| NF-S2 | 資格は HttpOnly・Secure・SameSite=Strict の Cookie だけ。URL・ログ・イベント・出力に含めない | **一部** | HttpOnly・SameSite=Strict は実装。**Secure 属性は付けていない**（ローカルの HTTP のため。本番は TLS 終端の後ろ）。ログ・イベント・出力には含まない（X-3・黄金のデータ・出力の型） |
+| NF-S2 | 資格は HttpOnly・Secure・SameSite=Strict の Cookie だけ。URL・ログ・イベント・出力に含めない | **達成** | **B16（U7）で、staging・production は Cookie に `Secure` を付ける**（`HttpPolicy.secureCookies`。`AppConfigSpec`・`HttpSpec`）。ローカル・テストは HTTP の開発のため付けない。ログ・イベント・出力には含まない（X-3・黄金のデータ・出力の型）。実際の HTTPS 下の確認は AWS 未適用のため未実施 |
 | NF-S3 | 鍵付きダイジェスト（HMAC）と鍵の版。定数時間の比較。本番は鍵必須 | **一部** | HMAC-SHA256・鍵の版・本番の鍵必須（終了コード 78）は緑。**ダイジェストの比較は DB の等価検索（定数時間でない）** |
 | NF-S4 | 資格の有効期限と失効。同じトランザクションで記録 | **達成** | 受け入れ `credentials.feature`（期限切れ・失効・再発行・鍵のローテーション） |
 | NF-S5 | すべての読み書きでサーバー側の認可 | **達成** | 認可は `Api`・ドメインの `handle`。否定の受け入れシナリオ（観察者・参加者・資格なし・別のゲーム） |
 | NF-S6 | 参加者への応答は自分の役割の状態だけ。型で漏れを防ぐ | **達成** | `SessionStateView`・受け入れ `co-input.feature`・`situation.feature` |
 | NF-S7 | 参加コードは参加先の発見にだけ使う | **達成** | 参加コードは `join` だけで使う。招待コードは別（`observation`） |
-| NF-S8 | 変更系は Origin（または Referer）を検査し、版と冪等キーを要求 | **未達** | 版（If-Match・basis）と冪等キーは要求する。**Origin・Referer の検査は未実装** |
+| NF-S8 | 変更系は Origin（または Referer）を検査し、版と冪等キーを要求 | **達成** | **B16（U7）で実装**: 変更系は、`ALLOWED_ORIGINS` の許可か `Host` と同一の Origin だけ通し、それ以外は 403 `app.origin_not_allowed`（`HttpSpec`）。Origin・Referer のどちらも無い要求は通す（ブラウザ以外の呼び出し。判断項目）。@ui は `ALLOWED_ORIGINS` を設定して 27/27 緑 |
 | NF-S9 | セキュリティヘッダーを CloudFront と API の両方で設定 | **一部** | API: 全応答（成功・拒否・存在しない経路）に CSP・HSTS・nosniff・Referrer-Policy・no-store（B15。`security-baseline.feature`）。CloudFront は Terraform の定義のみ（未適用） |
 | NF-S10 | 入力はスマートコンストラクタ・ValidatedNec で検証。上限 | **達成** | `GameSettings.custom`・`DemandSeries.of` など（全件の誤りの集約）。受け入れ・単体テスト。（本文の大きさの上限は NF-P12） |
 | NF-S11 | 参加・復帰・観察用の招待の専用レート制限。実効の上限がタスク数で増えない | **達成** | DB の窓（`attempt_failures`）。受け入れ `join-rate-limit.feature`・`HttpSpec` |
@@ -170,7 +170,6 @@ generated: { by: claude-code/claude-sonnet-5-5, at: 2026-11-28T00:00:00Z }
 
 | ID | 内容 |
 | :--- | :--- |
-| NF-S8 | 変更系は Origin（または Referer）を検査し、版と冪等キーを要求（版（If-Match・basis）と冪等キーは要求する。**Origin・Referer の検査は未実装**） |
 | NF-S18 | 観察者は読み取り専用で、3 表だけ。`game_join_codes` に DB の権限でも到達できない（アプリケーション層の型と認可で読み取り専用・参加コードを返さない（受け入れ）。**DB のロール・接続プールの分離は未実装**（B9。投影表が無い）） |
 | NF-O12 | 実行環境の観測（ヒープ・GC・スレッド・cats-effect の飽和・接続プール）（出していない。出し方も未確認（cats-effect の指標）） |
 | NF-O13 | `SESSION` が 2000 件を超えたらアラート（指標・アラームとも未実装（保存回数の上限 9 回で、実運用では超えにくい）） |

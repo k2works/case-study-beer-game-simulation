@@ -74,3 +74,21 @@ class AppConfigSpec extends FunSuite:
     )
     assert(AppConfig.load(local).exists(_.database.isInstanceOf[DatabaseConfig.Postgres]))
   }
+
+  test("[NF-S8・NF-S2] ALLOWED_ORIGINS はカンマ区切りで読む。Secure は staging・production だけ") {
+    val prod = Map(
+      "APP_ENV" -> "production",
+      "DB_URL" -> "jdbc:postgresql://localhost/x",
+      "DB_USER" -> "u",
+      "DB_PASSWORD" -> "p",
+      "BGS_CREDENTIAL_KEY" -> ("k" * 40),
+      "ALLOWED_ORIGINS" -> "https://a.example, https://b.example"
+    )
+    val policy = AppConfig.load(prod).map(_.httpPolicy)
+    assertEquals(
+      policy.map(_.allowedOrigins),
+      Right(Set("https://a.example", "https://b.example"))
+    )
+    assertEquals(policy.map(_.secureCookies), Right(true))
+    assertEquals(AppConfig.load(Map.empty).map(_.httpPolicy.secureCookies), Right(false))
+  }

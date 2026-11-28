@@ -17,9 +17,12 @@ import java.util.UUID
 
 /** HTTP の経路（API の契約: apps/beer-game-contracts/openapi.yaml）。認可・冪等・problem+json の写像はここに集める。 */
 object Routes:
-  def httpApp(env: Env): HttpApp[IO] = new Routes(env).app
+  def httpApp(env: Env): HttpApp[IO] = httpApp(env, HttpPolicy.local)
 
-private final class Routes(env: Env) extends Http4sDsl[IO]:
+  def httpApp(env: Env, policy: HttpPolicy): HttpApp[IO] =
+    new Routes(env, policy).app
+
+private final class Routes(env: Env, policy: HttpPolicy) extends Http4sDsl[IO]:
 
   private val SessionCookie = "bg_session"
   private val TabIdPattern = "^[A-Za-z0-9]{16,64}$"
@@ -374,7 +377,8 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         maxAge = Some(env.sessionTtl.getSeconds),
         path = Some("/"),
         sameSite = Some(SameSite.Strict),
-        httpOnly = true
+        httpOnly = true,
+        secure = policy.secureCookies
       )
     )
 
@@ -474,7 +478,8 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
         maxAge = Some(env.sessionTtl.getSeconds),
         path = Some("/api/v1/participations/recover"),
         sameSite = Some(SameSite.Strict),
-        httpOnly = true
+        httpOnly = true,
+        secure = policy.secureCookies
       )
     )
 
@@ -1133,10 +1138,39 @@ private final class Routes(env: Env) extends Http4sDsl[IO]:
   /** 要求ごとに構造化ログを 1 件出す（AC6.1.1）。相関 ID・操作・結果の状態・所要時間だけを持つ。 資格・表示名・参加コード・非公開の値は含めない（操作は、経路の識別子を
     * `{id}` に落とす）。
     */
+  private val mutating = Set(Method.POST, Method.PUT, Method.PATCH, Method.DELETE)
+
+  private def header(req: Request[IO], name: String): Option[String] =
+    req.headers.get(CIString(name)).flatMap(_.toList.headOption).map(_.value)
+
+  /** 変更系の Origin（無ければ Referer の Origin）を検査する（NF-S8）。どちらも無い要求は、ブラウザ以外の呼び出しとして通す。 */
+  private def originAllowed(req: Request[IO]): Boolean =
+    val origin = header(req, "Origin")
+      .orElse(header(req, "Referer").map(r => r.split("/", 4).take(3).mkString("/")))
+    origin.forall { o =>
+      policy.allowedOrigins.contains(o) ||
+      header(req, "Host").exists(h => o.endsWith("//" + h))
+    }
+
+  private def rejected(status: Status, code: String, detail: String): IO[Response[IO]] =
+    val correlation = UUID.randomUUID.toString
+    IO.pure(render(problem(status, code, correlation, detail, Nil, None), correlation))
+
+  /** 本文の上限（NF-P12）。`Content-Length` が上限を超えるものを、本文を読む前に拒否する。 */
+  private def tooLarge(req: Request[IO]): Boolean =
+    req.contentLength.exists(_ > policy.maxBodyBytes)
+
+  private def guard(req: Request[IO]): IO[Response[IO]] =
+    if tooLarge(req) then
+      rejected(Status.PayloadTooLarge, "app.payload_too_large", "本文が上限（64 KB）を超えています")
+    else if mutating.contains(req.method) && !originAllowed(req) then
+      rejected(Status.Forbidden, "app.origin_not_allowed", "許可されていない Origin からの変更の要求です")
+    else routes.run(req)
+
   val app: HttpApp[IO] = Kleisli { (req: Request[IO]) =>
     for
       start <- IO.monotonic
-      response <- routes.run(req).map(_.putHeaders(securityHeaders*))
+      response <- guard(req).map(_.putHeaders(securityHeaders*))
       end <- IO.monotonic
       operation = s"${req.method.name} ${req.uri.path.renderString.replaceAll(UuidPattern, "{id}")}"
       correlation = response.headers

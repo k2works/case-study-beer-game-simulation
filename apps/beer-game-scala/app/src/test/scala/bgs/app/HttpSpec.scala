@@ -1,6 +1,6 @@
 package bgs.app
 
-import bgs.adapter.http.Routes
+import bgs.adapter.http.{HttpPolicy, Routes}
 import bgs.adapter.persistence.{DoobieEventStore, DoobiePeripheralStore, Migrations, Transactions}
 import bgs.application.*
 import bgs.domain.{GameEvent, GameId, ParticipantId, StreamVersion}
@@ -1435,4 +1435,73 @@ class HttpSpec extends CatsEffectSuite:
         assertEquals(header("Cache-Control"), Some("no-store"))
       }
     }
+  }
+
+  private def strictApp(policy: HttpPolicy): IO[HttpApp[IO]] =
+    freshEnv.map(Routes.httpApp(_, policy))
+
+  private def withHeaders(
+      app: HttpApp[IO],
+      path: String,
+      headers: List[(String, String)],
+      body: Json = kitBody()
+  ): IO[Reply] =
+    val base = Request[IO](Method.POST, Uri.unsafeFromString(path))
+      .withEntity(body)(using jsonEncoderOf[IO, Json])
+      .putHeaders(Header.Raw(CIString("Idempotency-Key"), UUID.randomUUID.toString))
+    val req = headers.foldLeft(base)((r, h) => r.putHeaders(Header.Raw(CIString(h._1), h._2)))
+    app.run(req).flatMap { response =>
+      response.bodyText.compile.string.map { text =>
+        Reply(response.status.code, parse(text).getOrElse(Json.Null), response.headers)
+      }
+    }
+
+  private val strict = HttpPolicy(Set("https://beer.example"), secureCookies = true, 65536L)
+
+  test("[NF-S8] 変更系は、許可した Origin か同一の Host の Origin だけ通す。それ以外は 403") {
+    strictApp(strict).flatMap { app =>
+      for
+        allowed <- withHeaders(app, "/api/v1/games", List("Origin" -> "https://beer.example"))
+        same <- withHeaders(
+          app,
+          "/api/v1/games",
+          List("Origin" -> "https://app.internal", "Host" -> "app.internal")
+        )
+        foreign <- withHeaders(app, "/api/v1/games", List("Origin" -> "https://evil.example"))
+        referer <- withHeaders(app, "/api/v1/games", List("Referer" -> "https://evil.example/x"))
+        none <- withHeaders(app, "/api/v1/games", Nil)
+      yield
+        assertEquals(allowed.status, 201)
+        assertEquals(same.status, 201)
+        assertEquals(foreign.status, 403)
+        assertEquals(foreign.code, Some("app.origin_not_allowed"))
+        assertEquals(referer.status, 403)
+        assertEquals(none.status, 201)
+    }
+  }
+
+  test("[NF-S8] 読み取り（GET）は Origin を検査しない") {
+    strictApp(strict).flatMap { app =>
+      call(app, Method.GET, "/ready").map(r => assert(r.status != 403))
+    }
+  }
+
+  test("[NF-P12] 本文が 64 KB を超える要求は 413。上限ちょうどは通る") {
+    strictApp(strict).flatMap { app =>
+      val big = Json.obj("padding" -> Json.fromString("x" * 70000))
+      withHeaders(app, "/api/v1/games", Nil, big).map(r => assertEquals(r.status, 413))
+    }
+  }
+
+  test("[NF-S2] 本番相当の方針では Cookie に Secure が付く。ローカルの方針では付かない") {
+    def setCookie(r: Reply) =
+      r.headers.get(CIString("Set-Cookie")).map(_.toList.map(_.value).mkString(";")).getOrElse("")
+    for
+      secureApp <- strictApp(strict)
+      localApp <- strictApp(strict.copy(secureCookies = false))
+      s <- withHeaders(secureApp, "/api/v1/games", Nil)
+      l <- withHeaders(localApp, "/api/v1/games", Nil)
+    yield
+      assert(setCookie(s).contains("Secure"), setCookie(s))
+      assert(!setCookie(l).contains("Secure"), setCookie(l))
   }

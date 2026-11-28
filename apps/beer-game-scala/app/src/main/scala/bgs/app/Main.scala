@@ -76,7 +76,7 @@ object Main extends IOApp:
             .default[IO]
             .withHost(Host.fromString("0.0.0.0").getOrElse(host"0.0.0.0"))
             .withPort(port)
-            .withHttpApp(Routes.httpApp(env))
+            .withHttpApp(Routes.httpApp(env, config.httpPolicy))
             .build
             .useForever
         }

@@ -1,5 +1,7 @@
 package bgs.app
 
+import bgs.adapter.http.HttpPolicy
+
 /** 実行環境。`local` 以外では、秘密情報と PostgreSQL の接続を必須とし、H2 を拒否する。 */
 enum AppEnv:
   case Local, Test, Staging, Production
@@ -19,8 +21,16 @@ final case class AppConfig(
     appEnv: AppEnv,
     port: Int,
     database: DatabaseConfig,
-    credentialKey: Option[String]
-)
+    credentialKey: Option[String],
+    allowedOrigins: Set[String]
+):
+  /** HTTP の入口の方針。本番相当（staging・production）では Cookie に `Secure` を付ける。 */
+  def httpPolicy: HttpPolicy =
+    HttpPolicy(
+      allowedOrigins,
+      secureCookies = appEnv == AppEnv.Staging || appEnv == AppEnv.Production,
+      HttpPolicy.MaxBody
+    )
 
 object AppConfig:
 
@@ -67,11 +77,15 @@ object AppConfig:
         case Some(_)        => Left(List(s"BGS_CREDENTIAL_KEY は $MinKeyLength 文字以上"))
         case None if strict => Left(List("BGS_CREDENTIAL_KEY が必要（資格の署名鍵）"))
         case None           => Right(None)
+      val origins: Set[String] =
+        present(env, "ALLOWED_ORIGINS").toList
+          .flatMap(_.split(",").toList.map(_.trim).filter(_.nonEmpty))
+          .toSet
       val errors =
         List(port.left.toOption, database.left.toOption, key.left.toOption).flatten.flatten
       if errors.nonEmpty then Left(errors)
       else
         (port, database, key) match
-          case (Right(p), Right(d), Right(k)) => Right(AppConfig(e, p, d, k))
+          case (Right(p), Right(d), Right(k)) => Right(AppConfig(e, p, d, k, origins))
           case _                              => Left(List("設定が読めない"))
     }
